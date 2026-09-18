@@ -7,7 +7,7 @@ function setup(){
   performance:{now:()=>now},crypto:{randomUUID:()=> 'turn-1'},WebSocket:{OPEN:1},Worker:class{},
   window:{dispatchEvent(){},sidevoiceSessionId:()=> 'session-1'},
  });
- vm.runInContext(fs.readFileSync(__dirname+'/browser_audio/stt-client.js','utf8'),context);
+ vm.runInContext(fs.readFileSync(__dirname+'/stt-client.js','utf8'),context);
  const client=context.window.roomTranscription;client.runtime={model:'model',device:'webgpu'};client.socket={readyState:1,send:value=>sent.push(JSON.parse(value))};
  return {client,sent,setNow:value=>now=value};
 }
