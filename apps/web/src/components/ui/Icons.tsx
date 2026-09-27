@@ -79,8 +79,10 @@ export function CodexIcon({ className, size = 12 }: IconProps) {
   return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="m8 9 3 3-3 3M13 15h3" /></svg>;
 }
 
+/** The brand mark (sidevoice/brand-resources): four bars in the text colour, and the fourth, the
+ *  other voice, always in mustard. */
 export function SidevoiceMark({ className, size = 22 }: IconProps) {
-  return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><rect x="1" y="9.5" width="2.4" height="5" rx="1.2" /><rect x="5.4" y="6" width="2.4" height="12" rx="1.2" /><rect x="9.8" y="2" width="2.4" height="20" rx="1.2" /><rect x="14.2" y="6" width="2.4" height="12" rx="1.2" /><rect x="18.6" y="9.5" width="2.4" height="5" rx="1.2" /></svg>;
+  return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><rect x="1.5" y="9" width="3" height="6" rx="1.5" /><rect x="6" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="1.5" width="3" height="21" rx="1.5" /><rect x="15" y="6" width="3" height="12" rx="1.5" style={{ fill: "var(--sv-voice)" }} /><rect x="19.5" y="9" width="3" height="6" rx="1.5" /></svg>;
 }
 
 /** The logo for what a machine said it runs, from the first word of its platform line; a machine we
