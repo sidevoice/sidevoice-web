@@ -204,6 +204,11 @@ export function conversationView(s) {
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }
+/** How a conversation's harness is reached, in the words under its title. Only routes that differ in what the
+ *  person can do are named; a room that does not say leaves it to the harness name. */
+export function routeLabel(p) {
+    return { 'cursor-editor-view': 'tarjeta (experimental)', 'cursor-cli-persist': 'CLI persist (experimental)', 'cursor-cli': 'CLI, solo escucha' }[p.route] || null;
+}
 /** A capability the harness reaches by a route it does not offer: said, because it can misbehave. */
 export function experimentalNote(p) {
     const marked = p.capabilities?.experimental || [];
@@ -227,7 +232,7 @@ export function participantsView(s) {
             .filter(Boolean).join(' · ');
         return { threadId: p.thread_id, title: p.title, selected: p.thread_id === selected, available: !!p.available, switching: s.switching,
             unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
-            machine: p.machine?.host || null, machineId: p.machine?.id || null, harness: p.harness || null,
+            machine: p.machine?.host || null, machineId: p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }
