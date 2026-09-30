@@ -31,9 +31,13 @@ class BrowserTranscription{
   this.worker=null;this.pending=new Map();this.nextId=0;this.runtime=null;this.socket=null;
   this.language='auto';this.enabled=false;this.generation=0;
  }
- _ensureWorker(){
-  if(this.worker)return;
-  this.worker=new Worker('/voice-browser/stt-worker.js?v='+encodeURIComponent(globalThis.sidevoiceBuildId||'dev'),{type:'module'});
+ /* device 'native': the desktop app's own engine (native-worker.js), same protocol; anything else: Whisper in a Worker. */
+ _ensureWorker(device){
+  const native=device===undefined?!!this.native:device==='native';
+  if(this.worker&&!!this.native===native)return;
+  this.worker?.terminate();this.worker=null;this.native=native;
+  if(native){this.worker=globalThis.sidevoiceNativeWorkers?.transcription?.()||null;if(!this.worker){this.native=false;throw Error('El motor nativo solo está en la app de escritorio de Sidevoice.')}}
+  else this.worker=new Worker('/voice-browser/stt-worker.js?v='+encodeURIComponent(globalThis.sidevoiceBuildId||'dev'),{type:'module'});
   this.worker.onmessage=({data})=>{
    const request=this.pending.get(data.id);if(!request)return;
    if(data.type==='progress'){request.progress?.(data.progress);return}
@@ -47,7 +51,7 @@ class BrowserTranscription{
   };
  }
  _request(type,data={},progress,transfer=[]){
-  this._ensureWorker();const id=++this.nextId;
+  this._ensureWorker(data.device);const id=++this.nextId;
   return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject,progress});this.worker.postMessage({id,type,...data},transfer)});
  }
  async capabilities(){return this._request('capabilities')}
