@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationView, JoinStatusView, LanguageModelView, MachineView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
+import type { ChatMessage, ConversationView, IntegrationListing, IntegrationsView, JoinStatusView, LanguageModelView, MachineView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
 export interface AudioDevices {
  inputs: {id: string; label: string}[]; outputs: {id: string; label: string}[];
@@ -26,6 +26,11 @@ export interface SessionFacts {
  rendezvous: '' | 'room' | 'node'; node: string | null; nodeReach: NodeReach;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */
  pairingOpen: boolean; pairingNote: string;
+ /** The machine's integrations as listed for this device (never a key), or null until read; and why they were not. */
+ integrations: IntegrationListing | null; integrationsError: string;
+ /** What is typed in each integration's row and not stored yet, what the machine said about it, the row to open. */
+ integrationDrafts: Record<string, string>; integrationChecks: Record<string, {note: string; status: 'checking' | 'verified' | 'refused'}>;
+ integrationFocus: string | null;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';
@@ -42,6 +47,7 @@ export interface SessionSnapshot {
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string}; deviceNote: string;
  bootError: string | null; languageModels: LanguageModelView[]; machines: MachineView[]; pairing: PairingPromptView;
+ integrations: IntegrationsView;
 }
 export interface SessionStore {
  facts: SessionFacts;
@@ -56,6 +62,7 @@ export function shortModel(name: string | null | undefined): string;
 export const NO_MACHINE: string;
 export const UNPAIRED: string;
 export function machinesView(s: SessionFacts): MachineView[];
+export function keyedProvider(s: SessionFacts, id: string): 'ready' | 'missing' | 'hidden';
 export function reachNote(s: SessionFacts): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;
 export function sinceText(seconds: number | null | undefined, now: number): string;

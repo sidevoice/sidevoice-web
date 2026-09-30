@@ -1,14 +1,16 @@
 import { DialogFrame } from "../../components/ui/DialogFrame";
-import { AdvancedIcon, CloseIcon, GeneralIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { MachineList } from "../room/MachineList";
 import { ModelPicker } from "../../components/models/ModelPicker";
 import { InfoPopover } from "../../components/models/ModelInfo";
+import { IntegrationList, MissingIntegrations } from "./IntegrationList";
 import { LanguageModelList } from "./LanguageModelList";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
+import { useRoomStore } from "../../state/room-store";
 
 function GeneralSettings() {
-  return <section id="pane-general" aria-labelledby="settings-general" hidden><h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este navegador y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p></section>;
+  return <section id="pane-general" aria-labelledby="settings-general" hidden><h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este navegador y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya. Las claves de Integraciones son la excepción: son de la máquina, y sirven a todos tus dispositivos.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p></section>;
 }
 
 function VoiceSettings() {
@@ -16,12 +18,9 @@ function VoiceSettings() {
     <section id="pane-voice" aria-labelledby="settings-voice">
       <h3>Voces</h3>
       <label>Proveedor de voz<NativeSelect id="tts-provider" /></label>
+      <MissingIntegrations capability="voice" />
       <div id="tts-browser-options"><label>Procesamiento de la voz<NativeSelect id="tts-device" defaultValue="auto" /></label><p className="muted" id="tts-device-note" /></div>
       <ModelPicker label="Modelo" id="default-model" infoId="default-model-info" />
-      <div id="elevenlabs-credential" hidden>
-        <label>Clave de API de ElevenLabs<span className="key-field"><input id="elevenlabs-key" type="password" autoComplete="off" spellCheck={false} placeholder="Sin clave guardada" /><Button id="elevenlabs-key-clear" variant="ghost" size="icon" className="key-clear" aria-label="Quitar la clave guardada" title="Quitar la clave guardada"><CloseIcon size={15} /></Button></span></label>
-        <p className="muted" id="elevenlabs-key-state" role="status" />
-      </div>
       <label>Voz por defecto<NativeSelect id="default-voice"><option value="af_heart">Heart · US</option></NativeSelect></label>
       <label>Velocidad global <output id="speed-value">1.00×</output><input id="tts-speed" type="range" min="0.5" max="2" step="0.05" defaultValue="1" /></label><p id="speed-note" className="muted" />
       <Button id="prepare-model">Precargar modelo (opcional)</Button><p id="model-status" role="status" className="muted" />
@@ -36,10 +35,9 @@ function TranscriptionSettings() {
   return (
     <section id="pane-transcription" aria-labelledby="settings-transcription" hidden>
       <h3>Transcripción</h3>
-      <label>Motor de transcripción<NativeSelect id="stt-provider" /></label><p className="muted" id="stt-provider-note" />
+      <label>Motor de transcripción<NativeSelect id="stt-provider" /></label><MissingIntegrations capability="transcription" /><p className="muted" id="stt-provider-note" />
       <div id="stt-browser-options"><label>Procesamiento de transcripción<NativeSelect id="stt-device" /></label><p className="muted" id="stt-device-note" /></div>
       <ModelPicker label="Modelo" id="stt-model" infoId="stt-model-info" /><p className="muted" id="stt-model-note" />
-      <div id="stt-credential" hidden><label>Clave de API de OpenAI<span className="key-field"><input id="stt-key" type="password" placeholder="Sin clave guardada" autoComplete="off" spellCheck={false} /><Button id="stt-key-clear" variant="ghost" size="icon" className="key-clear" aria-label="Quitar la clave guardada" title="Quitar la clave guardada"><CloseIcon size={15} /></Button></span></label><p className="muted" id="stt-key-state" role="status" /></div>
       <label>Idioma al transcribir<NativeSelect id="stt-language"><option value="auto">Detectar automáticamente</option><option value="es">Español</option><option value="en">English</option></NativeSelect></label>
       <p className="muted" id="stt-apply-note" hidden />
     </section>
@@ -67,11 +65,18 @@ function AdvancedSettings() {
   );
 }
 
+/** The machine's own configuration, not this device's: shown to its owner only (#64). */
+function IntegrationSettings() {
+  return <section id="pane-integrations" aria-labelledby="settings-integrations" hidden><IntegrationList /></section>;
+}
+
 function MachineSettings() {
   return <section id="pane-machines" aria-labelledby="settings-machines" hidden><MachineList /></section>;
 }
 
 export function SettingsDialog() {
+  // Until the machine says who this device is, it is taken for the owner: that is every paired device today.
+  const owner = useRoomStore((state) => state.integrations.owner) !== false;
   return (
     <DialogFrame id="language-settings" className="settings-dialog" labelledBy="settings-title" title="Configuración" closeId="settings-close" footer={<div className="settings-footer"><p id="settings-error" role="alert" /><Button type="submit" form="language-form" variant="primary">Guardar cambios</Button></div>}>
       <form id="language-form">
@@ -80,10 +85,11 @@ export function SettingsDialog() {
             <Button variant="ghost" id="settings-general" aria-controls="pane-general" aria-pressed="false"><GeneralIcon /> General</Button>
             <Button variant="ghost" id="settings-voice" aria-controls="pane-voice" aria-pressed="true"><VoicesIcon /> Voces</Button>
             <Button variant="ghost" id="settings-transcription" aria-controls="pane-transcription" aria-pressed="false"><TranscriptionIcon /> Transcripción</Button>
+            <Button variant="ghost" id="settings-integrations" aria-controls="pane-integrations" aria-pressed="false" hidden={!owner}><IntegrationsIcon /> Integraciones</Button>
             <Button variant="ghost" id="settings-machines" aria-controls="pane-machines" aria-pressed="false"><MachinesIcon /> Máquinas</Button>
             <Button variant="ghost" id="settings-advanced" aria-controls="pane-advanced" aria-pressed="false"><AdvancedIcon /> Avanzado</Button>
           </nav>
-          <div className="settings-content"><GeneralSettings /><VoiceSettings /><TranscriptionSettings /><MachineSettings /><AdvancedSettings /></div>
+          <div className="settings-content"><GeneralSettings /><VoiceSettings /><TranscriptionSettings /><IntegrationSettings /><MachineSettings /><AdvancedSettings /></div>
         </div>
       </form>
     </DialogFrame>

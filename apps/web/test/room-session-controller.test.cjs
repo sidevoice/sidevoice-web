@@ -98,60 +98,75 @@ test('The controller publishes serializable snapshots through the React store br
  assert.equal(snapshots.bootError,'fallo');
  assert.equal(s.run("$('messages').children.length"),0,'React owns rendering when the bridge is installed');
 });
+// The machine's integrations as it lists them to its owner (#64): one row per provider, never a key.
+const OPENAI=(extra={})=>({id:'openai',label:'OpenAI',capabilities:['transcription'],configured:false,source:null,hint:null,environment:'VOICE_STT_API_KEY',...extra});
+const ELEVEN=(extra={})=>({id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:false,source:null,hint:null,environment:'VOICE_ELEVENLABS_API_KEY',...extra});
+const LISTING=(...providers)=>({owner:true,providers});
+// What the page holds lives in its own realm; compared by value.
+const plain=value=>JSON.parse(JSON.stringify(value));
 test('The React component tree initializes without inventing missing DOM elements',()=>{
  const s=setup({strictDOM:true});
  assert.equal(s.run("$('missing-element')"),null);
- for(const id of ['elevenlabs-key-clear','stt-key-clear'])
-  assert.equal(s.run("typeof $('"+id+"').onclick"),'function','removing a key is the only thing that cannot wait for the form');
- for(const action of ['toggleCall','toggleMic','cancelInput'])
+ assert.equal(s.run("typeof $('settings-integrations').onclick"),'function','Integraciones is a section like the others');
+ for(const action of ['toggleCall','toggleMic','cancelInput','typeIntegrationKey','checkIntegrationKey','clearIntegrationKey','openIntegration'])
   assert.equal(s.run("typeof window.sidevoiceActions."+action),'function','React calls '+action+', it does not reach into the DOM');
- for(const id of ['elevenlabs-credential','elevenlabs-key','elevenlabs-key-state','stt-provider','stt-credential','stt-key','stt-key-state'])
+ for(const id of ['stt-provider','tts-provider','pane-integrations','settings-integrations'])
   assert.ok(s.run("$('"+id+"')"),id);
+ for(const id of ['stt-key','elevenlabs-key','stt-credential','elevenlabs-credential'])
+  assert.equal(s.run("$('"+id+"')"),null,'a pane chooses, it does not authenticate: '+id);
 });
-test('ElevenLabs credentials render against the actual HTML controls',async()=>{
+test('Each integration shows its key masked, what it serves, and where the key came from',()=>{
  const s=setup({strictDOM:true});
- s.context.fetch=async()=>({ok:true,json:async()=>({credentials:{configured:true,source:'stored',hint:'…test'}})});
- await s.run('loadElevenLabs()');
- // The key shows itself where the key goes, masked, with the four digits the room returns.
- assert.match(s.run("$('elevenlabs-key').placeholder"),/•+ …test/,'every provider shows the same four digits, in the field');
- assert.equal(s.run("$('elevenlabs-key-state').textContent"),'','and the line below says nothing when there is nothing to say');
- s.run("sttCredentials={openai:{configured:true,source:'environment',hint:'…9f2a'}};showCredential('stt')");
- assert.match(s.run("$('stt-key').placeholder"),/•+ …9f2a/);
- assert.match(s.run("$('stt-key-state').textContent"),/entorno de la sala/,'a key it cannot remove is explained');
- assert.equal(s.run("$('stt-key-clear').disabled"),true);
- s.run("sttCredentials={};showCredential('stt')");
- assert.match(s.run("$('stt-key').placeholder"),/Sin clave/);
- assert.equal(s.run("$('elevenlabs-key-clear').disabled"),false);
- s.context.fetch=async()=>({ok:true,json:async()=>({credentials:{configured:false,source:null,hint:null}})});
- await s.run('loadElevenLabs()');
- assert.match(s.run("$('elevenlabs-key').placeholder"),/Sin clave/,'and an empty field says so where the key would go');
- assert.equal(s.run("$('elevenlabs-key-clear').disabled"),true);
+ s.run(`integrations=${JSON.stringify(LISTING(OPENAI({configured:true,source:'environment',hint:'…9f2a'}),ELEVEN({configured:true,source:'stored',hint:'…test'})))}`);
+ const [openai,eleven]=s.run('roomStore.getState().integrations.rows');
+ assert.equal(eleven.placeholder,'•••••••• …test','every provider shows the same four digits, in the field');
+ assert.equal(eleven.note,'','and the line below says nothing when there is nothing to say');
+ assert.equal(eleven.canClear,true);
+ assert.equal(eleven.uses,'Voz');
+ assert.equal(openai.placeholder,'•••••••• …9f2a');
+ assert.match(openai.note,/entorno de la máquina \(VOICE_STT_API_KEY\)/,'a key it cannot remove is explained');
+ assert.equal(openai.canClear,false);
+ assert.equal(openai.uses,'Transcripción');
+ s.run(`integrations=${JSON.stringify(LISTING(OPENAI()))}`);
+ const [none]=s.run('roomStore.getState().integrations.rows');
+ assert.equal(none.placeholder,'Sin clave','an empty field says so where the key would go');
+ assert.equal(none.canClear,false);
+ assert.deepEqual(plain(s.run('roomStore.getState().integrations.missing')),{transcription:[{id:'openai',label:'OpenAI'}],voice:[]});
 });
 
 // ----- a key checks itself where it is typed, and its models arrive with it (#72) -----
-test('A pasted transcription key is checked on blur and brings its models into the dropdown',async()=>{
+function openaiPane(s,listing,models=[]){
+ s.run(`integrations=${JSON.stringify(listing)};voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-mini-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',needs_key:true,default_model:'gpt-4o-transcribe',models:${JSON.stringify(models)},models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};renderTranscriptionProviders('openai');renderTranscription()`);
+}
+test('A pasted OpenAI key is checked on leaving the field and brings its models into Transcripción',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.fetch=async(path,options)=>{
-  calls.push([options?.method||'GET',path]);
-  if(path.includes('/transcription/credential'))return {ok:true,json:async()=>({credentials:{openai:{configured:true,source:'stored',hint:'…k3y9'}}})};
+  calls.push([options?.method||'GET',path,options?.body]);
+  if(path.includes('/integrations/openai'))return {ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}))};
   if(path.includes('/transcription/models'))return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'},{id:'gpt-4o-mini-transcribe',label:'GPT-4o mini'}],error:null})};
   throw Error('unexpected request: '+path);
  };
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-mini-transcribe'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={};$('stt-provider').value='openai';renderTranscription()");
- assert.equal(s.run("$('stt-model').children.length"),0,'nothing is offered while no key is known');
- s.run("$('stt-key').value='sk-nueva'");
- await s.run("$('stt-key').onblur()");
- assert.deepEqual(calls.map(call=>call[0]),['POST','GET'],'the key is sent once, and its models asked for once');
- assert.match(calls[0][1],/transcription\/credential/);
+ openaiPane(s,LISTING(OPENAI()));
+ assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>[o.value,o.textContent,!!o.disabled])")),[['browser','Browser',false],['openai','OpenAI · sin clave',true]],
+  'a provider with no key is greyed out, not gone');
+ assert.equal(s.run("$('stt-provider').value"),'browser','and cannot stay chosen');
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-nueva')");
+ await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
+ assert.deepEqual(calls.map(call=>call[0]),['PUT','GET'],'the key is sent once, and its models asked for once');
+ assert.match(calls[0][1],/\/api\/presentation\/integrations\/openai$/);
+ assert.equal(calls[0][2],JSON.stringify({key:'sk-nueva'}));
  assert.match(calls[1][1],/transcription\/models\?provider=openai/);
- assert.deepEqual(s.run("$('stt-model').children.map(option=>option.value)"),['gpt-4o-transcribe','gpt-4o-mini-transcribe'],'the dropdown fills in place, with no save and no reopen');
+ assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>[o.value,!!o.disabled])")),[['browser',false],['openai',false]],'the provider list follows the listing by itself');
+ s.run("$('stt-provider').value='openai';renderTranscription()");
+ assert.deepEqual(plain(s.run("$('stt-model').children.map(option=>option.value)")),['gpt-4o-transcribe','gpt-4o-mini-transcribe'],'the dropdown fills in place, with no save and no reopen');
  assert.equal(s.run("$('stt-model').value"),'gpt-4o-mini-transcribe','the model already chosen stays chosen while it is still offered');
- assert.match(s.run("$('stt-key-state').textContent"),/Clave verificada · Modelos actualizados/);
- assert.equal(s.run("$('stt-key').value"),'','a verified key is stored, so it leaves the field');
- assert.match(s.run("$('stt-key').placeholder"),/…k3y9/,'and shows itself masked, like any stored key');
- await s.run("$('stt-key').onblur()");
- assert.equal(calls.length,2,'leaving an empty field asks the room for nothing');
- await s.run('saveCredentials()');
+ const [row]=s.run('roomStore.getState().integrations.rows');
+ assert.equal(row.note,'Clave verificada · Modelos actualizados');
+ assert.equal(row.draft,'','a verified key is stored, so it leaves the field');
+ assert.match(row.placeholder,/…k3y9/,'and shows itself masked, like any stored key');
+ await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
+ assert.equal(calls.length,2,'leaving an empty field asks the machine for nothing');
+ await s.run('settleIntegrationKeys()');
  assert.equal(calls.length,2,'and saving sends no key again: the verified one is already stored');
 });
 test('A pause while typing checks the key without waiting for the field to be left',async()=>{
@@ -159,89 +174,143 @@ test('A pause while typing checks the key without waiting for the field to be le
  s.context.setTimeout=fn=>{pause=fn;return 1};s.context.clearTimeout=()=>{pause=null};
  s.context.fetch=async(path,options)=>{
   calls.push([options?.method||'GET',path]);
-  if(path.includes('/transcription/credential'))return {ok:true,json:async()=>({credentials:{openai:{configured:true,hint:'…k3y9'}}})};
+  if(path.includes('/integrations/openai'))return {ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}))};
   return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],error:null})};
  };
- s.run("voicePreferences={stt_provider:'openai'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={};$('stt-provider').value='openai';renderTranscription()");
- s.run("$('stt-key').value='sk-nueva';$('stt-key').oninput()");
+ openaiPane(s,LISTING(OPENAI()));
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-nueva')");
  assert.equal(calls.length,0,'nothing travels while the key is still being typed');
  await pause();
- assert.deepEqual(calls.map(call=>call[0]),['POST','GET']);
- assert.deepEqual(s.run("$('stt-model').children.map(option=>option.value)"),['gpt-4o-transcribe']);
+ assert.deepEqual(calls.map(call=>call[0]),['PUT','GET']);
+ assert.equal(s.run("sttProvider('openai').models.length"),1);
 });
 test('A key the provider refuses leaves the previous one in place and says so',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.fetch=async path=>{calls.push(path);return {ok:false,json:async()=>({detail:'OpenAI rejected the key.'})}};
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={openai:{configured:true,source:'stored',hint:'…vieja'}};sttRemote.openai.loaded=true;$('stt-provider').value='openai';renderTranscription()");
- s.run("$('stt-key').value='sk-mala';$('stt-key').oninput()");
- await s.run("$('stt-key').onblur()");
+ openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…vieja'})),[{id:'gpt-4o-transcribe',label:'GPT-4o'}]);
+ s.run("sttRemote.openai.loaded=true;window.sidevoiceActions.typeIntegrationKey('openai','sk-mala')");
+ await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.equal(calls.length,1,'a refused key is not followed by a request for models');
- assert.equal(s.run("$('stt-key-state').textContent"),'Clave rechazada · OpenAI rejected the key. · La clave anterior sigue en uso');
- assert.equal(s.run("$('stt-key').value"),'sk-mala','what was typed stays, to be corrected instead of retyped');
- assert.match(s.run("$('stt-key').placeholder"),/…vieja/,'and the key that was working is still the installed one');
- assert.deepEqual(s.run("$('stt-model').children.map(option=>option.value)"),['gpt-4o-transcribe'],'the models of the key that works are untouched');
- await s.run("$('stt-key').onblur()");
+ const row=()=>s.run('roomStore.getState().integrations.rows')[0];
+ assert.equal(row().note,'Clave rechazada · OpenAI rejected the key. · La clave anterior sigue en uso');
+ assert.equal(row().status,'refused');
+ assert.equal(row().draft,'sk-mala','what was typed stays, to be corrected instead of retyped');
+ assert.match(row().placeholder,/…vieja/,'and the key that was working is still the installed one');
+ assert.deepEqual(plain(s.run("$('stt-model').children.map(option=>option.value)")),['gpt-4o-transcribe'],'the models of the key that works are untouched');
+ await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.equal(calls.length,1,'leaving the field again does not send a key already refused');
- await assert.rejects(()=>s.run('saveCredentials()'),/Clave rechazada/,'saving does not close over a key the provider refused');
- s.run("$('stt-key').value='';$('stt-key').oninput()");
- assert.equal(s.run("$('stt-key-state').textContent"),'','emptying the field takes the complaint away with it');
- await s.run('saveCredentials()');
+ await assert.rejects(()=>s.run('settleIntegrationKeys()'),/Clave rechazada/,'saving does not close over a key the provider refused');
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','')");
+ assert.equal(row().note,'','emptying the field takes the complaint away with it');
+ await s.run('settleIntegrationKeys()');
 });
 test('A key field the browser filled in on its own never blocks saving (iPhone, 2026-09-26)',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.fetch=async path=>{calls.push(path);return {ok:false,json:async()=>({detail:'OpenAI rejected the key.'})}};
- s.run("sttCredentials={openai:{configured:true,source:'stored',hint:'…buena'}};forgetCredentialCheck('stt');$('stt-key').value='una-contraseña-guardada'");
- await s.run('saveCredentials()');
+ s.run(`integrations=${JSON.stringify(LISTING(OPENAI({configured:true,source:'stored',hint:'…buena'})))};forgetKeyChecks()`);
+ await s.run('settleIntegrationKeys()');
  assert.equal(calls.length,0,'nobody typed it, so nobody asked for it to be installed');
 });
 test('Reopening Settings asks for the OpenAI models again, because each opening brings a fresh catalogue',async()=>{
  const s=setup({strictDOM:true});
- s.run("sttRemote.openai.loaded=true;window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true,models:[]})};voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'}");
+ s.run(`integrations=${JSON.stringify(LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'})))};sttRemote.openai.loaded=true;window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true,models:[]})};voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'}`);
  s.context.fetch=async path=>({ok:true,json:async()=>path.includes('/transcription/models')
   ?{models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}]}
-  :{catalog:{providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]},credentials:{openai:{configured:true}}}});
+  :{catalog:{providers:[{id:'openai',label:'OpenAI',needs_key:true,default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]}}});
  await s.run('loadTranscription()');
  await new Promise(resolve=>setTimeout(resolve,0));
- assert.deepEqual(s.run("$('stt-model').children.map(option=>option.value)"),['gpt-4o-transcribe']);
+ assert.deepEqual(plain(s.run("$('stt-model').children.map(option=>option.value)")),['gpt-4o-transcribe']);
 });
 test('A key with nothing stored behind it says that nothing is saved',async()=>{
  const s=setup({strictDOM:true});
  s.context.fetch=async()=>({ok:false,json:async()=>({detail:'The key is empty.'})});
- s.run("voicePreferences={stt_provider:'openai'};sttCatalog={providers:[{id:'openai',label:'OpenAI',models:[]}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={};$('stt-provider').value='openai';renderTranscription();$('stt-key').value='sk-mala'");
- await s.run("$('stt-key').onblur()");
- assert.equal(s.run("$('stt-key-state').textContent"),'Clave rechazada · The key is empty. · No hay ninguna clave guardada');
+ openaiPane(s,LISTING(OPENAI()));
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-mala')");
+ await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
+ assert.equal(s.run('roomStore.getState().integrations.rows')[0].note,'Clave rechazada · The key is empty. · No hay ninguna clave guardada');
 });
-test('A verified ElevenLabs key brings its models into the voice dropdown, with no save',async()=>{
+test('A verified ElevenLabs key lights up its provider in Voces and brings its models, with no save',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.window.sidevoiceUI={setLanguageModels(){}};
  s.elements.get('default-voice').selectedOptions=[{textContent:'Dora'}];
+ const catalog={models:[{id:'kokoro',label:'Kokoro · 82M',provider:'kokoro'},{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',provider:'elevenlabs'},{id:'eleven_v3',label:'Eleven v3',provider:'elevenlabs'}],
+  languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}]};
  s.context.fetch=async(path,options)=>{
   calls.push([options?.method||'GET',path]);
-  if(path.includes('/synthesis/credential'))return {ok:true,json:async()=>({credentials:{configured:true,source:'stored',hint:'…11ab'}})};
-  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({
-   models:[{id:'kokoro',label:'Kokoro · 82M',provider:'kokoro'},{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',provider:'elevenlabs'},{id:'eleven_v3',label:'Eleven v3',provider:'elevenlabs'}],
-   languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}],
-   providers:{elevenlabs:{voices:[{id:'v1',label:'Nube',languages:['es']}]}}})};
+  if(path.includes('/integrations/elevenlabs'))return {ok:true,json:async()=>LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'}))};
+  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({...catalog,providers:{elevenlabs:{voices:[{id:'v1',label:'Nube',languages:['es']}]}}})};
   throw Error('unexpected request: '+path);
  };
- s.run(`voiceCatalog={models:[{id:'kokoro',label:'Kokoro · 82M',provider:'kokoro'}],languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}],providers:{elevenlabs:{voices:[]}}};
-  sttCapabilities={webgpu:false,wasm:true};voiceDraft={};elevenCredentials={};
+ s.run(`integrations=${JSON.stringify(LISTING(ELEVEN()))};voiceCatalog=${JSON.stringify({...catalog,providers:{elevenlabs:{voices:[]}}})};
+  sttCapabilities={webgpu:false,wasm:true};voiceDraft={};
   $('default-tts-language').value='es';$('default-model').value='kokoro';$('tts-provider').value='kokoro';renderVoiceProvider('kokoro','ef_dora')`);
- assert.deepEqual(s.run("$('tts-provider').children.map(option=>option.value)"),['kokoro'],'a provider with no key offers nothing yet');
- s.run("$('elevenlabs-key').value='eleven-nueva'");
- await s.run("$('elevenlabs-key').onblur()");
- assert.deepEqual(calls.map(call=>call[0]),['POST','GET'],'the key is sent once, and the catalogue asked for once');
+ assert.deepEqual(plain(s.run("$('tts-provider').children.map(o=>[o.value,o.textContent,!!o.disabled])")),[['kokoro','Este navegador',false],['elevenlabs','ElevenLabs · sin clave',true]],
+  'a provider with no key is greyed out');
+ s.run("window.sidevoiceActions.typeIntegrationKey('elevenlabs','eleven-nueva')");
+ await s.run("window.sidevoiceActions.checkIntegrationKey('elevenlabs')");
+ assert.deepEqual(calls.map(call=>call[0]),['PUT','GET'],'the key is sent once, and the catalogue asked for once');
  assert.match(calls[1][1],/voice-catalog/);
- assert.deepEqual(s.run("$('tts-provider').children.map(option=>option.value)"),['kokoro','elevenlabs'],'the provider appears as soon as its key is verified');
+ assert.deepEqual(plain(s.run("$('tts-provider').children.map(o=>[o.value,!!o.disabled])")),[['kokoro',false],['elevenlabs',false]],'the provider is offered as soon as its key is verified');
  s.run("$('tts-provider').value='elevenlabs';renderVoiceProvider()");
- assert.deepEqual(s.run("$('default-model').children.map(option=>option.value)"),['eleven_flash_v2_5','eleven_v3'],'and its models fill the dropdown in place');
- assert.match(s.run("$('elevenlabs-key-state').textContent"),/Clave verificada · Voces actualizadas/);
- assert.equal(s.run("$('elevenlabs-key').value"),'');
- assert.match(s.run("$('elevenlabs-key').placeholder"),/…11ab/);
+ assert.deepEqual(plain(s.run("$('default-model').children.map(option=>option.value)")),['eleven_flash_v2_5','eleven_v3'],'and its models fill the dropdown in place');
+ const [row]=s.run('roomStore.getState().integrations.rows');
+ assert.equal(row.note,'Clave verificada · Voces actualizadas');
+ assert.equal(row.draft,'');
+ assert.match(row.placeholder,/…11ab/);
+});
+test('Removing a key acts at once, and the pane that used it greys the provider out',async()=>{
+ const s=setup({strictDOM:true});const calls=[];
+ s.context.fetch=async(path,options)=>{calls.push([options?.method||'GET',path]);return {ok:true,json:async()=>LISTING(OPENAI())}};
+ openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'})),[{id:'gpt-4o-transcribe',label:'GPT-4o'}]);
+ assert.equal(s.run("$('stt-provider').value"),'openai');
+ await s.run("window.sidevoiceActions.clearIntegrationKey('openai')");
+ assert.deepEqual(calls,[['DELETE','/api/presentation/integrations/openai']],'no models are asked for with no key');
+ assert.equal(s.run("$('stt-provider').value"),'browser');
+ assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>[o.value,!!o.disabled])")),[['browser',false],['openai',true]]);
+ assert.equal(s.run("sttProvider('openai').models.length"),0,'the models of a key that is gone go with it');
+});
+test('"Configurar" opens Integraciones at the provider\'s row',()=>{
+ const s=setup({strictDOM:true});
+ s.run(`integrations=${JSON.stringify(LISTING(OPENAI(),ELEVEN()))}`);
+ s.run("settingsSection('voice');window.sidevoiceActions.openIntegration('elevenlabs')");
+ assert.equal(s.run("$('pane-integrations').hidden"),false);
+ assert.equal(s.run("$('pane-voice').hidden"),true);
+ assert.equal(s.run("$('settings-integrations').getAttribute('aria-pressed')"),'true');
+ assert.deepEqual(plain(s.run('roomStore.getState().integrations.rows').map(row=>[row.id,row.focused])),[['openai',false],['elevenlabs',true]]);
+ s.run("settingsSection('general')");
+ assert.equal(s.run('integrationFocus'),null,'leaving the section lets the row go');
+});
+test('Opening Settings reads the integrations before offering providers, so a saved OpenAI stays chosen',async()=>{
+ const s=setup({strictDOM:true});
+ s.saved['sidevoice.settings']=JSON.stringify({stt_provider:'openai',stt_model:'gpt-4o-transcribe'});
+ s.run("window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true,models:[]})};window.roomI18n={setLanguage(){}}");
+ const later=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ s.context.fetch=async path=>{
+  // The machine takes longest over its integrations: nothing may be offered before they arrive.
+  if(path.includes('/integrations')){await later(20);return {ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}),ELEVEN())}}
+  if(path.includes('/transcription/models'))return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}]})};
+  if(path.includes('/transcription'))return {ok:true,json:async()=>({catalog:{providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',needs_key:true,default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]}})};
+  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({models:[{id:'kokoro',label:'Kokoro',provider:'kokoro'}],languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}],providers:{elevenlabs:{voices:[]}}})};
+  return {ok:true,json:async()=>({stt_provider:'browser',stt_language:'auto',default_tts_language:'es',tts_speed:1,ui_language:'es',tts_device:'auto',audio_grace_seconds:1,replay_on_return_seconds:120,default_model:'kokoro',default_voice:'ef_dora'})};
+ };
+ s.elements.get('default-voice').selectedOptions=[{textContent:'Dora'}];
+ await s.run("$('settings-open').onclick()");
+ assert.equal(s.run("$('stt-provider').value"),'openai');
+ assert.equal(s.run("$('settings-error').textContent"),'');
+});
+test('A device that is not the owner never sees a provider nobody configured',()=>{
+ const s=setup({strictDOM:true});
+ // What the machine lists to a guest: only what can be chosen, and nothing about the key.
+ s.run(`integrations={owner:false,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]}`);
+ openaiPane(s,{owner:false,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]});
+ assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>o.value)")),['browser'],'not greyed out: not there at all');
+ assert.deepEqual(plain(s.run('roomStore.getState().integrations.missing')),{transcription:[],voice:[]},'so no "Configurar" either');
+ assert.equal(s.run('roomStore.getState().integrations.owner'),false);
+ assert.equal(s.run("keyedProvider(state,'elevenlabs')"),'ready');
 });
 test('A model list that no longer holds the saved model falls back to the first one offered',()=>{
  const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'openai',stt_model:'whisper-1'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-mini-transcribe',label:'GPT-4o mini'}],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={openai:{configured:true}};$('stt-provider').value='openai';renderTranscription()");
+ s.run("voicePreferences={stt_provider:'openai',stt_model:'whisper-1'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-mini-transcribe',label:'GPT-4o mini'}],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};$('stt-provider').value='openai';renderTranscription()");
  assert.deepEqual(s.run("$('stt-model').children.map(option=>option.value)"),['gpt-4o-mini-transcribe'],'a model this account does not offer never becomes an option of its own');
  assert.equal(s.run("$('stt-model').value"),'gpt-4o-mini-transcribe');
 });
@@ -252,18 +321,16 @@ test('Voices are chosen the way transcription is: the provider first, then what 
    {id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',provider:'elevenlabs'},
    {id:'eleven_v3',label:'Eleven v3',provider:'elevenlabs'}],
   languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}],providers:{elevenlabs:{voices:[{id:'v1',label:'Nube',languages:['es']}]}}};
-  sttCapabilities={webgpu:false,wasm:true};voiceDraft={};
+  sttCapabilities={webgpu:false,wasm:true};voiceDraft={};integrations={owner:true,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]};
   $('default-tts-language').value='es';$('default-model').value='kokoro';renderVoiceProvider('kokoro','ef_dora')`);
  assert.equal(JSON.stringify(s.run("$('tts-provider').children.map(o=>o.value)")),JSON.stringify(['kokoro','elevenlabs']));
  assert.equal(JSON.stringify(s.run("$('default-model').children.map(o=>o.value)")),JSON.stringify(['kokoro']),
   'the model list belongs to the chosen provider');
  assert.equal(s.run("$('tts-browser-options').hidden"),false,'the browser provider shows where it runs');
- assert.equal(s.run("$('elevenlabs-credential').hidden"),true,'and no key of a provider that is not in use');
  assert.match(s.run("$('tts-device-note').textContent"),/CPU/,'a browser without WebGPU says so, like transcription does');
- // Switching provider takes its models, its key, and drops what only the browser has.
+ // Switching provider takes its models, and drops what only the browser has.
  s.run("$('tts-provider').value='elevenlabs';renderVoiceProvider()");
  assert.equal(JSON.stringify(s.run("$('default-model').children.map(o=>o.value)")),JSON.stringify(['eleven_flash_v2_5','eleven_v3']));
- assert.equal(s.run("$('elevenlabs-credential').hidden"),false,'the key belongs to the provider, not to each model');
  assert.equal(s.run("$('tts-browser-options').hidden"),true);
  assert.equal(s.run("$('prepare-model').hidden"),true,'nothing to preload when the voice is not this browser\'s');
 });
@@ -293,17 +360,15 @@ test('Processing comes first and decides which local models are offered',()=>{
 });
 
 
-test('OpenAI remains selectable and shows its credential controls',()=>{
+test('OpenAI with a key on the machine is chosen here, and its key is not asked for here',()=>{
  const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',note:'Cloud',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-transcribe',label:'GPT'}]}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={openai:{configured:true,source:'stored',hint:'…test'}};$('stt-provider').value='openai';renderTranscription()");
- assert.equal(s.run("$('stt-credential').hidden"),false);
+ s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',note:'Cloud',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-transcribe',label:'GPT'}]}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};$('stt-provider').value='openai';renderTranscription()");
  assert.equal(s.run("$('stt-browser-options').hidden"),true);
  assert.deepEqual(s.run("$('stt-model').children.map(x=>x.value)"),['gpt-4o-transcribe']);
- assert.match(s.run("$('stt-key').placeholder"),/•+/,'a stored key shows itself masked in its own field');
 });
 test('OpenAI model loading never masquerades as a one-option catalogue',()=>{
  const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={openai:{configured:true}};sttRemote.openai.loading=true;$('stt-provider').value='openai';renderTranscription()");
+ s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};sttRemote.openai.loading=true;$('stt-provider').value='openai';renderTranscription()");
  assert.equal(s.run("$('stt-model').disabled"),true);
  assert.deepEqual(s.run("$('stt-model').children.map(x=>x.textContent)"),['Cargando modelos de OpenAI…']);
  assert.match(s.run("$('stt-model-note').textContent"),/Consultando/);
@@ -311,7 +376,7 @@ test('OpenAI model loading never masquerades as a one-option catalogue',()=>{
 test('OpenAI models are fetched only when its provider is selected',async()=>{
  const s=setup({strictDOM:true});let requests=[];
  s.context.fetch=async path=>{requests.push(path);return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'gpt-4o-transcribe'},{id:'gpt-4o-mini-transcribe',label:'gpt-4o-mini-transcribe'}],error:null})}};
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-mini-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};sttCredentials={openai:{configured:true}};$('stt-provider').value='openai';renderTranscription()");
+ s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-mini-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};$('stt-provider').value='openai';renderTranscription()");
  assert.equal(requests.length,0);
  await s.run("loadTranscriptionModels('openai',true)");
  assert.equal(requests.length,1);
@@ -338,7 +403,7 @@ test('ElevenLabs voices are filtered by primary language until all voices are re
    {id:'alice',label:'Alice',languages:['en']},
    {id:'mystery',label:'Sin idioma',languages:[]}
   ]}}
- };elevenCredentials={configured:true};$('tts-device').closest=()=>({hidden:false});$('default-model').value='eleven_flash_v2_5';$('default-tts-language').value='es';renderDefaultVoices('alice')`);
+ };integrations={owner:true,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]};$('tts-device').closest=()=>({hidden:false});$('default-model').value='eleven_flash_v2_5';$('default-tts-language').value='es';renderDefaultVoices('alice')`);
  assert.deepEqual(s.run("$('default-voice').children.map(x=>x.value)"),['lucia','__show_all_voices__']);
  assert.equal(s.run("$('default-voice').children[0].textContent"),'Lucía');
  assert.equal(s.run("$('default-voice').value"),'lucia','a stored voice from another language must not bypass the filter');
@@ -1581,7 +1646,7 @@ test('A control the person never saw does not decide anything',async()=>{
 test('Saving the settings form stores every device setting, the ambient bed among them',async()=>{
  const s=setup();const stored=[];
  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
- s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto'};voiceCatalog={languages:[],models:[]};$('stt-key').value='';$('elevenlabs-key').value=''");
+ s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto'};voiceCatalog={languages:[],models:[]}");
  for(const [id,value] of [['stt-language','es'],['stt-device',''],['default-tts-language','es'],['tts-speed','1'],['ui-language','es'],
   ['tts-device','auto'],['default-model','kokoro'],['default-voice','ef_dora'],['audio-grace-seconds','2'],['presence-sound','on'],['presence-volume','5'],['replay-on-return-seconds','300'],
   ['turn-end-mode','smart_turn'],['user-speech-timeout','2.5'],['smart-turn-min-silence','0.6'],['smart-turn-max-silence','3'],
@@ -2371,7 +2436,7 @@ test('Inside the desktop app a native device choice is saved, and outside it is 
  for(const [native,expected] of [[true,'native'],[false,'auto']]){
   const s=setup();const stored=[];
   s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
-  s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto',tts_device:'auto'};voiceCatalog={languages:[],models:[]};$('stt-key').value='';$('elevenlabs-key').value=''");
+  s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto',tts_device:'auto'};voiceCatalog={languages:[],models:[]}");
   if(native)s.run("nativeModels={stt:['onnx-community/whisper-small'],tts:['onnx-community/Kokoro-82M-v1.0-ONNX']}");
   s.run("$('tts-device').value='native'");
   await s.run("$('language-form').onsubmit({preventDefault(){}})");
