@@ -27,6 +27,17 @@ shipped upstream), Kokoro model (Apache-2.0), eSpeak-NG JS/WASM (GPL-3.0-or-late
 No code was copied from tts.rocks. Its engine selection and cache design were
 reviewed as references: https://github.com/steveseguin/tts-web.
 
+## Catalogues: copies of sidevoice-core's
+
+`catalog.json` (voices), `models.json` (the model catalogue, rubasace/sidevoice#124 §3) and
+`models.vectors.json` (the resolver's shared vectors) belong to sidevoice/sidevoice-core and are
+copied here byte for byte, never edited: `node copy-core-catalogs.mjs <sidevoice-core checkout>`.
+The core's `tests/test_catalog_contract.py` checks the copies against it when `SIDEVOICE_REPOSITORY`
+names this checkout. `page-models.js` reads `models.json` for the page's Whisper list (`stt-engine.js`
+`MODELS`) and Kokoro's repository, revision and dtypes (`engine.js`); nothing in the page names a
+model. `offers.ts` is the resolver (#124 §4) in TypeScript, passing the same vectors as the core's
+Python and the desktop app's Rust; it is not wired into the settings yet.
+
 ## Room integration
 
 `catalog.json` declares the available model, six languages and voice IDs. Python

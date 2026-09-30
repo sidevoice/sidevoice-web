@@ -1,7 +1,8 @@
 import {StyleTextToSpeech2Model,AutoTokenizer,Tensor,env} from '@huggingface/transformers';
 import ESpeakNG from '/voice-browser/assets/espeak-ng.js';
-const MODEL='onnx-community/Kokoro-82M-v1.0-ONNX';
-const REVISION='1939ad2a8e416c0acfeecc08a694d14ef25f2231';
+import {KOKORO} from './page-models.js';
+const MODEL=KOKORO.repository;
+const REVISION=KOKORO.revision;
 env.allowLocalModels=false;
 env.backends.onnx.wasm.wasmPaths='/voice-browser/assets/';
 env.backends.onnx.wasm.numThreads=1;
@@ -14,7 +15,7 @@ export async function initialize(preference,progress){
  await model?.dispose();model=null;
  device=preference;
  tokenizer=await AutoTokenizer.from_pretrained(MODEL,{revision:REVISION,progress_callback:progress});
- model=await StyleTextToSpeech2Model.from_pretrained(MODEL,{revision:REVISION,device,dtype:device==='webgpu'?'fp32':'q8',progress_callback:progress});
+ model=await StyleTextToSpeech2Model.from_pretrained(MODEL,{revision:REVISION,device,dtype:KOKORO.dtype[device==='webgpu'?'webgpu':'wasm'],progress_callback:progress});
  return device;
 }
 async function voiceData(voice,progress){
