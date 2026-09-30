@@ -71,7 +71,7 @@ test("a room answers only for the node a page names, and says whether it is conn
 });
 
 test("a conversation's request, and this device's pairing, go to the node; telemetry to the target", () => {
-  for (const path of ["/api/presentation", "/api/presentation?session_id=s", "/api/presentation/history?session_id=s", "/api/presentation/transcription/credential", "/api/presentation/client-error",
+  for (const path of ["/api/presentation", "/api/presentation?session_id=s", "/api/presentation/history?session_id=s", "/api/presentation/integrations/openai", "/api/presentation/client-error",
     "/api/device/identity?nonce=n", "/api/device/devices/d-1"])
     expect([path, isNodePath(path)]).toEqual([path, true]);
   for (const path of ["/api/connectors", "/api/connectors/pairing-code", "/api/connectors/c-1", "/api/telemetry", "/api/presentationx", "/api/devices", "/voice-browser/room-client.js"])

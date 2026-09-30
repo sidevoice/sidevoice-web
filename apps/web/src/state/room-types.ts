@@ -103,6 +103,47 @@ export interface PairingPromptView {
   note: string;
 }
 
+/** One provider as the machine lists it (#64): whether it has a key, never the key. `source`, `hint` and
+ *  `environment` are only told to the owner. */
+export interface IntegrationProvider {
+  id: string;
+  label: string;
+  capabilities: ("transcription" | "voice")[];
+  configured: boolean;
+  source?: "stored" | "environment" | null;
+  hint?: string | null;
+  environment?: string;
+}
+
+export interface IntegrationListing {
+  owner: boolean;
+  providers: IntegrationProvider[];
+}
+
+export interface IntegrationRowView {
+  id: string;
+  label: string;
+  /** What the provider can do for the machine, in words: "Transcripción", "Voz". */
+  uses: string;
+  configured: boolean;
+  placeholder: string;
+  /** News about the key — checking, verified, refused, from the environment — or ''. */
+  note: string;
+  status: "" | "checking" | "verified" | "refused";
+  canClear: boolean;
+  draft: string;
+  focused: boolean;
+}
+
+export interface IntegrationsView {
+  /** null until the machine has said. */
+  owner: boolean | null;
+  error: string;
+  rows: IntegrationRowView[];
+  /** Providers of each capability the machine lists without a key: greyed out in that pane, with "Configurar". */
+  missing: Record<"transcription" | "voice", {id: string; label: string}[]>;
+}
+
 export interface SelectOption {
   value: string;
   label: string;
@@ -144,4 +185,12 @@ export interface SidevoiceActions {
   pairDevice(code: string, name: string): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
+  /** What is typed in an integration's key field; a pause checks it with the provider. */
+  typeIntegrationKey(id: string, value: string): void;
+  /** Check the typed key now (the field was left, or Enter). Stored only if the provider takes it. */
+  checkIntegrationKey(id: string): Promise<void>;
+  /** Remove the key this machine stored for a provider. One from its environment stays. */
+  clearIntegrationKey(id: string): Promise<void>;
+  /** Open Integraciones at that provider's row: what a pane's "Configurar" does. */
+  openIntegration(id: string): void;
 }

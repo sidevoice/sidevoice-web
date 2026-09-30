@@ -31,6 +31,10 @@ export function initialSessionFacts() {
         rendezvous: '', node: null, nodeReach: '',
         // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
         pairingOpen: false, pairingNote: '',
+        // The machine's integrations as it listed them for this device — never a key, only whether there is one
+        // (#64) — or null until read; why they could not be read; what is typed in each row and not yet
+        // stored, what the machine said about it, and the row a pane's "Configurar" opened.
+        integrations: null, integrationsError: '', integrationDrafts: {}, integrationChecks: {}, integrationFocus: null,
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -282,6 +286,31 @@ export function machinesView(s) {
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
+const CAPABILITY_LABELS = { transcription: 'transcripción', voice: 'voz' };
+/** One row per provider of the machine in use, for its owner: the key as far as anyone may see it (masked,
+ *  its last four), where it came from, what the provider can do, and what is typed in the row and not stored. */
+export function integrationsView(s) {
+    return (s.integrations?.providers || []).map(p => {
+        const check = s.integrationChecks[p.id], environment = p.configured && p.source === 'environment';
+        return { id: p.id, label: p.label, uses: capitalize((p.capabilities || []).map(c => CAPABILITY_LABELS[c] || c).join(' y ')),
+            configured: !!p.configured, placeholder: p.configured ? '•••••••• ' + (p.hint || '') : 'Sin clave',
+            note: check?.note || (environment ? 'Esta clave viene del entorno de la máquina' + (p.environment ? ' (' + p.environment + ')' : '') + '; no se puede quitar desde aquí.' : ''),
+            status: check?.status || '', canClear: !!p.configured && p.source === 'stored',
+            draft: s.integrationDrafts[p.id] || '', focused: s.integrationFocus === p.id };
+    });
+}
+/** A provider that needs a key, as a pane offers it (#64): 'ready' with its key, 'missing' — greyed out, with a
+ *  way to configure it — when the machine lists it without one, and 'hidden' when this device is not shown it
+ *  (a device that is not the owner never sees a provider nobody configured) or the list is not known. */
+export function keyedProvider(s, id) {
+    const row = s.integrations?.providers?.find(p => p.id === id);
+    return !row ? 'hidden' : row.configured ? 'ready' : 'missing';
+}
+/** The providers of a capability that only need a key, for the note under the pane's provider choice. */
+export function missingIntegrations(s, capability) {
+    return (s.integrations?.providers || []).filter(p => !p.configured && p.capabilities?.includes(capability))
+        .map(p => ({ id: p.id, label: p.label }));
+}
 /** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). */
 export function reachNote(s) {
     const p = (s.pairings || []).find(x => x.fp === s.pairingInUse), called = p?.host ? '«' + p.host + '»' : 'la máquina';
@@ -341,6 +370,8 @@ export function createRoomSessionStore(seed = {}) {
             mic: micView(facts), call: callView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
             enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
             audioDevices: facts.audioDevices, machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
+            integrations: { owner: facts.integrations ? !!facts.integrations.owner : null, error: facts.integrationsError,
+                rows: integrationsView(facts), missing: { transcription: missingIntegrations(facts, 'transcription'), voice: missingIntegrations(facts, 'voice') } },
             bootError: facts.bootError, languageModels: facts.languageModels };
     }
     function publish() { if (depth || !dirty)

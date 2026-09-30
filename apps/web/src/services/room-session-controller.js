@@ -1,4 +1,4 @@
-import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE,reachNote} from '../state/room-session-state.js';
+import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE,reachNote,keyedProvider} from '../state/room-session-state.js';
 import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
@@ -271,7 +271,7 @@ function setupAudioControls(){
 
  globalThis.navigator?.mediaDevices?.addEventListener?.('devicechange',()=>{refreshAudioDevices();followDefaultRoute()});
 }
-let voiceCatalog=null;let voiceDraft={};let editingLanguage=null;let callExecution='browser';let elevenCredentials={};let sttCredentials={};let pendingBotText=[];
+let voiceCatalog=null;let voiceDraft={};let editingLanguage=null;let callExecution='browser';let pendingBotText=[];
 let textAttempt=null;
 const SHOW_ALL_VOICES='__show_all_voices__';let defaultVoicesExpanded=false;const expandedVoiceLanguages=new Set();
 try{state.roomSeen=JSON.parse(sessionStorage.getItem('voice-room-seen')||'{}')}catch{}
@@ -281,7 +281,7 @@ function targetId(){return state.roomBinding?.thread_id||null}
 function historyThreadId(){return state.viewedThread||targetId()}
 
 async function api(path,options){const r=await request(path,options);if(r.status===401)throw Error(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw Error(d.detail||'No se pudo completar la operación');return d}
-const post=(path,body)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+const post=(path,body,method='POST')=>api(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 
 /* What the microphone heard while the room was unreachable, said plainly. The person spoke to
  * nobody for a moment, and how much of it survived is a fact they are entitled to read. */
@@ -1421,7 +1421,8 @@ document.addEventListener('click',()=>document.querySelectorAll('.model-info[ari
 function providerFor(model){return modelInfo(model||'kokoro').provider||'kokoro'}
 /* Voices are chosen the way transcription is: the provider first, then what that provider offers. A flat
  * list of models mixed Kokoro with every ElevenLabs model and had nowhere to put what belongs to the
- * provider itself — its API key, and, when the provider is this browser, where the model runs (#64). */
+ * provider itself — where the model runs, when the provider is this browser. Its key is not the pane's: a
+ * provider that needs one is offered as the machine's integrations say (#64). */
 const VOICE_PROVIDERS={
  kokoro:{label:'Este navegador',browser:true},
  elevenlabs:{label:'ElevenLabs',key:'elevenlabs'},
@@ -1456,10 +1457,9 @@ function renderVoiceProvider(savedModel,savedVoice){
  if(!select||!voiceCatalog)return;
  const providers=voiceProviders();
  const wanted=select.value||providerFor(savedModel||$('default-model').value);
- entriesFor(select,providers.map(id=>[id,voiceProviderLabel(id)]),providers.includes(wanted)?wanted:providers[0]);
+ offerProviders(select,providers.map(id=>[id,voiceProviderLabel(id),!!VOICE_PROVIDERS[id]?.key]),wanted);
  const provider=select.value,meta=VOICE_PROVIDERS[provider]||{};
  $('tts-browser-options').hidden=!meta.browser;
- $('elevenlabs-credential').hidden=meta.key!=='elevenlabs';
  $('prepare-model').hidden=!meta.browser;
  const models=modelsOf(provider),current=$('default-model').value;
  const keep=models.some(model=>model.id===current)?current:(models.some(model=>model.id===savedModel)?savedModel:models[0]?.id);
@@ -1468,6 +1468,16 @@ function renderVoiceProvider(savedModel,savedVoice){
  renderDefaultVoices(savedVoice);
 }
 
+/* The providers a pane offers, from [id, label, needs a key]: one that needs a key is left out when this device
+ * is not shown it, and greyed out while the machine has no key for it — the pane's "Configurar" says why (#64). */
+function offerProviders(select,entries,wanted){
+ const offered=entries.flatMap(([id,label,keyed])=>{
+  const access=keyed?keyedProvider(state,id):'ready';
+  return access==='hidden'?[]:[[id,access==='missing'?label+' · sin clave':label,access==='missing']];
+ });
+ // A provider this device is not shown is not slipped back in as an option of its own.
+ entriesFor(select,offered,offered.some(([id])=>id===wanted)?wanted:null);
+}
 function entriesFor(select,entries,value){select.replaceChildren();const values=new Set(entries.map(entry=>entry[0]));if(value&& !values.has(value))entries=[[value,value],...entries];for(const [id,label,disabled] of entries){const option=document.createElement('option');option.value=id;option.textContent=label;if(disabled)option.disabled=true;select.append(option)}const usable=entries.filter(entry=>!entry[2]);select.value=usable.some(entry=>entry[0]===value)?value:(usable[0]?.[0]??'')}
 function elevenVoiceItems(){return voiceCatalog?.providers?.elevenlabs?.voices||[]}
 function conciseVoiceLabel(label){return String(label||"").split(" · ")[0].trim()}
@@ -1486,7 +1496,7 @@ function renderDefaultVoices(value){
  const model=$('default-model').value,language=$('default-tts-language').value||systemLanguage(SPEECH_LANGUAGES),voices=voiceEntriesFor(model,language,defaultVoicesExpanded);
  setModelInfo($('default-model-info'),model);entriesFor($('default-voice'),voices,validVoice(voices,value));
  const cloud=providerFor(model)==='elevenlabs';updateSpeedRange();
- $('model-status').textContent=cloud&&!elevenCredentials.configured?'Guarda una clave de ElevenLabs para cargar las voces de la cuenta.':'';
+ $('model-status').textContent=cloud&&keyedProvider(state,'elevenlabs')!=='ready'?'ElevenLabs no tiene clave en esta máquina: configúrala en Integraciones para cargar las voces de la cuenta.':'';
 }
 function stopPreview(){return roomStore.batch(()=>stopPreviewJob())}
 function stopPreviewJob(){const job=state.previewJob;state.previewJob=null;if(!job)return;job.controller.abort();if(job.browser)window.roomVoice?.cancel();$('preview-audio').pause();$('preview-audio').removeAttribute('src');if(job.url)URL.revokeObjectURL(job.url);for(const item of voiceCatalog?.languages||[])$('preview-'+item.id).textContent='▶'}
@@ -1502,7 +1512,8 @@ function renderLanguageRows(){
    const choices=voiceEntriesFor(actualModel,item.id,expandedVoiceLanguages.has(item.id)),voice=draft.voice==='inherit'||choices.some(([id])=>id===draft.voice)?(draft.voice||'inherit'):'inherit';
    return {language:item.id,label:item.label,model:draft.model||'inherit',actualModel,modelDescription:modelInfo(actualModel).description,
     modelOptions:[{value:'inherit',label:'Usar por defecto'},
-     ...voiceProviders().map(provider=>({label:voiceProviderLabel(provider),
+     ...voiceProviders().filter(provider=>!VOICE_PROVIDERS[provider]?.key||keyedProvider(state,provider)!=='hidden').map(provider=>({
+      label:voiceProviderLabel(provider)+(VOICE_PROVIDERS[provider]?.key&&keyedProvider(state,provider)==='missing'?' · sin clave':''),
       options:modelsOf(provider).map(entry=>({value:entry.id,label:entry.label}))}))],
     voice,voiceOptions:[["inherit","Usar voz predeterminada"],...choices].map(([value,label])=>({value,label})),
     speed:draft.speed==null?null:effectiveSpeed(actualModel,draft.speed),speedMin,speedMax,inheritedSpeed:effectiveSpeed(actualModel,globalSpeed)};
@@ -1601,7 +1612,7 @@ async function receiveBrowserSpeech(d,cloud=false){
 function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 
 $('settings-open').onclick=async()=>{try{
- forgetCredentialCheck('stt');forgetCredentialCheck('elevenlabs');
+ forgetKeyChecks();
  // Voices, transcription and keys are a machine's; pairing one is not. With none connected the dialog still
  // opens — on Máquinas, the one pane that has something to do — instead of failing on a catalogue nobody serves.
  if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
@@ -1613,10 +1624,11 @@ $('settings-open').onclick=async()=>{try{
 
  $('speed-value').textContent=Number(p.tts_speed).toFixed(2)+'×';$('settings-error').textContent='Cargando catálogos…';
  if(!$('language-settings').open)$('language-settings').showModal();
- const [catalog]=await Promise.all([api('/api/presentation/voice-catalog'),loadTranscription()]);
+ // The provider lists are derived from the integrations, so those are read first: a saved OpenAI rendered before
+ // its key was known would fall back to this browser, and saving would keep the fallback.
+ const [catalog]=await Promise.all([api('/api/presentation/voice-catalog'),loadIntegrations().then(loadTranscription)]);
  voiceCatalog=catalog;const eleven=voiceCatalog.providers?.elevenlabs||{};
  populateVoiceSettings(p);renderDefaultVoices(p.default_voice);renderLanguageRows();
- await loadElevenLabs().catch(()=>{});
  $('settings-error').textContent=eleven.error||'';
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 $('tts-speed').oninput=()=>{$('speed-value').textContent=Number($('tts-speed').value).toFixed(2)+'×';if(voiceCatalog){storeLanguage();renderLanguageRows()}};
@@ -1625,20 +1637,21 @@ $('tts-provider').onchange=()=>{storeLanguage();defaultVoicesExpanded=false;expa
 $('tts-device').onchange=()=>renderVoiceDevice($('tts-device').value);
 $('default-voice').onchange=()=>{if($('default-voice').value===SHOW_ALL_VOICES){defaultVoicesExpanded=true;renderDefaultVoices();renderLanguageRows();return}storeLanguage();renderLanguageRows()};
 $('default-tts-language').onchange=()=>{defaultVoicesExpanded=false;renderDefaultVoices();renderLanguageRows()};
-function settingsSection(name){for(const section of ['general','voice','transcription','machines','advanced']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
+function settingsSection(name){for(const section of ['general','voice','transcription','integrations','machines','advanced']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}if(name!=='integrations'&&state.integrationFocus)state.integrationFocus=null}
 $('settings-advanced').onclick=()=>settingsSection('advanced');
 $('settings-general').onclick=()=>settingsSection('general');
 $('settings-machines').onclick=()=>settingsSection('machines');
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
 $('settings-voice').onclick=()=>settingsSection('voice');
 $('settings-transcription').onclick=()=>settingsSection('transcription');
+$('settings-integrations').onclick=()=>settingsSection('integrations');
 let sttCatalog=null,sttCapabilities=null;
 const sttRemote={openai:{loaded:false,loading:false,error:null}};
 function sttProvider(id){return (sttCatalog?.providers||[]).find(provider=>provider.id===id)}
 function renderTranscription(){
  if(!sttCatalog||!sttCapabilities)return;
  const provider=$('stt-provider').value||state.voicePreferences?.stt_provider||'browser',entry=sttProvider(provider),modelSelect=$('stt-model');
- $('stt-browser-options').hidden=provider!=='browser';$('stt-credential').hidden=provider!=='openai';
+ $('stt-browser-options').hidden=provider!=='browser';
  $('stt-provider-note').textContent=entry?.note||'';
  const current=modelSelect.value,saved=state.voicePreferences?.stt_provider===provider?state.voicePreferences?.stt_model:null;
  if(provider==='browser'){
@@ -1665,7 +1678,6 @@ function renderTranscription(){
   $("stt-model-note").textContent=enabled.length?"":"Ningún modelo local puede correr con este procesamiento en este navegador.";
  }else{
   const models=entry?.models||[],remote=sttRemote.openai;
-  showCredential('stt');
   modelSelect.disabled=remote.loading;
   // What was chosen stays chosen while the provider still offers it; otherwise its default, otherwise the
   // first one. A model that is no longer in the list is never left selected and never becomes an option
@@ -1689,107 +1701,116 @@ async function loadTranscriptionModels(provider,refresh=false){
  finally{remote.loading=false;if($('stt-provider').value===provider)renderTranscription()}
 }
 async function loadTranscription(){
- const data=await api('/api/presentation/transcription');sttCatalog=data.catalog;sttCredentials=data.credentials||{};
+ const data=await api('/api/presentation/transcription');sttCatalog=data.catalog;
  // Each opening brings a fresh catalogue whose OpenAI list is empty: the "already loaded" flag belonged to the
  // previous copy, and trusting it left the model list empty on every reopening.
  sttRemote.openai.loaded=false;
  sttCapabilities=await window.roomTranscription.capabilities();
- entriesFor($('stt-provider'),(sttCatalog.providers||[]).filter(provider=>provider.id!=='browser'||sttCapabilities.webgpu||sttCapabilities.wasm).map(provider=>[provider.id,provider.label]),state.voicePreferences?.stt_provider||'browser');
+ renderTranscriptionProviders(state.voicePreferences?.stt_provider||'browser');
  $('stt-device').disabled=false;renderTranscription();
  if($('stt-provider').value==='openai')void loadTranscriptionModels('openai');
 }
+function renderTranscriptionProviders(wanted=$('stt-provider').value){
+ if(!sttCatalog||!sttCapabilities)return;
+ offerProviders($('stt-provider'),(sttCatalog.providers||[]).filter(provider=>provider.id!=='browser'||sttCapabilities.webgpu||sttCapabilities.wasm).map(provider=>[provider.id,provider.label,!!provider.needs_key]),wanted);
+}
 $('stt-provider').onchange=()=>{$('stt-model').replaceChildren();renderTranscription();if($('stt-provider').value==='openai')void loadTranscriptionModels('openai',true)};
 $('stt-device').onchange=renderTranscription;$('stt-model').onchange=renderTranscription;
-/* A key checks itself where it is typed: leaving the field, or a pause while typing, sends it to the room
- * exactly as the form did, and the room stores only a key its provider accepted. So that provider's models
- * are asked for right away and fill the dropdown in place — whoever has just pasted a key sees it work
- * without saving, closing the dialog and opening it again (#72). A key the provider refuses changes
- * nothing: the one installed keeps working, and the line under the field says so. Removing a key is still
- * the ✕ in the field, which is the only thing that cannot wait (#64). */
+/* Integrations (#64): the machine's key for each provider, one per provider whatever it is used for, written by
+ * its owner from any device and never read back. The machine lists them with what can be said about a key —
+ * whether there is one, where from, its last four — and that listing is the one fact the panes derive from:
+ * a provider that needs a key is offered, greyed out, or not shown at all, as it says.
+ *
+ * A key checks itself where it is typed: leaving the field, a pause while typing, or Enter sends it, and the
+ * machine stores only a key its provider accepted. What that provider offers is asked for right away and fills
+ * the other panes in place — whoever has just pasted a key sees it work without saving, closing the dialog and
+ * opening it again (#72). A key the provider refuses changes nothing: the one installed keeps working, and the
+ * line under the field says so. Removing a key is the ✕ in the field, and acts at once. */
 const KEY_CHECK_PAUSE=1500;
-const keyFields={
- stt:{missing:'Sin clave: OpenAI no podrá transcribir',state:()=>sttCredentials.openai},
- elevenlabs:{missing:'Sin clave: no hay voces de ElevenLabs',state:()=>elevenCredentials},
-};
-for(const check of Object.values(keyFields))Object.assign(check,{sent:null,timer:null,job:null,running:false,failed:false,note:'',typed:false});
-function forgetCredentialCheck(field){const check=keyFields[field];if(!check)return;clearTimeout(check.timer);Object.assign(check,{sent:null,timer:null,running:false,failed:false,note:'',typed:false})}
-function scheduleCredentialCheck(field){const check=keyFields[field];clearTimeout(check.timer);check.timer=setTimeout(()=>checkCredential(field),KEY_CHECK_PAUSE)}
-// The news about a key goes in the same line the stored one uses: one place to look, whatever happened.
-function credentialNote(field){
- const check=keyFields[field];
- if(check.note)return check.note;
- const state=check.state();
- return state?.configured&&state.source==='environment'?'Esta clave viene del entorno de la sala; no se puede quitar desde aquí.':'';
+const keyChecks={};   // provider -> the plumbing of its check; what its row says is the store's
+function keyCheck(id){return keyChecks[id]||(keyChecks[id]={timer:null,job:null,sent:null})}
+function integrationRow(id){return state.integrations?.providers?.find(row=>row.id===id)}
+function keyNote(id,note,status){
+ const checks={...state.integrationChecks};
+ if(note)checks[id]={note,status};else delete checks[id];
+ state.integrationChecks=checks;
 }
-function showCredentialNote(field){const note=$(field+'-key-state');if(note)note.textContent=credentialNote(field)}
-// The dropdown a verified key fills: transcription renders itself, synthesis renders from the catalogue.
-function renderCredential(field){
- if(field==='stt'){renderTranscription();return}
- showCredential('elevenlabs');renderVoiceProvider();renderLanguageRows();
+function keyDraft(id,value){state.integrationDrafts={...state.integrationDrafts,[id]:value}}
+function forgetKeyCheck(id){const check=keyCheck(id);clearTimeout(check.timer);Object.assign(check,{timer:null,sent:null});keyNote(id,'')}
+function forgetKeyChecks(){roomStore.batch(()=>{for(const id of Object.keys(keyChecks))forgetKeyCheck(id);state.integrationDrafts={}})}
+async function loadIntegrations(){
+ try{const listing=await api('/api/presentation/integrations');roomStore.patch({integrations:listing,integrationsError:''})}
+ catch(error){roomStore.patch({integrationsError:'No se pudieron leer las integraciones de esta máquina: '+error.message})}
 }
-async function checkCredential(field){
- const check=keyFields[field],input=$(field+'-key');
- if(!check||!input)return;
+function typeIntegrationKey(id,value){
+ const check=keyCheck(id);clearTimeout(check.timer);check.timer=null;
+ keyDraft(id,value);
+ if(String(value||'').trim()){check.timer=setTimeout(()=>checkIntegrationKey(id),KEY_CHECK_PAUSE);return}
+ // Emptying the field takes the complaint about what was in it away with it.
+ check.sent=null;keyNote(id,'');
+}
+async function checkIntegrationKey(id){
+ const check=keyCheck(id);
  clearTimeout(check.timer);check.timer=null;
- if(check.running){await check.job;return checkCredential(field)}
- const key=String(input.value||'').trim();
+ if(check.job){await check.job;return checkIntegrationKey(id)}
+ const key=String(state.integrationDrafts[id]||'').trim();
  if(!key||key===check.sent)return;
- check.sent=key;check.running=true;check.failed=false;check.note='Comprobando la clave…';showCredentialNote(field);
- check.job=verifyCredential(field,key);
- await check.job;
+ check.sent=key;keyNote(id,'Comprobando la clave…','checking');
+ check.job=verifyIntegrationKey(id,key);
+ try{await check.job}finally{check.job=null}
 }
-async function verifyCredential(field,key){
- const check=keyFields[field];
- try{
-  if(field==='stt'){
-   sttCredentials=(await post('/api/presentation/transcription/credential',{provider:'openai',key})).credentials||{};
-   sttRemote.openai.loaded=false;
-   await loadTranscriptionModels('openai',true);
-   check.note='Clave verificada · '+(sttRemote.openai.error||'Modelos actualizados');
-  }else{
-   elevenCredentials=(await post('/api/presentation/synthesis/credential',{key})).credentials||{};
-   voiceCatalog=await api('/api/presentation/voice-catalog');
-   check.note='Clave verificada · Voces actualizadas';
-  }
-  check.running=false;renderCredential(field);
- }catch(error){
+async function verifyIntegrationKey(id,key){
+ let listing;
+ try{listing=await post('/api/presentation/integrations/'+encodeURIComponent(id),{key},'PUT')}
+ catch(error){
   // Nothing was stored, so the field keeps what was typed: a key with one wrong character is corrected, not retyped.
-  check.running=false;check.failed=true;
-  check.note='Clave rechazada · '+error.message+' · '+(check.state()?.configured?'La clave anterior sigue en uso':'No hay ninguna clave guardada');
-  showCredentialNote(field);
+  keyNote(id,'Clave rechazada · '+error.message+' · '+(integrationRow(id)?.configured?'La clave anterior sigue en uso':'No hay ninguna clave guardada'),'refused');
+  return;
+ }
+ // A stored key leaves the field — unless the person already typed something else in it.
+ roomStore.batch(()=>{state.integrations=listing;if(String(state.integrationDrafts[id]||'').trim()===key)keyDraft(id,'')});
+ keyNote(id,'Clave verificada · '+await followIntegration(id),'verified');
+}
+async function clearIntegrationKey(id){
+ forgetKeyCheck(id);$('settings-error').textContent='';
+ try{state.integrations=await api('/api/presentation/integrations/'+encodeURIComponent(id),{method:'DELETE'})}
+ catch(e){$('settings-error').textContent=e.message;return}
+ await followIntegration(id);
+}
+/* What a changed key changes elsewhere: the catalogue of each capability its provider serves is asked for again,
+ * and says what it brought. The provider lists themselves follow the listing on their own (see below). */
+async function followIntegration(id){
+ const news=[],capabilities=integrationRow(id)?.capabilities||[];
+ if(capabilities.includes('transcription')&&sttCatalog){
+  const entry=sttProvider(id);if(entry)entry.models=[];Object.assign(sttRemote[id]||{},{loaded:false,loading:false,error:null});
+  if(integrationRow(id)?.configured&&sttRemote[id]){await loadTranscriptionModels(id,true);news.push(sttRemote[id].error||'Modelos actualizados')}
+  renderTranscription();
+ }
+ if(capabilities.includes('voice')&&voiceCatalog){
+  try{voiceCatalog=await api('/api/presentation/voice-catalog');news.push('Voces actualizadas')}
+  catch(error){news.push(error.message)}
+  renderVoiceProvider();renderLanguageRows();
+ }
+ return news.join(' · ')||'Guardada en la máquina';
+}
+/* Saving carries no key — a verified one is already stored — so the form only waits for a check still in
+ * flight, and refuses to close over a key the provider rejected while it is still in the field. Only what was
+ * typed is a draft: text the browser filled in on its own (a saved password on the iPhone) never reached one,
+ * and is not a key anyone asked to install. */
+async function settleIntegrationKeys(){
+ for(const id of Object.keys(state.integrationDrafts)){
+  await checkIntegrationKey(id);
+  const said=state.integrationChecks[id];
+  if(said?.status==='refused'&&String(state.integrationDrafts[id]||'').trim())throw Error(said.note);
  }
 }
-for(const field of ['stt','elevenlabs']){
- const input=$(field+'-key');
- if(!input)continue;
- input.onblur=()=>checkCredential(field);
- input.oninput=()=>{keyFields[field].typed=true;if(String(input.value||'').trim()){scheduleCredentialCheck(field);return}forgetCredentialCheck(field);showCredentialNote(field)};
-}
-/* Saving carries no key any more — a verified one is already stored — so the form only waits for a check
- * still in flight, and refuses to close over a key the provider rejected while it is still in the field. */
-async function saveCredentials(){
- for(const field of ['stt','elevenlabs']){
-  // A field the person never typed in may still hold text the browser filled in on its own (a saved
-  // password on the iPhone): that is not a key anyone asked to install, and refusing to save over it is not ours.
-  if(!keyFields[field].typed)continue;
-  await checkCredential(field);
-  const check=keyFields[field];
-  if(check.failed&&String($(field+'-key')?.value||'').trim())throw Error(check.note);
- }
-}
-$('stt-key-clear').onclick=async()=>{$('stt-key-clear').disabled=true;$('settings-error').textContent='';forgetCredentialCheck('stt');try{const result=await post('/api/presentation/transcription/credential',{provider:'openai',key:null});sttCredentials=result.credentials||{};const entry=sttProvider('openai');if(entry)entry.models=[];Object.assign(sttRemote.openai,{loaded:false,loading:false,error:null})}catch(e){$('settings-error').textContent=e.message}finally{renderTranscription()}};
-/* A stored key shows itself where the key goes: masked, in its own field, with the four digits the room
- * returns. The line underneath is for news — checking, verified, refused, taken from the room's
- * environment — and says nothing when there is nothing to say, instead of repeating what the field
- * already shows (#64). A key still being checked stays in the field until the room has answered. */
-function showCredential(field){
- const check=keyFields[field],state=check.state(),input=$(field+'-key'),clear=$(field+'-key-clear');
- if(input){if(!check.running)input.value='';input.placeholder=state?.configured?'•••••••• '+(state.hint||''):check.missing}
- showCredentialNote(field);
- if(clear)clear.disabled=!state?.configured||state.source==='environment';
-}
-async function loadElevenLabs(){const data=await api('/api/presentation/synthesis');elevenCredentials=data.credentials||{};showCredential('elevenlabs')}
-$('elevenlabs-key-clear').onclick=async()=>{forgetCredentialCheck('elevenlabs');try{await post('/api/presentation/synthesis/credential',{key:null});voiceCatalog=await api('/api/presentation/voice-catalog');elevenCredentials={};renderVoiceProvider();renderLanguageRows()}catch(e){$('settings-error').textContent=e.message}finally{await loadElevenLabs()}};
+function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
+// The provider lists are derived from the listing: whenever it changes — read, a key stored or removed — they follow.
+roomStore.subscribe((view,previous)=>{
+ if(view.facts.integrations===previous.facts.integrations)return;
+ renderTranscriptionProviders();renderTranscription();
+ renderVoiceProvider();if(voiceCatalog)renderLanguageRows();
+});
 $('reset-settings').onclick=async()=>{try{localStorage.removeItem(SETTINGS_KEY);localStorage.removeItem('sidevoice.mic')}catch{}voiceDraft={};await $('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
 $('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$('language-settings').addEventListener('close',stopPreview);
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
@@ -1910,7 +1931,7 @@ async function applyTranscriptionSettings(previous,next){
   return 'local';
  }finally{state.switchingTranscription=false}
 }
-async function saveSettings(){storeLanguage();try{await saveCredentials()}catch(error){$('settings-error').textContent=error.message;return}const previous=state.voicePreferences,p={...state.voicePreferences,tts_execution:'browser',language_overrides:voiceDraft};// A control the person never saw is not a decision they made: a select with nothing in it (its pane hidden,
+async function saveSettings(){storeLanguage();try{await settleIntegrationKeys()}catch(error){$('settings-error').textContent=error.message;return}const previous=state.voicePreferences,p={...state.voicePreferences,tts_execution:'browser',language_overrides:voiceDraft};// A control the person never saw is not a decision they made: a select with nothing in it (its pane hidden,
 // its catalogue still loading) keeps what was saved before instead of writing an empty string — which is
 // how a saved OpenAI transcription silently became the browser's (2026-09-20).
 const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.value:'';return raw===''||raw==null?previous?.[key]:raw};
@@ -1951,6 +1972,10 @@ window.sidevoiceActions={
   voiceDraft[language]={...voiceDraft[language],speed};renderLanguageRows();
  },
  previewVoice,
+ typeIntegrationKey,
+ checkIntegrationKey,
+ clearIntegrationKey,
+ openIntegration,
  // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
  // away, inside the person's own tap. The choice is this device's, kept for next time.
  chooseMachine(id){
