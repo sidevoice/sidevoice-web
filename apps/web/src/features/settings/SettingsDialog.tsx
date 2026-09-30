@@ -8,7 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 
 function GeneralSettings() {
-  return <section id="pane-general" aria-labelledby="settings-general" hidden><h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="es"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este navegador y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p></section>;
+  return <section id="pane-general" aria-labelledby="settings-general" hidden><h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este navegador y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p></section>;
 }
 
 function VoiceSettings() {
@@ -22,7 +22,7 @@ function VoiceSettings() {
         <label>Clave de API de ElevenLabs<span className="key-field"><input id="elevenlabs-key" type="password" autoComplete="off" spellCheck={false} placeholder="Sin clave guardada" /><Button id="elevenlabs-key-clear" variant="ghost" size="icon" className="key-clear" aria-label="Quitar la clave guardada" title="Quitar la clave guardada"><CloseIcon size={15} /></Button></span></label>
         <p className="muted" id="elevenlabs-key-state" role="status" />
       </div>
-      <label>Voz por defecto<NativeSelect id="default-voice"><option value="ef_dora">Dora</option></NativeSelect></label>
+      <label>Voz por defecto<NativeSelect id="default-voice"><option value="af_heart">Heart · US</option></NativeSelect></label>
       <label>Velocidad global <output id="speed-value">1.00×</output><input id="tts-speed" type="range" min="0.5" max="2" step="0.05" defaultValue="1" /></label><p id="speed-note" className="muted" />
       <Button id="prepare-model">Precargar modelo (opcional)</Button><p id="model-status" role="status" className="muted" />
       <label>Idioma de voz si el agente no lo indica<NativeSelect id="default-tts-language"><option value="es">Español</option><option value="en">English</option></NativeSelect></label>

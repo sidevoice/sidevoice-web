@@ -10,7 +10,7 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it.
- const modules={'../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing'};
+ const modules={'../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','./system-language.js':'SystemLanguage'};
  const imports=source=>source.replace(/^import \{(.*)\} from '(.*)';\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
  for(const [from,name] of Object.entries(modules)){
@@ -2378,4 +2378,23 @@ test('Inside the desktop app a native device choice is saved, and outside it is 
   const saved=stored.find(([key])=>key==='sidevoice.settings')?.[1];
   assert.equal(saved.tts_device,expected,native?'the app\'s engine is a device like the others':'a page without the app cannot choose it');
  }
+});
+
+test('A person who never chose gets their system language, English when it is none of ours, and a saved choice wins',async()=>{
+ const s=setup();
+ // The room's defaults are English: a node cannot know the person's system.
+ s.context.fetch=async()=>({ok:true,json:async()=>({ui_language:'en',stt_language:'en',default_tts_language:'en',default_voice:'af_heart'})});
+ s.context.navigator={languages:['de-DE','fr-FR']};
+ let p=await s.run('loadPreferences()');
+ assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['en','fr','fr']);
+ s.context.navigator={languages:['es-ES']};
+ p=await s.run('loadPreferences()');
+ assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['es','es','es']);
+ s.context.navigator={languages:['de-DE']};
+ p=await s.run('loadPreferences()');
+ assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['en','en','en']);
+ s.context.navigator={languages:['es-ES']};
+ s.context.localStorage={getItem:key=>key==='sidevoice.settings'?JSON.stringify({ui_language:'en',stt_language:'auto'}):null,setItem(){},removeItem(){}};
+ p=await s.run('loadPreferences()');
+ assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['en','auto','es']);
 });

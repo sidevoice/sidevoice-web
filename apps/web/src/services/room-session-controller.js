@@ -2,6 +2,7 @@ import {createRoomSessionStore,working,joinView,conversationView,participantsVie
 import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
+import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
@@ -1482,7 +1483,7 @@ function voiceEntriesFor(model,language,showAll=false){
 }
 function validVoice(entries,value){return entries.some(([id])=>id!==SHOW_ALL_VOICES&&id===value)?value:entries.find(([id])=>id!==SHOW_ALL_VOICES)?.[0]}
 function renderDefaultVoices(value){
- const model=$('default-model').value,language=$('default-tts-language').value||'es',voices=voiceEntriesFor(model,language,defaultVoicesExpanded);
+ const model=$('default-model').value,language=$('default-tts-language').value||systemLanguage(SPEECH_LANGUAGES),voices=voiceEntriesFor(model,language,defaultVoicesExpanded);
  setModelInfo($('default-model-info'),model);entriesFor($('default-voice'),voices,validVoice(voices,value));
  const cloud=providerFor(model)==='elevenlabs';updateSpeedRange();
  $('model-status').textContent=cloud&&!elevenCredentials.configured?'Guarda una clave de ElevenLabs para cargar las voces de la cuenta.':'';
@@ -1604,7 +1605,7 @@ $('settings-open').onclick=async()=>{try{
  // Voices, transcription and keys are a machine's; pairing one is not. With none connected the dialog still
  // opens — on Máquinas, the one pane that has something to do — instead of failing on a catalogue nobody serves.
  if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
- const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language||'es');state.voicePreferences=p;
+ const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);state.voicePreferences=p;
  for(const key of ['stt_language','default_tts_language','tts_speed','ui_language','tts_device','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
  for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
  $('presence-sound').value=(p.presence_sound??'on')==='off'?'off':'on';
@@ -1797,10 +1798,12 @@ $('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$
 // and the fix never reached the person it was written for (2026-09-20).
 const MIC_KEYS=['turn_patience'];
 // Every setting belongs to this device. The room answers with its defaults and keeps no copy; what this browser saved wins.
+// Between the two, what depends on the person's language comes from their system (system-language.js).
 const SETTINGS_KEY='sidevoice.settings';
 function storedPreferences(){for(const key of [SETTINGS_KEY,'sidevoice.mic']){try{const stored=JSON.parse(localStorage.getItem(key)||'null');if(stored&&typeof stored==='object')return stored}catch{}}return {}}
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(p));localStorage.removeItem('sidevoice.mic')}catch{}}
-async function loadPreferences(){const defaults=await api('/api/presentation/languages');return {...defaults,...storedPreferences()}}
+function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
+async function loadPreferences(){const defaults=await api('/api/presentation/languages');return {...defaults,...devicePreferences()}}
 // WebKit on the iPhone offers WebGPU and then fails while loading Whisper on it. A failed GPU load falls back to
 // CPU for this call and is remembered for this device, so 'automatic' starts on CPU next time; choosing GPU explicitly still tries it.
 // What this call is actually using, said small next to the controls: engine, model and processor, plus how the turn ends.
@@ -2054,7 +2057,8 @@ window.addEventListener('blur',releaseHold);document.addEventListener('visibilit
 // machine to ask.
 publishPairings();
 if(!pairingInUse(pairings))openPairing();
-locate().finally(()=>{loadPreferences().catch(()=>storedPreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language||'es'))});setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
+window.roomI18n?.setLanguage(devicePreferences().ui_language);
+locate().finally(()=>{loadPreferences().catch(()=>devicePreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language))});setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupAudioControls();
 setupOutputOwner();
