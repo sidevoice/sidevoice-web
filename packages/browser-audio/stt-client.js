@@ -54,7 +54,8 @@ class BrowserTranscription{
   this._ensureWorker(data.device);const id=++this.nextId;
   return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject,progress});this.worker.postMessage({id,type,...data},transfer)});
  }
- async capabilities(){return this._request('capabilities')}
+ /* What this browser can run in the page (never the native engine's list: that one is the app's). */
+ async capabilities(){return this._request('capabilities',{device:'browser'})}
  _preparation(data){window.dispatchEvent(new CustomEvent('voice-preparation',{detail:{kind:'transcription',...data}}))}
  _progress(value){
   const numeric=Number(value?.progress),file=String(value?.file||'').split('/').pop();

@@ -67,6 +67,9 @@ function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?'
  * null, and nothing of a node is asked: every such request carries this device's token. */
 const target=pageTarget();
 let nodeBase=null;
+/* The desktop app's native engine, when this page runs inside it: which of the page's models it can run, per task
+ * (page model ids; filled in once, further down). null outside the app. */
+let nativeModels=null;
 // This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
@@ -1436,10 +1439,12 @@ function renderVoiceDevice(saved){
  const entries=[['auto','Automático · GPU si está disponible']];
  if(sttCapabilities?.webgpu)entries.push(["webgpu","GPU · WebGPU"]);
  entries.push(['wasm','CPU · WebAssembly']);
+ if(nativeModels?.tts?.length)entries.push(['native','Este equipo · motor nativo de la app']);
  const wanted=saved||device.value||'auto';
  entriesFor(device,entries,entries.some(([id])=>id===wanted)?wanted:'auto');
  if(note)note.textContent=device.value==='auto'
   ?(sttCapabilities?.webgpu?'Automático usará la GPU de este navegador.':'Automático usará la CPU: este navegador no expone WebGPU.')
+  :device.value==='native'?'La app genera la voz con el procesador de este equipo, fuera de la página. El modelo se descarga una vez.'
   :device.value==='webgpu'?'La voz se generará en la GPU. Si falla, se reintenta en CPU y se te dice.'
   :'La voz se generará en la CPU. Más lenta, pero funciona en cualquier navegador.';
 }
@@ -1640,12 +1645,14 @@ function renderTranscription(){
   const device=$('stt-device'),savedDevice=device.value||state.voicePreferences?.stt_device||'auto',entries=[['auto','Automático']];
   if(sttCapabilities.webgpu)entries.push(['webgpu',gpuFailed?'GPU · WebGPU (falló al cargar Whisper aquí)':'GPU · WebGPU']);
   if(sttCapabilities.wasm)entries.push(['wasm','CPU · WebAssembly']);
+  if(nativeModels)entries.push(['native','Este equipo · motor nativo de la app']);
   entriesFor(device,entries,entries.some(([id])=>id===savedDevice)?savedDevice:'auto');
   const effective=device.value==='auto'?(sttCapabilities.webgpu&&!gpuFailed?'webgpu':'wasm'):device.value;
   $('stt-device-note').textContent=device.value==='auto'?(!sttCapabilities.webgpu?'Automático usará la CPU: WebGPU no está disponible en este navegador.':gpuFailed?'Automático usará la CPU: este navegador ofrece WebGPU pero no pudo cargar Whisper con ella.':'Automático usará la GPU: WebGPU está disponible en este navegador.'):(effective==='webgpu'?'Aceleración WebGPU. Si falla al cargar, se pasará a CPU.':'Procesamiento en CPU mediante WebAssembly.');
+  if(effective==='native')$('stt-device-note').textContent='La app transcribe con el procesador de este equipo, fuera de la página. Cada modelo se descarga una vez.';
   const all=entry?.models||[];
-  const runnable=model=>!!model.devices?.includes(effective)&&!!sttCapabilities.models?.includes(model.id);
-  const reason=model=>!model.devices?.includes(effective)?(effective==='wasm'?'requiere GPU':'solo CPU'):'no disponible en este navegador';
+  const runnable=model=>!!model.devices?.includes(effective)&&!!(effective==='native'?nativeModels?.stt:sttCapabilities.models)?.includes(model.id);
+  const reason=model=>effective==='native'?'no disponible en el motor nativo':!model.devices?.includes(effective)?(effective==='wasm'?'requiere GPU':'solo CPU'):'no disponible en este navegador';
   const enabled=all.filter(runnable),ids=enabled.map(model=>model.id);
   const preferred=ids.includes(current)?current:ids.includes(saved)?saved:ids.includes(entry?.default_model)?entry.default_model:ids[0];
   entriesFor(modelSelect,all.map(model=>[model.id,runnable(model)?model.label:model.label+' · '+reason(model),!runnable(model)]),preferred);
@@ -1808,7 +1815,7 @@ async function prepareLocalWhisper(model,device){
  if(device==='auto'&&storedPreferences().stt_gpu_failed)device='wasm';
  try{return await window.roomTranscription.prepare({model,device})}
  catch(error){
-  if(device==='wasm'||!caps.wasm)throw error;
+  if(device==='wasm'||device==='native'||!caps.wasm)throw error;
   state.liveNote='La GPU no pudo cargar '+model.split('/').pop()+'; este dispositivo usa la CPU';
   storePreferences({...(state.voicePreferences||{}),stt_device:'wasm',stt_gpu_failed:true});if(state.voicePreferences)state.voicePreferences.stt_device='wasm';
   const runtime=await window.roomTranscription.prepare({model,device:'wasm'});
@@ -1820,7 +1827,7 @@ async function prepareLocalWhisper(model,device){
 async function prepareTranscription(preferences){
  if(preferences?.stt_provider==='openai')return {browserStt:false,sttRuntime:null};
  let {stt_model:model,stt_device:device}=preferences||{};
- const caps=await window.roomTranscription.capabilities();
+ const caps=device==='native'&&nativeModels?{models:nativeModels.stt,wasm:false}:await window.roomTranscription.capabilities();
  if(!caps.models.includes(model)){
   const fallback=caps.models[0];
   if(!fallback)throw Error('Este navegador no puede transcribir en local; elige OpenAI en Configuración.');
@@ -1969,6 +1976,15 @@ function applyLockedCall(){
 // So the call owns it with an element of its own: a faint looping file, far below the microphone's
 // detector, playing while the microphone is open and paused while it is muted. A click then toggles the
 // microphone. It never touches the call's own output element, which is what echo cancellation listens to.
+// Ask the desktop app's native engine once what it can run; the settings re-render when it answers.
+(async()=>{
+ const engine=window.__sidevoiceDesktop?.host?.nativeEngine;if(!engine)return;
+ try{const info=await engine.available(),ids=info.pageIds||{},offers=info.offers||[];
+  const of=task=>Object.entries(ids).filter(([,id])=>offers.some(o=>o.model===id&&o.task===task)).map(([page])=>page);
+  nativeModels={stt:of('stt'),tts:of('tts')};
+  renderTranscription();renderVoiceDevice();
+ }catch{}
+})();
 let nowPlaying=null;
 function faintLoop(){
  const rate=8000,seconds=2,count=rate*seconds,bytes=new DataView(new ArrayBuffer(44+count*2));
@@ -1999,7 +2015,9 @@ function syncNowPlaying(){
 let lockScreenOn=false;
 function applyLockScreen(on){
  lockScreenOn=on;
- const session=typeof navigator!=='undefined'?navigator.mediaSession:null;
+ // In the desktop app on a Mac the app answers the headset's buttons itself (sidevoice-desktop src/headset.rs):
+ // handlers here too would toggle the microphone twice on one click.
+ const session=typeof navigator!=='undefined'&&window.__sidevoiceDesktop?.host?.mediaKeys!=='native'?navigator.mediaSession:null;
  if(session){
   // A click arrives as play or pause, whichever the platform thinks is next. "Play" always means open the
   // microphone; "pause" toggles it, because a click may reach us as pause even while muted.

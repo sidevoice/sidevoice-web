@@ -42,6 +42,8 @@ try {
     loadExternalScript(`/voice-browser/room-i18n.js?v=${buildId}`),
     loadExternalScript(`/voice-browser/room-client.js?v=${buildId}`),
     loadExternalScript(`/voice-browser/stt-client.js?v=${buildId}`),
+    // The desktop app's native engine as one more device (inert outside the app).
+    loadExternalScript(`/voice-browser/native-worker.js?v=${buildId}`),
   ]);
   root.render(<App />);
 } catch (error) {

@@ -2337,3 +2337,25 @@ test('Switched off on this device, or by the machine, the microphone stays on th
  await stored.join('call-1');
  assert.equal(FakePeer.all.length,0,'localStorage sidevoice.webrtc=off keeps the socket too');
 });
+test('Inside the desktop app, its native engine is one more place a voice can run',()=>{
+ const s=setup({strictDOM:true});
+ s.run("renderVoiceDevice('auto')");
+ const before=s.run("$('tts-device').children.map(option=>option.value)");
+ assert.ok(!before.includes('native'),'a browser has no native engine');
+ s.run("nativeModels={stt:['onnx-community/whisper-small'],tts:['onnx-community/Kokoro-82M-v1.0-ONNX']};renderVoiceDevice('native')");
+ assert.ok(s.run("$('tts-device').children.map(option=>option.value)").includes('native'));
+ assert.equal(s.run("$('tts-device').value"),'native','a saved native choice stays chosen');
+ assert.match(s.run("$('tts-device-note').textContent"),/procesador de este equipo/);
+});
+test('When the desktop app answers the headset buttons, the page does not answer them too',()=>{
+ const s=setup({strictDOM:true});
+ const registered=[];
+ s.context.navigator={mediaSession:{setActionHandler:(action,handler)=>registered.push([action,!!handler]),metadata:null}};
+ s.context.MediaMetadata=class{constructor(value){Object.assign(this,value)}};
+ s.run("applyLockScreen(true)");
+ assert.ok(registered.some(([action,on])=>action==='pause'&&on),'a page on its own takes the buttons');
+ registered.length=0;
+ s.context.window.__sidevoiceDesktop={host:{mediaKeys:'native'}};
+ s.run("applyLockScreen(true)");
+ assert.equal(registered.length,0,'with the app answering them, one click must not toggle the microphone twice');
+});
