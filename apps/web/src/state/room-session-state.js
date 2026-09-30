@@ -207,7 +207,7 @@ export function conversationView(s) {
 /** How a conversation's harness is reached, in the words under its title. Only routes that differ in what the
  *  person can do are named; a room that does not say leaves it to the harness name. */
 export function routeLabel(p) {
-    return { 'cursor-editor-view': 'tarjeta (experimental)', 'cursor-cli-persist': 'CLI persist (experimental)', 'cursor-cli': 'CLI, solo escucha' }[p.route] || null;
+    return { 'cursor-editor-bridge': 'Desktop Bridge (experimental)', 'cursor-editor-view': 'tarjeta (experimental)', 'cursor-cli-persist': 'CLI persist (experimental)', 'cursor-cli': 'CLI, solo escucha' }[p.route] || null;
 }
 /** A capability the harness reaches by a route it does not offer: said, because it can misbehave. */
 export function experimentalNote(p) {
