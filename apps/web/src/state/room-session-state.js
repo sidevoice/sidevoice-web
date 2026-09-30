@@ -205,7 +205,11 @@ export function conversationView(s) {
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }
 /** A capability the harness reaches by a route it does not offer: said, because it can misbehave. */
-export function experimentalNote(p) { return p.capabilities?.experimental?.includes('deliver') ? 'Entrega experimental: lo que dices se escribe en la conversación por un camino que su harness no ofrece; si escribes a la vez, se mezcla.' : null; }
+export function experimentalNote(p) {
+    const marked = p.capabilities?.experimental || [];
+    return [marked.includes('deliver') ? 'Entrega experimental: lo que dices se escribe en la conversación por un camino que su harness no ofrece; si escribes a la vez, se mezcla.' : null,
+        marked.includes('sessionIdentity') ? 'Identificación experimental: la conversación es la que muestra la tarjeta de Sidevoice.' : null].filter(Boolean).join(' ') || null;
+}
 export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? 'Este harness no informa cuándo está trabajando; los puntos siguen lo que dice la conversación.' : 'No sabemos si este harness informa cuándo está trabajando.'; }
 export function participantsView(s) {
     const selected = selectedThread(s), entries = [...s.people];

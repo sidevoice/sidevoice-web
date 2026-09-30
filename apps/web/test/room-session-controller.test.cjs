@@ -77,6 +77,8 @@ test('The controller publishes serializable snapshots through the React store br
  assert.equal(snapshots.participants[0].activityNote,null,'supported activity needs no warning');
  s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported',deliver:'supported',experimental:['deliver']}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/Entrega experimental/,'an experimental delivery is said');
+ s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported',deliver:'supported',sessionIdentity:'supported',experimental:['deliver','sessionIdentity']}}];rosterSignature=''");
+ assert.match(snapshots.participants[0].activityNote,/Identificación experimental/,'an experimental identity is said too');
  assert.equal(s.run("setRoomError('fallo')"),undefined);
  assert.equal(snapshots.bootError,'fallo');
  assert.equal(s.run("$('messages').children.length"),0,'React owns rendering when the bridge is installed');
