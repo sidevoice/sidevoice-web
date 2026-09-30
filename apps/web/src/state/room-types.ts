@@ -66,6 +66,9 @@ export interface ParticipantView {
   machineId?: string | null;
   /** The harness the conversation runs in ("claude", "codex"), shown as its icon; null when unknown. */
   harness?: string | null;
+  /** How that harness is reached, when the room says it (Cursor: its editor card, its CLI under persist, or
+   *  listening only); null against a room that does not. */
+  route?: string | null;
 }
 
 /** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
