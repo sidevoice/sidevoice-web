@@ -204,6 +204,8 @@ export function conversationView(s) {
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }
+/** A capability the harness reaches by a route it does not offer: said, because it can misbehave. */
+export function experimentalNote(p) { return p.capabilities?.experimental?.includes('deliver') ? 'Entrega experimental: lo que dices se escribe en la conversación por un camino que su harness no ofrece; si escribes a la vez, se mezcla.' : null; }
 export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? 'Este harness no informa cuándo está trabajando; los puntos siguen lo que dice la conversación.' : 'No sabemos si este harness informa cuándo está trabajando.'; }
 export function participantsView(s) {
     const selected = selectedThread(s), entries = [...s.people];
@@ -222,7 +224,7 @@ export function participantsView(s) {
         return { threadId: p.thread_id, title: p.title, selected: p.thread_id === selected, available: !!p.available, switching: s.switching,
             unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
             machine: p.machine?.host || null, machineId: p.machine?.id || null, harness: p.harness || null,
-            activityNote: workingCapabilityNote(p), detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
+            activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }
 /** How long ago, said the way a person says it. The clock comes in with the facts — nothing here

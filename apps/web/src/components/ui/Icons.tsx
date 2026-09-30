@@ -95,7 +95,7 @@ export function PlatformIcon({ platform, size = 12 }: { platform: string; size?:
   return <MachinesIcon size={size} />;
 }
 
-export const HARNESS_NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex" };
+export const HARNESS_NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
 
 export function HarnessIcon({ harness, size = 12 }: { harness: string; size?: number }) {
   if (harness === "claude") return <ClaudeIcon size={size} />;
