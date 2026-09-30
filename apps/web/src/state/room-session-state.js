@@ -6,6 +6,7 @@ export const GAP_BUFFER_SECONDS = 30;
 // breath, and the bed used to start in it, over someone who was still talking (2026-09-20).
 export const BED_AFTER_USER_MS = 2000;
 export const JOIN_STEPS = { audio: 'Preparando audio', whisper: 'Cargando Whisper', voice: 'Cargando el modelo de voz', microphone: 'Pidiendo el micrófono', room: 'Entrando en la sala', conversation: 'Volviendo a ', reconnect: 'Reconectando con la sala…', transcription: 'Cambiando de transcripción…', mic: 'Aplicando los ajustes del micrófono…' };
+export const NO_MACHINE = 'Ninguna máquina conectada a la sala. Enciende una de las emparejadas, o empareja una nueva en Configuración › Máquinas.';
 export const REPLAY_NOTES = { queued: 'Repitiendo lo que no oíste', playing: 'Repitiendo lo que no oíste', done: 'Repetido al volver', cancelled: 'Repetición cancelada', gone: 'No se pudo repetir · la sala ya no tiene ese audio' };
 const OUTPUT_MARKS = { ok: '', recovering: ' · audio ↻', failed: ' · audio ✕' };
 const OUTPUT_TITLES = { ok: 'Salida de audio en orden', recovering: 'La salida de audio se atascó y se está recuperando', failed: 'La salida de audio falló; revisa las estadísticas' };
@@ -22,6 +23,9 @@ export function initialSessionFacts() {
         audioDevices: { inputs: [], outputs: [], inputId: 'default', outputId: 'default', available: true, outputAvailable: true, busy: false },
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null, languageModels: [],
         machines: [], machinesAt: 0, machineBusy: '',
+        // What the target said it is ('room', 'node', 'legacy'; '' until it answers), the machines a room
+        // lists, and the one this page talks to (docs/RENDEZVOUS.md).
+        rendezvous: '', nodes: [], node: null,
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -54,8 +58,10 @@ export function sessionStatus(s) {
 export function joinView(s) {
     if (s.joinFailure)
         return { step: 'failed', text: s.joinFailure, progress: null, failed: true };
+    // With no machine to talk to, the line where a join starts says so before anybody taps: a standing
+    // note rather than a step, gone by itself the moment a machine connects.
     if (!s.joinStep)
-        return null;
+        return !s.ws && !s.connecting && nodeView(s).none ? { step: 'no-machine', text: NO_MACHINE, progress: null, failed: false, note: true } : null;
     const base = JOIN_STEPS[s.joinStep] + (s.joinStep === 'conversation' ? s.joinSubject : '');
     const note = s.joinProgress != null ? Math.round(s.joinProgress) + ' %' : s.joinDetail;
     return { step: s.joinStep, text: note ? base + ' (' + note + ')' : base, progress: s.joinProgress, failed: false };
@@ -260,6 +266,13 @@ export function machinesView(s) {
             busy: s.machineBusy === m.id };
     });
 }
+/** Which machine this page talks to, for the selector in the machines panel: shown only when there is a
+ *  choice to make, and the one in use stays listed — saying so — if it drops while a call is on it. */
+export function nodeView(s) {
+    const nodes = s.nodes || [], connected = nodes.filter(n => n.connected);
+    return { choose: connected.length > 1, none: s.rendezvous === 'room' && !connected.length, selected: s.node,
+        options: nodes.filter(n => n.connected || n.id === s.node).map(n => ({ id: n.id, host: (n.host || 'Máquina sin nombre') + (n.connected ? '' : ' · desconectada'), connected: !!n.connected })) };
+}
 export function liveText(s) {
     // A notice the runtime put there (the voice model loading, a saved preference, a server that did not
     // answer) speaks for the moment it belongs to; it is cleared when the call moves on, not overwritten
@@ -304,7 +317,7 @@ export function createRoomSessionStore(seed = {}) {
             join: joinView(facts), engine: engineView(facts), echo: echoCoverage({ ...facts.echoFacts, connected: !!facts.ws, track: !!facts.stream }), live: liveText(facts),
             mic: micView(facts), call: callView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
             enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
-            audioDevices: facts.audioDevices, machines: machinesView(facts),
+            audioDevices: facts.audioDevices, machines: machinesView(facts), node: nodeView(facts),
             bootError: facts.bootError, languageModels: facts.languageModels };
     }
     function publish() { if (depth || !dirty)

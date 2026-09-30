@@ -15,6 +15,7 @@
  */
 import { TELEMETRY_API } from "@sidevoice/protocol";
 import type { RoomTelemetry, TelemetryAttributes } from "./telemetry-types";
+import { pageTarget } from "./rendezvous.js";
 
 let implementation: RoomTelemetry | null = null;
 let loading: Promise<RoomTelemetry | null> | null = null;
@@ -53,16 +54,18 @@ export const telemetry: RoomTelemetry = {
   audioEvent: facade("audioEvent") as RoomTelemetry["audioEvent"],
 };
 
-/** Ask the room, and load the SDK only if it says a collector is waiting for the spans. */
+/** Ask the room, and load the SDK only if it says a collector is waiting for the spans. The room is
+ *  this page's target (docs/RENDEZVOUS.md), never the machine its call runs on. */
 export function initTelemetry(): Promise<RoomTelemetry | null> {
   loading ??= (async () => {
     try {
-      const response = await fetch(TELEMETRY_API, { headers: { accept: "application/json" } });
+      const url = pageTarget() + TELEMETRY_API;
+      const response = await fetch(url, { headers: { accept: "application/json" } });
       if (!response.ok) return null;
       const state = (await response.json()) as { enabled?: boolean };
       if (!state?.enabled) return null;
       const module = await import("./telemetry-otel");
-      implementation = module.createTelemetry({ url: TELEMETRY_API });
+      implementation = module.createTelemetry({ url });
       return implementation;
     } catch {
       // An older room has no such endpoint, and a page that cannot ask simply does not trace.

@@ -36,6 +36,8 @@ const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId = buildId;
 
 try {
+  // The audio runtime comes from whoever serves this page, never from the target (docs/RENDEZVOUS.md):
+  // these scripts start workers at `/voice-browser/…`, and a worker can only come from the page's own origin.
   await Promise.all([
     loadExternalScript(`/voice-browser/room-i18n.js?v=${buildId}`),
     loadExternalScript(`/voice-browser/room-client.js?v=${buildId}`),

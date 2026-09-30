@@ -1,7 +1,27 @@
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, ConnectorIcon, MachinesIcon, PlatformIcon } from "../../components/ui/Icons";
+import { NativeSelect } from "../../components/ui/NativeSelect";
 import { useRoomStore } from "../../state/room-store";
+
+/** Which machine this page talks to, once there is more than one to talk to: the conversations listed
+ *  and the call are that machine's. Choosing acts at once — it is not a setting the Save button waits
+ *  for — and in a call it hangs up and joins the other machine's, which the line under it says before
+ *  anybody chooses. The choice is this device's and is kept for next time. */
+function MachineChoice() {
+  const node = useRoomStore((state) => state.node);
+  if (!node.choose) return null;
+  return (
+    <>
+      <label>Máquina en uso
+        <NativeSelect value={node.selected ?? ""} onChange={(event) => window.sidevoiceActions?.chooseMachine(event.currentTarget.value)}>
+          {node.options.map((option) => <option key={option.id} value={option.id} disabled={!option.connected}>{option.host}</option>)}
+        </NativeSelect>
+      </label>
+      <p className="muted">Las conversaciones y la llamada son las de esa máquina. Cambiar de máquina cuelga la llamada y entra en la de la otra.</p>
+    </>
+  );
+}
 
 /** The machines paired with this room, and the only place a person can take a pairing away.
  *
@@ -21,6 +41,7 @@ export function MachineList() {
   return (
     <div className="machines" id="machines">
       <h3><MachinesIcon /> Máquinas</h3>
+      <MachineChoice />
       {machines.length === 0 && <p className="muted">Ninguna máquina emparejada todavía.</p>}
       {machines.map((machine) => (
         <div className="machine-row" key={machine.id} data-state={machine.state} data-open={open[machine.id] || undefined}>

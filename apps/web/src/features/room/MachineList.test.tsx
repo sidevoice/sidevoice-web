@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { MachineList } from "./MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -64,4 +64,36 @@ test("a revoked machine stays listed, says so, and is removed by a second action
 test("no machine paired yet says so, rather than showing an empty panel", () => {
   room([]);
   expect(document.getElementById("machines")!.textContent).toMatch(/Ninguna máquina emparejada/);
+});
+
+// ----- which machine this page talks to (docs/RENDEZVOUS.md) -----
+const node = (id: string, connected: boolean) => ({ id, host: id + "-host", connected });
+
+test("with one machine connected there is nothing to choose, and no selector", () => {
+  const store = room([paired()]);
+  act(() => { store.patch({ rendezvous: "room", nodes: [node("c-1", true), node("c-2", false)], node: "c-1" }); });
+  expect(screen.queryByRole("combobox", { name: /Máquina en uso/ })).toBeNull();
+});
+
+test("with two connected the panel offers the choice, says what it costs, and choosing is an action", async () => {
+  const chooseMachine = vi.fn();
+  window.sidevoiceActions = { chooseMachine } as unknown as typeof window.sidevoiceActions;
+  const store = room([paired()]);
+  act(() => { store.patch({ rendezvous: "room", nodes: [node("c-1", true), node("c-2", true), node("c-3", false)], node: "c-1" }); });
+
+  const select = screen.getByRole("combobox", { name: /Máquina en uso/ }) as HTMLSelectElement;
+  expect(select.value).toBe("c-1");
+  expect([...select.options].map((option) => option.textContent)).toEqual(["c-1-host", "c-2-host"]);   // the offline one is not offered
+  expect(document.getElementById("machines")!.textContent).toMatch(/cuelga la llamada/);
+  await act(async () => { fireEvent.change(select, { target: { value: "c-2" } }); });
+  expect(chooseMachine).toHaveBeenCalledWith("c-2");
+});
+
+test("the machine a call is on stays in the selector, saying it dropped, until the page moves", () => {
+  const store = room([paired()]);
+  act(() => { store.patch({ rendezvous: "room", nodes: [node("c-1", false), node("c-2", true), node("c-3", true)], node: "c-1" }); });
+  const select = screen.getByRole("combobox", { name: /Máquina en uso/ }) as HTMLSelectElement;
+  expect(select.value).toBe("c-1");
+  expect(select.options[0].textContent).toBe("c-1-host · desconectada");
+  expect(select.options[0].disabled).toBe(true);
 });

@@ -97,6 +97,17 @@ export interface JoinStatusView {
   text: string;
   progress: number | null;
   failed: boolean;
+  /** A standing note rather than a step (no machine to talk to): no progress dot, and no alert. */
+  note?: boolean;
+}
+
+/** The machine this page talks to, and the ones it could: the selector appears only with a choice. */
+export interface NodeChoiceView {
+  choose: boolean;
+  /** The target is a room and none of its machines is connected. */
+  none: boolean;
+  selected: string | null;
+  options: { id: string; host: string; connected: boolean }[];
 }
 
 export interface SelectOption {
@@ -135,4 +146,6 @@ export interface SidevoiceActions {
   /** Take this machine's pairing away from the room. Asked again on a machine already revoked, it
    *  takes the row away too. */
   revokeMachine(id: string): Promise<void>;
+  /** Talk to this machine from now on, on this device. In a call it hangs up and joins that machine's. */
+  chooseMachine(id: string): void;
 }

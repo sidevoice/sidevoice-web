@@ -1,4 +1,5 @@
-import type { ChatMessage, ConversationView, JoinStatusView, LanguageModelView, MachineView, ParticipantView, KaraokeRange } from './room-types';
+import type { ChatMessage, ConversationView, JoinStatusView, LanguageModelView, MachineView, NodeChoiceView, ParticipantView, KaraokeRange } from './room-types';
+import type { RendezvousNode } from '../services/rendezvous.js';
 export interface AudioDevices {
  inputs: {id: string; label: string}[]; outputs: {id: string; label: string}[];
  inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
@@ -20,6 +21,8 @@ export interface SessionFacts {
  now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null; languageModels: LanguageModelView[];
  /** The machines paired with this room, as the room last listed them, and the clock of that answer. */
  machines: Record<string, unknown>[]; machinesAt: number; machineBusy: string;
+ /** What the target said it is, the machines a room lists, and the one this page talks to. */
+ rendezvous: '' | 'room' | 'node' | 'legacy'; nodes: RendezvousNode[]; node: string | null;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';
@@ -35,7 +38,7 @@ export interface SessionSnapshot {
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string}; deviceNote: string;
- bootError: string | null; languageModels: LanguageModelView[]; machines: MachineView[];
+ bootError: string | null; languageModels: LanguageModelView[]; machines: MachineView[]; node: NodeChoiceView;
 }
 export interface SessionStore {
  facts: SessionFacts;
@@ -47,4 +50,7 @@ export interface SessionStore {
 export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionStore;
 export function receiptView(status: string): {symbol: string; label: string};
 export function shortModel(name: string | null | undefined): string;
+export const NO_MACHINE: string;
+export function nodeView(s: SessionFacts): NodeChoiceView;
+export function joinView(s: SessionFacts): JoinStatusView | null;
 export function sinceText(seconds: number | null | undefined, now: number): string;

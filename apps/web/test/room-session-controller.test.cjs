@@ -5,11 +5,15 @@ function setup({strictDOM=false}={}){
  const elements=new Map(),handlers={};
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element())}
  const context=vm.createContext({Element,console,Date,JSON,Math,Uint8Array,AbortController,btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
- const dependency=fs.readFileSync(sourceRoot+'/state/room-session-state.js','utf8');
- const exports=[...dependency.matchAll(/^export (?:function|const) (\w+)/gm)].map(m=>m[1]);
- vm.runInContext('const SessionState=(()=>{'+dependency.replace(/^export /gm,'')+';return {'+exports.join(',')+'}})();',context);
+ // Each module the controller imports becomes one object in the context, and its import line a destructuring of it.
+ const modules={'../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous'};
+ for(const [from,name] of Object.entries(modules)){
+  const dependency=fs.readFileSync(sourceRoot+'/services/'+from,'utf8');
+  const exports=[...dependency.matchAll(/^export (?:async function|function|const) (\w+)/gm)].map(m=>m[1]);
+  vm.runInContext('const '+name+'=(()=>{'+dependency.replace(/^export /gm,'')+';return {'+exports.join(',')+'}})();',context);
+ }
  const source=fs.readFileSync(sourceRoot+'/services/room-session-controller.js','utf8');
- const loaded=source.replace(/^import \{(.*)\} from .*;\n/,(_,names)=>'const {'+names.replace('echoCoverage as deriveEchoCoverage','echoCoverage:deriveEchoCoverage')+'}=SessionState;\n');
+ const loaded=source.replace(/^import \{(.*)\} from '(.*)';\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  vm.runInContext('"use strict";\n'+loaded,context);
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
  vm.runInContext("roomBinding={thread_id:'a',title:'A'};sessionId='s'",context);
@@ -1940,4 +1944,116 @@ test('Typed-message receipts keep their bubble ID and replies settle fallback st
  assert.equal(s.run('roomStore.getState().session.working'),false);
  s.emit('voice-input-receipt',{session_id:'s',thread_id:'a',revision:7,history_id:'s:user-text:message-id',status:'read'});
  assert.equal(s.run('roomStore.getState().session.working'),false,'a repeated receipt cannot reopen a settled turn');
+});
+
+// ----- the room joins this page with a machine (docs/RENDEZVOUS.md, "Web client contract") -----
+const TWO_MACHINES={kind:'room',web_build:null,nodes:[{id:'mac',host:'macbook',connected:true},{id:'pc',host:'linux',connected:true}]};
+test('Once the room names a machine, its conversations and the call go to that machine, and pairing stays with the room',async()=>{
+ const s=setup();const asked=[],beacons=[];
+ s.context.fetch=async path=>{asked.push(path);return {ok:true,status:200,json:async()=>path==='/api/rendezvous'?TWO_MACHINES:path==='/api/connectors'?{connectors:[]}:{binding:null,participants:[]}}};
+ s.context.localStorage={getItem:key=>key==='sidevoice.node'?'pc':null,setItem(){},removeItem(){}};
+ s.context.navigator={sendBeacon:url=>{beacons.push(url);return true}};s.context.Blob=Blob;
+ await s.run('locate()');
+ assert.equal(s.run('state.node'),'pc','the machine this device chose last, while it is connected');
+ asked.length=0;
+ await s.run('refresh()');await s.run('refreshMachines()');
+ assert.ok(asked.includes('/nodes/pc/api/presentation?session_id=s'),asked.join(' '));
+ assert.ok(asked.includes('/api/connectors'),'the machines list is the room\'s');
+ assert.ok(asked.includes('/api/rendezvous'),'and it asks the room again which machines there are, on the same beat');
+ assert.equal(s.run('roomSocketUrl()'),'wss://room.example/nodes/pc/api/presentation/ws');
+ s.run("reportClientError({kind:'uncaught',message:'boom'})");
+ assert.deepEqual(beacons,['/nodes/pc/api/presentation/client-error'],'an error report goes where the call would have');
+});
+test('Changing machine hangs up and joins the other machine\'s call, and the choice is kept on this device',()=>{
+ const s=setup();const stored={};
+ s.context.localStorage={getItem:key=>stored[key]??null,setItem(key,value){stored[key]=value},removeItem(key){delete stored[key]}};
+ s.run(`rendezvous='room';nodes=${JSON.stringify(TWO_MACHINES.nodes)};node='mac';nodeBase='/nodes/mac';people=[{thread_id:'a',title:'A',available:true}];
+  ws={readyState:1};var calls=[];disconnect=()=>{calls.push('hang-up');ws=null};toggleCall=async()=>{calls.push('join '+nodeBase)}`);
+ s.run("window.sidevoiceActions.chooseMachine('pc')");
+ assert.equal(JSON.stringify(s.run('calls')),JSON.stringify(['hang-up','join /nodes/pc']),'hung up first, then joined the other one\'s call');
+ assert.equal(stored['sidevoice.node'],'pc');
+ assert.equal(s.run('state.node'),'pc');
+ assert.equal(s.run('people.length'),0,'the other machine\'s conversations are not this one\'s');
+ assert.equal(s.run('roomBinding'),null);
+ // The one in use, or one that is not connected, changes nothing.
+ s.run("calls.length=0;ws={readyState:1}");
+ s.run("window.sidevoiceActions.chooseMachine('pc');window.sidevoiceActions.chooseMachine('gone')");
+ assert.equal(s.run('calls.length'),0);
+ // Out of a call there is nothing to hang up: the page just moves.
+ s.run("ws=null;window.sidevoiceActions.chooseMachine('mac')");
+ assert.equal(s.run('calls.length'),0);
+ assert.equal(s.run('nodeBase'),'/nodes/mac');
+ assert.equal(stored['sidevoice.node'],'mac');
+});
+test('A machine the room cannot reach is not a full room: its own sentence, and not a refusal to stop at',async()=>{
+ const s=setup();s.context.crypto={randomUUID:()=>'hello-id'};
+ const refused=async frame=>{const socket={send(){},close(){}},pending=s.run('openSession')(socket,{});
+  if(frame)socket.onmessage({data:JSON.stringify({type:'error',data:frame})});
+  socket.onclose({code:1013});return pending.then(()=>null,error=>error)};
+ const away=await refused({message:'Esa máquina no está conectada a la sala ahora mismo.',reason:'node_offline'});
+ assert.equal(away.message,'Esa máquina no está conectada a la sala ahora mismo.');
+ assert.equal(away.refused,false,'a machine restarting may be back at the next attempt');
+ const full=await refused(null);
+ assert.match(full.message,/máximo de navegadores/,'the close code alone still means a full room');
+ assert.equal(full.refused,true);
+});
+test('With no machine connected the page still says why, joins nothing, and keeps pairing reachable',async()=>{
+ const s=setup({strictDOM:true});const asked=[],sockets=[];
+ s.context.WebSocket=class{constructor(url){sockets.push(url)}};s.context.WebSocket.OPEN=1;
+ s.context.fetch=async path=>{asked.push(path);return {ok:true,status:200,json:async()=>({kind:'room',nodes:[{id:'mac',host:'macbook',connected:false}]})}};
+ s.context.window.roomVoice={unlock:async()=>{},cancel(){}};
+ await s.run('locate()');
+ assert.equal(s.run('nodeBase'),null);
+ assert.match(s.run('joinView(state).text'),/Ninguna máquina conectada a la sala/,'said before anybody taps');
+ assert.equal(s.run('joinView(state).note'),true);
+ await s.run('toggleCall()');
+ assert.equal(sockets.length,0,'no call socket without a machine to open it on');
+ assert.equal(s.run('joinView(state).failed'),true);
+ assert.match(s.run('joinView(state).text'),/Ninguna máquina conectada a la sala/);
+ assert.deepEqual(asked.filter(path=>path!=='/api/rendezvous'),[],'nothing of a machine was asked');
+ // Pairing is the room's: the dialog opens on Máquinas instead of failing on a catalogue nobody serves.
+ await s.run("$('settings-open').onclick()");
+ assert.equal(s.run("$('language-settings').open"),true);
+ assert.equal(s.run("$('pane-machines').hidden"),false);
+ assert.equal(s.run("$('pane-voice').hidden"),true);
+ // And a form no machine filled is never saved over this device's settings.
+ const written=[];s.context.localStorage={getItem:()=>null,setItem:key=>written.push(key),removeItem(){}};
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+ assert.equal(written.length,0);
+ // A machine connecting takes the note and the failed join away by themselves.
+ s.context.fetch=async path=>({ok:true,status:200,json:async()=>path==='/api/rendezvous'?{kind:'room',nodes:[{id:'mac',host:'macbook',connected:true}]}:{binding:null,participants:[],messages:[],connectors:[]}});
+ await s.run('locate()');
+ assert.equal(s.run('nodeBase'),'/nodes/mac');
+ assert.equal(s.run('joinView(state)'),null);
+});
+test('A reconnection comes back to the machine the call was on, and never hands its words to another machine',async()=>{
+ const run=async listing=>{
+  const s=setup();const sockets=[];
+  s.context.atob=value=>Buffer.from(value,'base64').toString('binary');
+  s.context.WebSocket=class{constructor(url){this.url=url;this.readyState=0;this.sent=[];sockets.push(this)}send(m){this.sent.push(m)}close(){this.readyState=3}};
+  s.context.WebSocket.OPEN=1;
+  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});s.context.crypto={randomUUID:()=>'hello-id'};
+  s.context.localStorage={getItem:key=>key==='sidevoice.node'?'pc':null,setItem(){},removeItem(){}};
+  s.context.fetch=async path=>({ok:true,status:200,json:async()=>path==='/api/rendezvous'?{kind:'room',nodes:listing}:{binding:null,room:{revision:0},clients:[],call:null,participants:[]}});
+  s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
+  s.run(`RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
+   window.roomVoice={unlock:async()=>{},cancel(){},signal(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
+   voicePreferences={stt_provider:'openai'};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1};
+   rendezvous='room';nodes=${JSON.stringify(listing)};node='mac';nodeBase='/nodes/mac';${GAP_FRAMES}`);
+  const pending=s.run('lostConnection')({code:1012},s.run('connectEpoch'),{browserStt:false,sttRuntime:null});
+  s.run("feed(Array(60).fill(0.4))");
+  for(let attempt=0;attempt<100&&!sockets.length;attempt++)await new Promise(resolve=>setTimeout(resolve,2));
+  const socket=sockets[0];socket.readyState=1;socket.onopen();
+  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
+  await pending;
+  return {url:socket.url,catchup:socket.sent.map(value=>JSON.parse(value)).filter(m=>m.type==='voice-catchup').length};
+ };
+ // Its machine dropped for a moment — still listed, not connected — while this device's favourite is up: it waits for its own.
+ const waited=await run([{id:'mac',host:'macbook',connected:false},{id:'pc',host:'linux',connected:true}]);
+ assert.equal(waited.url,'wss://room.example/nodes/mac/api/presentation/ws');
+ assert.ok(waited.catchup>0,'and what was said meanwhile reaches the conversation it was said to');
+ // Its machine is gone from the room altogether: the call lands on another, and the words stay unsent.
+ const moved=await run([{id:'pc',host:'linux',connected:true}]);
+ assert.equal(moved.url,'wss://room.example/nodes/pc/api/presentation/ws');
+ assert.equal(moved.catchup,0,'words said to one machine\'s conversation are never handed to another\'s');
 });

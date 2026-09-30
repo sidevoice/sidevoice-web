@@ -1,4 +1,5 @@
-import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES} from '../state/room-session-state.js';
+import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE} from '../state/room-session-state.js';
+import {pageTarget,routeUrl,callSocketUrl,locateNode,askRendezvous} from './rendezvous.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
@@ -58,6 +59,16 @@ $('loading-cancel').onclick=cancelPreparation;$('voice-loading').addEventListene
 // The room holds several browsers at once, so every question this page asks the
 // room carries its own session: the answer is about this browser and no other.
 function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?')+'session_id='+encodeURIComponent(state.sessionId):path}
+/* Where each request goes (docs/RENDEZVOUS.md): a conversation's, and the call, to the node this page talks to;
+ * pairing, machines and telemetry to the target. Until the target answers, the node base is the target itself —
+ * which is exactly what a room from before this version is. A room with no machine connected has none: null. */
+const target=pageTarget(),NODE_KEY='sidevoice.node';
+let nodeBase=target;
+function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(NO_MACHINE);return url}
+const request=async(path,options)=>fetch(routed(path),options);
+// Which machine this device talks to is this device's choice: kept across tabs and reloads, unlike the conversation.
+function rememberedNode(){try{return localStorage.getItem(NODE_KEY)||null}catch{return null}}
+function rememberNode(id){try{localStorage.setItem(NODE_KEY,id)}catch{}}
 // Which conversation this tab talks to is this tab's own state: the room routes, it never chooses for anyone.
 const SELECTED_KEY='sidevoice.selected';
 function rememberedThread(){try{return sessionStorage.getItem(SELECTED_KEY)||null}catch{return null}}
@@ -247,7 +258,7 @@ function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringif
 function targetId(){return state.roomBinding?.thread_id||null}
 function historyThreadId(){return state.viewedThread||targetId()}
 
-async function api(path,options){const r=await fetch(path,options),d=await r.json();if(!r.ok)throw Error(d.detail||'No se pudo completar la operación');return d}
+async function api(path,options){const r=await request(path,options),d=await r.json();if(!r.ok)throw Error(d.detail||'No se pudo completar la operación');return d}
 const post=(path,body)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 const remove=path=>api(path,{method:'DELETE'});
 
@@ -322,7 +333,8 @@ function followServedBuild(served){
  if(!served||page==='dev'||served===page)return;
  if(state.ws||state.connecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';return}
  try{if(sessionStorage.getItem('sidevoice.reloadedFor')===served)return;sessionStorage.setItem('sidevoice.reloadedFor',served)}catch{}
- location.replace(location.pathname+'?v='+encodeURIComponent(served));
+ const query=new URLSearchParams(location.search);query.set('v',served);
+ location.replace(location.pathname+'?'+query);
 }
 async function refresh(){const asked=++refreshAsked,session=state.sessionId;try{
  const d=await api(roomQuery('/api/presentation'));
@@ -335,7 +347,8 @@ async function refresh(){const asked=++refreshAsked,session=state.sessionId;try{
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(call.error);});
  applyMicState();
- followServedBuild(d.room?.web_build);
+ // Behind a room this answer is the machine's; the build this page follows is the room's (see applyLocation).
+ if(state.rendezvous!=='room')followServedBuild(d.room?.web_build);
 }catch{state.liveNote='Servidor no disponible'}}
 async function refreshHistory() { try {
     const data = await api(roomQuery('/api/presentation/history'));
@@ -394,11 +407,32 @@ async function selectOnlyListeningConversation(){
  }
  await select(listening[0].thread_id);return true;
 }
-async function refreshPeople(){try{const data=await api(roomQuery('/api/presentation/participants'));state.people=data.participants;await reselectRemembered()||await selectOnlyListeningConversation()}catch{}finally{refreshMachines()}}
+// An answer from the machine this page has just left describes nobody it can talk to.
+async function refreshPeople(){const base=nodeBase;try{const data=await api(roomQuery('/api/presentation/participants'));if(base!==nodeBase)return;state.people=data.participants;await reselectRemembered()||await selectOnlyListeningConversation()}catch{}finally{refreshMachines()}}
 // The machines paired with this room, on the same beat as the conversations: a machine connects and
 // goes away as they do, and the clock of the answer travels with it so the rows can say "hace 3 días"
-// without anything below reading a clock of its own.
-async function refreshMachines(){try{const data=await api('/api/connectors');roomStore.batch(()=>{state.machines=data.connectors||[];state.machinesAt=Date.now()})}catch{}}
+// without anything below reading a clock of its own. Which of them this page talks to rides the same beat.
+async function refreshMachines(){void locate();try{const data=await api('/api/connectors');roomStore.batch(()=>{state.machines=data.connectors||[];state.machinesAt=Date.now()})}catch{}}
+/* The target is asked again what it is and which machines it has when that matters: on load, on the machines'
+ * beat, before a join that has no machine yet and before every reconnection attempt. A call in progress is never
+ * moved by it — changing machine is a hang-up, and the person's to make — so while one is up only the list moves. */
+let locateAsked=0,locateApplied=0;
+async function locate({keep=null,move=!(state.ws||state.connecting||state.reconnecting)}={}){
+ const asked=++locateAsked,found=await askRendezvous(target,{remembered:rememberedNode(),keep});
+ if(!found||asked<locateApplied)return;locateApplied=asked;applyLocation(found,move);
+}
+function applyLocation(found,move){
+ if(!move){state.nodes=found.nodes;return}
+ // The first answer names the node the target was already serving: nothing the page holds is another machine's yet.
+ const moved=found.base!==nodeBase&&!!state.rendezvous;nodeBase=found.base;
+ roomStore.batch(()=>{state.rendezvous=found.kind;state.nodes=found.nodes;state.node=found.node;
+  if(found.base!=null&&state.joinFailure===NO_MACHINE)state.joinFailure='';
+  // Another machine's conversations are not this one's: what the page knew of the last one goes with it.
+  if(moved){state.people=[];state.roomBinding=null;state.viewedThread=null}});
+ // The page is the room's, not the machine's: it follows the build the room serves.
+ if(found.kind==='room')followServedBuild(found.build);
+ if(moved&&found.base!=null){refresh();refreshPeople();refreshHistory()}
+}
 async function reselectRemembered(){
  // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
  const wanted=rememberedThread();
@@ -602,7 +636,7 @@ function reportClientError(report){
   try{state.ws.send(JSON.stringify({type:'voice-client-error',data:{session_id:state.sessionId,...entry}}));return}catch{}
  }
  // Before the call exists, or once its socket is gone, the beacon still reaches the room.
- try{navigator.sendBeacon?.('/api/presentation/client-error',new Blob([JSON.stringify(entry)],{type:'application/json'}))}catch{}
+ try{navigator.sendBeacon?.(routed('/api/presentation/client-error'),new Blob([JSON.stringify(entry)],{type:'application/json'}))}catch{}
 }
 window.sidevoiceReportError=reportClientError;
 for(const queued of window.sidevoiceClientErrors||[])reportClientError(queued);
@@ -670,7 +704,7 @@ async function refreshConnectionStats(){
  try{
   const [connection,latency]=await Promise.allSettled([
    api(roomQuery('/api/presentation'),{signal:controller.signal}).then(data=>({data,elapsed:latencyNow()-started})),
-   fetch(roomQuery('/api/presentation/latency'),{signal:controller.signal}).then(async response=>{
+   request(roomQuery('/api/presentation/latency'),{signal:controller.signal}).then(async response=>{
     if(response.status===404)return {unavailable:true};
     if(!response.ok)throw Error('No se pudieron consultar las mediciones.');
     return response.json();
@@ -959,7 +993,7 @@ function measureMic(samples,enabled){
  return {value:Math.max(0,Math.min(100,Math.round((db+60)/60*100))),peak,state:peak>=.98?'clip':peak>=.8?'high':rms>.001?'normal':'quiet'};
 }
 function startMeter(rate){try{audioContext=window.roomVoice?.context||roomAudioContext(rate);analyser=audioContext.createAnalyser();analyser.fftSize=1024;micSource=audioContext.createMediaStreamSource(state.stream);micSource.connect(analyser);const data=new Float32Array(1024);let clipUntil=0,lastWave=0;function tick(){if(!analyser)return;analyser.getFloatTimeDomainData(data);const enabled=!!state.stream?.getAudioTracks()[0]?.enabled,level=measureMic(data,enabled);if(level.signal==='clip')clipUntil=Date.now()+600;const signal=enabled&&Date.now()<clipUntil?'clip':level.state;$('mute').style.setProperty('--mic-fill',level.value+'%');const meter=$('mic-level-meter'),mic=$('mic-control');mic.dataset.signal=signal;if(Date.now()-lastWave>=80){updateWave(level.value);lastWave=Date.now()}meter.setAttribute('aria-valuenow',String(level.value));const description=signal==='clip'?'Posible saturación del micrófono':signal==='high'?'Nivel de micrófono alto':'Nivel de micrófono';if(meter.dataset.signal!==signal){meter.dataset.signal=signal;meter.setAttribute('title',description);meter.setAttribute('aria-label',description)}meterFrame=requestAnimationFrame(tick)}tick()}catch{}}
-function roomSocketUrl(){return (location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/presentation/ws'}
+function roomSocketUrl(){if(nodeBase==null)throw Error(NO_MACHINE);return callSocketUrl(nodeBase,location)}
 const ROOM_IS_FULL='La sala ya tiene el máximo de navegadores conectados. Espera a que salga alguien y vuelve a entrar.';
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
@@ -968,7 +1002,8 @@ const ROOM_IS_FULL='La sala ya tiene el máximo de navegadores conectados. Esper
  * proxy rewrites. `null` means the room could not be reached at all, which is a different sentence.
  * A seat freed between the refusal and this question makes the room say it would admit us now; that
  * is a truthful answer to a question asked a moment too late, and it costs only the generic line. */
-async function roomRefusal(){try{const answer=await fetch('/api/presentation/admission',{cache:'no-store'});if(!answer.ok)return null;const admission=await answer.json();return admission&&typeof admission==='object'?admission:{}}catch{return null}}
+async function roomRefusal(){try{const answer=await request('/api/presentation/admission',{cache:'no-store'});if(!answer.ok)return null;const admission=await answer.json();return admission&&typeof admission==='object'?admission:{}}catch{return null}}
+const NODE_AWAY=new Set(['node_offline','node_unreachable','node_timeout','choose_node']);
 function refusalText(admission,broken){
  if(admission===null)return 'No se pudo conectar con la sala';
  if(admission.reason==='room_is_full')return ROOM_IS_FULL;   // the room's reason, in this page's language
@@ -985,7 +1020,11 @@ function openSession(socket,hello={}){return new Promise((resolve,reject)=>{cons
   // the person reads one sentence for one reason.
   // A room that answered and said no is not a room that is away: these are the refusals a reconnection
   // must not insist on. Everything else — no answer at all — is worth another try.
-  if(event?.code===1013||refused==='room_is_full')return fail(ROOM_IS_FULL,true);
+  // A room whose relay cannot reach the machine says so with the same close code as a full room, and a
+  // machine that is restarting is not a refusal: its own sentence, and the next attempt may find it back.
+  if(NODE_AWAY.has(refused))return fail(refusal||'La máquina no está conectada a la sala ahora mismo.',false);
+  // A frame that named another reason is that reason, whatever the close code: 1013 alone means full.
+  if(refused==='room_is_full'||event?.code===1013&&!refused)return fail(ROOM_IS_FULL,true);
   if(refusal)return fail(refusal,true);
   // The question keeps a short patience of its own: a room that does not answer it cannot say why
   // either, and nobody is left looking at a join line while a request hangs.
@@ -1052,7 +1091,7 @@ function disconnect() {
     applyLockedCall();
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls (#53).
-async function toggleCall(){if(state.ws||state.connecting){disconnect();return}personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;state.voicePreferences=await loadPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt_provider!=='openai')joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;callExecution='browser';if(callExecution==='browser'&&(state.voicePreferences.default_model||'kokoro')==='kokoro'){joinStatus('voice');await window.roomVoice.prepare({device:state.voicePreferences.tts_device},text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
+async function toggleCall(){if(state.ws||state.connecting){disconnect();return}personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(!state.rendezvous||nodeBase==null){await locate({move:true});if(epoch!==connectEpoch)return}if(nodeBase==null)throw Error(NO_MACHINE);state.voicePreferences=await loadPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt_provider!=='openai')joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;callExecution='browser';if(callExecution==='browser'&&(state.voicePreferences.default_model||'kokoro')==='kokoro'){joinStatus('voice');await window.roomVoice.prepare({device:state.voicePreferences.tts_device},text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
 // A room restart or a network blip must not end the call: the microphone permission, the media stream
 // and the unlocked output all survive it; only the socket needs reopening, with the same hello.
@@ -1116,6 +1155,8 @@ async function lostConnection(event,epoch,context){
  window.roomTranscription?.stop();roomStore.patch({harness:{},turns:{}});
  cancelBrowserSpeech();state.userLive=state.botLive=false;state.pendingUserText='';state.pendingPhase='';markHistorySeen();
  if(!shouldReconnect(event)){disconnect();failJoin('La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.');return}
+ // A reconnection comes back to the machine this call was on, for as long as the room still lists it.
+ const node=state.node;
  state.reconnecting=true;
  // Heard, not only shown: a driver cannot see "Reconectando…" (2026-09-26).
  window.roomVoice?.signal?.('lost');
@@ -1126,6 +1167,8 @@ async function lostConnection(event,epoch,context){
    if(attempt)window.roomVoice?.signal?.('retry');
    await new Promise(resolve=>setTimeout(resolve,RECONNECT_DELAYS_MS[Math.min(attempt,RECONNECT_DELAYS_MS.length-1)]));
    if(epoch!==connectEpoch)return;
+   await locate({keep:node,move:true});
+   if(epoch!==connectEpoch)return;
    try{
     const session=await joinRoom(epoch,context);
     if(epoch!==connectEpoch||!session)return;
@@ -1133,7 +1176,8 @@ async function lostConnection(event,epoch,context){
     await refresh();await refreshPeople();
     // Once the room has said which conversation this browser is on, what it missed can go to it. It
     // arrives after any turn already finished here, which is the order the room delivers turns in.
-    sendGapAudio(state.ws);
+    // Words said to one machine's conversation are never handed to another's.
+    if(state.node===node)sendGapAudio(state.ws);
     window.roomVoice?.signal?.('back');
     // Time spent in a tunnel is not time spent away: the idle clock starts again with the call (#63).
     personSignal();
@@ -1438,6 +1482,9 @@ function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 
 $('settings-open').onclick=async()=>{try{
  forgetCredentialCheck('stt');forgetCredentialCheck('elevenlabs');
+ // Voices, transcription and keys are a machine's; pairing one is not. With none connected the dialog still
+ // opens — on Máquinas, the one pane that has something to do — instead of failing on a catalogue nobody serves.
+ if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
  const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language||'es');state.voicePreferences=p;
  for(const key of ['stt_language','default_tts_language','tts_speed','ui_language','tts_device','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
  for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
@@ -1745,7 +1792,8 @@ async function saveSettings(){storeLanguage();try{await saveCredentials()}catch(
 const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.value:'';return raw===''||raw==null?previous?.[key]:raw};
 for(const key of ['stt_language','stt_device','default_tts_language','tts_speed','ui_language','tts_device','default_model','default_voice','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['tts_speed','audio_grace_seconds','presence_volume','replay_on_return_seconds'].includes(key)?Number(value):value;if((key==='stt_device'||key==='tts_device')&&!['auto','webgpu','wasm'].includes(p[key]))p[key]=['auto','webgpu','wasm'].includes(previous?.[key])?previous[key]:'auto'}p.stt_provider=field('stt_provider')||'browser';p.stt_model=field('stt_model')||previous?.stt_model;let hotSwap=false;try{storePreferences(p);if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));hotSwap=localModelSwap(previous,p);state.voicePreferences=p;applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();const applied=await applyTranscriptionSettings(previous,p);state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas'}catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}}
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
-$('language-form').onsubmit=async e=>{e.preventDefault();try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
+// A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
+$('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){$('settings-error').textContent=NO_MACHINE;return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
  skipReply:async()=>skipReply(),
@@ -1786,6 +1834,17 @@ window.sidevoiceActions={
   try{await remove('/api/connectors/'+encodeURIComponent(id))}
   catch(e){setRoomError(e.message||'No se pudo revocar esa máquina')}
   finally{state.machineBusy='';await refreshMachines();await refreshPeople()}
+ },
+ // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
+ // away, inside the person's own tap, from the list the machines' beat already holds (docs/RENDEZVOUS.md).
+ chooseMachine(id){
+  if(!state.nodes.some(node=>node.id===id&&node.connected))return;
+  rememberNode(id);
+  if(id===state.node)return;
+  const rejoin=!!(state.ws||state.connecting||state.reconnecting);
+  if(rejoin)disconnect();
+  applyLocation(locateNode({kind:'room',nodes:state.nodes,web_build:null},target,{remembered:id}),true);
+  if(rejoin)void toggleCall();
  },
 };
 // ----- the call with the screen locked (#59) -----
@@ -1861,7 +1920,10 @@ window.addEventListener('keydown',e=>{personSignal();
  }
 },true);
 window.addEventListener('keyup',e=>{if(e.code==='Space'&&spaceDown){e.preventDefault();releaseHold()}},true);
-window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});window.addEventListener('beforeunload',()=>{state.ws?.close();state.stream?.getTracks().forEach(t=>t.stop())});loadPreferences().then(p=>window.roomI18n?.setLanguage(p.ui_language||'es')).catch(()=>{});updateMic();refresh();refreshPeople();refreshHistory();setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
+window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});window.addEventListener('beforeunload',()=>{state.ws?.close();state.stream?.getTracks().forEach(t=>t.stop())});updateMic();
+// The first questions wait for the target to say which node they are for: one short answer, and a room with two
+// machines is never asked on their behalf. The interface language is this device's even with no machine to ask.
+locate().finally(()=>{loadPreferences().catch(()=>storedPreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language||'es'));refresh();refreshPeople();refreshHistory()});setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupAudioControls();
 setupOutputOwner();

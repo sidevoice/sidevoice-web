@@ -31,6 +31,8 @@ export default defineConfig({
       : { clientPort: 443, protocol: "wss" },
     proxy: {
       "/api": { target: "http://127.0.0.1:8767", ws: true },
+      // A room relays each machine's conversations and call under its own prefix (docs/RENDEZVOUS.md).
+      "/nodes": { target: "http://127.0.0.1:8767", ws: true },
       "/voice-browser": { target: "http://127.0.0.1:8767" },
       "/voice/mic_capture.js": { target: "http://127.0.0.1:8767" }
     }
