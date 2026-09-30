@@ -67,3 +67,16 @@ test('stopping the provider drops an in-flight answer and rejects pending work',
  assert.deepEqual(sent,[]);
  assert.equal(client.enabled,false);
 });
+
+test('switching between the page\'s engine and the native one fails what was waiting instead of leaving it hanging',async()=>{
+ const {client,context}=setup();
+ const posted=[];
+ context.Worker=class{constructor(){this.terminated=false}postMessage(message){posted.push(message)}terminate(){this.terminated=true}};
+ context.window.sidevoiceNativeWorkers=context.sidevoiceNativeWorkers={transcription:()=>({postMessage(message){posted.push({native:true,...message})},terminate(){}})};
+ client.worker=null;client.native=false;
+ const pending=client._request('transcribe',{device:'wasm',audio:new ArrayBuffer(4)});
+ const switched=client._request('load',{device:'native',model:'m'});
+ await assert.rejects(pending,/motor de transcripción/);
+ assert.ok(posted.some(message=>message.native&&message.type==='load'),'the native engine got the load');
+ client.pending.clear();void switched.catch(()=>{});
+});

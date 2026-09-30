@@ -2359,3 +2359,15 @@ test('When the desktop app answers the headset buttons, the page does not answer
  s.run("applyLockScreen(true)");
  assert.equal(registered.length,0,'with the app answering them, one click must not toggle the microphone twice');
 });
+test('Inside the desktop app a native device choice is saved, and outside it is not',async()=>{
+ for(const [native,expected] of [[true,'native'],[false,'auto']]){
+  const s=setup();const stored=[];
+  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+  s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto',tts_device:'auto'};voiceCatalog={languages:[],models:[]};$('stt-key').value='';$('elevenlabs-key').value=''");
+  if(native)s.run("nativeModels={stt:['onnx-community/whisper-small'],tts:['onnx-community/Kokoro-82M-v1.0-ONNX']}");
+  s.run("$('tts-device').value='native'");
+  await s.run("$('language-form').onsubmit({preventDefault(){}})");
+  const saved=stored.find(([key])=>key==='sidevoice.settings')?.[1];
+  assert.equal(saved.tts_device,expected,native?'the app\'s engine is a device like the others':'a page without the app cannot choose it');
+ }
+});

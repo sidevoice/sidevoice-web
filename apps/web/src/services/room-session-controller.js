@@ -70,6 +70,8 @@ let nodeBase=null;
 /* The desktop app's native engine, when this page runs inside it: which of the page's models it can run, per task
  * (page model ids; filled in once, further down). null outside the app. */
 let nativeModels=null;
+/** Where a model may run on this device: the page's own, and the desktop app's native engine when there is one. */
+function deviceChoices(){return nativeModels?['auto','webgpu','wasm','native']:['auto','webgpu','wasm']}
 // This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
@@ -1909,7 +1911,7 @@ async function saveSettings(){storeLanguage();try{await saveCredentials()}catch(
 // its catalogue still loading) keeps what was saved before instead of writing an empty string — which is
 // how a saved OpenAI transcription silently became the browser's (2026-09-20).
 const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.value:'';return raw===''||raw==null?previous?.[key]:raw};
-for(const key of ['stt_language','stt_device','default_tts_language','tts_speed','ui_language','tts_device','default_model','default_voice','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['tts_speed','audio_grace_seconds','presence_volume','replay_on_return_seconds'].includes(key)?Number(value):value;if((key==='stt_device'||key==='tts_device')&&!['auto','webgpu','wasm'].includes(p[key]))p[key]=['auto','webgpu','wasm'].includes(previous?.[key])?previous[key]:'auto'}p.stt_provider=field('stt_provider')||'browser';p.stt_model=field('stt_model')||previous?.stt_model;let hotSwap=false;try{storePreferences(p);if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));hotSwap=localModelSwap(previous,p);state.voicePreferences=p;applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();const applied=await applyTranscriptionSettings(previous,p);state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas'}catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}}
+for(const key of ['stt_language','stt_device','default_tts_language','tts_speed','ui_language','tts_device','default_model','default_voice','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['tts_speed','audio_grace_seconds','presence_volume','replay_on_return_seconds'].includes(key)?Number(value):value;if((key==='stt_device'||key==='tts_device')&&!deviceChoices().includes(p[key]))p[key]=deviceChoices().includes(previous?.[key])?previous[key]:'auto'}p.stt_provider=field('stt_provider')||'browser';p.stt_model=field('stt_model')||previous?.stt_model;let hotSwap=false;try{storePreferences(p);if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));hotSwap=localModelSwap(previous,p);state.voicePreferences=p;applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();const applied=await applyTranscriptionSettings(previous,p);state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas'}catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}}
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
 $('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){$('settings-error').textContent=reachNote(state)||NO_MACHINE;return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
@@ -1998,7 +2000,8 @@ function faintLoop(){
 }
 function primeNowPlaying(){
  // Created and started inside the Join click: iOS lets an element play only from a gesture the first time.
- if(nowPlaying||typeof Audio==='undefined'||typeof navigator==='undefined'||!navigator.mediaSession)return;
+ // Not in the desktop app on a Mac: the app is the Now Playing app there, and this element would compete with it.
+ if(window.__sidevoiceDesktop?.host?.mediaKeys==='native'||nowPlaying||typeof Audio==='undefined'||typeof navigator==='undefined'||!navigator.mediaSession)return;
  try{
   const element=new Audio();element.loop=true;element.setAttribute('playsinline','');
   element.src=URL.createObjectURL(faintLoop());nowPlaying=element;

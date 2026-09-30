@@ -17,6 +17,8 @@ export const VERIFIED_FOR_MS = 5 * 60 * 1000;
 export const IDENTITY_TIMEOUT_MS = 4000;
 export const NO_WEBCRYPTO = 'Este navegador no puede comprobar la identidad de la máquina: abre la página por https (o en este mismo equipo).';
 const DAMAGED = 'El código está incompleto o dañado. Cópialo entero otra vez.';
+/** A node lists its own address and a few public ones; every address in a code gets probed. */
+const MAX_CODE_URLS = 8;
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 // ----- bytes and text -----
@@ -82,6 +84,9 @@ export function decodePairingCode(code, now = Date.now()) {
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
         throw pairingError(DAMAGED);
     if (!urlList.length && !room) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
+    // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
+    // address is probed.
+    if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
     if (exp * 1000 <= now) throw pairingError('Este código ya caducó: duran 10 minutos. Pide uno nuevo.');
     return { v: 1, fp, host: host || null, urls: urlList, rv: room, secret, exp };
 }

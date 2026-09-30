@@ -73,6 +73,7 @@ test("a code that cannot be used says why, in one sentence the person can act on
   expect(why(codeFor({ v: 1, fp, urls: [], rv: null, exp: NOW / 1000 + 60 }))).toMatch(/incompleto o dañado/);  // keys missing
   expect(why(codeFor(payload({ fp: "short" })))).toMatch(/incompleto o dañado/);
   expect(why(codeFor(payload({ fp }, { urls: ["ftp://mac"] })))).toMatch(/incompleto o dañado/);
+  expect(why(codeFor(payload({ fp }, { urls: Array.from({ length: 9 }, (_, i) => `https://m${i}.example`) })))).toMatch(/incompleto o dañado/);  // more addresses than a node writes
   expect(why(codeFor(payload({ fp }, { rv: { url: "https://room.example" } })))).toMatch(/incompleto o dañado/);
   expect(why(codeFor(payload({ fp }, { urls: [], rv: null })))).toMatch(/dónde encontrar la máquina/);
   expect(why(codeFor(payload({ fp }, { exp: NOW / 1000 })))).toMatch(/caducó/);
