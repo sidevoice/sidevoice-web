@@ -1,5 +1,5 @@
 import { DialogFrame } from "../../components/ui/DialogFrame";
-import { AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, MachinesIcon, RefreshIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, CloseIcon, GeneralIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { MachineList } from "../room/MachineList";
 import { ModelPicker } from "../../components/models/ModelPicker";
 import { InfoPopover } from "../../components/models/ModelInfo";
@@ -86,14 +86,6 @@ export function SettingsDialog() {
           <div className="settings-content"><GeneralSettings /><VoiceSettings /><TranscriptionSettings /><MachineSettings /><AdvancedSettings /></div>
         </div>
       </form>
-      <DialogFrame id="pair-dialog" className="pair-dialog" labelledBy="pair-title" title="Emparejar máquina" closeId="pair-close">
-        <div className="pair-row">
-          <code id="pair-code" className="pair-code" aria-live="polite" />
-          <Button id="pair-copy" variant="ghost" size="icon" aria-label="Copiar código" title="Copiar código"><CopyIcon /></Button>
-          <Button id="pair-refresh" variant="ghost" size="icon" aria-label="Nuevo código" title="Nuevo código"><RefreshIcon /></Button>
-        </div>
-        <p className="muted pair-meta"><span id="pair-expires" /> · Un solo uso</p>
-      </DialogFrame>
     </DialogFrame>
   );
 }

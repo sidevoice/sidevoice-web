@@ -68,27 +68,20 @@ export interface ParticipantView {
   harness?: string | null;
 }
 
-/** One machine paired with this room, as its row reads. A revoked machine is still a row: it stays
- *  in the list, saying so, until somebody takes it away. */
+/** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
+ *  it stays, saying so, until the person pairs again or forgets it. */
 export interface MachineView {
+  /** The machine's fingerprint: what identifies it to this device. */
   id: string;
   host: string;
-  /** Operating system and connector version in one line — whatever of it the machine said. */
-  description: string;
-  connected: boolean;
+  /** The one this page talks to: its conversations and its call. */
+  inUse: boolean;
   revoked: boolean;
+  /** Where this device reaches it: directly, through the room, not at all, or — not in use — not asked. */
+  reach: "direct" | "room" | "away" | "offline" | "checking" | "idle" | "revoked";
+  reachLabel: string;
   state: "connected" | "offline" | "revoked";
-  stateLabel: string;
   pairedLabel: string;
-  seenLabel: string;
-  /** How many of the room's conversations run on this machine right now, and the line that says so. */
-  conversations: number;
-  conversationsLabel: string;
-  /** What the machine said it runs, for the row; the version goes in the details. */
-  platform: string;
-  version: string;
-  /** The room is being asked to revoke or remove this one; its buttons wait. */
-  busy: boolean;
 }
 
 /** The step a join (or a reconnection) is on, already written the way the person reads it. */
@@ -101,13 +94,10 @@ export interface JoinStatusView {
   note?: boolean;
 }
 
-/** The machine this page talks to, and the ones it could: the selector appears only with a choice. */
-export interface NodeChoiceView {
-  choose: boolean;
-  /** The target is a room and none of its machines is connected. */
-  none: boolean;
-  selected: string | null;
-  options: { id: string; host: string; connected: boolean }[];
+/** The dialog that pairs this device with a machine, and the sentence it opens with when the page opened it. */
+export interface PairingPromptView {
+  open: boolean;
+  note: string;
 }
 
 export interface SelectOption {
@@ -143,9 +133,12 @@ export interface SidevoiceActions {
   updateLanguageVoice(language: string, voice: string): void;
   updateLanguageSpeed(language: string, speed: number | null): void;
   previewVoice(language: string): Promise<void>;
-  /** Take this machine's pairing away from the room. Asked again on a machine already revoked, it
-   *  takes the row away too. */
-  revokeMachine(id: string): Promise<void>;
-  /** Talk to this machine from now on, on this device. In a call it hangs up and joins that machine's. */
+  /** Talk to this paired machine from now on, on this device. In a call it hangs up and joins that machine's. */
   chooseMachine(id: string): void;
+  /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */
+  forgetMachine(id: string): Promise<void>;
+  /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */
+  pairDevice(code: string, name: string): Promise<{ host: string | null }>;
+  openPairing(): void;
+  closePairing(): void;
 }

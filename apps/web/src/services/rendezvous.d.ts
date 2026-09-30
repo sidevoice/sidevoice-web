@@ -1,30 +1,18 @@
-/** One machine as the room's `GET /api/rendezvous` lists it. */
-export interface RendezvousNode {
-  id: string;
-  host?: string | null;
-  platform?: string | null;
-  version?: string | null;
-  connected?: boolean;
-  via?: string | null;
-}
-/** Where this page's conversations and call live, and what the target said to get there. */
-export interface NodeLocation {
-  kind: "room" | "node" | "legacy";
-  nodes: RendezvousNode[];
-  node: string | null;
-  /** The node base: `''` is the page's own origin; `null` is a room with no machine connected. */
-  base: string | null;
-  /** The web build the room serves, when the target is a room that said. */
+/** What a server's `GET /api/rendezvous` said it is. */
+export interface TargetDescription {
+  kind: "room" | "node";
+  /** A node's id, as it names itself. */
+  id: string | null;
+  /** A node's fingerprint (docs/DEVICE_PAIRING.md): whether the target is the node a pairing names. */
+  fingerprint: string | null;
+  /** The web build a room serves, when it said. */
   build: string | null;
-}
-export interface NodeChoice {
-  remembered?: string | null;
-  keep?: string | null;
 }
 
 declare global {
   interface Window {
-    /** Set by a desktop shell before this page loads: the room or node it talks to. */
+    /** Set before this page loads — by a desktop shell, or a standalone deployment's `target.js` — to the
+     *  room or node it talks to. */
     __SIDEVOICE_TARGET__?: string;
   }
 }
@@ -34,6 +22,7 @@ export function pageTarget(): string;
 export function isNodePath(path: string): boolean;
 export function routeUrl(path: string, target: string, nodeBase: string | null): string | null;
 export function callSocketUrl(nodeBase: string, location: { protocol: string; host: string }): string;
-export function pickNode(nodes: RendezvousNode[], choice?: NodeChoice): string | null;
-export function locateNode(answer: unknown, target: string, choice?: NodeChoice): NodeLocation;
-export function askRendezvous(target: string, choice?: NodeChoice, get?: typeof fetch): Promise<NodeLocation | null>;
+export function describeTarget(answer: unknown): TargetDescription | null;
+export function patiently<T>(promise: Promise<T>, ms?: number): Promise<T>;
+export function askTarget(target: string, get?: typeof fetch, timeoutMs?: number): Promise<TargetDescription | null>;
+export function askRoomNode(room: string, id: string, get?: typeof fetch, timeoutMs?: number): Promise<boolean | null>;

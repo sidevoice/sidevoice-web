@@ -1,92 +1,60 @@
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
-import { ChevronIcon, ConnectorIcon, MachinesIcon, PlatformIcon } from "../../components/ui/Icons";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { MachinesIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 
-/** Which machine this page talks to, once there is more than one to talk to: the conversations listed
- *  and the call are that machine's. Choosing acts at once — it is not a setting the Save button waits
- *  for — and in a call it hangs up and joins the other machine's, which the line under it says before
- *  anybody chooses. The choice is this device's and is kept for next time. */
-function MachineChoice() {
-  const node = useRoomStore((state) => state.node);
-  if (!node.choose) return null;
-  return (
-    <>
-      <label>Máquina en uso
-        <NativeSelect value={node.selected ?? ""} onChange={(event) => window.sidevoiceActions?.chooseMachine(event.currentTarget.value)}>
-          {node.options.map((option) => <option key={option.id} value={option.id} disabled={!option.connected}>{option.host}</option>)}
-        </NativeSelect>
-      </label>
-      <p className="muted">Las conversaciones y la llamada son las de esa máquina. Cambiar de máquina cuelga la llamada y entra en la de la otra.</p>
-    </>
-  );
-}
-
-/** The machines paired with this room, and the only place a person can take a pairing away.
+/** The machines this device is paired with (docs/DEVICE_PAIRING.md), and the only place to change which one
+ *  it talks to or to forget one.
  *
- *  A row says the least that identifies a machine — its name and whether it is here — and opens
- *  on demand to say the rest: what it runs, how many conversations it carries, since when, and the
- *  action that takes its pairing away. Revoking is not undoable (the machine needs a new one-time
- *  code to come back), so it asks first, in the row: a browser `confirm()` would take the whole
- *  page hostage for a question about one line of it. A machine already revoked stays listed,
- *  greyed, until somebody removes it; the note under the list says so. Pairing a new machine
- *  starts here too, since this is where the result appears. */
+ *  A row says the machine's name, whether it is the one in use, and where this device reaches it — directly or
+ *  through the room. "Usar" acts at once — it is not a setting the Save button waits for — and in a call it hangs
+ *  up and joins that machine's, which the note under the list says before anybody taps. Forgetting is not
+ *  undoable (coming back takes a new code from the machine), so it asks first, in the row: a browser `confirm()`
+ *  would take the whole page hostage for a question about one line of it. Pairing another machine starts here,
+ *  since this is where the result appears. */
 export function MachineList() {
   const machines = useRoomStore((state) => state.machines);
-  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [asking, setAsking] = useState<string | null>(null);
-  const toggle = (id: string) => setOpen((current) => ({ ...current, [id]: !current[id] }));
 
   return (
     <div className="machines" id="machines">
       <h3><MachinesIcon /> Máquinas</h3>
-      <MachineChoice />
-      {machines.length === 0 && <p className="muted">Ninguna máquina emparejada todavía.</p>}
+      {machines.length === 0 && <p className="muted">Este dispositivo no está emparejado con ninguna máquina todavía.</p>}
       {machines.map((machine) => (
-        <div className="machine-row" key={machine.id} data-state={machine.state} data-open={open[machine.id] || undefined}>
-          <button
-            type="button"
-            className="machine-summary"
-            aria-expanded={!!open[machine.id]}
-            aria-label={`${open[machine.id] ? "Ocultar detalles de" : "Mostrar detalles de"} ${machine.host}`}
-            onClick={() => toggle(machine.id)}
-          >
-            <span className="machine-state" data-state={machine.state} title={machine.stateLabel}><span className="dot" /></span>
-            <span className="machine-copy"><span className="machine-name" title={machine.host}>{machine.host}</span>
-              <span className="machine-brief muted">
-                {machine.platform && <span className="machine-tag"><PlatformIcon platform={machine.platform} /> {machine.platform}</span>}
-                {machine.version && <span className="machine-tag" title="Versión del conector"><ConnectorIcon /> {machine.version}</span>}
-              </span></span>
-            <ChevronIcon className="machine-chevron" />
-          </button>
-          {open[machine.id] && (
-            <div className="machine-details">
-              <span className="machine-detail">{[machine.stateLabel, machine.conversationsLabel].filter(Boolean).join(" · ")}</span>
-              <span className="machine-detail muted">{[machine.pairedLabel, machine.seenLabel].filter(Boolean).join(" · ")}</span>
-              {asking === machine.id ? (
-                <div className="machine-confirm" role="group" aria-label={`Confirmar para ${machine.host}`}>
-                  <span className="muted">{machine.revoked ? "¿Quitar de la lista?" : "¿Revocar el emparejamiento?"}</span>
-                  <Button variant="danger" size="compact" disabled={machine.busy}
-                    onClick={() => { setAsking(null); void window.sidevoiceActions?.revokeMachine(machine.id); }}
-                  >{machine.revoked ? "Sí, quitar" : "Sí, revocar"}</Button>
-                  <Button variant="ghost" size="compact" onClick={() => setAsking(null)}>Cancelar</Button>
-                </div>
-              ) : (
-                <Button variant="ghost" size="compact" className="machine-action" disabled={machine.busy}
-                  aria-label={`${machine.revoked ? "Quitar" : "Revocar"} ${machine.host}`}
-                  onClick={() => setAsking(machine.id)}
-                >{machine.revoked ? "Quitar" : "Revocar"}</Button>
-              )}
-            </div>
-          )}
+        <div className="machine-row" key={machine.id} data-state={machine.state} data-in-use={machine.inUse || undefined}>
+          <div className="machine-summary">
+            <span className="machine-state" data-state={machine.state} title={machine.reachLabel}><span className="dot" /></span>
+            <span className="machine-copy">
+              <span className="machine-name" title={machine.host}>{machine.host}</span>
+              <span className="machine-brief muted">{[machine.inUse ? "En uso" : "", machine.reachLabel, machine.pairedLabel].filter(Boolean).join(" · ")}</span>
+            </span>
+            {asking === machine.id ? (
+              <span className="machine-confirm" role="group" aria-label={`Confirmar para ${machine.host}`}>
+                <span className="muted">¿Olvidar esta máquina? Para volver a usarla hará falta un código nuevo.</span>
+                <Button variant="danger" size="compact" onClick={() => { setAsking(null); void window.sidevoiceActions?.forgetMachine(machine.id); }}>Sí, olvidar</Button>
+                <Button variant="ghost" size="compact" onClick={() => setAsking(null)}>Cancelar</Button>
+              </span>
+            ) : (
+              <span className="machine-actions">
+                {!machine.inUse && (
+                  <Button variant="ghost" size="compact" className="machine-action" aria-label={`Usar ${machine.host}`}
+                    onClick={() => window.sidevoiceActions?.chooseMachine(machine.id)}>Usar</Button>
+                )}
+                <Button variant="ghost" size="compact" className="machine-action" aria-label={`Olvidar ${machine.host}`}
+                  onClick={() => setAsking(machine.id)}>Olvidar</Button>
+              </span>
+            )}
+          </div>
         </div>
       ))}
+      {machines.length > 1 && (
+        <p className="muted">Las conversaciones y la llamada son las de la máquina en uso. Cambiar de máquina cuelga la llamada y entra en la de la otra.</p>
+      )}
       {machines.some((machine) => machine.revoked) && (
-        <p className="muted">Una máquina revocada sigue en la lista hasta que la quitas. No puede volver a conectarse: para usarla otra vez, emparéjala de nuevo con un código.</p>
+        <p className="muted">Una máquina revocada ya no acepta este dispositivo. Para volver a usarla, emparéjalo de nuevo con un código.</p>
       )}
       <div className="pairing">
-        <Button id="pair-connector" variant="ghost" size="compact">Emparejar máquina</Button>
+        <Button id="pair-device-open" variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.openPairing()}>Emparejar una máquina</Button>
       </div>
     </div>
   );

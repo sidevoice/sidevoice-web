@@ -6,7 +6,8 @@ export const GAP_BUFFER_SECONDS = 30;
 // breath, and the bed used to start in it, over someone who was still talking (2026-09-20).
 export const BED_AFTER_USER_MS = 2000;
 export const JOIN_STEPS = { audio: 'Preparando audio', whisper: 'Cargando Whisper', voice: 'Cargando el modelo de voz', microphone: 'Pidiendo el micrófono', room: 'Entrando en la sala', conversation: 'Volviendo a ', reconnect: 'Reconectando con la sala…', transcription: 'Cambiando de transcripción…', mic: 'Aplicando los ajustes del micrófono…' };
-export const NO_MACHINE = 'Ninguna máquina conectada a la sala. Enciende una de las emparejadas, o empareja una nueva en Configuración › Máquinas.';
+export const NO_MACHINE = 'Ninguna máquina disponible. Enciende la que usas, o empareja una en Configuración › Máquinas.';
+export const UNPAIRED = 'Este dispositivo no está emparejado con ninguna máquina. Emparéjalo para poder entrar.';
 export const REPLAY_NOTES = { queued: 'Repitiendo lo que no oíste', playing: 'Repitiendo lo que no oíste', done: 'Repetido al volver', cancelled: 'Repetición cancelada', gone: 'No se pudo repetir · la sala ya no tiene ese audio' };
 const OUTPUT_MARKS = { ok: '', recovering: ' · audio ↻', failed: ' · audio ✕' };
 const OUTPUT_TITLES = { ok: 'Salida de audio en orden', recovering: 'La salida de audio se atascó y se está recuperando', failed: 'La salida de audio falló; revisa las estadísticas' };
@@ -22,10 +23,14 @@ export function initialSessionFacts() {
         screenLock: { state: '', note: '' }, deviceNote: '', holding: false, userQuietAt: 0, liveNote: '',
         audioDevices: { inputs: [], outputs: [], inputId: 'default', outputId: 'default', available: true, outputAvailable: true, busy: false },
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null, languageModels: [],
-        machines: [], machinesAt: 0, machineBusy: '',
-        // What the target said it is ('room', 'node', 'legacy'; '' until it answers), the machines a room
-        // lists, and the one this page talks to (docs/RENDEZVOUS.md).
-        rendezvous: '', nodes: [], node: null,
+        // The machines this device is paired with (never their tokens), the one in use, and the clock of the
+        // moment they were read so a row can say "hace 3 días" without reading one (docs/DEVICE_PAIRING.md).
+        pairings: [], pairingInUse: null, machinesAt: 0,
+        // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
+        // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
+        rendezvous: '', node: null, nodeReach: '',
+        // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
+        pairingOpen: false, pairingNote: '',
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -59,9 +64,11 @@ export function joinView(s) {
     if (s.joinFailure)
         return { step: 'failed', text: s.joinFailure, progress: null, failed: true };
     // With no machine to talk to, the line where a join starts says so before anybody taps: a standing
-    // note rather than a step, gone by itself the moment a machine connects.
-    if (!s.joinStep)
-        return !s.ws && !s.connecting && nodeView(s).none ? { step: 'no-machine', text: NO_MACHINE, progress: null, failed: false, note: true } : null;
+    // note rather than a step, gone by itself the moment the machine answers.
+    if (!s.joinStep) {
+        const note = !s.ws && !s.connecting ? reachNote(s) : '';
+        return note ? { step: 'no-machine', text: note, progress: null, failed: false, note: true } : null;
+    }
     const base = JOIN_STEPS[s.joinStep] + (s.joinStep === 'conversation' ? s.joinSubject : '');
     const note = s.joinProgress != null ? Math.round(s.joinProgress) + ' %' : s.joinDetail;
     return { step: s.joinStep, text: note ? base + ' (' + note + ')' : base, progress: s.joinProgress, failed: false };
@@ -248,30 +255,35 @@ export function sinceText(seconds, now) {
     const days = Math.round(hours / 24);
     return days === 1 ? 'hace 1 día' : 'hace ' + days + ' días';
 }
-/** The machines paired with this room, each as one row: what it is, whether it is here, and since
- *  when. A machine whose pairing was revoked stays in the list saying so — a row that vanished
- *  would leave whoever wonders why it went quiet with nothing to read. */
+/** The machines this device is paired with, each as one row: its name, whether it is the one in use, where
+ *  this device reaches it, and since when. A pairing the machine revoked stays listed, saying so, until the
+ *  person pairs again or forgets it — a row that vanished would leave nothing to read about why. */
 export function machinesView(s) {
-    return (s.machines || []).map(m => {
-        const revoked = !!m.revoked;
-        const conversations = (s.people || []).filter(p => p.machine?.id === m.id).length;
-        return { id: m.id, host: m.host || 'Máquina sin nombre', platform: m.platform || '', version: m.version || '', conversations,
-            conversationsLabel: conversations === 0 ? '' : conversations === 1 ? '1 conversación' : conversations + ' conversaciones',
-            description: [m.platform, m.version].filter(Boolean).join(' · '),
-            connected: !revoked && !!m.connected, revoked,
-            state: revoked ? 'revoked' : m.connected ? 'connected' : 'offline',
-            stateLabel: revoked ? 'Revocada' : m.connected ? 'Conectada' : 'Desconectada',
-            pairedLabel: sinceText(m.created, s.machinesAt) && 'Emparejada ' + sinceText(m.created, s.machinesAt),
-            seenLabel: sinceText(m.last_seen, s.machinesAt) && 'Vista ' + sinceText(m.last_seen, s.machinesAt),
-            busy: s.machineBusy === m.id };
+    return (s.pairings || []).map(p => {
+        const inUse = p.fp === s.pairingInUse;
+        const routes = [p.urls?.length ? 'directa' : '', p.rv ? 'por la sala' : ''].filter(Boolean).join(' o ');
+        const reach = p.revoked ? 'revoked' : !inUse ? 'idle' : s.node === p.fp && s.rendezvous === 'room' ? 'room'
+            : s.node === p.fp && s.rendezvous === 'node' ? 'direct' : ['away', 'offline'].includes(s.nodeReach) ? s.nodeReach : 'checking';
+        const labels = { revoked: 'Revocada: ya no reconoce este dispositivo', idle: routes ? 'Conexión ' + routes : '',
+            room: 'A través de la sala', direct: 'Conexión directa', away: 'No responde', offline: 'Desconectada de la sala', checking: 'Buscándola…' };
+        return { id: p.fp, host: p.host || 'Máquina sin nombre', inUse, revoked: !!p.revoked, reach, reachLabel: labels[reach],
+            state: p.revoked ? 'revoked' : reach === 'room' || reach === 'direct' ? 'connected' : 'offline',
+            pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
-/** Which machine this page talks to, for the selector in the machines panel: shown only when there is a
- *  choice to make, and the one in use stays listed — saying so — if it drops while a call is on it. */
-export function nodeView(s) {
-    const nodes = s.nodes || [], connected = nodes.filter(n => n.connected);
-    return { choose: connected.length > 1, none: s.rendezvous === 'room' && !connected.length, selected: s.node,
-        options: nodes.filter(n => n.connected || n.id === s.node).map(n => ({ id: n.id, host: (n.host || 'Máquina sin nombre') + (n.connected ? '' : ' · desconectada'), connected: !!n.connected })) };
+/** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). */
+export function reachNote(s) {
+    const p = (s.pairings || []).find(x => x.fp === s.pairingInUse), called = p?.host ? '«' + p.host + '»' : 'la máquina';
+    const Called = called[0].toUpperCase() + called.slice(1);
+    if (s.nodeReach === 'unpaired')
+        return UNPAIRED;
+    if (s.nodeReach === 'revoked')
+        return Called + ' ya no reconoce este dispositivo: se revocó el emparejamiento. Vuelve a emparejarlo con un código nuevo.';
+    if (s.nodeReach === 'offline')
+        return Called + ' no está conectada a la sala ahora mismo. Enciéndela, o usa otra en Configuración › Máquinas.';
+    if (s.nodeReach === 'away')
+        return 'No se llega a ' + called + ' ni directamente ni a través de la sala. Comprueba que está encendida.';
+    return '';
 }
 export function liveText(s) {
     // A notice the runtime put there (the voice model loading, a saved preference, a server that did not
@@ -317,7 +329,7 @@ export function createRoomSessionStore(seed = {}) {
             join: joinView(facts), engine: engineView(facts), echo: echoCoverage({ ...facts.echoFacts, connected: !!facts.ws, track: !!facts.stream }), live: liveText(facts),
             mic: micView(facts), call: callView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
             enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
-            audioDevices: facts.audioDevices, machines: machinesView(facts), node: nodeView(facts),
+            audioDevices: facts.audioDevices, machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             bootError: facts.bootError, languageModels: facts.languageModels };
     }
     function publish() { if (depth || !dirty)

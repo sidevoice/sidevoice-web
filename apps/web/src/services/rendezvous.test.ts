@@ -1,8 +1,7 @@
 import { afterEach, expect, test } from "vitest";
-import { askRendezvous, callSocketUrl, isNodePath, locateNode, pageTarget, pickNode, resolveTarget, routeUrl } from "./rendezvous.js";
+import { askRoomNode, askTarget, callSocketUrl, describeTarget, isNodePath, pageTarget, resolveTarget, routeUrl } from "./rendezvous.js";
 
 const ORIGIN = "https://room.example";
-const machine = (id: string, connected: boolean, host = id) => ({ id, host, connected, platform: "macOS", version: "0.6.0", via: connected ? "outbound" : null });
 
 afterEach(() => { delete window.__SIDEVOICE_TARGET__; });
 
@@ -34,71 +33,55 @@ test("the page reads its target from the window a shell writes to, before its ow
   expect(pageTarget()).toBe("http://127.0.0.1:8767");
 });
 
-test("a room with no machine connected has no node base, and says which machines it has", () => {
-  const found = locateNode({ kind: "room", nodes: [machine("a", false)] }, "");
-  expect(found).toMatchObject({ kind: "room", node: null, base: null });
-  expect(found.nodes.map((node) => node.id)).toEqual(["a"]);
-  expect(locateNode({ kind: "room", nodes: [] }, "https://room.example").base).toBeNull();
+test("what a target is: a node by its fingerprint, a room by the build it serves, or neither", () => {
+  expect(describeTarget({ kind: "node", id: "mac", host: "macbook", fingerprint: "fp-1" })).toEqual({ kind: "node", id: "mac", fingerprint: "fp-1", build: null });
+  expect(describeTarget({ kind: "room", nodes: [], web_build: "b1" })).toEqual({ kind: "room", id: null, fingerprint: null, build: "b1" });
+  // A 404's body, a static server's page, a room from before rendezvous: not a node, not a room.
+  for (const answer of [null, {}, { binding: null }, { kind: "other" }]) expect(describeTarget(answer)).toBeNull();
 });
 
-test("with one machine connected the page talks to it, behind the room's relay", () => {
-  const found = locateNode({ kind: "room", web_build: "b1", nodes: [machine("off", false), machine("mac/1", true)] }, "");
-  expect(found).toMatchObject({ kind: "room", node: "mac/1", base: "/nodes/mac%2F1", build: "b1" });
-  expect(locateNode({ kind: "room", nodes: [machine("mac", true)] }, "https://room.example").base).toBe("https://room.example/nodes/mac");
-});
-
-test("with two connected, the one this device chose last wins, else the first connected", () => {
-  const nodes = [machine("a", false), machine("b", true), machine("c", true)];
-  expect(locateNode({ kind: "room", nodes }, "").node).toBe("b");
-  expect(locateNode({ kind: "room", nodes }, "", { remembered: "c" }).node).toBe("c");
-  // A remembered machine that is away is not waited for: the page lands on one that answers.
-  expect(locateNode({ kind: "room", nodes }, "", { remembered: "a" }).node).toBe("b");
-  expect(locateNode({ kind: "room", nodes }, "", { remembered: "gone" }).node).toBe("b");
-});
-
-test("a reconnecting call stays with its machine while the room still lists it, connected or not", () => {
-  const nodes = [machine("a", false), machine("b", true)];
-  expect(pickNode(nodes, { keep: "a", remembered: "b" })).toBe("a");
-  // Revoked, or removed: the room no longer lists it, and the ordinary choice applies.
-  expect(pickNode(nodes, { keep: "gone", remembered: "b" })).toBe("b");
-  expect(pickNode([], { keep: "a" })).toBeNull();
-});
-
-test("a node is its own node base, and anything else a room from before this version", () => {
-  expect(locateNode({ kind: "node", id: "mac", host: "macbook" }, "http://node.lan:8767")).toMatchObject({ kind: "node", node: "mac", base: "http://node.lan:8767", nodes: [] });
-  expect(locateNode(null, "")).toMatchObject({ kind: "legacy", base: "", node: null });
-  expect(locateNode({ binding: null }, "https://room.example")).toMatchObject({ kind: "legacy", base: "https://room.example" });
-  // Malformed rows are not machines.
-  expect(locateNode({ kind: "room", nodes: [null, { id: "" }, { connected: true }, machine("ok", true)] }, "").nodes.map((node) => node.id)).toEqual(["ok"]);
-});
-
-test("asking the target: a 404 is an older room, a failure is no answer at all", async () => {
+test("asking the target: a failure, or anything that is not a node or a room, is no answer at all", async () => {
   const asked: string[] = [];
   const answer = (status: number, body: unknown = {}) => (async (url: string) => { asked.push(url); return new Response(JSON.stringify(body), { status }); }) as unknown as typeof fetch;
 
-  expect(await askRendezvous("", {}, answer(404))).toMatchObject({ kind: "legacy", base: "" });
-  expect(asked).toEqual(["/api/rendezvous"]);
-  expect(await askRendezvous("https://room.example", { remembered: "b" }, answer(200, { kind: "room", nodes: [machine("a", true), machine("b", true)] })))
-    .toMatchObject({ kind: "room", node: "b", base: "https://room.example/nodes/b" });
+  expect(await askTarget("https://room.example", answer(200, { kind: "room", nodes: [], web_build: "b2" }))).toMatchObject({ kind: "room", build: "b2" });
   expect(asked.at(-1)).toBe("https://room.example/api/rendezvous");
-  expect(await askRendezvous("", {}, answer(200, { kind: "node", id: "mac" }))).toMatchObject({ kind: "node", base: "" });
-  // Nothing learned: the page keeps the node it had rather than forget it over one lost request.
-  expect(await askRendezvous("", {}, answer(502))).toBeNull();
-  expect(await askRendezvous("", {}, (async () => { throw new TypeError("Failed to fetch"); }) as unknown as typeof fetch)).toBeNull();
-  expect(await askRendezvous("", {}, (async () => new Response("<html>", { status: 200 })) as unknown as typeof fetch)).toBeNull();
+  expect(await askTarget("", answer(200, { kind: "node", id: "mac", fingerprint: "fp" }))).toMatchObject({ kind: "node", fingerprint: "fp" });
+  expect(asked.at(-1)).toBe("/api/rendezvous");
+  expect(await askTarget("", answer(404))).toBeNull();
+  expect(await askTarget("", answer(502))).toBeNull();
+  expect(await askTarget("", (async () => { throw new TypeError("Failed to fetch"); }) as unknown as typeof fetch)).toBeNull();
+  expect(await askTarget("", (async () => new Response("<html>", { status: 200 })) as unknown as typeof fetch)).toBeNull();
+  // A target that never answers is no answer, after a while, rather than a page that waits for ever.
+  const hangs = (() => new Promise(() => {})) as unknown as typeof fetch;
+  expect(await askTarget("https://blackhole.example", hangs, 5)).toBeNull();
+  expect(await askRoomNode("https://blackhole.example", "m-1", hangs, 5)).toBeNull();
 });
 
-test("a conversation's request goes to the node, pairing and telemetry to the target", () => {
-  for (const path of ["/api/presentation", "/api/presentation?session_id=s", "/api/presentation/history?session_id=s", "/api/presentation/transcription/credential", "/api/presentation/client-error"])
+test("a room answers only for the node a page names, and says whether it is connected", async () => {
+  const asked: string[] = [];
+  const room = (body: unknown, status = 200) => (async (url: string) => { asked.push(url); return new Response(JSON.stringify(body), { status }); }) as unknown as typeof fetch;
+  expect(await askRoomNode("https://room.example", "m/1", room({ kind: "room", nodes: [{ id: "m/1", connected: true }] }))).toBe(true);
+  expect(asked.at(-1)).toBe("https://room.example/api/rendezvous?nodes=m%2F1");
+  expect(await askRoomNode("https://room.example", "m-1", room([{ id: "m-1", connected: false }]))).toBe(false);
+  // Not named in the answer, a failure, or no answer: nothing is known.
+  expect(await askRoomNode("https://room.example", "m-1", room({ kind: "room", nodes: [] }))).toBeNull();
+  expect(await askRoomNode("https://room.example", "m-1", room({}, 500))).toBeNull();
+  expect(await askRoomNode("https://room.example", "m-1", (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch)).toBeNull();
+});
+
+test("a conversation's request, and this device's pairing, go to the node; telemetry to the target", () => {
+  for (const path of ["/api/presentation", "/api/presentation?session_id=s", "/api/presentation/history?session_id=s", "/api/presentation/transcription/credential", "/api/presentation/client-error",
+    "/api/device/identity?nonce=n", "/api/device/devices/d-1"])
     expect([path, isNodePath(path)]).toEqual([path, true]);
-  for (const path of ["/api/connectors", "/api/connectors/pairing-code", "/api/connectors/c-1", "/api/telemetry", "/api/presentationx", "/voice-browser/room-client.js"])
+  for (const path of ["/api/connectors", "/api/connectors/pairing-code", "/api/connectors/c-1", "/api/telemetry", "/api/presentationx", "/api/devices", "/voice-browser/room-client.js"])
     expect([path, isNodePath(path)]).toEqual([path, false]);
 
   expect(routeUrl("/api/presentation/participants?session_id=s", "", "/nodes/mac")).toBe("/nodes/mac/api/presentation/participants?session_id=s");
   expect(routeUrl("/api/connectors", "", "/nodes/mac")).toBe("/api/connectors");
   expect(routeUrl("/api/presentation", "https://room.example", "https://room.example/nodes/mac")).toBe("https://room.example/nodes/mac/api/presentation");
   expect(routeUrl("/api/telemetry", "https://room.example", "https://room.example/nodes/mac")).toBe("https://room.example/api/telemetry");
-  // Unchanged, byte for byte, against a room from before this version.
+  // A node that serves the page itself keeps every path relative.
   expect(routeUrl("/api/presentation/select", "", "")).toBe("/api/presentation/select");
   // No machine: nothing of a node can be asked, while the room's own endpoints still answer.
   expect(routeUrl("/api/presentation/languages", "", null)).toBeNull();

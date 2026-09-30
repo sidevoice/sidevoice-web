@@ -40,28 +40,33 @@ test("the line goes away once the call is up", () => {
   expect(document.getElementById("join-status")).not.toBeVisible();
 });
 
-test("with no machine connected the line says so before any tap, as a note, and goes when one connects", () => {
+const pairing = { fp: "fp-mac", host: "mac", urls: ["http://127.0.0.1:8768"], rv: { url: "https://room.example", node: "m-1" }, device_id: "d-1", paired_at: null, revoked: false };
+
+test("with no machine to talk to the line says why before any tap, as a note, and goes when it answers", () => {
   const store = renderJoin(null);
-  // Before the target has answered nothing is known, and nothing is said.
+  // While the machine is still being looked for nothing is known, and nothing is said.
+  act(() => store.patch({ pairings: [pairing], pairingInUse: "fp-mac", node: "fp-mac", nodeReach: "" }));
   expect(document.getElementById("join-status")).not.toBeVisible();
-  act(() => store.patch({ rendezvous: "room", nodes: [{ id: "m-1", host: "mac", connected: false }] }));
+  act(() => store.patch({ nodeReach: "offline" }));
   const line = document.getElementById("join-status")!;
   expect(line).toBeVisible();
-  expect(screen.getByRole("status")).toHaveTextContent(/Ninguna máquina conectada a la sala/);
+  expect(screen.getByRole("status")).toHaveTextContent(/«mac» no está conectada a la sala/);
   expect(line.dataset.state).toBe("note");
   expect(line.querySelector(".join-status-dot")).toBeNull();   // a standing note, not a step in progress
+  act(() => store.patch({ nodeReach: "away" }));
+  expect(screen.getByRole("status")).toHaveTextContent(/No se llega a «mac» ni directamente ni a través de la sala/);
 
-  // A join that found no machine says it as an alert; a machine connecting takes both away.
-  act(() => store.patch({ joinFailure: "Ninguna máquina conectada a la sala." }));
+  // A join that found no machine says it as an alert; the machine answering takes both away.
+  act(() => store.patch({ joinFailure: "No se llega a «mac»." }));
   expect(screen.getByRole("alert")).toBeInTheDocument();
-  act(() => store.patch({ joinFailure: "", nodes: [{ id: "m-1", host: "mac", connected: true }], node: "m-1" }));
+  act(() => store.patch({ joinFailure: "", nodeReach: "ok", rendezvous: "room" }));
   expect(line).not.toBeVisible();
 });
 
-test("a room from before this version, or a node, never reads as a room without machines", () => {
+test("a device paired with nothing, or with a machine that revoked it, says so and what to do", () => {
   const store = renderJoin(null);
-  act(() => store.patch({ rendezvous: "legacy" }));
-  expect(document.getElementById("join-status")).not.toBeVisible();
-  act(() => store.patch({ rendezvous: "node", node: "m-1" }));
-  expect(document.getElementById("join-status")).not.toBeVisible();
+  act(() => store.patch({ nodeReach: "unpaired" }));
+  expect(screen.getByRole("status")).toHaveTextContent(/no está emparejado con ninguna máquina/);
+  act(() => store.patch({ pairings: [{ ...pairing, revoked: true }], pairingInUse: "fp-mac", node: "fp-mac", nodeReach: "revoked" }));
+  expect(screen.getByRole("status")).toHaveTextContent(/«mac» ya no reconoce este dispositivo.*código nuevo/);
 });

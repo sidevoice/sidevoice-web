@@ -1,19 +1,18 @@
-/* Where this page talks to, and nothing else (docs/RENDEZVOUS.md, "Web client contract").
+/* Where this page talks to, and nothing else (docs/RENDEZVOUS.md, "Web client contract"; docs/DEVICE_PAIRING.md).
  *
- * Two addresses. The *target* is the one the page was pointed at: a room, or a node directly. Pairing,
- * the machines list and telemetry are the room's and go there. The *node base* is where the
- * conversations and the call live: the node itself, or the room's relay to the node this page chose.
- * Every `/api/presentation…` request and the call socket go to the node base.
+ * Two addresses. The *target* is the one the page was pointed at: a room, or a node directly. Telemetry is the
+ * target's. The *node base* is where the conversations and the call live: the node this device is paired with,
+ * reached directly or through a room's relay — whichever address proved it is that node (device-pairing.js).
+ * Every `/api/presentation…` and `/api/device…` request and the call socket go to the node base.
  *
- * Addresses are prefixes. `''` is the page's own origin, so a page served by its target keeps every
- * path relative, exactly as it was before the split; `/nodes/<id>` is a node behind that same room; an
- * absolute URL is a target on another origin (a desktop shell). No DOM, storage or clock in here: the
- * controller decides when to ask, and these say what the answer means. */
+ * Addresses are prefixes. `''` is the page's own origin, so a page served by its target keeps every path
+ * relative; `/nodes/<id>` is a node behind that same room; an absolute URL is anywhere else. No DOM, storage
+ * or clock in here: the controller decides when to ask, and these say what the answer means. */
 
-/** The target: what a desktop shell set in `window.__SIDEVOICE_TARGET__`, else the page's own origin.
- *  Never the page's address: a `?target=` in a link would send this page's microphone, its typed text
- *  and any key entered in its settings to whatever server the link named. A value that is not an
- *  http(s) address is not a target; the result never ends in `/`. */
+/** The target: what a desktop shell (or a standalone deployment's `target.js`) set in
+ *  `window.__SIDEVOICE_TARGET__`, else the page's own origin. Never the page's address: a `?target=` in a link
+ *  would send this page's microphone, its typed text and any key entered in its settings to whatever server
+ *  the link named. A value that is not an http(s) address is not a target; the result never ends in `/`. */
 export function resolveTarget({ injected, origin } = {}) {
     for (const candidate of [injected]) {
         if (typeof candidate !== 'string' || !candidate.trim())
@@ -36,9 +35,9 @@ export function resolveTarget({ injected, origin } = {}) {
 export function pageTarget() {
     return resolveTarget({ injected: globalThis.window?.__SIDEVOICE_TARGET__, origin: globalThis.location?.origin });
 }
-/** A conversation, a call, a setting the node applies: everything under `/api/presentation`. */
+/** A conversation, a call, a setting the node applies, this device's own pairing: everything the node owns. */
 export function isNodePath(path) {
-    return /^\/api\/presentation(?:[/?]|$)/.test(path);
+    return /^\/api\/(?:presentation|device)(?:[/?]|$)/.test(path);
 }
 /** The address of one request. `null` when it belongs to a node and this page has none to ask. */
 export function routeUrl(path, target, nodeBase) {
@@ -53,44 +52,44 @@ export function callSocketUrl(nodeBase, location) {
         return path.replace(/^http/, 'ws');
     return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + path;
 }
-/** Which node, among the ones the room lists: a reconnecting call's own while the room still lists it
- *  (a machine that drops for a moment is waited for, not swapped), else the one this device chose last
- *  if it is connected, else the first connected — which, when there is one, is the only one. */
-export function pickNode(nodes, { remembered = null, keep = null } = {}) {
-    if (keep != null && nodes.some(node => node.id === keep))
-        return keep;
-    const connected = nodes.filter(node => node.connected);
-    return (connected.find(node => node.id === remembered) ?? connected[0])?.id ?? null;
-}
-/** What the target's `GET /api/rendezvous` answer means for this page. `null` stands for a 404: a room
- *  from before this version, whose own `/api/presentation` is the node. A room with no connected
- *  machine has no node base at all, and says so with `base: null`. */
-export function locateNode(answer, target, choice = {}) {
+/** What a `GET /api/rendezvous` answer says the server is: a node (and which, by its fingerprint), a room (and
+ *  the web build it serves), or — anything else, a 404, a static server's page — neither. */
+export function describeTarget(answer) {
     if (answer?.kind === 'node')
-        return { kind: 'node', nodes: [], node: typeof answer.id === 'string' ? answer.id : null, base: target, build: null };
-    if (answer?.kind !== 'room')
-        return { kind: 'legacy', nodes: [], node: null, base: target, build: null };
-    const nodes = (Array.isArray(answer.nodes) ? answer.nodes : []).filter(node => node && typeof node.id === 'string' && node.id);
-    const node = pickNode(nodes, choice);
-    return { kind: 'room', nodes, node, base: node == null ? null : target + '/nodes/' + encodeURIComponent(node),
-        build: typeof answer.web_build === 'string' ? answer.web_build : null };
+        return { kind: 'node', id: typeof answer.id === 'string' ? answer.id : null,
+            fingerprint: typeof answer.fingerprint === 'string' ? answer.fingerprint : null, build: null };
+    if (answer?.kind === 'room')
+        return { kind: 'room', id: null, fingerprint: null, build: typeof answer.web_build === 'string' ? answer.web_build : null };
+    return null;
 }
-/** Ask the target what it is. `null` when it could not answer — unreachable, or failing — which is
- *  not an answer: the page keeps what it had rather than forget a node over one lost request. */
-export async function askRendezvous(target, choice = {}, get = globalThis.fetch) {
-    let response;
+/** A question to a server that does not answer is no answer, after a while: an address that swallows packets
+ *  would otherwise hold the page's search for its machine for as long as the network gives up. */
+export function patiently(promise, ms = 4000) {
+    let timer;
+    return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Error('timeout')), ms); })])
+        .finally(() => clearTimeout(timer));
+}
+/** Ask the target what it is. `null` when it is neither a node nor a room, or could not answer. */
+export async function askTarget(target, get = globalThis.fetch, timeoutMs = 4000) {
     try {
-        response = await get(target + '/api/rendezvous', { headers: { accept: 'application/json' }, cache: 'no-store' });
+        const response = await patiently(get(target + '/api/rendezvous', { headers: { accept: 'application/json' }, cache: 'no-store' }), timeoutMs);
+        return response.ok ? describeTarget(await response.json()) : null;
     }
     catch {
         return null;
     }
-    if (response.status === 404)
-        return locateNode(null, target, choice);
-    if (!response.ok)
-        return null;
+}
+/** Whether a room says the node `id` is connected to it now. A room lists nodes to nobody: it answers only
+ *  for the ids a page already knows (from its pairing). `null` is no answer. */
+export async function askRoomNode(room, id, get = globalThis.fetch, timeoutMs = 4000) {
     try {
-        return locateNode(await response.json(), target, choice);
+        const response = await patiently(get(room + '/api/rendezvous?nodes=' + encodeURIComponent(id), { headers: { accept: 'application/json' }, cache: 'no-store' }), timeoutMs);
+        if (!response.ok)
+            return null;
+        const answer = await response.json();
+        const nodes = Array.isArray(answer) ? answer : Array.isArray(answer?.nodes) ? answer.nodes : [];
+        const node = nodes.find(entry => entry?.id === id);
+        return node ? !!node.connected : null;
     }
     catch {
         return null;

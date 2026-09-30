@@ -1,5 +1,6 @@
-import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE} from '../state/room-session-state.js';
-import {pageTarget,routeUrl,callSocketUrl,locateNode,askRendezvous} from './rendezvous.js';
+import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE,reachNote} from '../state/room-session-state.js';
+import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
+import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
@@ -60,16 +61,30 @@ $('loading-cancel').onclick=cancelPreparation;$('voice-loading').addEventListene
 // The room holds several browsers at once, so every question this page asks the
 // room carries its own session: the answer is about this browser and no other.
 function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?')+'session_id='+encodeURIComponent(state.sessionId):path}
-/* Where each request goes (docs/RENDEZVOUS.md): a conversation's, and the call, to the node this page talks to;
- * pairing, machines and telemetry to the target. Until the target answers, the node base is the target itself —
- * which is exactly what a room from before this version is. A room with no machine connected has none: null. */
-const target=pageTarget(),NODE_KEY='sidevoice.node';
-let nodeBase=target;
-function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(NO_MACHINE);return url}
-const request=async(path,options)=>fetch(routed(path),options);
-// Which machine this device talks to is this device's choice: kept across tabs and reloads, unlike the conversation.
-function rememberedNode(){try{return localStorage.getItem(NODE_KEY)||null}catch{return null}}
-function rememberNode(id){try{localStorage.setItem(NODE_KEY,id)}catch{}}
+/* Where each request goes (docs/RENDEZVOUS.md, docs/DEVICE_PAIRING.md): a conversation's, the call and this
+ * device's own pairing to the node this device is paired with; telemetry to the target. The node base is an
+ * address that proved — with the key pinned when pairing — that it is that node. Until one has there is none,
+ * null, and nothing of a node is asked: every such request carries this device's token. */
+const target=pageTarget();
+let nodeBase=null;
+// This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
+// storage; the store the interface reads gets everything else.
+function pageStorage(){try{return localStorage}catch{return null}}
+let pairings=readPairings(pageStorage());
+function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,machinesAt:Date.now()})}
+function keepPairings(next){pairings=next;const storage=pageStorage();if(storage)writePairings(storage,next);publishPairings()}
+function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
+function withToken(options,token){return {...options,headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
+// Every request to the node carries the token of the pairing in use; one the node refuses means that pairing is
+// gone. An address that stops answering is looked at again on the next beat, in case another one answers.
+const request=async(path,options)=>{
+ const url=routed(path);if(!isNodePath(path))return fetch(url,options);
+ const pairing=pairingInUse(pairings),base=nodeBase;if(!pairing)throw Error(NO_MACHINE);
+ let response;
+ try{response=await fetch(url,withToken(options,pairing.token))}catch(error){doubted=base;throw error}
+ if(response.status===401)pairingRefused(pairing.fp);
+ return response;
+};
 // Which conversation this tab talks to is this tab's own state: the room routes, it never chooses for anyone.
 const SELECTED_KEY='sidevoice.selected';
 function rememberedThread(){try{return sessionStorage.getItem(SELECTED_KEY)||null}catch{return null}}
@@ -259,9 +274,8 @@ function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringif
 function targetId(){return state.roomBinding?.thread_id||null}
 function historyThreadId(){return state.viewedThread||targetId()}
 
-async function api(path,options){const r=await request(path,options),d=await r.json();if(!r.ok)throw Error(d.detail||'No se pudo completar la operación');return d}
+async function api(path,options){const r=await request(path,options);if(r.status===401)throw Error(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw Error(d.detail||'No se pudo completar la operación');return d}
 const post=(path,body)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-const remove=path=>api(path,{method:'DELETE'});
 
 /* What the microphone heard while the room was unreachable, said plainly. The person spoke to
  * nobody for a moment, and how much of it survived is a fact they are entitled to read. */
@@ -337,7 +351,7 @@ function followServedBuild(served){
  const query=new URLSearchParams(location.search);query.set('v',served);
  location.replace(location.pathname+'?'+query);
 }
-async function refresh(){const asked=++refreshAsked,session=state.sessionId;try{
+async function refresh(){if(nodeBase==null)return;const asked=++refreshAsked,session=state.sessionId;try{
  const d=await api(roomQuery('/api/presentation'));
  if(asked<refreshApplied||session!==state.sessionId)return;
  refreshApplied=asked;
@@ -348,8 +362,8 @@ async function refresh(){const asked=++refreshAsked,session=state.sessionId;try{
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(call.error);});
  applyMicState();
- // Behind a room this answer is the machine's; the build this page follows is the room's (see applyLocation).
- if(state.rendezvous!=='room')followServedBuild(d.room?.web_build);
+ // The page follows the build of whoever serves it: this answer's only when the node itself served the page.
+ if(target===''&&nodeBase==='')followServedBuild(d.room?.web_build);
 }catch{state.liveNote='Servidor no disponible'}}
 async function refreshHistory() { try {
     const data = await api(roomQuery('/api/presentation/history'));
@@ -388,14 +402,6 @@ async function refreshHistory() { try {
     }
 }
 catch { } }
-let pairTimer=null;
-function showPairingCountdown(deadline){clearInterval(pairTimer);const tick=()=>{const left=Math.max(0,Math.round((deadline-Date.now())/1000));$('pair-expires').textContent='Caduca en '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0');if(left<=0){clearInterval(pairTimer);pairTimer=null;if($('pair-dialog').open)void freshPairingCode()}};tick();pairTimer=setInterval(tick,1000)}
-async function freshPairingCode(){try{const r=await post('/api/connectors/pairing-code',{});$('pair-code').textContent=r.code;showPairingCountdown(Date.now()+(r.expires_in||180)*1000);return true}catch(e){setRoomError(e.message||'No se pudo generar el código');return false}}
-$('pair-connector').onclick=async()=>{if(await freshPairingCode()&&!$('pair-dialog').open)$('pair-dialog').showModal()};
-$('pair-refresh').onclick=()=>{void freshPairingCode()};
-let pairCopied=null;
-$('pair-copy').onclick=async()=>{const code=$('pair-code').textContent;if(!code)return;try{await navigator.clipboard.writeText(code)}catch{setRoomError('No se pudo copiar el código');return}const meta=$('pair-expires');clearTimeout(pairCopied);const before=meta.textContent;meta.textContent='Copiado';pairCopied=setTimeout(()=>{if(meta.textContent==='Copiado')meta.textContent=before},1200)};
-$('pair-close').onclick=()=>$('pair-dialog').close();$('pair-dialog').addEventListener('close',()=>{clearInterval(pairTimer);pairTimer=null});
 // Joining a room lands on a conversation: the one this tab remembers, else the first one listening in the
 // list. With none at all, the list opens by itself — empty, which says so — once per call (2026-09-26).
 let emptyListShownFor=null;
@@ -410,30 +416,95 @@ async function selectOnlyListeningConversation(){
 }
 // An answer from the machine this page has just left describes nobody it can talk to.
 async function refreshPeople(){const base=nodeBase;try{const data=await api(roomQuery('/api/presentation/participants'));if(base!==nodeBase)return;state.people=data.participants;await reselectRemembered()||await selectOnlyListeningConversation()}catch{}finally{refreshMachines()}}
-// The machines paired with this room, on the same beat as the conversations: a machine connects and
-// goes away as they do, and the clock of the answer travels with it so the rows can say "hace 3 días"
-// without anything below reading a clock of its own. Which of them this page talks to rides the same beat.
-async function refreshMachines(){void locate();try{const data=await api('/api/connectors');roomStore.batch(()=>{state.machines=data.connectors||[];state.machinesAt=Date.now()})}catch{}}
-/* The target is asked again what it is and which machines it has when that matters: on load, on the machines'
- * beat, before a join that has no machine yet and before every reconnection attempt. A call in progress is never
- * moved by it — changing machine is a hang-up, and the person's to make — so while one is up only the list moves. */
-let locateAsked=0,locateApplied=0;
-async function locate({keep=null,move=!(state.ws||state.connecting||state.reconnecting)}={}){
- const asked=++locateAsked,found=await askRendezvous(target,{remembered:rememberedNode(),keep});
- if(!found||asked<locateApplied)return;locateApplied=asked;applyLocation(found,move);
+// Where the machine in use answers rides the conversations' beat, and so does the clock the rows read.
+function refreshMachines(){roomStore.patch({machinesAt:Date.now()});void locate()}
+/* Which address the machine in use answers at is asked when it matters: on load, on the beat while there is
+ * none, before a join that has none, and before each reconnection attempt after the first. An address that
+ * proved itself is trusted for a few minutes (docs/DEVICE_PAIRING.md). A call in progress is never moved by it
+ * — changing machine is a hang-up, and the person's to make. A reconnecting call (`hold`) keeps the address it
+ * had while that one's proof is recent: the machine may be restarting, and the socket is the better probe. */
+const verified=new Map();
+let locateAsked=0,locateApplied=0,targetAbout=null,reachFailure='',doubted=null;
+async function locate({move=!(state.ws||state.connecting||state.reconnecting),fresh=false,hold=false}={}){
+ if(!move)return;
+ const pairing=pairingInUse(pairings);
+ if(!pairing){settleBase(null,'unpaired',null);return}
+ if(pairing.revoked){settleBase(null,'revoked',pairing);return}
+ const recent=base=>base!=null&&Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
+ if(!fresh&&state.node===pairing.fp&&recent(nodeBase)&&doubted!==nodeBase)return;
+ const asked=++locateAsked,deps={get:fetch},started=new Map();
+ let found=null,reach='away';
+ try{
+  // The pairing's own addresses are asked while the target says what it is: its answer can only add one more.
+  void firstProven(candidateBases(pairing,{origin:location.origin}),pairing,deps,started).catch(()=>{});
+  const about=await askTarget(target,fetch);
+  if(about)targetAbout=about;
+  found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,deps,started);
+  // With nothing proven, the room the machine links with says whether it is there at all.
+  if(!found&&pairing.rv&&await askRoomNode(pairing.rv.url,pairing.rv.node,fetch)===false)reach='offline';
+ }catch{}
+ if(asked<locateApplied||pairingInUse(pairings)!==pairing)return;
+ locateApplied=asked;
+ // The page follows the build of whoever serves it: a room serving this page says which.
+ if(target===''&&targetAbout?.kind==='room')followServedBuild(targetAbout.build);
+ if(found){verified.set(found.base,Date.now());if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
+ if(hold&&state.node===pairing.fp&&recent(nodeBase))return;
+ settleBase(null,reach,pairing);
 }
-function applyLocation(found,move){
- if(!move){state.nodes=found.nodes;return}
- // The first answer names the node the target was already serving: nothing the page holds is another machine's yet.
- const moved=found.base!==nodeBase&&!!state.rendezvous;nodeBase=found.base;
- roomStore.batch(()=>{state.rendezvous=found.kind;state.nodes=found.nodes;state.node=found.node;
-  if(found.base!=null&&state.joinFailure===NO_MACHINE)state.joinFailure='';
+function settleBase(found,reach,pairing){
+ const base=found?.base??null,moved=base!==nodeBase,machine=pairing?.fp??null,other=machine!==state.node;
+ nodeBase=base;
+ roomStore.batch(()=>{
+  state.nodeReach=reach;state.rendezvous=found?(found.via==='room'?'room':'node'):'';
   // Another machine's conversations are not this one's: what the page knew of the last one goes with it.
-  if(moved){state.people=[];state.roomBinding=null;state.viewedThread=null}});
- // The page is the room's, not the machine's: it follows the build the room serves.
- if(found.kind==='room')followServedBuild(found.build);
- if(moved&&found.base!=null){refresh();refreshPeople();refreshHistory()}
+  if(other){state.node=machine;state.people=[];state.roomBinding=null;state.viewedThread=null}
+  if(base!=null&&reachFailure&&state.joinFailure===reachFailure){state.joinFailure='';reachFailure=''}
+ });
+ if(moved&&base!=null){refresh();refreshPeople();refreshHistory()}
 }
+/* ----- pairing this device with a machine (docs/DEVICE_PAIRING.md) ----- */
+function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
+function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
+// The machine no longer knows this device's token: the pairing is kept, saying so, and a new code is asked for.
+function pairingRefused(fp,{call=false}={}){
+ const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked)return;
+ keepPairings(revokedPairing(pairings,fp));
+ if(pairings.inUse!==fp)return;
+ const inCall=call||!!(state.ws||state.connecting||state.reconnecting);
+ if(inCall)disconnect();
+ settleBase(null,'revoked',pairingInUse(pairings));
+ reachFailure=reachNote(state);
+ if(inCall)failJoin(reachFailure);
+ openPairing(reachFailure);
+}
+// A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
+async function pairDevice(code,name){
+ const about=await askTarget(target,fetch);if(about)targetAbout=about;
+ const {pairing,base}=await redeemPairingCode(code,{name,target,about,origin:location.origin,get:fetch});
+ const inCall=!!(state.ws||state.connecting||state.reconnecting),use=!inCall||pairings.inUse===pairing.fp;
+ keepPairings(withPairing(pairings,pairing,{use}));
+ verified.set(base.base,Date.now());
+ if(use&&!inCall)settleBase(base,'ok',pairing);
+ closePairing();
+ return {host:pairing.host};
+}
+// Forgotten here at once; the machine is asked to revoke the token too, only at an address that proves it is that
+// machine — the token goes nowhere else — and without waiting on it: it is a courtesy, not a condition.
+async function forgetMachine(fp){
+ const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing)return;
+ const wasInUse=pairings.inUse===fp,known=wasInUse&&state.node===fp?nodeBase:null;
+ if(wasInUse&&(state.ws||state.connecting||state.reconnecting))disconnect();
+ keepPairings(withoutPairing(pairings,fp));
+ if(wasInUse){const next=pairingInUse(pairings);settleBase(null,next?'':'unpaired',next);if(next)void locate({move:true})}
+ if(pairing.revoked)return;
+ try{
+  const place=known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?{base:known}
+   :await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+  if(place)await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
+ }catch{}
+}
+// Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
+function callProtocols(){const token=pairingInUse(pairings)?.token;if(!token)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+token]}
 async function reselectRemembered(){
  // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
  const wanted=rememberedThread();
@@ -636,8 +707,9 @@ function reportClientError(report){
  if(state.ws?.readyState===WebSocket.OPEN&&state.sessionId){
   try{state.ws.send(JSON.stringify({type:'voice-client-error',data:{session_id:state.sessionId,...entry}}));return}catch{}
  }
- // Before the call exists, or once its socket is gone, the beacon still reaches the room.
- try{navigator.sendBeacon?.(routed('/api/presentation/client-error'),new Blob([JSON.stringify(entry)],{type:'application/json'}))}catch{}
+ // Before the call exists, or once its socket is gone, a request that outlives the page still reaches the machine.
+ // Not a beacon: a beacon cannot carry this device's token.
+ request('/api/presentation/client-error',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)}).catch(()=>{});
 }
 window.sidevoiceReportError=reportClientError;
 for(const queued of window.sidevoiceClientErrors||[])reportClientError(queued);
@@ -1003,7 +1075,7 @@ function measureMic(samples,enabled){
  return {value:Math.max(0,Math.min(100,Math.round((db+60)/60*100))),peak,state:peak>=.98?'clip':peak>=.8?'high':rms>.001?'normal':'quiet'};
 }
 function startMeter(rate){try{audioContext=window.roomVoice?.context||roomAudioContext(rate);analyser=audioContext.createAnalyser();analyser.fftSize=1024;micSource=audioContext.createMediaStreamSource(state.stream);micSource.connect(analyser);const data=new Float32Array(1024);let clipUntil=0,lastWave=0;function tick(){if(!analyser)return;analyser.getFloatTimeDomainData(data);const enabled=!!state.stream?.getAudioTracks()[0]?.enabled,level=measureMic(data,enabled);if(level.signal==='clip')clipUntil=Date.now()+600;const signal=enabled&&Date.now()<clipUntil?'clip':level.state;$('mute').style.setProperty('--mic-fill',level.value+'%');const meter=$('mic-level-meter'),mic=$('mic-control');mic.dataset.signal=signal;if(Date.now()-lastWave>=80){updateWave(level.value);lastWave=Date.now()}meter.setAttribute('aria-valuenow',String(level.value));const description=signal==='clip'?'Posible saturación del micrófono':signal==='high'?'Nivel de micrófono alto':'Nivel de micrófono';if(meter.dataset.signal!==signal){meter.dataset.signal=signal;meter.setAttribute('title',description);meter.setAttribute('aria-label',description)}meterFrame=requestAnimationFrame(tick)}tick()}catch{}}
-function roomSocketUrl(){if(nodeBase==null)throw Error(NO_MACHINE);return callSocketUrl(nodeBase,location)}
+function roomSocketUrl(){if(nodeBase==null)throw Error(reachNote(state)||NO_MACHINE);return callSocketUrl(nodeBase,location)}
 const ROOM_IS_FULL='La sala ya tiene el máximo de navegadores conectados. Espera a que salga alguien y vuelve a entrar.';
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
@@ -1026,6 +1098,8 @@ function openSession(socket,hello={}){return new Promise((resolve,reject)=>{cons
  // why: failing here would answer «no se pudo conectar» to a room that knows it is full.
  socket.onerror=()=>{broken=true};
  socket.onclose=event=>{clearTimeout(timer);timer=null;
+  // The machine no longer knows this device's token: final, and the pairing is what has to change.
+  if(event?.code===4401){pairingRefused(pairings.inUse);return fail(reachNote(state)||NO_MACHINE,true)}
   // However the reason arrived — the close code, the frame's own name for it, the frame's sentence —
   // the person reads one sentence for one reason.
   // A room that answered and said no is not a room that is away: these are the refusals a reconnection
@@ -1123,7 +1197,10 @@ function disconnect() {
     applyLockedCall();
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls (#53).
-async function toggleCall(){if(state.ws||state.connecting){disconnect();return}personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(!state.rendezvous||nodeBase==null){await locate({move:true});if(epoch!==connectEpoch)return}if(nodeBase==null)throw Error(NO_MACHINE);state.voicePreferences=await loadPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt_provider!=='openai')joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;callExecution='browser';if(callExecution==='browser'&&(state.voicePreferences.default_model||'kokoro')==='kokoro'){joinStatus('voice');await window.roomVoice.prepare({device:state.voicePreferences.tts_device},text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
+async function toggleCall(){if(state.ws||state.connecting){disconnect();return}
+ // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
+ const pairing=pairingInUse(pairings);if(!pairing||pairing.revoked){openPairing(pairing?reachNote(state):'');return}
+ personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await loadPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt_provider!=='openai')joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;callExecution='browser';if(callExecution==='browser'&&(state.voicePreferences.default_model||'kokoro')==='kokoro'){joinStatus('voice');await window.roomVoice.prepare({device:state.voicePreferences.tts_device},text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
 // A room restart or a network blip must not end the call: the microphone permission, the media stream
 // and the unlocked output all survive it; only the socket needs reopening, with the same hello.
@@ -1131,7 +1208,7 @@ async function toggleCall(){if(state.ws||state.connecting){disconnect();return}p
 // end the call (2026-09-26, driving). Only the person hanging up, or the room refusing this browser, stops it.
 const RECONNECT_DELAYS_MS=[1000,2000,5000];
 
-function shouldReconnect(event){return ![1008,1013].includes(event?.code)}   // refused by policy or full: do not insist
+function shouldReconnect(event){return ![1008,1013,4401].includes(event?.code)}   // refused by policy, full, or not paired: do not insist
 // A room that answers and refuses this browser is not a room that is away: insisting would never end.
 function refusedForGood(error){return error?.refused===true}
 // The room replays nothing into a new session: the one being replaced is over the moment the new
@@ -1146,7 +1223,7 @@ function dropReplacedSession(socket){
 // `context.keepCurrent` is a swap: the call in progress keeps this page's socket, its audio and its
 // microphone until the room has answered the new hello, so a refusal costs the call nothing.
 async function joinRoom(epoch,context){
- const socket=new WebSocket(roomSocketUrl());socket.binaryType='arraybuffer';
+ const socket=new WebSocket(roomSocketUrl(),callProtocols());socket.binaryType='arraybuffer';
  if(context.keepCurrent)openingSocket=socket;else state.ws=socket;
  let session;
  // The hello carries this browser's call span, so the room's own spans are inside it instead of
@@ -1188,8 +1265,9 @@ async function lostConnection(event,epoch,context){
  // while the socket is down is what the gap buffer keeps. Only the room's own transcription stops.
  window.roomTranscription?.stop();roomStore.patch({harness:{},turns:{}});
  cancelBrowserSpeech();state.userLive=state.botLive=false;state.pendingUserText='';state.pendingPhase='';markHistorySeen();
+ if(event?.code===4401){pairingRefused(pairings.inUse,{call:true});return}
  if(!shouldReconnect(event)){disconnect();failJoin('La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.');return}
- // A reconnection comes back to the machine this call was on, for as long as the room still lists it.
+ // A reconnection comes back to the machine this call was on — by whichever of its addresses answers.
  const node=state.node;
  state.reconnecting=true;
  // Heard, not only shown: a driver cannot see "Reconectando…" (2026-09-26).
@@ -1201,7 +1279,7 @@ async function lostConnection(event,epoch,context){
    if(attempt)window.roomVoice?.signal?.('retry');
    await new Promise(resolve=>setTimeout(resolve,RECONNECT_DELAYS_MS[Math.min(attempt,RECONNECT_DELAYS_MS.length-1)]));
    if(epoch!==connectEpoch)return;
-   await locate({keep:node,move:true});
+   await locate({move:true,fresh:attempt>0,hold:true});
    if(epoch!==connectEpoch)return;
    try{
     const session=await joinRoom(epoch,context);
@@ -1518,7 +1596,7 @@ $('settings-open').onclick=async()=>{try{
  forgetCredentialCheck('stt');forgetCredentialCheck('elevenlabs');
  // Voices, transcription and keys are a machine's; pairing one is not. With none connected the dialog still
  // opens — on Máquinas, the one pane that has something to do — instead of failing on a catalogue nobody serves.
- if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
+ if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
  const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language||'es');state.voicePreferences=p;
  for(const key of ['stt_language','default_tts_language','tts_speed','ui_language','tts_device','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
  for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
@@ -1827,7 +1905,7 @@ const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.valu
 for(const key of ['stt_language','stt_device','default_tts_language','tts_speed','ui_language','tts_device','default_model','default_voice','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['tts_speed','audio_grace_seconds','presence_volume','replay_on_return_seconds'].includes(key)?Number(value):value;if((key==='stt_device'||key==='tts_device')&&!['auto','webgpu','wasm'].includes(p[key]))p[key]=['auto','webgpu','wasm'].includes(previous?.[key])?previous[key]:'auto'}p.stt_provider=field('stt_provider')||'browser';p.stt_model=field('stt_model')||previous?.stt_model;let hotSwap=false;try{storePreferences(p);if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));hotSwap=localModelSwap(previous,p);state.voicePreferences=p;applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();const applied=await applyTranscriptionSettings(previous,p);state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas'}catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}}
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
-$('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){$('settings-error').textContent=NO_MACHINE;return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
+$('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){$('settings-error').textContent=reachNote(state)||NO_MACHINE;return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
  skipReply:async()=>skipReply(),
@@ -1861,25 +1939,20 @@ window.sidevoiceActions={
   voiceDraft[language]={...voiceDraft[language],speed};renderLanguageRows();
  },
  previewVoice,
- async revokeMachine(id){
-  // Twice over the same endpoint: the first takes the pairing away, the second takes the row away.
-  // Which of the two this is, is what the room has on file, never what this page remembers.
-  state.machineBusy=id;
-  try{await remove('/api/connectors/'+encodeURIComponent(id))}
-  catch(e){setRoomError(e.message||'No se pudo revocar esa máquina')}
-  finally{state.machineBusy='';await refreshMachines();await refreshPeople()}
- },
  // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
- // away, inside the person's own tap, from the list the machines' beat already holds (docs/RENDEZVOUS.md).
+ // away, inside the person's own tap. The choice is this device's, kept for next time.
  chooseMachine(id){
-  if(!state.nodes.some(node=>node.id===id&&node.connected))return;
-  rememberNode(id);
-  if(id===state.node)return;
+  if(!pairings.list.some(p=>p.fp===id)||id===pairings.inUse)return;
   const rejoin=!!(state.ws||state.connecting||state.reconnecting);
   if(rejoin)disconnect();
-  applyLocation(locateNode({kind:'room',nodes:state.nodes,web_build:null},target,{remembered:id}),true);
-  if(rejoin)void toggleCall();
+  keepPairings(usingPairing(pairings,id));
+  settleBase(null,'',pairingInUse(pairings));
+  if(rejoin)void toggleCall();else void locate({move:true});
  },
+ forgetMachine,
+ pairDevice,
+ openPairing:()=>openPairing(),
+ closePairing,
 };
 // ----- the call with the screen locked (#59) -----
 // On unless this device turned it off: the page keeps sounding when locked, and a faint floor keeps iOS from
@@ -1955,9 +2028,12 @@ window.addEventListener('keydown',e=>{personSignal();
 },true);
 window.addEventListener('keyup',e=>{if(e.code==='Space'&&spaceDown){e.preventDefault();releaseHold()}},true);
 window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});window.addEventListener('beforeunload',()=>{state.ws?.close();state.stream?.getTracks().forEach(t=>t.stop())});updateMic();
-// The first questions wait for the target to say which node they are for: one short answer, and a room with two
-// machines is never asked on their behalf. The interface language is this device's even with no machine to ask.
-locate().finally(()=>{loadPreferences().catch(()=>storedPreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language||'es'));refresh();refreshPeople();refreshHistory()});setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
+// The first questions wait for the machine to prove where it is: finding it asks for the conversations by itself.
+// A device paired with nothing is asked for a code at once. The interface language is this device's even with no
+// machine to ask.
+publishPairings();
+if(!pairingInUse(pairings))openPairing();
+locate().finally(()=>{loadPreferences().catch(()=>storedPreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language||'es'))});setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupAudioControls();
 setupOutputOwner();
