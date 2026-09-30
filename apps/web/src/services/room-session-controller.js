@@ -1,5 +1,6 @@
 import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE} from '../state/room-session-state.js';
 import {pageTarget,routeUrl,callSocketUrl,locateNode,askRendezvous} from './rendezvous.js';
+import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
@@ -197,7 +198,7 @@ async function replaceMicrophone(id){
   next.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);
   source.connect(analyser);source.connect(captureNode);
  }catch(error){source?.disconnect();next.getTracks().forEach(t=>t.stop());throw error}
- const previous=state.stream;micSource.disconnect();micSource=source;state.stream=next;inputDeviceId=id;
+ const previous=state.stream;micSource.disconnect();micSource=source;state.stream=next;inputDeviceId=id;micLink?.replaceTrack(next.getAudioTracks()[0]);
  previous.getTracks().forEach(t=>t.stop());
  await window.roomVoice.unlock();updateMic();
 }
@@ -227,7 +228,7 @@ async function restartCaptureOnRoute(){
  const source=audioContext.createMediaStreamSource(next);
  next.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);
  source.connect(analyser);source.connect(captureNode);
- micSource=source;state.stream=next;
+ micSource=source;state.stream=next;micLink?.replaceTrack(next.getAudioTracks()[0]);
  await window.roomVoice.resumeOutput?.();
  window.roomVoice?.note?.('route-change','capture restarted');syncNowPlaying();
  updateMic();
@@ -682,6 +683,7 @@ function renderConnectionStats(data,roundTrip){
   ...audioOutputFacts(window.roomVoice?.health?.()),
   ['Micrófono',track?.label||selectedLabel('input')],
   ['Captura',!track?'No iniciada':track.readyState==='ended'?'Finalizada':track.muted?'Sin señal del dispositivo':track.enabled?'Activa':'Silenciada'],
+  ['Ruta del micrófono',micPathFact()],
   ['Altavoces',selectedLabel('output')],
   ['Cancelación de eco',flag(settings.echoCancellation)],
   ['Reducción de ruido',flag(settings.noiseSuppression)],
@@ -693,6 +695,14 @@ function renderConnectionStats(data,roundTrip){
   ['Pantalla activa',screenWakeLock&&!screenWakeLock.released?'Activado':'No confirmado']
  ];
  $('stats-connection').replaceChildren(...facts.flatMap(([label,value])=>[statsCell('dt',label),statsCell('dd',value)]));
+}
+// Which path the microphone reaches the machine on, and — when it is not WebRTC — why not (phase 4).
+function micPathFact(){
+ const link=state.sessionId&&micLink?.sessionId===state.sessionId?micLink:null;if(!link)return '—';
+ if(link.path==='webrtc')return 'WebRTC';
+ const socket=state.rendezvous==='room'?'Socket (relé)':'Socket';
+ const why=({negotiating:'preparando WebRTC…',recovering:'WebRTC interrumpido; esperando a que vuelva'})[link.state]||({page_off:'WebRTC desactivado en este dispositivo',unsupported:'este navegador no tiene WebRTC',unavailable:'la máquina no ofrece WebRTC',node_off:'la máquina tiene WebRTC desactivado',offer:'la máquina no aceptó la conexión WebRTC',timeout:'WebRTC no llegó a conectar',failed:'la conexión WebRTC falló',closed:'la conexión WebRTC se cerró',disconnected:'WebRTC se cortó y no volvió',track:'el micrófono nuevo no pasó a WebRTC',error:'no se pudo preparar WebRTC'})[link.reason];
+ return why?socket+' · '+why+(link.detail&&['offer','error','unavailable'].includes(link.reason)?': '+link.detail:''):socket;
 }
 function resetStats(){renderLatencyStats(null,null);$('stats-connection').replaceChildren();$('stats-updated').textContent=''}
 async function refreshConnectionStats(){
@@ -1044,9 +1054,30 @@ async function startCapture(socket,session){if(!micSource)throw Error('No se pud
  captureRate=session.sample_rate;
  const node=new AudioWorkletNode(context,'mic-capture',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1,channelCountMode:'explicit',processorOptions:{sampleRate:session.sample_rate}});captureNode=node;node.port.onmessage=e=>{
   if(captureNode!==node||!micTrack()?.enabled)return;
-  // The socket is gone but the call is not: this is what the gap buffer exists for.
-  if(state.ws===socket&&socket.readyState===WebSocket.OPEN){socket.send(e.data);holdSpokenAudio(e.data)}else bufferGapAudio(e.data);
+  sendMicFrame(socket,e.data);
  };source.connect(node);node.connect(context.destination)/* reachable from the destination so it keeps running; its output stays silent */}
+// One frame of what the microphone heard. The socket is gone but the call is not: this is what the gap buffer exists
+// for. While WebRTC carries the microphone the socket sends none of it, and the page still keeps its own copy of an
+// unconfirmed turn (#102): a machine that restarts mid-sentence loses it whichever path it came by.
+function sendMicFrame(socket,data){if(state.ws===socket&&socket.readyState===WebSocket.OPEN){if(!micOnWebrtc(socket))socket.send(data);holdSpokenAudio(data)}else bufferGapAudio(data)}
+/* ----- the microphone over WebRTC (docs/RENDEZVOUS.md, phase 4) -----
+ * Once a call has its session, the track the page already captures is offered to the machine; while that
+ * connection is up the socket stops carrying the microphone and carries everything else exactly as before. The
+ * attempt belongs to its session and to the socket that session came on: a new session closes it and tries again. */
+let micLink=null,micLinkSocket=null;
+function startMicLink(socket,sessionId){
+ closeMicLink();
+ let stored=null;try{stored=localStorage.getItem('sidevoice.webrtc')}catch{}
+ micLinkSocket=socket;
+ micLink=createMicLink({sessionId,track:micTrack(),allowed:webrtcAllowed({search:location.search,stored}),Peer:globalThis.RTCPeerConnection,
+  config:()=>api('/api/presentation/rtc/config'),offer:body=>post('/api/presentation/rtc/offer',body),
+  // Said on the socket this session came on and on no other: a session being replaced has nobody left to tell.
+  announce:path=>{if(state.ws===socket&&socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'voice-media',data:{session_id:sessionId,path}}))},
+  onChange:link=>window.roomVoice?.note?.('mic-path',link.path+' · '+link.state+(link.reason?' · '+link.reason:''))});
+ void micLink.start();
+}
+function closeMicLink(){const link=micLink;micLink=micLinkSocket=null;link?.close()}
+function micOnWebrtc(socket){return micLinkSocket===socket&&micLink?.path==='webrtc'}
 function disconnect() {
     latencyTurns.clear();
     latencyActiveTurn = null;
@@ -1072,6 +1103,7 @@ function disconnect() {
     state.switchingSession = false;
     const socket = state.ws, opening = openingSocket;
     state.ws = openingSocket = null;
+    closeMicLink();
     socket?.close();
     opening?.close();
     state.engineReady=false;
@@ -1105,6 +1137,7 @@ function refusedForGood(error){return error?.refused===true}
 // The room replays nothing into a new session: the one being replaced is over the moment the new
 // one exists, so this page drops what belonged to it instead of pretending it is still running.
 function dropReplacedSession(socket){
+ if(micLinkSocket===socket)closeMicLink();
  socket.onclose=socket.onmessage=socket.onerror=null;
  try{socket.close()}catch{}
  window.roomTranscription?.stop();
@@ -1144,11 +1177,12 @@ async function joinRoom(epoch,context){
  if(context.browserStt)window.roomTranscription.start({socket,language:state.voicePreferences.stt_language});
  else window.roomTranscription?.stop();
  stopMeter();startMeter(session.sample_rate);await startCapture(socket,session);
+ if(state.ws===socket&&state.sessionId===session.session_id)startMicLink(socket,session.session_id);
  return session;
 }
 async function lostConnection(event,epoch,context){
  if(epoch!==connectEpoch||state.reconnecting)return;
- state.ws=null;
+ state.ws=null;closeMicLink();
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
  // The meter and the capture stay up on purpose: the microphone was never paused, and what it hears
  // while the socket is down is what the gap buffer keeps. Only the room's own transcription stops.

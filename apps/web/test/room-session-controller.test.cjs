@@ -4,9 +4,9 @@ function setup({strictDOM=false}={}){
  class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={};
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element())}
- const context=vm.createContext({Element,console,Date,JSON,Math,Uint8Array,AbortController,btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Uint8Array,AbortController,URLSearchParams,btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it.
- const modules={'../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous'};
+ const modules={'../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic'};
  for(const [from,name] of Object.entries(modules)){
   const dependency=fs.readFileSync(sourceRoot+'/services/'+from,'utf8');
   const exports=[...dependency.matchAll(/^export (?:async function|function|const) (\w+)/gm)].map(m=>m[1]);
@@ -2056,4 +2056,116 @@ test('A reconnection comes back to the machine the call was on, and never hands 
  const moved=await run([{id:'pc',host:'linux',connected:true}]);
  assert.equal(moved.url,'wss://room.example/nodes/pc/api/presentation/ws');
  assert.equal(moved.catchup,0,'words said to one machine\'s conversation are never handed to another\'s');
+});
+
+// ----- the microphone over WebRTC (docs/RENDEZVOUS.md, phase 4) -----
+// Neither this harness nor this pod has WebRTC: the peer connection below is a fake that records what the page
+// asked of it and moves when the test says so. A real browser, a real node and a real network are not covered.
+class FakePeer{
+ constructor(config){this.config=config;this.connectionState='new';this.iceGatheringState='new';this.closed=false;this.transceivers=[];FakePeer.all.push(this)}
+ addTransceiver(track,init){const transceiver={track,init,sender:{replaceTrack:async()=>{}}};this.transceivers.push(transceiver);return transceiver}
+ async createOffer(){return {type:'offer',sdp:'v=0 offer'}}
+ async setLocalDescription(description){this.localDescription={...description}}
+ async setRemoteDescription(description){this.remote=description}
+ close(){this.closed=true;this.connectionState='closed'}
+ gather(){this.iceGatheringState='complete';this.onicegatheringstatechange?.()}
+ move(connectionState){this.connectionState=connectionState;this.onconnectionstatechange?.()}
+}
+function webrtcCall({search='',rtc={enabled:true,ice_servers:[{urls:['stun:stun.example:3478']}]}}={}){
+ const s=setup();const sockets=[],requests=[];FakePeer.all=[];
+ s.context.RTCPeerConnection=FakePeer;
+ s.context.location={protocol:'https:',host:'room.example',search};
+ s.context.WebSocket=class{constructor(url){this.url=url;this.readyState=0;this.sent=[];sockets.push(this)}send(m){this.sent.push(m)}close(){this.readyState=3}};
+ s.context.WebSocket.OPEN=1;
+ s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});s.context.crypto={randomUUID:()=>'hello-id'};
+ s.context.fetch=async(path,init)=>{requests.push([path,init?.body?JSON.parse(init.body):null]);return {ok:true,status:200,json:async()=>
+  path.endsWith('/rtc/config')?rtc:path.endsWith('/rtc/offer')?{sdp:'v=0 answer',type:'answer'}:{binding:null,room:{revision:0},clients:[],call:null,participants:[]}}};
+ const track={enabled:true,stop(){}};
+ s.run(`startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
+  window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
+  voicePreferences={stt_provider:'openai'};rendezvous='room';node='mac';nodeBase='/nodes/mac'`);
+ s.context.__track=track;s.run("stream={getAudioTracks:()=>[globalThis.__track],getTracks:()=>[globalThis.__track]}");
+ const join=async(id,context={})=>{
+  const joining=s.run('joinRoom')(s.run('connectEpoch'),{browserStt:false,sttRuntime:null,...context});
+  const socket=sockets.at(-1);socket.readyState=1;socket.onopen();
+  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:id,sample_rate:16000,channels:1}})});
+  await joining;await new Promise(resolve=>setTimeout(resolve,0));
+  return socket;
+ };
+ // What the socket carried: the microphone's PCM frames, and the path the node was told.
+ const frames=socket=>socket.sent.filter(m=>typeof m!=='string').length;
+ const media=socket=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m)).filter(m=>m.type==='voice-media').map(m=>m.data);
+ const speak=socket=>s.run('sendMicFrame')(socket,new ArrayBuffer(640));
+ return {s,sockets,requests,track,join,frames,media,speak,settle:()=>new Promise(resolve=>setTimeout(resolve,0))};
+}
+test('With a session, the microphone is offered to the machine; the socket stops carrying it only once WebRTC is connected',async()=>{
+ const {s,requests,track,join,frames,media,speak,settle}=webrtcCall();
+ const socket=await join('call-1');
+ assert.equal(requests[0][0],'/nodes/mac/api/presentation/rtc/config','asked of the node, through the room');
+ const peer=FakePeer.all[0];
+ assert.equal(JSON.stringify(peer.config),JSON.stringify({iceServers:[{urls:['stun:stun.example:3478']}]}));
+ assert.equal(peer.transceivers[0].track,track,'the track the call already captures, not a second microphone');
+ assert.equal(peer.transceivers[0].init.direction,'sendonly');
+ speak(socket);
+ assert.equal(frames(socket),1,'while it negotiates, the socket is the microphone');
+ peer.gather();await settle();
+ const offer=requests.find(([path])=>path.endsWith('/rtc/offer'));
+ assert.equal(offer[0],'/nodes/mac/api/presentation/rtc/offer');
+ assert.equal(JSON.stringify(offer[1]),JSON.stringify({session_id:'call-1',sdp:'v=0 offer',type:'offer'}));
+ assert.equal(JSON.stringify(peer.remote),JSON.stringify({type:'answer',sdp:'v=0 answer'}));
+ assert.equal(media(socket).length,0,'answered is not connected: the node has not been told anything yet');
+ speak(socket);assert.equal(frames(socket),2);
+ peer.move('connected');
+ assert.equal(JSON.stringify(media(socket)),JSON.stringify([{session_id:'call-1',path:'webrtc'}]));
+ speak(socket);speak(socket);
+ assert.equal(frames(socket),2,'no PCM on the socket while WebRTC carries the microphone');
+ assert.equal(s.run('micPathFact()'),'WebRTC');
+ // It fails: the node is told, and the socket carries the microphone again.
+ peer.move('failed');
+ assert.equal(JSON.stringify(media(socket).map(m=>m.path)),JSON.stringify(['webrtc','socket']));
+ speak(socket);assert.equal(frames(socket),3);
+ assert.equal(peer.closed,true);
+ assert.equal(s.run('micPathFact()'),'Socket (relé) · la conexión WebRTC falló');
+ // And everything else on the socket is what it always was: the hello went first, untouched.
+ assert.equal(JSON.parse(socket.sent[0]).type,'client-ready');
+});
+test('A new session closes the old connection and negotiates again for itself; hanging up closes it',async()=>{
+ const {s,requests,join,media,settle}=webrtcCall();
+ const first=await join('call-1');
+ FakePeer.all[0].gather();await settle();FakePeer.all[0].move('connected');
+ // The settings swap: a second socket, and the first one let go once the room has answered.
+ const second=await join('call-2',{keepCurrent:true});
+ assert.equal(FakePeer.all[0].closed,true,'the old connection belonged to the old session');
+ assert.equal(JSON.stringify(media(first).map(m=>m.path)),JSON.stringify(['webrtc']),'and nothing is announced on a socket being let go');
+ assert.equal(FakePeer.all.length,2);
+ FakePeer.all[1].gather();await settle();
+ const offers=requests.filter(([path])=>path.endsWith('/rtc/offer')).map(([,body])=>body.session_id);
+ assert.equal(JSON.stringify(offers),JSON.stringify(['call-1','call-2']));
+ FakePeer.all[1].move('connected');
+ assert.equal(JSON.stringify(media(second)),JSON.stringify([{session_id:'call-2',path:'webrtc'}]));
+ // A dropped socket: the connection goes with the session it belonged to.
+ s.run('lostConnection')({code:1008},s.run('connectEpoch'),{browserStt:false,sttRuntime:null});
+ assert.equal(FakePeer.all[1].closed,true);
+ assert.equal(s.run('micLink'),null);
+ // Hanging up closes whatever the next call had (the hang-up above let the microphone go; a new call opens it again).
+ s.run("stream={getAudioTracks:()=>[globalThis.__track],getTracks:()=>[globalThis.__track]}");
+ await join('call-3');
+ assert.equal(FakePeer.all.length,3);
+ s.run('disconnect()');
+ assert.equal(FakePeer.all[2].closed,true);
+});
+test('Switched off on this device, or by the machine, the microphone stays on the socket and the statistics say why',async()=>{
+ for(const [options,why] of [[{search:'?webrtc=0'},'WebRTC desactivado en este dispositivo'],[{rtc:{enabled:false,ice_servers:[]}},'la máquina tiene WebRTC desactivado']]){
+  const {s,requests,join,frames,media,speak}=webrtcCall(options);
+  const socket=await join('call-1');
+  speak(socket);
+  assert.equal(frames(socket),1);
+  assert.equal(media(socket).length,0);
+  assert.equal(FakePeer.all.length,0,'no peer connection at all');
+  assert.equal(requests.some(([path])=>path.endsWith('/rtc/offer')),false);
+  assert.equal(s.run('micPathFact()'),'Socket (relé) · '+why);
+ }
+ const stored=webrtcCall();stored.s.context.localStorage={getItem:key=>key==='sidevoice.webrtc'?'off':null,setItem(){},removeItem(){}};
+ await stored.join('call-1');
+ assert.equal(FakePeer.all.length,0,'localStorage sidevoice.webrtc=off keeps the socket too');
 });
