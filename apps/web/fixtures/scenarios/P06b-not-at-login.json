@@ -1,0 +1,9 @@
+{ "id": "P6b", "title": "Núcleo sin arranque al iniciar sesión", "title_en": "Core not started at login",
+  "walk": "Row «No se arranca al iniciar sesión»; Estado › «Arrancar al iniciar sesión» (service install) → running.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "not-installed", "after_ms": 0 }],
+      "calls": { "serviceInstall": [{ "ok": true, "states": [{ "state": "starting", "after_ms": 0 }, { "state": "running", "after_ms": 1800 }] }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

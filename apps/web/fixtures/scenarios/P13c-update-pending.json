@@ -1,0 +1,9 @@
+{ "id": "P13c", "title": "Actualización pendiente con llamada abierta", "title_en": "Update pending during a call",
+  "walk": "Running, an update is pending and a call is open: Estado › «Actualizar» waits for the call, «Aplicar ahora» does not.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0, "calls": 1, "update": { "from": "0.4.0", "to": "0.4.2" } }],
+      "calls": { "update": [{ "ok": true, "states": [{ "state": "starting", "after_ms": 0 }, { "state": "running", "after_ms": 2500, "core": { "version": "0.4.2", "api": 3 }, "update": null, "calls": 0 }] }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

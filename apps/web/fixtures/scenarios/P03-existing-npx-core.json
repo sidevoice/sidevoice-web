@@ -1,0 +1,9 @@
+{ "id": "P3", "title": "Núcleo de npx ya en marcha, app nueva", "title_en": "Existing npx core, no app data",
+  "walk": "The app finds the running core and pairs over the socket: the wizard opens straight at W3 with the real states.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0 }],
+      "agents": [
+        { "id": "claude", "label": "Claude Code", "present": true, "version": "2.3.1", "registration": "connected", "connect": "auto" },
+        { "id": "codex", "label": "Codex", "present": true, "version": "0.157.0", "registration": "not-connected", "connect": "auto" } ] } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "onboarding": null }

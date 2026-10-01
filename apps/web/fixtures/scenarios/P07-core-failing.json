@@ -1,0 +1,14 @@
+{ "id": "P7", "title": "El núcleo falla al arrancar", "title_en": "Core failing",
+  "walk": "Backoff 2 of 5 … then failed with its cause (missing module soxr), step, attempts, log tail; «Reintentar» → running.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [
+        { "state": "backoff", "after_ms": 0, "attempts": 2, "failure": { "key": "import.missing-module", "detail": "soxr", "step": "import" } },
+        { "state": "backoff", "after_ms": 3000, "attempts": 3, "failure": { "key": "import.missing-module", "detail": "soxr", "step": "import" } },
+        { "state": "backoff", "after_ms": 6000, "attempts": 4, "failure": { "key": "import.missing-module", "detail": "soxr", "step": "import" } },
+        { "state": "failed", "after_ms": 9000, "failure": { "key": "import.missing-module", "detail": "soxr", "step": "import", "attempts": 5,
+          "log_tail": ["Traceback (most recent call last):", "  File \"sidevoice_core/server/__main__.py\", line 31, in main", "    from ..pipeline import audio", "  File \"sidevoice_core/pipeline/audio.py\", line 4, in <module>", "    import soxr", "ModuleNotFoundError: No module named 'soxr'"] } } ],
+      "calls": { "restart": [{ "ok": true, "states": [{ "state": "starting", "after_ms": 0 }, { "state": "running", "after_ms": 2000 }] }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

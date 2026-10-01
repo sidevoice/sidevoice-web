@@ -7,6 +7,7 @@
 .claude/
 node_modules/
 dist/
+dist-prototype/
 __pycache__/
 *.py[cod]
 *.log

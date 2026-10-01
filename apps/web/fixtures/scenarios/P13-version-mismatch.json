@@ -1,0 +1,9 @@
+{ "id": "P13", "title": "Versión: la máquina es más antigua", "title_en": "Version mismatch: core older",
+  "walk": "incompatible (core api below the app's range): «Actualizar la máquina» runs the transaction → running on the new version.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "incompatible", "after_ms": 0, "incompatible": "core-older", "core": { "version": "0.2.4", "api": 1 } }],
+      "calls": { "update": [{ "ok": true, "states": [{ "state": "starting", "after_ms": 0 }, { "state": "running", "after_ms": 2500, "core": { "version": "0.4.0", "api": 3 } }] }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

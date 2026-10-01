@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { decodePairingCode, deviceName } from "../../services/device-pairing.js";
 import { useT } from "../../i18n";
@@ -30,7 +30,7 @@ export function loopbackOnly(code: string): boolean {
 
 /** W2′ «Conecta con tu máquina», and Configuración › Máquinas › «Añadir una máquina» (F4): a code and this
  *  device's name; the page redeems it. */
-export function PairWithCode({ onPaired, submitLabel, use = true }: { onPaired: (fp: string) => void; submitLabel?: string; use?: boolean }) {
+export function PairWithCode({ onPaired, submitLabel, use = true, renderActions = (submit) => submit }: { onPaired: (fp: string) => void; submitLabel?: string; use?: boolean; renderActions?: (submit: ReactNode) => ReactNode }) {
   const t = useT();
   const hosts = useHostsController();
   const [code, setCode] = useState("");
@@ -70,7 +70,7 @@ export function PairWithCode({ onPaired, submitLabel, use = true }: { onPaired: 
         <input id="pair-name" value={name} maxLength={60} autoComplete="off" disabled={busy} onChange={(event) => setName(event.currentTarget.value)} />
       </label>
       {error && <p className="form-error" role="alert">{error.text ?? t(error.key)}</p>}
-      <Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pair.connecting") : submitLabel ?? t("pair.connect")}</Button>
+      {renderActions(<Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pair.connecting") : submitLabel ?? t("pair.connect")}</Button>)}
     </form>
   );
 }

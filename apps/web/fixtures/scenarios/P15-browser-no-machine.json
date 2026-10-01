@@ -1,0 +1,5 @@
+{ "id": "P15", "title": "Navegador / móvil sin máquina", "title_en": "Browser / phone, no machine",
+  "walk": "The no-machine screen's browser variant (npx hint), the Voz note with no host; «Conectar con una máquina» with the NUC code → W4 (phone rule: ElevenLabs on the NUC) → W5 → W6.",
+  "inApp": false, "view": "phone",
+  "hosts": { "nuc": { "name": "NUC", "via": "room", "integrations": { "elevenlabs": "stored", "openai": "stored" } } },
+  "onboarding": null }

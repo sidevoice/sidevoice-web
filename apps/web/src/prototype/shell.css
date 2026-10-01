@@ -1,0 +1,82 @@
+/* PROTOTYPE ONLY: the frames and the switcher panel. */
+* { box-sizing: border-box }
+html, body, #shell { height: 100%; margin: 0 }
+body { font-family: Inter, system-ui, sans-serif; background: #0d0f12; color: #e8edf1; overflow: hidden }
+button, select, input { font: inherit }
+.proto { position: relative; height: 100%; display: grid; place-items: center; padding: 1.2rem }
+.app-frame { display: block; width: 100%; height: 100%; border: 0; background: #14171b }
+.lights { display: inline-flex; gap: 7px }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57 }
+.lights i:nth-child(2) { background: #febc2e }
+.lights i:nth-child(3) { background: #28c840 }
+
+/* The desktop app: a macOS desktop with its menu bar, the window, and the collapsed call card. */
+.proto[data-view=app] { padding: 0; background: radial-gradient(1200px 700px at 30% 20%, #3a2f52 0%, #1d1830 45%, #0f0d17 100%) }
+.desktop { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; }
+.menubar { display: flex; justify-content: space-between; align-items: center; height: 26px; padding: 0 .9rem; background: #1d1a26cc; backdrop-filter: blur(14px); font-size: 13px }
+.menubar-left, .menubar-right { position: relative; display: flex; align-items: center; gap: 1.1rem }
+.menubar-left span { opacity: .85 }
+.tray-icon { display: grid; place-items: center; width: 26px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #f3eefa; cursor: pointer }
+.tray-icon[aria-expanded=true], .tray-icon:hover { background: #ffffff26 }
+.tray-icon svg rect { fill: currentColor } .tray-icon svg rect:nth-child(4) { fill: #ffffff80 }
+.tray-menu { position: absolute; z-index: 50; top: 24px; right: 7rem; display: grid; min-width: 17rem; padding: .3rem; border-radius: 9px; background: #2b2734f2; border: 1px solid #ffffff22; box-shadow: 0 16px 40px #000a; backdrop-filter: blur(20px) }
+.tray-menu button { display: block; padding: .32rem .7rem; border: 0; border-radius: 5px; background: transparent; color: #f2f2f5; text-align: start; font-size: 13px; cursor: pointer }
+.tray-menu button:hover:not(:disabled) { background: #7a5cc9 }
+.tray-menu button:disabled { opacity: .45; cursor: default }
+.tray-menu small { opacity: .6 }
+.tray-menu hr { width: 100%; margin: .25rem 0; border: 0; border-top: 1px solid #ffffff1c }
+.window { place-self: center; width: min(1240px, calc(100% - 3rem)); height: calc(100% - 3rem); display: grid; grid-template-rows: 30px 1fr; overflow: hidden; border-radius: 11px; border: 1px solid #ffffff1f; box-shadow: 0 30px 80px #000c }
+.titlebar { position: relative; display: flex; align-items: center; padding: 0 .8rem; background: #1e2228; border-bottom: 1px solid #00000080 }
+.titlebar .title { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; color: #b9c0c8; pointer-events: none }
+.call-card { position: absolute; right: 1.4rem; bottom: 1.4rem; display: flex; align-items: center; gap: .6rem; width: 17.5rem; padding: .55rem .7rem; border-radius: 16px; background: #1c2128f2; border: 1px solid #ffffff1c; box-shadow: 0 14px 40px #000b; backdrop-filter: blur(12px) }
+.card-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--sv-primary-muted); color: var(--sv-primary) }
+.card-copy { flex: 1; min-width: 0; display: grid; font-size: 12px }
+.card-copy b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.card-copy small { color: #a1acb9 }
+.card-wave { display: flex; align-items: center; gap: 2px; height: 20px }
+.card-wave i { width: 3px; height: 6px; border-radius: 2px; background: var(--sv-primary); animation: wave 1s ease-in-out infinite }
+.card-wave i:nth-child(2) { animation-delay: .12s } .card-wave i:nth-child(3) { animation-delay: .24s } .card-wave i:nth-child(4) { animation-delay: .36s } .card-wave i:nth-child(5) { animation-delay: .48s }
+@keyframes wave { 50% { height: 16px } }
+
+/* A browser window, and a phone. */
+.browser { width: min(1240px, 100%); height: 100%; display: grid; grid-template-rows: 38px 1fr; overflow: hidden; border-radius: 11px; border: 1px solid #ffffff1f; box-shadow: 0 30px 80px #000c }
+.browser-bar { display: flex; align-items: center; gap: 1rem; padding: 0 .9rem; background: #2a2d33 }
+.address { flex: 1; max-width: 34rem; margin: 0 auto; padding: .28rem .8rem; border-radius: 8px; background: #1b1d22; color: #c4c9cf; font-size: 13px; text-align: center }
+.phone { position: relative; width: 390px; height: min(844px, 100%); padding: 14px; border-radius: 54px; background: #050506; box-shadow: 0 0 0 2px #2b2b2f, 0 30px 80px #000c }
+.phone .app-frame { border-radius: 40px }
+.phone-notch { position: absolute; z-index: 2; top: 24px; left: 50%; width: 112px; height: 30px; transform: translateX(-50%); border-radius: 20px; background: #050506 }
+.bare { position: fixed; inset: 0 }
+
+/* The switcher: small, floating, and plainly not part of the product. */
+.panel { position: fixed; z-index: 100; right: 1rem; top: 2.4rem; width: 21rem; max-height: calc(100% - 3.4rem); display: flex; flex-direction: column; border-radius: 14px; background: #fff8e6; color: #2a2116; border: 2px dashed #e0a82e; box-shadow: 0 18px 50px #000b; font-size: 13px }
+.proto:not([data-view=app]) .panel { top: 1rem; max-height: calc(100% - 2rem) }
+.panel:not([data-open]) { width: auto }
+.panel-toggle { display: flex; align-items: center; gap: .4rem; padding: .5rem .8rem; border: 0; background: transparent; color: #6b4b10; font-weight: 800; letter-spacing: .08em; cursor: pointer }
+.panel-body { overflow: auto; padding: 0 .9rem .9rem }
+.panel-warning { margin: 0 0 .6rem; padding: .4rem .55rem; border-radius: 8px; background: #f6e1ad; font-size: 12px }
+.panel label { display: block; margin: .5rem 0; font-weight: 600 }
+.panel select { display: block; width: 100%; margin-top: .25rem; padding: .35rem; border-radius: 8px; border: 1px solid #c9b48a; background: white; color: #2a2116 }
+.walk { margin: .2rem 0 .7rem; color: #5b4a2e; line-height: 1.45 }
+.seg { display: flex; margin: .45rem 0; border: 1px solid #c9b48a; border-radius: 9px; overflow: hidden }
+.seg button { flex: 1; padding: .35rem .3rem; border: 0; border-inline-end: 1px solid #c9b48a; background: white; color: #2a2116; cursor: pointer; font-size: 12px }
+.seg button:last-child { border: 0 }
+.seg button[aria-pressed=true] { background: #4a2f6b; color: white }
+.panel details { margin: .6rem 0; padding: .35rem .5rem; border-radius: 9px; background: #fbeecb }
+.panel summary { cursor: pointer; font-weight: 700 }
+.code-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin: .45rem 0 }
+.code-row span { width: 100%; font-weight: 600 }
+.code-row button, .panel-actions button { padding: .25rem .5rem; border-radius: 7px; border: 1px solid #c9b48a; background: white; color: #2a2116; cursor: pointer; font-size: 12px }
+.panel fieldset { margin: .5rem 0; padding: .2rem .5rem .4rem; border: 1px solid #e3cf9f; border-radius: 8px }
+.panel legend { font-weight: 700; font-size: 12px; color: #6b4b10 }
+.panel .toggle-check { display: flex; gap: .4rem; align-items: flex-start; margin: .3rem 0; font-weight: 400 }
+.panel .toggle-select { font-weight: 400 }
+.panel .hint { margin: .3rem 0 0; font-size: 11px; color: #6b5a3a }
+.panel-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem }
+.flash { margin: 0; padding: .45rem .8rem; border-top: 1px dashed #e0a82e; font-size: 12px }
+.proto[data-narrow] .panel { top: auto; bottom: .6rem; right: .6rem; left: auto; max-height: 75dvh }
+.proto[data-narrow] .panel[data-open] { left: .6rem; width: auto }
+/* With the panel open, the window and the browser keep clear of it. */
+@media (min-width: 1100px) {
+  .proto[data-panel]:not([data-narrow]) .window { width: min(1240px, calc(100% - 25rem)); margin-inline-end: 23rem }
+  .proto[data-panel]:not([data-narrow]):not([data-view=app]) { padding-inline-end: 23.5rem }
+}

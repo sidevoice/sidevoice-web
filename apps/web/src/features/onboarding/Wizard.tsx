@@ -44,7 +44,6 @@ export function Wizard() {
   const hosts = useHostsController();
   const wizard = useHosts((s) => s.wizard);
   const ref = useModal(wizard.open, () => void hosts.deferWizard());
-  const back = previousStep(wizard.step, wizard.path);
   return (
     <dialog ref={ref} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title">
       <div className="wizard-head">
@@ -56,10 +55,21 @@ export function Wizard() {
       <div className="wizard-body">
         {wizard.open && <StepBody step={wizard.step} />}
       </div>
-      {back && wizard.step !== "W6" && (
-        <div className="wizard-back"><Button variant="ghost" size="compact" onClick={() => hosts.goTo(back, back === "W1" ? null : undefined)}>{t("wizard.back")}</Button></div>
-      )}
     </dialog>
+  );
+}
+
+/** A step's action row: «Atrás» at its start (except on W1 and W6), the step's own actions at its end. */
+function Actions({ children }: { children?: React.ReactNode }) {
+  const t = useT();
+  const hosts = useHostsController();
+  const wizard = useHosts((s) => s.wizard);
+  const back = wizard.step === "W6" ? null : previousStep(wizard.step, wizard.path);
+  return (
+    <div className="wizard-actions">
+      {back && <Button variant="ghost" className="wizard-back" onClick={() => hosts.goTo(back, back === "W1" ? null : undefined)}>{t("wizard.back")}</Button>}
+      {children}
+    </div>
   );
 }
 
@@ -114,7 +124,7 @@ function W1() {
       <p className="muted found-line" role="status">
         {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found", { names }) : t("wizard.w1.none")}
       </p>
-      <div className="wizard-actions"><Button variant="primary" disabled={!choice} onClick={() => void next()}>{t("wizard.continue")}</Button></div>
+      <Actions><Button variant="primary" disabled={!choice} onClick={() => void next()}>{t("wizard.continue")}</Button></Actions>
     </>
   );
 }
@@ -180,14 +190,14 @@ function W2() {
           {error.kept && <p className="muted">{t("wizard.w2.kept")}</p>}
         </div>
       )}
-      <div className="wizard-actions">
+      <Actions>
         {outcome === "running" && <Button onClick={() => void hosts.localCancelInstall()}>{t("common.cancel")}</Button>}
         {(outcome === "failed" || outcome === "cancelled") && <>
           <Button variant="ghost" onClick={async () => { await hosts.choosePath("remote"); hosts.goTo("W2r", "remote"); }}>{t("wizard.w2.withoutAgents")}</Button>
           {outcome === "failed" && <CopyButton text={details} label={t("common.copyDetails")} size="default" />}
           <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>{t("common.retry")}</Button>
         </>}
-      </div>
+      </Actions>
     </>
   );
 }
@@ -199,7 +209,7 @@ function W2r() {
   return (
     <>
       <p className="muted">{t("wizard.w2r.lead")}</p>
-      <PairWithCode onPaired={(fp) => { void hosts.loadIntegrations(fp); hosts.goTo("W4"); }} />
+      <PairWithCode onPaired={(fp) => { void hosts.loadIntegrations(fp); hosts.goTo("W4"); }} renderActions={(submit) => <Actions>{submit}</Actions>} />
     </>
   );
 }
@@ -243,7 +253,7 @@ function W3() {
     return (
       <div className="problem" role="alert">
         <p>{t(listing.error === "no-connector" ? "agents.noConnector" : "agents.scanFailed")}</p>
-        <div className="wizard-actions"><Button variant="ghost" onClick={() => void next()}>{t("agents.notNow")}</Button><Button variant="primary" onClick={() => fp && void hosts.loadAgents(fp, true)}>{t("common.retry")}</Button></div>
+        <Actions><Button variant="ghost" onClick={() => void next()}>{t("agents.notNow")}</Button><Button variant="primary" onClick={() => fp && void hosts.loadAgents(fp, true)}>{t("common.retry")}</Button></Actions>
       </div>
     );
   const remaining = agents.filter((a) => a.registration === "not-connected");
@@ -276,12 +286,12 @@ function W3() {
         </ul>
       )}
       {connectedAny && <p className="ok-line" role="status">{t("agents.nextConversations")}</p>}
-      <div className="wizard-actions">
+      <Actions>
         {chosen.length > 0 ? <>
           <Button variant="ghost" onClick={() => void next()}>{t("agents.notNow")}</Button>
           <Button variant="primary" disabled={connecting} onClick={() => void connect()}>{t("wizard.w3.connect", { n: chosen.length })}</Button>
         </> : <Button variant="primary" onClick={() => void next()}>{remaining.length && !connectedAny ? t("agents.notNow") : t("wizard.continue")}</Button>}
-      </div>
+      </Actions>
     </>
   );
 }
@@ -357,10 +367,10 @@ function W4() {
           <h3>{t("stage.stt")}</h3><StageSettings task="stt" />
           <h3>{t("stage.tts")}</h3><StageSettings task="tts" />
         </div>
-        <div className="wizard-actions">
+        <Actions>
           <Button variant="ghost" onClick={() => setChoosing(false)}>{t("wizard.w4.backToProposal")}</Button>
           <Button variant="primary" onClick={() => hosts.goTo("W5")}>{t("wizard.continue")}</Button>
-        </div>
+        </Actions>
       </>
     );
 
@@ -368,16 +378,16 @@ function W4() {
     return (
       <div className="problem" role="alert">
         <p>{t("wizard.w4.integrationsFailed")}</p>
-        <div className="wizard-actions"><Button variant="primary" onClick={() => inUse && void hosts.loadIntegrations(inUse)}>{t("common.retry")}</Button></div>
+        <Actions><Button variant="primary" onClick={() => inUse && void hosts.loadIntegrations(inUse)}>{t("common.retry")}</Button></Actions>
       </div>
     );
   if (proposal.rows.length === 0)
     return (
       <div className="problem" role="alert">
         <p>{t("wizard.w4.noOffer")}</p>
-        <div className="wizard-actions">
+        <Actions>
           {inUse && <Button variant="primary" onClick={() => hosts.openSettings("host", inUse, "integrations")}>{t("wizard.w4.openIntegrations")}</Button>}
-        </div>
+        </Actions>
       </div>
     );
 
@@ -406,7 +416,7 @@ function W4() {
       </ul>
       {!runs && <p className="muted">{proposal.bytes ? t("wizard.w4.total", { size: bytesText(proposal.bytes, lang) }) : t("wizard.w4.nothingToDownload")}</p>}
       {!runs && <p className="muted small">{t("wizard.w4.nothingBefore")}</p>}
-      <div className="wizard-actions">
+      <Actions>
         {!runs && <>
           <Button variant="ghost" onClick={() => setChoosing(true)}>{t("wizard.w4.other")}</Button>
           <Button variant="primary" disabled={proposal.missing.length > 0} onClick={() => void accept(proposal.rows)}>{t("wizard.w4.use")}</Button>
@@ -417,7 +427,7 @@ function W4() {
           <Button variant="primary" onClick={() => void accept(proposal.rows.filter((row) => runs[row.task]?.phase !== "done"))}>{t("common.retry")}</Button>
         </>}
         {allDone && <Button variant="primary" onClick={() => hosts.goTo("W5")}>{t("wizard.continue")}</Button>}
-      </div>
+      </Actions>
     </>
   );
 }
@@ -503,14 +513,14 @@ function W5() {
           </NativeSelect>
         </label>
       )}
-      <div className="wizard-actions">
-        <Button variant="ghost" onClick={() => void skip()}>{t("wizard.w5.skip")}</Button>
+      <Actions>
+        {echo.state !== "replied" && <Button variant="ghost" onClick={() => void skip()}>{t("wizard.w5.skip")}</Button>}
         {echo.state === "idle" ? <Button variant="primary" onClick={start}>{t("wizard.w5.start")}</Button> : <>
           <Button variant="ghost" onClick={() => setPicking(true)}>{t("wizard.w5.notHearing")}</Button>
           <Button onClick={start}>{t("wizard.w5.repeat")}</Button>
           <Button variant="primary" disabled={echo.state !== "replied"} onClick={() => void works()}>{t("wizard.w5.works")}</Button>
         </>}
-      </div>
+      </Actions>
     </>
   );
 }
@@ -523,7 +533,7 @@ function W6() {
     <>
       <p className="done-lead">{t("wizard.w6.lead")}</p>
       <p className="ask-agent">«{t("wizard.w6.ask")}»</p>
-      <div className="wizard-actions"><Button variant="primary" onClick={() => void hosts.finishWizard()}>{t("wizard.w6.go")}</Button></div>
+      <Actions><Button variant="primary" onClick={() => void hosts.finishWizard()}>{t("wizard.w6.go")}</Button></Actions>
     </>
   );
 }

@@ -1,0 +1,8 @@
+{ "id": "P13b", "title": "Versión: la máquina es más nueva", "title_en": "Version mismatch: core newer",
+  "walk": "incompatible (core api above the app's range): «Esta máquina es más nueva que la app: actualiza Sidevoice». Also: a running core with an update pending shows «Actualizar» in P13c.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "incompatible", "after_ms": 0, "incompatible": "core-newer", "core": { "version": "0.6.0", "api": 5 } }] } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

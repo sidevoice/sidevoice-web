@@ -1,0 +1,9 @@
+{ "id": "P12", "title": "La máquina ya no reconoce a esta app", "title_en": "Local app refused",
+  "walk": "State refused (its device was revoked or its list wiped): banner and Estado with «Volver a conectar» — never automatic.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "refused", "after_ms": 0 }], "refused": true,
+      "calls": { "reconnect": [{ "ok": true, "states": [{ "state": "running", "after_ms": 600 }] }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

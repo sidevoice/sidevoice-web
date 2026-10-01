@@ -1,0 +1,9 @@
+{ "id": "P8", "title": "Servicio caído (supervisor)", "title_en": "Supervisor down",
+  "walk": "service-failed with the manager's reason (start-limit); «Reintentar» (reset-failed + restart) → running; or «Reinstalar».",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "service-failed", "after_ms": 0, "failure": { "key": "start-limit" } }],
+      "calls": { "restart": [{ "ok": true, "states": [{ "state": "starting", "after_ms": 0 }, { "state": "running", "after_ms": 2000 }] }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana" } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

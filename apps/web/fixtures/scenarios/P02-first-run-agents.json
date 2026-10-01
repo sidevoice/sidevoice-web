@@ -1,0 +1,9 @@
+{ "id": "P2", "title": "Primer arranque con agentes", "title_en": "First run, agents found",
+  "walk": "W1 («Sí» preselected) → W2 downloads the core (6 s) → W3 connects Claude Code and Codex → W4 → W5 → W6.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "absent", "after_ms": 0 }], "install": { "duration_ms": 6000 },
+      "agents": [
+        { "id": "claude", "label": "Claude Code", "present": true, "version": "2.3.1", "registration": "not-connected", "connect": "auto" },
+        { "id": "codex", "label": "Codex", "present": true, "version": "0.157.0", "registration": "not-connected", "connect": "auto" } ] } },
+  "hosts": { "local": { "name": "MacBook de Ana", "connect_ms": 800 } },
+  "onboarding": null }

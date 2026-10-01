@@ -107,7 +107,7 @@ function LocalStatus() {
   const call = (name: Parameters<typeof hosts.localCall>[0]) => run(name, () => hosts.localCall(name));
   return (
     <div className="host-status" data-state={local.state}>
-      <p className="status-line"><HostDot dot={view.dot} /> <strong><PhraseText phrase={view.subtitle} /></strong></p>
+      <p className="status-line"><HostDot dot={view.dot} /> <strong>{local.state === "running" ? t("host.status.running", { calls: local.calls ?? 0 }) : <PhraseText phrase={view.subtitle} />}</strong></p>
       {local.state === "backoff" && f && <p className="muted"><PhraseText phrase={failurePhrase(f)} /></p>}
       {local.state === "refused" && <p className="muted">{t("host.refused.detail")}</p>}
       {local.state === "incompatible" && <p className="muted">{t(local.incompatible === "core-newer" ? "host.coreNewer.detail" : "host.coreOlder.detail")}</p>}

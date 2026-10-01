@@ -1,0 +1,6 @@
+{ "id": "P1", "title": "Nada instalado, sin agentes", "title_en": "Nothing installed, no agents",
+  "walk": "W1 («No» preselected) → W2′ with the NUC code → W4 → W5 → W6. Or «Lo haré luego» → no-machine screen.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "absent", "after_ms": 0 }], "agents": [] } },
+  "hosts": { "nuc": { "name": "NUC", "via": "room" } },
+  "onboarding": null }

@@ -1,0 +1,12 @@
+{ "id": "P10", "title": "Remoto que no responde / sin servicio", "title_en": "Remote unreachable / no connector",
+  "walk": "NUC «No responde desde hace 3 h»; the Pod answers but its Agentes tab says the service is not running there.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0 }] } },
+  "hosts": { "local": { "name": "MacBook de Ana" },
+             "nuc": { "name": "NUC", "via": "room", "reachable": false, "silent_hours": 3 },
+             "pod": { "name": "Pod de desarrollo", "via": "direct",
+               "routes": { "GET /api/host/agents": [{ "status": 503, "body": { "key": "no-connector", "message": "no connector linked" }, "delay_ms": 300 }] } } },
+  "pairings": [ { "host": "nuc", "paired_days_ago": 40 }, { "host": "pod", "paired_days_ago": 3 } ], "in_use": "local",
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

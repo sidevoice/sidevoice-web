@@ -1,0 +1,9 @@
+{ "id": "P4", "title": "Portátil del sofá (sin agentes)", "title_en": "First run, sofa laptop",
+  "walk": "W1 «No» → W2′: the first NUC code is refused as already used, a second one pairs → W4 with the NUC's places (ElevenLabs has a key).",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "absent", "after_ms": 0 }], "agents": [] } },
+  "hosts": { "nuc": { "name": "NUC", "via": "room", "integrations": { "elevenlabs": "stored", "openai": false },
+      "routes": { "POST /api/device/pair": [
+        { "status": 403, "body": { "key": "REFUSED_SECRET", "detail": "Ese código no vale: no existe, ya se usó o ha caducado. Pide uno nuevo en la máquina." }, "delay_ms": 500 },
+        { "default": true } ] } } },
+  "onboarding": null }

@@ -1,0 +1,10 @@
+{ "id": "P14", "title": "Host local no alcanzable desde fuera", "title_en": "Local host not reachable from other devices",
+  "walk": "Dispositivos › «Emparejar otro dispositivo»: reach local-only → connect it to the room (URL + room code) → the code now reaches through the room.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0 }],
+      "calls": { "pairingCode": [{ "ok": true, "reach": "local-only" }, { "ok": true, "reach": "room" }], "pairRoom": [{ "ok": true, "delay_ms": 1500 }] } } },
+  "hosts": { "local": { "name": "MacBook de Ana",
+      "devices": [ { "name": "Sidevoice en Mac", "kind": "local", "self": true, "created_days_ago": 2, "seen_minutes_ago": 0 } ] } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true, "open": { "pane": "host", "host": "local", "tab": "devices" },
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

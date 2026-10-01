@@ -1,0 +1,13 @@
+{ "id": "P9", "title": "Local + NUC remoto", "title_en": "Local + remote",
+  "walk": "Two rows; «Usar» switches; the NUC keeps its own voice (ElevenLabs) — see the «Para» line in Voz on each host.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0 }],
+      "agents": [ { "id": "claude", "label": "Claude Code", "present": true, "version": "2.3.1", "registration": "connected", "connect": "auto" } ] } },
+  "hosts": { "local": { "name": "MacBook de Ana" },
+             "nuc": { "name": "NUC", "via": "room", "integrations": { "elevenlabs": "stored", "openai": "environment" },
+               "agents": [ { "id": "codex", "label": "Codex", "present": true, "version": "0.157.0", "registration": "connected", "connect": "auto" } ] } },
+  "pairings": [ { "host": "nuc", "paired_days_ago": 20 } ], "in_use": "local",
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } },
+              "hosts": { "nuc": { "tts": { "place": "elevenlabs", "model": "eleven_flash_v2_5" } } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true,
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

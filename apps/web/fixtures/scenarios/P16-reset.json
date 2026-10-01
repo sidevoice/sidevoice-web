@@ -1,0 +1,13 @@
+{ "id": "P16", "title": "Borrar datos", "title_en": "Reset",
+  "walk": "Esta app › «Borrar datos…». App only → relaunch rediscovers the host (P3). Both → relaunch into the first run (P2). With the machine box, the machine step fails once; «Reintentar» resumes.",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0 }],
+      "agents": [ { "id": "claude", "label": "Claude Code", "present": true, "version": "2.3.1", "registration": "connected", "connect": "auto" } ] },
+    "app": { "reset": { "fail_once": "machine", "error": { "key": "service-teardown", "detail": "launchctl bootout: 5: Input/output error" },
+      "leaves": ["La caché de uv (~/.cache/uv)", "Una entrada «sidevoice» de Cursor que no era nuestra"], "relaunch": { "app": "P3", "machine": "P2" } } } },
+  "hosts": { "local": { "name": "MacBook de Ana",
+      "devices": [ { "name": "Sidevoice en Mac", "kind": "local", "self": true, "created_days_ago": 12, "seen_minutes_ago": 0 },
+                   { "name": "iPhone de Ana", "kind": "code", "created_days_ago": 10, "seen_minutes_ago": 180 } ] } },
+  "stages": { "default": { "stt": { "place": "device", "model": "whisper-base" }, "tts": { "place": "device", "model": "kokoro-82m-v1.0" } } },
+  "installed": ["whisper-base", "kokoro-82m-v1.0"], "room": true, "open": { "pane": "app" },
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 } }

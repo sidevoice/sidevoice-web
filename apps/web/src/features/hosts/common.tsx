@@ -57,9 +57,10 @@ export function CopyButton({ text, label, size = "compact" }: { text: string | (
 
 export function formatWhen(seconds: number | null | undefined, now: number, language: string): string {
   if (!seconds) return "—";
-  const elapsed = Math.round(now / 1000 - seconds);
+  // The clock a view was rendered with can be older than the answer it shows: never "in 4 seconds".
+  const elapsed = Math.max(0, Math.round(Math.max(now, Date.now()) / 1000 - seconds));
   const rtf = new Intl.RelativeTimeFormat(language, { numeric: "auto" });
-  if (Math.abs(elapsed) < 60) return rtf.format(-elapsed, "second");
+  if (elapsed < 60) return rtf.format(0, "second");
   if (Math.abs(elapsed) < 3600) return rtf.format(-Math.round(elapsed / 60), "minute");
   if (Math.abs(elapsed) < 86400) return rtf.format(-Math.round(elapsed / 3600), "hour");
   return rtf.format(-Math.round(elapsed / 86400), "day");
