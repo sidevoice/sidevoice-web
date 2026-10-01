@@ -2,6 +2,7 @@
  * the shadow; nothing here styles anything else. Dark by default, light with the system. */
 :root { color-scheme: light dark; }
 html, body { margin: 0; background: transparent; overflow: hidden; }
+*, *::before, *::after { box-sizing: border-box; }
 body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; cursor: default; }
 #root { padding: 12px; }
 
@@ -9,7 +10,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
   --fg: var(--sv-text); --mu: var(--sv-muted); --btn: rgb(255 255 255 / 9%); --btn-hover: rgb(255 255 255 / 16%);
   --line: rgb(255 255 255 / 9%); --accent: var(--sv-primary); --accent-bg: var(--sv-primary-muted);
   --avatar: #4a2f6b; --muted-bg: #f9dedc; --muted-fg: #601410; --end: #dc362e; --end-hover: #ef443b; --cross: #ff8a80;
-  width: 320px; padding: 10px 12px; border-radius: 16px; color: var(--fg);
+  box-sizing: border-box; width: 320px; padding: 10px 12px; border-radius: 16px; color: var(--fg);
   background: rgb(22 25 31 / 92%); border: 1px solid var(--line); box-shadow: 0 8px 22px rgb(0 0 0 / 40%);
   -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
 }
@@ -71,8 +72,8 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 .card-mic { display: inline-flex; align-items: center; height: 30px; border-radius: 15px; background: var(--btn); }
 .card-mic[data-muted] { background: var(--muted-bg); color: var(--muted-fg); }
 .call-card .card-devices { width: 20px; height: 30px; border-radius: 15px 0 0 15px; color: var(--mu); border-right: 1px solid var(--line); }
-.call-card .card-devices svg { transform: rotate(180deg); }
-.call-card .card-devices[aria-expanded=true] svg { transform: none; }
+/* The devices open below the controls: the chevron points down, and up while they are open. */
+.call-card .card-devices[aria-expanded=true] svg { transform: rotate(180deg); }
 .card-mic[data-muted] .card-devices { color: var(--muted-fg); border-right-color: rgb(96 20 16 / 20%); }
 .call-card .card-mute { width: 30px; height: 30px; border-radius: 0 15px 15px 0; }
 .call-card .card-mic button:hover:not(:disabled) { background: var(--btn-hover); }
