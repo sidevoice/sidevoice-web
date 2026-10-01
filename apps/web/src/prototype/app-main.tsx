@@ -13,6 +13,7 @@ import "./prototype.css";
 import { currentLanguage, setLanguage, t, useT } from "../i18n";
 import { systemLanguage } from "../services/system-language.js";
 import { redeemPairingCode, NO_WEBCRYPTO } from "../services/device-pairing.js";
+import { desktopHost } from "../services/desktop-host";
 import { createRoomSessionStore } from "../state/room-session-state.js";
 import { RoomStoreContext } from "../state/room-store";
 import { createHostsController, createHostsStore, HostsContext, PAIRINGS_KEY, useHosts, type HostTab, type SettingsPane } from "../state/hosts/hosts-store";
@@ -81,12 +82,12 @@ async function boot() {
     : { runs: "page" as const, has: toggles.noWebgpu ? ["wasm"] : ["webgpu", "webgpu-f16", "wasm"] };
   const engine = createFakeEngine(toggles, capabilities, installed, currentLanguage);
 
-  if (inApp) window.__sidevoiceDesktop = { host: createFakeBridge(scenario, toggles, hosts, (note) => showNote(t("proto.note." + note)), (next) => post({ type: "relaunch", scenario: next })) };
+  if (inApp) window.__sidevoiceDesktop = { host: createFakeBridge(scenario, toggles, hosts, (note) => showNote(t("proto.note." + note)), (next) => post({ type: "relaunch", scenario: next })) as unknown as Record<string, unknown> };
 
   // A host the fixture says went silent hours ago: this client noticed then, not now.
   const store = createHostsStore({ reach: Object.fromEntries([...hosts.byAlias.values()].filter((h) => h.seed.silent_hours).map((h) => [h.fp, { state: "unreachable" as const, since: Math.floor(Date.now() / 1000) - h.seed.silent_hours! * 3600 }])) });
   const controller = createHostsController(store, {
-    storage, bridge: () => window.__sidevoiceDesktop?.host ?? null, now: () => Date.now(),
+    storage, bridge: desktopHost, now: () => Date.now(),
     verifyStage: engine.verifyStage, echoTest: engine.echoTest,
     async redeem(code, name) {
       if (toggles.w2rNoWebCrypto) throw new Error(NO_WEBCRYPTO);

@@ -149,13 +149,8 @@ export interface DesktopHost {
   mediaKeys?: string;
 }
 
-declare global {
-  interface Window {
-    __sidevoiceDesktop?: { host?: DesktopHost };
-  }
-}
-
-/** The bridge, or null outside the app. */
+/** The bridge, or null outside the app. `window.__sidevoiceDesktop` is declared by the call controls card
+ *  (call-controls/host.ts) as an open record; the host page reads its own groups from it. */
 export function desktopHost(): DesktopHost | null {
-  return (typeof window !== "undefined" && window.__sidevoiceDesktop?.host) || null;
+  return (typeof window !== "undefined" && (window.__sidevoiceDesktop?.host as DesktopHost | undefined)) || null;
 }

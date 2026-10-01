@@ -31,7 +31,9 @@ function Shell() {
   const [hosts, setHosts] = useState<{ alias: string; name: string }[]>([]);
   const [flash, setFlash] = useState<string | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
-  const [card, setCard] = useState(!!initial.scenario.room);
+  // The card floats while a call is on: shown for the scenarios that start configured, from the tray otherwise.
+  const [card, setCard] = useState(!!initial.scenario.stages);
+  const [cardSize, setCardSize] = useState({ width: 344, height: 80 });
   const frame = useRef<HTMLIFrameElement>(null);
   const narrow = useNarrow();
   const current = scenarioById(scenario);
@@ -44,10 +46,15 @@ function Shell() {
   useEffect(() => { history.replaceState(null, "", query); }, [query]);
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as { source?: string; type?: string; scenario?: string; hosts?: { alias: string; name: string }[]; pasted?: boolean };
-      if (data?.source !== "sidevoice-prototype") return;
+      const data = event.data as { source?: string; type?: string; scenario?: string; hosts?: { alias: string; name: string }[]; pasted?: boolean; width?: number; height?: number; command?: string };
+      if (data?.source !== "sidevoice-prototype" && data?.source !== "sidevoice-card") return;
       if (data.type === "ready") setHosts(data.hosts ?? []);
       if (data.type === "relaunch" && data.scenario) { setScenario(data.scenario); setToggles({}); setGeneration((g) => g + 1); say("Relanzada tras «Borrar datos» → " + data.scenario); }
+      if (data.type === "size" && data.width) setCardSize({ width: data.width, height: data.height ?? 80 });
+      if (data.type === "command") {
+        if (data.command === "open-app") send({ type: "open-app" });
+        else say("Tarjeta: «" + data.command + "» (la llamada no está simulada)");
+      }
       if (data.type === "code-sent") say(data.pasted ? "Código pegado en el campo" : "Código copiado al portapapeles (abre el campo del código y pégalo)");
     };
     window.addEventListener("message", onMessage);
@@ -94,13 +101,7 @@ function Shell() {
             <div className="titlebar"><span className="lights"><i /><i /><i /></span><span className="title">Sidevoice</span></div>
             {iframe}
           </div>
-          {card && (
-            <div className="call-card" title="Tarjeta de controles de llamada, plegada (desktop#5): flota sobre otras apps cuando la ventana no está delante">
-              <span className="card-mark"><SidevoiceMark size={20} /></span>
-              <span className="card-copy"><b>sidevoice-web · onboarding</b><small>Claude · 3:12</small></span>
-              <span className="card-wave"><i /><i /><i /><i /><i /></span>
-            </div>
-          )}
+          {card && <iframe className="card-frame" src={"prototype-card.html?lang=" + (lang || "")} title="Sidevoice · controles de llamada" style={{ width: cardSize.width, height: cardSize.height }} />}
         </div>
       ) : effectiveView === "browser" ? (
         <div className="browser">
