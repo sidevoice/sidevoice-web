@@ -90,7 +90,8 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
         previewing={task !== "tts" ? null : onVoicePreview ? voicePreviewing ?? null : !hideVoiceTools ? tools.previewing : null} />
       {task === "tts" && !hideVoiceTools && <p className="muted" role="status">{tools.previewNote}</p>}
       {afterOptions}
-      {(view.advanced || view.diagnostics) && (
+      {/* A provider has nothing here to tune: what runs it is theirs (operator, 2026-10-01). */}
+      {(view.advanced || view.diagnostics) && view.place === "device" && (
         <details className="stage-advanced">
           <summary>{t("stage.advanced")}</summary>
           {view.advanced && (
