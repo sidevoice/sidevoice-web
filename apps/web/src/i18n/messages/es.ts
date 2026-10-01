@@ -554,7 +554,5 @@ export const es: Record<string, string> = {
   "option.help.instructions": "Cómo quieres que hable: tono, estilo, pronunciación.",
   "option.help.voice": "La voz con la que te habla en cada idioma. «Automática» usa la primera de ese idioma.",
   "stagecard.key.clear": "Borrar la clave de {provider} de esta máquina",
-  "try.guide.tts.chat": "Escríbeme lo que quieras oír y te lo leo con esta voz.",
-  "stagecard.send": "Enviar",
   "wizard.group.done": "Listo",
 };

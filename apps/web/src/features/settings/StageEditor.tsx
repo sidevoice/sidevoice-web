@@ -31,6 +31,7 @@ import { offeredSentence, saySample } from "./try-samples";
 import checks from "../../../../../packages/browser-audio/checks/checks.json";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
 import { MessageGroup } from "../conversation/MessageGroup";
+import { Avatar } from "../../components/ui/Avatar";
 import type { ChatMessage, StageOptionView, StageView } from "../../state/room-types";
 
 /** What the person said works, per stage, for this session: the whole configuration on one machine. A wizard step
@@ -59,6 +60,8 @@ export const StageFlowContext = createContext<StageFlow>("try");
 /** Where the voice test's text is written — compared in the prototype (operator, 2026-10-02): "chat", in the
  *  person's own bubble, sent like a message and read back by Sidevoice; "field", a text box under the conversation. */
 export type VoiceTestStyle = "chat" | "field";
+// "chat" (operator, 2026-10-02): the text is written inside Sidevoice's own bubble («Primeros pasos»), one line, its
+// placeholder a sentence in the language, and ▶ in the bubble reads it.
 export const VoiceTestContext = createContext<VoiceTestStyle>("chat");
 
 /** The longest text the voice test plays. */
@@ -128,8 +131,9 @@ function KeyLine({ fp, provider, label, configured, hint, ownSubmit, ref }: { fp
 
 type TrialState = "idle" | "listening" | "transcribing" | "heard" | "playing" | "played" | "failed";
 type Trial = ReturnType<typeof useTrial>;
-/** What a try says or plays: the language, and the text (the sentence offered to say, or the person's own to hear). */
-interface TryInput { language: string; text: string }
+/** What a try says or plays: the language, and the text (the sentence offered to say, or the person's own to hear).
+ *  `draft` / `placeholder`: the voice test's field as written, and the sentence it falls back to. */
+interface TryInput { language: string; text: string; draft?: string; placeholder?: string }
 
 /** Trying a prepared stage: listening to the person (stt) or playing the text (tts). A newer try or a reset makes a
  *  late result of the previous one count for nothing. */
@@ -208,8 +212,10 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   // as a sentence in it, and is the person's to change — in any language — up to TEXT_MAX characters.
   const [voiceLanguage, setVoiceLanguage] = useState(speechLanguage);
   const sampleIn = (language: string) => voiceLanguages?.find((l) => l.id === language)?.sample ?? "";
-  const [text, setText] = useState(() => sampleIn(speechLanguage));
-  useEffect(() => { setText(sampleIn(voiceLanguage).slice(0, TEXT_MAX)); // eslint-disable-next-line react-hooks/exhaustive-deps
+  // In the bubble the sentence is the placeholder; in a field it is the text to start from.
+  const inBubble = useContext(VoiceTestContext) === "chat";
+  const [text, setText] = useState(() => inBubble ? "" : sampleIn(speechLanguage));
+  useEffect(() => { setText(inBubble ? "" : sampleIn(voiceLanguage).slice(0, TEXT_MAX)); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceLanguage]);
   const trial = useTrial(task);
   const keyLine = useRef<KeyHandle>(null);
@@ -275,7 +281,9 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   // Transcription: the sentence offered is in the stage's language, or the person's when it detects it.
   const sttLanguage = view.options.find((o) => o.kind === "language");
   const sayLanguage = sttLanguage && sttLanguage.value !== "auto" ? sttLanguage.value : speechLanguage;
-  const input: TryInput = task === "stt" ? { language: sayLanguage, text: saySample(sayLanguage) } : { language: voiceLanguage, text };
+  const voiceSample = sampleIn(voiceLanguage).slice(0, TEXT_MAX);
+  const input: TryInput = task === "stt" ? { language: sayLanguage, text: saySample(sayLanguage) }
+    : { language: voiceLanguage, text: text.trim() || voiceSample, draft: text, placeholder: voiceSample };
   const start = () => trial.start(input);
   // The voice is configured per language, every language in view (operator, 2026-10-01), each with only its own
   // voices (sidevoice-core#23 filters a provider's by language) and its ▶: hearing a language makes it the test's.
@@ -590,25 +598,27 @@ function TestText({ value, language, languageLabel, onChange, disabled }: { valu
   );
 }
 
-/** The voice test's text written in the person's own bubble, as a message to send: Enter (or ↑) sends it, and
- *  Sidevoice reads it back in the voice chosen. */
-function ComposerBubble({ value, language, languageLabel, onChange, onSend }: { value: string; language: string; languageLabel: string; onChange: (text: string) => void; onSend: () => void }) {
+/** The voice test in Sidevoice's own bubble («Primeros pasos»): one line to write what to hear — its placeholder a
+ *  sentence in the language — and ▶ (or Enter) to hear it in the voice chosen. While it plays, the bubble is the
+ *  call's own, the words following the voice. */
+function SpeakBubble({ name, value, placeholder, language, languageLabel, onChange, onPlay }: { name: string; value: string; placeholder: string; language: string; languageLabel: string; onChange: (text: string) => void; onPlay: () => void }) {
   const t = useT();
-  const ready = !!value.trim();
   return (
-    <div className="message-group live-draft" data-role="user">
+    <section className="message-group" data-role="assistant" aria-label={name}>
       <div className="chat-message-row">
-        <div className="chat-bubble try-composer" data-role="user" data-position="only">
-          <textarea rows={2} maxLength={TEXT_MAX} lang={language} value={value} aria-label={languageLabel ? t("stagecard.text.labelIn", { language: languageLabel }) : t("stagecard.text.label")}
-            onChange={(event) => onChange(event.currentTarget.value)}
-            onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (ready) onSend(); } }} />
-          <span className="try-composer-foot">
-            <span className="try-count">{languageLabel ? languageLabel + " · " : ""}{t("stagecard.text.count", { n: value.length, max: TEXT_MAX })}</span>
-            <button type="button" className="try-send" aria-label={t("stagecard.send")} title={t("stagecard.send")} disabled={!ready} onClick={onSend}>↑</button>
+        <Avatar name={name} icon={<SidevoiceMark size={16} />} decorative />
+        <article className="chat-bubble try-speak" data-role="assistant" data-position="only">
+          <span className="chat-sender">{name}</span>
+          <span className="try-speak-row">
+            <input type="text" maxLength={TEXT_MAX} lang={language} value={value} placeholder={placeholder}
+              aria-label={languageLabel ? t("stagecard.text.labelIn", { language: languageLabel }) : t("stagecard.text.label")}
+              onChange={(event) => onChange(event.currentTarget.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onPlay(); } }} />
+            <button type="button" className="try-send" aria-label={t("stagecard.listen")} title={t("stagecard.listen")} onClick={onPlay}>▶</button>
           </span>
-        </div>
+        </article>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -630,15 +640,16 @@ function TryShow({ task, trial, input, languageLabel, onText, onStart }: { task:
   // The instructions are Sidevoice's own message, as in a real conversation (operator, 2026-10-01).
   return (<>
     <div className="try-chat" ref={chat}>
-      {guide.say(task === "stt" ? t("try.guide.stt", { sample: input.text }) : t(chatStyle ? "try.guide.tts.chat" : "try.guide.tts"))}
-      {task === "tts" && chatStyle && played && (state === "playing" || state === "played") && <MessageGroup group={{ id: "sent", role: "user", name: t("stagecard.you"), messages: [message("user", played)] }} />}
+      {(task === "stt" || !chatStyle) && guide.say(task === "stt" ? t("try.guide.stt", { sample: input.text }) : t("try.guide.tts"))}
+      {task === "tts" && chatStyle && state !== "playing" && (
+        <SpeakBubble name={guide.name} value={input.draft ?? ""} placeholder={input.placeholder ?? ""} language={input.language} languageLabel={languageLabel} onChange={onText} onPlay={onStart} />
+      )}
       {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
       {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
-      {task === "tts" && (state === "playing" || state === "played") && (
+      {task === "tts" && (chatStyle ? state === "playing" : state === "playing" || state === "played") && (
         guide.say(played, { playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null }, "played")
       )}
     </div>
-    {task === "tts" && !busy && chatStyle && <div className="try-chat"><ComposerBubble value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} onSend={onStart} /></div>}
     {task === "tts" && !busy && !chatStyle && <TestText value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} />}
     <div role="alert">{state === "failed" && <p className="row-error small">
       {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}

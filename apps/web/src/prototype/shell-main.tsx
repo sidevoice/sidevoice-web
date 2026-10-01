@@ -147,7 +147,7 @@ function Shell() {
               <p className="hint"><b>A</b>: descargar y preparar → «Probar» → «¿Es lo que has dicho? / ¿Te suena bien?» → «Sí, funciona».</p>
               <p className="hint"><b>B</b>: la app lo comprueba sola (descarga, carga, sale audio) → configurar y escuchar tu texto las veces que quieras → «Usar esta voz».</p>
               <div className="seg" role="group" aria-label="Prueba de voz">
-                <button type="button" aria-pressed={toggles.voiceTest !== "field"} onClick={() => setToggle("voiceTest", "")}>Voz: escribir en tu globo</button>
+                <button type="button" aria-pressed={toggles.voiceTest !== "field"} onClick={() => setToggle("voiceTest", "")}>Voz: en el globo de Sidevoice</button>
                 <button type="button" aria-pressed={toggles.voiceTest === "field"} onClick={() => setToggle("voiceTest", "field")}>Voz: campo de texto</button>
               </div>
               <p className="hint"><b>C</b>: lista de todos los modelos; al tocar uno se descarga y comprueba, con sus tiempos en la tarjeta → la prueba es al final, una conversación real.</p>
