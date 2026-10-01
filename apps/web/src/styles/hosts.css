@@ -377,18 +377,17 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-card-actions .ui-button { min-height: 0; height: 1.9rem; padding-block: 0 }
 .stage-card-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .8rem }
 .stage-card-actions { flex: none; display: inline-flex; gap: .4rem }
-.stage-card-about { overflow: hidden; text-overflow: ellipsis }
 /* «?» beside an option's name: what it is for, in a tooltip. */
-.field-label-row { display: inline-flex; align-items: center; gap: .4rem }
-.field-help { display: inline-grid; place-items: center; width: 1.05rem; height: 1.05rem; padding: 0; border: 1px solid var(--sv-border); border-radius: 50%; background: transparent; color: var(--sv-muted); font: 600 .66rem/1 inherit; cursor: help }
 .field-help:hover, .field-help:focus-visible { color: var(--sv-text); border-color: var(--sv-selected-border) }
-/* The title line: name, size and «— description» flow as one text over up to two lines (always two lines tall, so
-   the card keeps its size), the phases at its right. */
-.stage-card-head { align-items: center }
-.stage-card-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow: hidden; min-height: 2.7em; line-height: 1.35; align-content: center }
-.stage-card-name > * { margin-inline-end: .35rem }
-.stage-card-about { display: inline }
 /* Compact steps: no numbers (their order is their place), a check once done. */
 .stage-card-phases { gap: .2rem }
 .stage-card-phases li::before { content: none }
 .stage-card-phases li[data-state=done]::before { content: "✓ " }
+/* Title (name, size) and subtitle (the description, one line), the steps at their right. */
+.stage-card-title { display: grid; min-width: 0; gap: .1rem }
+.stage-card-name { display: flex; align-items: baseline; gap: .45rem; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
+.stage-card-about { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-height: 1.3em }
+/* «?»: centred on its label's line, the mark centred in its circle. */
+.field-label-row { display: inline-flex; align-items: center; gap: .35rem; line-height: 1.2 }
+.field-help { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 1rem; height: 1rem; padding: 0; border: 1px solid var(--sv-border); border-radius: 50%; background: transparent; color: var(--sv-muted); font-size: .62rem; font-weight: 700; line-height: 1; padding: .1em 0 0; cursor: help }
+.field-help:hover, .field-help:focus-visible { color: var(--sv-text); border-color: var(--sv-selected-border) }

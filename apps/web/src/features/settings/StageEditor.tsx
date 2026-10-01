@@ -529,9 +529,12 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   return (
     <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-tone={tone} data-works={works || undefined}>
       <div className="stage-card-head">
-        {/* Its size only: whether it is here is the phases' to say. */}
-        <span className="stage-card-name" title={model?.description}><strong>{model?.label ?? view.model}</strong>{view.place === "device" && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}
-          {model?.description && <span className="muted small stage-card-about">— {model.description}</span>}</span>
+        {/* Title and subtitle, as the model list shows them (operator, 2026-10-02); the subtitle's line is kept even when
+            a model has no description, so every card is the same size. */}
+        <span className="stage-card-title">
+          <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{view.place === "device" && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}</span>
+          <span className="stage-card-about muted small" title={model?.description}>{model?.description || " "}</span>
+        </span>
         <ol className="stage-card-phases">
           {phases.map((phase) => {
             const done = phase === "download" ? downloaded && !downloading
