@@ -41,6 +41,8 @@ export const es: Record<string, string> = {
   "wizard.w1.title": "¿Trabajas con agentes de programación en este ordenador?",
   "wizard.w1.lead": "Sidevoice puede instalarse aquí para darles voz.",
   "wizard.w1.yes": "Sí, aquí uso agentes",
+  "wizard.w1.yesDetail": "Tus agentes corren en este ordenador: Sidevoice se instala aquí, a su lado.",
+  "wizard.w1.noDetail": "Tus agentes están en otra máquina: te conectas a ella con un código.",
   "wizard.w1.no": "No, este ordenador solo habla con otra máquina",
   "wizard.w1.searching": "Buscando agentes en este ordenador…",
   "wizard.w1.found": "Hemos encontrado agentes en este ordenador.",

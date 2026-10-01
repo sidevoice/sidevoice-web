@@ -119,7 +119,10 @@ function W1() {
         {(["agents", "remote"] as const).map((value) => (
           <label key={value} className="choice-card" data-checked={choice === value || undefined}>
             <input type="radio" name="w1-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} />
-            <span className="choice-copy"><strong>{t(value === "agents" ? "wizard.w1.yes" : "wizard.w1.no")}</strong></span>
+            <span className="choice-copy">
+              <strong>{t(value === "agents" ? "wizard.w1.yes" : "wizard.w1.no")}</strong>
+              <span className="muted">{t(value === "agents" ? "wizard.w1.yesDetail" : "wizard.w1.noDetail")}</span>
+            </span>
           </label>
         ))}
       </fieldset>
