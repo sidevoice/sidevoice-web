@@ -69,8 +69,10 @@ export function LocalHostBanner() {
   const local = useHosts((s) => s.local);
   const fp = useHosts((s) => s.localPairing?.fp ?? null);
   const inUse = useHosts((s) => s.inUse);
+  const wizardOpen = useHosts((s) => s.wizard.open);
   const phrase = localBanner(local);
-  if (!phrase || !local || (fp && inUse !== fp)) return null;
+  // The wizard is already saying what this computer is doing (W2 installs and starts it).
+  if (!phrase || !local || wizardOpen || (fp && inUse !== fp)) return null;
   const retry = local.state === "refused" ? "reconnect" : local.state === "stopped-by-person" ? "start" : local.state === "not-installed" ? "serviceInstall" : "restart";
   return (
     <div className="room-banner" role="alert" data-state={local.state}>
