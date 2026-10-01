@@ -28,7 +28,7 @@ import { MessageGroup } from "../conversation/MessageGroup";
 import type { ChatMessage } from "../../state/room-types";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
-import { AgentRow, otherAgent } from "../hosts/AgentRow";
+import { AgentRow, OtherAgentSection } from "../hosts/AgentRow";
 
 const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title.stt", W4v: "wizard.w4.title.tts", W5: "wizard.w5.title", W6: "wizard.w6.title" };
 
@@ -267,14 +267,13 @@ function W3() {
       </div>
     );
   const anyConnected = agents.some((a) => a.registration === "connected");
-  const other = otherAgent(listing.value?.custom, t("agents.other"));
   return (
     <>
       <p className="muted">{t(agents.length ? "wizard.w3.lead" : "wizard.w3.none")}</p>
       <ul className="agent-rows">
         {agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="wizard" />)}
-        {other && <AgentRow key={other.id} fp={fp} agent={other} mode="wizard" />}
       </ul>
+      <OtherAgentSection custom={listing.value?.custom} />
       <Actions><Button variant="primary" onClick={() => void next()}>{anyConnected || agents.length === 0 ? t("wizard.continue") : t("agents.notNow")}</Button></Actions>
     </>
   );

@@ -25,7 +25,7 @@ export function SidevoiceLink({ registration }: { registration: DetectedAgent["r
 /** The id of the row that stands for any agent the connector has no module for. */
 export const OTHER = "other";
 
-function CodeBlock({ code }: { code: string }) {
+export function CodeBlock({ code }: { code: string }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   return (
@@ -36,6 +36,30 @@ function CodeBlock({ code }: { code: string }) {
         <CopyIcon size={15} />{copied && <span>{t("common.copied")}</span>}
       </button>
     </div>
+  );
+}
+
+/** «Añadir otro agente» (operator, 2026-10-02: a section apart, not a row among the detected ones): for any agent the
+ *  connector has no module for, what to add to it by hand — the MCP command, or its JSON. */
+export function OtherAgentSection({ custom }: { custom: { command: string; snippet: string } | null | undefined }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  if (!custom) return null;
+  return (
+    <section className="other-agent">
+      <div className="other-agent-head">
+        <span className="agent-icon"><ConnectorIcon size={16} /></span>
+        <span className="agent-copy"><strong>{t("agents.other.title")}</strong><span className="muted small">{t("agents.other.sub")}</span></span>
+        <Button size="compact" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? t("common.close") : t("agents.other.add")}<ChevronIcon size={14} className={open ? "chevron-up" : undefined} /></Button>
+      </div>
+      {open && (
+        <div className="agent-howto">
+          <p className="muted small">{t("agents.other.detail")}</p>
+          {custom.command && <><p className="howto-label">{t("agents.other.command")}</p><CodeBlock code={custom.command} /></>}
+          {custom.snippet && <><p className="howto-label">{t("agents.other.json")}</p><CodeBlock code={custom.snippet} /></>}
+        </div>
+      )}
+    </section>
   );
 }
 

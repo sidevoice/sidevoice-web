@@ -466,3 +466,14 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 /* Each try's button on its speaker's side. */
 .try-row[data-side=person] { justify-content: flex-end }
 .try-row[data-side=sidevoice] { padding-inline-start: 2.5rem }
+/* Integraciones: a row per provider, the key asked for in place. */
+.provider-keys { display: grid; gap: .5rem; margin: .4rem 0 0; padding: 0; list-style: none }
+.provider-key { display: grid; gap: .5rem; padding: .7rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22 }
+.provider-key[data-configured] { border-color: #2f4a3d }
+.provider-key-head { display: flex; align-items: center; gap: .7rem }
+.provider-key-name { flex: 1; min-width: 0; display: grid; gap: .1rem }
+.provider-key .key-line { margin: 0 }
+/* «Añadir otro agente»: apart, under the detected agents. */
+.other-agent { display: grid; gap: .6rem; margin-top: 1.1rem; padding: .8rem .9rem; border: 1px dashed var(--sv-border); border-radius: 12px }
+.other-agent-head { display: flex; align-items: center; gap: .7rem }
+.other-agent-head .agent-copy { flex: 1; display: grid; gap: .1rem; min-width: 0 }

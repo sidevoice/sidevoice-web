@@ -74,9 +74,11 @@ export function SettingsShell() {
         <h2 id="settings-shell-title"><SettingsIcon size={14} /> {t("settings.title")}</h2>
         <nav className="settings-nav" aria-label={t("settings.sections")}>
           <NavButton pane="general" current={pane === "general"} onClick={() => go("general")}><GeneralIcon /> {t("settings.general")}</NavButton>
-          <NavButton pane="voice" current={pane === "voice"} onClick={() => go("voice")}><VoicesIcon /> {t("stage.tts")}</NavButton>
-          <NavButton pane="transcription" current={pane === "transcription"} onClick={() => go("transcription")}><TranscriptionIcon /> {t("stage.stt")}</NavButton>
+          {/* Voz and Transcripción are each machine's; only with no machine are they here (this device's models). */}
+          {!rows.length && <NavButton pane="voice" current={pane === "voice"} onClick={() => go("voice")}><VoicesIcon /> {t("stage.tts")}</NavButton>}
+          {!rows.length && <NavButton pane="transcription" current={pane === "transcription"} onClick={() => go("transcription")}><TranscriptionIcon /> {t("stage.stt")}</NavButton>}
           {inApp && <NavButton pane="app" current={pane === "app"} onClick={() => go("app")}><AppIcon /> {t("settings.thisApp")}</NavButton>}
+          <NavButton pane="advanced" current={pane === "advanced"} onClick={() => go("advanced")}><AdvancedIcon /> {t("settings.advanced")}</NavButton>
           <div className="nav-group" role="group" aria-labelledby="nav-hosts">
             <NavButton pane="hosts" current={pane === "hosts"} onClick={() => go("hosts")}><MachinesIcon /> <span id="nav-hosts">{t("hosts.title")}</span></NavButton>
             {rows.map((row) => (
@@ -86,8 +88,6 @@ export function SettingsShell() {
             ))}
             <NavButton pane="add-host" current={pane === "add-host"} onClick={() => go("add-host")}><span className="nav-glyph" aria-hidden="true">+</span> {t("hosts.add")}</NavButton>
           </div>
-          {/* Last: what one rarely needs, and the diagnostics (operator, 2026-10-02). */}
-          <NavButton pane="advanced" current={pane === "advanced"} onClick={() => go("advanced")}><AdvancedIcon /> {t("settings.advanced")}</NavButton>
         </nav>
       </aside>
       <section className="transcript settings-main">

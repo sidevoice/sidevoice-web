@@ -73,7 +73,8 @@ const TEXT_MAX = 200;
 interface KeyHandle { submit(): void }
 
 /** `ownSubmit`: its own «Validar» while a typed key is unchecked; in the wizard that is the footer's button. */
-function KeyLine({ fp, provider, label, configured, hint, ownSubmit, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; ownSubmit: boolean; ref?: Ref<KeyHandle> }) {
+/** `onAccepted`: told when a key was checked and kept (Integraciones closes the field then). */
+export function KeyLine({ fp, provider, label, configured, hint, ownSubmit, onAccepted, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; ownSubmit: boolean; onAccepted?: () => void; ref?: Ref<KeyHandle> }) {
   const t = useT();
   const hosts = useHostsController();
   const [key, setKey] = useState("");
@@ -90,6 +91,7 @@ function KeyLine({ fp, provider, label, configured, hint, ownSubmit, ref }: { fp
     setChecked(value);
     setKey("");
     setState("");
+    onAccepted?.();
   }
   const input = useRef<HTMLInputElement>(null);
   // A key is checked as soon as it is in (operator, 2026-10-01): pasted, or a moment after typing stops.
@@ -348,7 +350,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     setPreparedHere(true);
     window.sidevoiceActions?.testStage?.(task, { place: stage.place, model: stage.model, options: stage.options ?? {}, build: stage.build ?? null });
   }
-  if (rawCheck?.phase === "done") remember(task, (rawCheck as unknown as { stage: Stage; result?: Measured }).stage, (rawCheck as unknown as { result?: Measured }).result);
+  if (rawCheck?.phase === "done") remember(inUse, task, (rawCheck as unknown as { stage: Stage; result?: Measured }).stage, (rawCheck as unknown as { result?: Measured }).result);
   const settings = (
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={list ? null : keyFor} hideCheck hidePlaceNote hideVoiceTools
       pickers={list ? <ModelList task={task} ctx={ctx} view={view} current={current} saved={saved} running={rawCheck} rawStep={rawStep} onPick={pick} onRetry={prepare} /> : undefined}
@@ -384,12 +386,21 @@ type Phase = "download" | "prepare" | "test" | "check";
 
 /** What a check measured: how long loading took, and how long the model takes to answer. */
 interface Measured { load_ms?: number; passes?: { latency_ms?: number; first_audio_ms?: number }[] }
-/** What each model measured when it was last checked here, per stage and place/model: shown on its card for good. */
-const measuredBy = new Map<string, Measured>();
-function remember(task: Task, stage: Stage | undefined, result: Measured | undefined) {
-  if (stage && result) measuredBy.set(task + ":" + stage.place + "/" + stage.model, result);
+/** What each model measured when it was last checked, per machine, stage and place/model — kept on this device, so
+ *  the card shows it every time (operator, 2026-10-02); «Volver a comprobar» measures again. */
+const MEASURED_KEY = "sidevoice.measured";
+const measuredBy: Record<string, Measured> = (() => {
+  try { return JSON.parse(localStorage.getItem(MEASURED_KEY) || "{}") as Record<string, Measured>; } catch { return {}; }
+})();
+const measuredKey = (fp: string | null, task: Task, place: string, model: string) => (fp ?? "") + "|" + task + ":" + place + "/" + model;
+function remember(fp: string | null, task: Task, stage: Stage | undefined, result: Measured | undefined) {
+  if (!stage || !result) return;
+  const key = measuredKey(fp, task, stage.place, stage.model);
+  if (JSON.stringify(measuredBy[key]) === JSON.stringify(result)) return;
+  measuredBy[key] = result;
+  try { localStorage.setItem(MEASURED_KEY, JSON.stringify(measuredBy)); } catch { /* shown this session only */ }
 }
-const measuredFor = (task: Task, place: string, model: string) => measuredBy.get(task + ":" + place + "/" + model);
+const measuredFor = (fp: string | null, task: Task, place: string, model: string) => measuredBy[measuredKey(fp, task, place, model)];
 /** Past this a turn feels slow (checks.json, the same bound the check calls slow). */
 const COMFORT_MS = checks.stt.comfort_ms;
 
@@ -449,7 +460,7 @@ function ModelList({ task, ctx, view, current, saved, running, rawStep, onPick, 
                   const slow = check?.phase === "slow" && mine(running?.stage);
                   const here = model.offer ? installed(model.offer) : false;
                   const size = model.offer?.download_size ? bytesText(model.offer.download_size, lang) : "";
-                  const measured = measuredFor(task, place.id, model.id);
+                  const measured = measuredFor(inUse, task, place.id, model.id);
                   const phases: Phase[] = place.id === "device" ? ["download", "prepare", "check"] : ["check"];
                   const at: Phase = rawStep === "download" ? "download" : rawStep === "check" || place.id !== "device" ? "check" : "prepare";
                   return (
@@ -515,6 +526,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
 }) {
   const t = useT();
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
+  const inUse = useHosts((s) => s.inUse);
   if (!view) return null;
   const check = view.check;
   const model = view.models.find((m) => m.id === view.model);
@@ -532,7 +544,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : first;
   const lang = currentLanguage();
   const chooseOther = () => document.getElementById(`${task}-model`)?.click();
-  const measured = measuredFor(task, view.place, view.model);
+  const measured = measuredFor(inUse, task, view.place, view.model);
   // The bar: empty before, the download's share while downloading, moving while it loads and checks, full once ready.
   const tone = failed ? "failed" : slow ? "slow" : prepared ? "done" : running ? "running" : "idle";
   const share = check?.phase === "running" ? check.fraction : null;
@@ -550,6 +562,8 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
     : slow ? <>{!inFooter && <Button variant="primary" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>}<Button size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, false)}>{t("stagecard.chooseOther")}</Button></>
     : !prepared ? (!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{prepareLabel}</Button>)
     : flow === "try" && works ? <Button variant="ghost" size="compact" onClick={onRetry}>{t("stagecard.tryAgain")}</Button>
+    // Ready: measure it again, here (operator, 2026-10-02).
+    : prepared ? <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.recheckStage(task)}>{t("stagecard.recheck")}</Button>
     : null;
   return (
     <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-tone={tone} data-works={works || undefined}>
@@ -722,7 +736,6 @@ function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart
           {trial.state === "listening" ? t("stagecard.listening") : trial.state === "transcribing" ? t("stagecard.transcribing") : trial.state === "playing" ? t("stagecard.playing")
             : t(task === "stt" ? "stagecard.speak" : "stagecard.listen")}
         </Button>}
-        {works && <span className="ok-line small" role="status">{t(task === "tts" ? "stagecard.b.inUse.tts" : "stagecard.b.inUse.stt")}</span>}
       </span>
     </div>
   );

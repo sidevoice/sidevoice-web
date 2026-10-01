@@ -28,7 +28,7 @@ export interface Remote<T> { status: Status; value: T | null; error: string | nu
 const idle = <T,>(): Remote<T> => ({ status: "idle", value: null, error: null, at: null });
 
 export type SettingsPane = "general" | "voice" | "transcription" | "advanced" | "app" | "hosts" | "host" | "add-host";
-export type HostTab = "status" | "agents" | "integrations" | "devices" | "stages";
+export type HostTab = "status" | "agents" | "integrations" | "devices" | "voice" | "transcription";
 
 export interface HostsFacts {
   inApp: boolean;
@@ -399,6 +399,10 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
 
     // ----- settings and «Esta app» -----
     openSettings(pane: SettingsPane = "voice", host: string | null = null, tab: HostTab = "status") {
+      // Voz and Transcripción are each machine's (operator, 2026-10-02): asked for in general, they open on the
+      // machine in use; with no machine they stay panes of their own (this device's models only).
+      const inUse = store.getState().inUse;
+      if ((pane === "voice" || pane === "transcription") && inUse) { patch({ settings: { open: true, pane: "host", host: inUse, tab: pane } }); return; }
       patch({ settings: { open: true, pane, host, tab } });
     },
     closeSettings() { patch({ settings: { ...f().settings, open: false } }); },

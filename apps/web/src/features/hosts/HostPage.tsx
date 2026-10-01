@@ -11,8 +11,10 @@ import { RoomStoreContext, useRoomStore, type RoomStore } from "../../state/room
 import { failurePhrase, localSubtitle, remoteSubtitle, type StoredPairing } from "../../state/hosts/host-list";
 import { useHosts, useHostsController, type HostTab } from "../../state/hosts/hosts-store";
 import { effectiveStage, hasStages, type Task } from "../../state/hosts/stage-scope";
-import { IntegrationList } from "../settings/IntegrationList";
-import { AgentRow, otherAgent } from "./AgentRow";
+import { KeyLine, StageEditor } from "../settings/StageEditor";
+import { ProviderIcon } from "../../components/ui/Icons";
+import type { IntegrationProvider } from "../../state/room-types";
+import { AgentRow, OtherAgentSection } from "./AgentRow";
 import { CopyButton, formatWhen, HostDot, PhraseText } from "./common";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 
@@ -22,7 +24,7 @@ export const QrRendererContext = createContext<((code: string) => React.ReactNod
 /** Who renders a host's integrations: a room store scoped to that host, kept by whoever wires the page to the room. */
 export const IntegrationScopeContext = createContext<{ storeFor(fp: string): RoomStore } | null>(null);
 
-const TABS: HostTab[] = ["status", "agents", "integrations", "devices", "stages"];
+const TABS: HostTab[] = ["status", "agents", "integrations", "devices", "voice", "transcription"];
 
 export function HostPage({ fp }: { fp: string }) {
   const t = useT();
@@ -68,7 +70,7 @@ export function HostPage({ fp }: { fp: string }) {
         {tab === "agents" && <AgentsTab fp={fp} />}
         {tab === "integrations" && <IntegrationsTab fp={fp} />}
         {tab === "devices" && <DevicesTab fp={fp} local={entry.local} />}
-        {tab === "stages" && <StagesTab fp={fp} inUse={row.inUse} />}
+        {(tab === "voice" || tab === "transcription") && <MachineStage key={tab} fp={fp} task={tab === "voice" ? "tts" : "stt"} inUse={row.inUse} />}
       </div>
     </section>
   );
@@ -228,8 +230,8 @@ function AgentsTab({ fp }: { fp: string }) {
       {agents.length === 0 && <p className="muted">{t("agents.none")}</p>}
       <ul className="agent-rows">
         {agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="host" />)}
-        {(() => { const other = otherAgent(listing.value?.custom, t("agents.other")); return other && <AgentRow key={other.id} fp={fp} agent={other} mode="host" />; })()}
       </ul>
+      <OtherAgentSection custom={listing.value?.custom} />
     </div>
   );
 }
@@ -249,8 +251,33 @@ function IntegrationsTab({ fp }: { fp: string }) {
         <Button size="compact" onClick={() => void hosts.loadIntegrations(fp)}>{t("common.retry")}</Button>
       </div>
     );
-  if (!scope) return null;
-  return <RoomStoreContext.Provider value={scope.storeFor(fp)}><IntegrationList /></RoomStoreContext.Provider>;
+  return <ProviderKeys fp={fp} providers={remote.value?.providers ?? []} />;
+}
+
+/** Each provider this machine can call (operator, 2026-10-02: cleaner): its icon and name, what it is for, whether
+ *  this machine keeps a key («•••• 7f2c»), and «Configurar» / «Cambiar», which asks for the key right there. */
+function ProviderKeys({ fp, providers }: { fp: string; providers: IntegrationProvider[] }) {
+  const t = useT();
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <ul className="provider-keys">
+      {providers.map((p) => (
+        <li key={p.id} className="provider-key" data-configured={p.configured || undefined}>
+          <div className="provider-key-head">
+            <ProviderIcon id={p.id} size={18} />
+            <span className="provider-key-name"><strong>{p.label}</strong>
+              <span className="muted small">{p.capabilities.map((c) => t(c === "transcription" ? "stage.stt" : "stage.tts")).join(" · ")}</span></span>
+            <span className={p.configured ? "ok-line small" : "muted small"}>{p.configured ? t("keys.kept", { hint: p.hint ?? "" }) : t("keys.missing")}</span>
+            <Button size="compact" variant={p.configured ? "ghost" : "default"} aria-expanded={open === p.id} onClick={() => setOpen(open === p.id ? null : p.id)}>
+              {open === p.id ? t("common.close") : p.configured ? t("keys.change") : t("keys.configure")}
+            </Button>
+          </div>
+          {/* A key checked and kept closes the field: «Cambiar» opens it again (operator, 2026-10-02). */}
+          {open === p.id && <KeyLine fp={fp} provider={p.id} label={p.label} configured={p.configured} hint={p.hint ?? null} ownSubmit onAccepted={() => setOpen(null)} />}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 // ----- Dispositivos -----
@@ -341,32 +368,41 @@ function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
   );
 }
 
-// ----- Voz y transcripción -----
-/** What this machine uses for each stage — its own (operator, 2026-10-02) — and «Copiar de…» another machine that has
- *  a configuration: this device's models as they are, a provider as a choice (asking for this machine's key if it has
- *  none), never what runs at the other machine itself. */
-function StagesTab({ fp, inUse }: { fp: string; inUse: boolean }) {
+// ----- Voz / Transcripción -----
+/** A machine's own transcription or voice (operator, 2026-10-02): the stage editor for it — it edits the machine in
+ *  use, so another one is put in use first — and «Copiar de…» another machine that has a configuration. */
+function MachineStage({ fp, task, inUse }: { fp: string; task: Task; inUse: boolean }) {
+  const t = useT();
+  const hosts = useHostsController();
+  if (!inUse) return (
+    <div className="stages-tab">
+      <p className="muted small">{t("stages.notInUse")}</p>
+      <Button size="compact" onClick={() => hosts.use(fp)}>{t("hosts.use")}</Button>
+      <StagesCopy fp={fp} />
+    </div>
+  );
+  return (
+    <div className="stages-tab">
+      <StageEditor task={task} />
+      <StagesCopy fp={fp} />
+    </div>
+  );
+}
+
+/** «Copiar de…»: only when another machine has something to copy — this device's models as they are, a provider as
+ *  a choice (asking for this machine's key if it has none), never what runs at the other machine itself. */
+function StagesCopy({ fp }: { fp: string }) {
   const t = useT();
   const hosts = useHostsController();
   const scope = useHosts((s) => s.scope);
   const rows = useHosts((s) => s.rows);
   const keys = useHosts((s) => s.integrations[fp]?.value?.providers ?? []);
-  const store = useContext(RoomStoreContext);
-  useRoomStore((s) => s.stages);
-  const ctx = store ? stageContext(store.facts) : null;
   const [from, setFrom] = useState("");
   const [note, setNote] = useState<string | null>(null);
   useEffect(() => { void hosts.loadIntegrations(fp); }, [hosts, fp]);
   const nameOf = (row: { local: boolean; name: string }) => row.local ? t("host.thisComputer") : row.name;
-  const describe = (task: Task) => {
-    const stage = effectiveStage(scope, fp, task);
-    return !stage || !ctx ? t("stages.unset") : stageLabel(ctx, task, stage);
-  };
-  const change = (task: Task) => {
-    if (!inUse) hosts.use(fp);
-    hosts.openSettings(task === "stt" ? "transcription" : "voice");
-  };
   const sources = rows.filter((row) => row.fp !== fp && hasStages(scope, row.fp));
+  if (!sources.length) return null;
   function copy() {
     const source = sources.find((row) => row.fp === from);
     if (!source) return;
@@ -380,27 +416,17 @@ function StagesTab({ fp, inUse }: { fp: string; inUse: boolean }) {
     setFrom("");
   }
   return (
-    <div className="stages-tab">
-      {(["tts", "stt"] as Task[]).map((task) => (
-        <div key={task} className="stage-summary">
-          <span><strong>{t(task === "stt" ? "stage.stt" : "stage.tts")}</strong><span className="muted"> · {describe(task)}</span></span>
-          <Button variant="ghost" size="compact" onClick={() => change(task)}>{inUse ? t("stages.change") : t("stages.useAndChange")}</Button>
-        </div>
-      ))}
-      {!inUse && <p className="muted small">{t("stages.notInUse")}</p>}
-      {/* Only when another machine has something to copy. */}
-      {sources.length > 0 && (
-        <div className="stages-copy">
-          <label className="ui-field">{t("stages.copyFrom")}
-            <NativeSelect value={from} onChange={(event) => setFrom(event.currentTarget.value)}>
-              <option value="">{t("stages.copyPick")}</option>
-              {sources.map((row) => <option key={row.fp} value={row.fp}>{nameOf(row)}</option>)}
-            </NativeSelect>
-          </label>
-          <Button size="compact" disabled={!from} onClick={copy}>{t("stages.copy")}</Button>
-        </div>
-      )}
+    <>
+      <div className="stages-copy">
+        <label className="ui-field">{t("stages.copyFrom")}
+          <NativeSelect value={from} onChange={(event) => setFrom(event.currentTarget.value)}>
+            <option value="">{t("stages.copyPick")}</option>
+            {sources.map((row) => <option key={row.fp} value={row.fp}>{nameOf(row)}</option>)}
+          </NativeSelect>
+        </label>
+        <Button size="compact" disabled={!from} onClick={copy}>{t("stages.copy")}</Button>
+      </div>
       {note && <p className="ok-line small" role="status">{note}</p>}
-    </div>
+    </>
   );
 }
