@@ -127,7 +127,7 @@ function W1() {
         ))}
       </fieldset>
       <p className="muted found-line" role="status">
-        {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found") : t("wizard.w1.none")}
+        {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found", { names: found.map((agent) => agent.label).join(", ") }) : t("wizard.w1.none")}
       </p>
       <Actions><Button variant="primary" disabled={!choice} onClick={() => void next()}>{t("wizard.continue")}</Button></Actions>
     </>
