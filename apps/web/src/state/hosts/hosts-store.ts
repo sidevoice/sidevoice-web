@@ -17,7 +17,7 @@ import { agentAction, deleteIntegrationKey, hostAbout, HostError, listAgents, ty
 import { candidateBases } from "../../services/device-pairing.js";
 import type { IntegrationListing } from "../room-types";
 import { hostList, hostRows, type HostList, type HostRowView, type RemoteReach, type StoredPairing, type StoredPairings } from "./host-list";
-import { chooseStage, emptyScope, forgetHost, migrateStages, STAGES_KEY, useGeneral, type Stage, type StageScope, type Task } from "./stage-scope";
+import { adoptDefault, chooseStage, copyStages, emptyScope, forgetHost, migrateStages, STAGES_KEY, type Stage, type StageScope, type Task } from "./stage-scope";
 import { opensByItself, resumeStep, pathOf, type Path, type Step } from "./onboarding";
 
 export const PAIRINGS_KEY = "sidevoice.pairings";
@@ -150,6 +150,9 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
     return base ? { fp, base, token: entry.pairing.token } : null;
   }
 
+  /** The configuration loaded came from before stages were per machine: every machine fills from the general one. */
+  let legacy = false;
+
   function onLocal(state: LocalHostState) {
     const was = f().local?.state;
     patch({ local: state, now: deps.now() });
@@ -159,6 +162,8 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
   async function refreshLocalPairing() {
     const pairing = await deps.bridge()?.localHost?.pairing() ?? null;
     patch({ localPairing: pairing });
+    // This computer's machine, like any kept from before, takes the configuration there was.
+    if (pairing && (legacy || !Object.keys(f().scope.hosts).length)) persistScope(adoptDefault(f().scope, pairing.fp));
     // A stored pairing with the local fingerprint is dropped: the local entry wins (§4.1).
     const { dropped } = store.getState().list;
     if (dropped.length) persistPairings({ ...f().stored, list: f().stored.list.filter((p) => !dropped.includes(p)) });
@@ -172,7 +177,11 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
     async start() {
       const bridge = deps.bridge();
       const stored = readStored(deps.storage);
-      const scope = migrateStages(readJson(deps.storage, STAGES_KEY), stored.inUse);
+      // Machines kept from before stages were per machine take the configuration there was (this computer's too,
+      // when its pairing arrives).
+      const loaded = migrateStages(readJson(deps.storage, STAGES_KEY));
+      legacy = Object.keys(loaded.hosts).length > 0 || stored.list.length > 0;
+      const scope = stored.list.reduce((s, p) => adoptDefault(s, p.fp), loaded);
       const onboarding = bridge?.onboarding ? await bridge.onboarding.read() : readJson(deps.storage, ONBOARDING_KEY);
       patch({ inApp: !!bridge, canHostAgents: !!bridge?.hostsAgents, stored, scope, onboarding, now: deps.now() });
       const localHost = bridge?.localHost;
@@ -216,6 +225,8 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
       if (!persistPairings({ inUse, list: [pairing, ...stored.list.filter((p) => p.fp !== pairing.fp)] }))
         throw new Error("storage");
       patch({ reach: { ...f().reach, [pairing.fp]: { state: "ok", via: pairing.urls.length ? "direct" : "room" } } });
+      // The first machine takes what was chosen with none; any later one starts empty (or copies, from its page).
+      if (!Object.keys(f().scope.hosts).length) persistScope(adoptDefault(f().scope, pairing.fp));
       return pairing;
     },
     async checkReach(fp: string) {
@@ -343,7 +354,12 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
 
     // ----- stages (§3) -----
     chooseStage(fp: string | null, task: Task, stage: Stage) { persistScope(chooseStage(f().scope, fp, task, stage)); },
-    useGeneral(fp: string, task: Task) { persistScope(useGeneral(f().scope, fp, task)); },
+    /** «Copiar de…»: `from`'s stages for `to` (see copyStages). */
+    copyStages(from: string, to: string, hasKey: (provider: string) => boolean) {
+      const result = copyStages(f().scope, from, to, hasKey);
+      persistScope(result.scope);
+      return result;
+    },
     verifyStage(task: Task, stage: Stage, fp: string | null, onProgress: (p: VerifyProgress) => void, signal: AbortSignal) {
       return deps.verifyStage(task, stage, target(fp), onProgress, signal);
     },
@@ -357,8 +373,8 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
         onboarding: f().onboarding,
         localReady: f().local?.state === "running" && !!f().localPairing,
         remoteReady: f().stored.list.length > 0,
-        sttSet: !!(f().scope.default.stt || (inUse && f().scope.hosts[inUse]?.stt)),
-        ttsSet: !!(f().scope.default.tts || (inUse && f().scope.hosts[inUse]?.tts)),
+        sttSet: !!(inUse ? f().scope.hosts[inUse]?.stt : f().scope.default.stt),
+        ttsSet: !!(inUse ? f().scope.hosts[inUse]?.tts : f().scope.default.tts),
         canHostAgents: f().canHostAgents,
       });
     },

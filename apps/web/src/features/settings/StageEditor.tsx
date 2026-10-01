@@ -530,8 +530,9 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const measured = measuredFor(task, view.place, view.model);
   // The bar: empty before, the download's share while downloading, moving while it loads and checks, full once ready.
   const tone = failed ? "failed" : slow ? "slow" : prepared ? "done" : running ? "running" : "idle";
-  const fill = prepared || failed || slow ? 1 : downloading && check?.fraction != null ? check.fraction : 0;
-  const busyBar = running && !(downloading && check?.fraction != null);
+  const share = check?.phase === "running" ? check.fraction : null;
+  const fill = prepared || failed || slow ? 1 : downloading && share != null ? share : 0;
+  const busyBar = running && !(downloading && share != null);
   const prepareLabel = !loads ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare")
     : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly");
   const status = running ? <span className="stage-card-line">{check.step}{check.amount ? " · " + check.amount : ""}</span>

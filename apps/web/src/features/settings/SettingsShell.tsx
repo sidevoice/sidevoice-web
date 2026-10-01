@@ -15,7 +15,7 @@ import type { Task } from "../../state/hosts/stage-scope";
 import { HostDot } from "../hosts/common";
 import { HostList } from "../hosts/HostList";
 import { HostPage } from "../hosts/HostPage";
-import { PairWithCode } from "../hosts/PairWithCode";
+import { AddMachine } from "../hosts/AddMachine";
 import { AdvancedSettings, GeneralSettings } from "./SettingsDialog";
 import { StageScopeLine } from "./StageScopeLine";
 import { StageEditor } from "./StageEditor";
@@ -99,12 +99,7 @@ export function SettingsShell() {
           {pane === "app" && <ThisApp />}
           {pane === "hosts" && <HostList />}
           {pane === "host" && settings.host && <HostPage key={settings.host} fp={settings.host} />}
-          {pane === "add-host" && (
-            <section className="pane">
-              <h3>{t("hosts.add")}</h3>
-              <PairWithCode use={false} submitLabel={t("hosts.addSubmit")} onPaired={(fp) => hosts.openSettings("host", fp)} />
-            </section>
-          )}
+          {pane === "add-host" && <AddMachine />}
         </div>
       </section>
     </main>

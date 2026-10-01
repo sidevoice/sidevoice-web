@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseStage, effectiveStage, emptyScope, forgetHost, migrateStages, stageSource, useGeneral, type Stage } from "./stage-scope";
+import { adoptDefault, chooseStage, copyStages, effectiveStage, emptyScope, forgetHost, migrateStages, type Stage } from "./stage-scope";
 import { hostList, hostRows, localBanner, localSubtitle, remoteSubtitle, type StoredPairing } from "./host-list";
 import { opensByItself, previousStep, resumeStep } from "./onboarding";
 import type { LocalPairing } from "../../services/desktop-host";
@@ -7,45 +7,50 @@ import type { LocalPairing } from "../../services/desktop-host";
 const device = (model: string): Stage => ({ place: "device", model, options: {}, build: null });
 const provider = (place: string, model: string): Stage => ({ place, model, options: {}, build: null });
 
-describe("stage scope (§3)", () => {
-  it("keeps device choices in the default, valid for every host", () => {
+describe("stage scope (§3): per machine", () => {
+  it("keeps a choice with the machine it was made for, and nowhere else", () => {
     const scope = chooseStage(emptyScope(), "nuc", "tts", device("kokoro"));
-    expect(scope.default.tts?.model).toBe("kokoro");
-    expect(scope.hosts).toEqual({});
-    expect(effectiveStage(scope, "other", "tts")?.model).toBe("kokoro");
+    expect(effectiveStage(scope, "nuc", "tts")?.model).toBe("kokoro");
+    expect(effectiveStage(scope, "mac", "tts")).toBeNull();
+    expect(scope.default).toEqual({});
   });
 
-  it("keeps a provider only as that host's override", () => {
-    const scope = chooseStage(chooseStage(emptyScope(), null, "tts", device("kokoro")), "nuc", "tts", provider("elevenlabs", "flash"));
-    expect(effectiveStage(scope, "nuc", "tts")?.place).toBe("elevenlabs");
-    expect(effectiveStage(scope, "mac", "tts")?.place).toBe("device");
-    expect(stageSource(scope, "nuc", "tts")).toBe("host");
-    expect(stageSource(scope, "mac", "tts")).toBe("general");
-  });
-
-  it("refuses a provider with no host to keep it", () => {
+  it("keeps this device's models with no machine, and refuses a provider or a machine there", () => {
+    const scope = chooseStage(emptyScope(), null, "stt", device("whisper-base"));
+    expect(effectiveStage(scope, null, "stt")?.model).toBe("whisper-base");
     expect(() => chooseStage(emptyScope(), null, "stt", provider("openai", "whisper-1"))).toThrow();
+    expect(() => chooseStage(emptyScope(), null, "stt", provider("host", "whisper-small"))).toThrow();
   });
 
-  it("choosing this device for a host writes the default and drops that host's override", () => {
-    let scope = chooseStage(emptyScope(), "nuc", "tts", provider("elevenlabs", "flash"));
-    scope = chooseStage(scope, "nuc", "tts", device("kokoro"));
-    expect(scope.hosts.nuc).toBeUndefined();
-    expect(scope.default.tts?.model).toBe("kokoro");
+  it("a machine takes what was chosen with none for each stage it has none of its own, and keeps its own", () => {
+    const none = chooseStage(chooseStage(emptyScope(), null, "tts", device("kokoro")), null, "stt", device("whisper-base"));
+    expect(effectiveStage(adoptDefault(none, "nuc"), "nuc", "tts")?.model).toBe("kokoro");
+    const own = adoptDefault(chooseStage(none, "nuc", "tts", provider("elevenlabs", "flash")), "nuc");
+    expect(effectiveStage(own, "nuc", "tts")?.place).toBe("elevenlabs");
+    expect(effectiveStage(own, "nuc", "stt")?.model).toBe("whisper-base");
   });
 
-  it("«Usar la configuración general» removes only that task's override", () => {
-    let scope = chooseStage(emptyScope(), "nuc", "tts", provider("elevenlabs", "flash"));
-    scope = chooseStage(scope, "nuc", "stt", provider("openai", "whisper-1"));
-    scope = useGeneral(scope, "nuc", "tts");
-    expect(scope.hosts.nuc).toEqual({ stt: provider("openai", "whisper-1") });
+  it("«Copiar de…» copies this device's models and a provider's choice (asking for a key), never the machine itself", () => {
+    let scope = chooseStage(emptyScope(), "nuc", "stt", provider("host", "whisper-large-v3-turbo"));
+    scope = chooseStage(scope, "nuc", "tts", provider("elevenlabs", "flash"));
+    const result = copyStages(scope, "nuc", "mac", () => false);
+    expect(effectiveStage(result.scope, "mac", "tts")?.place).toBe("elevenlabs");
+    expect(effectiveStage(result.scope, "mac", "stt")).toBeNull();
+    expect(result).toMatchObject({ copied: ["tts"], needsKey: ["tts"], notCopied: ["stt"] });
+    expect(copyStages(scope, "nuc", "mac", () => true).needsKey).toEqual([]);
+    const local = copyStages(chooseStage(emptyScope(), "mac", "stt", device("whisper-base")), "mac", "nuc", () => false);
+    expect(effectiveStage(local.scope, "nuc", "stt")?.model).toBe("whisper-base");
+  });
+
+  it("a forgotten machine takes its stages with it", () => {
+    const scope = chooseStage(emptyScope(), "nuc", "tts", provider("elevenlabs", "flash"));
     expect(forgetHost(scope, "nuc").hosts).toEqual({});
   });
 
-  it("migrates today's per-fingerprint stages", () => {
-    const scope = migrateStages({ mac: { stt: device("whisper-base"), tts: device("kokoro") }, nuc: { tts: provider("elevenlabs", "flash"), stt: device("whisper-tiny") } }, "mac");
-    expect(scope.default).toEqual({ stt: device("whisper-base"), tts: device("kokoro") });
-    expect(scope.hosts).toEqual({ nuc: { tts: provider("elevenlabs", "flash") } });
+  it("migrates today's per-fingerprint stages as they are: one pair per machine", () => {
+    const scope = migrateStages({ mac: { stt: device("whisper-base"), tts: device("kokoro") }, nuc: { tts: provider("elevenlabs", "flash"), stt: device("whisper-tiny") } });
+    expect(scope.default).toEqual({});
+    expect(scope.hosts).toEqual({ mac: { stt: device("whisper-base"), tts: device("kokoro") }, nuc: { tts: provider("elevenlabs", "flash"), stt: device("whisper-tiny") } });
   });
 });
 

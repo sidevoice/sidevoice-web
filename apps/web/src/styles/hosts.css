@@ -456,3 +456,6 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .settings-view .settings-content > section { min-width: 0; max-width: 100% }
 /* Narrow: the steps under the title, so the name is read whole. */
 @media (max-width: 520px) { .stage-card-head { flex-wrap: wrap } .stage-card-title { flex: 1 1 100% } }
+.stages-copy { display: flex; align-items: flex-end; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--sv-border) }
+.stages-copy .ui-field { flex: 1 1 14rem; margin: 0 }
+.settings-view label.choice-card { display: flex; margin: 0 }

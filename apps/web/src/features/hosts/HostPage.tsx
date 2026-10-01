@@ -10,10 +10,11 @@ import { stageLabel } from "../../state/stage-settings.js";
 import { RoomStoreContext, useRoomStore, type RoomStore } from "../../state/room-store";
 import { failurePhrase, localSubtitle, remoteSubtitle, type StoredPairing } from "../../state/hosts/host-list";
 import { useHosts, useHostsController, type HostTab } from "../../state/hosts/hosts-store";
-import { effectiveStage, stageSource, type Task } from "../../state/hosts/stage-scope";
+import { effectiveStage, hasStages, type Task } from "../../state/hosts/stage-scope";
 import { IntegrationList } from "../settings/IntegrationList";
 import { AgentRow, otherAgent } from "./AgentRow";
 import { CopyButton, formatWhen, HostDot, PhraseText } from "./common";
+import { NativeSelect } from "../../components/ui/NativeSelect";
 
 /** Draws a pairing code as a QR. The web carries no encoder yet; with none provided, the code is shown as text only. */
 export const QrRendererContext = createContext<((code: string) => React.ReactNode) | null>(null);
@@ -341,23 +342,43 @@ function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
 }
 
 // ----- Voz y transcripción -----
+/** What this machine uses for each stage — its own (operator, 2026-10-02) — and «Copiar de…» another machine that has
+ *  a configuration: this device's models as they are, a provider as a choice (asking for this machine's key if it has
+ *  none), never what runs at the other machine itself. */
 function StagesTab({ fp, inUse }: { fp: string; inUse: boolean }) {
   const t = useT();
   const hosts = useHostsController();
   const scope = useHosts((s) => s.scope);
+  const rows = useHosts((s) => s.rows);
+  const keys = useHosts((s) => s.integrations[fp]?.value?.providers ?? []);
   const store = useContext(RoomStoreContext);
   useRoomStore((s) => s.stages);
   const ctx = store ? stageContext(store.facts) : null;
+  const [from, setFrom] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => { void hosts.loadIntegrations(fp); }, [hosts, fp]);
+  const nameOf = (row: { local: boolean; name: string }) => row.local ? t("host.thisComputer") : row.name;
   const describe = (task: Task) => {
     const stage = effectiveStage(scope, fp, task);
-    if (!stage || !ctx) return t("stages.unset");
-    const label = stageLabel(ctx, task, stage);
-    return stageSource(scope, fp, task) === "host" ? t("stages.hostOnly", { label }) : t("stages.general", { label: label + " · " + t("stage.place.deviceLower") });
+    return !stage || !ctx ? t("stages.unset") : stageLabel(ctx, task, stage);
   };
   const change = (task: Task) => {
     if (!inUse) hosts.use(fp);
     hosts.openSettings(task === "stt" ? "transcription" : "voice");
   };
+  const sources = rows.filter((row) => row.fp !== fp && hasStages(scope, row.fp));
+  function copy() {
+    const source = sources.find((row) => row.fp === from);
+    if (!source) return;
+    const result = hosts.copyStages(source.fp, fp, (provider) => !!keys.find((p) => p.id === provider)?.configured);
+    const what = (tasks: Task[]) => tasks.map((task) => t(task === "stt" ? "stage.sttLower" : "stage.ttsLower")).join(" · ");
+    setNote([
+      result.copied.length ? t("stages.copied", { from: nameOf(source), what: what(result.copied) }) : "",
+      result.needsKey.length ? t("stages.copyNeedsKey", { what: what(result.needsKey) }) : "",
+      result.notCopied.length ? t("stages.copyNotHere", { what: what(result.notCopied), from: nameOf(source) }) : "",
+    ].filter(Boolean).join(" "));
+    setFrom("");
+  }
   return (
     <div className="stages-tab">
       {(["tts", "stt"] as Task[]).map((task) => (
@@ -367,6 +388,19 @@ function StagesTab({ fp, inUse }: { fp: string; inUse: boolean }) {
         </div>
       ))}
       {!inUse && <p className="muted small">{t("stages.notInUse")}</p>}
+      {/* Only when another machine has something to copy. */}
+      {sources.length > 0 && (
+        <div className="stages-copy">
+          <label className="ui-field">{t("stages.copyFrom")}
+            <NativeSelect value={from} onChange={(event) => setFrom(event.currentTarget.value)}>
+              <option value="">{t("stages.copyPick")}</option>
+              {sources.map((row) => <option key={row.fp} value={row.fp}>{nameOf(row)}</option>)}
+            </NativeSelect>
+          </label>
+          <Button size="compact" disabled={!from} onClick={copy}>{t("stages.copy")}</Button>
+        </div>
+      )}
+      {note && <p className="ok-line small" role="status">{note}</p>}
     </div>
   );
 }
