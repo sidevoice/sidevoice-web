@@ -22,6 +22,7 @@ import { effectiveStage, type Task } from "../../state/hosts/stage-scope";
 import { StageSettings } from "../settings/StageSettings";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
+import { AgentRow } from "../hosts/AgentRow";
 
 const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title", W5: "wizard.w5.title", W6: "wizard.w6.title" };
 
@@ -153,19 +154,6 @@ function DetectedAgents({ found }: { found: DetectedAgent[] | null }) {
   );
 }
 
-/** Whether Sidevoice is connected to an agent: the mark lit (lila and mustard) or off (one ink, the fourth bar at
- *  45 %, as the brand's one-ink rule draws it), always with its words — the mark alone does not say it. */
-export function SidevoiceLink({ registration }: { registration: DetectedAgent["registration"] }) {
-  const t = useT();
-  const on = registration === "connected";
-  return (
-    <span className="sv-link" data-on={on || undefined} data-registration={registration}>
-      <SidevoiceMark size={14} className="sv-link-mark" />
-      <span>{t("wizard.w1.registration." + registration)}</span>
-    </span>
-  );
-}
-
 // ----- W2 -----
 const INSTALL_STEPS: InstallProgress["step"][] = ["download", "verify", "service", "connect"];
 
@@ -255,73 +243,27 @@ function W3() {
   const hosts = useHostsController();
   const fp = useHosts((s) => s.localPairing?.fp ?? null);
   const listing = useHosts((s) => (fp ? s.agents[fp] : undefined));
-  const busy = useHosts((s) => s.agentBusy);
-  const errors = useHosts((s) => s.agentErrors);
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [connecting, setConnecting] = useState(false);
-  const [connectedAny, setConnectedAny] = useState(false);
+  const [connected, setConnected] = useState<string | null>(null);
   useEffect(() => { if (fp) void hosts.loadAgents(fp, true); }, [fp, hosts]);
   const agents = useMemo(() => (listing?.value?.agents ?? []).filter((a) => a.present), [listing]);
-  useEffect(() => {
-    setChecked((current) => Object.fromEntries(agents.map((a) => [a.id, current[a.id] ?? (a.registration === "not-connected" && a.connect === "auto")])));
-  }, [agents]);
-  const chosen = agents.filter((a) => checked[a.id] && a.registration === "not-connected");
-  async function connect() {
-    if (!fp) return;
-    setConnecting(true);
-    for (const agent of chosen) {
-      const answer = await hosts.agentAction(fp, agent.id, "connect");
-      if (answer?.agent.registration === "connected") setConnectedAny(true);
-    }
-    setConnecting(false);
-  }
   async function next() { await hosts.markOnboarding({ agents_done: true }); hosts.goTo("W4"); }
-  if (!listing || listing.status === "loading" && !listing.value) return <p className="muted" role="status">{t("agents.scanning")}</p>;
+  if (!fp || !listing || listing.status === "loading" && !listing.value) return <p className="muted" role="status">{t("agents.scanning")}</p>;
   if (listing.status === "failed" && !listing.value)
     return (
       <div className="problem" role="alert">
         <p>{t(listing.error === "no-connector" ? "agents.noConnector" : "agents.scanFailed")}</p>
-        <Actions><Button variant="ghost" onClick={() => void next()}>{t("agents.notNow")}</Button><Button variant="primary" onClick={() => fp && void hosts.loadAgents(fp, true)}>{t("common.retry")}</Button></Actions>
+        <Actions><Button variant="ghost" onClick={() => void next()}>{t("agents.notNow")}</Button><Button variant="primary" onClick={() => void hosts.loadAgents(fp, true)}>{t("common.retry")}</Button></Actions>
       </div>
     );
-  const remaining = agents.filter((a) => a.registration === "not-connected");
+  const anyConnected = agents.some((a) => a.registration === "connected");
   return (
     <>
-      {agents.length === 0 ? <p className="empty-note">{t("wizard.w3.none")}</p> : (
-        <ul className="agent-rows">
-          {agents.map((agent) => {
-            const key = fp + ":" + agent.id;
-            const disabled = agent.registration !== "not-connected" || agent.connect === "manual" || connecting;
-            return (
-              <li key={agent.id} className="agent-row" data-registration={agent.registration}>
-                <label className="agent-pick">
-                  <input type="checkbox" checked={agent.registration === "connected" || !!checked[agent.id]} disabled={disabled}
-                    onChange={(event) => setChecked({ ...checked, [agent.id]: event.currentTarget.checked })} />
-                  <span className="agent-icon"><HarnessIcon harness={agent.id} size={18} /></span>
-                  <span className="agent-copy">
-                    <strong>{agent.label}</strong>{agent.version && <span className="muted"> · {agent.version}</span>}
-                    {agent.registration !== "connected" && !busy[key] && (agent.connect === "manual" || agent.registration === "foreign" || checked[agent.id]) &&
-                      <span className="muted agent-status">{t(agentStatusKey(agent))}</span>}
-                  </span>
-                  {busy[key] ? <span className="sv-link">{t("agents.connecting")}</span> : <SidevoiceLink registration={agent.registration} />}
-                </label>
-                {agent.connect === "manual" && agent.registration === "not-connected" && <ManualConfig agent={agent} />}
-                {errors[key] && (
-                  <p className="row-error" role="alert">{t("agents.connectFailed", { message: errors[key].message || errors[key].key })}
-                    <Button variant="ghost" size="compact" onClick={() => fp && void hosts.agentAction(fp, agent.id, "connect")}>{t("common.retry")}</Button></p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {connectedAny && <p className="ok-line" role="status">{t("agents.nextConversations")}</p>}
-      <Actions>
-        {chosen.length > 0 ? <>
-          <Button variant="ghost" onClick={() => void next()}>{t("agents.notNow")}</Button>
-          <Button variant="primary" disabled={connecting} onClick={() => void connect()}>{t("wizard.w3.connect", { n: chosen.length })}</Button>
-        </> : <Button variant="primary" onClick={() => void next()}>{remaining.length && !connectedAny ? t("agents.notNow") : t("wizard.continue")}</Button>}
-      </Actions>
+      {agents.length === 0 ? <p className="empty-note">{t("wizard.w3.none")}</p> : <>
+        <p className="muted">{t("wizard.w3.lead")}</p>
+        <ul className="agent-rows">{agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="wizard" onConnected={setConnected} />)}</ul>
+      </>}
+      {connected && <p className="ok-line" role="status">{t("agents.nextConversationsNamed", { name: connected })}</p>}
+      <Actions><Button variant="primary" onClick={() => void next()}>{anyConnected || agents.length === 0 ? t("wizard.continue") : t("agents.notNow")}</Button></Actions>
     </>
   );
 }

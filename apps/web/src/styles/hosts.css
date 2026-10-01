@@ -90,7 +90,12 @@
 .agent-row[data-registration=foreign] .agent-status { color: #f0cf8a }
 .agent-line .row-actions { margin: 0 }
 .manual-config { margin-top: .6rem }
-.manual-config pre, .log-tail, .code-text { margin: .4rem 0; padding: .6rem .7rem; border-radius: 10px; background: #0f1318; border: 1px solid var(--sv-border); font: .74rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; color: #cfd6de }
+.agent-actions { margin: .55rem 0 0 2.65rem }
+.howto { margin: .5rem 0 0 2.65rem; display: grid; gap: .35rem; justify-items: start }
+.howto pre { width: 100%; margin: 0 }
+.howto p, .agent-row .row-error { margin-top: .2rem; margin-bottom: 0 }
+.agent-row .row-error { margin: .45rem 0 0 2.65rem }
+.manual-config pre, .howto pre, .log-tail, .code-text { margin: .4rem 0; padding: .6rem .7rem; border-radius: 10px; background: #0f1318; border: 1px solid var(--sv-border); font: .74rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; color: #cfd6de }
 .proposal { display: grid; gap: .55rem; margin: .4rem 0 .8rem; padding: 0; list-style: none }
 .proposal-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: .3rem .8rem; padding: .75rem .9rem; border: 1px solid var(--sv-border); border-radius: 12px; background: var(--sv-surface-raised) }
 .proposal-row[data-phase=done] { border-color: #3d6b55 }

@@ -63,13 +63,22 @@ function json(status: number, body: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
+const MCP = "/Users/ana/.sidevoice/connector/0.4.0/sidevoice";
+/** What each module would run, or what it would write, to register Sidevoice (§4.4). */
+export function instructionsFor(id: string): DetectedAgent["instructions"] {
+  if (id === "claude") return { command: `claude mcp add --scope user sidevoice -- ${MCP} mcp` };
+  if (id === "codex") return { command: `codex mcp add sidevoice -- ${MCP} mcp` };
+  if (id === "cursor") return { file: "~/.cursor/mcp.json", snippet: JSON.stringify({ mcpServers: { sidevoice: { command: MCP, args: ["mcp"] } } }, null, 2) };
+  return null;
+}
+
 function localAgentsFor(seed: HostSeed, toggles: Toggles): DetectedAgent[] {
-  let agents = (seed.agents ?? []).map((agent) => ({ ...agent }));
+  let agents = (seed.agents ?? []).map((agent) => ({ ...agent, instructions: agent.instructions ?? instructionsFor(agent.id) }));
   if (toggles.w3Foreign) agents = agents.map((a) => a.id === "codex" ? { ...a, registration: "foreign" as const } : a);
   if (toggles.w3ManualCodex) agents = agents.map((a) => a.id === "codex" && a.registration === "not-connected" ? { ...a, connect: "manual" as const,
-    manual: { file: "~/.codex/config.toml", snippet: '[mcp_servers.sidevoice]\ncommand = "/Users/ana/.sidevoice/connector/0.4.0/sidevoice"\nargs = ["mcp"]' } } : a);
+    instructions: { file: "~/.codex/config.toml", snippet: '[mcp_servers.sidevoice]\ncommand = "/Users/ana/.sidevoice/connector/0.4.0/sidevoice"\nargs = ["mcp"]' } } : a);
   if (toggles.w3Dismissed && !agents.some((a) => a.id === "cursor"))
-    agents.push({ id: "cursor", label: "Cursor", present: true, version: "1.8.2", registration: "not-connected", connect: "auto", dismissed: true });
+    agents.push({ id: "cursor", label: "Cursor", present: true, version: "1.8.2", registration: "not-connected", connect: "auto", dismissed: true, instructions: instructionsFor("cursor") });
   return agents;
 }
 
@@ -90,7 +99,7 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
       base: isLocal && view === "app" ? LOCAL_BASE : viaRoom ? ROOM_URL + "/nodes/" + node : direct,
       urls: isLocal && view === "app" ? [LOCAL_BASE] : viaRoom ? [] : [direct],
       rv: viaRoom ? { url: ROOM_URL, node } : null,
-      agents: isLocal ? localAgentsFor({ ...seed, agents: seed.agents ?? localAgents }, toggles) : (seed.agents ?? []).map((a) => ({ ...a })),
+      agents: isLocal ? localAgentsFor({ ...seed, agents: seed.agents ?? localAgents }, toggles) : (seed.agents ?? []).map((a) => ({ ...a, instructions: a.instructions ?? instructionsFor(a.id) })),
       devices: (seed.devices ?? []).map((d, i) => ({ device_id: d.self ? "self-" + alias : "dev-" + alias + "-" + i, name: d.name, kind: d.kind,
         created_at: now() - d.created_days_ago * 86400, last_seen: d.seen_minutes_ago == null ? null : now() - d.seen_minutes_ago * 60 })),
       providers: Object.fromEntries(Object.keys(PROVIDERS).map((id) => {

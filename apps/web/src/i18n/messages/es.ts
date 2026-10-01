@@ -408,4 +408,13 @@ export const es: Record<string, string> = {
   "setup.pending.title": "La configuración no está terminada",
   "setup.pending.text": "Sidevoice no se puede usar hasta terminarla. Seguirás justo donde lo dejaste.",
   "setup.pending.where": "Siguiente paso: {step}",
+  "wizard.w3.lead": "Conecta los que quieras usar por voz. Puedes hacerlo tú si lo prefieres.",
+  "agents.howto.toggle": "Hacerlo yo",
+  "agents.howto.manualToggle": "Cómo conectarlo",
+  "agents.howto.command": "Ejecuta esto en una terminal:",
+  "agents.howto.copyCommand": "Copiar comando",
+  "agents.howto.file": "Añade esto a {file}:",
+  "agents.howto.check": "Ya está, comprobar",
+  "agents.howto.checking": "Comprobando…",
+  "agents.howto.none": "Este agente no tiene forma de conectarse a mano.",
 };

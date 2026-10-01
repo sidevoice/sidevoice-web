@@ -68,6 +68,9 @@ export interface DetectedAgent {
   dismissed?: boolean;
   /** A manual registration: the file to edit and what to put in it. */
   manual?: { file: string; snippet: string } | null;
+  /** How to connect it by hand, whatever `connect` is: the command the module would run, or the file and what to put
+   *  in it. Added by the prototype (operator, 2026-10-01): the connector's `detect` should return it (R2-a). */
+  instructions?: { command?: string; file?: string; snippet?: string } | null;
 }
 
 export interface InstallProgress { step: "download" | "verify" | "service" | "connect"; done: number; total: number }

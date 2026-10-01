@@ -3,7 +3,6 @@
  * answers late never fills another host's page. */
 import { createContext, useContext, useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
-import { HarnessIcon } from "../../components/ui/Icons";
 import { currentLanguage, useT } from "../../i18n";
 import type { BridgeResult, LocalHostState, PairingCodeAnswer } from "../../services/desktop-host";
 import { stageContext } from "../../state/room-session-state.js";
@@ -13,7 +12,7 @@ import { failurePhrase, localSubtitle, remoteSubtitle, type StoredPairing } from
 import { useHosts, useHostsController, type HostTab } from "../../state/hosts/hosts-store";
 import { effectiveStage, stageSource, type Task } from "../../state/hosts/stage-scope";
 import { IntegrationList } from "../settings/IntegrationList";
-import { agentStatusKey, ManualConfig } from "../onboarding/Wizard";
+import { AgentRow } from "./AgentRow";
 import { CopyButton, formatWhen, HostDot, PhraseText } from "./common";
 
 /** Draws a pairing code as a QR. The web carries no encoder yet; with none provided, the code is shown as text only. */
@@ -206,8 +205,6 @@ function AgentsTab({ fp }: { fp: string }) {
   const t = useT();
   const hosts = useHostsController();
   const listing = useHosts((s) => s.agents[fp]);
-  const busy = useHosts((s) => s.agentBusy);
-  const errors = useHosts((s) => s.agentErrors);
   const now = useHosts((s) => s.now);
   const [connected, setConnected] = useState<string | null>(null);
   // Opening Agentes rescans (F5).
@@ -222,10 +219,6 @@ function AgentsTab({ fp }: { fp: string }) {
       </div>
     );
   const agents = (listing.value?.agents ?? []).filter((a) => a.present || a.registration === "connected");
-  async function act(id: string, action: "connect" | "disconnect" | "dismiss") {
-    const answer = await hosts.agentAction(fp, id, action);
-    if (action === "connect" && answer?.agent.registration === "connected") setConnected(answer.agent.label);
-  }
   return (
     <div className="agents-tab">
       <p className="muted small scanned">
@@ -233,31 +226,7 @@ function AgentsTab({ fp }: { fp: string }) {
         {" · "}<Button variant="ghost" size="compact" onClick={() => void hosts.loadAgents(fp, true)}>{t("agents.rescan")}</Button>
       </p>
       {agents.length === 0 ? <p className="empty-note">{t("agents.none")}</p> : (
-        <ul className="agent-rows">
-          {agents.map((agent) => {
-            const key = fp + ":" + agent.id;
-            const isNew = agent.present && agent.registration === "not-connected" && !agent.dismissed;
-            return (
-              <li key={agent.id} className="agent-row" data-registration={agent.registration}>
-                <div className="agent-line">
-                  <span className="agent-icon"><HarnessIcon harness={agent.id} size={18} /></span>
-                  <span className="agent-copy">
-                    <strong>{agent.label}</strong>{agent.version && <span className="muted"> · {agent.version}</span>}
-                    {isNew && <span className="badge badge-new">{t("hosts.newAgent")}</span>}
-                    <span className="muted agent-status">{busy[key] ? t("agents.busy." + busy[key]) : t(agent.registration === "not-connected" && agent.connect === "auto" ? "agents.notConnected" : agentStatusKey(agent))}</span>
-                  </span>
-                  <span className="row-actions">
-                    {agent.registration === "connected" && <Button variant="ghost" size="compact" disabled={!!busy[key]} onClick={() => void act(agent.id, "disconnect")}>{t("agents.disconnect")}</Button>}
-                    {agent.registration === "not-connected" && agent.connect === "auto" && <Button variant="primary" size="compact" disabled={!!busy[key]} onClick={() => void act(agent.id, "connect")}>{t("agents.connect")}</Button>}
-                    {isNew && <Button variant="ghost" size="compact" disabled={!!busy[key]} onClick={() => void act(agent.id, "dismiss")}>{t("agents.notNow")}</Button>}
-                  </span>
-                </div>
-                {agent.connect === "manual" && agent.registration === "not-connected" && <ManualConfig agent={agent} />}
-                {errors[key] && <p className="row-error" role="alert">{t("agents.connectFailed", { message: errors[key].message || errors[key].key })}</p>}
-              </li>
-            );
-          })}
-        </ul>
+        <ul className="agent-rows">{agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="host" onConnected={setConnected} />)}</ul>
       )}
       {connected && <p className="ok-line" role="status">{t("agents.nextConversationsNamed", { name: connected })}</p>}
     </div>
