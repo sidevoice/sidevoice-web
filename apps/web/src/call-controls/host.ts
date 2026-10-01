@@ -41,6 +41,9 @@ export interface CallControlsState {
   alwaysExpanded: boolean;
   /** The global mute shortcut as the person reads it (⌃⌥M, Ctrl+Alt+M); empty when there is none. */
   muteShortcut: string;
+  /** Counts clicks the person made outside the card (the app sees them; a window never focused does not): any change
+   *  closes an open panel. Absent where the app cannot tell. */
+  outsideClicks?: number;
 }
 
 export type CallCommand =

@@ -17,6 +17,14 @@ export const en = {
   "card.skip": "Skip what is playing",
   "card.hangUp": "Hang up",
   "card.yourMicrophone": "Your microphone",
+  "card.reach.holding": "can't receive",
+  "card.reach.offline": "offline",
+  "card.unread": "{n} unread",
+  "card.microphoneNumber": "Microphone {n}",
+  "card.speakerNumber": "Speaker {n}",
+  "card.deviceMissing": "Selected device · disconnected",
+  "card.deviceFailed": "The room kept the previous device: that one could not be used.",
+  "card.devicesInSystem": "Choose this device in the system's settings.",
   "card.youAreMuted": "You are muted",
 } as const;
 

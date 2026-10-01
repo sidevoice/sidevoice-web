@@ -15,6 +15,10 @@ because it is bundled: esbuild puts `socket.io-client` inside `dist/cli.mjs`,
 so that file redistributes Socket.IO's client and its own dependencies under
 their MIT licenses.
 
+The desktop app's call controls card bundles the DM Sans typeface
+(`apps/web/public/fonts/`), under the SIL Open Font License 1.1, with its
+licence beside it (`OFL.txt`).
+
 In particular, eSpeak NG has GPL license obligations when redistributing its
 generated WASM/bundles. Review upstream licenses and model cards before
 redistributing compiled assets or weights; the repository's Apache-2.0 license does

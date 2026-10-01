@@ -1,7 +1,10 @@
 import type { DownloadsView, ChatMessage, ConversationView, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
+/** One device to choose. `system` is the system's own choice, `number` a device the system lists without a name (its
+ *  place, from 1), `missing` the chosen one, no longer connected: whoever shows it words those itself. */
+export interface AudioDeviceOption { id: string; label: string; system?: boolean; number?: number; missing?: boolean }
 export interface AudioDevices {
- inputs: {id: string; label: string}[]; outputs: {id: string; label: string}[];
+ inputs: AudioDeviceOption[]; outputs: AudioDeviceOption[];
  inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
 }
 export type NodeReach = '' | 'ok' | 'unpaired' | 'revoked' | 'offline' | 'away';
@@ -56,12 +59,17 @@ export interface SessionSnapshot {
  audioDevices: AudioDevices;
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
+ callCard: CallCardView;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string}; deviceNote: string;
  bootError: string | null; stages: {stt: StageView; tts: StageView} | null; downloads: DownloadsView; voiceTools: {previewing: string | null; previewNote: string; prepareNote: string; gpuSetAside: boolean}; machines: MachineView[]; pairing: PairingPromptView;
  integrations: IntegrationsView;
 }
+export interface CallCardView {
+ agent: 'idle' | 'working' | 'speaking'; youTalking: boolean; canSkip: boolean; conversation: string | null; title: string;
+}
+export function callCardView(s: SessionFacts): CallCardView;
 export interface SessionStore {
  facts: SessionFacts;
  getState(): SessionSnapshot; getInitialState(): SessionSnapshot;

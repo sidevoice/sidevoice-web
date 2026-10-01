@@ -191,10 +191,11 @@ function releaseScreenWakeLock(){
  * rather than read once. */
 function deviceOptions(devices,kind,selected){
   const listed=devices.filter(d=>d.kind===kind&&d.deviceId&&d.deviceId!=='default');
-  const options=[{id:'default',label:'Predeterminado del sistema'},
-    ...listed.map((device,index)=>({id:device.deviceId,label:device.label||((kind==='audioinput'?'Micrófono ':'Altavoz ')+(index+1))}))];
+  // The labels are the room's words; `system`, `number` and `missing` let whoever else shows them word them itself.
+  const options=[{id:'default',label:'Predeterminado del sistema',system:true},
+    ...listed.map((device,index)=>device.label?{id:device.deviceId,label:device.label}:{id:device.deviceId,label:(kind==='audioinput'?'Micrófono ':'Altavoz ')+(index+1),number:index+1})];
   if(selected!=='default'&&!listed.some(d=>d.deviceId===selected))
-   options.push({id:selected,label:'Dispositivo seleccionado · desconectado'});
+   options.push({id:selected,label:'Dispositivo seleccionado · desconectado',missing:true});
   return options;
 }
 async function refreshAudioDevices(){
@@ -275,7 +276,6 @@ async function restartCaptureOnRoute(){
 }
 function updateWave(value){
  waveLevels.shift();waveLevels.push(value);
- const levelChannel=window.sidevoiceUI?.micLevel;if(typeof levelChannel?.publish==='function')levelChannel.publish(value);
  const bars=$('mic-control').querySelectorAll?.('.mic-wave i')||[];
  for(const [i,bar] of [...bars].entries())bar.style.height=Math.max(2,Math.round(waveLevels[i]*.26))+'px';
 }
@@ -1084,7 +1084,7 @@ function recordMessage(raw, socket) {
     if (t === 'error')
         setRoomError(sayRefusal(d, d.error || 'Error de conexión'));
 }
-function stopMeter(){cancelAnimationFrame(meterFrame);meterFrame=null;captureNode?.disconnect();captureNode=null;micSource?.disconnect();analyser?.disconnect();if(audioContext&&audioContext!==window.roomVoice?.context)audioContext.close().catch(()=>{});audioContext=null;analyser=null;micSource=null;$('mute').style.setProperty('--mic-fill','0%');$('mic-control').dataset.signal='quiet';$('mic-level-meter').setAttribute('aria-valuenow','0');waveLevels.fill(0);updateWave(0)}
+function stopMeter(){cancelAnimationFrame(meterFrame);meterFrame=null;captureNode?.disconnect();captureNode=null;micSource?.disconnect();analyser?.disconnect();if(audioContext&&audioContext!==window.roomVoice?.context)audioContext.close().catch(()=>{});audioContext=null;analyser=null;micSource=null;$('mute').style.setProperty('--mic-fill','0%');$('mic-control').dataset.signal='quiet';$('mic-level-meter').setAttribute('aria-valuenow','0');waveLevels.fill(0);updateWave(0);lastLevelAt=0;publishMicLevel(null,false)}
 /* The bubble of the turn being recorded draws this microphone: the waveform pulls the samples the meter's
  * own analyser already holds, once per animation frame and from the canvas itself. No second audio graph, no
  * capture of its own, and nothing that renders React at meter frequency. */
@@ -1154,9 +1154,22 @@ async function startCapture(socket,session){if(!micSource)throw Error('No se pud
  if(state.ws!==socket||audioContext!==context||epoch!==connectEpoch)return;
  captureRate=session.sample_rate;
  const node=new AudioWorkletNode(context,'mic-capture',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1,channelCountMode:'explicit',processorOptions:{sampleRate:session.sample_rate}});captureNode=node;node.port.onmessage=e=>{
-  if(captureNode!==node||!micTrack()?.enabled)return;
+  if(captureNode!==node)return;
+  publishMicLevel(e.data,!!micTrack()?.enabled);
+  if(!micTrack()?.enabled)return;
   sendMicFrame(socket,e.data);
  };source.connect(node);node.connect(context.destination)/* reachable from the destination so it keeps running; its output stays silent */}
+// The microphone's level for whoever shows it outside this page (state/mic-level.ts: the desktop app's call controls
+// card), measured from the frames the capture worklet sends — not from the meter's animation frames, which stop while
+// the page is hidden, the case the card is for. On the meter's scale, at most every 80 ms; 0 while muted.
+let lastLevelAt=0;
+function publishMicLevel(frame,enabled){
+ const now=Date.now();if(now-lastLevelAt<80)return;lastLevelAt=now;
+ let level=0;
+ if(enabled&&frame?.byteLength){const samples=new Int16Array(frame);let squares=0;for(const sample of samples){const v=sample/32768;squares+=v*v}
+  const rms=Math.sqrt(squares/samples.length),db=20*Math.log10(Math.max(rms,1e-6));level=Math.max(0,Math.min(100,Math.round((db+60)/60*100)))}
+ const channel=window.sidevoiceUI?.micLevel;if(typeof channel?.publish==='function')channel.publish(level);
+}
 // One frame of what the microphone heard. The socket is gone but the call is not: this is what the gap buffer exists
 // for. While WebRTC carries the microphone the socket sends none of it, and the page still keeps its own copy of an
 // unconfirmed turn: a machine that restarts mid-sentence loses it whichever path it came by.

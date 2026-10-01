@@ -1,5 +1,7 @@
 /* The call controls card (CallCard.tsx). Its window is transparent and exactly the card's size plus a margin for
  * the shadow; nothing here styles anything else. Dark by default, light with the system. */
+/* The brand's typeface, bundled with its licence (public/fonts/OFL.txt). */
+@font-face { font-family: "DM Sans"; src: url("/voice/fonts/DMSans-Variable-latin.woff2") format("woff2"); font-weight: 100 1000; font-display: swap; }
 :root { color-scheme: light dark; }
 html, body { margin: 0; background: transparent; overflow: hidden; }
 *, *::before, *::after { box-sizing: border-box; }
@@ -48,19 +50,21 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 .call-card .card-title { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 0 4px 0 0; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: inherit; }
 .call-card .card-title:hover { background: var(--btn); }
 .card-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-title-chevron { width: 0; overflow: hidden; opacity: 0; color: var(--mu); transition: opacity .15s; }
-.call-card[data-expanded] .card-title-chevron { width: 14px; opacity: 1; }
+/* The chevron and "open Sidevoice" keep their space at rest and only appear near the pointer: nothing moves. */
+.card-title-chevron { width: 14px; flex: none; visibility: hidden; opacity: 0; color: var(--mu); transition: opacity .15s; }
+.call-card[data-expanded] .card-title-chevron { visibility: visible; opacity: 1; }
+.card-unread { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; margin-left: 2px; }
 .card-title[aria-expanded=true] .card-title-chevron svg { transform: rotate(180deg); }
 .card-sub { font-size: 11px; color: var(--mu); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; max-width: 100%; }
-.card-sub.reconnecting { color: var(--sv-voice); }
+.card-sub.reconnecting { color: var(--fg); opacity: .8; }
 /* When room is short (the controls near the pointer), the machine and the harness give way; the clock never does. */
 .card-machine, .card-harness { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
 .card-machine svg, .card-harness svg { flex: none; }
 .card-clock { font-variant-numeric: tabular-nums; flex: none; }
 
 /* "Open Sidevoice" appears in free space left of your wave, so nothing moves. */
-.call-card .card-open { width: 0; height: 26px; margin-left: -10px; overflow: hidden; opacity: 0; color: var(--mu); border-radius: 7px; flex: none; transition: opacity .15s; }
-.call-card[data-expanded] .card-open { width: 26px; margin-left: 0; opacity: 1; }
+.call-card .card-open { width: 26px; height: 26px; visibility: hidden; opacity: 0; color: var(--mu); border-radius: 7px; flex: none; transition: opacity .15s; }
+.call-card[data-expanded] .card-open { visibility: visible; opacity: 1; }
 .call-card .card-open:hover { background: var(--btn); color: var(--fg); }
 
 .your-wave { position: relative; display: flex; align-items: center; gap: 2.4px; height: 18px; flex: none; padding: 0 1px; }
@@ -87,7 +91,11 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 /* Panels open below and close by themselves. */
 .card-panel { margin: 10px -4px 0; padding-top: 6px; border-top: 1px solid var(--line); }
 .card-panel.conversations { max-height: 260px; overflow: auto; }
-.card-panel #participants { display: flex; flex-direction: column; }
+.card-conversations { display: flex; flex-direction: column; }
+.card-badge { min-width: 16px; height: 16px; padding: 0 4px; margin-right: 6px; border-radius: 8px; display: grid; place-items: center; font-size: 10px; font-weight: 700; background: var(--accent); color: var(--sv-on-primary); flex: none; }
+.card-note { margin: 6px 8px 2px; font-size: 11.5px; color: var(--mu); }
+.card-panel .person:disabled { opacity: .5; }
+@media (prefers-color-scheme: light) { .card-badge { color: #fff; } }
 .card-panel .participant-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: 12px; margin: 2px 0; }
 .card-panel .participant-row[data-selected] { border-color: var(--sv-selected-border); background: var(--sv-selected); }
 .call-card .card-panel .person { display: flex; gap: 8px; align-items: center; justify-content: flex-start; width: 100%; padding: 7px 8px; border-radius: 12px; text-align: left; }

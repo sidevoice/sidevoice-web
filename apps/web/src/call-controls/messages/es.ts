@@ -19,5 +19,13 @@ export const es: Partial<Record<MessageKey, string>> = {
   "card.skip": "Saltar lo que está sonando",
   "card.hangUp": "Colgar",
   "card.yourMicrophone": "Tu micrófono",
+  "card.reach.holding": "no puede recibir",
+  "card.reach.offline": "sin conexión",
+  "card.unread": "{n} sin leer",
+  "card.microphoneNumber": "Micrófono {n}",
+  "card.speakerNumber": "Altavoz {n}",
+  "card.deviceMissing": "Dispositivo elegido · desconectado",
+  "card.deviceFailed": "La sala siguió con el dispositivo anterior: ese no se pudo usar.",
+  "card.devicesInSystem": "Elige este dispositivo en los ajustes del sistema.",
   "card.youAreMuted": "Estás silenciado",
 };
