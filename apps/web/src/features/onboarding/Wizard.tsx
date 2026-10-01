@@ -44,6 +44,9 @@ export function Wizard() {
   const hosts = useHostsController();
   const wizard = useHosts((s) => s.wizard);
   const ref = useModal(wizard.open, () => void hosts.deferWizard());
+  const title = useRef<HTMLHeadingElement>(null);
+  // Each step starts at its question, for a screen reader and for the keyboard, not at «Lo haré luego».
+  useEffect(() => { if (wizard.open) title.current?.focus(); }, [wizard.open, wizard.step]);
   return (
     <dialog ref={ref} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title">
       <div className="wizard-head">
@@ -51,7 +54,7 @@ export function Wizard() {
         <Button variant="ghost" size="compact" className="wizard-later" onClick={() => void hosts.deferWizard()}>{t("wizard.later")}</Button>
       </div>
       <Indicator step={wizard.step} />
-      <h2 id="wizard-title">{t(TITLES[wizard.step])}</h2>
+      <h2 id="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[wizard.step])}</h2>
       <div className="wizard-body">
         {wizard.open && <StepBody step={wizard.step} />}
       </div>

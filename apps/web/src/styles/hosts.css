@@ -31,6 +31,7 @@
 .wizard-dialog { width: min(36rem, calc(100vw - 1.5rem)); max-height: calc(100dvh - 1.5rem); padding: 1.25rem 1.5rem 1.4rem; border-radius: var(--sv-radius-md); background: var(--sv-surface); border: 1px solid var(--sv-border); box-shadow: var(--sv-shadow-dialog) }
 .wizard-dialog::backdrop { background: #0b0d10cc }
 .wizard-dialog h2 { margin: .9rem 0 .6rem; font-size: 1.35rem; line-height: 1.25; letter-spacing: -.01em; text-transform: none; color: var(--sv-text) }
+.wizard-dialog h2:focus { outline: none }
 .wizard-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem }
 .wizard-brand { display: inline-flex; align-items: center; gap: .45rem; color: var(--sv-primary); font-size: .78rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase }
 .wizard-later { color: var(--sv-muted) }
