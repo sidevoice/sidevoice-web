@@ -25,7 +25,7 @@ import { TranscriptPanel } from "../features/conversation/TranscriptPanel";
 import { CallToolbar } from "../features/call/CallToolbar";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { Wizard } from "../features/onboarding/Wizard";
-import { LocalHostBanner, NoMachine, SetupBanner } from "../features/onboarding/NoMachine";
+import { LocalHostBanner, NoMachine, SetupPending, useSetupPending } from "../features/onboarding/NoMachine";
 import { SettingsShell } from "../features/settings/SettingsShell";
 import { ResetDialog } from "../features/settings/ResetDialog";
 import { IntegrationScopeContext, QrRendererContext } from "../features/hosts/HostPage";
@@ -186,12 +186,12 @@ function Note() {
 function App() {
   useT();
   const noMachine = useHosts((s) => s.rows.length === 0 && (!s.local || s.local.state === "absent"));
+  const setupPending = useSetupPending();
   return (
     <>
       <RoomHeader />
-      <LocalHostBanner />
-      <SetupBanner />
-      {noMachine ? <main className="no-machine-main"><NoMachine /></main> : (
+      {!setupPending && <LocalHostBanner />}
+      {setupPending ? <main className="no-machine-main"><SetupPending /></main> : noMachine ? <main className="no-machine-main"><NoMachine /></main> : (
         <main>
           <ParticipantSidebar />
           <TranscriptPanel />

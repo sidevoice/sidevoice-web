@@ -397,7 +397,6 @@ export const es: Record<string, string> = {
   "reset.state.running": "en curso",
   "reset.state.done": "hecho",
   "reset.state.failed": "falló",
-  "banner.setupPending": "La configuración inicial no está terminada.",
   "app.shortcut.invalid": "No se guardó: «{value}» no es un atajo válido. Formato: CmdOrCtrl+Shift+M, Alt+F9…",
   "app.shortcut.conflict": "Guardado, pero otra aplicación ya usa ese atajo: puede que no llegue a Sidevoice.",
   "pair.deviceName": "Sidevoice en {where}",
@@ -407,4 +406,7 @@ export const es: Record<string, string> = {
   "wizard.w1.registration.not-connected": "Sin conectar",
   "wizard.w1.registration.foreign": "Otra configuración «sidevoice»",
   "wizard.w1.registration.unknown": "",
+  "setup.pending.title": "La configuración no está terminada",
+  "setup.pending.text": "Sidevoice no se puede usar hasta terminarla. Seguirás justo donde lo dejaste.",
+  "setup.pending.where": "Siguiente paso: {step}",
 };

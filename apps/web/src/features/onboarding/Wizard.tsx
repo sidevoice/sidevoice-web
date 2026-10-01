@@ -174,21 +174,12 @@ function W2() {
   const hosts = useHostsController();
   const local = useHosts((s) => s.local);
   const paired = useHosts((s) => !!s.localPairing);
-  const [progress, setProgress] = useState<InstallProgress | null>(null);
-  const [outcome, setOutcome] = useState<"running" | "cancelled" | "failed" | "done">("running");
-  const [error, setError] = useState<BridgeError & { kept?: boolean } | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let live = true;
-    setOutcome("running"); setError(null); setProgress({ step: "download", done: 0, total: 0 });
-    void hosts.localInstall((p) => { if (live) setProgress(p); }).then((result) => {
-      if (!live) return;
-      if (result.ok) setOutcome("done");
-      else if (result.error.key === "cancelled") setOutcome("cancelled");
-      else { setOutcome("failed"); setError(result.error); }
-    });
-    return () => { live = false; };
-  }, [hosts, attempt]);
+  const install = useHosts((s) => s.install);
+  const outcome = install.status === "idle" ? "running" : install.status;
+  const progress = install.progress;
+  const error = install.error as (BridgeError & { kept?: boolean }) | null;
+  // Arriving at W2 starts the install, unless one is already under way or over (the wizard was closed meanwhile).
+  useEffect(() => { if (install.status === "idle") void hosts.localInstall(); }, [hosts, install.status]);
   useEffect(() => {
     if (outcome === "done" && local?.state === "running" && paired) {
       const timer = setTimeout(() => hosts.goTo("W3"), 700);
@@ -232,7 +223,7 @@ function W2() {
         {(outcome === "failed" || outcome === "cancelled") && <>
           <Button variant="ghost" onClick={async () => { await hosts.choosePath("remote"); hosts.goTo("W2r", "remote"); }}>{t("wizard.w2.withoutAgents")}</Button>
           {outcome === "failed" && <CopyButton text={details} label={t("common.copyDetails")} size="default" />}
-          <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>{t("common.retry")}</Button>
+          <Button variant="primary" onClick={() => void hosts.localInstall()}>{t("common.retry")}</Button>
         </>}
       </Actions>
     </>

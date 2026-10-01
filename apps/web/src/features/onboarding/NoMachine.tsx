@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { SidevoiceMark } from "../../components/ui/Icons";
 import { useT } from "../../i18n";
 import { localBanner } from "../../state/hosts/host-list";
+import { stepGroups, pathOf } from "../../state/hosts/onboarding";
 import { useHosts, useHostsController } from "../../state/hosts/hosts-store";
 import { CopyButton, PhraseText } from "../hosts/common";
 
@@ -14,19 +15,17 @@ export function NoMachine() {
   const hosts = useHostsController();
   const inApp = useHosts((s) => s.inApp);
   const canHostAgents = useHosts((s) => s.canHostAgents);
-  const deferred = useHosts((s) => !!s.onboarding?.deferred_at && !s.onboarding?.completed_at);
   return (
     <section className="no-machine" aria-labelledby="no-machine-title">
       <SidevoiceMark size={40} className="no-machine-mark" />
       <h2 id="no-machine-title">{t("noMachine.title")}</h2>
       <p className="muted">{t("noMachine.text")}</p>
       <div className="no-machine-actions">
-        {deferred && <Button variant="primary" onClick={() => hosts.openWizard()}>{t("noMachine.resume")}</Button>}
         {inApp ? <>
-          {canHostAgents && <Button variant={deferred ? "default" : "primary"} onClick={() => void hosts.choosePath("agents").then(() => hosts.openWizard("W1"))}>{t("hosts.useAgentsHere")}</Button>}
+          {canHostAgents && <Button variant="primary" onClick={() => void hosts.choosePath("agents").then(() => hosts.openWizard("W1"))}>{t("hosts.useAgentsHere")}</Button>}
           <Button onClick={async () => { await hosts.choosePath("remote"); hosts.openWizard("W2r"); }}>{t("noMachine.otherMachine")}</Button>
         </> : <>
-          <Button variant={deferred ? "default" : "primary"} onClick={() => hosts.openWizard("W2r")}>{t("noMachine.connect")}</Button>
+          <Button variant="primary" onClick={() => hosts.openWizard("W2r")}>{t("noMachine.connect")}</Button>
           <div className="npx-hint">
             <p className="muted">{t("noMachine.notReady")}</p>
             <div className="npx-line"><code>{NPX}</code><CopyButton text={NPX} /></div>
@@ -37,17 +36,30 @@ export function NoMachine() {
   );
 }
 
-/** Onboarding left for later once a host was connected: the no-machine screen is gone, so the room offers it. */
-export function SetupBanner() {
+/** Whether the first-run setup was started and left for later: until it is finished the app is not usable. */
+export function useSetupPending(): boolean {
+  return useHosts((s) => !!s.onboarding?.deferred_at && !s.onboarding?.completed_at);
+}
+
+/** Setup left unfinished (operator, 2026-10-01): the app is not usable until it is done, and there is one way on —
+ *  «Continuar la configuración», back at the first step whose outcome is not durable. */
+export function SetupPending() {
   const t = useT();
   const hosts = useHostsController();
-  const pending = useHosts((s) => !!s.onboarding?.deferred_at && !s.onboarding?.completed_at && s.rows.length > 0 && !s.wizard.open);
-  if (!pending) return null;
+  const facts = useHosts((s) => s.onboarding);
+  const canHostAgents = useHosts((s) => s.canHostAgents);
+  const step = hosts.resumeStep();
+  const group = stepGroups(pathOf({ onboarding: facts, canHostAgents })).find((g) => g.steps.includes(step));
   return (
-    <div className="room-banner setup-banner" role="status">
-      <span>{t("banner.setupPending")}</span>
-      <span className="row-actions"><Button size="compact" variant="primary" onClick={() => hosts.openWizard()}>{t("noMachine.resume")}</Button></span>
-    </div>
+    <section className="no-machine" aria-labelledby="setup-pending-title">
+      <SidevoiceMark size={40} className="no-machine-mark" />
+      <h2 id="setup-pending-title">{t("setup.pending.title")}</h2>
+      <p className="muted">{t("setup.pending.text")}</p>
+      {group && <p className="muted small">{t("setup.pending.where", { step: t(group.key) })}</p>}
+      <div className="no-machine-actions">
+        <Button variant="primary" onClick={() => hosts.openWizard()}>{t("noMachine.resume")}</Button>
+      </div>
+    </section>
   );
 }
 

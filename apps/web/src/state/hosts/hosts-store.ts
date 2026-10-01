@@ -50,6 +50,8 @@ export interface HostsFacts {
   appSettings: AppSettings | null;
   diagnostics: AppDiagnostics | null;
   storageFailed: boolean;
+  /** The core's install (W2): it goes on when the wizard is closed, and W2 shows the one in flight on return. */
+  install: { status: "idle" | "running" | "done" | "cancelled" | "failed"; progress: InstallProgress | null; error: BridgeError | null };
   now: number;
 }
 
@@ -102,7 +104,7 @@ export function createHostsStore(seed: Partial<HostsFacts> = {}): HostsStore {
     inApp: false, canHostAgents: false, local: null, localPairing: null, stored: { inUse: null, list: [] }, reach: {},
     agents: {}, agentBusy: {}, agentErrors: {}, devices: {}, integrations: {}, scope: emptyScope(), onboarding: null,
     wizard: { open: false, step: "W1", path: null }, settings: { open: false, pane: "voice", host: null, tab: "status" },
-    reset: { open: false, steps: null, running: false }, appSettings: null, diagnostics: null, storageFailed: false, now: 0, ...seed,
+    reset: { open: false, steps: null, running: false }, appSettings: null, diagnostics: null, storageFailed: false, install: { status: "idle", progress: null, error: null }, now: 0, ...seed,
   };
   const store = createStore<HostsView>(() => view(facts)) as HostsStore;
   store.facts = () => facts;
@@ -242,10 +244,14 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
       return result;
     },
     async localUpdate(now = false) { return deps.bridge()?.localHost?.update?.({ now }) ?? { ok: false, error: { key: "unsupported" } } as BridgeResult; },
-    async localInstall(onProgress: (progress: InstallProgress) => void) {
+    /** Start the install, or do nothing when one is already in flight: there is one install, whoever looks at it. */
+    async localInstall() {
       const install = deps.bridge()?.localHost?.install;
-      if (!install) return { ok: false, error: { key: "unsupported" } } as BridgeResult;
-      return install(onProgress);
+      if (!install) { patch({ install: { status: "failed", progress: null, error: { key: "unsupported" } } }); return; }
+      if (f().install.status === "running") return;
+      patch({ install: { status: "running", progress: { step: "download", done: 0, total: 0 }, error: null } });
+      const result = await install((progress) => patch({ install: { ...f().install, progress } }));
+      patch({ install: { ...f().install, status: result.ok ? "done" : result.error.key === "cancelled" ? "cancelled" : "failed", error: result.ok ? null : result.error } });
     },
     async localCancelInstall() { await deps.bridge()?.localHost?.cancel?.(); },
     async localAgents() { return await deps.bridge()?.localHost?.agents?.() ?? null; },

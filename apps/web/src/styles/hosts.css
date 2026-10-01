@@ -185,7 +185,7 @@
 .stage-summary { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; padding: .7rem .85rem; margin-bottom: .45rem; border: 1px solid var(--sv-border); border-radius: 12px; background: var(--sv-surface-raised) }
 
 /* The room without a machine (§5.6), and the local host's banner */
-.no-machine-main { display: grid !important; place-items: center; padding: 1rem }
+.no-machine-main { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; place-items: center; padding: 1rem }
 .no-machine { width: min(30rem, 100%); padding: 2rem 1.6rem; text-align: center; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface) }
 .no-machine-mark { color: var(--sv-primary) }
 .no-machine h2 { margin: .8rem 0 .4rem; font-size: 1.3rem; text-transform: none; letter-spacing: 0; color: var(--sv-text) }
@@ -201,7 +201,6 @@
 
 /* White on the room's #ea4335 is 3.9:1; destructive buttons here use a darker red (5.6:1). */
 .settings-shell .ui-button--danger, .reset-dialog .ui-button--danger, .host-page .ui-button--danger { background: #c5221f; border-color: #c5221f }
-.setup-banner { border-color: var(--sv-selected-border); background: var(--sv-selected); color: var(--sv-primary-soft) }
 
 /* F7 */
 .reset-dialog { width: min(32rem, calc(100vw - 1.5rem)); padding: 1.3rem 1.5rem; border-radius: var(--sv-radius-md); background: var(--sv-surface); border: 1px solid var(--sv-border) }
