@@ -56,6 +56,10 @@ function useStageContext() {
  *    person's own test is the wizard's last step, a real conversation. */
 export type StageFlow = "try" | "configure" | "list";
 export const StageFlowContext = createContext<StageFlow>("try");
+/** Where the voice test's text is written — compared in the prototype (operator, 2026-10-02): "chat", in the
+ *  person's own bubble, sent like a message and read back by Sidevoice; "field", a text box under the conversation. */
+export type VoiceTestStyle = "chat" | "field";
+export const VoiceTestContext = createContext<VoiceTestStyle>("chat");
 
 /** The longest text the voice test plays. */
 const TEXT_MAX = 200;
@@ -586,11 +590,34 @@ function TestText({ value, language, languageLabel, onChange, disabled }: { valu
   );
 }
 
+/** The voice test's text written in the person's own bubble, as a message to send: Enter (or ↑) sends it, and
+ *  Sidevoice reads it back in the voice chosen. */
+function ComposerBubble({ value, language, languageLabel, onChange, onSend }: { value: string; language: string; languageLabel: string; onChange: (text: string) => void; onSend: () => void }) {
+  const t = useT();
+  const ready = !!value.trim();
+  return (
+    <div className="message-group live-draft" data-role="user">
+      <div className="chat-message-row">
+        <div className="chat-bubble try-composer" data-role="user" data-position="only">
+          <textarea rows={2} maxLength={TEXT_MAX} lang={language} value={value} aria-label={languageLabel ? t("stagecard.text.labelIn", { language: languageLabel }) : t("stagecard.text.label")}
+            onChange={(event) => onChange(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (ready) onSend(); } }} />
+          <span className="try-composer-foot">
+            <span className="try-count">{languageLabel ? languageLabel + " · " : ""}{t("stagecard.text.count", { n: value.length, max: TEXT_MAX })}</span>
+            <button type="button" className="try-send" aria-label={t("stagecard.send")} title={t("stagecard.send")} disabled={!ready} onClick={onSend}>↑</button>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** What a try shows, in the call's own bubbles (operator, 2026-10-01: the real components, so a change to them shows
  *  here too): the person's live bubble with its waveform while they speak, then what it understood; the agent's
  *  bubble with the text as the voice plays it. Before that: the sentence to say, or the text to hear. */
-function TryShow({ task, trial, input, languageLabel, onText }: { task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void }) {
+function TryShow({ task, trial, input, languageLabel, onText, onStart }: { task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void; onStart: () => void }) {
   const t = useT();
+  const chatStyle = useContext(VoiceTestContext) === "chat";
   const { state, failure, heard, played } = trial;
   const busy = state === "listening" || state === "transcribing" || state === "playing";
   const spoken = useSpokenSoFar(played, state === "playing");
@@ -603,14 +630,16 @@ function TryShow({ task, trial, input, languageLabel, onText }: { task: Task; tr
   // The instructions are Sidevoice's own message, as in a real conversation (operator, 2026-10-01).
   return (<>
     <div className="try-chat" ref={chat}>
-      {guide.say(task === "stt" ? t("try.guide.stt", { sample: input.text }) : t("try.guide.tts"))}
+      {guide.say(task === "stt" ? t("try.guide.stt", { sample: input.text }) : t(chatStyle ? "try.guide.tts.chat" : "try.guide.tts"))}
+      {task === "tts" && chatStyle && played && (state === "playing" || state === "played") && <MessageGroup group={{ id: "sent", role: "user", name: t("stagecard.you"), messages: [message("user", played)] }} />}
       {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
       {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
       {task === "tts" && (state === "playing" || state === "played") && (
         guide.say(played, { playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null }, "played")
       )}
     </div>
-    {task === "tts" && !busy && <TestText value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} />}
+    {task === "tts" && !busy && chatStyle && <div className="try-chat"><ComposerBubble value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} onSend={onStart} /></div>}
+    {task === "tts" && !busy && !chatStyle && <TestText value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} />}
     <div role="alert">{state === "failed" && <p className="row-error small">
       {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}
     </p>}</div>
@@ -628,7 +657,7 @@ function TryIt({ task, trial, input, languageLabel, onText, onStart, inFooter, o
   const busy = state === "listening" || state === "transcribing" || state === "playing";
   return (
     <div className="stage-card-body try-it">
-      <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} />
+      <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} onStart={onStart} />
       {answered && !no && (
         <div className="try-question">
           <p>{t(task === "stt" ? "stagecard.ask.stt" : "stagecard.ask.tts")}</p>
@@ -666,7 +695,7 @@ function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart
   const busy = trial.state === "listening" || trial.state === "transcribing" || trial.state === "playing";
   return (
     <div className="stage-configure">
-      <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} />
+      <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} onStart={onStart} />
       <span className="try-row">
         {!inFooter && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
           {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />}{" "}

@@ -393,3 +393,10 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .field-help:hover, .field-help:focus-visible { color: var(--sv-text); border-color: var(--sv-selected-border) }
 .key-field .key-clear { position: static; margin: 0; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.3rem; height: 1.3rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--sv-muted); font-size: 1rem; line-height: 1; cursor: pointer }
 .key-clear:hover, .key-clear:focus-visible { color: var(--sv-text); background: #ffffff12 }
+/* The voice test written in the person's own bubble, sent like a message. */
+.try-composer { display: grid; gap: .3rem; width: min(100%, 26rem); max-width: 100%; opacity: 1 }
+.try-composer textarea { width: 100%; min-height: 3rem; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; line-height: 1.5; resize: none; outline: none }
+.try-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem }
+.try-composer .try-count { color: #b9d8c9 }
+.try-send { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; padding: 0; border: 0; border-radius: 50%; background: var(--sv-primary); color: var(--sv-on-primary); font-size: 1rem; font-weight: 700; cursor: pointer }
+.try-send:disabled { opacity: .45; cursor: default }

@@ -34,7 +34,9 @@ const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.tit
 function Indicator({ step }: { step: Step }) {
   const t = useT();
   const path = useHosts((s) => s.wizard.path);
-  const groups = stepGroups(path);
+  const flow = useContext(StageFlowContext);
+  // In B there is no test step: the last group is the end.
+  const groups = stepGroups(path).map((group) => flow === "configure" && group.key === "wizard.group.test" ? { ...group, key: "wizard.group.done" } : group);
   const at = groups.findIndex((group) => group.steps.includes(step));
   return (
     <ol className="wizard-steps" aria-label={t("wizard.progress")}>
@@ -294,6 +296,13 @@ export function ManualConfig({ agent }: { agent: DetectedAgent }) {
 function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
+  const flow = useContext(StageFlowContext);
+  // In B each stage was tried by the person already: no separate test step after the voice (operator, 2026-10-02).
+  async function next() {
+    if (task === "stt") { hosts.goTo("W4v"); return; }
+    if (flow === "configure") { await hosts.markOnboarding({ test_passed: true }); hosts.goTo("W6"); }
+    else hosts.goTo("W5");
+  }
   return (
     <>
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
@@ -302,7 +311,7 @@ function StageStep({ task }: { task: Task }) {
           {pending?.secondary && <Button onClick={pending.secondary.run}>{pending.secondary.label}</Button>}
           {pending
             ? <Button variant="primary" disabled={pending.disabled} aria-busy={pending.disabled || undefined} onClick={pending.run}>{pending.label}</Button>
-            : <Button variant="primary" onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button>}
+            : <Button variant="primary" onClick={() => void next()}>{t("wizard.continue")}</Button>}
         </Actions>
       )} />
     </>

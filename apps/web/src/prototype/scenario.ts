@@ -47,6 +47,7 @@ export interface ToggleDef { id: string; group: string; label: string; options?:
 export const FLOW_TOGGLE = "stageFlow";
 export const TOGGLES: ToggleDef[] = [
   { id: FLOW_TOGGLE, group: "Flujo", label: "Paso de cada modelo", options: ["", "A", "C"], reload: true },
+  { id: "voiceTest", group: "Flujo", label: "Prueba de voz", options: ["", "field"], reload: true },
   { id: "offline", group: "Entorno", label: "Sin red: hosts remotos y descargas fallan" },
   { id: "noWebgpu", group: "Entorno", label: "Navegador sin WebGPU (solo WASM)", reload: true },
   { id: "slowDownload", group: "Entorno", label: "Descargas lentas (×6)" },

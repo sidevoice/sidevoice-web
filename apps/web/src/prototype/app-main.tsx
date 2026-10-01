@@ -29,7 +29,7 @@ import { LocalHostBanner, NoMachine, SetupPending, useSetupPending } from "../fe
 import { SettingsShell } from "../features/settings/SettingsShell";
 import { ResetDialog } from "../features/settings/ResetDialog";
 import { IntegrationScopeContext, QrRendererContext } from "../features/hosts/HostPage";
-import { StageFlowContext } from "../features/settings/StageEditor";
+import { StageFlowContext, VoiceTestContext } from "../features/settings/StageEditor";
 import { FakeQr } from "./FakeQr";
 import { readParams, type Toggles } from "./scenario";
 import { createFakeHosts } from "./fakes/hosts";
@@ -214,9 +214,11 @@ async function boot() {
         <IntegrationScopeContext.Provider value={adapter}>
           <QrRendererContext.Provider value={(code) => <figure className="proto-qr"><FakeQr text={code} /><figcaption>{t("proto.qr")}</figcaption></figure>}>
             <StageFlowContext.Provider value={toggles.stageFlow === "C" ? "list" : toggles.stageFlow === "A" ? "try" : "configure"}>
-              <TooltipProvider>
-                <App />
-              </TooltipProvider>
+              <VoiceTestContext.Provider value={toggles.voiceTest === "field" ? "field" : "chat"}>
+                <TooltipProvider>
+                  <App />
+                </TooltipProvider>
+              </VoiceTestContext.Provider>
             </StageFlowContext.Provider>
           </QrRendererContext.Provider>
         </IntegrationScopeContext.Provider>
