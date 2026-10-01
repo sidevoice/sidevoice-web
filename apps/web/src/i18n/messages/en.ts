@@ -561,4 +561,8 @@ export const en: Record<string, string> = {
   "keys.change": "Change",
   "keys.remove": "Remove",
   "settings.back": "Back",
+  "pair.error.plaintext": "This code reaches the machine only over unencrypted http, and pairing only travels over https (or within this same computer). Give the machine an https address and ask for a new code.",
+  "pair.error.version": "This code is from another version of Sidevoice. Update the app or ask for a new code.",
+  "pair.error.noAddress": "The code doesn't say where to find the machine. Ask for a new one.",
+  "pair.error.refused": "The machine didn't accept the pairing. Try again.",
 };

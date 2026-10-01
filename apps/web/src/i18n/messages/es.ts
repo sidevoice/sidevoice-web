@@ -561,4 +561,8 @@ export const es: Record<string, string> = {
   "keys.change": "Cambiar",
   "keys.remove": "Quitar",
   "settings.back": "Volver",
+  "pair.error.plaintext": "Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.",
+  "pair.error.version": "Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.",
+  "pair.error.noAddress": "El código no dice dónde encontrar la máquina. Pide uno nuevo.",
+  "pair.error.refused": "La máquina no aceptó el emparejamiento. Vuelve a intentarlo.",
 };

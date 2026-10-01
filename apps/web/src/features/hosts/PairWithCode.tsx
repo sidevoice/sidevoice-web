@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { decodePairingCode, deviceName } from "../../services/device-pairing.js";
-import { useT } from "../../i18n";
+import { currentLanguage, useT } from "../../i18n";
 import { useHostsController } from "../../state/hosts/hosts-store";
 
 const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(\/|$)/;
@@ -17,6 +17,11 @@ export function pairingFailureKey(error: unknown): { key: string; text?: string 
   if (/^No se pudo llegar/.test(message)) return { key: "pair.error.unreachable" };
   if (/no es la del código/.test(message)) return { key: "pair.error.mismatch" };
   if (/^Ese código no vale|REFUSED_SECRET|ya no vale/.test(message)) return { key: "pair.error.used" };
+  // The pairing module still says these in Spanish (#17): each one is a key here, so it reads in the UI's language.
+  if (/por http sin cifrar/.test(message)) return { key: "pair.error.plaintext" };
+  if (/de otra versión de Sidevoice/.test(message)) return { key: "pair.error.version" };
+  if (/no dice dónde encontrar/.test(message)) return { key: "pair.error.noAddress" };
+  if (/no aceptó el emparejamiento/.test(message)) return { key: "pair.error.refused" };
   return { key: "pair.error.other", text: message };
 }
 
@@ -70,7 +75,7 @@ export function PairWithCode({ onPaired, submitLabel, use = true, renderActions 
       <label className="ui-field">{t("pair.name")}
         <input id="pair-name" value={name} maxLength={60} autoComplete="off" disabled={busy} onChange={(event) => setName(event.currentTarget.value)} />
       </label>
-      {error && <p className="form-error" role="alert">{error.text ?? t(error.key)}</p>}
+      {error && <p className="form-error" role="alert">{error.text && currentLanguage() === "es" ? error.text : t(error.key)}</p>}
       {renderActions(<Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pair.connecting") : submitLabel ?? t("pair.connect")}</Button>)}
     </form>
   );
