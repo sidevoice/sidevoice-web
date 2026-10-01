@@ -39,7 +39,7 @@ export interface SessionFacts {
  remoteModels: Record<string, {models?: {id: string; label?: string; description?: string}[]; voices?: {id: string; label?: string; languages?: string[]}[]; error?: string}>;
  stageDraft: {stt?: Record<string, unknown>; tts?: Record<string, unknown>} | null;
  previewNote: string; prepareNote: string; gpuSetAside: boolean;
- /** Per stage, the model selection in flight or just over (#124 §6), and what its last check measured (#90). */
+ /** Per stage, the model selection in flight or just over (sidevoice/sidevoice-core#21), and what its last check measured (sidevoice/sidevoice-core#13). */
  stageChecks: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>; stageDiagnostics: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>;
  /** Every model or engine download in flight, and the ones that just ended. */
  downloads: import('../services/downloads.js').DownloadItem[];

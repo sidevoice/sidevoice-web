@@ -2,7 +2,7 @@ import { expect, test, vi } from "vitest";
 import { createStageSelection, type Stage, type StageCheck } from "./stage-selection.js";
 import type { CheckResult } from "./load-and-verify.js";
 
-/* Selecting a model (#124 §6, D11–D12), driven through its hooks: the previous stage is touched only by `activate`,
+/* Selecting a model, driven through its hooks: the previous stage is touched only by `activate`,
  * and `activate` runs only after a passed check — and, for a slow one, the person's yes. */
 const BASE: Stage = { place: "device", model: "whisper-base", options: { language: "es" }, build: null };
 const TINY: Stage = { place: "device", model: "whisper-tiny", options: { language: "es" }, build: null };
@@ -148,7 +148,7 @@ test("a recheck measures what is in use and changes nothing", async () => {
   expect(s.last()).toMatchObject({ phase: "done", recheck: true });
 });
 
-test("an activation the call refuses is a failure with its reason; the candidate is let go (review R01)", async () => {
+test("an activation the call refuses is a failure with its reason; the candidate is let go", async () => {
   const s = selection();
   s.hooks.activate.mockImplementationOnce(async () => { throw Object.assign(new Error("refused"), { reason: { key: "switch_refused", message: "x", detail: "no key" } }); });
   const done = s.it.select("stt", BASE);

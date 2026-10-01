@@ -102,7 +102,7 @@ test("in the app, the native engine's capabilities never yield a page build, and
   expect([...document.querySelectorAll<HTMLOptionElement>("#stt-build option")].map((o) => o.value)).toEqual(["auto", "sherpa-onnx/cpu", "sherpa-onnx/coreml"]);
 });
 
-test("in the app the whole settings dialog, every pane, says nothing of a browser (review R10)", async () => {
+test("in the app the whole settings dialog, every pane, says nothing of a browser", async () => {
   const { SettingsDialog } = await import("./SettingsDialog");
   const { ConnectionStatsDialog } = await import("../diagnostics/ConnectionStatsDialog");
   const { PreparationDialog } = await import("../call/PreparationDialog");

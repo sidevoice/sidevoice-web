@@ -6,7 +6,7 @@
 //   <out>/voice-browser/        → packages/browser-audio/dist (workers, clients, assets/ with the WebAssembly)
 //
 // It holds no secret and names no server: whoever serves it says where it points by writing
-// window.__SIDEVOICE_TARGET__ into /voice/target.js (docs/DEVICE_PAIRING.md). The desktop app bundles this
+// window.__SIDEVOICE_TARGET__ into /voice/target.js (`apps/web/public/target.js`). The desktop app bundles this
 // same layout (sidevoice/sidevoice-desktop scripts/vendor-web.mjs); deploy/web-static/ serves it with nginx.
 //
 //   npm run build -w @sidevoice/protocol -w @sidevoice/browser-audio -w @sidevoice/web

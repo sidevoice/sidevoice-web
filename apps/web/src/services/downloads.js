@@ -1,5 +1,5 @@
 /* Every model or engine download this device has in flight, wherever it was started from — a model selected in
- * Configuración (#124 §6), or a call that connects with a model not on disk yet — and whichever engine fetches it:
+ * Configuración (sidevoice/sidevoice-core#21), or a call that connects with a model not on disk yet — and whichever engine fetches it:
  * this page's (transformers.js, into the browser's cache) or the desktop app's (the bridge's `install`, which
  * reports its own speed). The room shows them while they run and briefly after (DownloadsIndicator); each one
  * carries the way to cancel it, which is its starter's. Pure apart from the clock and the timer it is given. */

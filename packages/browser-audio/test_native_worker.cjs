@@ -10,7 +10,7 @@ function setup(engine){
  vm.runInContext(BUNDLED,context);
  return context.sidevoiceNativeWorkers;
 }
-/* The bridge contract (#124 phases 2 and 3): capabilities, installed builds, install (a job: `promise.job`, progress
+/* The bridge contract (sidevoice/sidevoice-core#21): capabilities, installed builds, install (a job: `promise.job`, progress
  * as {job, model, engine, done, total, bytes_per_s}), cancel, load, loaded, unload, memory, transcribe, synthesize —
  * by catalogue model id and engine. No offers and no page ids: the page resolves offers. */
 function engine(overrides={}){
@@ -119,7 +119,7 @@ test('a native refusal {key, message, ...params} is said by its key where the pa
  }
 });
 
-test('a model already in memory on that accelerator is not loaded again; on another one it is (D13)',async()=>{
+test('a model already in memory on that accelerator is not loaded again; on another one it is',async()=>{
  const fake=engine({installed:async()=>[{model:'whisper-small',engine:'sherpa-onnx'}]});
  fake.inMemory.push({model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu',since:0,last_used:0});
  const worker=setup(fake).transcription(),{seen,until}=talk(worker);
@@ -132,7 +132,7 @@ test('a model already in memory on that accelerator is not loaded again; on anot
  assert.deepEqual(fake.calls.at(-1),['load','whisper-small','sherpa-onnx','coreml']);
 });
 
-test('a failure says the step it happened at and hands on the app\'s refusal (#124 §6)',async()=>{
+test('a failure says the step it happened at and hands on the app\'s refusal (sidevoice/sidevoice-core#21)',async()=>{
  const interrupted={key:'download_failed',url:'https://example.com/m.tar.bz2',message:'Could not download https://example.com/m.tar.bz2: reset'};
  const nomemory={key:'model_needs_memory',needed_mb:2500,memory_mb:2048,message:'whisper-large needs 2500 MB of memory; this device has 2048 MB.'};
  for(const [overrides,step,key] of [

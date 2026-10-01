@@ -3,7 +3,7 @@ import type { StageChoiceView, StageOptionView, StageTask } from "../../state/ro
 import { Button } from "../ui/Button";
 import { NativeSelect } from "../ui/NativeSelect";
 
-/* The design-system fields a model family's options are drawn with (#124 D16). The schema comes from the model
+/* The design-system fields a model family's options are drawn with. The schema comes from the model
  * catalogue; nothing here names a model or a family. */
 
 type Change = (value: unknown, language?: string) => void;

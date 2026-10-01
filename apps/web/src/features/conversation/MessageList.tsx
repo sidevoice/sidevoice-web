@@ -24,7 +24,7 @@ export function MessageList({ conversation }: { conversation: ConversationView }
   };
 
   // Anything that changes the height of the log counts, the thinking bubble included: it appeared after
-  // this ran and left the view a sliver short of the bottom, which is exactly where the dots live (#64).
+  // this ran and left the view a sliver short of the bottom, which is exactly where the dots live.
   useLayoutEffect(() => {
     if (nearBottom.current) scrollToBottom("auto");
     else if (lastId && lastId !== previousLast.current) setShowNewMessages(true);

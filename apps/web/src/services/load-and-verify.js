@@ -1,4 +1,4 @@
-/* Select = load and verify (#124 §6, D11–D12): one model checked before it takes effect, wherever it runs.
+/* Select = load and verify: one model checked before it takes effect, wherever it runs.
  *
  * On this device the model is loaded in a worker of its own — the page's Worker, or the desktop app's native
  * engine behind the same protocol (native-worker.js) — so the one in use keeps working meanwhile: downloaded if it

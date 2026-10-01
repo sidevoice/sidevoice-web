@@ -4,7 +4,7 @@ import { DialogFrame } from "../../components/ui/DialogFrame";
 import { deviceName } from "../../services/device-pairing.js";
 import { useRoomStore } from "../../state/room-store";
 
-/** Pairing this device with a machine (docs/DEVICE_PAIRING.md): the machine issues a one-time code — shown by
+/** Pairing this device with a machine (the node side: sidevoice-core `server/devices.py`): the machine issues a one-time code — shown by
  *  the agent when the person asks, or by `sidevoice pair-device` — and it is pasted here. The page opens this by
  *  itself when it has no machine to talk to, or when the one it used no longer knows it; it says why on top.
  *  The code is checked and redeemed by the controller; this only collects it and says how that went. */

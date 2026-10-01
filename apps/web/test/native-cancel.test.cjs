@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
-/* Cancel against the desktop app (#124 §6; review R04): the real check (load-and-verify.js) driving the real native
+/* Cancel against the desktop app (sidevoice/sidevoice-core#21): the real check (load-and-verify.js) driving the real native
  * worker (native-worker.js, bundled as the page gets it) over a bridge whose install and load are held open, so a
  * cancel can land in each step. The bridge is sidevoice-desktop#3's: install is a job (`promise.job`), cancel(job),
  * load, loaded, unload(model, engine, accelerator). */
@@ -59,7 +59,7 @@ test('a load the app cancelled (an unload landed on it) is a cancel, not a failu
  assert.deepEqual([outcome.ok,outcome.cancelled,outcome.step],[false,true,'load']);
 });
 
-/* Review R04 (re-check): the load is done and the worker has queued its `ready`, but the page has not seen it yet when
+/* The load is done and the worker has queued its `ready`, but the page has not seen it yet when
  * the cancel lands. The instance is still the worker's then, and is released. */
 test('a cancel after the load resolved but before its ready reached the page releases that instance (R04)',async()=>{
  const actions=[],load=deferred();

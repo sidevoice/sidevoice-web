@@ -14,7 +14,7 @@ export interface PairingCodePayload {
   secret: string;
   exp: number;
 }
-/** One pairing as this device keeps it (docs/DEVICE_PAIRING.md, "Redeeming it"). */
+/** One pairing as this device keeps it once its code is redeemed (sidevoice-core `server/devices.py`). */
 export interface Pairing {
   fp: string;
   public_key: string;

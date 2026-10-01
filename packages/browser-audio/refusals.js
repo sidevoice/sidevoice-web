@@ -1,7 +1,7 @@
 /* What a refusal says to a person. sidevoice-core refuses with {key, message, ...params}, and the desktop app's
  * native engine rejects with the same shape: a stable key, the parameters it needs, and a sentence in English
  * for whoever does not know the key. A known key is said here, in the page's source language (room-i18n.js
- * pairs it with its English until #128), with its parameters; an unknown one says its own sentence. */
+ * pairs it with its English until #17), with its parameters; an unknown one says its own sentence. */
 import catalog from './models.json' with {type:'json'};
 
 const label=id=>catalog.providers.find(provider=>provider.id===id)?.label||String(id||'');
@@ -11,7 +11,7 @@ export const REFUSALS={
  provider_key_missing:refusal=>label(refusal.provider)+' necesita una clave de API antes de conectar.',
  voice_missing:refusal=>'Elige una voz de '+label(refusal.provider)+' antes de conectar.',
  integration_superseded:()=>'La clave se cambió o se quitó mientras se comprobaba, así que no se guardó.',
- // Why a model did not take effect (#124 §6): the node's checks (sidevoice_core/models/verdicts.py and
+ // Why a model did not take effect (sidevoice/sidevoice-core#21): the node's checks (sidevoice_core/models/verdicts.py and
  // pipeline/model_check.py), this page's engines (model-check.js) and the desktop app's native engine.
  download_failed:()=>'La descarga se interrumpió.',
  download_corrupt:()=>'Lo descargado no es el archivo que nombra el catálogo (la suma de comprobación no coincide).',

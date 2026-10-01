@@ -1,5 +1,5 @@
 /* The resolver: which models a place can run, each on its best build, with the others ranked behind it
- * (rubasace/sidevoice#124 §4). This page computes "Este dispositivo" with it; a host computes "En el host"
+ * (sidevoice/sidevoice-core#21). This page computes "Este dispositivo" with it; a host computes "En el host"
  * with sidevoice-core's reference (`sidevoice_core/models/offers.py`), and the desktop app's Rust does the same.
  * The three pass the core's shared vectors (models.vectors.json, a copy like models.json): change the rules
  * there first. A pure function; nothing here detects capabilities or loads anything. */
@@ -105,7 +105,7 @@ function packageFor(engine: Engine, capabilities: Capabilities): Package | null 
 
 function fit(build: Build, engine: Engine, capabilities: Capabilities): { accelerators: string[]; pkg: Package | null } | null {
   const has = new Set(capabilities.has);
-  // A page engine only in a page, a native one only in a native runtime (D5).
+  // A page engine only in a page, a native one only in a native runtime.
   if (engine.runs !== capabilities.runs) return null;
   let pkg: Package | null = null;
   let usable: string[];

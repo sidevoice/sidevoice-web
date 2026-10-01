@@ -9,7 +9,7 @@ env.backends.onnx.wasm.numThreads=1;
 let transcriber=null,active=null;
 
 /* What this page has: the resolver (offers.ts) decides from it which models it offers, and the diagnostics show
- * the WebGPU adapter it found (#90). */
+ * the WebGPU adapter it found (sidevoice/sidevoice-core#13). */
 export async function capabilities(){
  const wasm=typeof WebAssembly==='object'&&typeof WebAssembly.validate==='function';
  let adapter=null;

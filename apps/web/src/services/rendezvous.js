@@ -1,4 +1,4 @@
-/* Where this page talks to, and nothing else (docs/RENDEZVOUS.md, "Web client contract"; docs/DEVICE_PAIRING.md).
+/* Where this page talks to, and nothing else (the node side: sidevoice-core `server/rendezvous.py`, `server/devices.py`).
  *
  * Two addresses. The *target* is the one the page was pointed at: a room, or a node directly. Telemetry is the
  * target's. The *node base* is where the conversations and the call live: the node this device is paired with,

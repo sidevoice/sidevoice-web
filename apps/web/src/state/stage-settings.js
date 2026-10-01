@@ -1,4 +1,4 @@
-/* The two stages this device configures — transcription (stt) and voice (tts) — as rubasace/sidevoice#124 §5
+/* The two stages this device configures — transcription (stt) and voice (tts) — as sidevoice/sidevoice-core#21
  * shapes them: a place (this device or a provider the machine holds a key for), a model among what that place
  * offers, and the options that model's family (or the provider) declares in the model catalogue. Pure: the
  * facts come from the store (the catalogue, this device's offers, the machine's integrations, the remote model
@@ -107,9 +107,9 @@ export function normalizeOptions(ctx, stage, task) {
 }
 
 /** What this device would pick with nothing saved: the resolver's first offer for the stage, with its family's
- *  defaults in the person's system language (#124 §5, D14's "best combination", minus the verification). None
+ *  defaults in the person's system language (the "best combination", minus the verification). None
  *  (null) when this device runs nothing for the stage: a provider is the person's to choose, with its key and a
- *  model, and is never made up here (review R06). */
+ *  model, and is never made up here. */
 export function defaultStage(ctx, task) {
     const offer = taskOffers(ctx.offers, task)[0];
     if (!offer)
@@ -135,7 +135,7 @@ export function placeModels(ctx, place, task) {
 
 /** A stage as it will be used: the place kept; on this device, a model it offers; at a provider, the model chosen
  *  — kept when the account's list is unknown or does not name it, since a provider ships models before we list
- *  them — and the list's first only for a new choice with none yet (review R05); a build override only when this
+ *  them — and the list's first only for a new choice with none yet; a build override only when this
  *  device can run it; and options that fit the schema. */
 export function effectiveStage(ctx, task, stage) {
     const base = stage && typeof stage === 'object' ? stage : defaultStage(ctx, task);
@@ -177,7 +177,7 @@ function buildLabel(catalog, choice) {
     return (engine?.label?.split(' (')[0] || choice.engine) + ' · ' + (ACCELERATOR_LABELS[choice.accelerator] || choice.accelerator);
 }
 
-/** The places a stage can be put, siblings (D8): this device when it offers a model for the stage, and every
+/** The places a stage can be put, siblings: this device when it offers a model for the stage, and every
  *  provider the machine lists — greyed out with Configurar when it lacks a key, to any paired device. While the
  *  listing is not in, only a provider already chosen is shown, as it was. */
 function placesFor(ctx, task, chosen) {
@@ -219,7 +219,7 @@ function optionView(ctx, stage, task, option, value) {
 
 /** Everything a stage pane shows. */
 export function stageView(ctx, task, stage) {
-    // While a model is being selected (#124 §6) the pane shows that one, and nothing else can be changed until
+    // While a model is being selected (sidevoice/sidevoice-core#21) the pane shows that one, and nothing else can be changed until
     // the check is over: it takes effect, or the pane goes back to what was in use.
     const check = ctx.checks?.[task] || null;
     const selecting = check && ['consent', 'running', 'slow'].includes(check.phase) && !check.recheck;
@@ -244,7 +244,7 @@ function stageViewOf(ctx, task, stage) {
         task,
         places: placesFor(ctx, task, current.place),
         place: current.place,
-        // Edits that depend on the machine's listing wait for it (#64 review F18): the choice stays as saved.
+        // Edits that depend on the machine's listing wait for it: the choice stays as saved.
         editable: ctx.integrations === 'ready' || (current.place === DEVICE && ctx.integrations !== 'loading'),
         integrations: ctx.integrations,
         // A provider model the account's list does not (or cannot now) name is still the one chosen, and shown.
@@ -310,7 +310,7 @@ export function voiceFor(ctx, stage, language) {
 }
 
 /** A provider's voice stage as it is saved: every language left on "Automática" gets the voice that choice
- *  names (voiceFor), because the node speaks only voices the stage carries (review R02). A device model keeps
+ *  names (voiceFor), because the node speaks only voices the stage carries. A device model keeps
  *  its automatic choice, which the node resolves from the catalogue itself. */
 export function withVoicesChosen(ctx, stage) {
     const option = stage && stage.place !== DEVICE && optionSchema(ctx.catalog, stage, 'tts').find((o) => o.kind === 'voice' && o.per_language);
@@ -338,7 +338,7 @@ export function stageProblem(ctx, task, stage) {
     return '';
 }
 
-// ----- selecting a model (#124 §6) and what was measured (#90), as the pane says them -----
+// ----- selecting a model (sidevoice/sidevoice-core#21) and what was measured (sidevoice/sidevoice-core#13), as the pane says them -----
 
 const STEP_LABELS = { download: 'Descarga', load: 'Carga', check: 'Comprobación', key: 'Clave', host: 'Máquina', apply: 'Aplicar' };
 /** A time in milliseconds, as the panes say it. */
@@ -390,7 +390,7 @@ export function checkView(ctx, task, check) {
 }
 
 const yesNo = (value) => (value ? 'Sí' : 'No');
-/** Diagnostics for a stage (#90): where and on what its model runs, and what its last check measured; on a page,
+/** Diagnostics for a stage (sidevoice/sidevoice-core#13): where and on what its model runs, and what its last check measured; on a page,
  *  also what the page itself has. `rows` are label/value pairs, the same ones Copiar resultados copies. */
 export function diagnosticsView(ctx, task, stage) {
     const current = effectiveStage(ctx, task, stage);

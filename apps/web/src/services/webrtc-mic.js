@@ -1,4 +1,4 @@
-/* The microphone over WebRTC, for one call session (docs/RENDEZVOUS.md, "Phase 4").
+/* The microphone over WebRTC, for one call session (the node side: sidevoice-core `server/webrtc.py`).
  *
  * The call socket keeps carrying everything it always has; this carries only the microphone, browser →
  * node, and only while it works. Once the socket has a session the page offers the track it already

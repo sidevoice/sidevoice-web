@@ -50,7 +50,7 @@ function AdvancedSettings() {
   );
 }
 
-/** The machine's own configuration, not this device's: any paired device sets it (#64). */
+/** The machine's own configuration, not this device's: any paired device sets it. */
 function IntegrationSettings() {
   return <section id="pane-integrations" aria-labelledby="settings-integrations" hidden><IntegrationList /></section>;
 }

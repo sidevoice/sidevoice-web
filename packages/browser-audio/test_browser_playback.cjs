@@ -107,7 +107,7 @@ test('Speech leaves through a media element when the context can feed one, so ec
  assert.equal(s.voice.supportsOutputSelection,true);await s.voice.setOutputDevice('headset');assert.equal(elementSink,'headset');
  s.voice.cancel();await assert.rejects(p);
 });
-test('Off the iPhone the voice plays straight through the context, never through a media element (#80)',async()=>{
+test('Off the iPhone the voice plays straight through the context, never through a media element',async()=>{
  const s=setup();let elements=0;
  s.context.Audio=class{constructor(){elements++}async play(){}pause(){}};
  const context=new s.context.AudioContext();context.createMediaStreamDestination=()=>({stream:{}});s.voice.context=context;
@@ -143,7 +143,7 @@ test('Output pauses while the page is hidden or the context is interrupted, and 
  s.context.document.hidden=false;context.state='interrupted';listeners.statechange();assert.equal(paused,2);
  context.state='running';listeners.statechange();assert.equal(played,2);
 });
-test('A desktop tab in the background keeps its output playing; only an interrupted context pauses it (#96)',async()=>{
+test('A desktop tab in the background keeps its output playing; only an interrupted context pauses it',async()=>{
  const s=setup();const sink={stream:{}};let paused=0;const listeners={};
  s.context.Audio=class{async play(){}pause(){paused++}};
  s.context.document={hidden:false,addEventListener(name,fn){listeners[name]=fn}};
@@ -251,7 +251,7 @@ test('A page that never comes back stops the room waiting for it',async()=>{
  assert.equal(s.voice.job,null,'the engine is free for what comes next');
 });
 
-test('A device that asked to keep the call with the screen locked keeps its output playing on hide (#59)',async()=>{
+test('A device that asked to keep the call with the screen locked keeps its output playing on hide (sidevoice/sidevoice-web#4)',async()=>{
  const s=setup();const sink={stream:{}};let paused=0;const listeners={};
  s.context.Audio=class{async play(){}pause(){paused++}};
  s.context.document={hidden:false,addEventListener(name,fn){listeners[name]=fn}};
@@ -264,7 +264,7 @@ test('A device that asked to keep the call with the screen locked keeps its outp
  s.voice.keepPlayingWhileHidden(false);assert.equal(s.voice.pauseWhileHidden,true,'off, the platform does what it always did');
  assert.equal(s.voice.health().events.filter(e=>e.kind==='locked-call').map(e=>e.detail).join(),'on,off');
 });
-test('A phone call hung up with the screen locked gives the call its sound back without unlocking (#59)',async()=>{
+test('A phone call hung up with the screen locked gives the call its sound back without unlocking (sidevoice/sidevoice-web#4)',async()=>{
  const s=setup();const sink={stream:{}};let paused=0,played=0;const listeners={};
  s.context.Audio=class{async play(){played++}pause(){paused++}};
  s.context.document={hidden:false,addEventListener(name,fn){listeners[name]=fn}};
@@ -281,7 +281,7 @@ test('A phone call hung up with the screen locked gives the call its sound back 
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(played,settled);
 });
-test('The locked call keeps a faint floor sounding, never before the output has rendered, and stops it when off (#59)',async()=>{
+test('The locked call keeps a faint floor sounding, never before the output has rendered, and stops it when off (sidevoice/sidevoice-web#4)',async()=>{
  const s=setup();const {context}=mediaOutput(s);await s.voice.unlock();
  const sourcesBefore=s.sources.length;
  s.voice.presenceReady=()=>false;
@@ -297,7 +297,7 @@ test('The locked call keeps a faint floor sounding, never before the output has 
  s.voice.keepPlayingWhileHidden(false);
  assert.equal(s.voice.keepAlive,null);assert.equal(floor.stopped,true);
 });
-test('A tab that is not the one sounding is muted, never paused, and gets its sound back at once (#96)',async()=>{
+test('A tab that is not the one sounding is muted, never paused, and gets its sound back at once',async()=>{
  const s=setup();const {context,counters}=mediaOutput(s);
  s.voice.setAudible(false);await s.voice.unlock();
  assert.equal(s.voice.output.element.muted,true,'an element created after the decision starts muted');
@@ -306,7 +306,7 @@ test('A tab that is not the one sounding is muted, never paused, and gets its so
  s.voice.setAudible(false);assert.equal(s.voice.output.element.muted,true);
  assert.equal(counters.paused,pausedBefore,'muting never pauses the element');
 });
-test('A background tab that is still playing is not given up after the away limit (#96)',async()=>{
+test('A background tab that is still playing is not given up after the away limit',async()=>{
  const s=setup();const {context}=mediaOutput(s);s.voice.pauseWhileHidden=false;await s.voice.unlock();
  s.voice.stallCheckMs=3;s.voice.stallAfterMs=5;s.voice.awayLimitMs=10;
  s.context.document={hidden:true,addEventListener(){}};
@@ -433,7 +433,7 @@ test('A fresh output is greeted once: audible notes first, then silence long eno
  assert.equal(s.voice.health().events.at(-1).kind,'chime');
 });
 
-// ----- the ambient bed while a conversation works on a turn (#42) -----
+// ----- the ambient bed while a conversation works on a turn -----
 test('The bed is never the first thing a fresh output renders: it waits for the greeting or a voice',async()=>{
  const s=setup();
  assert.equal(s.voice.startPresence({volume:.035}),false,'no context, nothing to play into');
@@ -505,7 +505,7 @@ test('The bed is a slow breath in phrases: swells, then silence, quietest at the
  assert.ok(swell>8*join,'twice per loop, and quiet where the breaths meet');
  assert.ok(Math.abs(data[0])<.01&&Math.abs(data[data.length-1])<.01,'the loop joins itself without a step');
  const gap=Array.from(data.slice(rate*7.3,rate*10.1));
- assert.ok(gap.every(v=>v===0),'after two breaths, seconds of silence: a long turn is not a continuous hum (#91)');
+ assert.ok(gap.every(v=>v===0),'after two breaths, seconds of silence: a long turn is not a continuous hum');
  assert.ok(rms(rate*11.8,rate*12.2)>8*seam,'and then the next phrase');
 });
 
@@ -524,7 +524,7 @@ test('Hanging up has its own descending pair, and it too leaves the element with
  assert.equal(s.voice.health().events.at(-1).kind,'hangup');
 });
 
-test('A checked voice takes over loaded; one sounding finishes on the old worker first (#124 §6)',async()=>{
+test('A checked voice takes over loaded; one sounding finishes on the old worker first (sidevoice/sidevoice-core#21)',async()=>{
  const s=setup();await s.voice.unlock();
  const speaking=s.voice.speak({text:'hola',model:'kokoro-82m-v1.0',accelerator:'wasm'});
  const old=s.workers[0],id=old.last.id;

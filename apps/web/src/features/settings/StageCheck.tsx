@@ -11,7 +11,7 @@ function Rows({ rows }: { rows: { label: string; value: string }[] }) {
   );
 }
 
-/** A model being selected (#124 §6): selecting it downloads it (after asking), loads it and checks it, and only a
+/** A model being selected (sidevoice/sidevoice-core#21): selecting it downloads it (after asking), loads it and checks it, and only a
  *  check that passed puts it in place of the model in use. Every phrase is a whole text of its own, so the page's
  *  translation (room-i18n.js) finds it; the values beside them are the model's and the numbers. */
 export function StageCheck({ task, check }: { task: StageTask; check: StageCheckView }) {

@@ -1,4 +1,4 @@
-/* This device's half of pairing with a node (docs/DEVICE_PAIRING.md).
+/* This device's half of pairing with a node (the node's half: sidevoice-core `server/devices.py`).
  *
  * A node accepts this page only with a device token it minted when the person paired it: the node issues a
  * one-time code, the person pastes it here, the page redeems it and keeps the token. Before a token goes

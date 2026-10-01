@@ -81,7 +81,7 @@ test('switching between the page\'s engine and the native one fails what was wai
  client.pending.clear();void switched.catch(()=>{});
 });
 
-test('a checked model takes over: the old worker finishes what it was doing, then is let go (#124 §6)',async()=>{
+test('a checked model takes over: the old worker finishes what it was doing, then is let go (sidevoice/sidevoice-core#21)',async()=>{
  const {client}=setup();
  class Fake{constructor(name){this.name=name;this.posted=[];this.terminated=false}postMessage(data){this.posted.push(data)}terminate(){this.terminated=true}}
  const old=new Fake('old'),checked=new Fake('checked');
@@ -114,7 +114,7 @@ test('a load that is abandoned lets its worker go — download and all — and w
  assert.equal(client.worker,null);
 });
 
-test('a swap in a call: adopt, stop, then the old worker\'s late answer — the old worker is let go (review R06)',async()=>{
+test('a swap in a call: adopt, stop, then the old worker\'s late answer — the old worker is let go',async()=>{
  const {client}=setup();
  class Fake{constructor(){this.posted=[];this.terminated=0}postMessage(d){this.posted.push(d)}terminate(){this.terminated++}}
  const A=new Fake(),B=new Fake();

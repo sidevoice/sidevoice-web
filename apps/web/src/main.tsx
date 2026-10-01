@@ -16,7 +16,7 @@ import "./styles/room.css";
 import "./styles/react.css";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
-// socket, so until it exists the reports wait here (#58).
+// socket, so until it exists the reports wait here.
 window.sidevoiceClientErrors = [];
 function report(kind: string, message: string, stack?: string) {
   const entry = { kind, message, stack: stack ?? "", component: "" };
@@ -36,7 +36,7 @@ const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId = buildId;
 
 try {
-  // The audio runtime comes from whoever serves this page, never from the target (docs/RENDEZVOUS.md):
+  // The audio runtime comes from whoever serves this page, never from the target (`services/rendezvous.js`):
   // these scripts start workers at `/voice-browser/…`, and a worker can only come from the page's own origin.
   await Promise.all([
     loadExternalScript(`/voice-browser/room-i18n.js?v=${buildId}`),

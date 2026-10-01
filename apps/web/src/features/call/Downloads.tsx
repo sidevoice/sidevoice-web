@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { DownloadsIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 
-/* The models and engines this device is downloading, in the room and not only in Configuración (#124 §6): a small
+/* The models and engines this device is downloading, in the room and not only in Configuración (sidevoice/sidevoice-core#21): a small
  * indicator beside the model indicators while any download runs — or just ended — that opens a panel with a row
  * per download: its bar, bytes, speed, time left and Cancelar; an ended one says how it ended for a few seconds.
  * The same for this page's downloads and the desktop app's. */
