@@ -305,4 +305,5 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .try-meter { width: 7rem; height: .4rem; border-radius: 99px; background: #0f1318; overflow: hidden }
 .try-meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--sv-primary), var(--sv-voice)); transition: width 80ms linear }
 .try-answer { padding-top: .2rem }
-.wizard-wait { margin-inline-end: .4rem }
+/* The step under way, in the footer's place: read as a state, not as a dead button. */
+.wizard-actions button[aria-busy=true]:disabled { opacity: 1; color: var(--sv-muted); background: #ffffff0d; border-color: var(--sv-border) }

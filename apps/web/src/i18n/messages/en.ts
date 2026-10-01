@@ -483,7 +483,6 @@ export const en: Record<string, string> = {
   "stagecard.works": "✓ Works",
   "stagecard.tryAgain": "Try again",
   "stagecard.tryOtherModel": "Try {model}.",
-  "stagecard.continueHint": "Test the model to continue",
   "stage.where": "Where",
   "stage.model": "Model",
   "stage.modelsLoading": "Loading models…",
@@ -505,4 +504,10 @@ export const en: Record<string, string> = {
   "stagecard.fail.mic-denied": "The microphone is blocked. Allow it and try again.",
   "stagecard.fail.no-mic": "No microphone found. Connect one and try again.",
   "stagecard.fail.stt-error": "Transcription failed. Try again or choose another model.",
+  "stagecard.next.key": "Check the key",
+  "stagecard.next.downloading": "Downloading…",
+  "stagecard.next.preparing": "Preparing…",
+  "stagecard.next.try": "Try it",
+  "stagecard.try.stt.footer": "Press «Try it» and say a sentence, for example:",
+  "stagecard.try.tts.footer": "Press «Try it» to hear this sentence in the chosen voice:",
 };

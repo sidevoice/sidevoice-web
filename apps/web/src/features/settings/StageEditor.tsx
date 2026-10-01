@@ -8,8 +8,12 @@
  * for real — says a sentence and reads it back, or listens to it — and says whether it works. «Funciona» is what the
  * wizard waits for; in Configuración the same answer only closes the card. A provider without a key asks for it in one
  * line under «Dónde». Switching model releases the previous one from memory; it stays on disk. Every change — place,
- * model, engine, voice, language — is tried again: what was said to work is that exact configuration, on that machine. */
-import { useContext, useEffect, useRef, useState } from "react";
+ * model, engine, voice, language — is tried again: what was said to work is that exact configuration, on that machine.
+ *
+ * In the wizard the next step is the footer's primary button (operator, 2026-10-01): «Descargar y preparar», «Probar»,
+ * «Sí, funciona» — whatever this model still needs — and «Continuar» only once nothing is pending; the card then keeps
+ * only what goes beside it (Cancelar, No, Elegir otro modelo). */
+import { useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { Button } from "../../components/ui/Button";
 import { MicrophoneIcon, SpeakerIcon } from "../../components/ui/Icons";
 import { currentLanguage, useT } from "../../i18n";
@@ -38,7 +42,10 @@ function useStageContext() {
 
 /** A provider's key, in one line: required, checked with the provider, kept on the machine; once accepted it stays in
  *  the field, masked, and can be replaced (a refused replacement leaves the previous key in place). */
-function KeyLine({ fp, provider, label, configured, hint, onCancel }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; onCancel?: () => void }) {
+interface KeyHandle { submit(): void }
+
+/** `ownSubmit`: its own «Validar» while a typed key is unchecked; in the wizard that is the footer's button. */
+function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; onCancel?: () => void; ownSubmit: boolean; ref?: Ref<KeyHandle> }) {
   const t = useT();
   const hosts = useHostsController();
   const [key, setKey] = useState("");
@@ -55,16 +62,19 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel }: { fp: stri
     setChecked(value);
     setState("");
   }
+  const input = useRef<HTMLInputElement>(null);
+  // From the footer: an empty field is where to start; a typed key is checked.
+  useImperativeHandle(ref, () => ({ submit() { if (!key.trim()) input.current?.focus(); else void check(); } }));
   const typed = key.trim();
   const valid = configured && state !== "refused" && (!typed || typed === checked);
   const unsent = !!typed && typed !== checked && state === "";
   return (
     <div className="key-line" data-state={state || (valid ? "valid" : undefined)}>
-      <input id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
+      <input ref={input} id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
         placeholder={configured && hint ? "•••• " + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
         onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
         onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
-      {unsent && <Button size="compact" onMouseDown={(event) => event.preventDefault()} onClick={() => void check()}>{t("stagecard.keyCheck")}</Button>}
+      {unsent && ownSubmit && <Button size="compact" onMouseDown={(event) => event.preventDefault()} onClick={() => void check()}>{t("stagecard.keyCheck")}</Button>}
       <span className="key-line-state" role="status">
         {state === "checking" ? t("integrations.checking")
           : state === "refused" ? (configured ? t("wizard.w4.keyRefusedKept", { provider: label }) : t("wizard.w4.keyRefused", { provider: label }))
@@ -75,9 +85,60 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel }: { fp: stri
   );
 }
 
-/** `onWorksChange`: the wizard, which waits for «Funciona». Without it (Configuración) a prepared model is in use at
- *  once, and the card says so until it is tried. */
-export function StageEditor({ task, onWorksChange }: { task: Task; onWorksChange?: (works: boolean) => void }) {
+type TrialState = "idle" | "listening" | "heard" | "playing" | "played" | "failed";
+type Trial = ReturnType<typeof useTrial>;
+
+/** Trying a prepared stage: listening to the person (stt) or playing the sample (tts). A newer try or a reset makes a
+ *  late result of the previous one count for nothing. */
+function useTrial(task: Task) {
+  const hosts = useHostsController();
+  const inUse = useHosts((s) => s.inUse);
+  const language = useRoomStore((s) => s.facts.speechLanguage);
+  const [state, setState] = useState<TrialState>("idle");
+  const [failure, setFailure] = useState("");
+  const [heard, setHeard] = useState("");
+  const [level, setLevel] = useState(0);
+  const [no, setNo] = useState(false);
+  const abort = useRef<AbortController | null>(null);
+  const run = useRef(0);
+  useEffect(() => () => { run.current++; abort.current?.abort(); }, []);
+  function begin() { abort.current?.abort(); setHeard(""); setNo(false); setFailure(""); setLevel(0); return ++run.current; }
+  const fail = (key: string) => { setFailure(key); setState("failed"); setLevel(0); };
+  function listen() {
+    const id = begin();
+    const controller = new AbortController();
+    abort.current = controller;
+    setState("listening");
+    const live = () => run.current === id && !controller.signal.aborted;
+    void hosts.echoTest(inUse, {
+      level: (value) => { if (live()) setLevel(value); },
+      heard: (text) => { if (live()) { setHeard(text); setState("heard"); setLevel(0); controller.abort(); } },
+      replied: () => undefined,
+      failed: (key) => { if (live()) fail(key); },
+      silent: () => { if (live()) fail("silent"); },
+    }, controller.signal);
+  }
+  // «¿Te suena bien?» once it has been heard: when playback ends, not after a guess at how long it takes.
+  async function play() {
+    const id = begin();
+    setState("playing");
+    try { await window.sidevoiceActions?.previewVoice(language); if (run.current === id) setState("played"); }
+    catch { if (run.current === id) fail("play"); }
+  }
+  return {
+    state, failure, heard, level, no, setNo,
+    start() { if (task === "stt") listen(); else void play(); },
+    reset() { begin(); setState("idle"); },
+  };
+}
+
+/** The step a model still needs, as the wizard's primary button; `null` once it works. */
+export interface PendingStep { label: string; disabled?: boolean; run?: () => void }
+
+/** `footer`: the wizard's, given the step still pending. Without one (Configuración) the card carries its own buttons,
+ *  and a model prepared there is in use at once, which the card says until it is tried. `bodyClassName`: the
+ *  scrolling box the editor sits in, above the footer. */
+export function StageEditor({ task, footer, bodyClassName }: { task: Task; footer?: (pending: PendingStep | null) => ReactNode; bodyClassName?: string }) {
   const t = useT();
   const hosts = useHostsController();
   const room = useContext(RoomStoreContext);
@@ -96,10 +157,15 @@ export function StageEditor({ task, onWorksChange }: { task: Task; onWorksChange
   // Prepared from this card: in Configuración it is in use from then on, which the card says until it is tried.
   const [preparedHere, setPreparedHere] = useState(false);
   const [works, setWorks] = useState(() => !!saved && verified.get(task) === keyOf(inUse, saved));
+  const trial = useTrial(task);
+  const keyLine = useRef<KeyHandle>(null);
+  // A try is about the configuration it tried.
+  const tried = keyOf(inUse, draft ?? saved);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => trial.reset(), [tried]);
   useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
   // What was said to work is that configuration: any other one has to be tried again.
   useEffect(() => { setWorks(!!saved && !draft && verified.get(task) === keyOf(inUse, saved)); }, [saved, draft, task, inUse]);
-  useEffect(() => { onWorksChange?.(works); }, [works, onWorksChange]);
   const keyed = useHosts((s) => !!keyFor && !!s.inUse && !!s.integrations[s.inUse]?.value?.providers.find((p) => p.id === keyFor)?.configured);
   useEffect(() => {
     if (!keyed || !keyFor || !ctx) return;
@@ -107,7 +173,7 @@ export function StageEditor({ task, onWorksChange }: { task: Task; onWorksChange
     setKeyFor(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyed, keyFor, task]);
-  if (!view || !ctx || !room) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
+  if (!view || !ctx || !room) return <><p className="muted" role="status">{t("wizard.w4.measuring")}</p>{footer?.({ label: t("wizard.continue"), disabled: true })}</>;
 
   function select(stage: unknown) {
     // The panes read both stages from the draft while there is one: the other one is what is kept.
@@ -130,7 +196,7 @@ export function StageEditor({ task, onWorksChange }: { task: Task; onWorksChange
   function answer(ok: boolean) {
     if (ok && saved) { verified.set(task, keyOf(inUse, saved)); setWorks(true); setPrevious(null); }
   }
-  function retry() { verified.delete(task); setWorks(false); }
+  function retry() { verified.delete(task); setWorks(false); trial.reset(); }
   function restore() {
     if (!previous) return;
     hosts.chooseStage(inUse, task, previous);
@@ -146,10 +212,25 @@ export function StageEditor({ task, onWorksChange }: { task: Task; onWorksChange
   const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
   const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
   const keyPanel = keyProvider && inUse && listing
-    ? <KeyLine key={keyProvider} fp={inUse} provider={keyProvider} label={listing.label} configured={!!listing.configured} hint={listing.hint ?? null}
-        onCancel={keyFor ? () => setKeyFor(null) : undefined} />
+    ? <KeyLine ref={keyLine} key={keyProvider} fp={inUse} provider={keyProvider} label={listing.label} configured={!!listing.configured} hint={listing.hint ?? null}
+        onCancel={keyFor ? () => setKeyFor(null) : undefined} ownSubmit={!footer} />
     : null;
-  return (
+  const rawStep = rawCheck?.phase === "running" ? rawCheck.progress?.step ?? "load" : null;
+  const lang = currentLanguage();
+  // What is still to do, in the order the card shows it.
+  const pending: PendingStep | null =
+    keyFor || (keyProvider && listing && !listing.configured) ? { label: t("stagecard.next.key"), run: () => keyLine.current?.submit() }
+    : !view.model ? { label: t("wizard.continue"), disabled: true }
+    : rawStep ? { label: t(rawStep === "download" ? "stagecard.next.downloading" : "stagecard.next.preparing"), disabled: true }
+    : check?.phase === "failed" && !prepared ? { label: t("common.retry"), run: prepare }
+    : check?.phase === "slow" ? { label: t("check.useAnyway"), run: () => window.sidevoiceActions?.decideStage(task, true) }
+    : !prepared ? { label: needsDownload ? t("stagecard.downloadPrepare", { size: bytesText(offer?.download_size ?? 0, lang) }) : t("stagecard.prepare"), run: prepare }
+    : works ? null
+    : trial.state === "listening" ? { label: t("stagecard.listening"), disabled: true }
+    : trial.state === "playing" ? { label: t("stagecard.playing"), disabled: true }
+    : trial.state === "heard" || trial.state === "played" ? { label: t("stagecard.yesWorks"), run: () => answer(true) }
+    : { label: t("stagecard.next.try"), run: trial.start };
+  const settings = (
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor} hideCheck hidePlaceNote hideVoiceTools
       onPlaceChange={placeChosen}
       onModelChange={(model) => select(withModel(ctx, task, current, model))}
@@ -157,12 +238,13 @@ export function StageEditor({ task, onWorksChange }: { task: Task; onWorksChange
       onBuildChange={(value) => select(withBuild(ctx, task, current, value))}
       afterModel={keyFor || !view.model ? null : (
         <StageCard task={task} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
-          runningStep={rawCheck?.phase === "running" ? rawCheck.progress?.step ?? "load" : null} inUseNote={!onWorksChange && preparedHere}
+          runningStep={rawStep} inUseNote={!footer && preparedHere} inFooter={!!footer} trial={trial}
           previous={previous ? labelOf(ctx, previous.model) : null} onRestore={restore}
           freed={freed} onPrepare={prepare} onAnswer={answer} onRetry={retry}
           onTry={(model) => select(withModel(ctx, task, current, model))} />
       )} />
   );
+  return <>{bodyClassName ? <div className={bodyClassName}>{settings}</div> : settings}{footer?.(pending)}</>;
 }
 
 function labelOf(ctx: NonNullable<ReturnType<typeof stageContext>>, model: string): string {
@@ -172,8 +254,10 @@ function labelOf(ctx: NonNullable<ReturnType<typeof stageContext>>, model: strin
 type Phase = "download" | "prepare" | "test";
 
 /** The card under the model: the three phases as a strip, and what the current one needs. */
-function StageCard({ task, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, previous, onRestore, freed, onPrepare, onAnswer, onRetry, onTry }: {
+function StageCard({ task, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, previous, onRestore, freed, onPrepare, onAnswer, onRetry, onTry }: {
   task: Task; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
+  /** The next step is the wizard's footer button: the card does not repeat it. */
+  inFooter: boolean; trial: Trial;
   previous: string | null; onRestore: () => void; freed: string | null;
   onPrepare: () => void; onAnswer: (ok: boolean) => void; onRetry: () => void; onTry: (model: string) => void;
 }) {
@@ -214,22 +298,22 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
       ) : check?.phase === "failed" && !prepared ? (
         <div className="stage-card-body" role="alert">
           <span className="row-error small">{t("check.failed", { step: check.step, cause: check.cause })}</span>
-          <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>
+          {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>}
         </div>
       ) : check?.phase === "slow" ? (
         <div className="stage-card-body" role="alert">
           <span className="warn-line small">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
           <span className="try-row">
-            <Button variant="primary" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>
+            {!inFooter && <Button variant="primary" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>}
             <Button size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, false)}>{t("stagecard.chooseOther")}</Button>
           </span>
         </div>
       ) : !prepared ? (
         <div className="stage-card-body">
           <span className="muted small">{t(needsDownload ? "stagecard.needsDownload" : "stagecard.needsPrepare")}</span>
-          <Button variant="primary" size="compact" onClick={onPrepare}>
+          {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>
             {needsDownload ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.prepare")}
-          </Button>
+          </Button>}
         </div>
       ) : works ? (
         <div className="stage-card-body stage-card-works" role="status">
@@ -238,7 +322,7 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
         </div>
       ) : (<>
         {inUseNote && <p className="muted small" role="status">{t("stagecard.inUse")}</p>}
-        <TryIt task={task} onAnswer={onAnswer} onTry={onTry} previous={previous} onRestore={onRestore} />
+        <TryIt task={task} trial={trial} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} previous={previous} onRestore={onRestore} />
       </>)}
       {freed && prepared && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}
     </section>
@@ -247,65 +331,36 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
 
 /** Phase 3: the person tries it. Transcription: a sentence to say (any will do), the level while it listens, and what it
  *  understood. Voice: a sentence played in the chosen voice. Then «¿Funciona?»: yes is what counts; no offers what to try. */
-function TryIt({ task, onAnswer, onTry, previous, onRestore }: { task: Task; onAnswer: (ok: boolean) => void; onTry: (model: string) => void; previous: string | null; onRestore: () => void }) {
+function TryIt({ task, trial, inFooter, onAnswer, onTry, previous, onRestore }: { task: Task; trial: Trial; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void; previous: string | null; onRestore: () => void }) {
   const t = useT();
-  const hosts = useHostsController();
-  const inUse = useHosts((s) => s.inUse);
   const language = useRoomStore((s) => s.facts.speechLanguage);
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
   // What is played is the voice catalogue's sentence for the language, so it is the one shown.
   const hearSample = useRoomStore((s) => s.facts.voiceLanguages?.find((l) => l.id === s.facts.speechLanguage)?.sample ?? "");
-  const [state, setState] = useState<"idle" | "listening" | "heard" | "playing" | "played" | "failed">("idle");
-  const [failure, setFailure] = useState("");
-  const [heard, setHeard] = useState("");
-  const [level, setLevel] = useState(0);
-  const [no, setNo] = useState(false);
-  const abort = useRef<AbortController | null>(null);
-  const alive = useRef(true);
-  useEffect(() => { alive.current = true; return () => { alive.current = false; abort.current?.abort(); }; }, []);
+  const { state, failure, heard, level, no, setNo } = trial;
   const sample = task === "stt" ? saySample(language) : hearSample;
-  const fail = (key: string) => { setFailure(key); setState("failed"); setLevel(0); };
   const models = view?.models ?? [];
   const next = models[models.findIndex((m) => m.id === view?.model) + 1] ?? null;
   // Going back to the model kept before is offered as that, not as another one to try.
   const bigger = next && next.label !== previous ? next : null;
-
-  function listen() {
-    abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
-    setState("listening"); setHeard(""); setNo(false);
-    void hosts.echoTest(inUse, {
-      level: (value) => { if (!controller.signal.aborted) setLevel(value); },
-      heard: (text) => { if (!controller.signal.aborted) { setHeard(text); setState("heard"); setLevel(0); controller.abort(); } },
-      replied: () => undefined,
-      failed: (key) => { if (!controller.signal.aborted) fail(key); },
-      silent: () => { if (!controller.signal.aborted) fail("silent"); },
-    }, controller.signal);
-  }
-  // «¿Te suena bien?» once it has been heard: when playback ends, not after a guess at how long it takes.
-  async function play() {
-    setState("playing"); setNo(false);
-    try { await window.sidevoiceActions?.previewVoice(language); if (alive.current) setState("played"); }
-    catch { if (alive.current) fail("play"); }
-  }
   const answered = state === "heard" || state === "played";
   return (
     <div className="stage-card-body try-it">
-      <p className="small">{t(task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts")}</p>
+      <p className="small">{t((task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts") + (inFooter ? ".footer" : ""))}</p>
       {sample && <blockquote className="try-sample">«{sample}»</blockquote>}
-      <div className="try-row">
-        {task === "stt" ? (
-          <Button variant={answered ? "default" : "primary"} size="compact" onClick={listen} disabled={state === "listening"} aria-pressed={state === "listening"}>
+      {/* In the wizard the first try is the footer's «Probar»; «Otra vez» stays here. */}
+      {(!inFooter || answered || state === "listening" || state === "playing") && <div className="try-row">
+        {(!inFooter || answered) && (task === "stt" ? (
+          <Button variant={answered ? "default" : "primary"} size="compact" onClick={trial.start} disabled={state === "listening"} aria-pressed={state === "listening"}>
             <MicrophoneIcon size={15} /> {state === "listening" ? t("stagecard.listening") : answered ? t("stagecard.again") : t("stagecard.speak")}
           </Button>
         ) : (
-          <Button variant={answered ? "default" : "primary"} size="compact" onClick={play} disabled={state === "playing"}>
+          <Button variant={answered ? "default" : "primary"} size="compact" onClick={trial.start} disabled={state === "playing"}>
             <SpeakerIcon size={15} /> {state === "playing" ? t("stagecard.playing") : answered ? t("stagecard.again") : t("stagecard.listen")}
           </Button>
-        )}
+        ))}
         {state === "listening" && <span className="try-meter" aria-hidden="true"><span style={{ width: Math.round(level * 100) + "%" }} /></span>}
-      </div>
+      </div>}
       <div role="status">{state === "heard" && <p className="try-heard">{t("stagecard.heard")} <strong>«{heard}»</strong></p>}</div>
       <div role="alert">{state === "failed" && <p className="row-error small">
         {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}
@@ -313,7 +368,7 @@ function TryIt({ task, onAnswer, onTry, previous, onRestore }: { task: Task; onA
       {answered && (
         <div className="try-row try-answer">
           <span className="small">{t(task === "stt" ? "stagecard.ask.stt" : "stagecard.ask.tts")}</span>
-          <Button variant="primary" size="compact" onClick={() => onAnswer(true)}>{t("stagecard.yesWorks")}</Button>
+          {!inFooter && <Button variant="primary" size="compact" onClick={() => onAnswer(true)}>{t("stagecard.yesWorks")}</Button>}
           <Button variant="ghost" size="compact" onClick={() => setNo(true)}>{t("common.noCap")}</Button>
         </div>
       )}

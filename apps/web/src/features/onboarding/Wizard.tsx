@@ -284,19 +284,22 @@ export function ManualConfig({ agent }: { agent: DetectedAgent }) {
 
 // ----- W4 / W4v -----
 /** Transcription (W4) and voice (W4v): the same editor Configuración uses (settings/StageEditor), starting from what
- *  suits this device best; «Continuar» once the person said the chosen model works. */
+ *  suits this device best. The primary button is the step the model still needs — download, prepare, try, «Sí,
+ *  funciona» — and «Continuar» once the person said it works (operator, 2026-10-01: never a disabled «Continuar» that
+ *  sends them looking for what to press). */
 function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
-  const [works, setWorks] = useState(false);
   return (
     <>
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
-      <div className="wizard-stage"><StageEditor task={task} onWorksChange={setWorks} /></div>
-      <Actions>
-        {!works && <span className="muted small wizard-wait">{t("stagecard.continueHint")}</span>}
-        <Button variant="primary" disabled={!works} onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button>
-      </Actions>
+      <StageEditor task={task} bodyClassName="wizard-stage" footer={(pending) => (
+        <Actions>
+          {pending
+            ? <Button variant="primary" disabled={pending.disabled} aria-busy={pending.disabled || undefined} onClick={pending.run}>{pending.label}</Button>
+            : <Button variant="primary" onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button>}
+        </Actions>
+      )} />
     </>
   );
 }
