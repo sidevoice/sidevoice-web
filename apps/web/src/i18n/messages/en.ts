@@ -511,8 +511,6 @@ export const en: Record<string, string> = {
   "stagecard.phase.check": "Check",
   "stagecard.b.title.tts": "Configure and listen",
   "stagecard.b.title.stt": "Configure and try",
-  "stagecard.b.useVoice": "Use this voice",
-  "stagecard.b.useModel": "Use this model",
   "stagecard.b.inUse.tts": "✓ This voice is in use",
   "stagecard.b.inUse.stt": "✓ This model is in use",
   "stagecard.check": "Check",

@@ -226,6 +226,10 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const tried = keyOf(inUse, draft ?? saved);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => trial.reset(), [tried]);
+  // B: heard or spoken once, it is the person's — what «Usar este modelo» used to say.
+  useEffect(() => {
+    if (flow === "configure" && trial.tried && saved && verified.get(task) !== keyOf(inUse, saved)) { verified.set(task, keyOf(inUse, saved)); setWorks(true); }
+  }, [flow, trial.tried, saved, task, inUse]);
   useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
   // What was said to work is that configuration: any other one has to be tried again.
   useEffect(() => { setWorks(!!saved && !draft && verified.get(task) === keyOf(inUse, saved)); }, [saved, draft, task, inUse]);
@@ -308,7 +312,6 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : null;
   const rawStep = rawCheck?.phase === "running" ? rawCheck.progress?.step ?? "load" : null;
   const lang = currentLanguage();
-  const keep = t(task === "tts" ? "stagecard.b.useVoice" : "stagecard.b.useModel");
   // A provider has nothing to download or load here: its model is only checked (operator, 2026-10-01).
   const remote = view.place !== "device" && view.place !== "host";
   // What is still to do, in the order the card shows it.
@@ -325,7 +328,9 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : trial.state === "playing" ? { label: t("stagecard.playing"), disabled: true }
     // B: checked already; first the person tries it, then keeps it when they like what they heard — and tries again
     // as often as they want (operator, 2026-10-01: «Usar este modelo» must not come before any test).
-    : flow === "configure" ? (trial.tried ? { label: keep, run: () => answer(true), secondary: { label: t("stagecard.next.again"), run: start } } : { label: t("stagecard.next.try"), run: start })
+    // B: checked already; the person hears it (or speaks) once and it is theirs — no «Usar este modelo» (operator,
+    // 2026-10-02: it added nothing, the model is in use from the check on).
+    : flow === "configure" ? { label: t(task === "tts" ? "stagecard.listen" : "stagecard.speak"), run: start }
     // The answer is the action bar: «No» beside «Sí, funciona».
     : (trial.state === "heard" || trial.state === "played") && !trial.no
       ? { label: t("stagecard.yesWorks"), run: () => answer(true), secondary: { label: t("common.noCap"), run: () => trial.setNo(true) } }
@@ -358,7 +363,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
       </>}
       afterOptions={configure ? (
         <ConfigureAndListen task={task} trial={trial} input={input} languageLabel={testLanguageLabel} onText={setText} onStart={start} works={works} inFooter={!!footer}
-          onKeep={() => answer(true)} keepLabel={keep} />
+ />
       ) : null}
       afterModel={list || keyFor || !view.model ? null : (
         <StageCard task={task} flow={flow} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
@@ -703,8 +708,8 @@ function TryIt({ task, trial, input, languageLabel, onText, onStart, inFooter, o
 
 /** Flow "configure", second part: under the options, the test — the person's text and «Escuchar» with the settings as
  *  they are now (or a sentence to say and «Hablar»), as often as they like — and keeping it. No question asked. */
-function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart, works, inFooter, onKeep, keepLabel }: {
-  task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void; onStart: () => void; works: boolean; inFooter: boolean; onKeep: () => void; keepLabel: string;
+function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart, works, inFooter }: {
+  task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void; onStart: () => void; works: boolean; inFooter: boolean;
 }) {
   const t = useT();
   const busy = trial.state === "listening" || trial.state === "transcribing" || trial.state === "playing";
@@ -712,12 +717,11 @@ function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart
     <div className="stage-configure">
       <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} onStart={onStart} />
       <span className="try-row" data-side={task === "stt" ? "person" : "sidevoice"}>
-        {!inFooter && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
+        {(!inFooter || trial.tried) && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
           {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />}{" "}
           {trial.state === "listening" ? t("stagecard.listening") : trial.state === "transcribing" ? t("stagecard.transcribing") : trial.state === "playing" ? t("stagecard.playing")
             : t(task === "stt" ? "stagecard.speak" : "stagecard.listen")}
         </Button>}
-        {!inFooter && !works && trial.tried && <Button variant="primary" size="compact" onClick={onKeep}>{keepLabel}</Button>}
         {works && <span className="ok-line small" role="status">{t(task === "tts" ? "stagecard.b.inUse.tts" : "stagecard.b.inUse.stt")}</span>}
       </span>
     </div>
