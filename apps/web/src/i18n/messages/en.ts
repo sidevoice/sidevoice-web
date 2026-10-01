@@ -528,4 +528,5 @@ export const en: Record<string, string> = {
   "stagecard.b.useModel": "Use this model",
   "stagecard.b.inUse.tts": "✓ This voice is in use",
   "stagecard.b.inUse.stt": "✓ This model is in use",
+  "stagecard.b.say.footer": "Press «Try it» and say something, in any language — for example:",
 };

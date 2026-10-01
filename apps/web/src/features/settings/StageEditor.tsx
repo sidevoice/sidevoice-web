@@ -121,6 +121,8 @@ function useTrial(task: Task) {
   const [heard, setHeard] = useState("");
   const [played, setPlayed] = useState("");
   const [no, setNo] = useState(false);
+  // Heard or played at least once since the configuration changed.
+  const [tried, setTried] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const run = useRef(0);
   useEffect(() => () => { run.current++; abort.current?.abort(); }, []);
@@ -136,7 +138,7 @@ function useTrial(task: Task) {
     void hosts.echoTest(inUse, {
       level: () => undefined,
       transcribing: () => { if (live()) setState("transcribing"); },
-      heard: (text) => { if (live()) { setHeard(text); setState("heard"); controller.abort(); } },
+      heard: (text) => { if (live()) { setHeard(text); setState("heard"); setTried(true); controller.abort(); } },
       replied: () => undefined,
       failed: (key) => { if (live()) fail(key); },
       silent: () => { if (live()) fail("silent"); },
@@ -147,13 +149,13 @@ function useTrial(task: Task) {
     const id = begin();
     setPlayed(input.text);
     setState("playing");
-    try { await window.sidevoiceActions?.previewVoice(input.language, input.text); if (run.current === id) setState("played"); }
+    try { await window.sidevoiceActions?.previewVoice(input.language, input.text); if (run.current === id) { setState("played"); setTried(true); } }
     catch { if (run.current === id) fail("play"); }
   }
   return {
-    state, failure, heard, played, no, setNo,
+    state, failure, heard, played, no, setNo, tried,
     start(input: TryInput) { if (task === "stt") listen(input); else void play(input); },
-    reset() { begin(); setState("idle"); },
+    reset() { begin(); setState("idle"); setTried(false); },
   };
 }
 
@@ -275,11 +277,12 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : check?.phase === "slow" ? { label: t("check.useAnyway"), run: () => window.sidevoiceActions?.decideStage(task, true) }
     : !prepared ? { label: !needsDownload ? t("stagecard.prepare") : offer?.download_size ? t("stagecard.downloadPrepare", { size: bytesText(offer.download_size, lang) }) : t("stagecard.downloadPrepareOnly"), run: prepare }
     : works ? null
-    // B: checked already; what is left is keeping it, whenever the person likes what they heard.
-    : flow === "configure" ? { label: keep, run: () => answer(true) }
     : trial.state === "listening" ? { label: t("stagecard.listening"), disabled: true }
     : trial.state === "transcribing" ? { label: t("stagecard.transcribing"), disabled: true }
     : trial.state === "playing" ? { label: t("stagecard.playing"), disabled: true }
+    // B: checked already; first the person tries it, then keeps it when they like what they heard — and tries again
+    // as often as they want (operator, 2026-10-01: «Usar este modelo» must not come before any test).
+    : flow === "configure" ? (trial.tried ? { label: keep, run: () => answer(true), secondary: { label: t("stagecard.next.again"), run: start } } : { label: t("stagecard.next.try"), run: start })
     // The answer is the action bar: «No» beside «Sí, funciona».
     : (trial.state === "heard" || trial.state === "played") && !trial.no
       ? { label: t("stagecard.yesWorks"), run: () => answer(true), secondary: { label: t("common.noCap"), run: () => trial.setNo(true) } }
@@ -420,12 +423,15 @@ function TryShow({ task, trial, input, onText }: { task: Task; trial: Trial; inp
   const { state, failure, heard, played } = trial;
   const busy = state === "listening" || state === "transcribing" || state === "playing";
   const spoken = useSpokenSoFar(played, state === "playing");
+  // Started from the action bar, the try may be below the fold: it comes into view as it happens.
+  const chat = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (state !== "idle") chat.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }, [state]);
   const message = (role: "user" | "assistant", text: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
     ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
   return (<>
     {task === "stt" && <blockquote className="try-sample" lang={input.language}>«{input.text}»</blockquote>}
     {task === "tts" && !busy && <TestText value={input.text} language={input.language} onChange={onText} />}
-    <div className="try-chat">
+    <div className="try-chat" ref={chat}>
       {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
       {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
       {task === "tts" && (state === "playing" || state === "played") && (
@@ -489,15 +495,15 @@ function ConfigureAndListen({ task, trial, input, onText, onStart, works, inFoot
   const busy = trial.state === "listening" || trial.state === "transcribing" || trial.state === "playing";
   return (
     <div className="stage-configure">
-      {task === "stt" && <p className="small">{t("stagecard.b.say")}</p>}
+      {task === "stt" && <p className="small">{t(inFooter ? "stagecard.b.say.footer" : "stagecard.b.say")}</p>}
       <TryShow task={task} trial={trial} input={input} onText={onText} />
       <span className="try-row">
-        <Button size="compact" onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
+        {!inFooter && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
           {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />}{" "}
           {trial.state === "listening" ? t("stagecard.listening") : trial.state === "transcribing" ? t("stagecard.transcribing") : trial.state === "playing" ? t("stagecard.playing")
             : t(task === "stt" ? "stagecard.speak" : "stagecard.listen")}
-        </Button>
-        {!inFooter && !works && <Button variant="primary" size="compact" onClick={onKeep}>{keepLabel}</Button>}
+        </Button>}
+        {!inFooter && !works && trial.tried && <Button variant="primary" size="compact" onClick={onKeep}>{keepLabel}</Button>}
         {works && <span className="ok-line small" role="status">{t(task === "tts" ? "stagecard.b.inUse.tts" : "stagecard.b.inUse.stt")}</span>}
       </span>
     </div>

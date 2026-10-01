@@ -308,7 +308,7 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 /* Trying a model: the call's bubbles inside the card, and the question under them. */
 .try-chat, .try-question { justify-self: stretch }
 .try-chat { display: grid }
-.try-chat:empty { display: none }
+.try-chat:empty { display: block; height: 0 }
 .try-chat .message-group { margin: .2rem 0 }
 .try-question { display: grid; gap: .5rem; padding-top: .6rem; border-top: 1px solid var(--sv-border) }
 .try-question p { margin: 0; font-size: .9rem; font-weight: 600 }
