@@ -430,4 +430,5 @@ export const es: Record<string, string> = {
   "wizard.w4.lead.stt": "Te proponemos la transcripción que mejor va en este dispositivo. Puedes cambiarla ahora o luego en Configuración.",
   "wizard.w4.lead.tts": "Te proponemos la voz que mejor va en este dispositivo. Escúchala y cámbiala si quieres.",
   "wizard.w4.chooseOne": "Elige una opción para continuar.",
+  "agents.justConnected": "Ya tiene voz en las conversaciones nuevas",
 };

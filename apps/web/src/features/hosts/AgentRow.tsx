@@ -86,15 +86,19 @@ export function AgentRow({ fp, agent, mode, onConnected }: { fp: string; agent: 
   const notConnected = agent.registration === "not-connected";
   const isNew = mode === "host" && agent.present && notConnected && !agent.dismissed;
   // Connected some other way (by hand, from the panel): said like a «Conectar» that worked.
+  // Just connected (by «Conectar» or by hand): said in the card itself, small and green, for a few seconds.
   const was = useRef(agent.registration);
+  const [justConnected, setJustConnected] = useState(false);
   useEffect(() => {
-    if (was.current === "not-connected" && agent.registration === "connected" && !busy) { setOpen(false); onConnected?.(agent.label); }
+    if (was.current === "not-connected" && agent.registration === "connected") { setOpen(false); setJustConnected(true); onConnected?.(agent.label); }
     was.current = agent.registration;
-  }, [agent.registration, agent.label, busy, onConnected]);
-  async function connect() {
-    const answer = await hosts.agentAction(fp, agent.id, "connect");
-    if (answer?.agent.registration === "connected") onConnected?.(answer.agent.label);
-  }
+  }, [agent.registration, agent.label, onConnected]);
+  useEffect(() => {
+    if (!justConnected) return;
+    const timer = setTimeout(() => setJustConnected(false), 5000);
+    return () => clearTimeout(timer);
+  }, [justConnected]);
+  async function connect() { await hosts.agentAction(fp, agent.id, "connect"); }
   return (
     <li className="agent-row" data-registration={agent.registration} data-open={open || undefined}>
       <div className="agent-main">
@@ -102,6 +106,7 @@ export function AgentRow({ fp, agent, mode, onConnected }: { fp: string; agent: 
       <span className="agent-copy">
         <span className="agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}
           {isNew && <span className="badge badge-new">{t("hosts.newAgent")}</span>}</span>
+        {justConnected && <span className="agent-status agent-ok" role="status">{t("agents.justConnected")}</span>}
         {error && <span className="agent-status row-error" role="alert">{t("agents.connectFailed", { message: error.message || error.key })}</span>}
         {!error && agent.registration === "foreign" && <span className="agent-status muted">{t("agents.foreign")}</span>}
         {!error && agent.id === OTHER && <span className="agent-status muted">{t("agents.other.sub")}</span>}

@@ -244,9 +244,6 @@ function W3() {
   const hosts = useHostsController();
   const fp = useHosts((s) => s.localPairing?.fp ?? null);
   const listing = useHosts((s) => (fp ? s.agents[fp] : undefined));
-  const [connected, setConnected] = useState<string | null>(null);
-  // Said for a moment after connecting, then gone: the row's state says it from then on.
-  useEffect(() => { if (!connected) return; const timer = setTimeout(() => setConnected(null), 5000); return () => clearTimeout(timer); }, [connected]);
   useEffect(() => { if (fp) void hosts.loadAgents(fp, true); }, [fp, hosts]);
   const agents = useMemo(() => (listing?.value?.agents ?? []).filter((a) => a.present), [listing]);
   async function next() { await hosts.markOnboarding({ agents_done: true }); hosts.goTo("W4"); }
@@ -264,10 +261,9 @@ function W3() {
     <>
       <p className="muted">{t(agents.length ? "wizard.w3.lead" : "wizard.w3.none")}</p>
       <ul className="agent-rows">
-        {agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="wizard" onConnected={setConnected} />)}
+        {agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="wizard" />)}
         {other && <AgentRow key={other.id} fp={fp} agent={other} mode="wizard" />}
       </ul>
-      {connected && <p className="ok-line" role="status">{t("agents.nextConversationsNamed", { name: connected })}</p>}
       <Actions><Button variant="primary" onClick={() => void next()}>{anyConnected || agents.length === 0 ? t("wizard.continue") : t("agents.notNow")}</Button></Actions>
     </>
   );

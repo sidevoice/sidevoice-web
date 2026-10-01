@@ -430,4 +430,5 @@ export const en: Record<string, string> = {
   "wizard.w4.lead.stt": "We suggest the transcription that suits this device best. Change it now or later in Settings.",
   "wizard.w4.lead.tts": "We suggest the voice that suits this device best. Listen to it and change it if you like.",
   "wizard.w4.chooseOne": "Choose an option to continue.",
+  "agents.justConnected": "Has a voice in new conversations",
 };
