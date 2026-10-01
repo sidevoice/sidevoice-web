@@ -20,7 +20,7 @@ import { previousStep, stepGroups, type Step } from "../../state/hosts/onboardin
 import { proposeStages, type ProposalRow } from "../../state/hosts/proposal";
 import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-scope";
 import { effectiveStage as effectiveStageOf, withModel, withPlace } from "../../state/stage-settings.js";
-import { StageSettings } from "../settings/StageSettings";
+import { StageEditor } from "../settings/StageEditor";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
 import { AgentRow, otherAgent } from "../hosts/AgentRow";
@@ -283,217 +283,21 @@ export function ManualConfig({ agent }: { agent: DetectedAgent }) {
 }
 
 // ----- W4 / W4v -----
-function useStageContext() {
-  const store = useContext(RoomStoreContext);
-  useRoomStore((s) => s.stages);
-  return store ? stageContext(store.facts) : null;
-}
-
-/** A provider's key, asked for in one line: required, checked with the provider, kept on the machine. */
-function KeyLine({ fp, provider, label, configured, hint }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null }) {
-  const t = useT();
-  const hosts = useHostsController();
-  // The key stays in the field once accepted (masked), so a wrong paste can be replaced without starting over.
-  const [key, setKey] = useState("");
-  const [checked, setChecked] = useState("");
-  const [state, setState] = useState<"" | "checking" | "refused">("");
-  async function check() {
-    const value = key.trim();
-    if (!value || value === checked || state === "checking") return;
-    setState("checking");
-    try { await hosts.putKey(fp, provider, value); } catch { setState("refused"); return; }
-    setChecked(value);
-    setState("");
-  }
-  const valid = configured && state !== "refused" && (!key.trim() || key.trim() === checked);
-  return (
-    <div className="key-line" data-state={state || (valid ? "valid" : undefined)}>
-      <input id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
-        placeholder={configured && hint ? "•••• " + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
-        onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
-        onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
-      <span className="key-line-state" role="status">
-        {state === "checking" ? t("integrations.checking")
-          : state === "refused" ? (configured ? t("wizard.w4.keyRefusedKept", { provider: label }) : t("wizard.w4.keyRefused", { provider: label }))
-          : valid ? t("wizard.w4.keyValid") : t("wizard.w4.keyRequired")}
-      </span>
-    </div>
-  );
-}
-
-/** Transcription (W4) and voice (W4v): the stage's own settings pane, the same one Configuración shows, starting from
- *  what suits this device best (model-first D14). A device model is downloaded, loaded and checked before it counts. */
+/** Transcription (W4) and voice (W4v): the same editor Configuración uses (settings/StageEditor), starting from what
+ *  suits this device best; «Continuar» once the person said the chosen model works. */
 function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
-  const room = useContext(RoomStoreContext);
-  const inUse = useHosts((s) => s.inUse);
-  const integrations = useHosts((s) => (s.inUse ? s.integrations[s.inUse] : undefined));
-  const saved = useHosts((s) => effectiveStage(s.scope, s.inUse, task));
-  const view = useRoomStore((s) => s.stages?.[task] ?? null);
-  const draft = useRoomStore((s) => s.facts.stageDraft?.[task] ?? null);
-  const ctx = useStageContext();
-  const [keyFor, setKeyFor] = useState<string | null>(null);
-  const [freed, setFreed] = useState<string | null>(null);
-  const check = view?.check ?? null;
-  const ready = !!ctx?.offers && integrations?.status !== "loading";
-  useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
-  // A key typed here, accepted by its provider, makes that provider the place.
-  const keyed = useHosts((s) => !!keyFor && !!s.inUse && !!s.integrations[s.inUse]?.value?.providers.find((p) => p.id === keyFor)?.configured);
-  useEffect(() => {
-    if (!keyed || !keyFor || !ctx) return;
-    select(withPlace(ctx, task, null, keyFor, null));
-    setKeyFor(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyed, keyFor, task]);
-  if (!ready || !view || !ctx || !room) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
-  /** Choosing only selects (a draft); «Descargar y probar» is what downloads, loads and checks it. */
-  function select(stage: unknown) {
-    room!.patch({ stageDraft: { ...(room!.facts.stageDraft ?? {}), [task]: stage as Record<string, unknown> } });
-  }
-  const shown = (draft ?? saved ?? null) as Stage | null;
-  const current = shown ?? (stageViewStage(ctx, task));
-  const testedOk = !draft && !!saved && (!check || check.phase === "done");
-  const offer = (ctx.offers as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
-  const installed = !!offer && (ctx.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
-  const needsDownload = view.place === "device" && !!offer && !installed;
-  const busy = !!check && ["running", "slow"].includes(check.phase);
-  const next = task === "stt" ? "W4v" : "W5";
-  function test() {
-    if (saved && saved.model !== view!.model && saved.place === "device") setFreed(familyLabel(ctx!, saved.model));
-    window.sidevoiceActions?.testStage?.(task, { place: view!.place, model: view!.model, options: current?.options ?? {}, build: null });
-  }
-  // The key line stays while a provider is the place: pending, or chosen with its key (shown masked, replaceable).
-  const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
-  const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
-  const keyPanel = keyProvider && inUse && listing ? (
-    <KeyLine key={keyProvider} fp={inUse} provider={keyProvider} label={listing.label} configured={!!listing.configured} hint={listing.hint ?? null} />
-  ) : null;
+  const [works, setWorks] = useState(false);
   return (
     <>
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
-      {view.unconfigured && !keyFor && <p className="problem">{t("wizard.w4.noOffer")}</p>}
-      <div className="wizard-stage">
-        {/* A provider with no key asks for it here, not in Configuración. */}
-        <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor}
-          onPlaceChange={(place) => select(withPlace(ctx, task, current, place, null))}
-          onModelChange={(model) => select(withModel(ctx, task, current, model))}
-          hideCheck
-          afterModel={keyFor || !view.model ? null : (
-            <ModelCard task={task} prepared={testedOk} busy={busy} freed={freed} onPrepare={test}
-              onTryAnother={(model) => select(withModel(ctx, task, current, model))}
-              prepareLabel={needsDownload ? t("wizard.w4.downloadTest", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.test")} />
-          )} />
-      </div>
+      <div className="wizard-stage"><StageEditor task={task} onWorksChange={setWorks} /></div>
       <Actions>
-        <Button variant="primary" disabled={!testedOk} onClick={() => hosts.goTo(next)}>{t("wizard.continue")}</Button>
+        {!works && <span className="muted small wizard-wait">{t("stagecard.continueHint")}</span>}
+        <Button variant="primary" disabled={!works} onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button>
       </Actions>
     </>
-  );
-}
-
-function stageViewStage(ctx: ReturnType<typeof stageContext>, task: Task): Stage | null {
-  return (effectiveStageOf(ctx, task, null) as Stage | null) ?? null;
-}
-function familyLabel(ctx: ReturnType<typeof stageContext>, model: string): string {
-  return ((ctx.catalog as { models?: { id: string; label?: string }[] } | null)?.models?.find((m) => m.id === model)?.label) ?? model;
-}
-
-/** Under the model, always: what it is, the one button that prepares it (download, load, check), its progress, and —
- *  once prepared — trying it for real. «Continuar» waits for it. */
-function ModelCard({ task, prepared, busy, freed, onPrepare, prepareLabel, onTryAnother }: {
-  task: Task; prepared: boolean; busy: boolean; freed: string | null; onPrepare: () => void; prepareLabel: string; onTryAnother: (model: string) => void;
-}) {
-  const t = useT();
-  const view = useRoomStore((s) => s.stages?.[task] ?? null);
-  if (!view) return null;
-  const check = view.check;
-  const model = view.models.find((m) => m.id === view.model);
-  const actions = () => window.sidevoiceActions;
-  return (
-    <div className="model-card-panel" data-phase={prepared ? "ready" : check?.phase ?? "idle"}>
-      <div className="model-card-head">
-        <strong>{model?.label ?? view.model}</strong>
-        {model?.detail && <span className="muted small">{model.detail}</span>}
-      </div>
-      {model?.description && <p className="muted small">{model.description}</p>}
-      {check?.phase === "running" ? (
-        <div className="model-card-run" role="status">
-          <span className="small">{check.step}{check.amount ? " · " + check.amount : ""}</span>
-          <progress max={1} value={check.fraction ?? undefined} />
-          <Button variant="ghost" size="compact" onClick={() => actions()?.cancelStage(task)}>{t("common.cancel")}</Button>
-        </div>
-      ) : check?.phase === "failed" && !prepared ? (
-        <div className="model-card-run" role="alert">
-          <span className="row-error small">{t("check.failed", { step: check.step, cause: check.cause })}</span>
-          <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>
-        </div>
-      ) : check?.phase === "slow" ? (
-        <div className="model-card-run" role="alert">
-          <span className="warn-line small">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
-          <Button variant="primary" size="compact" onClick={() => actions()?.decideStage(task, true)}>{t("check.useAnyway")}</Button>
-        </div>
-      ) : prepared ? (
-        <TryStage task={task} freed={freed} onTryAnother={onTryAnother} />
-      ) : (
-        <div className="model-card-run"><Button variant="primary" size="compact" disabled={busy} onClick={onPrepare}>{prepareLabel}</Button></div>
-      )}
-    </div>
-  );
-}
-
-/** Trying a prepared stage for real: say something and read it back, or listen to the voice; then, if it did not do
- *  well, a bigger model is a tap away. Nothing here blocks going on. */
-function TryStage({ task, freed, onTryAnother }: { task: Task; freed: string | null; onTryAnother: (model: string) => void }) {
-  const t = useT();
-  const hosts = useHostsController();
-  const inUse = useHosts((s) => s.inUse);
-  const language = useRoomStore((s) => s.facts.speechLanguage);
-  const view = useRoomStore((s) => s.stages?.[task] ?? null);
-  const [state, setState] = useState<"" | "listening" | "heard" | "played">("");
-  const [heard, setHeard] = useState("");
-  const [verdict, setVerdict] = useState<"" | "good" | "bad">("");
-  const abort = useRef<AbortController | null>(null);
-  useEffect(() => () => abort.current?.abort(), []);
-  const rows = view?.check?.phase === "done" ? view.check.rows : [];
-  const models = view?.models ?? [];
-  const bigger = models[models.findIndex((m) => m.id === view?.model) + 1] ?? null;
-  function listen() {
-    abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
-    setState("listening"); setHeard(""); setVerdict("");
-    void hosts.echoTest(inUse, {
-      level: () => undefined,
-      heard: (text) => { if (!controller.signal.aborted) { setHeard(text); setState("heard"); controller.abort(); } },
-      replied: () => undefined, failed: () => setState(""), silent: () => setState(""),
-    }, controller.signal);
-  }
-  return (
-    <div className="try-stage">
-      <p className="ok-line small">{t("wizard.w4.ready")}</p>
-      {rows.length > 0 && <dl className="stage-check-rows">{rows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>}
-      <div className="try-row">
-        {task === "stt"
-          ? <Button size="compact" onClick={listen} disabled={state === "listening"}>{state === "listening" ? t("wizard.w4.tryListening") : t("wizard.w4.trySay")}</Button>
-          : <Button size="compact" onClick={() => { void window.sidevoiceActions?.previewVoice(language); setState("played"); setVerdict(""); }}>{t("wizard.w4.tryListen")}</Button>}
-        {heard && <span className="muted small">{t("wizard.w4.tryHeard", { text: heard })}</span>}
-      </div>
-      {(state === "heard" || state === "played") && (
-        <div className="try-row">
-          <span className="small">{t(task === "stt" ? "wizard.w4.askHeard" : "wizard.w4.askSound")}</span>
-          <Button size="compact" variant={verdict === "good" ? "primary" : "ghost"} onClick={() => setVerdict("good")}>{t("common.yesCap")}</Button>
-          <Button size="compact" variant={verdict === "bad" ? "primary" : "ghost"} onClick={() => setVerdict("bad")}>{t("common.noCap")}</Button>
-        </div>
-      )}
-      {verdict === "bad" && (
-        <div className="try-row">
-          <span className="muted small">{bigger ? t("wizard.w4.tryBigger", { model: bigger.label }) : t(task === "stt" ? "wizard.w4.tryProvider" : "wizard.w4.tryVoice")}</span>
-          {bigger && <Button size="compact" onClick={() => onTryAnother(bigger.id)}>{t("wizard.w4.useBigger", { model: bigger.label })}</Button>}
-        </div>
-      )}
-      {freed && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}
-    </div>
   );
 }
 

@@ -24,10 +24,11 @@ const WHERE_NOTES = {
  *  options waiting until the key is in. */
 /** `onPlaceChange` / `onModelChange`: what choosing does — by default the room's actions (a device model asks to be
  *  downloaded and checked); the wizard only selects, and tests on its own button. */
-export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, afterModel, hideCheck }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void; onModelChange?: (model: string) => void; afterModel?: ReactNode; hideCheck?: boolean }) {
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, afterModel, hideCheck, hidePlaceNote }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void; onModelChange?: (model: string) => void; afterModel?: ReactNode; hideCheck?: boolean; hidePlaceNote?: boolean }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
+  const inApp = useRoomStore((state) => state.facts.inApp);
   const actions = () => window.sidevoiceActions;
   if (!view) return <p className="muted" role="status">Cargando…</p>;
   const locked = !view.editable;
@@ -47,7 +48,9 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
         <ChoiceSelect id={`${task}-place`} labelledBy={`${task}-place-label`} value={pendingPlace ?? view.place} disabled={locked}
           choices={view.places.map((place) => ({ value: place.id, label: place.label, kind: place.state, icon: <ProviderIcon id={place.id} />,
             group: place.id === "device" ? undefined : t("stage.place.providers"),
-            detail: place.state === "missing" ? t("stage.place.noKey") : undefined }))}
+            detail: place.state === "missing" ? t("stage.place.noKey") : undefined,
+            // What running there means, said in the list itself rather than under the model.
+            description: place.id === "device" ? WHERE_NOTES[inApp ? "app" : "page"] : t("stage.place.providerNote", { provider: place.label }) }))}
           onChange={(id) => {
             const place = view.places.find((p) => p.id === id);
             if (place?.state === "missing") (onMissingPlace ?? ((p: string) => actions()?.openIntegration(p)))(id);
@@ -68,7 +71,7 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
       {view.check && !hideCheck && <StageCheck task={task} check={view.check} />}
       {afterModel}
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
-      {WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
+      {!hidePlaceNote && WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
       <OptionsForm task={task} options={view.options} disabled={locked}
         onChange={(id, value, language) => actions()?.setStageOption(task, id, value, language)}
         onPreview={task === "tts" ? (language) => void actions()?.previewVoice(language) : undefined}

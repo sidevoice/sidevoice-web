@@ -13,7 +13,7 @@ import { PairWithCode } from "../hosts/PairWithCode";
 import { useModal } from "../hosts/common";
 import { AdvancedSettings, GeneralSettings } from "./SettingsDialog";
 import { StageScopeLine } from "./StageScopeLine";
-import { StageSettings } from "./StageSettings";
+import { StageEditor } from "./StageEditor";
 import { ThisApp } from "./ThisApp";
 
 function NavButton({ pane, current, onClick, children }: { pane: string; current: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -26,7 +26,7 @@ function StagePane({ task }: { task: Task }) {
     <section className="pane">
       <h3>{t(task === "stt" ? "stage.stt" : "stage.tts")}</h3>
       <StageScopeLine task={task} />
-      <StageSettings task={task} />
+      <StageEditor task={task} />
     </section>
   );
 }

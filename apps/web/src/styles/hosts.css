@@ -283,3 +283,25 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .model-card-head { display: flex; align-items: baseline; gap: .5rem }
 .model-card-run { display: grid; gap: .35rem; justify-items: start }
 .model-card-run progress { width: 100%; height: 6px; accent-color: var(--sv-primary) }
+
+/* StageEditor's card: the three phases as a strip, then what the current one needs. */
+.stage-card { display: grid; gap: .5rem; margin-top: .6rem; padding: .8rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22 }
+.stage-card[data-works] { border-color: #3d6b55 }
+.stage-card p { margin: 0 }
+.stage-card-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap }
+.stage-card-name { display: inline-flex; align-items: baseline; gap: .45rem }
+.stage-card-phases { display: flex; gap: .25rem; margin: 0; padding: 0; list-style: none; counter-reset: phase }
+.stage-card-phases li { counter-increment: phase; padding: .12rem .5rem; border-radius: var(--sv-radius-pill); font-size: .7rem; color: var(--sv-muted); background: #ffffff0a }
+.stage-card-phases li::before { content: counter(phase) " · " }
+.stage-card-phases li[data-state=current] { color: var(--sv-on-primary); background: var(--sv-primary) }
+.stage-card-phases li[data-state=done] { color: #9ed3b4; background: #1e3329 }
+.stage-card-phases li[data-state=done]::before { content: "✓ " }
+.stage-card-body { display: grid; gap: .45rem; justify-items: start }
+.stage-card-body progress { width: 100%; height: 6px; accent-color: var(--sv-primary) }
+.stage-card-works { display: flex; align-items: center; gap: .6rem }
+.try-sample { margin: 0; padding: .45rem .7rem; border-inline-start: 3px solid var(--sv-primary-dim); background: #ffffff08; border-radius: 0 8px 8px 0; font-size: .9rem }
+.try-heard { font-size: .88rem }
+.try-meter { width: 7rem; height: .4rem; border-radius: 99px; background: #0f1318; overflow: hidden }
+.try-meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--sv-primary), var(--sv-voice)); transition: width 80ms linear }
+.try-answer { padding-top: .2rem }
+.wizard-wait { margin-inline-end: .4rem }
