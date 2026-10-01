@@ -27,7 +27,7 @@ type Status = "idle" | "loading" | "ready" | "failed";
 export interface Remote<T> { status: Status; value: T | null; error: string | null; at: number | null }
 const idle = <T,>(): Remote<T> => ({ status: "idle", value: null, error: null, at: null });
 
-export type SettingsPane = "general" | "voice" | "transcription" | "advanced" | "app" | "host" | "add-host";
+export type SettingsPane = "general" | "voice" | "transcription" | "advanced" | "app" | "hosts" | "host" | "add-host";
 export type HostTab = "status" | "agents" | "integrations" | "devices" | "stages";
 
 export interface HostsFacts {
@@ -206,10 +206,12 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
       if (t && pairing && !pairing.revoked) void revokeDevice(t, pairing.device_id).catch(() => undefined);
       if (f().settings.host === fp) patch({ settings: { ...f().settings, pane: "voice", host: null } });
     },
-    async addRemote(code: string, name: string) {
+    /** F4: a host added from Configuración is listed, not switched to (`use: false`); W2′'s becomes the one in use. */
+    async addRemote(code: string, name: string, { use = true }: { use?: boolean } = {}) {
       const pairing = await deps.redeem(code, name);
       const stored = f().stored;
-      if (!persistPairings({ inUse: pairing.fp, list: [pairing, ...stored.list.filter((p) => p.fp !== pairing.fp)] }))
+      const inUse = use || !store.getState().inUse ? pairing.fp : store.getState().inUse;
+      if (!persistPairings({ inUse, list: [pairing, ...stored.list.filter((p) => p.fp !== pairing.fp)] }))
         throw new Error("storage");
       patch({ reach: { ...f().reach, [pairing.fp]: { state: "ok", via: pairing.urls.length ? "direct" : "room" } } });
       return pairing;

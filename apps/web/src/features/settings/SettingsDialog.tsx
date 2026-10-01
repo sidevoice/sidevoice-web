@@ -7,7 +7,7 @@ import { StageSettings } from "./StageSettings";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 
-function GeneralSettings() {
+export function GeneralSettings() {
   return <section id="pane-general" aria-labelledby="settings-general" hidden><h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este dispositivo y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya. Las claves de Integraciones son la excepción: son de la máquina, y sirven a todos tus dispositivos.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p></section>;
 }
 
@@ -29,7 +29,7 @@ function TranscriptionSettings() {
   );
 }
 
-function AdvancedSettings() {
+export function AdvancedSettings() {
   return (
     <section id="pane-advanced" aria-labelledby="settings-advanced" hidden>
       <h3>Tiempos de conversación</h3>
