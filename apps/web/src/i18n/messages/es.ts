@@ -441,4 +441,6 @@ export const es: Record<string, string> = {
   "wizard.w4.keyRequired": "Obligatoria",
   "wizard.w4.keyRefused": "{provider} rechazó la clave",
   "proto.keys": "Claves de proveedores",
+  "wizard.w4.keyValid": "Válida ✓",
+  "wizard.w4.keyRefusedKept": "{provider} rechazó esta clave; sigue la anterior",
 };

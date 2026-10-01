@@ -441,4 +441,6 @@ export const en: Record<string, string> = {
   "wizard.w4.keyRequired": "Required",
   "wizard.w4.keyRefused": "{provider} refused the key",
   "proto.keys": "Provider keys",
+  "wizard.w4.keyValid": "Valid ✓",
+  "wizard.w4.keyRefusedKept": "{provider} refused this key; the previous one stays",
 };

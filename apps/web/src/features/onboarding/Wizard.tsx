@@ -289,25 +289,32 @@ function useStageContext() {
 }
 
 /** A provider's key, asked for in one line: required, checked with the provider, kept on the machine. */
-function KeyLine({ fp, provider, label }: { fp: string; provider: string; label: string }) {
+function KeyLine({ fp, provider, label, configured, hint }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null }) {
   const t = useT();
   const hosts = useHostsController();
+  // The key stays in the field once accepted (masked), so a wrong paste can be replaced without starting over.
   const [key, setKey] = useState("");
+  const [checked, setChecked] = useState("");
   const [state, setState] = useState<"" | "checking" | "refused">("");
   async function check() {
-    if (!key.trim() || state === "checking") return;
+    const value = key.trim();
+    if (!value || value === checked || state === "checking") return;
     setState("checking");
-    try { await hosts.putKey(fp, provider, key.trim()); } catch { setState("refused"); return; }
+    try { await hosts.putKey(fp, provider, value); } catch { setState("refused"); return; }
+    setChecked(value);
     setState("");
   }
+  const valid = configured && state !== "refused" && (!key.trim() || key.trim() === checked);
   return (
-    <div className="key-line" data-state={state || undefined}>
+    <div className="key-line" data-state={state || (valid ? "valid" : undefined)}>
       <input id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
-        placeholder={t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
+        placeholder={configured && hint ? "•••• " + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
         onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
-        onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus />
+        onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
       <span className="key-line-state" role="status">
-        {state === "checking" ? t("integrations.checking") : state === "refused" ? t("wizard.w4.keyRefused", { provider: label }) : t("wizard.w4.keyRequired")}
+        {state === "checking" ? t("integrations.checking")
+          : state === "refused" ? (configured ? t("wizard.w4.keyRefusedKept", { provider: label }) : t("wizard.w4.keyRefused", { provider: label }))
+          : valid ? t("wizard.w4.keyValid") : t("wizard.w4.keyRequired")}
       </span>
     </div>
   );
@@ -352,7 +359,12 @@ function StageStep({ task }: { task: Task }) {
     actions?.chooseStageModel(task, view!.model);
     actions?.decideStage(task, true);
   }
-  const keyPanel = keyFor && inUse ? <KeyLine fp={inUse} provider={keyFor} label={view.places.find((p) => p.id === keyFor)?.label ?? keyFor} /> : null;
+  // The key line stays while a provider is the place: pending, or chosen with its key (shown masked, replaceable).
+  const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
+  const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
+  const keyPanel = keyProvider && inUse && listing ? (
+    <KeyLine key={keyProvider} fp={inUse} provider={keyProvider} label={listing.label} configured={!!listing.configured} hint={listing.hint ?? null} />
+  ) : null;
   return (
     <>
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>

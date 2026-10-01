@@ -270,3 +270,5 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .key-line[data-state=refused] input { border-color: var(--sv-danger) }
 .key-line[data-state=refused] .key-line-state { color: #f4b4ab }
 .choice-icon svg { display: block }
+.key-line[data-state=valid] .key-line-state { color: #9ed3b4 }
+.key-line[data-state=valid] input { border-color: #3d6b55 }
