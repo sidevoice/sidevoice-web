@@ -46,8 +46,9 @@ export async function hostRequest<T>(target: HostTarget, method: string, path: s
 export interface AgentsListing { agents: DetectedAgent[]; scanned_at: number; custom?: { command: string; snippet: string } | null }
 export interface DeviceRow { device_id: string; name: string; kind: "code" | "local"; created_at: number; last_seen: number | null }
 
-export const listAgents = (target: HostTarget, rescan = false) =>
-  hostRequest<AgentsListing>(target, "GET", "/api/host/agents" + (rescan ? "?rescan=1" : ""));
+/** `watch`: the agent a person is connecting by hand, re-read from its own configuration (`claude mcp get`…). */
+export const listAgents = (target: HostTarget, rescan = false, watch?: string) =>
+  hostRequest<AgentsListing>(target, "GET", "/api/host/agents" + (rescan ? "?rescan=1" + (watch ? "&watch=" + encodeURIComponent(watch) : "") : ""));
 export const agentAction = (target: HostTarget, id: string, action: "connect" | "disconnect" | "dismiss") =>
   hostRequest<{ agent: DetectedAgent; manual?: { file: string; snippet: string } }>(target, "POST", `/api/host/agents/${encodeURIComponent(id)}/${action}`);
 export const listDevices = (target: HostTarget) => hostRequest<{ devices: DeviceRow[] }>(target, "GET", "/api/device/devices");

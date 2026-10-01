@@ -261,14 +261,14 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
     async pairRoom(url: string, code: string) { return await deps.bridge()?.localHost?.pairRoom?.(url, code) ?? { ok: false, error: { key: "unsupported" } } as BridgeResult; },
 
     // ----- what a host says, per host -----
-    async loadAgents(fp: string, rescan = false) {
+    async loadAgents(fp: string, rescan = false, watch?: string) {
       const t = target(fp);
       if (!t) return;
       const epoch = bump("agents:" + fp);
       const before = f().agents[fp] ?? idle();
       patch({ agents: { ...f().agents, [fp]: { ...before, status: "loading", error: null } } });
       try {
-        const value = await listAgents(t, rescan);
+        const value = await listAgents(t, rescan, watch);
         if (epochs.get("agents:" + fp) === epoch) patch({ agents: { ...f().agents, [fp]: { status: "ready", value, error: null, at: deps.now() } } });
       } catch (error) {
         if (epochs.get("agents:" + fp) === epoch) patch({ agents: { ...f().agents, [fp]: { ...before, status: "failed", error: failureOf(error) } } });

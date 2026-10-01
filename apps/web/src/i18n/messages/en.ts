@@ -414,11 +414,8 @@ export const en: Record<string, string> = {
   "agents.howto.command": "Run this in a terminal:",
   "agents.howto.copyCommand": "Copy command",
   "agents.howto.file": "Add this to {file}:",
-  "agents.howto.check": "Done, check",
-  "agents.howto.checking": "Checking…",
   "agents.howto.none": "This agent has no manual way to connect.",
   "agents.howto.title": "Connect {name} by hand",
-  "agents.howto.after": "Once you have done it:",
   "agents.manualOnly": "Connected by hand",
   "agents.other": "Another agent",
   "agents.other.sub": "Any MCP-compatible agent",
@@ -426,4 +423,5 @@ export const en: Record<string, string> = {
   "agents.other.detail": "Add Sidevoice as an MCP server in your agent. It will have a voice; whether it receives what you say depends on that agent.",
   "agents.other.command": "MCP server command:",
   "agents.other.json": "Or, if your agent takes JSON:",
+  "agents.howto.waiting": "Once you have run it, it is detected by itself.",
 };

@@ -414,11 +414,8 @@ export const es: Record<string, string> = {
   "agents.howto.command": "Ejecuta esto en una terminal:",
   "agents.howto.copyCommand": "Copiar comando",
   "agents.howto.file": "Añade esto a {file}:",
-  "agents.howto.check": "Ya está, comprobar",
-  "agents.howto.checking": "Comprobando…",
   "agents.howto.none": "Este agente no tiene forma de conectarse a mano.",
   "agents.howto.title": "Conectar {name} a mano",
-  "agents.howto.after": "Cuando lo hayas hecho:",
   "agents.manualOnly": "Se conecta a mano",
   "agents.other": "Otro agente",
   "agents.other.sub": "Cualquier agente compatible con MCP",
@@ -426,4 +423,5 @@ export const es: Record<string, string> = {
   "agents.other.detail": "Añade Sidevoice como servidor MCP en tu agente. Tendrá voz; que reciba lo que dices depende de ese agente.",
   "agents.other.command": "Comando del servidor MCP:",
   "agents.other.json": "O, si tu agente usa JSON:",
+  "agents.howto.waiting": "Cuando lo hayas ejecutado, se detecta solo.",
 };

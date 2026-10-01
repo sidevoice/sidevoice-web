@@ -230,3 +230,6 @@
 :is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .room-banner) .ui-button--primary:active:not(:disabled) { background: var(--sv-primary-dim) }
 .choice-card { transition: border-color .12s, background-color .12s }
 .choice-card:hover:not([data-checked]) { border-color: var(--sv-selected-border); background: #232a36 }
+.howto-wait { display: flex; align-items: center; gap: .45rem; font-size: .76rem; color: var(--sv-muted) }
+.wait-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--sv-primary); animation: host-pulse 1.2s ease-in-out infinite }
+@media (prefers-reduced-motion: reduce) { .wait-dot { animation: none } }

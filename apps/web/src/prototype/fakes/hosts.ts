@@ -156,6 +156,12 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
         if (toggles.w3ScanTimeout) { await sleep(2500); return json(504, { key: "scan-timeout", message: "agents.list timed out after 20 s" }); }
         await sleep(query.get("rescan") ? 700 : 250);
         if (query.get("rescan")) host.scannedAt = now();
+        const watched = host.agents.find((a) => a.id === query.get("watch"));
+        if (watched) {
+          const seen = (host.routeCalls.get("watch:" + watched.id) ?? 0) + 1;
+          host.routeCalls.set("watch:" + watched.id, seen);
+          if (seen >= 3 && watched.registration === "not-connected") watched.registration = "connected";
+        }
         return json(200, { agents: host.agents, scanned_at: host.scannedAt,
           custom: { command: `${MCP} mcp`, snippet: JSON.stringify({ mcpServers: { sidevoice: { command: MCP, args: ["mcp"] } } }, null, 2) } });
       }

@@ -2,7 +2,7 @@
  * «Conectar» runs the agent's own registration (`claude mcp add`, `codex mcp add`, Cursor's file); «Hacerlo yo» shows
  * what that is — the command, or the file and what to put in it — for whoever prefers to do it, and opens by itself
  * when the automatic way failed or does not exist. «Comprobar» asks the host to look again. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useT } from "../../i18n";
@@ -50,21 +50,23 @@ function HowToPanel({ agent, fp, id, onDone }: { agent: DetectedAgent; fp: strin
   const t = useT();
   const hosts = useHostsController();
   const how = agent.instructions;
-  const [checking, setChecking] = useState(false);
   const other = agent.id === OTHER;
+  const hasHow = !!how;
+  // Connected by hand: the host re-reads the agent's own configuration every few seconds while this is open, and the
+  // row turns «Conectado» by itself. «Otro agente» cannot be read, so there is nothing to wait for there.
+  useEffect(() => {
+    if (other || !hasHow) return;
+    const timer = setInterval(() => void hosts.loadAgents(fp, true, agent.id), 4000);
+    return () => clearInterval(timer);
+  }, [other, hasHow, hosts, fp, agent.id]);
   return (
     <div className="agent-howto" id={id}>
       {!how ? <p className="muted small">{t("agents.howto.none")}</p> : <>
         {other && <p className="muted small">{t("agents.other.detail")}</p>}
         {how.command && <><p className="howto-label">{other ? t("agents.other.command") : t("agents.howto.command")}</p><CodeBlock code={how.command} /></>}
         {how.snippet && <><p className="howto-label">{how.file ? t("agents.howto.file", { file: how.file }) : t("agents.other.json")}</p><CodeBlock code={how.snippet} /></>}
-        <div className="howto-foot">
-          <span className="muted small">{t("agents.howto.after")}</span>
-          <Button variant="primary" size="compact" disabled={checking}
-            onClick={async () => { setChecking(true); await hosts.loadAgents(fp, true); setChecking(false); onDone(); }}>
-            {checking ? t("agents.howto.checking") : t("agents.howto.check")}
-          </Button>
-        </div>
+        {!other && <p className="howto-wait" role="status"><span className="wait-dot" aria-hidden="true" />{t("agents.howto.waiting")}</p>}
+        {other && <div className="howto-foot"><Button variant="ghost" size="compact" onClick={onDone}>{t("common.close")}</Button></div>}
       </>}
     </div>
   );
@@ -83,6 +85,12 @@ export function AgentRow({ fp, agent, mode, onConnected }: { fp: string; agent: 
   useEffect(() => { if (error) setOpen(true); }, [error]);
   const notConnected = agent.registration === "not-connected";
   const isNew = mode === "host" && agent.present && notConnected && !agent.dismissed;
+  // Connected some other way (by hand, from the panel): said like a «Conectar» that worked.
+  const was = useRef(agent.registration);
+  useEffect(() => {
+    if (was.current === "not-connected" && agent.registration === "connected" && !busy) { setOpen(false); onConnected?.(agent.label); }
+    was.current = agent.registration;
+  }, [agent.registration, agent.label, busy, onConnected]);
   async function connect() {
     const answer = await hosts.agentAction(fp, agent.id, "connect");
     if (answer?.agent.registration === "connected") onConnected?.(answer.agent.label);
