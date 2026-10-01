@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { StageSettings } from "./StageSettings";
+import { setLanguage } from "../../i18n";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { stageContext } from "../../state/room-session-state.js";
@@ -12,6 +13,8 @@ import voices from "../../../../../packages/browser-audio/catalog.json";
 import type { StageTask } from "../../state/room-types";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
+// These panes are checked in Spanish, the language their fixtures speak.
+setLanguage("es");
 
 const PAGE: Capabilities = { runs: "page", has: ["webgpu", "webgpu-f16", "wasm"] };
 const WASM: Capabilities = { runs: "page", has: ["wasm"] };

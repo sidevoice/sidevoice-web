@@ -34,8 +34,13 @@ export function ChoiceSelect({ id, value, choices, onChange, disabled, placehold
     if (!open) return;
     const away = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("pointerdown", away, true);
-    root.current?.querySelector<HTMLElement>("[aria-selected=true]")?.focus() ?? root.current?.querySelector<HTMLElement>("[role=option]")?.focus();
-    return () => document.removeEventListener("pointerdown", away, true);
+    // Opens on the selected row, else the first.
+    (root.current?.querySelector<HTMLElement>("[aria-selected=true]") ?? root.current?.querySelector<HTMLElement>("[role=option]"))?.focus();
+    // Tabbing out of the list closes it, as a native one does.
+    const node = root.current;
+    const out = (event: FocusEvent) => { if (!node?.contains(event.relatedTarget as Node | null)) setOpen(false); };
+    node?.addEventListener("focusout", out);
+    return () => { document.removeEventListener("pointerdown", away, true); node?.removeEventListener("focusout", out); };
   }, [open]);
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
@@ -50,6 +55,12 @@ export function ChoiceSelect({ id, value, choices, onChange, disabled, placehold
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       options[Math.max(0, Math.min(options.length - 1, at + (event.key === "ArrowDown" ? 1 : -1)))]?.focus();
+    } else if (event.key === "Home" || event.key === "End") { event.preventDefault(); options[event.key === "Home" ? 0 : options.length - 1]?.focus(); }
+    else if (event.key.length === 1 && /\S/.test(event.key)) {
+      // Type-ahead: the next row whose label starts with that letter.
+      const letter = event.key.toLowerCase();
+      [...options.slice(at + 1), ...options.slice(0, at + 1)]
+        .find((option) => option.querySelector(".choice-label")?.textContent?.trim().toLowerCase().startsWith(letter))?.focus();
     } else if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.current?.focus(); }
     else if ((event.key === "Enter" || event.key === " ") && at >= 0) { event.preventDefault(); pick(ordered[at].value); }
   }

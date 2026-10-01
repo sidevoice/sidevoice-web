@@ -264,9 +264,9 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .choice-row .choice-label { flex: 1; min-width: 0 }
 .choice-check { flex: none; width: 1rem; text-align: center; color: var(--sv-primary); font-size: .8rem }
 .choice-desc { color: var(--sv-muted); font-size: .74rem; line-height: 1.35 }
-.key-line { display: flex; align-items: center; gap: .6rem; margin: -.4rem 0 .9rem }
-.key-line input { flex: 1; min-width: 0; height: 2.5rem; padding: 0 .7rem; border: 1px solid var(--sv-selected-border); border-radius: .65rem; background: #141b23; color: inherit; font: inherit }
-.key-line-state { flex: none; font-size: .74rem; color: var(--sv-muted) }
+.key-line { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .6rem; margin: -.4rem 0 .9rem }
+.key-line input { flex: 1 1 14rem; min-width: 10rem; height: 2.5rem; padding: 0 .7rem; border: 1px solid var(--sv-selected-border); border-radius: .65rem; background: #141b23; color: inherit; font: inherit }
+.key-line-state { flex: 0 1 auto; font-size: .74rem; color: var(--sv-muted) }
 .key-line[data-state=refused] input { border-color: var(--sv-danger) }
 .key-line[data-state=refused] .key-line-state { color: #f4b4ab }
 .choice-icon svg { display: block }
@@ -288,7 +288,8 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-card { display: grid; gap: .5rem; margin-top: .6rem; padding: .8rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22 }
 .stage-card[data-works] { border-color: #3d6b55 }
 .stage-card p { margin: 0 }
-.stage-card-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap }
+/* The strip on its own row, so it sits in the same place whatever the model is called. */
+.stage-card-head { display: grid; justify-items: start; gap: .45rem }
 .stage-card-name { display: inline-flex; align-items: baseline; gap: .45rem }
 .stage-card-phases { display: flex; gap: .25rem; margin: 0; padding: 0; list-style: none; counter-reset: phase }
 .stage-card-phases li { counter-increment: phase; padding: .12rem .5rem; border-radius: var(--sv-radius-pill); font-size: .7rem; color: var(--sv-muted); background: #ffffff0a }

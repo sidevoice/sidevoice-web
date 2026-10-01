@@ -5,6 +5,7 @@ import modelCatalog from "../../../../../packages/browser-audio/models.json";
 import type { EchoEvents, VerifyOutcome, VerifyProgress } from "../../state/hosts/hosts-store";
 import type { Stage, Task } from "../../state/hosts/stage-scope";
 import type { Toggles } from "../scenario";
+import { saySample } from "../../features/settings/try-samples";
 
 const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
   const timer = setTimeout(resolve, ms);
@@ -69,7 +70,8 @@ export function createFakeEngine(toggles: Toggles, capabilities: Parameters<type
     if (mode === "stt-error") { await sleep(700, signal); events.failed("stt-error", "stt"); return; }
     await sleep(800, signal);
     const es = language() === "es";
-    const heard = es ? "Hola, ¿me oyes bien?" : "Hi, can you hear me?";
+    // What was offered to say, as if it had been said.
+    const heard = saySample(language());
     events.heard(heard);
     await sleep(600, signal);
     if (signal.aborted) return;

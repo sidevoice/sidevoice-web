@@ -28,10 +28,12 @@ export interface AdapterOptions {
   capabilities: Parameters<typeof resolveOffers>[1];
   installed: Set<string>;
   noOffer: boolean;
+  /** The «tts-error» variant: the voice does not play. */
+  previewFails: boolean;
   onNote(text: string): void;
 }
 
-export function createRoomAdapter({ room, hosts, capabilities, installed, noOffer, onNote }: AdapterOptions) {
+export function createRoomAdapter({ room, hosts, capabilities, installed, noOffer, previewFails, onNote }: AdapterOptions) {
   const scoped = new Map<string, RoomStore>();
   let integrationFp: string | null = null;
   const aborts: Partial<Record<StageTask, AbortController>> = {};
@@ -155,10 +157,23 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
       try { await navigator.clipboard.writeText(diagnosticsText(task, room.getState().stages?.[task]?.diagnostics)); return true; } catch { return false; }
     },
     cancelDownload() {},
+    // Resolves once the sample has been heard, rejects when it does not play (the «tts-error» variant). The browser's
+    // synthesis stands in for the chosen voice; where it has none, the time it would take stands in for it.
     async previewVoice(language) {
-      const sample = voiceCatalog.languages.find((l) => l.id === language)?.sample ?? "Hola";
-      try { const u = new SpeechSynthesisUtterance(sample); u.lang = language; window.speechSynthesis?.speak(u); } catch { /* none */ }
+      const sample = voiceCatalog.languages.find((l) => l.id === language)?.sample ?? "";
       room.patch({ previewNote: t("proto.note.preview") });
+      const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      if (previewFails) { await wait(900); throw new Error("tts-error"); }
+      const synth = window.speechSynthesis;
+      if (!synth || !sample || !synth.getVoices().length) { await wait(2400); return; }
+      synth.cancel();
+      await new Promise<void>((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(sample);
+        utterance.lang = language;
+        const timer = setTimeout(resolve, 9000);
+        utterance.onend = utterance.onerror = () => { clearTimeout(timer); resolve(); };
+        synth.speak(utterance);
+      });
     },
     async prepareVoice() { room.patch({ prepareNote: t("proto.note.prepared") }); },
     async retryIntegrations() { const fp = inUse(); if (fp) await hosts.loadIntegrations(fp); },

@@ -121,7 +121,7 @@ async function boot() {
   });
 
   const room = createRoomSessionStore({ inApp, speechLanguage: currentLanguage() });
-  const adapter = createRoomAdapter({ room, hosts: controller, capabilities, installed, noOffer: !!toggles.w4NoOffer, onNote: (text) => showNote(text) });
+  const adapter = createRoomAdapter({ room, hosts: controller, capabilities, installed, noOffer: !!toggles.w4NoOffer, previewFails: toggles.w5 === "tts-error", onNote: (text) => showNote(text) });
   window.sidevoiceActions = adapter.actions;
   window.sidevoiceUI = { store: room, setBootError: (bootError) => room.patch({ bootError }) };
 
