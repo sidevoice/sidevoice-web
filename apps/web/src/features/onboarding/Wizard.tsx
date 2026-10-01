@@ -106,7 +106,6 @@ function W1() {
     });
     return () => { live = false; };
   }, [hosts]);
-  const names = found?.map((agent) => agent.label).join(", ");
   async function next() {
     if (!choice) return;
     await hosts.choosePath(choice);
@@ -114,20 +113,18 @@ function W1() {
   }
   return (
     <>
+      <p className="muted">{t("wizard.w1.lead")}</p>
       <fieldset className="choice-cards">
         <legend className="sr-only">{t("wizard.w1.title")}</legend>
         {(["agents", "remote"] as const).map((value) => (
           <label key={value} className="choice-card" data-checked={choice === value || undefined}>
             <input type="radio" name="w1-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} />
-            <span className="choice-copy">
-              <strong>{t(value === "agents" ? "wizard.w1.yes" : "wizard.w1.no")}</strong>
-              <span className="muted">{t(value === "agents" ? "wizard.w1.yesDetail" : "wizard.w1.noDetail")}</span>
-            </span>
+            <span className="choice-copy"><strong>{t(value === "agents" ? "wizard.w1.yes" : "wizard.w1.no")}</strong></span>
           </label>
         ))}
       </fieldset>
       <p className="muted found-line" role="status">
-        {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found", { names }) : t("wizard.w1.none")}
+        {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found") : t("wizard.w1.none")}
       </p>
       <Actions><Button variant="primary" disabled={!choice} onClick={() => void next()}>{t("wizard.continue")}</Button></Actions>
     </>
