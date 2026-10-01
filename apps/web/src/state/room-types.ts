@@ -185,7 +185,7 @@ export interface StageView {
   /** The build this device runs the model on, automatic by default; null off this device. */
   advanced: { value: string; choices: StageChoiceView[]; reason: string } | null;
   /** Where the work happens: in this page, in the desktop app, or at a provider. */
-  where: "page" | "app" | "provider";
+  where: "page" | "app" | "host" | "provider";
   /** Nothing chosen, and this device runs nothing for the stage: a place has to be chosen. */
   unconfigured?: boolean;
   /** The model being selected — asked, downloading, loading, checked — or the outcome of the last one (sidevoice/sidevoice-core#21). */

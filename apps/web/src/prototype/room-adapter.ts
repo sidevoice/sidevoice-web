@@ -11,6 +11,7 @@ import type { RoomStore } from "../state/room-store";
 import type { SidevoiceActions, StageTask } from "../state/room-types";
 import type { HostsController } from "../state/hosts/hosts-store";
 import { effectiveStage, type Stage } from "../state/hosts/stage-scope";
+import { HOST_OFFERS } from "./fakes/host-machine";
 
 type Facts = RoomStore["facts"];
 
@@ -58,6 +59,8 @@ function describe(catalog: typeof modelCatalog) {
 }
 
 export interface AdapterOptions {
+  /** What the paired machine has on disk, as model ids (shared with the fake engine). */
+  hostDisk: Set<string>;
   room: RoomStore;
   hosts: HostsController;
   capabilities: Parameters<typeof resolveOffers>[1];
@@ -68,7 +71,8 @@ export interface AdapterOptions {
   onNote(text: string): void;
 }
 
-export function createRoomAdapter({ room, hosts, capabilities, installed, noOffer, previewFails, onNote }: AdapterOptions) {
+export function createRoomAdapter({ room, hosts, capabilities, installed, noOffer, previewFails, onNote, hostDisk }: AdapterOptions) {
+  const hostInstalled = () => HOST_OFFERS.filter((o) => hostDisk.has(o.model)).map((o) => ({ model: o.model, engine: o.engine }));
   const scoped = new Map<string, RoomStore>();
   let integrationFp: string | null = null;
   const aborts: Partial<Record<StageTask, AbortController>> = {};
@@ -95,11 +99,14 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
     const remote = fp ? state.integrations[fp] : undefined;
     if (fp && !remote) void hosts.loadIntegrations(fp);
     const prefs = { ...(f().voicePreferences ?? {}), stt: effectiveStage(state.scope, fp, "stt"), tts: effectiveStage(state.scope, fp, "tts") };
+    // A paired machine in use is a place of its own (sidevoice-core#21): «En NUC».
+    const machine = fp && fp !== state.localPairing?.fp ? state.rows.find((r) => r.fp === fp) : null;
     room.patch({
       integrations: remote?.value ?? null,
       integrationsStatus: fp ? (remote?.value && remote.status === "loading" ? "ready" : integrationsStatus(remote?.status)) : "idle",
       integrationsError: remote?.status === "failed" ? t("integrations.failed") : "",
       voicePreferences: prefs,
+      hostOffers: machine ? HOST_OFFERS as never : null, hostInstalled: machine ? hostInstalled() : [], hostLabel: machine ? t("stage.place.host", { name: machine.name }) : "",
     });
     for (const [scopeFp, store] of scoped) {
       const listing = state.integrations[scopeFp];
@@ -141,7 +148,7 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
       if (!abort.signal.aborted) setCheck(task, { phase: "running", stage, previous, recheck, progress: { step: p.phase, done: p.done, total: p.total } });
     }, abort.signal);
     if (abort.signal.aborted) return;
-    room.patch({ installedBuilds: installedBuilds() });
+    room.patch({ installedBuilds: installedBuilds(), hostInstalled: hostInstalled() });
     const build = deviceBuild(f().deviceOffers, stage);
     if (outcome.ok && outcome.slow) { setCheck(task, { phase: "slow", stage, previous, recheck, result: { latency_ms: outcome.slow.latency_ms } }); return; }
     if (!outcome.ok) {

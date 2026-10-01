@@ -565,4 +565,6 @@ export const es: Record<string, string> = {
   "pair.error.version": "Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.",
   "pair.error.noAddress": "El código no dice dónde encontrar la máquina. Pide uno nuevo.",
   "pair.error.refused": "La máquina no aceptó el emparejamiento. Vuelve a intentarlo.",
+  "stage.place.host": "En {name}",
+  "stage.place.hostNote": "Se ejecuta en {name}, con lo que tiene esa máquina: no se descarga nada en este dispositivo.",
 };

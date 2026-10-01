@@ -259,9 +259,11 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const check = view.check;
   const rawCheck = (ctx.checks as Record<string, { phase: string; progress?: { step?: string } } | null> | null)?.[task] ?? null;
   const prepared = !draft && !!saved && saved.place === view.place && saved.model === view.model && (!check || check.phase === "done");
-  const offer = (ctx.offers as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
-  const installed = !!offer && (ctx.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
-  const needsDownload = view.place === "device" && !!offer && !installed;
+  // This device and the machine in use both download and load models; each has its own offers and disk.
+  const atHost = view.place === "host";
+  const offer = ((atHost ? ctx.hostOffers : ctx.offers) as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
+  const installed = !!offer && ((atHost ? ctx.hostInstalled : ctx.installed) as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
+  const needsDownload = (view.place === "device" || atHost) && !!offer && !installed;
   function prepare() {
     setPreparedHere(true);
     window.sidevoiceActions?.testStage?.(task, { place: view!.place, model: view!.model, options: current?.options ?? {}, build: current?.build ?? null });
@@ -298,7 +300,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     if (prepared) trial.start({ language, text: sampleIn(language).slice(0, TEXT_MAX) });
   }
   const testLanguageLabel = voiceRows.find((r) => r.language === voiceLanguage)?.label ?? "";
-  const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
+  const keyProvider = keyFor ?? (view.place && view.place !== "device" && view.place !== "host" ? view.place : null);
   const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
   const keyPanel = keyProvider && inUse && listing
     ? <KeyLine ref={keyLine} key={keyProvider} fp={inUse} provider={keyProvider} label={listing.label} configured={!!listing.configured} hint={listing.hint ?? null}
@@ -308,7 +310,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const lang = currentLanguage();
   const keep = t(task === "tts" ? "stagecard.b.useVoice" : "stagecard.b.useModel");
   // A provider has nothing to download or load here: its model is only checked (operator, 2026-10-01).
-  const remote = view.place !== "device";
+  const remote = view.place !== "device" && view.place !== "host";
   // What is still to do, in the order the card shows it.
   const pending: PendingStep | null =
     keyFor || (keyProvider && listing && !listing.configured) ? { label: t("stagecard.next.key"), run: () => keyLine.current?.submit() }
@@ -516,8 +518,9 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const slow = check?.phase === "slow";
   const last: Phase = flow === "configure" ? "check" : "test";
   // A provider's model is only checked: there is nothing to download or load here.
-  const phases: Phase[] = view.place === "device" ? ["download", "prepare", last] : flow === "configure" ? ["check"] : ["check", "test"];
-  const first: Phase = view.place === "device" ? "prepare" : "check";
+  const loads = view.place === "device" || view.place === "host";
+  const phases: Phase[] = loads ? ["download", "prepare", last] : flow === "configure" ? ["check"] : ["check", "test"];
+  const first: Phase = loads ? "prepare" : "check";
   // While it runs, the phases follow the progress: downloading, then loading, then checking.
   const downloading = runningStep === "download";
   const downloaded = !needsDownload || (!!runningStep && !downloading);
@@ -529,13 +532,13 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const tone = failed ? "failed" : slow ? "slow" : prepared ? "done" : running ? "running" : "idle";
   const fill = prepared || failed || slow ? 1 : downloading && check?.fraction != null ? check.fraction : 0;
   const busyBar = running && !(downloading && check?.fraction != null);
-  const prepareLabel = view.place !== "device" ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare")
+  const prepareLabel = !loads ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare")
     : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly");
   const status = running ? <span className="stage-card-line">{check.step}{check.amount ? " · " + check.amount : ""}</span>
     : failed ? <span className="stage-card-line row-error" title={t("check.failed", { step: check.step, cause: check.cause })}>{t("check.failed", { step: check.step, cause: check.cause })}</span>
     : slow ? <span className="stage-card-line warn-line">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
     : prepared ? (measured ? <Metrics task={task} result={measured} /> : <span className="stage-card-line ok-line">{t("stagecard.ready")}</span>)
-    : <span className="stage-card-line muted">{t(view.place !== "device" ? "stagecard.status.unchecked" : needsDownload ? "stagecard.status.notDownloaded" : "stagecard.status.downloaded")}</span>;
+    : <span className="stage-card-line muted">{t(!loads ? "stagecard.status.unchecked" : needsDownload ? "stagecard.status.notDownloaded" : "stagecard.status.downloaded")}</span>;
   const actions = running ? <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.cancelStage(task)}>{t("common.cancel")}</Button>
     : failed ? <>{!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>}<Button size="compact" onClick={chooseOther}>{t("stagecard.chooseOther")}</Button></>
     : slow ? <>{!inFooter && <Button variant="primary" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>}<Button size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, false)}>{t("stagecard.chooseOther")}</Button></>
@@ -548,7 +551,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
         {/* Title and subtitle, as the model list shows them (operator, 2026-10-02); the subtitle's line is kept even when
             a model has no description, so every card is the same size. */}
         <span className="stage-card-title">
-          <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{view.place === "device" && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}</span>
+          <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{loads && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}</span>
           <span className="stage-card-about muted small" title={model?.description}>{model?.description || " "}</span>
         </span>
         <ol className="stage-card-phases">

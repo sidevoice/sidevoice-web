@@ -15,6 +15,10 @@ import { CHECKS } from '../../../../packages/browser-audio/model-check.js';
 
 export const TASKS = ['stt', 'tts'];
 export const DEVICE = 'device';
+/** The machine in use as a place (sidevoice/sidevoice-core#21, D7): it runs the model itself, with what it says it
+ *  can run (`ctx.hostOffers`, computed there) — absent when it offers nothing for the stage. */
+export const HOST = 'host';
+const onMachine = (place) => place === DEVICE || place === HOST;
 
 const OPTION_LABELS = { language: 'Idioma', context: 'Contexto', voice: 'Voz', speed: 'Velocidad', instructions: 'Instrucciones' };
 const ACCELERATOR_LABELS = { cpu: 'CPU', coreml: 'Core ML', metal: 'Metal', cuda: 'CUDA', directml: 'DirectML', vulkan: 'Vulkan', webgpu: 'WebGPU', wasm: 'WASM' };
@@ -37,7 +41,7 @@ export function taskOffers(offers, task) { return (offers || []).filter((offer) 
 /** The option schema a stage's choice declares: its family's on this device, its provider's otherwise. */
 export function optionSchema(catalog, stage, task) {
     if (!stage) return [];
-    if (stage.place === DEVICE) return familyOf(catalog, stage.model)?.family?.options || [];
+    if (onMachine(stage.place)) return familyOf(catalog, stage.model)?.family?.options || [];
     return providerOf(catalog, stage.place, task)?.[task]?.options || [];
 }
 
@@ -121,9 +125,10 @@ export function defaultStage(ctx, task) {
 /** The models a place offers for a stage: this device's offers, or the provider's own list. `null` while that
  *  list is not known — loading, or its read failed — which is not the same as a place that offers nothing. */
 export function placeModels(ctx, place, task) {
-    if (place === DEVICE) {
-        if (!ctx.offers) return null;
-        return taskOffers(ctx.offers, task).map((offer) => ({ id: offer.model, label: familyOf(ctx.catalog, offer.model)?.model?.label || offer.model, description: familyOf(ctx.catalog, offer.model)?.model?.description, offer }));
+    if (onMachine(place)) {
+        const offers = place === HOST ? ctx.hostOffers : ctx.offers;
+        if (!offers) return null;
+        return taskOffers(offers, task).map((offer) => ({ id: offer.model, label: familyOf(ctx.catalog, offer.model)?.model?.label || offer.model, description: familyOf(ctx.catalog, offer.model)?.model?.description, offer }));
     }
     const provider = providerOf(ctx.catalog, place, task);
     if (!provider) return [];
@@ -142,10 +147,10 @@ export function effectiveStage(ctx, task, stage) {
     if (!base)
         return null;
     let { place, model, build } = base;
-    if (place !== DEVICE && !providerOf(ctx.catalog, place, task)) return defaultStage(ctx, task);
+    if (!onMachine(place) && !providerOf(ctx.catalog, place, task)) return defaultStage(ctx, task);
     const models = placeModels(ctx, place, task);
-    if (models && !models.some((m) => m.id === model) && (place === DEVICE || !model)) {
-        if (!models.length && place === DEVICE) return defaultStage(ctx, task);
+    if (models && !models.some((m) => m.id === model) && (onMachine(place) || !model)) {
+        if (!models.length && onMachine(place)) return defaultStage(ctx, task);
         model = models[0]?.id || '';
     }
     if (place !== DEVICE) build = null;
@@ -184,6 +189,8 @@ function placesFor(ctx, task, chosen) {
     const places = [];
     const device = placeModels(ctx, DEVICE, task);
     if (device === null ? chosen === DEVICE : device.length) places.push({ id: DEVICE, label: 'Este dispositivo', state: device === null ? 'unknown' : 'ready' });
+    const host = placeModels(ctx, HOST, task);
+    if (host?.length) places.push({ id: HOST, label: ctx.hostLabel || HOST, state: 'ready' });
     for (const provider of ctx.catalog?.providers || []) {
         if (!(provider.tasks || []).includes(task)) continue;
         if (ctx.integrations !== 'ready') {
@@ -239,7 +246,7 @@ function stageViewOf(ctx, task, stage) {
             check: null, diagnostics: null };
     }
     const models = placeModels(ctx, current.place, task);
-    const installed = (offer) => (ctx.installed || []).some((b) => b.model === offer.model && b.engine === offer.engine);
+    const installed = (offer) => ((current.place === HOST ? ctx.hostInstalled : ctx.installed) || []).some((b) => b.model === offer.model && b.engine === offer.engine);
     const view = {
         task,
         places: placesFor(ctx, task, current.place),
@@ -257,7 +264,7 @@ function stageViewOf(ctx, task, stage) {
         model: current.model,
         options: optionSchema(ctx.catalog, current, task).map((option) => optionView(ctx, current, task, option, current.options[option.id])),
         advanced: null,
-        where: current.place === DEVICE ? (ctx.inApp ? 'app' : 'page') : 'provider',
+        where: current.place === DEVICE ? (ctx.inApp ? 'app' : 'page') : current.place === HOST ? 'host' : 'provider',
     };
     const offer = models?.find((m) => m.id === current.model)?.offer;
     if (current.place === DEVICE && offer) {

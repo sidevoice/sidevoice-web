@@ -41,6 +41,8 @@ export interface SessionFacts {
  deviceOffers: Record<string, unknown>[] | null; installedBuilds: {model: string; engine: string}[];
  remoteModels: Record<string, {models?: {id: string; label?: string; description?: string}[]; voices?: {id: string; label?: string; languages?: string[]}[]; error?: string}>;
  stageDraft: {stt?: Record<string, unknown>; tts?: Record<string, unknown>} | null;
+ /** The machine in use as a place (sidevoice-core#21): its offers, its downloaded builds and its label. */
+ hostOffers?: unknown[] | null; hostInstalled?: {model: string; engine: string}[]; hostLabel?: string;
  previewNote: string; prepareNote: string; gpuSetAside: boolean;
  /** Per stage, the model selection in flight or just over (sidevoice/sidevoice-core#21), and what its last check measured (sidevoice/sidevoice-core#13). */
  stageChecks: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>; stageDiagnostics: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>;

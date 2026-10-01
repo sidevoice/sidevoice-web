@@ -35,6 +35,7 @@ import { readParams, type Toggles } from "./scenario";
 import { createFakeHosts } from "./fakes/hosts";
 import { createFakeBridge } from "./fakes/bridge";
 import { createFakeEngine } from "./fakes/engine";
+import { createHostDisk } from "./fakes/host-machine";
 import { createRoomAdapter } from "./room-adapter";
 
 const params = readParams(location.search);
@@ -105,7 +106,8 @@ async function boot() {
   const capabilities = inApp
     ? { runs: "native" as const, os: "macos", arch: "aarch64", has: ["cpu", "coreml"], memory_mb: 16384 }
     : { runs: "page" as const, has: toggles.noWebgpu ? ["wasm"] : ["webgpu", "webgpu-f16", "wasm"] };
-  const engine = createFakeEngine(toggles, capabilities, installed, currentLanguage);
+  const hostDisk = createHostDisk();
+  const engine = createFakeEngine(toggles, capabilities, installed, currentLanguage, hostDisk);
   // What the call's waveform reads from the audio runtime, fed by the fake microphone.
   window.sidevoiceAudio = { readWaveform: engine.readWaveform };
 
@@ -124,7 +126,7 @@ async function boot() {
   });
 
   const room = createRoomSessionStore({ inApp, speechLanguage: currentLanguage() });
-  const adapter = createRoomAdapter({ room, hosts: controller, capabilities, installed, noOffer: !!toggles.w4NoOffer, previewFails: toggles.w5 === "tts-error", onNote: (text) => showNote(text) });
+  const adapter = createRoomAdapter({ room, hosts: controller, capabilities, installed, noOffer: !!toggles.w4NoOffer, previewFails: toggles.w5 === "tts-error", hostDisk, onNote: (text) => showNote(text) });
   window.sidevoiceActions = adapter.actions;
   window.sidevoiceUI = { store: room, setBootError: (bootError) => room.patch({ bootError }) };
 

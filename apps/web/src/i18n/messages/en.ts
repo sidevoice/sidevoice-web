@@ -565,4 +565,6 @@ export const en: Record<string, string> = {
   "pair.error.version": "This code is from another version of Sidevoice. Update the app or ask for a new code.",
   "pair.error.noAddress": "The code doesn't say where to find the machine. Ask for a new one.",
   "pair.error.refused": "The machine didn't accept the pairing. Try again.",
+  "stage.place.host": "On {name}",
+  "stage.place.hostNote": "Runs on {name}, with what that machine has: nothing is downloaded to this device.",
 };

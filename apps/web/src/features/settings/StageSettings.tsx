@@ -57,10 +57,10 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
         <span className="ui-field-label" id={`${task}-place-label`}>{t("stage.where")}</span>
         <ChoiceSelect id={`${task}-place`} labelledBy={`${task}-place-label`} value={pendingPlace ?? view.place} disabled={locked}
           choices={view.places.map((place) => ({ value: place.id, label: place.label, kind: place.state, icon: <ProviderIcon id={place.id} />,
-            group: place.id === "device" ? undefined : t("stage.place.providers"),
+            group: place.id === "device" || place.id === "host" ? undefined : t("stage.place.providers"),
             detail: place.state === "missing" ? t("stage.place.noKey") : undefined,
             // What running there means, said in the list itself rather than under the model.
-            description: place.id === "device" ? t(WHERE_NOTES[inApp ? "app" : "page"]) : t("stage.place.providerNote", { provider: place.label }) }))}
+            description: place.id === "device" ? t(WHERE_NOTES[inApp ? "app" : "page"]) : place.id === "host" ? t("stage.place.hostNote", { name: place.label.replace(/^\S+\s/, "") }) : t("stage.place.providerNote", { provider: place.label }) }))}
           onChange={(id) => {
             const place = view.places.find((p) => p.id === id);
             if (place?.state === "missing") (onMissingPlace ?? ((p: string) => actions()?.openIntegration(p)))(id);

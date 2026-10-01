@@ -5,6 +5,7 @@ import modelCatalog from "../../../../../packages/browser-audio/models.json";
 import type { EchoEvents, VerifyOutcome, VerifyProgress } from "../../state/hosts/hosts-store";
 import type { Stage, Task } from "../../state/hosts/stage-scope";
 import type { Toggles } from "../scenario";
+import { HOST_OFFERS } from "./host-machine";
 import { offeredSentence, saySample } from "../../features/settings/try-samples";
 
 const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
@@ -12,7 +13,7 @@ const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) 
   signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
 });
 
-export function createFakeEngine(toggles: Toggles, capabilities: Parameters<typeof resolveOffers>[1], installed: Set<string>, language: () => string) {
+export function createFakeEngine(toggles: Toggles, capabilities: Parameters<typeof resolveOffers>[1], installed: Set<string>, language: () => string, hostDisk: Set<string> = new Set()) {
   // The microphone as the call's waveform reads it (window.sidevoiceAudio): samples at the level the fake is «hearing».
   let level = 0;
   function readWaveform() {
@@ -24,6 +25,21 @@ export function createFakeEngine(toggles: Toggles, capabilities: Parameters<type
   const say = (events: EchoEvents) => ({ ...events, level(value: number) { level = value; events.level(value); } });
   async function verifyStage(task: Task, stage: Stage, _host: unknown, onProgress: (p: VerifyProgress) => void, signal: AbortSignal): Promise<VerifyOutcome> {
     const cancelled = { ok: false as const, step: "apply", reason: { key: "apply_cancelled" } };
+    // At the machine: its own offer, its own disk.
+    if (stage.place === "host") {
+      const offer = HOST_OFFERS.find((o) => o.model === stage.model);
+      const total = hostDisk.has(stage.model) ? 0 : offer?.download_size ?? 400_000_000;
+      for (let done = 0; total && done < total; done = Math.min(total, done + 300e6 / 8)) {
+        onProgress({ phase: "download", done, total });
+        await sleep(125, signal);
+        if (signal.aborted) return cancelled;
+        if (toggles.offline) return { ok: false, step: "host", reason: { key: "host_unreachable" } };
+      }
+      if (total) { onProgress({ phase: "download", done: total, total }); hostDisk.add(stage.model); }
+      onProgress({ phase: "load" }); await sleep(800, signal); if (signal.aborted) return cancelled;
+      onProgress({ phase: "check" }); await sleep(1000, signal); if (signal.aborted) return cancelled;
+      return { ok: true, result: { load_ms: 1400, passes: task === "stt" ? [{ latency_ms: 260 }] : [{ first_audio_ms: 240, realtime: 9.5 }] } };
+    }
     if (stage.place !== "device") {
       onProgress({ phase: "check" });
       await sleep(900, signal);

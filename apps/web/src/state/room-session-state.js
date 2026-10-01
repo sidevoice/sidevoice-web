@@ -350,7 +350,9 @@ export function keyedProvider(s, id) {
 export function stageContext(s) {
     return { catalog: s.modelCatalog, offers: s.deviceOffers, installed: s.installedBuilds, inApp: s.inApp, language: s.speechLanguage,
         languages: s.voiceLanguages, remote: s.remoteModels, integrations: s.integrationsStatus, keyed: (id) => keyedProvider(s, id),
-        checks: s.stageChecks, diagnostics: s.stageDiagnostics, pageFacts: s.pageFacts };
+        checks: s.stageChecks, diagnostics: s.stageDiagnostics, pageFacts: s.pageFacts,
+        // The machine in use as a place: what it can run, what it has, what it is called (sidevoice-core#21).
+        hostOffers: s.hostOffers ?? null, hostInstalled: s.hostInstalled ?? [], hostLabel: s.hostLabel ?? '' };
 }
 /** Transcription and voice as their panes show them: the draft while the dialog edits one, else what is saved. */
 export function stagesView(s) {
