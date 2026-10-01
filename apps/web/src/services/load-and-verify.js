@@ -42,7 +42,8 @@ function ask(worker, message, { onProgress, onAudio, signal } = {}) {
 }
 
 /* Download progress across the files a load fetches, in bytes (downloads.js's counter, which also carries the
- * desktop app's own speed). The step is the download while a file is still arriving, the load after. */
+ * desktop app's own speed). The step is the download until an authoritative end of it: the desktop app's install
+ * over (`loading`), or the load itself done. A failure while a file is still arriving is the download's. */
 function tracker(expected, onProgress, download) {
     const files = new Map(), bytes = byteCounter(expected);
     const state = { step: download ? 'download' : 'load', loadFrom: null };
@@ -54,11 +55,12 @@ function tracker(expected, onProgress, download) {
             const counted = bytes(event);
             if (!counted) return;
             if (event.status === 'done') {
+                // A file that finished says nothing about the ones not asked for yet (a configuration file finishes
+                // before the weights start, N02): the download is over only when the load is — or, in the desktop
+                // app, when its install is (`loading`). Until then it is still a download, with its Cancelar.
                 files.set(name, true);
-                if ([...files.values()].every(Boolean)) {
-                    state.step = 'load'; state.loadFrom = now();
-                    onProgress(download ? { step: 'load', ...counted } : { step: 'load' });
-                }
+                if ([...files.values()].every(Boolean)) state.loadFrom = now();
+                if (download) onProgress({ step: 'download', ...counted });
                 return;
             }
             files.set(name, false);

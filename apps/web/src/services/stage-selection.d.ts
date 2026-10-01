@@ -17,6 +17,6 @@ export function createStageSelection(hooks: {
   publish(task: 'stt' | 'tts', check: StageCheck | null): void;
   consent(task: 'stt' | 'tts', stage: Stage): Promise<{ size: number } | null>;
   verify(task: 'stt' | 'tts', stage: Stage, options: { signal: AbortSignal; onProgress(progress: CheckProgress): void }): Promise<CheckResult>;
-  activate(task: 'stt' | 'tts', stage: Stage, result: CheckResult, options: { signal: AbortSignal }): Promise<void> | void;
+  activate(task: 'stt' | 'tts', stage: Stage, result: CheckResult, options: { signal: AbortSignal; commit(): void }): Promise<void> | void;
   discard(task: 'stt' | 'tts', stage: Stage, result: CheckResult | null): void;
 }): StageSelection;

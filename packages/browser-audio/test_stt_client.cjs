@@ -150,3 +150,21 @@ test('a swap the call refused is undone: the old worker is back, the new one is 
  swap.commit();
  assert.equal(A.terminated,0,'a commit after a restore lets nothing go');
 });
+
+test('a preparation that is cancelled ends quietly: no failure is shown, and the keyed cancel is handed on (N03)',async()=>{
+ for(const how of ['abandon','native']){
+  const events=[];
+  const {client,context}=setup();
+  context.window.dispatchEvent=event=>events.push(event.detail);
+  class Fake{constructor(){this.posted=[]}postMessage(d){this.posted.push(d)}terminate(){}}
+  const worker=new Fake();client.worker=worker;client.native=false;client._listen(worker);
+  const loading=client.prepare({model:'whisper-base',engine:'sherpa-onnx',accelerator:'cpu'});
+  if(how==='abandon'){client.abandon();await assert.rejects(loading,{name:'AbortError'})}
+  else{
+   worker.onmessage({data:{id:worker.posted[0].id,type:'error',error:'Descarga cancelada.',step:'download',reason:{key:'install_cancelled',message:'cancelled'}}});
+   await assert.rejects(loading,error=>error.reason?.key==='install_cancelled');
+  }
+  assert.ok(!events.some(detail=>detail.phase==='error'),how+': no failure dialog');
+  assert.equal(events.at(-1).phase,'hidden',how);
+ }
+});

@@ -51,7 +51,8 @@ test("a transcription model is downloaded with progress in bytes, loaded, then c
   expect(result.passes).toHaveLength(2);
   expect(result.latency_ms).toBe(result.passes[1].latency_ms);
   expect(progress).toContainEqual({ step: "download", done: 30, total: 100, bytes_per_s: null });
-  expect(progress).toContainEqual({ step: "load", done: 60, total: 100, bytes_per_s: null });
+  expect(progress).toContainEqual({ step: "download", done: 60, total: 100, bytes_per_s: null });
+  expect(progress.some((p) => (p as { step: string }).step === "load")).toBe(false);
   expect(progress).toContainEqual({ step: "check", pass: 2, passes: 2 });
   expect(fake.posted.map((m) => m.type)).toEqual(["load", "transcribe", "transcribe"]);
   expect(fake.posted[1]).toMatchObject({ language: "es", accelerator: "wasm" });
@@ -147,4 +148,26 @@ test("a model already on disk is loaded, not downloaded, though its files are re
   expect(progress.some((p) => p.step === "download")).toBe(false);
   const failing = worker({ load: (_m, send) => { send({ type: "progress", progress: { status: "progress", file: "a", loaded: 1, total: 9 } }); send({ type: "error", error: "bad graph" }); } });
   expect(await verifyDevice({ task: "stt", build: BUILD, open: () => failing, fetchClip: clipBytes, language: "es", download: false })).toMatchObject({ step: "load", reason: { key: "load_failed" } });
+});
+
+test("a configuration file that finishes before the weights start does not end the download (review N02)", async () => {
+  let release!: () => void;
+  const fake = worker({
+    load: async (_m, send) => {
+      send({ type: "progress", progress: { status: "progress", file: "config.json", loaded: 100, total: 100 } });
+      send({ type: "progress", progress: { status: "done", file: "config.json" } });
+      send({ type: "progress", progress: { status: "progress", file: "onnx/encoder_model_quantized.onnx", loaded: 1024, total: 30_000_000 } });
+      await new Promise<void>((resolve) => { release = resolve; });
+      send({ type: "ready", runtime: {} });
+    },
+    transcribe: (_m, send) => send({ type: "result", result: { text: ES } }),
+  });
+  const progress: { step: string; done?: number }[] = [];
+  const pending = verifyDevice({ task: "stt", build: BUILD, open: () => fake, fetchClip: clipBytes, language: "es", expected: 79_664_191, onProgress: (p) => progress.push(p) });
+  await new Promise((r) => setTimeout(r, 10));
+  expect(progress.map((p) => p.step)).toEqual(["download", "download", "download"]);
+  expect(progress.at(-1)).toMatchObject({ step: "download", done: 1124 });
+  release();
+  expect((await pending).ok).toBe(true);
+  expect(progress.find((p) => p.step !== "download")?.step).toBe("check");
 });

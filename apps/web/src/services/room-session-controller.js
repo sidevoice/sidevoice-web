@@ -1271,6 +1271,8 @@ async function joinRoom(epoch,context){
  const replaced=context.keepCurrent&&state.ws&&state.ws!==socket?state.ws:null;
  state.ws=socket;
  if(replaced)dropReplacedSession(replaced);
+ // From here the call is on the new session: a swap that got this far is done, never undone (review R01).
+ context.onCommit?.();
  // What reopens this socket by itself is the call, never the swap that opened it.
  const again={browserStt:context.browserStt,sttRuntime:context.sttRuntime};
  socket.onclose=event=>{if(state.ws===socket)lostConnection(event,epoch,again)};
@@ -1684,7 +1686,7 @@ async function recordDiagnostics(task,stage,result,build){
  * refuses, or one cancelled meanwhile, puts back what was there and throws its reason: nothing is stored, nothing is
  * unloaded, and the selection lets the candidate go. */
 let switchRefusal=null;
-async function activateStage(task,stage,result,{signal}={}){
+async function activateStage(task,stage,result,{signal,commit}={}){
  const previous=state.voicePreferences||devicePreferences(),ctx=stageContext(state);
  const saved=withVoicesChosen(ctx,stage),next={...previous,[task]:saved};
  const before=previous?.[task]?deviceRequest(effectiveStage(ctx,task,previous[task])):null;
@@ -1694,15 +1696,22 @@ async function activateStage(task,stage,result,{signal}={}){
   const cancel=()=>abortSwitch();signal?.addEventListener('abort',cancel);
   try{
    switchRefusal=null;
-   applied=await applyTranscriptionSettings(previous,next);
+   // The commit point is the call taking the change (its new session admitted, or a local swap starting): before
+   // it a cancel aborts the handover and nothing changes; from it the change is finished, stored and the previous
+   // model let go, whatever arrives meanwhile (review R01).
+   applied=await applyTranscriptionSettings(previous,next,{onCommit:commit});
    if(signal?.aborted)throw Object.assign(Error('The change was cancelled.'),{reason:{key:'apply_cancelled',message:'The change was cancelled.'}});
    // A change the call has to rebuild its pipeline for went through only if the new session did.
    if(state.ws&&pipelineSettingsChanged(previous,next)&&applied!=='switched')
     throw Object.assign(Error('The call refused the change.'),{reason:switchRefusal||{key:'switch_refused',message:'The call refused the change.'}});
   }catch(error){handover?.restore();throw error}
   finally{signal?.removeEventListener('abort',cancel)}
+  commit?.();
   handover?.commit();
- }else if(result.worker)window.roomVoice.adopt(result.worker,{native:result.native,model:result.build.model,accelerator:result.build.accelerator});
+ }else{
+  commit?.();
+  if(result.worker)window.roomVoice.adopt(result.worker,{native:result.native,model:result.build.model,accelerator:result.build.accelerator});
+ }
  storePreferences(next);
  // The pane keeps showing what the person chose (a provider's "Automática" voice too); what is stored names it.
  roomStore.patch({voicePreferences:next,stageDraft:{...(state.stageDraft||{stt:previous?.stt,tts:previous?.tts}),[task]:stage}});
@@ -1919,6 +1928,8 @@ window.addEventListener('voice-output',event=>noteOutputHealth(event.detail?.kin
 function modelLabel(id){return state.modelCatalog?.models?.find(model=>model.id===id)?.label||id}
 /* A device stage's transcription model, on its build. WebGPU that fails to load it (the iPhone) falls back to the
  * same engine on WASM when this device has it, and this device stops offering WebGPU from then on. */
+/** Whether an error is a cancel — the page's own (AbortError), or the desktop app's keyed one — and not a failure. */
+function cancelled(error){return error?.name==='AbortError'||['install_cancelled','load_cancelled'].includes(error?.reason?.key)}
 /* A load that may download first — a call connecting with a model not on disk yet, or Precargar — is the room's
  * download too: listed with its bytes, speed and time left, and cancelled there (`cancel`). `load(progress)` runs it. */
 async function trackedLoad(task,request,load,cancel){
@@ -1932,8 +1943,8 @@ async function trackedLoad(task,request,load,cancel){
   if(request.native&&!onDisk(request))roomStore.patch({installedBuilds:[...(state.installedBuilds||[]),{model:request.model,engine:request.engine}]});
   return value;
  }catch(error){
-  const cancelled=error?.name==='AbortError'||['install_cancelled','load_cancelled'].includes(error?.reason?.key);
-  downloads.end(id,cancelled?'cancelled':'failed',cancelled?'':sayRefusal(error?.reason,String(error?.message||error)));
+  const stopped=cancelled(error);
+  downloads.end(id,stopped?'cancelled':'failed',stopped?'':sayRefusal(error?.reason,String(error?.message||error)));
   throw error;
  }
 }
@@ -1941,8 +1952,11 @@ async function trackedLoad(task,request,load,cancel){
 function cancelJoinLoad(task){if(state.connecting)disconnect();if(task==='stt')window.roomTranscription?.abandon?.();else window.roomVoice?.abandon?.()}
 async function prepareLocalWhisper(build){
  const prepare=chosen=>trackedLoad('stt',buildRequest(chosen),progress=>window.roomTranscription.prepare(buildRequest(chosen),progress||undefined),()=>cancelJoinLoad('stt'));
+ const epoch=connectEpoch;
  try{return await prepare(build)}
  catch(error){
+  // A cancel is the end of this preparation, never a reason to try another copy; nor is a join that is gone (N01).
+  if(cancelled(error)||epoch!==connectEpoch)throw error;
   const offer=state.deviceOffers?.find(item=>item.model===build.model);
   const fallback=build.accelerator==='webgpu'&&[offer,...(offer?.alternatives||[])].find(choice=>choice?.engine===build.engine&&choice.accelerator==='wasm');
   if(!fallback)throw error;
@@ -1984,7 +1998,8 @@ function localModelSwap(previous,next){return !!state.ws&&next?.stt?.place===DEV
  * Whisper model, its GPU→CPU fallback) loads while the call goes on over the socket it already has,
  * the new session only replaces the old one once the room has answered it, and a refusal leaves the
  * call exactly as it was — with the room's own reason for it said out loud. */
-async function switchSession(previous,next){
+let switchCommitted=0;
+async function switchSession(previous,next,{onCommit}={}){
  if(!state.ws)return false;
  // The last save wins: a swap still in flight is abandoned, never queued behind this one.
  if(state.switchingSession)abortSwitch();
@@ -1999,7 +2014,7 @@ async function switchSession(previous,next){
   const context=await prepareTranscription(next);
   if(stale())return false;
   phase='room';joinStatus(step);
-  const session=await joinRoom(epoch,{...context,keepCurrent:true});
+  const session=await joinRoom(epoch,{...context,keepCurrent:true,onCommit:()=>{switchCommitted=attempt;onCommit?.()}});
   if(stale()||!session)return false;
   await window.roomVoice?.unlock();
   roomStore.patch({engineReady:true,enginePreferences:next,voicePreferences:next,sttRuntime:context.sttRuntime});showEchoCover();
@@ -2018,15 +2033,18 @@ async function switchSession(previous,next){
 }
 // Cancelling the preparation abandons the swap, not the call: the old session was never touched.
 function abortSwitch(){
- if(!state.switchingSession)return;
+ // A swap the call has already taken (its new session admitted) is past cancelling: it finishes.
+ if(!state.switchingSession||switchCommitted===switchEpoch)return;
  ++switchEpoch;state.switchingSession=false;
  const opening=openingSocket;openingSocket=null;opening?.close();
  showPreparation({phase:'hidden'});clearJoinStatus();
 }
-async function applyTranscriptionSettings(previous,next){
+async function applyTranscriptionSettings(previous,next,{onCommit}={}){
  if(!state.ws)return false;
- if(pipelineSettingsChanged(previous,next))return await switchSession(previous,next)&&'switched';
+ if(pipelineSettingsChanged(previous,next))return await switchSession(previous,next,{onCommit})&&'switched';
  if(!localModelSwap(previous,next))return false;
+ // A local swap is not refused by anybody: it is committed as it starts.
+ onCommit?.();
  const socket=state.ws,epoch=connectEpoch;state.switchingTranscription=true;
  window.roomTranscription.stop({cancelTurn:true});
  try{

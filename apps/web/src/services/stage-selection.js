@@ -7,7 +7,8 @@
  * (`discard`) and the previous model stays active and loaded. Only a passed check (and, when it was slow, the
  * person's "usar igualmente") calls `activate`, which hands the candidate over (in a call, the call has to take it),
  * and only once that went through stores the choice and unloads the previous model; an activation that fails throws
- * (its `reason`, a refusal) having changed nothing, and the candidate is let go. A newer selection of the same stage replaces one in flight.
+ * (its `reason`, a refusal) having changed nothing, and the candidate is let go. Activation says when it reaches its
+ * commit point (`commit()`): from there it is finished, and a cancel no longer applies (review R01). A newer selection of the same stage replaces one in flight.
  *
  * The how is injected — `consent(task, stage)` says what a download costs (null when there is none),
  * `verify(task, stage, {onProgress, signal})` is load-and-verify.js's, `activate` and `discard` are the
@@ -18,7 +19,8 @@ export function createStageSelection({ publish, consent, verify, activate, disca
 
     function cancel(task) {
         const run = runs[task];
-        if (!run) return;
+        // Past the commit point the change has happened (a call took the new session): it is finished, not undone.
+        if (!run || run.committed) return;
         delete runs[task];
         run.controller.abort();
         run.decide?.(false);
@@ -45,7 +47,12 @@ export function createStageSelection({ publish, consent, verify, activate, disca
             publish(task, { phase: 'running', stage, progress: { step: needed ? 'download' : 'load' }, recheck });
             result = await verify(task, stage, { signal: run.controller.signal,
                 onProgress: (progress) => { if (live()) publish(task, { phase: 'running', stage, progress, recheck }); } });
-            if (!live() || result.cancelled) { discard(task, stage, result); return; }
+            if (!live() || result.cancelled) {
+                discard(task, stage, result);
+                // Cancelled from elsewhere (the desktop app's own cancel): over, and not a failure (N03).
+                if (live()) { delete runs[task]; publish(task, null); }
+                return;
+            }
             if (!result.ok) {
                 discard(task, stage, result);
                 publish(task, { phase: 'failed', stage, step: result.step, reason: result.reason, result, recheck });
@@ -63,7 +70,7 @@ export function createStageSelection({ publish, consent, verify, activate, disca
             // Taking effect is part of the selection: a call that refuses the change leaves everything as it was, and
             // only an activation that went through is done (review R01).
             publish(task, { phase: 'running', stage, progress: { step: 'apply' } });
-            await activate(task, stage, result, { signal: run.controller.signal });
+            await activate(task, stage, result, { signal: run.controller.signal, commit: () => { run.committed = true; } });
             if (live()) publish(task, { phase: 'done', stage, result });
         } catch (error) {
             if (result?.ok) discard(task, stage, result);

@@ -48,7 +48,7 @@ test("a model takes effect only after its check passed, and the previous one is 
   await s.finish();
   await done;
   expect(s.order).toEqual(["verify", "verified", "activate"]);
-  expect(s.hooks.activate).toHaveBeenCalledWith("stt", BASE, expect.objectContaining({ ok: true }), { signal: expect.any(AbortSignal) });
+  expect(s.hooks.activate).toHaveBeenCalledWith("stt", BASE, expect.objectContaining({ ok: true }), { signal: expect.any(AbortSignal), commit: expect.any(Function) });
   expect(s.hooks.discard).not.toHaveBeenCalled();
   expect(s.last()).toMatchObject({ phase: "done" });
 });
@@ -173,4 +173,34 @@ test("cancelling while it takes effect reaches the activation, and says nothing 
   expect(signal!.aborted).toBe(true);
   expect(s.last()).toBeNull();
   expect(s.hooks.discard).toHaveBeenCalledTimes(1);
+});
+
+test("a check the desktop app cancelled itself ends the selection quietly: nothing shown, nothing running (N03)", async () => {
+  const s = selection();
+  const done = s.it.select("stt", BASE);
+  await settle();
+  await s.finish({ ok: false, cancelled: true, step: "download", passes: [] });
+  await done;
+  expect(s.last()).toBeNull();
+  expect(s.it.busy("stt")).toBe(false);
+  expect(s.hooks.discard).toHaveBeenCalledTimes(1);
+  expect(s.hooks.activate).not.toHaveBeenCalled();
+});
+
+test("past its commit point an activation is finished: a cancel then changes nothing and it ends done (R01)", async () => {
+  const s = selection();
+  let release!: () => void;
+  s.hooks.activate.mockImplementationOnce(async (...args: unknown[]) => {
+    const { signal, commit } = args[3] as { signal: AbortSignal; commit(): void };
+    commit();
+    await new Promise<void>((resolve) => { release = resolve; });
+    expect(signal.aborted).toBe(false);
+  });
+  const done = s.it.select("stt", BASE);
+  await settle(); await s.finish();
+  s.it.cancel("stt");
+  release();
+  await done;
+  expect(s.last()).toMatchObject({ phase: "done" });
+  expect(s.hooks.discard).not.toHaveBeenCalled();
 });

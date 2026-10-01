@@ -2641,7 +2641,7 @@ test('A model download that failed on WebGPU falls back once and leaves the GPU 
  s.context.__failure=()=>failure;
  s.run("window.roomTranscription.prepare=async options=>{if(options.accelerator==='webgpu')throw __failure();return {model:options.model,engine:options.engine,accelerator:options.accelerator}}");
  const count=()=>stageView(s,'stt').models.length;
- for(const error of [Error('Failed to fetch model download'),Object.assign(Error('cancelled'),{name:'AbortError'}),Error('Could not locate file: "https://huggingface.co/…/encoder_model.onnx"')]){
+ for(const error of [Error('Failed to fetch model download'),Error('Could not locate file: "https://huggingface.co/…/encoder_model.onnx"')]){
   failure=error;
   const runtime=plain(await s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"));
   assert.equal(runtime.sttRuntime.accelerator,'wasm','the call still goes on, on the CPU');
@@ -2957,4 +2957,106 @@ test('A download a call starts while connecting is listed, and cancelling it aba
  s.run("window.sidevoiceActions.cancelDownload("+JSON.stringify(item.id)+")");
  assert.equal(abandoned,1);
  assert.equal(plain(s.run('state.downloads'))[0].state,'cancelled');
+});
+
+/* Review N01: a cancel is the end of a preparation, never a reason to try the other accelerator. */
+test('Cancelling a call\'s WebGPU download from the room ends the preparation: no WASM copy is started (N01)',async()=>{
+ const s=setup();const saved={};
+ s.context.localStorage={getItem:key=>saved[key]??null,setItem:(key,value)=>{saved[key]=value},removeItem(key){delete saved[key]}};
+ await measured(s,PAGE_CAPS);
+ const calls=[];let reject,progress;
+ s.context.__prepare=(options,onProgress)=>{calls.push(options.accelerator);progress=onProgress;return new Promise((_,no)=>{reject=no})};
+ s.run("window.roomTranscription.prepare=(options,onProgress)=>__prepare(options,onProgress);window.roomTranscription.abandon=()=>{}");
+ const preparing=s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})");preparing.catch(()=>{});
+ await settle();
+ progress({status:'progress',file:'onnx/encoder_model_fp32.onnx',loaded:1e6,total:2e8});
+ const [row]=plain(s.run('state.downloads'));
+ s.run("window.sidevoiceActions.cancelDownload("+JSON.stringify(row.id)+")");
+ reject(Object.assign(Error('Transcripción cancelada'),{name:'AbortError'}));
+ await assert.rejects(preparing,{name:'AbortError'});
+ await settle();
+ assert.deepEqual(calls,['webgpu'],'nothing else is downloaded');
+ assert.deepEqual(plain(s.run('state.downloads')).map(item=>item.state),['cancelled']);
+ assert.equal(saved['sidevoice.webgpu-failed'],undefined,'and a cancel says nothing about the GPU');
+});
+test('A keyed cancel from the desktop app ends the preparation the same way, and a join that is gone tries nothing else (N01)',async()=>{
+ const s=setup();
+ await measured(s,PAGE_CAPS);
+ const calls=[];
+ s.context.__prepare=options=>{calls.push(options.accelerator);return Promise.reject(Object.assign(Error('Descarga cancelada.'),{reason:{key:'install_cancelled',message:'x'}}))};
+ s.run("window.roomTranscription.prepare=options=>__prepare(options)");
+ await assert.rejects(s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"),error=>error.reason?.key==='install_cancelled');
+ assert.deepEqual(calls,['webgpu']);
+ calls.length=0;
+ s.context.__prepare=options=>{calls.push(options.accelerator);s.run('connectEpoch++');return Promise.reject(Error('GPU device lost'))};
+ await assert.rejects(s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"),/GPU device lost/);
+ assert.deepEqual(calls,['webgpu'],'the join that owned it is gone: no second attempt');
+});
+
+/* Review R01 (re-check): a Cancel that lands after the room admitted the new session — while the page is still
+ * finishing the switch (here: audio unlock held open) — is past the commit point: the change completes, stored,
+ * and the previous model is let go, consistently. */
+test('A cancel after the room admitted the new session does not half-undo it: the change finishes and is stored (R01)',async()=>{
+ const {s,old,unloads,next}=await handover();
+ let unlock;s.context.__held=resolve=>{unlock=resolve};
+ s.run("window.roomVoice.unlock=()=>new Promise(resolve=>__held(resolve))");
+ next.readyState=1;next.onopen();
+ next.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
+ await settle();
+ assert.equal(typeof unlock,'function','the switch is past hello, waiting on the audio unlock');
+ assert.equal(old.closed,true,'the call is already on the new session');
+ s.run("window.sidevoiceActions.cancelStage('stt')");
+ unlock();
+ await settle();
+ assert.equal(s.run('sessionId'),'new-session');
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-1');
+ assert.equal(s.run('enginePreferences.stt.model'),'whisper-1');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-1','stored: the active choice and the stored one agree');
+ assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']],'the model the old session used is let go');
+ assert.equal(plain(s.run('stageChecks.stt')).phase,'done');
+});
+test('A cancel before the room answered still aborts the new session and changes nothing (R01)',async()=>{
+ const {s,old,unloads,next}=await handover();
+ s.run("window.sidevoiceActions.cancelStage('stt')");
+ await settle();
+ assert.equal(next.closed,true,'the opening socket is closed');
+ assert.equal(s.run('ws'),old);
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+ assert.equal(s.saved['sidevoice.stages'],undefined);
+ assert.deepEqual(unloads,[]);
+});
+
+/* Review N02: a configuration file that finished says nothing about the weights still to come. */
+test('A finished config file does not end the room\'s download: it stays running, with its Cancelar, which still works (N02)',async()=>{
+ const s=setup({strictDOM:true});let terminated=0;
+ await measured(s,{webgpu:false,webgpuFp16:false,wasm:true});
+ s.context.__page={posted:[],postMessage(message){this.posted.push(message);if(message.type!=='load')return;
+   const send=progress=>setTimeout(()=>this.onmessage?.({data:{id:message.id,type:'progress',progress}}),0);
+   send({status:'progress',file:'config.json',loaded:100,total:100});send({status:'done',file:'config.json'});
+   send({status:'progress',file:'onnx/encoder_model_quantized.onnx',loaded:1024,total:30e6})},terminate(){terminated++}};
+ s.run("window.roomTranscription.candidate=()=>__page;ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");await settle();
+ s.run("window.sidevoiceActions.decideStage('stt',true)");await settle();
+ const [item]=plain(s.run('state.downloads'));
+ assert.deepEqual([item.state,item.done],['running',1124]);
+ const view=plain(s.run('roomStore.getState().downloads'));
+ assert.deepEqual([view.running,view.rows[0].status,view.rows[0].cancellable],[1,'Descargando',true]);
+ assert.equal(plain(s.run('stageChecks.stt')).progress.step,'download');
+ assert.equal(s.run("downloads.cancel("+JSON.stringify(item.id)+")"),true);
+ await settle();
+ assert.equal(terminated,1,'the weights stop downloading');
+});
+
+/* Review N03: a cancel is an end, not a failure, wherever it comes from. */
+test('A voice download the desktop app cancelled while a call connects is said cancelled, not failed (N03)',async()=>{
+ const s=setup({strictDOM:true});
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu'],memory_mb:16384}),installed:async()=>[]}}};
+ await s.run('measureDevice(true)');
+ s.context.__reject=null;
+ s.run("window.roomVoice={prepare:(options,status,onProgress)=>new Promise((_,no)=>{__reject=no}),abandon(){},cancel(){}}");
+ const loading=s.run("trackedLoad('tts',ttsRequest("+JSON.stringify(TTS())+"),progress=>window.roomVoice.prepare({},()=>{},progress),()=>{})");loading.catch(()=>{});
+ await settle();
+ s.context.__reject(Object.assign(Error('Descarga cancelada.'),{step:'download',reason:{key:'install_cancelled',message:'x'}}));
+ await assert.rejects(loading);
+ assert.deepEqual(plain(s.run('state.downloads')).map(item=>[item.state,item.error]),[['cancelled','']]);
 });

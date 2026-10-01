@@ -40,12 +40,13 @@ import {refusalText} from './refusals.js';
   halt();
   let load_ms=0;
   if(!inMemory){
-   // This worker owns the instance it loads: until the load is over, a cancel releases it (an unload also stops a
-   // load still in flight); one that completes after the cancel is released then.
+   // This worker owns the instance it loads until the page has it: through the load, and after it until its `ready`
+   // is delivered (Stand.emit). A cancel anywhere in that span releases it (an unload also stops a load still in
+   // flight); one that completes after the cancel is released then (review R04).
    const build={model,engine:name,accelerator};
    progress({status:'loading',file:model});stand.loading=build;stand.released.delete(model+'/'+name+'/'+accelerator);
    try{load_ms=Number((await at('load',()=>engine.load(model,name,accelerator)))?.load_ms)||0}
-   finally{if(stand.loading===build)stand.loading=null}
+   catch(error){if(stand.loading===build)stand.loading=null;throw error}
    if(stand.epoch!==epoch){stand.release(build);halt()}
   }
   return {cached,load_ms};
@@ -53,7 +54,9 @@ import {refusalText} from './refusals.js';
  /* Posts to whoever set onmessage, asynchronously, like a Worker. */
  class Stand{
   constructor(engine){this.engine=engine;this.onmessage=null;this.onerror=null;this.epoch=0;this.chain=Promise.resolve();this.job=null;this.loading=null;this.released=new Set()}
-  emit(data){setTimeout(()=>this.onmessage?.({data}),0)}
+  // A message is delivered only if no cancel came in between; a delivered `ready` hands the instance it reports over
+  // to the page, which from then on is the one to release it.
+  emit(data){const epoch=this.epoch;setTimeout(()=>{if(epoch!==this.epoch)return;if(data.type==='ready')this.loading=null;this.onmessage?.({data})},0)}
   // A cancel, or a worker let go, stops what this worker was doing — a download the app is running for it, and a load.
   stop(){
    this.epoch++;const job=this.job,loading=this.loading;this.job=null;this.loading=null;

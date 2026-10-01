@@ -58,3 +58,40 @@ test('a load the app cancelled (an unload landed on it) is a cancel, not a failu
  const outcome=await result;
  assert.deepEqual([outcome.ok,outcome.cancelled,outcome.step],[false,true,'load']);
 });
+
+/* Review R04 (re-check): the load is done and the worker has queued its `ready`, but the page has not seen it yet when
+ * the cancel lands. The instance is still the worker's then, and is released. */
+test('a cancel after the load resolved but before its ready reached the page releases that instance (R04)',async()=>{
+ const actions=[],load=deferred();
+ const engine={installed:async()=>[{model:'whisper-base',engine:'sherpa-onnx'}],loaded:async()=>[],
+  load(model,name,accelerator){actions.push(['load',model,name,accelerator]);return load.promise},
+  unload:async(model,name,accelerator)=>{actions.push(['unload',model,name,accelerator]);return null},
+  cancel:async()=>true,install(){throw Error('not here')},transcribe:async()=>'hola'};
+ globalThis.__sidevoiceDesktop={host:{nativeEngine:engine}};new Function(BUNDLE)();
+ const workers=globalThis.sidevoiceNativeWorkers,controller=new AbortController();
+ const result=check(workers,controller.signal);
+ await settle();
+ assert.deepEqual(actions,[['load','whisper-base','sherpa-onnx','coreml']]);
+ load.resolve({load_ms:5});
+ for(let i=0;i<20;i++)await Promise.resolve();   // microtasks only: the worker queues its ready, no timer runs
+ controller.abort();
+ const outcome=await result;
+ await settle();                                   // now the timers: the ready that was queued
+ assert.deepEqual([outcome.cancelled,outcome.loaded],[true,false]);
+ assert.deepEqual(actions,[['load','whisper-base','sherpa-onnx','coreml'],['unload','whisper-base','sherpa-onnx','coreml']]);
+});
+test('a ready the page received makes the instance the page\'s: the worker does not release it on a later cancel',async()=>{
+ const actions=[];
+ const engine={installed:async()=>[{model:'whisper-base',engine:'sherpa-onnx'}],loaded:async()=>[],
+  load:async(...args)=>{actions.push(['load',...args]);return {load_ms:5}},unload:async(...args)=>{actions.push(['unload',...args]);return null},
+  cancel:async()=>true,install(){throw Error('not here')},transcribe:()=>new Promise(()=>{})};
+ globalThis.__sidevoiceDesktop={host:{nativeEngine:engine}};new Function(BUNDLE)();
+ const workers=globalThis.sidevoiceNativeWorkers,controller=new AbortController();
+ const result=check(workers,controller.signal);
+ await settle();
+ controller.abort();   // after ready was delivered (the check itself ends either way)
+ const outcome=await result;
+ await settle();
+ assert.equal(outcome.loaded,true,'the page knows it loaded, and releases it itself (discardCandidate)');
+ assert.ok(!actions.some(([kind])=>kind==='unload'),'not released twice');
+});
