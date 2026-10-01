@@ -152,6 +152,15 @@ function Shell() {
                 ))}
               </details>
             )}
+            <details className="codes" open>
+              <summary>Claves de proveedores</summary>
+              <p className="hint">Pega en el campo de clave que esté abierto (o se copian). Las que llevan «proto» pasan la validación.</p>
+              <div className="code-row">
+                <button type="button" onClick={() => send({ type: "paste-key", value: "sk-proto-openai-9f3a2c" })}>OpenAI válida</button>
+                <button type="button" onClick={() => send({ type: "paste-key", value: "el-proto-11labs-7f2c" })}>ElevenLabs válida</button>
+                <button type="button" onClick={() => send({ type: "paste-key", value: "sk-esta-no-vale" })}>rechazada</button>
+              </div>
+            </details>
             <details className="toggles">
               <summary>Variantes ({active})</summary>
               {groups.map((group) => (

@@ -42,13 +42,26 @@ function room(capabilities: Capabilities, inApp = false, models: Catalog = catal
   return { store: store as RoomStore, openIntegration };
 }
 const pane = (task: StageTask) => document.querySelector(`.stage-settings[data-task=${task}]`)!;
-const modelIds = (task: StageTask) => [...pane(task).querySelectorAll<HTMLOptionElement>(`#${task}-model option`)].map((o) => o.value);
+/** A ChoiceSelect's values, read by opening it and closing it again. */
+function choiceValues(id: string): string[] {
+  const trigger = document.getElementById(id)!;
+  fireEvent.click(trigger);
+  const values = [...document.querySelectorAll<HTMLElement>(`#${id}-list [role=option]`)].map((item) => item.dataset.value!);
+  fireEvent.click(trigger);
+  return values;
+}
+function choose(id: string, value: string) {
+  fireEvent.click(document.getElementById(id)!);
+  fireEvent.click(document.querySelector<HTMLElement>(`#${id}-list [role=option][data-value="${value}"]`)!);
+}
+const modelIds = (task: StageTask) => choiceValues(`${task}-model`);
 
 test("a WASM-only page offers three models, one with WebGPU and f16 five; no engine choice outside Avanzado", () => {
   room(WASM);
   expect(modelIds("stt")).toEqual(["whisper-tiny", "whisper-base"]);
   expect(modelIds("tts")).toEqual(["kokoro-82m-v1.0"]);
-  expect(screen.getAllByRole("option", { name: "Este dispositivo" })).toHaveLength(2);
+  expect(choiceValues("stt-place")).toContain("device");
+  expect(choiceValues("tts-place")).toContain("device");
   expect(pane("stt").textContent).toMatch(/este navegador/);
   expect(pane("stt").querySelector("summary")!.textContent).toBe("Avanzado");
   document.body.innerHTML = "";
@@ -70,16 +83,16 @@ test("a place change makes the model list follow; a model change makes the optio
   const optionIds = () => [...pane("stt").querySelectorAll("[id^=stt-option-]")].map((node) => node.id.replace("stt-option-", ""));
   expect(modelIds("stt")[0]).toBe("whisper-tiny");
   expect(optionIds()).toEqual(["language"]);
-  fireEvent.change(document.getElementById("stt-model")!, { target: { value: "test-parakeet" } });
-  expect(document.getElementById("stt-model")).toHaveValue("test-parakeet");
+  choose("stt-model", "test-parakeet");
+  expect(document.getElementById("stt-model")).toHaveAttribute("data-value", "test-parakeet");
   expect(optionIds()).toEqual(["beam"]);
   expect(document.getElementById("stt-option-beam")).toHaveValue("4");
-  fireEvent.change(document.getElementById("stt-place")!, { target: { value: "openai" } });
-  expect(document.getElementById("stt-place")).toHaveValue("openai");
+  choose("stt-place", "openai");
+  expect(document.getElementById("stt-place")).toHaveAttribute("data-value", "openai");
   expect(modelIds("stt")).toEqual(["gpt-4o-transcribe"]);
   expect(optionIds()).toEqual(["language", "context"]);
   expect(pane("stt").querySelector("#stt-build")).toBeNull();
-  fireEvent.change(document.getElementById("stt-place")!, { target: { value: "device" } });
+  choose("stt-place", "device");
   expect(modelIds("stt")).toContain("test-parakeet");
   fireEvent.change(document.getElementById("stt-build")!, { target: { value: "transformers-js/wasm" } });
   expect(document.getElementById("stt-build")).toHaveValue("transformers-js/wasm");
@@ -87,12 +100,13 @@ test("a place change makes the model list follow; a model change makes the optio
 
 test("a keyless provider opens Integraciones at its row instead of being chosen", () => {
   const { openIntegration } = room(PAGE);
-  const openai = document.querySelector<HTMLOptionElement>("#stt-place option[value=openai]")!;
-  expect(openai).toHaveAttribute("data-state", "missing");
-  expect(openai.textContent).toMatch(/^OpenAI · /);
-  fireEvent.change(document.getElementById("stt-place")!, { target: { value: "openai" } });
+  fireEvent.click(document.getElementById("stt-place")!);
+  const openai = document.querySelector<HTMLElement>("#stt-place-list [role=option][data-value=openai]")!;
+  expect(openai).toHaveAttribute("data-kind", "missing");
+  expect(openai.textContent).toMatch(/^OpenAI/);
+  fireEvent.click(openai);
   expect(openIntegration).toHaveBeenCalledWith("openai");
-  expect(document.getElementById("stt-place")).toHaveValue("device");
+  expect(document.getElementById("stt-place")).toHaveAttribute("data-value", "device");
 });
 
 test("in the app, the native engine's capabilities never yield a page build, and the page's words are absent", () => {

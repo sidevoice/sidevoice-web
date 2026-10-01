@@ -33,14 +33,14 @@ function room() {
   return { store, actions, check };
 }
 const pane = (task: StageTask = "stt") => document.querySelector<HTMLElement>(`.stage-settings[data-task=${task}]`)!;
-const picker = () => pane().querySelector<HTMLSelectElement>("#stt-model")!;
+const picker = () => pane().querySelector<HTMLButtonElement>("#stt-model")!;
 
 test("a model not on this device asks before downloading, with its size; the pane waits for the answer", () => {
   const { actions, check } = room();
   check({ phase: "consent", stage: BASE, size: 79_664_191 });
   expect(pane().textContent).toContain("Descarga necesaria:");
   expect(pane().textContent).toContain("80 MB");
-  expect(picker().value).toBe("whisper-base");
+  expect(picker().dataset.value).toBe("whisper-base");
   expect(picker().disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Descargar y probar" }));
   expect(actions.decideStage).toHaveBeenCalledWith("stt", true);
@@ -70,7 +70,7 @@ test("a failure names the model, the step and the cause, and the pane is back on
   expect(alert.textContent).toContain("La descarga se interrumpió.");
   expect(alert.textContent).toContain("Sigue activo");
   expect(alert.textContent).toContain("Whisper tiny");
-  expect(picker().value).toBe("whisper-tiny");
+  expect(picker().dataset.value).toBe("whisper-tiny");
   expect(picker().disabled).toBe(false);
   check({ phase: "failed", stage: BASE, step: "check", reason: { key: "check_mismatch", heard: "Thanks for watching", message: "x" } });
   expect(screen.getByRole("alert").textContent).toContain("El modelo entendió otra cosa: «Thanks for watching»");

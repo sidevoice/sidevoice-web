@@ -113,3 +113,11 @@ export function HarnessIcon({ harness, size = 12 }: { harness: string; size?: nu
   if (harness === "cursor") return <CursorIcon size={size} />;
   return null;
 }
+
+/** A provider a stage can run at, by its own mark, simplified to one ink; this device is the machine's screen. */
+export function ProviderIcon({ id, size = 16 }: { id: string; size?: number }) {
+  if (id === "device") return <MachinesIcon size={size} />;
+  if (id === "elevenlabs") return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><rect x="7" y="3" width="3.2" height="18" rx="1.6" /><rect x="13.8" y="3" width="3.2" height="18" rx="1.6" /></svg>;
+  if (id === "openai") return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><ellipse cx="12" cy="12" rx="9" ry="4.2" /><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(60 12 12)" /><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(120 12 12)" /></svg>;
+  return <ConnectorIcon size={size} />;
+}

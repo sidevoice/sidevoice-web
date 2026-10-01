@@ -181,6 +181,17 @@ async function boot() {
     if (data.type === "toggles" && data.toggles) { for (const key of Object.keys(toggles)) delete toggles[key]; Object.assign(toggles, data.toggles); }
     if (data.type === "open-settings") controller.openSettings(data.pane ?? "app");
     if (data.type === "open-app") controller.closeSettings();
+    if (data.type === "paste-key" && (data as { value?: string }).value) {
+      const value = (data as { value: string }).value;
+      const field = (document.activeElement instanceof HTMLInputElement && document.activeElement.type === "password" ? document.activeElement : null)
+        ?? document.querySelector<HTMLInputElement>(".key-line input, .integration-row input[type=password]");
+      if (field) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.focus();
+      } else void navigator.clipboard?.writeText(value).catch(() => undefined);
+      post({ type: "code-sent", pasted: !!field });
+    }
     if (data.type === "code" && data.alias) {
       const code = data.variant === "malformed" ? "SV1.esto-no-es-un-codigo!" : hosts.code(data.alias, (data.variant as never) ?? "valid");
       const field = document.getElementById("pair-code") as HTMLTextAreaElement | null;

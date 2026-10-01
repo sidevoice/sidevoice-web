@@ -47,7 +47,23 @@ const PROVIDERS: Record<string, { label: string; capabilities: string[]; environ
 
 const now = () => Math.floor(Date.now() / 1000);
 
-async function identity(): Promise<{ keys: CryptoKeyPair; publicKey: string; fp: string }> {
+const usedSecrets = new Set<string>();
+
+/** A host's identity, the same for the whole browser session (codes copied before a reload still name it). */
+async function identity(name?: string): Promise<{ keys: CryptoKeyPair; publicKey: string; fp: string }> {
+  const stored = name ? sessionStorage.getItem("proto-identity:" + name) : null;
+  if (stored) {
+    const { priv, pub } = JSON.parse(stored);
+    const keys = { privateKey: await crypto.subtle.importKey("jwk", priv, { name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]),
+      publicKey: await crypto.subtle.importKey("jwk", pub, { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"]) } as CryptoKeyPair;
+    const spki = await crypto.subtle.exportKey("spki", keys.publicKey);
+    return { keys, publicKey: b64(spki), fp: bytesToBase64url(new Uint8Array(await crypto.subtle.digest("SHA-256", spki))) };
+  }
+  const made = await fresh();
+  if (name) sessionStorage.setItem("proto-identity:" + name, JSON.stringify({ priv: await crypto.subtle.exportKey("jwk", made.keys.privateKey), pub: await crypto.subtle.exportKey("jwk", made.keys.publicKey) }));
+  return made;
+}
+async function fresh(): Promise<{ keys: CryptoKeyPair; publicKey: string; fp: string }> {
   const keys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
   const spki = await crypto.subtle.exportKey("spki", keys.publicKey);
   const fp = bytesToBase64url(new Uint8Array(await crypto.subtle.digest("SHA-256", spki)));
@@ -89,7 +105,7 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
   const seeds: Record<string, HostSeed> = { ...scenario.hosts };
   if (scenario.bridge?.localHost && !seeds.local) seeds.local = { name: "MacBook de Ana" };
   for (const [alias, seed] of Object.entries(seeds)) {
-    const { keys, publicKey, fp } = await identity();
+    const { keys, publicKey, fp } = await identity(scenario.id + ":" + alias);
     const isLocal = alias === "local";
     const node = alias + "-node";
     // Seen from a browser, this computer's host is reached through the room like any other.
@@ -144,8 +160,9 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
         return json(200, { public_key: host.publicKey, signature: bytesToBase64url(new Uint8Array(signature)) });
       }
       case route === "POST /api/device/pair": {
-        if (!host.secrets.has(body?.secret)) return json(403, { detail: "Ese código no vale: no existe, ya se usó o ha caducado. Pide uno nuevo en la máquina." });
-        host.secrets.delete(body.secret);
+        // Any code this host issued in this browser session is good once — also one copied before a reload.
+        if (!body?.secret || usedSecrets.has(host.fp + ":" + body.secret)) return json(403, { detail: "Ese código no vale: no existe, ya se usó o ha caducado. Pide uno nuevo en la máquina." });
+        usedSecrets.add(host.fp + ":" + body.secret);
         const device_id = "dev-" + Math.random().toString(36).slice(2, 8);
         host.devices.push({ device_id, name: body.name || "Sidevoice", kind: "code", created_at: now(), last_seen: now() });
         await sleep(400);
@@ -193,7 +210,7 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
       case route.startsWith("PUT /api/presentation/integrations/"): {
         const id = path.split("/").pop()!;
         await sleep(900);
-        if (toggles.w4KeyRefused) return json(400, { detail: PROVIDERS[id].label + " rechazó la clave." });
+        if (toggles.w4KeyRefused || !/proto/.test(String(body?.key ?? ""))) return json(400, { detail: PROVIDERS[id].label + " rechazó la clave." });
         host.providers[id] = { configured: true, source: "stored", hint: String(body?.key ?? "").slice(-4) };
         return json(200, listing(host));
       }

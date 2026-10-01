@@ -1,4 +1,6 @@
-import { ModelPicker } from "../../components/models/ModelPicker";
+import type { ReactNode } from "react";
+import { ChoiceSelect } from "../../components/ui/ChoiceSelect";
+import { ProviderIcon } from "../../components/ui/Icons";
 import { OptionsForm } from "../../components/options/OptionFields";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
@@ -18,7 +20,9 @@ const WHERE_NOTES = {
  *  Avanzado the build it runs on. Everything shown is the store's; every change is an action. */
 /** `onMissingPlace`: what choosing a provider with no key does — by default, Integraciones at its row; the wizard
  *  asks for the key in place. */
-export function StageSettings({ task, onMissingPlace }: { task: StageTask; onMissingPlace?: (id: string) => void }) {
+/** `pendingPlace`: a provider chosen whose key is still being asked for — shown as the place, with the model and its
+ *  options waiting until the key is in. */
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
@@ -37,31 +41,27 @@ export function StageSettings({ task, onMissingPlace }: { task: StageTask; onMis
       <div className="ui-field">
         {/* One list, whatever the number of providers (operator, 2026-10-01): this device first, the providers
             under it, a provider with no key said so — choosing it asks for the key. */}
-        <label className="ui-field-label" htmlFor={`${task}-place`}>Dónde</label>
-        <NativeSelect id={`${task}-place`} className="place-select" value={view.place} disabled={locked}
-          onChange={(event) => {
-            const id = event.currentTarget.value;
+        <span className="ui-field-label" id={`${task}-place-label`}>Dónde</span>
+        <ChoiceSelect id={`${task}-place`} labelledBy={`${task}-place-label`} value={pendingPlace ?? view.place} disabled={locked}
+          choices={view.places.map((place) => ({ value: place.id, label: place.label, kind: place.state, icon: <ProviderIcon id={place.id} />,
+            group: place.id === "device" ? undefined : t("stage.place.providers"),
+            detail: place.state === "missing" ? t("stage.place.noKey") : undefined }))}
+          onChange={(id) => {
             const place = view.places.find((p) => p.id === id);
             if (place?.state === "missing") (onMissingPlace ?? ((p: string) => actions()?.openIntegration(p)))(id);
             else actions()?.chooseStagePlace(task, id);
-          }}>
-          {!view.place && <option value="">—</option>}
-          {view.places.filter((p) => p.id === "device").map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}
-          {view.places.some((p) => p.id !== "device") && (
-            <optgroup label={t("stage.place.providers")}>
-              {view.places.filter((p) => p.id !== "device").map((place) => (
-                <option key={place.id} value={place.id} data-state={place.state}>{place.label}{place.state === "missing" ? " · " + t("stage.place.noKey") : ""}</option>
-              ))}
-            </optgroup>
-          )}
-        </NativeSelect>
+          }} />
       </div>
-      <ModelPicker label="Modelo" id={`${task}-model`} value={view.model} disabled={locked || view.modelsLoading || !view.models.length}
-        description={view.models.find((model) => model.id === view.model)?.description}
-        onChange={(event) => actions()?.chooseStageModel(task, event.target.value)}>
-        {view.modelsLoading && !view.models.length && <option value="">Cargando modelos…</option>}
-        {view.models.map((model) => <option key={model.id} value={model.id}>{model.label}{model.detail ? ` · ${model.detail}` : ""}</option>)}
-      </ModelPicker>
+      {placeExtra}
+      <div className="ui-field">
+        <span className="ui-field-label" id={`${task}-model-label`}>Modelo</span>
+        <ChoiceSelect id={`${task}-model`} labelledBy={`${task}-model-label`} value={pendingPlace ? "" : view.model}
+          disabled={!!pendingPlace || locked || view.modelsLoading || !view.models.length}
+          placeholder={pendingPlace ? t("stage.keyFirst") : view.modelsLoading ? "Cargando modelos…" : "—"}
+          choices={view.models.map((model) => ({ value: model.id, label: model.label, detail: model.detail || undefined, description: model.description }))}
+          onChange={(model) => actions()?.chooseStageModel(task, model)} />
+      </div>
+      {pendingPlace ? null : <>
       {view.check && <StageCheck task={task} check={view.check} />}
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
       {WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
@@ -98,6 +98,7 @@ export function StageSettings({ task, onMissingPlace }: { task: StageTask; onMis
           <p className="muted" role="status">{tools.prepareNote}</p>
         </>
       )}
+      </>}
     </div>
   );
 }

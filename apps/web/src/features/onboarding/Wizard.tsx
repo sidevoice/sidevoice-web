@@ -22,8 +22,6 @@ import { effectiveStage, type Task } from "../../state/hosts/stage-scope";
 import { StageSettings } from "../settings/StageSettings";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
-import { IntegrationScopeContext } from "../hosts/HostPage";
-import { IntegrationList } from "../settings/IntegrationList";
 import { AgentRow, otherAgent } from "../hosts/AgentRow";
 
 const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title.stt", W4v: "wizard.w4.title.tts", W5: "wizard.w5.title", W6: "wizard.w6.title" };
@@ -73,7 +71,7 @@ function Actions({ children }: { children?: React.ReactNode }) {
   const back = wizard.step === "W6" ? null : previousStep(wizard.step, wizard.path);
   return (
     <div className="wizard-actions">
-      {back && <Button variant="ghost" className="wizard-back" onClick={() => hosts.goTo(back, back === "W1" ? null : undefined)}>{t("wizard.back")}</Button>}
+      {back && <Button variant="default" className="wizard-back" onClick={() => hosts.goTo(back, back === "W1" ? null : undefined)}>{t("wizard.back")}</Button>}
       {children}
     </div>
   );
@@ -290,12 +288,36 @@ function useStageContext() {
   return store ? stageContext(store.facts) : null;
 }
 
+/** A provider's key, asked for in one line: required, checked with the provider, kept on the machine. */
+function KeyLine({ fp, provider, label }: { fp: string; provider: string; label: string }) {
+  const t = useT();
+  const hosts = useHostsController();
+  const [key, setKey] = useState("");
+  const [state, setState] = useState<"" | "checking" | "refused">("");
+  async function check() {
+    if (!key.trim() || state === "checking") return;
+    setState("checking");
+    try { await hosts.putKey(fp, provider, key.trim()); } catch { setState("refused"); return; }
+    setState("");
+  }
+  return (
+    <div className="key-line" data-state={state || undefined}>
+      <input id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
+        placeholder={t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
+        onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
+        onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus />
+      <span className="key-line-state" role="status">
+        {state === "checking" ? t("integrations.checking") : state === "refused" ? t("wizard.w4.keyRefused", { provider: label }) : t("wizard.w4.keyRequired")}
+      </span>
+    </div>
+  );
+}
+
 /** Transcription (W4) and voice (W4v): the stage's own settings pane, the same one Configuración shows, starting from
  *  what suits this device best (model-first D14). A device model is downloaded, loaded and checked before it counts. */
 function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
-  const scope = useContext(IntegrationScopeContext);
   const inUse = useHosts((s) => s.inUse);
   const integrations = useHosts((s) => (s.inUse ? s.integrations[s.inUse] : undefined));
   const chosen = useHosts((s) => !!effectiveStage(s.scope, s.inUse, task));
@@ -312,7 +334,11 @@ function StageStep({ task }: { task: Task }) {
   useEffect(() => { if (check?.phase === "failed" || check === null) setAdvancing(false); }, [check]);
   // A key typed here, accepted by its provider, makes its place choosable: the panel goes.
   const keyed = useHosts((s) => !!keyFor && !!s.inUse && !!s.integrations[s.inUse]?.value?.providers.find((p) => p.id === keyFor)?.configured);
-  useEffect(() => { if (keyed) setKeyFor(null); }, [keyed]);
+  useEffect(() => {
+    if (!keyed || !keyFor) return;
+    window.sidevoiceActions?.chooseStagePlace(task, keyFor);
+    setKeyFor(null);
+  }, [keyed, keyFor, task]);
   if (!ready || !view) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
   const offer = (ctx?.offers as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
   const installed = !!offer && (ctx?.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
@@ -326,23 +352,17 @@ function StageStep({ task }: { task: Task }) {
     actions?.chooseStageModel(task, view!.model);
     actions?.decideStage(task, true);
   }
+  const keyPanel = keyFor && inUse ? <KeyLine fp={inUse} provider={keyFor} label={view.places.find((p) => p.id === keyFor)?.label ?? keyFor} /> : null;
   return (
     <>
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
       {view.unconfigured && !keyFor && <p className="problem">{t("wizard.w4.noOffer")}</p>}
       <div className="wizard-stage">
         {/* A provider with no key asks for it here, not in Configuración. */}
-        <StageSettings task={task} onMissingPlace={setKeyFor} />
+        <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor} />
       </div>
-      {keyFor && inUse && scope && (
-        <div className="inline-key">
-          <p className="howto-label">{t("wizard.w4.keyFor", { provider: view.places.find((p) => p.id === keyFor)?.label ?? keyFor })}</p>
-          <RoomStoreContext.Provider value={scope.storeFor(inUse)}><IntegrationList only={[keyFor]} /></RoomStoreContext.Provider>
-          <Button variant="ghost" size="compact" onClick={() => setKeyFor(null)}>{t("common.cancel")}</Button>
-        </div>
-      )}
       <Actions>
-        <Button variant="primary" disabled={busy || advancing && !chosen || !view.model}
+        <Button variant="primary" disabled={!!keyFor || busy || advancing && !chosen || !view.model}
           onClick={proceed}>
           {chosen && !check ? t("wizard.continue") : needsDownload ? t("wizard.w4.downloadContinue", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.useContinue")}
         </Button>

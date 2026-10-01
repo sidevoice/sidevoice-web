@@ -433,7 +433,12 @@ export const es: Record<string, string> = {
   "agents.justConnected": "Ya tiene voz en las conversaciones nuevas",
   "wizard.w4.downloadContinue": "Descargar y continuar · {size}",
   "wizard.w4.useContinue": "Usar y continuar",
-  "wizard.w4.keyFor": "Clave de {provider}: se guarda en tu máquina.",
+  "wizard.w4.keyFor": "{provider} necesita una clave de API. Pégala aquí: se comprueba con {provider} y se guarda en tu máquina.",
   "stage.place.providers": "Proveedores",
   "stage.place.noKey": "sin clave",
+  "stage.keyFirst": "Primero, la clave",
+  "wizard.w4.keyPlaceholder": "Clave de API de {provider}",
+  "wizard.w4.keyRequired": "Obligatoria",
+  "wizard.w4.keyRefused": "{provider} rechazó la clave",
+  "proto.keys": "Claves de proveedores",
 };
