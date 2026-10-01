@@ -436,7 +436,7 @@ export const en: Record<string, string> = {
   "wizard.w4.keyFor": "{provider} needs an API key. Paste it here: it's checked with {provider} and kept on your machine.",
   "stage.place.providers": "Providers",
   "stage.place.noKey": "no key",
-  "stage.keyFirst": "The key first",
+  "stage.keyFirst": "Available once the key is checked",
   "wizard.w4.keyPlaceholder": "{provider} API key",
   "wizard.w4.keyRequired": "Required",
   "wizard.w4.keyRefused": "{provider} refused the key",

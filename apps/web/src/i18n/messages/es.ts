@@ -436,7 +436,7 @@ export const es: Record<string, string> = {
   "wizard.w4.keyFor": "{provider} necesita una clave de API. Pégala aquí: se comprueba con {provider} y se guarda en tu máquina.",
   "stage.place.providers": "Proveedores",
   "stage.place.noKey": "sin clave",
-  "stage.keyFirst": "Primero, la clave",
+  "stage.keyFirst": "Disponible al validar la clave",
   "wizard.w4.keyPlaceholder": "Clave de API de {provider}",
   "wizard.w4.keyRequired": "Obligatoria",
   "wizard.w4.keyRefused": "{provider} rechazó la clave",
