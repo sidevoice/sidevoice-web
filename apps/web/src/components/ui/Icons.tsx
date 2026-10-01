@@ -6,7 +6,7 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, CircleAlert, Clock3, Copy, Cpu, Ear, Keyboard, KeyRound, MessagesSquare, Mic, Monitor, MoreHorizontal,
+  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal,
   Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -34,6 +34,9 @@ export const SettingsIcon = mark(Settings, 22);
 
 // ----- the call
 export const MicrophoneIcon = mark(Mic, 24);
+export const MicrophoneOffIcon = mark(MicOff, 24);
+/** Back to the whole app, from the desktop app's call controls card. */
+export const OpenAppIcon = mark(ExternalLink, 16);
 export const SpeakerIcon = mark(Volume2, 20);
 export const CallIcon = mark(Phone, 22);
 export const HangupIcon = mark(PhoneOff, 22);

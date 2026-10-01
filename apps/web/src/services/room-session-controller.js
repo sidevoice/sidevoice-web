@@ -275,6 +275,7 @@ async function restartCaptureOnRoute(){
 }
 function updateWave(value){
  waveLevels.shift();waveLevels.push(value);
+ const levelChannel=window.sidevoiceUI?.micLevel;if(typeof levelChannel?.publish==='function')levelChannel.publish(value);
  const bars=$('mic-control').querySelectorAll?.('.mic-wave i')||[];
  for(const [i,bar] of [...bars].entries())bar.style.height=Math.max(2,Math.round(waveLevels[i]*.26))+'px';
 }

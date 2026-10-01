@@ -17,7 +17,8 @@ export default defineConfig({
     // The room reads this to tell a page which build it is serving, so a stale tab can say so.
     closeBundle() { mkdirSync("dist", { recursive: true }); writeFileSync("dist/build-id.json", JSON.stringify({ build_id: buildId }) + "\n"); },
   }],
-  build: { outDir: "dist", emptyOutDir: true },
+  // Two pages: the room, and the desktop app's call controls card (src/call-controls/), which reuses the room's pieces.
+  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { input: { main: "index.html", "call-controls": "call-controls.html" } } },
   server: {
     // Reachable from a phone through the tunnel, not just from localhost: `npm run dev -w @sidevoice/web`
     // then expose this port. The websocket that pushes the updates has to be told it arrives over TLS on

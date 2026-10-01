@@ -20,6 +20,8 @@ declare global {
     sidevoiceUI?: {
       store?: import("../state/room-store").RoomStore;
       setBootError(value: string | null): void;
+      /** The microphone's level as the meter measures it (state/mic-level.ts). */
+      micLevel?: import("../state/mic-level").MicLevelChannel;
     };
     /** The meter's analyser, pulled per animation frame by the waveform bubble; null while no call captures. */
     sidevoiceAudio?: { readWaveform(): Float32Array | null };
