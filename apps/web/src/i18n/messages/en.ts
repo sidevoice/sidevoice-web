@@ -45,7 +45,6 @@ export const en: Record<string, string> = {
   "wizard.w1.noDetail": "Your agents are on another machine: you connect to it with a code.",
   "wizard.w1.no": "No, this computer only talks to another machine",
   "wizard.w1.searching": "Looking for agents on this computer…",
-  "wizard.w1.found": "We found: {names}.",
   "wizard.w1.none": "We didn't find any agents.",
   "wizard.w2.title": "Setting up this computer",
   "wizard.w2.lead": "Sidevoice installs its core here and starts it when you log in. No agent is connected until you choose it.",
@@ -403,4 +402,9 @@ export const en: Record<string, string> = {
   "app.shortcut.conflict": "Saved, but another app already uses that shortcut: it may not reach Sidevoice.",
   "pair.deviceName": "Sidevoice on {where}",
   "proto.qr": "Sample QR: it can't be scanned in the prototype",
+  "wizard.w1.detected": "Agents on this computer",
+  "wizard.w1.registration.connected": "already has a voice",
+  "wizard.w1.registration.not-connected": "no voice yet",
+  "wizard.w1.registration.foreign": "has another «sidevoice» entry",
+  "wizard.w1.registration.unknown": "",
 };

@@ -114,6 +114,7 @@ function W1() {
   return (
     <>
       <p className="muted">{t("wizard.w1.lead")}</p>
+      <DetectedAgents found={found} />
       <fieldset className="choice-cards">
         <legend className="sr-only">{t("wizard.w1.title")}</legend>
         {(["agents", "remote"] as const).map((value) => (
@@ -126,11 +127,33 @@ function W1() {
           </label>
         ))}
       </fieldset>
-      <p className="muted found-line" role="status">
-        {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found", { names: found.map((agent) => agent.label).join(", ") }) : t("wizard.w1.none")}
-      </p>
       <Actions><Button variant="primary" disabled={!choice} onClick={() => void next()}>{t("wizard.continue")}</Button></Actions>
     </>
+  );
+}
+
+/** What the connector's modules detected on this computer (§4.4 `detect`), as they report it: the only place W1
+ *  names agents. Nothing is connected here; W3 asks. */
+function DetectedAgents({ found }: { found: DetectedAgent[] | null }) {
+  const t = useT();
+  return (
+    <section className="detected" aria-labelledby="detected-title" aria-busy={found === null}>
+      <h3 id="detected-title">{t("wizard.w1.detected")}</h3>
+      {found === null ? <p className="muted small" role="status">{t("wizard.w1.searching")}</p>
+        : found.length === 0 ? <p className="muted small" role="status">{t("wizard.w1.none")}</p> : (
+          <ul className="detected-list">
+            {found.map((agent) => (
+              <li key={agent.id} className="detected-agent" data-registration={agent.registration}>
+                <span className="agent-icon"><HarnessIcon harness={agent.id} size={18} /></span>
+                <span className="detected-copy">
+                  <strong>{agent.label}</strong>
+                  <span className="muted small">{[agent.version, t("wizard.w1.registration." + agent.registration)].filter(Boolean).join(" · ")}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+    </section>
   );
 }
 

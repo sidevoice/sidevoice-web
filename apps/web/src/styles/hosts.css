@@ -54,7 +54,13 @@
 .choice-card:focus-within { outline: 2px solid var(--sv-primary); outline-offset: 2px }
 .choice-card[data-checked] { border-color: var(--sv-primary); background: var(--sv-selected); box-shadow: inset 0 0 0 1px var(--sv-primary) }
 .choice-card .muted { font-size: .8rem }
-.found-line { margin-top: .8rem !important; min-height: 1.4em }
+.detected { margin: .2rem 0 1rem }
+.detected h3 { margin: 0 0 .45rem; font-size: .78rem; font-weight: 650; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .05em }
+.detected-list { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0; padding: 0; list-style: none }
+.detected-agent { display: flex; align-items: center; gap: .55rem; padding: .45rem .75rem .45rem .45rem; border: 1px solid var(--sv-border); border-radius: 12px; background: var(--sv-surface-raised) }
+.detected-copy { display: grid; line-height: 1.25 }
+.detected-agent[data-registration=connected] .detected-copy .muted { color: #9ed3b4 }
+.detected-agent[data-registration=foreign] .detected-copy .muted { color: #f0cf8a }
 .install-steps, .reset-steps { display: grid; gap: .55rem; margin: .8rem 0; padding: 0; list-style: none }
 .install-steps li, .reset-steps li { display: grid; grid-template-columns: 1.1rem minmax(0, 1fr); gap: .1rem .6rem; align-items: center; color: var(--sv-muted) }
 .install-steps li[data-state=running], .reset-steps li[data-state=running], .install-steps li[data-state=done], .reset-steps li[data-state=done] { color: var(--sv-text) }
