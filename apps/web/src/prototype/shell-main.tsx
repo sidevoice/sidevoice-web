@@ -138,10 +138,10 @@ function Shell() {
               ))}
             </div>
             <fieldset className="flow-pick">
-              <legend>Paso de cada modelo (transcripción y voz)</legend>
+              <legend>Paso de cada modelo (transcripción y voz) — elegido: B</legend>
               <div className="seg" role="group" aria-label="Paso de cada modelo">
-                <button type="button" aria-pressed={toggles[FLOW_TOGGLE] !== "B"} onClick={() => setToggle(FLOW_TOGGLE, "")}>A · Probar y confirmar</button>
-                <button type="button" aria-pressed={toggles[FLOW_TOGGLE] === "B"} onClick={() => setToggle(FLOW_TOGGLE, "B")}>B · Comprobar y configurar</button>
+                <button type="button" aria-pressed={toggles[FLOW_TOGGLE] === "A"} onClick={() => setToggle(FLOW_TOGGLE, "A")}>A · Probar y confirmar</button>
+                <button type="button" aria-pressed={!toggles[FLOW_TOGGLE] || toggles[FLOW_TOGGLE] === "B"} onClick={() => setToggle(FLOW_TOGGLE, "")}>B · Comprobar y configurar ✓</button>
                 <button type="button" aria-pressed={toggles[FLOW_TOGGLE] === "C"} onClick={() => setToggle(FLOW_TOGGLE, "C")}>C · Lista y conversación</button>
               </div>
               <p className="hint"><b>A</b>: descargar y preparar → «Probar» → «¿Es lo que has dicho? / ¿Te suena bien?» → «Sí, funciona».</p>

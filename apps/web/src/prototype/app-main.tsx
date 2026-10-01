@@ -213,7 +213,7 @@ async function boot() {
       <HostsContext.Provider value={controller}>
         <IntegrationScopeContext.Provider value={adapter}>
           <QrRendererContext.Provider value={(code) => <figure className="proto-qr"><FakeQr text={code} /><figcaption>{t("proto.qr")}</figcaption></figure>}>
-            <StageFlowContext.Provider value={toggles.stageFlow === "C" ? "list" : toggles.stageFlow === "B" ? "configure" : "try"}>
+            <StageFlowContext.Provider value={toggles.stageFlow === "C" ? "list" : toggles.stageFlow === "A" ? "try" : "configure"}>
               <TooltipProvider>
                 <App />
               </TooltipProvider>

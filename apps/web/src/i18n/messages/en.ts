@@ -544,4 +544,8 @@ export const en: Record<string, string> = {
   "metrics.fast": "Fast",
   "metrics.ok": "Fine",
   "metrics.slow": "Slow",
+  "stagecard.ready": "Ready",
+  "stagecard.status.notDownloaded": "Not downloaded",
+  "stagecard.status.downloaded": "Downloaded",
+  "stagecard.status.unchecked": "Not checked yet",
 };

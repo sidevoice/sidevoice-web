@@ -370,8 +370,9 @@ const measuredFor = (task: Task, place: string, model: string) => measuredBy.get
 /** Past this a turn feels slow (checks.json, the same bound the check calls slow). */
 const COMFORT_MS = checks.stt.comfort_ms;
 
-/** What a check measured, said plainly (operator, 2026-10-01): how soon it understands you (or starts speaking), with
- *  a word and a bar against a comfortable conversation, and how long it took to get ready. */
+/** What a check measured, said plainly (operator, 2026-10-01/02): how soon it understands you (or starts speaking), how
+ *  long it took to get ready, and at the end a word for it against a comfortable conversation — no bar, which would
+ *  read as progress. */
 function Metrics({ task, result }: { task: Task; result: Measured }) {
   const t = useT();
   const lang = currentLanguage();
@@ -381,14 +382,9 @@ function Metrics({ task, result }: { task: Task; result: Measured }) {
   const verdict = answer == null ? null : answer <= COMFORT_MS / 3 ? "fast" : answer <= COMFORT_MS ? "ok" : "slow";
   return (
     <div className="metrics">
-      {answer != null && verdict && (
-        <span className="metric" data-verdict={verdict}>
-          <span className="metric-text">{t(task === "stt" ? "metrics.understands" : "metrics.speaks", { s: seconds(answer) })}</span>
-          <span className="metric-bar" aria-hidden="true"><span style={{ width: Math.min(100, Math.round((answer / COMFORT_MS) * 100)) + "%" }} /></span>
-          <span className="metric-verdict">{t("metrics." + verdict)}</span>
-        </span>
-      )}
-      {result.load_ms != null && <span className="metric metric-quiet">{t("metrics.ready", { s: seconds(result.load_ms) })}</span>}
+      {answer != null && <span className="metric-text">{t(task === "stt" ? "metrics.understands" : "metrics.speaks", { s: seconds(answer) })}</span>}
+      {result.load_ms != null && <span className="metric-quiet">{t("metrics.ready", { s: seconds(result.load_ms) })}</span>}
+      {verdict && <span className="metric-verdict" data-verdict={verdict}>{t("metrics." + verdict)}</span>}
     </div>
   );
 }
@@ -484,8 +480,10 @@ function ModelList({ task, ctx, view, current, saved, running, rawStep, onPick, 
   );
 }
 
-/** The card under the model: its phases as a strip, and what the current one needs. In "try" the last phase is the
- *  person's («Probar»); in "configure" it is the app's own check («Comprobar»), and trying it is configuring it, below. */
+/** The card under the model, always the same size whatever its state (operator, 2026-10-02): the name, and at its
+ *  right the phases to go through; the model's line; one bar, there from the start and empty until it is made ready,
+ *  that fills as it downloads, loads and checks; and one status line — what is happening, what went wrong, or what the
+ *  check measured — with its actions at the end. In "try" the person's own try follows, under it. */
 function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, input, languageLabel, onText, onStart, onPrepare, onAnswer, onRetry, onTry }: {
   task: Task; flow: StageFlow; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
   /** The next step is the wizard's footer button: the card does not repeat it. */
@@ -498,75 +496,63 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const check = view.check;
   const model = view.models.find((m) => m.id === view.model);
   const running = check?.phase === "running";
+  const failed = check?.phase === "failed" && !prepared;
+  const slow = check?.phase === "slow";
   const last: Phase = flow === "configure" ? "check" : "test";
-  // The same strip every time: a model that runs here is downloaded first (done when it is on disk); a provider has
-  // nothing to download.
   // A provider's model is only checked: there is nothing to download or load here.
   const phases: Phase[] = view.place === "device" ? ["download", "prepare", last] : flow === "configure" ? ["check"] : ["check", "test"];
   const first: Phase = view.place === "device" ? "prepare" : "check";
-  // While it runs, the strip follows the progress: downloading, then loading, then checking.
+  // While it runs, the phases follow the progress: downloading, then loading, then checking.
   const downloading = runningStep === "download";
   const downloaded = !needsDownload || (!!runningStep && !downloading);
   const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : first;
   const lang = currentLanguage();
   const chooseOther = () => document.getElementById(`${task}-model`)?.click();
   const measured = measuredFor(task, view.place, view.model);
+  // The bar: empty before, the download's share while downloading, moving while it loads and checks, full once ready.
+  const tone = failed ? "failed" : slow ? "slow" : prepared ? "done" : running ? "running" : "idle";
+  const fill = prepared || failed || slow ? 1 : downloading && check?.fraction != null ? check.fraction : 0;
+  const busyBar = running && !(downloading && check?.fraction != null);
+  const prepareLabel = view.place !== "device" ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare")
+    : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly");
+  const status = running ? <span className="stage-card-line">{check.step}{check.amount ? " · " + check.amount : ""}</span>
+    : failed ? <span className="stage-card-line row-error" title={t("check.failed", { step: check.step, cause: check.cause })}>{t("check.failed", { step: check.step, cause: check.cause })}</span>
+    : slow ? <span className="stage-card-line warn-line">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
+    : prepared ? (measured ? <Metrics task={task} result={measured} /> : <span className="stage-card-line ok-line">{t("stagecard.ready")}</span>)
+    : <span className="stage-card-line muted">{t(view.place !== "device" ? "stagecard.status.unchecked" : needsDownload ? "stagecard.status.notDownloaded" : "stagecard.status.downloaded")}</span>;
+  const actions = running ? <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.cancelStage(task)}>{t("common.cancel")}</Button>
+    : failed ? <>{!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>}<Button size="compact" onClick={chooseOther}>{t("stagecard.chooseOther")}</Button></>
+    : slow ? <>{!inFooter && <Button variant="primary" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>}<Button size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, false)}>{t("stagecard.chooseOther")}</Button></>
+    : !prepared ? (!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{prepareLabel}</Button>)
+    : flow === "try" && works ? <Button variant="ghost" size="compact" onClick={onRetry}>{t("stagecard.tryAgain")}</Button>
+    : null;
   return (
-    <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-works={works || undefined}>
+    <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-tone={tone} data-works={works || undefined}>
       <div className="stage-card-head">
-        <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{model?.detail && <span className="muted small">{model.detail}</span>}</span>
+        {/* Its size only: whether it is here is the phases' to say. */}
+        <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{view.place === "device" && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}</span>
         <ol className="stage-card-phases">
           {phases.map((phase) => {
             const done = phase === "download" ? downloaded && !downloading
               : prepared ? phase !== "test" || works : phases.indexOf(phase) < phases.indexOf(at);
-            const state = done ? "done" : phase === at ? "current" : "next";
+            const state = done ? "done" : phase === at && (running || prepared || failed || slow) ? "current" : "next";
             return <li key={phase} data-state={state} aria-current={state === "current" ? "step" : undefined}>{t("stagecard.phase." + phase)}</li>;
           })}
         </ol>
       </div>
-      {model?.description && <p className="muted small">{model.description}</p>}
-      {/* What the check measured — on this device or at the provider (a real request, timed) — stays in view. */}
-      {prepared && !running && measured && <Metrics task={task} result={measured} />}
-
-      {running ? (
-        <div className="stage-card-body" role="status">
-          <span className="small">{check.step}{check.amount ? " · " + check.amount : ""}</span>
-          <progress max={1} value={check.fraction ?? undefined} />
-          <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.cancelStage(task)}>{t("common.cancel")}</Button>
-        </div>
-      ) : check?.phase === "failed" && !prepared ? (
-        <div className="stage-card-body" role="alert">
-          <span className="row-error small">{t("check.failed", { step: check.step, cause: check.cause })}</span>
-          <span className="try-row">
-            {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>}
-            {flow === "configure" && <Button size="compact" onClick={chooseOther}>{t("stagecard.chooseOther")}</Button>}
-          </span>
-        </div>
-      ) : check?.phase === "slow" ? (
-        <div className="stage-card-body" role="alert">
-          <span className="warn-line small">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
-          <span className="try-row">
-            {!inFooter && <Button variant="primary" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>}
-            <Button size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, false)}>{t("stagecard.chooseOther")}</Button>
-          </span>
-        </div>
-      ) : !prepared ? (
-        // What the phases mean is the strip's to say (operator, 2026-10-01: no notes about downloads or memory).
-        !inFooter && <div className="stage-card-body">
-          <Button variant="primary" size="compact" onClick={onPrepare}>
-            {view.place !== "device" ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare") : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly")}
-          </Button>
-        </div>
-      ) : flow === "configure" ? null
-      : works ? (
-        <div className="stage-card-body stage-card-works" role="status">
-          <span className="ok-line">{t("stagecard.works")}</span>
-          <Button variant="ghost" size="compact" onClick={onRetry}>{t("stagecard.tryAgain")}</Button>
-        </div>
-      ) : (<>
+      <p className="stage-card-desc muted small" title={model?.description}>{model?.description || " "}</p>
+      <div className="stage-card-track" data-tone={tone} data-busy={busyBar || undefined} role={running ? "progressbar" : undefined}
+        aria-valuemin={running ? 0 : undefined} aria-valuemax={running ? 100 : undefined} aria-valuenow={running && !busyBar ? Math.round(fill * 100) : undefined}>
+        <span style={{ width: Math.round(fill * 100) + "%" }} />
+      </div>
+      <div className="stage-card-status" role={failed || slow ? "alert" : "status"}>
+        {status}
+        {actions && <span className="stage-card-actions">{actions}</span>}
+      </div>
+      {flow === "try" && prepared && !works && <>
         {inUseNote && <p className="muted small" role="status">{t("stagecard.inUse")}</p>}
         <TryIt task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} onStart={onStart} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
-      </>)}
+      </>}
     </section>
   );
 }
