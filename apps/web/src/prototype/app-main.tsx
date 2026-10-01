@@ -260,7 +260,7 @@ function App() {
       <SettingsShell />
       <ResetDialog />
       <Note />
-      <EnterSplash playOnMount={configured} />
+      <EnterSplash />
       <audio id="preview-audio" />
     </>
   );

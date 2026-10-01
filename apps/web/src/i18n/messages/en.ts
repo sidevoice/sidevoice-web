@@ -555,5 +555,4 @@ export const en: Record<string, string> = {
   "option.help.voice": "The voice it uses for each language. «Automatic» takes that language's first voice.",
   "stagecard.key.clear": "Remove the {provider} key from this machine",
   "wizard.group.done": "Done",
-  "brand.tagline": "Give your agent a voice.",
 };
