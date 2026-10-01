@@ -417,4 +417,7 @@ export const en: Record<string, string> = {
   "agents.howto.check": "Done, check",
   "agents.howto.checking": "Checking…",
   "agents.howto.none": "This agent has no manual way to connect.",
+  "agents.howto.title": "Connect {name} by hand",
+  "agents.howto.after": "Once you have done it:",
+  "agents.manualOnly": "Connected by hand",
 };

@@ -417,4 +417,7 @@ export const es: Record<string, string> = {
   "agents.howto.check": "Ya está, comprobar",
   "agents.howto.checking": "Comprobando…",
   "agents.howto.none": "Este agente no tiene forma de conectarse a mano.",
+  "agents.howto.title": "Conectar {name} a mano",
+  "agents.howto.after": "Cuando lo hayas hecho:",
+  "agents.manualOnly": "Se conecta a mano",
 };
