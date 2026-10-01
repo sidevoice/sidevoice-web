@@ -378,14 +378,15 @@ function StageStep({ task }: { task: Task }) {
         <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor}
           onPlaceChange={(place) => select(withPlace(ctx, task, current, place, null))}
           onModelChange={(model) => select(withModel(ctx, task, current, model))}
-          afterModel={testedOk ? <TryStage task={task} freed={freed} /> : null} />
+          hideCheck
+          afterModel={keyFor || !view.model ? null : (
+            <ModelCard task={task} prepared={testedOk} busy={busy} freed={freed} onPrepare={test}
+              onTryAnother={(model) => select(withModel(ctx, task, current, model))}
+              prepareLabel={needsDownload ? t("wizard.w4.downloadTest", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.test")} />
+          )} />
       </div>
       <Actions>
-        {testedOk
-          ? <Button variant="primary" onClick={() => hosts.goTo(next)}>{t("wizard.continue")}</Button>
-          : <Button variant="primary" disabled={!!keyFor || busy || !view.model} onClick={test}>
-              {needsDownload ? t("wizard.w4.downloadTest", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.test")}
-            </Button>}
+        <Button variant="primary" disabled={!testedOk} onClick={() => hosts.goTo(next)}>{t("wizard.continue")}</Button>
       </Actions>
     </>
   );
@@ -398,21 +399,70 @@ function familyLabel(ctx: ReturnType<typeof stageContext>, model: string): strin
   return ((ctx.catalog as { models?: { id: string; label?: string }[] } | null)?.models?.find((m) => m.id === model)?.label) ?? model;
 }
 
-/** Once a stage passed its check, it can be tried for real: say something and read it back, or listen to the voice. */
-function TryStage({ task, freed }: { task: Task; freed: string | null }) {
+/** Under the model, always: what it is, the one button that prepares it (download, load, check), its progress, and —
+ *  once prepared — trying it for real. «Continuar» waits for it. */
+function ModelCard({ task, prepared, busy, freed, onPrepare, prepareLabel, onTryAnother }: {
+  task: Task; prepared: boolean; busy: boolean; freed: string | null; onPrepare: () => void; prepareLabel: string; onTryAnother: (model: string) => void;
+}) {
+  const t = useT();
+  const view = useRoomStore((s) => s.stages?.[task] ?? null);
+  if (!view) return null;
+  const check = view.check;
+  const model = view.models.find((m) => m.id === view.model);
+  const actions = () => window.sidevoiceActions;
+  return (
+    <div className="model-card-panel" data-phase={prepared ? "ready" : check?.phase ?? "idle"}>
+      <div className="model-card-head">
+        <strong>{model?.label ?? view.model}</strong>
+        {model?.detail && <span className="muted small">{model.detail}</span>}
+      </div>
+      {model?.description && <p className="muted small">{model.description}</p>}
+      {check?.phase === "running" ? (
+        <div className="model-card-run" role="status">
+          <span className="small">{check.step}{check.amount ? " · " + check.amount : ""}</span>
+          <progress max={1} value={check.fraction ?? undefined} />
+          <Button variant="ghost" size="compact" onClick={() => actions()?.cancelStage(task)}>{t("common.cancel")}</Button>
+        </div>
+      ) : check?.phase === "failed" && !prepared ? (
+        <div className="model-card-run" role="alert">
+          <span className="row-error small">{t("check.failed", { step: check.step, cause: check.cause })}</span>
+          <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>
+        </div>
+      ) : check?.phase === "slow" ? (
+        <div className="model-card-run" role="alert">
+          <span className="warn-line small">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
+          <Button variant="primary" size="compact" onClick={() => actions()?.decideStage(task, true)}>{t("check.useAnyway")}</Button>
+        </div>
+      ) : prepared ? (
+        <TryStage task={task} freed={freed} onTryAnother={onTryAnother} />
+      ) : (
+        <div className="model-card-run"><Button variant="primary" size="compact" disabled={busy} onClick={onPrepare}>{prepareLabel}</Button></div>
+      )}
+    </div>
+  );
+}
+
+/** Trying a prepared stage for real: say something and read it back, or listen to the voice; then, if it did not do
+ *  well, a bigger model is a tap away. Nothing here blocks going on. */
+function TryStage({ task, freed, onTryAnother }: { task: Task; freed: string | null; onTryAnother: (model: string) => void }) {
   const t = useT();
   const hosts = useHostsController();
   const inUse = useHosts((s) => s.inUse);
   const language = useRoomStore((s) => s.facts.speechLanguage);
-  const [state, setState] = useState<"" | "listening" | "heard">("");
+  const view = useRoomStore((s) => s.stages?.[task] ?? null);
+  const [state, setState] = useState<"" | "listening" | "heard" | "played">("");
   const [heard, setHeard] = useState("");
+  const [verdict, setVerdict] = useState<"" | "good" | "bad">("");
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  const rows = view?.check?.phase === "done" ? view.check.rows : [];
+  const models = view?.models ?? [];
+  const bigger = models[models.findIndex((m) => m.id === view?.model) + 1] ?? null;
   function listen() {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
-    setState("listening"); setHeard("");
+    setState("listening"); setHeard(""); setVerdict("");
     void hosts.echoTest(inUse, {
       level: () => undefined,
       heard: (text) => { if (!controller.signal.aborted) { setHeard(text); setState("heard"); controller.abort(); } },
@@ -422,14 +472,24 @@ function TryStage({ task, freed }: { task: Task; freed: string | null }) {
   return (
     <div className="try-stage">
       <p className="ok-line small">{t("wizard.w4.ready")}</p>
-      {task === "stt" ? (
+      {rows.length > 0 && <dl className="stage-check-rows">{rows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>}
+      <div className="try-row">
+        {task === "stt"
+          ? <Button size="compact" onClick={listen} disabled={state === "listening"}>{state === "listening" ? t("wizard.w4.tryListening") : t("wizard.w4.trySay")}</Button>
+          : <Button size="compact" onClick={() => { void window.sidevoiceActions?.previewVoice(language); setState("played"); setVerdict(""); }}>{t("wizard.w4.tryListen")}</Button>}
+        {heard && <span className="muted small">{t("wizard.w4.tryHeard", { text: heard })}</span>}
+      </div>
+      {(state === "heard" || state === "played") && (
         <div className="try-row">
-          <Button size="compact" onClick={listen} disabled={state === "listening"}>{state === "listening" ? t("wizard.w4.tryListening") : t("wizard.w4.trySay")}</Button>
-          {heard && <span className="muted small">{t("wizard.w4.tryHeard", { text: heard })}</span>}
+          <span className="small">{t(task === "stt" ? "wizard.w4.askHeard" : "wizard.w4.askSound")}</span>
+          <Button size="compact" variant={verdict === "good" ? "primary" : "ghost"} onClick={() => setVerdict("good")}>{t("common.yesCap")}</Button>
+          <Button size="compact" variant={verdict === "bad" ? "primary" : "ghost"} onClick={() => setVerdict("bad")}>{t("common.noCap")}</Button>
         </div>
-      ) : (
+      )}
+      {verdict === "bad" && (
         <div className="try-row">
-          <Button size="compact" onClick={() => void window.sidevoiceActions?.previewVoice(language)}>{t("wizard.w4.tryListen")}</Button>
+          <span className="muted small">{bigger ? t("wizard.w4.tryBigger", { model: bigger.label }) : t(task === "stt" ? "wizard.w4.tryProvider" : "wizard.w4.tryVoice")}</span>
+          {bigger && <Button size="compact" onClick={() => onTryAnother(bigger.id)}>{t("wizard.w4.useBigger", { model: bigger.label })}</Button>}
         </div>
       )}
       {freed && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}

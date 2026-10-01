@@ -451,4 +451,12 @@ export const en: Record<string, string> = {
   "wizard.w4.tryHeard": "It heard: «{text}»",
   "wizard.w4.tryListen": "Listen to the voice",
   "wizard.w4.freed": "{model} was released from memory; it stays downloaded.",
+  "common.yesCap": "Yes",
+  "common.noCap": "No",
+  "wizard.w4.askHeard": "Did it get it right?",
+  "wizard.w4.askSound": "Does it sound right?",
+  "wizard.w4.tryBigger": "{model} understands better, at a larger size.",
+  "wizard.w4.useBigger": "Try {model}",
+  "wizard.w4.tryProvider": "You can try a provider under «Where».",
+  "wizard.w4.tryVoice": "Try another voice below.",
 };

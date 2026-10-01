@@ -24,7 +24,7 @@ const WHERE_NOTES = {
  *  options waiting until the key is in. */
 /** `onPlaceChange` / `onModelChange`: what choosing does — by default the room's actions (a device model asks to be
  *  downloaded and checked); the wizard only selects, and tests on its own button. */
-export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, afterModel }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void; onModelChange?: (model: string) => void; afterModel?: ReactNode }) {
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, afterModel, hideCheck }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void; onModelChange?: (model: string) => void; afterModel?: ReactNode; hideCheck?: boolean }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
@@ -65,7 +65,7 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
           onChange={(model) => onModelChange ? onModelChange(model) : actions()?.chooseStageModel(task, model)} />
       </div>
       {pendingPlace ? null : <>
-      {view.check && <StageCheck task={task} check={view.check} />}
+      {view.check && !hideCheck && <StageCheck task={task} check={view.check} />}
       {afterModel}
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
       {WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
