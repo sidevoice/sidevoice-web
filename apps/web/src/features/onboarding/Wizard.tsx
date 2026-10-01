@@ -147,13 +147,27 @@ function DetectedAgents({ found }: { found: DetectedAgent[] | null }) {
                 <span className="agent-icon"><HarnessIcon harness={agent.id} size={18} /></span>
                 <span className="detected-copy">
                   <strong>{agent.label}</strong>
-                  <span className="muted small">{[agent.version, t("wizard.w1.registration." + agent.registration)].filter(Boolean).join(" · ")}</span>
+                  {agent.version && <span className="muted small">{agent.version}</span>}
                 </span>
+                <SidevoiceLink registration={agent.registration} />
               </li>
             ))}
           </ul>
         )}
     </section>
+  );
+}
+
+/** Whether Sidevoice is connected to an agent: the mark lit (lila and mustard) or off (one ink, the fourth bar at
+ *  45 %, as the brand's one-ink rule draws it), always with its words — the mark alone does not say it. */
+export function SidevoiceLink({ registration }: { registration: DetectedAgent["registration"] }) {
+  const t = useT();
+  const on = registration === "connected";
+  return (
+    <span className="sv-link" data-on={on || undefined} data-registration={registration}>
+      <SidevoiceMark size={14} className="sv-link-mark" />
+      <span>{t("wizard.w1.registration." + registration)}</span>
+    </span>
   );
 }
 

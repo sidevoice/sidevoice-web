@@ -403,8 +403,8 @@ export const es: Record<string, string> = {
   "pair.deviceName": "Sidevoice en {where}",
   "proto.qr": "QR de muestra: no se puede escanear en el prototipo",
   "wizard.w1.detected": "Agentes en este ordenador",
-  "wizard.w1.registration.connected": "ya tiene voz",
-  "wizard.w1.registration.not-connected": "sin voz todavía",
-  "wizard.w1.registration.foreign": "tiene otra configuración «sidevoice»",
+  "wizard.w1.registration.connected": "Conectado a Sidevoice",
+  "wizard.w1.registration.not-connected": "Sin conectar",
+  "wizard.w1.registration.foreign": "Otra configuración «sidevoice»",
   "wizard.w1.registration.unknown": "",
 };
