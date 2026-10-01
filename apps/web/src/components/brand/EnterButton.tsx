@@ -2,13 +2,14 @@ import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /* The one button that enters Sidevoice (operator, 2026-10-02: «más sugerente», a button of its own): a pill in the
  * brand's lilac, the mark inside it softly moving as a voice does, and an arrow that leans forward on hover. Pressed,
- * it grows from where it is until the lilac fills the window, and then the app fades in (EnterSplash). Used only to
+ * it grows from where it is until the film's lavender fills the window, the film's close plays on it and the app
+ * fades in (EnterSplash). Used only to
  * enter — not a variant of the design system's buttons. */
 
 const BARS = [
   { x: 1.5, y: 9, h: 6 }, { x: 6, y: 6, h: 12 }, { x: 10.5, y: 1.5, h: 21 }, { x: 15, y: 6, h: 12, voice: true }, { x: 19.5, y: 9, h: 6 },
 ];
-const GROW_MS = 480;
+const GROW_MS = 900;
 
 export function EnterButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   const button = useRef<HTMLButtonElement>(null);

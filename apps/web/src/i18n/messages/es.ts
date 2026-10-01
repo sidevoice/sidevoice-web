@@ -555,4 +555,5 @@ export const es: Record<string, string> = {
   "option.help.voice": "La voz con la que te habla en cada idioma. «Automática» usa la primera de ese idioma.",
   "stagecard.key.clear": "Borrar la clave de {provider} de esta máquina",
   "wizard.group.done": "Listo",
+  "brand.tagline": "Dale voz a tu agente.",
 };
