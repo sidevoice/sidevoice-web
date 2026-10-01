@@ -402,7 +402,7 @@ export const es: Record<string, string> = {
   "app.shortcut.conflict": "Guardado, pero otra aplicación ya usa ese atajo: puede que no llegue a Sidevoice.",
   "pair.deviceName": "Sidevoice en {where}",
   "proto.qr": "QR de muestra: no se puede escanear en el prototipo",
-  "wizard.w1.detected": "Agentes en este ordenador",
+  "wizard.w1.detected": "Detectados en este ordenador",
   "wizard.w1.registration.connected": "Conectado a Sidevoice",
   "wizard.w1.registration.not-connected": "Sin conectar",
   "wizard.w1.registration.foreign": "Otra configuración «sidevoice»",

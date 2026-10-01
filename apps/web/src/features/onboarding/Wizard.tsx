@@ -114,7 +114,6 @@ function W1() {
   return (
     <>
       <p className="muted">{t("wizard.w1.lead")}</p>
-      <DetectedAgents found={found} />
       <fieldset className="choice-cards">
         <legend className="sr-only">{t("wizard.w1.title")}</legend>
         {(["agents", "remote"] as const).map((value) => (
@@ -127,6 +126,7 @@ function W1() {
           </label>
         ))}
       </fieldset>
+      <DetectedAgents found={found} />
       <Actions><Button variant="primary" disabled={!choice} onClick={() => void next()}>{t("wizard.continue")}</Button></Actions>
     </>
   );
@@ -138,22 +138,17 @@ function DetectedAgents({ found }: { found: DetectedAgent[] | null }) {
   const t = useT();
   return (
     <section className="detected" aria-labelledby="detected-title" aria-busy={found === null}>
-      <h3 id="detected-title">{t("wizard.w1.detected")}</h3>
       {found === null ? <p className="muted small" role="status">{t("wizard.w1.searching")}</p>
-        : found.length === 0 ? <p className="muted small" role="status">{t("wizard.w1.none")}</p> : (
+        : found.length === 0 ? <p className="muted small" role="status">{t("wizard.w1.none")}</p> : <>
+          <span id="detected-title" className="muted small">{t("wizard.w1.detected")}</span>
           <ul className="detected-list">
             {found.map((agent) => (
-              <li key={agent.id} className="detected-agent" data-registration={agent.registration}>
-                <span className="agent-icon"><HarnessIcon harness={agent.id} size={18} /></span>
-                <span className="detected-copy">
-                  <strong>{agent.label}</strong>
-                  {agent.version && <span className="muted small">{agent.version}</span>}
-                  <SidevoiceLink registration={agent.registration} />
-                </span>
+              <li key={agent.id} className="detected-agent" title={agent.version ?? undefined}>
+                <HarnessIcon harness={agent.id} size={14} /> {agent.label}
               </li>
             ))}
           </ul>
-        )}
+        </>}
     </section>
   );
 }
@@ -314,8 +309,10 @@ function W3() {
                   <span className="agent-icon"><HarnessIcon harness={agent.id} size={18} /></span>
                   <span className="agent-copy">
                     <strong>{agent.label}</strong>{agent.version && <span className="muted"> · {agent.version}</span>}
-                    <span className="muted agent-status">{busy[key] ? t("agents.connecting") : t(agentStatusKey(agent))}</span>
+                    {agent.registration !== "connected" && !busy[key] && (agent.connect === "manual" || agent.registration === "foreign" || checked[agent.id]) &&
+                      <span className="muted agent-status">{t(agentStatusKey(agent))}</span>}
                   </span>
+                  {busy[key] ? <span className="sv-link">{t("agents.connecting")}</span> : <SidevoiceLink registration={agent.registration} />}
                 </label>
                 {agent.connect === "manual" && agent.registration === "not-connected" && <ManualConfig agent={agent} />}
                 {errors[key] && (

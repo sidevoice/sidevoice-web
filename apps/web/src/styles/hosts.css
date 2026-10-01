@@ -55,13 +55,12 @@
 .choice-card[data-checked] { border-color: var(--sv-primary); background: var(--sv-selected); box-shadow: inset 0 0 0 1px var(--sv-primary) }
 .choice-card .muted { font-size: .8rem }
 .detected { margin: .2rem 0 1rem }
-.detected h3 { margin: 0 0 .45rem; font-size: .78rem; font-weight: 650; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .05em }
-/* Every card the same size, whatever its name or state: a grid of equal columns, rows as tall as the tallest. */
-.detected-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none }
-.detected-agent { display: flex; align-items: flex-start; gap: .6rem; min-width: 0; padding: .6rem .7rem; border: 1px solid var(--sv-border); border-radius: 12px; background: var(--sv-surface-raised) }
-.detected-copy { display: grid; justify-items: start; gap: .15rem; min-width: 0; line-height: 1.25 }
-.detected-copy strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.detected-copy .sv-link { margin-top: .25rem }
+/* W1: what was detected, small, under the choice; nothing to do with it here. */
+.detected { margin: 1.1rem 0 0; padding-top: .9rem; border-top: 1px solid var(--sv-border) }
+.detected > .muted { display: block; margin-bottom: .5rem }
+.detected-list { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none }
+.detected-agent { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .65rem; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-surface-raised); font-size: .8rem; color: var(--sv-text) }
+.agent-pick .sv-link { margin-inline-start: auto; align-self: center }
 .sv-link { display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .45rem; border-radius: var(--sv-radius-pill); background: #ffffff0d; color: var(--sv-muted); font-size: .72rem; white-space: nowrap }
 .sv-link-mark { color: #6b7280 }
 .sv-link-mark rect:nth-child(4) { fill: currentColor !important; opacity: .45 }
@@ -83,6 +82,7 @@
 .agent-rows { display: grid; gap: .5rem; margin: .4rem 0; padding: 0; list-style: none }
 .agent-row { padding: .7rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: var(--sv-surface-raised) }
 .agent-pick, .agent-line { display: flex; align-items: center; gap: .65rem }
+.agent-pick { margin: 0 !important; cursor: pointer }
 .agent-pick input { accent-color: var(--sv-primary); width: 1.05rem; height: 1.05rem; flex: none }
 .agent-icon { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: 8px; background: #ffffff10 }
 .agent-copy { flex: 1; min-width: 0 }
