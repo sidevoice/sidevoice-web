@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS, duration, SHOW_DELAY_MS } from "./CallCard";
 import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
@@ -153,10 +153,17 @@ test("a press that moves is a drag of the window, not a click", () => {
   expect(host.drag).toHaveBeenCalledTimes(3);
 });
 
-test("the window is sized to the card plus its margin", () => {
+test("the window is sized to the card plus its margin, and never to nothing", () => {
   const host = fakeHost();
+  const box = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+  box.mockReturnValue({ width: 0, height: 0 } as DOMRect);
   render(<CallCard host={host} t={t} />);
-  expect(host.layout).toHaveBeenCalledWith({ width: 24, height: 24 });
+  expect(host.layout).not.toHaveBeenCalled();
+  cleanup();
+  box.mockReturnValue({ width: 320, height: 54 } as DOMRect);
+  render(<CallCard host={host} t={t} />);
+  expect(host.layout).toHaveBeenCalledWith({ width: 344, height: 78 });
+  box.mockRestore();
 });
 
 test("nothing outside a call", () => {

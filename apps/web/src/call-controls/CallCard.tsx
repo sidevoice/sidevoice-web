@@ -163,6 +163,7 @@ export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) 
     if (!element) return;
     const report = () => {
       const box = element.getBoundingClientRect();
+      if (!box.width || !box.height) return; // just removed: the card is not shown, nothing to size
       host.layout({ width: Math.ceil(box.width) + 2 * CARD_MARGIN, height: Math.ceil(box.height) + 2 * CARD_MARGIN });
     };
     report();

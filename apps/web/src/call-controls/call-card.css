@@ -53,8 +53,10 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 .card-title[aria-expanded=true] .card-title-chevron svg { transform: rotate(180deg); }
 .card-sub { font-size: 11px; color: var(--mu); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; max-width: 100%; }
 .card-sub.reconnecting { color: var(--sv-voice); }
-.card-machine, .card-harness { display: inline-flex; align-items: center; gap: 3px; }
-.card-clock { font-variant-numeric: tabular-nums; }
+/* When room is short (the controls near the pointer), the machine and the harness give way; the clock never does. */
+.card-machine, .card-harness { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
+.card-machine svg, .card-harness svg { flex: none; }
+.card-clock { font-variant-numeric: tabular-nums; flex: none; }
 
 /* "Open Sidevoice" appears in free space left of your wave, so nothing moves. */
 .call-card .card-open { width: 0; height: 26px; margin-left: -10px; overflow: hidden; opacity: 0; color: var(--mu); border-radius: 7px; flex: none; transition: opacity .15s; }
