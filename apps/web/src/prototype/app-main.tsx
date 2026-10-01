@@ -105,6 +105,8 @@ async function boot() {
     ? { runs: "native" as const, os: "macos", arch: "aarch64", has: ["cpu", "coreml"], memory_mb: 16384 }
     : { runs: "page" as const, has: toggles.noWebgpu ? ["wasm"] : ["webgpu", "webgpu-f16", "wasm"] };
   const engine = createFakeEngine(toggles, capabilities, installed, currentLanguage);
+  // What the call's waveform reads from the audio runtime, fed by the fake microphone.
+  window.sidevoiceAudio = { readWaveform: engine.readWaveform };
 
   if (inApp) window.__sidevoiceDesktop = { host: createFakeBridge(scenario, toggles, hosts, (note) => showNote(t("proto.note." + note)), (next) => post({ type: "relaunch", scenario: next })) as unknown as Record<string, unknown> };
 

@@ -140,6 +140,13 @@
   .settings-shell .nav-group .nav-item[data-pane=host], .settings-shell .nav-group .nav-item[data-pane=add-host] { padding-inline-start: .7rem }
   .settings-shell .settings-content { padding: 0 1rem 1.2rem }
   .wizard-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; border: 0 }
+  /* The wizard's actions are a compact bar fixed at the very bottom (operator, 2026-10-01: «importantísimo»); the
+     step scrolls above it as one page. */
+  .wizard-dialog { padding-bottom: 4.4rem }
+  .wizard-actions { position: fixed; inset: auto 0 0; z-index: 3; margin: 0; padding: .5rem .9rem calc(.5rem + env(safe-area-inset-bottom)); flex-wrap: nowrap; gap: .5rem; background: var(--sv-surface); border-top: 1px solid var(--sv-border) }
+  .wizard-actions .ui-button { min-height: 2.35rem; padding-block: .3rem }
+  .wizard-actions .ui-button--primary { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+  .wizard-stage { max-height: none; overflow: visible; padding-inline-end: 0 }
   .proposal-row { grid-template-columns: minmax(0, 1fr) }
 }
 
@@ -301,9 +308,13 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-card-body progress { width: 100%; height: 6px; accent-color: var(--sv-primary) }
 .stage-card-works { display: flex; align-items: center; gap: .6rem }
 .try-sample { margin: 0; padding: .45rem .7rem; border-inline-start: 3px solid var(--sv-primary-dim); background: #ffffff08; border-radius: 0 8px 8px 0; font-size: .9rem }
-.try-heard { font-size: .88rem }
-.try-meter { width: 7rem; height: .4rem; border-radius: 99px; background: #0f1318; overflow: hidden }
-.try-meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--sv-primary), var(--sv-voice)); transition: width 80ms linear }
 .try-answer { padding-top: .2rem }
 /* The step under way, in the footer's place: read as a state, not as a dead button. */
 .wizard-actions button[aria-busy=true]:disabled { opacity: 1; color: var(--sv-muted); background: #ffffff0d; border-color: var(--sv-border) }
+/* Trying a model: the call's bubbles inside the card, and the question under them. */
+.try-chat, .try-question { justify-self: stretch }
+.try-chat { display: grid }
+.try-chat:empty { display: none }
+.try-chat .message-group { margin: .2rem 0 }
+.try-question { display: grid; gap: .5rem; padding-top: .6rem; border-top: 1px solid var(--sv-border) }
+.try-question p { margin: 0; font-size: .9rem; font-weight: 600 }

@@ -25,6 +25,9 @@ import { effectiveStage as effectiveStageOf, withBuild, withModel, withOption, w
 import { bytesText } from "../hosts/common";
 import { StageSettings } from "./StageSettings";
 import { saySample } from "./try-samples";
+import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
+import { MessageGroup } from "../conversation/MessageGroup";
+import type { ChatMessage } from "../../state/room-types";
 
 /** What the person said works, per stage, for this session: the whole configuration on one machine. A wizard step
  *  resumed after a restart is past it already (resumeStep skips a stage that is set), so this does not need to outlive
@@ -85,7 +88,7 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
   );
 }
 
-type TrialState = "idle" | "listening" | "heard" | "playing" | "played" | "failed";
+type TrialState = "idle" | "listening" | "transcribing" | "heard" | "playing" | "played" | "failed";
 type Trial = ReturnType<typeof useTrial>;
 
 /** Trying a prepared stage: listening to the person (stt) or playing the sample (tts). A newer try or a reset makes a
@@ -112,6 +115,7 @@ function useTrial(task: Task) {
     const live = () => run.current === id && !controller.signal.aborted;
     void hosts.echoTest(inUse, {
       level: (value) => { if (live()) setLevel(value); },
+      transcribing: () => { if (live()) setState("transcribing"); },
       heard: (text) => { if (live()) { setHeard(text); setState("heard"); setLevel(0); controller.abort(); } },
       replied: () => undefined,
       failed: (key) => { if (live()) fail(key); },
@@ -133,7 +137,7 @@ function useTrial(task: Task) {
 }
 
 /** The step a model still needs, as the wizard's primary button; `null` once it works. */
-export interface PendingStep { label: string; disabled?: boolean; run?: () => void }
+export interface PendingStep { label: string; disabled?: boolean; run?: () => void; secondary?: { label: string; run: () => void } }
 
 /** `footer`: the wizard's, given the step still pending. Without one (Configuración) the card carries its own buttons,
  *  and a model prepared there is in use at once, which the card says until it is tried. `bodyClassName`: the
@@ -152,8 +156,6 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const ctx = useStageContext();
   const [keyFor, setKeyFor] = useState<string | null>(null);
   const [freed, setFreed] = useState<string | null>(null);
-  // What was kept before the model being tried, to go back to it if it does not convince.
-  const [previous, setPrevious] = useState<Stage | null>(null);
   // Prepared from this card: in Configuración it is in use from then on, which the card says until it is tried.
   const [preparedHere, setPreparedHere] = useState(false);
   const [works, setWorks] = useState(() => !!saved && verified.get(task) === keyOf(inUse, saved));
@@ -173,6 +175,14 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     setKeyFor(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyed, keyFor, task]);
+  // With nothing kept yet, the language starts on «Detectar automáticamente» (operator, 2026-10-01), whatever the
+  // system language is.
+  const autoLanguage = !saved && !rawDraft && !!ctx && !!view?.options.some((o) => o.kind === "language" && o.choices.some((c) => c.value === "auto"));
+  useEffect(() => {
+    if (!autoLanguage || !ctx) return;
+    select(withOption(ctx, task, effectiveStageOf(ctx, task, null), "language", "auto"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLanguage]);
   if (!view || !ctx || !room) return <><p className="muted" role="status">{t("wizard.w4.measuring")}</p>{footer?.({ label: t("wizard.continue"), disabled: true })}</>;
 
   function select(stage: unknown) {
@@ -189,19 +199,13 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const needsDownload = view.place === "device" && !!offer && !installed;
   function prepare() {
     if (saved && saved.place === "device" && saved.model !== view!.model) setFreed(labelOf(ctx!, saved.model));
-    setPrevious(saved && !same(saved, current) ? saved : null);
     setPreparedHere(true);
     window.sidevoiceActions?.testStage?.(task, { place: view!.place, model: view!.model, options: current?.options ?? {}, build: current?.build ?? null });
   }
   function answer(ok: boolean) {
-    if (ok && saved) { verified.set(task, keyOf(inUse, saved)); setWorks(true); setPrevious(null); }
+    if (ok && saved) { verified.set(task, keyOf(inUse, saved)); setWorks(true); }
   }
   function retry() { verified.delete(task); setWorks(false); trial.reset(); }
-  function restore() {
-    if (!previous) return;
-    hosts.chooseStage(inUse, task, previous);
-    setPrevious(null); setFreed(null);
-  }
   function placeChosen(place: string) { setKeyFor(null); select(withPlace(ctx!, task, current, place, null)); }
   // An option of the kept model takes effect at once (and asks to be tried again); one of a model still being chosen
   // stays in the draft with it.
@@ -224,12 +228,16 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : rawStep ? { label: t(rawStep === "download" ? "stagecard.next.downloading" : "stagecard.next.preparing"), disabled: true }
     : check?.phase === "failed" && !prepared ? { label: t("common.retry"), run: prepare }
     : check?.phase === "slow" ? { label: t("check.useAnyway"), run: () => window.sidevoiceActions?.decideStage(task, true) }
-    : !prepared ? { label: needsDownload ? t("stagecard.downloadPrepare", { size: bytesText(offer?.download_size ?? 0, lang) }) : t("stagecard.prepare"), run: prepare }
+    : !prepared ? { label: !needsDownload ? t("stagecard.prepare") : offer?.download_size ? t("stagecard.downloadPrepare", { size: bytesText(offer.download_size, lang) }) : t("stagecard.downloadPrepareOnly"), run: prepare }
     : works ? null
     : trial.state === "listening" ? { label: t("stagecard.listening"), disabled: true }
+    : trial.state === "transcribing" ? { label: t("stagecard.transcribing"), disabled: true }
     : trial.state === "playing" ? { label: t("stagecard.playing"), disabled: true }
-    : trial.state === "heard" || trial.state === "played" ? { label: t("stagecard.yesWorks"), run: () => answer(true) }
-    : { label: t("stagecard.next.try"), run: trial.start };
+    // The answer is the action bar: «No» beside «Sí, funciona».
+    : (trial.state === "heard" || trial.state === "played") && !trial.no
+      ? { label: t("stagecard.yesWorks"), run: () => answer(true), secondary: { label: t("common.noCap"), run: () => trial.setNo(true) } }
+    : trial.state === "idle" ? { label: t("stagecard.next.try"), run: trial.start }
+    : { label: t("stagecard.next.again"), run: trial.start };
   const settings = (
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor} hideCheck hidePlaceNote hideVoiceTools
       onPlaceChange={placeChosen}
@@ -239,7 +247,6 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
       afterModel={keyFor || !view.model ? null : (
         <StageCard task={task} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
           runningStep={rawStep} inUseNote={!footer && preparedHere} inFooter={!!footer} trial={trial}
-          previous={previous ? labelOf(ctx, previous.model) : null} onRestore={restore}
           freed={freed} onPrepare={prepare} onAnswer={answer} onRetry={retry}
           onTry={(model) => select(withModel(ctx, task, current, model))} />
       )} />
@@ -254,11 +261,11 @@ function labelOf(ctx: NonNullable<ReturnType<typeof stageContext>>, model: strin
 type Phase = "download" | "prepare" | "test";
 
 /** The card under the model: the three phases as a strip, and what the current one needs. */
-function StageCard({ task, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, previous, onRestore, freed, onPrepare, onAnswer, onRetry, onTry }: {
+function StageCard({ task, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, freed, onPrepare, onAnswer, onRetry, onTry }: {
   task: Task; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
   /** The next step is the wizard's footer button: the card does not repeat it. */
   inFooter: boolean; trial: Trial;
-  previous: string | null; onRestore: () => void; freed: string | null;
+  freed: string | null;
   onPrepare: () => void; onAnswer: (ok: boolean) => void; onRetry: () => void; onTry: (model: string) => void;
 }) {
   const t = useT();
@@ -312,7 +319,7 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
         <div className="stage-card-body">
           <span className="muted small">{t(needsDownload ? "stagecard.needsDownload" : "stagecard.needsPrepare")}</span>
           {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>
-            {needsDownload ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.prepare")}
+            {!needsDownload ? t("stagecard.prepare") : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly")}
           </Button>}
         </div>
       ) : works ? (
@@ -322,63 +329,84 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
         </div>
       ) : (<>
         {inUseNote && <p className="muted small" role="status">{t("stagecard.inUse")}</p>}
-        <TryIt task={task} trial={trial} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} previous={previous} onRestore={onRestore} />
+        <TryIt task={task} trial={trial} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
       </>)}
       {freed && prepared && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}
     </section>
   );
 }
 
-/** Phase 3: the person tries it. Transcription: a sentence to say (any will do), the level while it listens, and what it
- *  understood. Voice: a sentence played in the chosen voice. Then «¿Funciona?»: yes is what counts; no offers what to try. */
-function TryIt({ task, trial, inFooter, onAnswer, onTry, previous, onRestore }: { task: Task; trial: Trial; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void; previous: string | null; onRestore: () => void }) {
+/** Phase 3: the person tries it, in the call's own bubbles (operator, 2026-10-01: the real components, so a change to
+ *  them shows here too). Transcription: a sentence to say, the person's live bubble with its waveform while they speak,
+ *  then what it understood. Voice: the agent's bubble with the sentence as it plays. Then «¿Es lo que has dicho?» /
+ *  «¿Te suena bien?»: yes is what counts; no offers another model. In the wizard the buttons are the action bar's. */
+function TryIt({ task, trial, inFooter, onAnswer, onTry }: { task: Task; trial: Trial; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void }) {
   const t = useT();
   const language = useRoomStore((s) => s.facts.speechLanguage);
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
   // What is played is the voice catalogue's sentence for the language, so it is the one shown.
   const hearSample = useRoomStore((s) => s.facts.voiceLanguages?.find((l) => l.id === s.facts.speechLanguage)?.sample ?? "");
-  const { state, failure, heard, level, no, setNo } = trial;
+  const { state, failure, heard, no, setNo } = trial;
   const sample = task === "stt" ? saySample(language) : hearSample;
-  const models = view?.models ?? [];
-  const next = models[models.findIndex((m) => m.id === view?.model) + 1] ?? null;
-  // Going back to the model kept before is offered as that, not as another one to try.
-  const bigger = next && next.label !== previous ? next : null;
+  const others = (view?.models ?? []).filter((m) => m.id !== view?.model);
   const answered = state === "heard" || state === "played";
+  const busy = state === "listening" || state === "transcribing" || state === "playing";
+  const spoken = useSpokenSoFar(sample, state === "playing");
+  const message = (role: "user" | "assistant", text: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
   return (
     <div className="stage-card-body try-it">
-      <p className="small">{t((task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts") + (inFooter ? ".footer" : ""))}</p>
-      {sample && <blockquote className="try-sample">«{sample}»</blockquote>}
-      {/* In the wizard the first try is the footer's «Probar»; «Otra vez» stays here. */}
-      {(!inFooter || answered || state === "listening" || state === "playing") && <div className="try-row">
-        {(!inFooter || answered) && (task === "stt" ? (
-          <Button variant={answered ? "default" : "primary"} size="compact" onClick={trial.start} disabled={state === "listening"} aria-pressed={state === "listening"}>
-            <MicrophoneIcon size={15} /> {state === "listening" ? t("stagecard.listening") : answered ? t("stagecard.again") : t("stagecard.speak")}
-          </Button>
-        ) : (
-          <Button variant={answered ? "default" : "primary"} size="compact" onClick={trial.start} disabled={state === "playing"}>
-            <SpeakerIcon size={15} /> {state === "playing" ? t("stagecard.playing") : answered ? t("stagecard.again") : t("stagecard.listen")}
-          </Button>
-        ))}
-        {state === "listening" && <span className="try-meter" aria-hidden="true"><span style={{ width: Math.round(level * 100) + "%" }} /></span>}
-      </div>}
-      <div role="status">{state === "heard" && <p className="try-heard">{t("stagecard.heard")} <strong>«{heard}»</strong></p>}</div>
+      {!answered && !busy && <p className="small">{t((task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts") + (inFooter ? ".footer" : ""))}</p>}
+      {(task === "stt" || (!busy && !answered)) && sample && <blockquote className="try-sample">«{sample}»</blockquote>}
+      <div className="try-chat">
+        {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
+        {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
+        {task === "tts" && (state === "playing" || state === "played") && (
+          <MessageGroup group={{ id: "try", role: "assistant", name: "Sidevoice", messages: [message("assistant", sample, {
+            playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null })] }} />
+        )}
+      </div>
       <div role="alert">{state === "failed" && <p className="row-error small">
         {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}
       </p>}</div>
-      {answered && (
-        <div className="try-row try-answer">
-          <span className="small">{t(task === "stt" ? "stagecard.ask.stt" : "stagecard.ask.tts")}</span>
-          {!inFooter && <Button variant="primary" size="compact" onClick={() => onAnswer(true)}>{t("stagecard.yesWorks")}</Button>}
-          <Button variant="ghost" size="compact" onClick={() => setNo(true)}>{t("common.noCap")}</Button>
+      {answered && !no && (
+        <div className="try-question">
+          <p>{t(task === "stt" ? "stagecard.ask.stt" : "stagecard.ask.tts")}</p>
+          {!inFooter && <span className="try-row">
+            <Button variant="primary" size="compact" onClick={() => onAnswer(true)}>{t("stagecard.yesWorks")}</Button>
+            <Button size="compact" onClick={() => setNo(true)}>{t("common.noCap")}</Button>
+          </span>}
         </div>
       )}
       {no && (
-        <div className="try-row">
-          {(bigger || !previous) && <span className="muted small">{bigger ? t(task === "stt" ? "wizard.w4.tryBigger" : "stagecard.tryOtherModel", { model: bigger.label }) : t(task === "stt" ? "wizard.w4.tryProvider" : "wizard.w4.tryVoice")}</span>}
-          {bigger && <Button size="compact" onClick={() => onTry(bigger.id)}>{t("wizard.w4.useBigger", { model: bigger.label })}</Button>}
-          {previous && <Button size="compact" onClick={onRestore}>{t("stagecard.restore", { model: previous })}</Button>}
+        <div className="try-question">
+          <p>{others.length ? t("stagecard.tryAnother") : t(task === "stt" ? "wizard.w4.tryProvider" : "wizard.w4.tryVoice")}</p>
+          {!!others.length && <span className="try-row">
+            {others.map((m) => <Button key={m.id} size="compact" onClick={() => onTry(m.id)}>{m.label}{m.detail && <span className="muted"> · {m.detail}</span>}</Button>)}
+          </span>}
         </div>
+      )}
+      {!inFooter && !busy && (state === "idle" || state === "failed" || no) && (
+        <span className="try-row">
+          <Button variant={no ? "default" : "primary"} size="compact" onClick={trial.start}>
+            {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />} {state === "idle" ? t(task === "stt" ? "stagecard.speak" : "stagecard.listen") : t("stagecard.next.again")}
+          </Button>
+        </span>
       )}
     </div>
   );
+}
+
+/** How far the voice has got through the sentence, word by word, at a speaking pace — for the bubble's karaoke while
+ *  the engine gives no word timings of its own. */
+function useSpokenSoFar(text: string, playing: boolean): number {
+  const [to, setTo] = useState(0);
+  useEffect(() => {
+    if (!playing) { setTo(0); return; }
+    const ends = [...text.matchAll(/\S+/g)].map((m) => m.index! + m[0].length);
+    let word = 0;
+    const timer = setInterval(() => { word = Math.min(ends.length, word + 1); setTo(ends[word - 1] ?? 0); }, 330);
+    return () => clearInterval(timer);
+  }, [text, playing]);
+  return to;
 }

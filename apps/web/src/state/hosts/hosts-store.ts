@@ -64,7 +64,7 @@ export interface HostsView extends HostsFacts {
 export interface VerifyProgress { phase: "download" | "load" | "check"; done?: number; total?: number }
 export type VerifyOutcome = { ok: true; slow?: { latency_ms: number }; result?: Record<string, unknown> } | { ok: false; step: string; reason: { key: string; [k: string]: unknown } };
 
-export interface EchoEvents { level(value: number): void; heard(text: string): void; replied(text: string): void; failed(key: string, stage?: Task): void; silent(): void }
+export interface EchoEvents { level(value: number): void; transcribing?(): void; heard(text: string): void; replied(text: string): void; failed(key: string, stage?: Task): void; silent(): void }
 
 export interface HostsDeps {
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;

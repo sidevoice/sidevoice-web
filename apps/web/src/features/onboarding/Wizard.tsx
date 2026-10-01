@@ -295,6 +295,7 @@ function StageStep({ task }: { task: Task }) {
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
       <StageEditor task={task} bodyClassName="wizard-stage" footer={(pending) => (
         <Actions>
+          {pending?.secondary && <Button onClick={pending.secondary.run}>{pending.secondary.label}</Button>}
           {pending
             ? <Button variant="primary" disabled={pending.disabled} aria-busy={pending.disabled || undefined} onClick={pending.run}>{pending.label}</Button>
             : <Button variant="primary" onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button>}

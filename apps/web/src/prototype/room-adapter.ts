@@ -81,9 +81,19 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
     const fp = inUse();
     if (stage.place !== DEVICE && !fp) return;
     hosts.chooseStage(fp, task, (task === "tts" ? withVoicesChosen(ctx(), stage) : stage) as Stage);
-    // What is kept is no longer a draft.
-    if (f().stageDraft?.[task]) { const draft = { ...f().stageDraft }; delete draft[task]; room.patch({ stageDraft: Object.keys(draft).length ? draft : null }); }
+    settleDraft(task);
   };
+  /** What is kept is no longer a draft. The panes read both stages from the draft while there is one, so this stage's
+   *  entry becomes what is kept (not a hole, which would read as the default), and the draft goes once nothing in it
+   *  differs from what is kept. */
+  function settleDraft(task: StageTask) {
+    const draft = f().stageDraft;
+    if (!draft) return;
+    const kept = (f().voicePreferences ?? {}) as Record<string, unknown>;
+    const next = { ...draft, [task]: kept[task] } as Record<string, unknown>;
+    const pending = (["stt", "tts"] as const).some((k) => next[k] && JSON.stringify(next[k]) !== JSON.stringify(kept[k]));
+    room.patch({ stageDraft: pending ? next as never : null });
+  }
   const setCheck = (task: StageTask, check: Record<string, unknown> | null) => room.patch({ stageChecks: { ...f().stageChecks, [task]: check } });
 
   async function runCheck(task: StageTask, stage: Stage, recheck = false) {
@@ -212,5 +222,5 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
     },
   };
 
-  return { actions, storeFor, sync };
+  return { actions, storeFor, sync, settleDraft };
 }

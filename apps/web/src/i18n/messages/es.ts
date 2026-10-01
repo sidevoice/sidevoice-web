@@ -477,7 +477,7 @@ export const es: Record<string, string> = {
   "stagecard.again": "Otra vez",
   "stagecard.heard": "Ha entendido:",
   "stagecard.notHeard": "No te ha oído. Revisa el micrófono y vuelve a probar.",
-  "stagecard.ask.stt": "¿Es lo que dijiste?",
+  "stagecard.ask.stt": "¿Es lo que has dicho?",
   "stagecard.ask.tts": "¿Te suena bien?",
   "stagecard.yesWorks": "Sí, funciona",
   "stagecard.works": "✓ Funciona",
@@ -510,4 +510,9 @@ export const es: Record<string, string> = {
   "stagecard.next.try": "Probar",
   "stagecard.try.stt.footer": "Pulsa «Probar» y di una frase, por ejemplo:",
   "stagecard.try.tts.footer": "Pulsa «Probar» para oír esta frase con la voz elegida:",
+  "stagecard.transcribing": "Transcribiendo…",
+  "stagecard.next.again": "Probar otra vez",
+  "stagecard.tryAnother": "Prueba otro modelo:",
+  "stagecard.you": "Tú",
+  "stagecard.downloadPrepareOnly": "Descargar y preparar",
 };

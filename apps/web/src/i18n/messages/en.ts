@@ -510,4 +510,9 @@ export const en: Record<string, string> = {
   "stagecard.next.try": "Try it",
   "stagecard.try.stt.footer": "Press «Try it» and say a sentence, for example:",
   "stagecard.try.tts.footer": "Press «Try it» to hear this sentence in the chosen voice:",
+  "stagecard.transcribing": "Transcribing…",
+  "stagecard.next.again": "Try again",
+  "stagecard.tryAnother": "Try another model:",
+  "stagecard.you": "You",
+  "stagecard.downloadPrepareOnly": "Download and prepare",
 };
