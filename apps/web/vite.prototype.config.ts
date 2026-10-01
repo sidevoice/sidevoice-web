@@ -21,6 +21,8 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: { input: { prototype: resolve(__dirname, "prototype.html"), app: resolve(__dirname, "prototype-app.html"), card: resolve(__dirname, "prototype-card.html") } },
   },
-  server: { host: "127.0.0.1", port: 5191, strictPort: true, allowedHosts: true },
+  // Served through a tunnel for live review: the hot-reload socket is told it arrives over TLS on 443 at that host.
+  server: { host: "127.0.0.1", port: 5191, strictPort: true, allowedHosts: true,
+    hmr: process.env.PROTOTYPE_HMR_HOST ? { host: process.env.PROTOTYPE_HMR_HOST, clientPort: 443, protocol: "wss" } : undefined },
   preview: { host: "127.0.0.1", port: 5190, strictPort: true, allowedHosts: true },
 });
