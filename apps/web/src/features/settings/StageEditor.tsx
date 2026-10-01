@@ -63,6 +63,8 @@ const TEXT_MAX = 200;
  *  checking, valid, refused — is said inside the field, beside the masked last characters of the key kept (operator,
  *  2026-10-01); a refused replacement leaves the previous key in place. */
 interface KeyHandle { submit(): void }
+/** The host says only a key's last four characters: the rest is drawn at a key's usual length. */
+const MASK = "•".repeat(28);
 
 /** `ownSubmit`: its own «Validar» while a typed key is unchecked; in the wizard that is the footer's button. */
 function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; onCancel?: () => void; ownSubmit: boolean; ref?: Ref<KeyHandle> }) {
@@ -73,8 +75,8 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
   const [state, setState] = useState<"" | "checking" | "refused">("");
   // What was sent: a result is about that value, and a key typed while it was checked is checked on its own.
   const sent = useRef("");
-  async function check() {
-    const value = key.trim();
+  async function check(typed = key) {
+    const value = typed.trim();
     if (!value || value === checked || state === "checking") return;
     sent.current = value;
     setState("checking");
@@ -84,6 +86,9 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
     setState("");
   }
   const input = useRef<HTMLInputElement>(null);
+  // A key is checked as soon as it is in (operator, 2026-10-01): pasted, or a moment after typing stops.
+  const idle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(idle.current), []);
   // From the footer: an empty field is where to start; a typed key is checked.
   useImperativeHandle(ref, () => ({ submit() { if (!key.trim()) input.current?.focus(); else void check(); } }));
   const typed = key.trim();
@@ -96,9 +101,15 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
     <div className="key-line" data-state={state || (valid ? "valid" : undefined)}>
       <span className="key-field">
         <input ref={input} id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
-          placeholder={configured && hint ? "•••• " + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
+          placeholder={configured && hint ? MASK + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
           aria-describedby={"key-state-" + provider}
-          onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setKey(value); if (state === "refused") setState("");
+            clearTimeout(idle.current);
+            if (value.trim().length >= 8) idle.current = setTimeout(() => void check(value), 900);
+          }}
+          onPaste={(event) => { const value = event.clipboardData.getData("text"); if (value.trim()) { clearTimeout(idle.current); setTimeout(() => void check(value), 0); } }}
           onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
         <span className="key-state" id={"key-state-" + provider} role="status"
           title={state === "refused" ? t(configured ? "wizard.w4.keyRefusedKept" : "wizard.w4.keyRefused", { provider: label }) : undefined}>{said}</span>
@@ -196,6 +207,9 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   }, [voiceLanguage]);
   const trial = useTrial(task);
   const keyLine = useRef<KeyHandle>(null);
+  // The language the person chose themselves; until then every model starts on «Detectar automáticamente» where it
+  // can (operator, 2026-10-01: for every transcription that detects, detecting is the default).
+  const chosenLanguage = useRef(false);
   // A try is about the configuration it tried.
   const tried = keyOf(inUse, draft ?? saved);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,7 +220,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const keyed = useHosts((s) => !!keyFor && !!s.inUse && !!s.integrations[s.inUse]?.value?.providers.find((p) => p.id === keyFor)?.configured);
   useEffect(() => {
     if (!keyed || !keyFor || !ctx) return;
-    select(withPlace(ctx, task, null, keyFor, null));
+    select(detecting(withPlace(ctx, task, null, keyFor, null)));
     setKeyFor(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyed, keyFor, task]);
@@ -220,6 +234,10 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   }, [autoLanguage]);
   if (!view || !ctx || !room) return <><p className="muted" role="status">{t("wizard.w4.measuring")}</p>{footer?.({ label: t("wizard.continue"), disabled: true })}</>;
 
+  /** A model newly chosen: its language detected, unless the person chose one. */
+  function detecting(stage: unknown) {
+    return chosenLanguage.current || !ctx ? stage : withOption(ctx, task, stage, "language", "auto");
+  }
   function select(stage: unknown) {
     // The panes read both stages from the draft while there is one: the other one is what is kept.
     const kept = room!.facts.voicePreferences as Record<string, unknown> | null;
@@ -240,10 +258,11 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     if (ok && saved) { verified.set(task, keyOf(inUse, saved)); setWorks(true); }
   }
   function retry() { verified.delete(task); setWorks(false); trial.reset(); }
-  function placeChosen(place: string) { setKeyFor(null); select(withPlace(ctx!, task, current, place, null)); }
+  function placeChosen(place: string) { setKeyFor(null); select(detecting(withPlace(ctx!, task, current, place, null))); }
   // An option of the kept model takes effect at once (and asks to be tried again); one of a model still being chosen
   // stays in the draft with it.
   function optionChosen(id: string, value: unknown, language?: string) {
+    if (id === "language") chosenLanguage.current = value !== "auto";
     if (draft || !saved) select(withOption(ctx!, task, current, id, value, language));
     else window.sidevoiceActions?.setStageOption(task, id, value, language);
   }
@@ -300,7 +319,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   function pick(place: string, model: string) {
     setKeyFor(null);
     const base = place === current?.place ? current : withPlace(ctx!, task, current, place, null);
-    const stage = withModel(ctx!, task, base, model) as Stage;
+    const stage = detecting(withModel(ctx!, task, base, model)) as Stage;
     select(stage);
     if (saved && same(saved, stage) && (!check || check.phase === "done")) return;
     setPreparedHere(true);
@@ -311,7 +330,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={list ? null : keyFor} hideCheck hidePlaceNote hideVoiceTools
       pickers={list ? <ModelList task={task} ctx={ctx} view={view} current={current} saved={saved} running={rawCheck} rawStep={rawStep} onPick={pick} onRetry={prepare} /> : undefined}
       onPlaceChange={placeChosen}
-      onModelChange={(model) => select(withModel(ctx, task, current, model))}
+      onModelChange={(model) => select(detecting(withModel(ctx, task, current, model)))}
       onOptionChange={optionChosen}
       onBuildChange={(value) => select(withBuild(ctx, task, current, value))}
       optionsView={optionsView}
@@ -327,7 +346,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
         <StageCard task={task} flow={flow} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
           runningStep={rawStep} inUseNote={!footer && preparedHere && flow === "try"} inFooter={!!footer} trial={trial} input={input} languageLabel={testLanguageLabel} onText={setText} onStart={start}
           onPrepare={prepare} onAnswer={answer} onRetry={retry}
-          onTry={(model) => select(withModel(ctx, task, current, model))} />
+          onTry={(model) => select(detecting(withModel(ctx, task, current, model)))} />
       )} />
   );
   const body = <div className="stage-editor">{settings}</div>;
