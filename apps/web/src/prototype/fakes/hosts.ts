@@ -73,6 +73,7 @@ export function instructionsFor(id: string): DetectedAgent["instructions"] {
 }
 
 function localAgentsFor(seed: HostSeed, toggles: Toggles): DetectedAgent[] {
+  if (toggles.w1NoAgents) return [];
   let agents = (seed.agents ?? []).map((agent) => ({ ...agent, instructions: agent.instructions ?? instructionsFor(agent.id) }));
   if (toggles.w3Foreign) agents = agents.map((a) => a.id === "codex" ? { ...a, registration: "foreign" as const } : a);
   if (toggles.w3ManualCodex) agents = agents.map((a) => a.id === "codex" && a.registration === "not-connected" ? { ...a, connect: "manual" as const,
@@ -155,7 +156,8 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
         if (toggles.w3ScanTimeout) { await sleep(2500); return json(504, { key: "scan-timeout", message: "agents.list timed out after 20 s" }); }
         await sleep(query.get("rescan") ? 700 : 250);
         if (query.get("rescan")) host.scannedAt = now();
-        return json(200, { agents: host.agents, scanned_at: host.scannedAt });
+        return json(200, { agents: host.agents, scanned_at: host.scannedAt,
+          custom: { command: `${MCP} mcp`, snippet: JSON.stringify({ mcpServers: { sidevoice: { command: MCP, args: ["mcp"] } } }, null, 2) } });
       }
       case route.startsWith("POST /api/host/agents/"): {
         const [, , , , id, action] = path.split("/");

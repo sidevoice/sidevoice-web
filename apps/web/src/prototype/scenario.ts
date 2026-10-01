@@ -49,7 +49,7 @@ export const TOGGLES: ToggleDef[] = [
   { id: "slowDownload", group: "Entorno", label: "Descargas lentas (×6)" },
   { id: "coreFailing", group: "Entorno", label: "El núcleo falla al (re)arrancar" },
   { id: "delayedHost", group: "Entorno", label: "Hosts remotos tardan 3 s en contestar" },
-  { id: "w1NoAgents", group: "W1–W2", label: "W1: no se encuentran agentes" },
+  { id: "w1NoAgents", group: "W1–W2", label: "No se encuentran agentes (W1 y W3)" },
   { id: "w2Error", group: "W1–W2", label: "W2: error de instalación", options: ["", "install.network", "install.proxy", "install.disk", "install.checksum", "install.no-bundle", "install.authenticity"] },
   { id: "w2Kept", group: "W1–W2", label: "W2: la instalación anterior sigue intacta" },
   { id: "w2rNoWebCrypto", group: "W2′", label: "W2′: navegador sin WebCrypto" },

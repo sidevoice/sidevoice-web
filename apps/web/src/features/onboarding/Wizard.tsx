@@ -22,7 +22,7 @@ import { effectiveStage, type Task } from "../../state/hosts/stage-scope";
 import { StageSettings } from "../settings/StageSettings";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
-import { AgentRow } from "../hosts/AgentRow";
+import { AgentRow, otherAgent } from "../hosts/AgentRow";
 
 const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title", W5: "wizard.w5.title", W6: "wizard.w6.title" };
 
@@ -256,12 +256,14 @@ function W3() {
       </div>
     );
   const anyConnected = agents.some((a) => a.registration === "connected");
+  const other = otherAgent(listing.value?.custom, t("agents.other"));
   return (
     <>
-      {agents.length === 0 ? <p className="empty-note">{t("wizard.w3.none")}</p> : <>
-        <p className="muted">{t("wizard.w3.lead")}</p>
-        <ul className="agent-rows">{agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="wizard" onConnected={setConnected} />)}</ul>
-      </>}
+      <p className="muted">{t(agents.length ? "wizard.w3.lead" : "wizard.w3.none")}</p>
+      <ul className="agent-rows">
+        {agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="wizard" onConnected={setConnected} />)}
+        {other && <AgentRow key={other.id} fp={fp} agent={other} mode="wizard" />}
+      </ul>
       {connected && <p className="ok-line" role="status">{t("agents.nextConversationsNamed", { name: connected })}</p>}
       <Actions><Button variant="primary" onClick={() => void next()}>{anyConnected || agents.length === 0 ? t("wizard.continue") : t("agents.notNow")}</Button></Actions>
     </>

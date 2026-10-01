@@ -42,7 +42,8 @@ export async function hostRequest<T>(target: HostTarget, method: string, path: s
   return answer as T;
 }
 
-export interface AgentsListing { agents: DetectedAgent[]; scanned_at: number }
+/** `custom`: how any MCP-capable agent the connector has no module for gets Sidevoice (operator, 2026-10-01). */
+export interface AgentsListing { agents: DetectedAgent[]; scanned_at: number; custom?: { command: string; snippet: string } | null }
 export interface DeviceRow { device_id: string; name: string; kind: "code" | "local"; created_at: number; last_seen: number | null }
 
 export const listAgents = (target: HostTarget, rescan = false) =>

@@ -12,7 +12,7 @@ import { failurePhrase, localSubtitle, remoteSubtitle, type StoredPairing } from
 import { useHosts, useHostsController, type HostTab } from "../../state/hosts/hosts-store";
 import { effectiveStage, stageSource, type Task } from "../../state/hosts/stage-scope";
 import { IntegrationList } from "../settings/IntegrationList";
-import { AgentRow } from "./AgentRow";
+import { AgentRow, otherAgent } from "./AgentRow";
 import { CopyButton, formatWhen, HostDot, PhraseText } from "./common";
 
 /** Draws a pairing code as a QR. The web carries no encoder yet; with none provided, the code is shown as text only. */
@@ -225,9 +225,11 @@ function AgentsTab({ fp }: { fp: string }) {
         {listing.status === "loading" ? t("agents.scanning") : t("agents.scannedAt", { when: formatWhen(Math.floor((listing.value?.scanned_at ?? 0)), now, lang) })}
         {" · "}<Button variant="ghost" size="compact" onClick={() => void hosts.loadAgents(fp, true)}>{t("agents.rescan")}</Button>
       </p>
-      {agents.length === 0 ? <p className="empty-note">{t("agents.none")}</p> : (
-        <ul className="agent-rows">{agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="host" onConnected={setConnected} />)}</ul>
-      )}
+      {agents.length === 0 && <p className="muted">{t("agents.none")}</p>}
+      <ul className="agent-rows">
+        {agents.map((agent) => <AgentRow key={agent.id} fp={fp} agent={agent} mode="host" onConnected={setConnected} />)}
+        {(() => { const other = otherAgent(listing.value?.custom, t("agents.other")); return other && <AgentRow key={other.id} fp={fp} agent={other} mode="host" />; })()}
+      </ul>
       {connected && <p className="ok-line" role="status">{t("agents.nextConversationsNamed", { name: connected })}</p>}
     </div>
   );

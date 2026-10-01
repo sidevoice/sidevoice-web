@@ -13,7 +13,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import { useStore } from "zustand";
 import { createContext, useContext } from "react";
 import type { AppDiagnostics, AppSettings, BridgeError, BridgeResult, DesktopHost, DetectedAgent, InstallProgress, LocalHostState, LocalPairing, OnboardingState, PairingCodeAnswer, ResetStep } from "../../services/desktop-host";
-import { agentAction, deleteIntegrationKey, hostAbout, HostError, listAgents, listDevices, listIntegrations, putIntegrationKey, revokeDevice, type DeviceRow, type HostTarget } from "../../services/host-api";
+import { agentAction, deleteIntegrationKey, hostAbout, HostError, listAgents, type AgentsListing, listDevices, listIntegrations, putIntegrationKey, revokeDevice, type DeviceRow, type HostTarget } from "../../services/host-api";
 import { candidateBases } from "../../services/device-pairing.js";
 import type { IntegrationListing } from "../room-types";
 import { hostList, hostRows, type HostList, type HostRowView, type RemoteReach, type StoredPairing, type StoredPairings } from "./host-list";
@@ -37,7 +37,7 @@ export interface HostsFacts {
   localPairing: LocalPairing | null;
   stored: StoredPairings;
   reach: Record<string, RemoteReach>;
-  agents: Record<string, Remote<{ agents: DetectedAgent[]; scanned_at: number }>>;
+  agents: Record<string, Remote<AgentsListing>>;
   agentBusy: Record<string, string>;
   agentErrors: Record<string, BridgeError>;
   devices: Record<string, Remote<DeviceRow[]>>;
