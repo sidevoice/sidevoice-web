@@ -37,7 +37,8 @@ function Shell() {
   const frame = useRef<HTMLIFrameElement>(null);
   const narrow = useNarrow();
   const current = scenarioById(scenario);
-  const query = writeParams({ scenario, view, lang, toggles });
+  const [at, setAt] = useState<string | null>(initial.at);
+  const query = writeParams({ scenario, view, lang, toggles, at });
   // The frame loads once per generation: a live toggle changes the URL, not the running app.
   const [src, setSrc] = useState("prototype-app.html" + query);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,6 +50,7 @@ function Shell() {
       const data = event.data as { source?: string; type?: string; scenario?: string; hosts?: { alias: string; name: string }[]; pasted?: boolean; width?: number; height?: number; command?: string };
       if (data?.source !== "sidevoice-prototype" && data?.source !== "sidevoice-card") return;
       if (data.type === "ready") setHosts(data.hosts ?? []);
+      if (data.type === "step") setAt((data as { step?: string | null }).step ?? null);
       if (data.type === "relaunch" && data.scenario) { setScenario(data.scenario); setToggles({}); setGeneration((g) => g + 1); say("Relanzada tras «Borrar datos» → " + data.scenario); }
       if (data.type === "size" && data.width) setCardSize({ width: data.width, height: data.height ?? 80 });
       if (data.type === "command") {
@@ -68,7 +70,7 @@ function Shell() {
     if (TOGGLES.find((d) => d.id === id)?.reload) setGeneration((g) => g + 1);
     else send({ type: "toggles", toggles: next });
   }
-  function choose(id: string) { setScenario(id); const s = scenarioById(id); setView(s.view ?? (s.inApp ? "app" : "browser")); setGeneration((g) => g + 1); }
+  function choose(id: string) { setAt(null); setScenario(id); const s = scenarioById(id); setView(s.view ?? (s.inApp ? "app" : "browser")); setGeneration((g) => g + 1); }
   const groups = [...new Set(TOGGLES.map((d) => d.group))];
   const active = Object.values(toggles).filter(Boolean).length;
   const effectiveView: View = narrow ? (view === "app" ? "app" : "phone") : view;

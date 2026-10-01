@@ -73,7 +73,8 @@ export const TOGGLES: ToggleDef[] = [
 
 export type Toggles = Record<string, string | boolean>;
 
-export interface Params { scenario: Scenario; view: View; lang: string; toggles: Toggles }
+/** `at`: the wizard step on screen, kept in the URL so a reload lands there again (prototype only). */
+export interface Params { scenario: Scenario; view: View; lang: string; toggles: Toggles; at: string | null }
 
 export function readParams(search: string): Params {
   const query = new URLSearchParams(search);
@@ -85,14 +86,15 @@ export function readParams(search: string): Params {
     toggles[def.id] = def.options ? value : value === "1";
   }
   const view = (query.get("view") as View | null) ?? scenario.view ?? (scenario.inApp ? "app" : "browser");
-  return { scenario, view, lang: query.get("lang") ?? "", toggles };
+  return { scenario, view, lang: query.get("lang") ?? "", toggles, at: query.get("at") };
 }
 
-export function writeParams(params: { scenario: string; view: View; lang: string; toggles: Toggles }): string {
+export function writeParams(params: { scenario: string; view: View; lang: string; toggles: Toggles; at?: string | null }): string {
   const query = new URLSearchParams();
   query.set("s", params.scenario);
   query.set("view", params.view);
   if (params.lang) query.set("lang", params.lang);
+  if (params.at) query.set("at", params.at);
   for (const def of TOGGLES) {
     const value = params.toggles[def.id];
     if (value === true) query.set(def.id, "1");

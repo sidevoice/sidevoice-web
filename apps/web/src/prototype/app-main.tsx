@@ -37,7 +37,30 @@ import { createFakeEngine } from "./fakes/engine";
 import { createRoomAdapter } from "./room-adapter";
 
 const params = readParams(location.search);
-const { scenario, view } = params;
+const { view } = params;
+const scenario = fastForward(structuredClone(params.scenario), params.at);
+
+/** A reload that lands back on wizard step `at`: what the steps before it would have left behind, made so — the
+ *  local host installed and running, the agents step done, a machine paired, the stages before it chosen. Close to
+ *  what was on screen, not the same choices. */
+function fastForward(s: typeof params.scenario, at: string | null): typeof params.scenario {
+  const order = ["W1", "W2", "W2r", "W3", "W4", "W4v", "W5", "W6"];
+  const step = order.indexOf(at ?? "");
+  if (step <= 0) return s;
+  const remote = at === "W2r" || (!s.bridge?.localHost && at !== "W2" && at !== "W3") || (s.onboarding?.choice === "remote");
+  s.onboarding = { choice: remote ? "remote" : "agents", deferred_at: Math.floor(Date.now() / 1000) - 60 };
+  if (!remote && step >= order.indexOf("W3") && s.bridge?.localHost) s.bridge.localHost.states = [{ state: "running", after_ms: 0 }];
+  if (!remote && step >= order.indexOf("W4")) s.onboarding.agents_done = true;
+  if (remote && step >= order.indexOf("W4")) {
+    const alias = Object.keys(s.hosts).find((a) => a !== "local");
+    if (alias && !(s.pairings ?? []).some((p) => p.host === alias)) { s.pairings = [{ host: alias, paired_days_ago: 0 }, ...(s.pairings ?? [])]; s.in_use = alias; }
+  }
+  const stt = { place: "device", model: "whisper-tiny" }, tts = { place: "device", model: "kokoro-82m-v1.0" };
+  if (step >= order.indexOf("W4v")) s.stages = { ...(s.stages ?? {}), default: { ...(s.stages?.default ?? {}), stt } };
+  if (step >= order.indexOf("W5")) s.stages = { ...(s.stages ?? {}), default: { ...(s.stages?.default ?? {}), stt, tts } };
+  if (step >= order.indexOf("W4v")) s.installed = [...new Set([...(s.installed ?? []), "whisper-tiny", ...(step >= order.indexOf("W5") ? ["kokoro-82m-v1.0"] : [])])];
+  return s;
+}
 const toggles: Toggles = { ...params.toggles };
 setLanguage(params.lang || systemLanguage(["es", "en"]));
 
@@ -129,6 +152,19 @@ async function boot() {
   seedRoom();
   if (scenario.scan_on_start && store.getState().localPairing) void controller.loadAgents(store.getState().localPairing!.fp);
   if (toggles.resumeAt && inApp) controller.openWizard();
+  if (params.at && params.at !== "W1") controller.openWizard(params.at as never);
+  // The shell keeps the step in its URL.
+  let lastStep: string | null = null;
+  store.subscribe((state) => {
+    const step = state.wizard.open ? state.wizard.step : null;
+    if (step === lastStep) return;
+    lastStep = step;
+    post({ type: "step", step });
+    // The frame keeps it too: a hot reload reloads the frame's own URL.
+    const url = new URL(location.href);
+    if (step) url.searchParams.set("at", step); else url.searchParams.delete("at");
+    history.replaceState(null, "", url);
+  });
   if (scenario.open) controller.openSettings(scenario.open.pane as SettingsPane, scenario.open.host ? fp(scenario.open.host) : null, (scenario.open.tab ?? "status") as HostTab);
   setInterval(() => controller.tick(), 30_000);
 
