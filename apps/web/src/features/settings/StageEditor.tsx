@@ -603,8 +603,8 @@ function TestText({ value, language, languageLabel, onChange, disabled }: { valu
 }
 
 /** The voice test in Sidevoice's own bubble («Primeros pasos»): one line to write what to hear — its placeholder a
- *  sentence in the language — and ▶ (or Enter) to hear it in the voice chosen. While it plays, the bubble is the
- *  call's own, the words following the voice. */
+ *  sentence in the language — heard with the button under it («Escuchar», or the wizard's «Probar»), or Enter; the
+ *  bubble stays clean of controls (operator, 2026-10-02). While it plays, it is the call's own, the words following. */
 function SpeakBubble({ name, value, placeholder, language, languageLabel, onChange, onPlay }: { name: string; value: string; placeholder: string; language: string; languageLabel: string; onChange: (text: string) => void; onPlay: () => void }) {
   const t = useT();
   return (
@@ -618,7 +618,6 @@ function SpeakBubble({ name, value, placeholder, language, languageLabel, onChan
               aria-label={languageLabel ? t("stagecard.text.labelIn", { language: languageLabel }) : t("stagecard.text.label")}
               onChange={(event) => onChange(event.currentTarget.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onPlay(); } }} />
-            <button type="button" className="try-send" aria-label={t("stagecard.listen")} title={t("stagecard.listen")} onClick={onPlay}>▶</button>
           </span>
         </article>
       </div>
