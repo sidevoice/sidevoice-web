@@ -93,7 +93,7 @@ export const en: Record<string, string> = {
   "wizard.w5.changeTts": "Change voice",
   "wizard.w6.title": "Done",
   "wizard.w6.lead": "Open a conversation with your agent and ask it:",
-  "wizard.w6.ask": "connect to voice",
+  "wizard.w6.ask": "connect to Sidevoice",
   "wizard.w6.go": "Go to the room",
 
   "echo.mic-denied": "Sidevoice isn't allowed to use the microphone.",
