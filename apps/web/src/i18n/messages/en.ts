@@ -567,4 +567,6 @@ export const en: Record<string, string> = {
   "pair.error.refused": "The machine didn't accept the pairing. Try again.",
   "stage.place.host": "On {name}",
   "stage.place.hostNote": "Runs on {name}, with what that machine has: nothing is downloaded to this device.",
+  "settings.thisDevice": "This device",
+  "settings.deviceNameHint": "Machines you pair with from now on list it with this name.",
 };

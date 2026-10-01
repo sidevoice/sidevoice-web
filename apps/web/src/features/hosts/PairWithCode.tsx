@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
-import { decodePairingCode, deviceName } from "../../services/device-pairing.js";
+import { decodePairingCode } from "../../services/device-pairing.js";
+import { currentDeviceName } from "../../state/device-name";
 import { currentLanguage, useT } from "../../i18n";
 import { useHostsController } from "../../state/hosts/hosts-store";
 
@@ -40,7 +41,8 @@ export function PairWithCode({ onPaired, submitLabel, use = true, renderActions 
   const hosts = useHostsController();
   const [code, setCode] = useState("");
   // device-pairing.js names this device in Spanish (#128); the platform it found is said through the bundles.
-  const [name, setName] = useState(() => { const where = deviceName().replace(/^Sidevoice( en )?/, ""); return where ? t("pair.deviceName", { where }) : "Sidevoice"; });
+  // The computer's name by default (operator, 2026-10-02), or the one chosen in General.
+  const [name, setName] = useState(() => currentDeviceName((where) => t("pair.deviceName", { where })));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ key: string; text?: string } | null>(null);
 

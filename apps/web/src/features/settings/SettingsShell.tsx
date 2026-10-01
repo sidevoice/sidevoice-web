@@ -5,7 +5,8 @@
  * It is a view of the app, not a window over it (operator, 2026-10-02): it takes the place of the conversations — the
  * sections where the conversation list is, the section where the conversation is, in the same cards and colours —
  * with «Volver» (or Esc) back to them. */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { currentDeviceName, setDeviceName } from "../../state/device-name";
 import { Button } from "../../components/ui/Button";
 import { AdvancedIcon, AppIcon, BackIcon, GeneralIcon, MachinesIcon, SettingsIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useT } from "../../i18n";
@@ -22,6 +23,21 @@ import { AppDiagnostics, ThisApp } from "./ThisApp";
 
 function NavButton({ pane, current, onClick, children }: { pane: string; current: boolean; onClick: () => void; children: React.ReactNode }) {
   return <Button variant="ghost" className="nav-item" data-pane={pane} aria-current={current ? "page" : undefined} onClick={onClick}>{children}</Button>;
+}
+
+/** This device's name, as the machines it pairs with will list it. */
+function DeviceNameSection() {
+  const t = useT();
+  const [name, setName] = useState(() => currentDeviceName((where) => t("pair.deviceName", { where })));
+  return (
+    <section className="pane device-name">
+      <h3>{t("settings.thisDevice")}</h3>
+      <label className="ui-field">{t("pair.name")}
+        <input value={name} maxLength={60} autoComplete="off" onChange={(event) => setName(event.currentTarget.value)} onBlur={() => setDeviceName(name)} />
+      </label>
+      <p className="muted small">{t("settings.deviceNameHint")}</p>
+    </section>
+  );
 }
 
 function StagePane({ task }: { task: Task }) {
@@ -76,7 +92,7 @@ export function SettingsShell() {
       </aside>
       <section className="transcript settings-main">
         <div className="settings-content">
-          {pane === "general" && <div className="legacy-pane"><GeneralSettings /></div>}
+          {pane === "general" && <><DeviceNameSection /><div className="legacy-pane"><GeneralSettings /></div></>}
           {pane === "voice" && <StagePane task="tts" />}
           {pane === "transcription" && <StagePane task="stt" />}
           {pane === "advanced" && <><div className="legacy-pane"><AdvancedSettings /></div>{inApp && <AppDiagnostics />}</>}

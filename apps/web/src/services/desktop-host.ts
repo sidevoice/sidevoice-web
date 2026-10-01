@@ -146,6 +146,8 @@ export interface DesktopHost {
   platform?: string;
   /** Whether this platform can host agents (O2: macOS arm64 app); «Usar agentes en este ordenador» needs it. */
   hostsAgents?: boolean;
+  /** The computer's own name (as the OS calls it): this device's name by default. */
+  computerName?: string;
   localHost?: LocalHostBridge;
   app?: AppBridge;
   onboarding?: OnboardingBridge;

@@ -89,6 +89,7 @@ export function createFakeBridge(scenario: Scenario, toggles: Toggles, hosts: Fa
     version: 1,
     platform: String(toggles.appPlatform || "") || (scenario.platform ?? "macos-aarch64"),
     hostsAgents: (scenario.platform ?? "macos-aarch64") === "macos-aarch64",
+    computerName: scenario.hosts?.local?.name ?? "MacBook de Ana",
     localHost: {
       async state() { return state; },
       subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },

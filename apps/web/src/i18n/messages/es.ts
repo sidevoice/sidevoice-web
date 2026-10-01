@@ -567,4 +567,6 @@ export const es: Record<string, string> = {
   "pair.error.refused": "La máquina no aceptó el emparejamiento. Vuelve a intentarlo.",
   "stage.place.host": "En {name}",
   "stage.place.hostNote": "Se ejecuta en {name}, con lo que tiene esa máquina: no se descarga nada en este dispositivo.",
+  "settings.thisDevice": "Este dispositivo",
+  "settings.deviceNameHint": "Las máquinas que emparejes a partir de ahora lo verán con este nombre.",
 };
