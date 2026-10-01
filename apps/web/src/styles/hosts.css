@@ -346,3 +346,5 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .model-card-progress { display: grid; gap: .4rem; justify-items: start; padding: 0 .8rem .7rem }
 .model-card-progress progress { width: 100%; height: 6px; accent-color: var(--sv-primary) }
 .conversation-test { gap: .1rem; margin: .4rem 0 .6rem; padding: .7rem .8rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #13171c }
+/* Sidevoice's own mark as the sender of a try («Primeros pasos»). */
+.ui-avatar[data-icon] { display: grid; place-items: center; color: var(--sv-primary) }

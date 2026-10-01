@@ -17,7 +17,7 @@
  * only what goes beside it (Cancelar, No, Elegir otro modelo). */
 import { createContext, useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { Button } from "../../components/ui/Button";
-import { MicrophoneIcon, SpeakerIcon } from "../../components/ui/Icons";
+import { MicrophoneIcon, SidevoiceMark, SpeakerIcon } from "../../components/ui/Icons";
 import { currentLanguage, useT } from "../../i18n";
 import { stageContext } from "../../state/room-session-state.js";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -521,6 +521,16 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   );
 }
 
+/** Who speaks in a try: Sidevoice itself, as a conversation of its own («Primeros pasos»), with its mark. */
+function useGuide() {
+  const t = useT();
+  const name = t("try.agent");
+  const say = (text: string, extra: Partial<ChatMessage> = {}, id = "guide") => (
+    <MessageGroup key={id} icon={<SidevoiceMark size={16} />} group={{ id, role: "assistant", name, messages: [{ segment: null, role: "assistant", text, name, time: 0, draft: true, ...extra }] }} />
+  );
+  return { name, say };
+}
+
 /** The voice test's text: a sentence in the language being heard to begin with, the person's to change. */
 function TestText({ value, language, languageLabel, onChange, disabled }: { value: string; language: string; languageLabel: string; onChange: (text: string) => void; disabled?: boolean }) {
   const t = useT();
@@ -541,22 +551,23 @@ function TryShow({ task, trial, input, languageLabel, onText }: { task: Task; tr
   const { state, failure, heard, played } = trial;
   const busy = state === "listening" || state === "transcribing" || state === "playing";
   const spoken = useSpokenSoFar(played, state === "playing");
+  const guide = useGuide();
   // Started from the action bar, the try may be below the fold: it comes into view as it happens.
   const chat = useRef<HTMLDivElement>(null);
   useEffect(() => { if (state !== "idle") chat.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }, [state]);
   const message = (role: "user" | "assistant", text: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
     ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
+  // The instructions are Sidevoice's own message, as in a real conversation (operator, 2026-10-01).
   return (<>
-    {task === "stt" && <blockquote className="try-sample" lang={input.language}>«{input.text}»</blockquote>}
-    {task === "tts" && !busy && <TestText value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} />}
     <div className="try-chat" ref={chat}>
+      {guide.say(task === "stt" ? t("try.guide.stt", { sample: input.text }) : t("try.guide.tts"))}
       {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
       {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
       {task === "tts" && (state === "playing" || state === "played") && (
-        <MessageGroup group={{ id: "try", role: "assistant", name: "Sidevoice", messages: [message("assistant", played, {
-          playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null })] }} />
+        guide.say(played, { playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null }, "played")
       )}
     </div>
+    {task === "tts" && !busy && <TestText value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} />}
     <div role="alert">{state === "failed" && <p className="row-error small">
       {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}
     </p>}</div>
@@ -574,7 +585,6 @@ function TryIt({ task, trial, input, languageLabel, onText, onStart, inFooter, o
   const busy = state === "listening" || state === "transcribing" || state === "playing";
   return (
     <div className="stage-card-body try-it">
-      {!answered && !busy && <p className="small">{t((task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts") + (inFooter ? ".footer" : ""))}</p>}
       <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} />
       {answered && !no && (
         <div className="try-question">
@@ -613,7 +623,6 @@ function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart
   const busy = trial.state === "listening" || trial.state === "transcribing" || trial.state === "playing";
   return (
     <div className="stage-configure">
-      {task === "stt" && <p className="small">{t(inFooter ? "stagecard.b.say.footer" : "stagecard.b.say")}</p>}
       <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} />
       <span className="try-row">
         {!inFooter && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>

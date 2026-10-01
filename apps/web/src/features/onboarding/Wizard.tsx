@@ -359,10 +359,10 @@ function W5Conversation() {
     <>
       <p className="muted">{t("w5c.lead")}</p>
       <div className="try-chat conversation-test">
-        <MessageGroup group={{ id: "prompt", role: "assistant", name: "Sidevoice", messages: [message("assistant", prompt, { playback: turn.state === "speaking" ? "playing" : "complete" })] }} />
+        <MessageGroup icon={<SidevoiceMark size={16} />} group={{ id: "prompt", role: "assistant", name: t("try.agent"), messages: [message("assistant", prompt, { playback: turn.state === "speaking" ? "playing" : "complete" })] }} />
         {(turn.state === "listening" || turn.state === "transcribing") && <LiveDraftBubble phase={turn.state} />}
         {turn.heard && <MessageGroup group={{ id: "heard", role: "user", name: t("stagecard.you"), messages: [message("user", turn.heard)] }} />}
-        {turn.reply && <MessageGroup group={{ id: "reply", role: "assistant", name: "Sidevoice", messages: [message("assistant", turn.reply)] }} />}
+        {turn.reply && <MessageGroup icon={<SidevoiceMark size={16} />} group={{ id: "reply", role: "assistant", name: t("try.agent"), messages: [message("assistant", turn.reply)] }} />}
       </div>
       {turn.state === "silent" && <p className="row-error" role="alert">{t("wizard.w5.silent")}</p>}
       {turn.state === "failed" && turn.error && (
