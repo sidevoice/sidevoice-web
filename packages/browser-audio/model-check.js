@@ -53,7 +53,9 @@ export function transcriptProblem(expected,heard){
 /** Why a voice check failed, as a refusal, or null when the audio is audible and lasts a plausible time. */
 export function audioProblem(samples,rate){
  const count=samples?.length||0,seconds=rate?count/rate:0;
- let sum=0;for(let i=0;i<count;i++)sum+=samples[i]*samples[i];
+ // Audio that is not numbers (NaN, ±Infinity), or a rate that is not one, is no audio: never "loud enough".
+ let sum=0,finite=Number.isFinite(rate)&&rate>0;for(let i=0;i<count&&finite;i++){const value=samples[i];if(!Number.isFinite(value))finite=false;else sum+=value*value}
+ if(!finite)return {key:'check_invalid_audio',message:'The model produced audio that is not a valid waveform.'};
  if(!count||Math.sqrt(sum/count)<spec.tts.min_rms)return {key:'check_silent',message:'The model loaded but produced nothing.'};
  const [low,high]=spec.tts.seconds;
  if(seconds<low||seconds>high)return {key:'check_duration',seconds:Math.round(seconds*100)/100,message:`The model produced ${seconds.toFixed(1)} s of audio for a phrase that takes about five.`};

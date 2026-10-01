@@ -87,7 +87,7 @@ test('a checked model takes over: the old worker finishes what it was doing, the
  const old=new Fake('old'),checked=new Fake('checked');
  client.worker=old;client.native=false;client._listen(old);
  const inFlight=client._request('transcribe',{native:false,model:'whisper-tiny'});
- client.adopt(checked,{model:'whisper-base',engine:'transformers-js',accelerator:'wasm'},false);
+ client.adopt(checked,{model:'whisper-base',engine:'transformers-js',accelerator:'wasm'},false).commit();
  assert.equal(client.runtime.model,'whisper-base');
  assert.equal(old.terminated,false,'a transcription is still running on it');
  const next=client._request('transcribe',{native:false,model:'whisper-base'});
@@ -98,4 +98,55 @@ test('a checked model takes over: the old worker finishes what it was doing, the
  checked.onmessage({data:{id:checked.posted[0].id,type:'result',result:{text:'adiós'}}});
  assert.equal((await next).text,'adiós');
  assert.equal(checked.terminated,false);
+});
+
+test('a load that is abandoned lets its worker go — download and all — and what waited on it is told',async()=>{
+ const {client}=setup();
+ class Fake{constructor(){this.posted=[];this.terminated=false}postMessage(d){this.posted.push(d)}terminate(){this.terminated=true}}
+ const worker=new Fake();client.worker=worker;client.native=false;client._listen(worker);
+ const seen=[];
+ const loading=client.prepare({model:'whisper-base',engine:'transformers-js',accelerator:'wasm'},value=>seen.push(value));
+ worker.onmessage({data:{id:worker.posted[0].id,type:'progress',progress:{status:'progress',file:'a.onnx',loaded:5,total:9}}});
+ assert.deepEqual(seen.map(v=>v.loaded),[5],'the caller hears the engine\'s progress');
+ client.abandon();
+ await assert.rejects(loading,{name:'AbortError'});
+ assert.equal(worker.terminated,true);
+ assert.equal(client.worker,null);
+});
+
+test('a swap in a call: adopt, stop, then the old worker\'s late answer — the old worker is let go (review R06)',async()=>{
+ const {client}=setup();
+ class Fake{constructor(){this.posted=[];this.terminated=0}postMessage(d){this.posted.push(d)}terminate(){this.terminated++}}
+ const A=new Fake(),B=new Fake();
+ client.worker=A;client.native=false;client._listen(A);
+ const pending=client._request('transcribe',{native:false,model:'whisper-tiny'});pending.catch(()=>{});
+ client.adopt(B,{model:'whisper-base'},false).commit();
+ assert.equal(A.terminated,0,'a transcription is still running on it');
+ client.stop();
+ assert.equal(A.terminated,1,'clearing what it was doing lets it go');
+ A.onmessage({data:{id:A.posted[0].id,type:'result',result:{text:'tarde'}}});
+ assert.equal(A.terminated,1,'once');
+ assert.equal(client.pending.size,0);
+ assert.equal(B.terminated,0);
+});
+test('an unmatched late answer from a worker no longer in use lets it go',()=>{
+ const {client}=setup();
+ class Fake{constructor(){this.posted=[];this.terminated=0}postMessage(d){this.posted.push(d)}terminate(){this.terminated++}}
+ const A=new Fake(),B=new Fake();
+ client.worker=A;client._listen(A);client.retired.add(A);client.worker=B;
+ A.onmessage({data:{id:999,type:'result',result:{}}});
+ assert.equal(A.terminated,1);
+});
+test('a swap the call refused is undone: the old worker is back, the new one is let go with what it had',async()=>{
+ const {client}=setup();
+ class Fake{constructor(){this.posted=[];this.terminated=0}postMessage(d){this.posted.push(d)}terminate(){this.terminated++}}
+ const A=new Fake(),B=new Fake();
+ client.worker=A;client.native=false;client.runtime={model:'whisper-tiny'};client._listen(A);
+ const swap=client.adopt(B,{model:'whisper-base'},false);
+ const onB=client._request('transcribe',{native:false});
+ swap.restore();
+ await assert.rejects(onB,{name:'AbortError'});
+ assert.deepEqual([client.worker===A,client.runtime.model,A.terminated,B.terminated],[true,'whisper-tiny',0,1]);
+ swap.commit();
+ assert.equal(A.terminated,0,'a commit after a restore lets nothing go');
 });

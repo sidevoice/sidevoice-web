@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationView, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
+import type { DownloadsView, ChatMessage, ConversationView, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
 export interface AudioDevices {
  inputs: {id: string; label: string}[]; outputs: {id: string; label: string}[];
@@ -41,6 +41,8 @@ export interface SessionFacts {
  previewNote: string; prepareNote: string; gpuSetAside: boolean;
  /** Per stage, the model selection in flight or just over (#124 §6), and what its last check measured (#90). */
  stageChecks: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>; stageDiagnostics: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>;
+ /** Every model or engine download in flight, and the ones that just ended. */
+ downloads: import('../services/downloads.js').DownloadItem[];
  pageFacts: {adapter: {vendor: string; architecture: string; device: string; description: string} | null; crossOriginIsolated: boolean; threads: number | null; cores: number | null} | null;
 }
 export interface SessionStatus {
@@ -57,7 +59,7 @@ export interface SessionSnapshot {
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string}; deviceNote: string;
- bootError: string | null; stages: {stt: StageView; tts: StageView} | null; voiceTools: {previewing: string | null; previewNote: string; prepareNote: string; gpuSetAside: boolean}; machines: MachineView[]; pairing: PairingPromptView;
+ bootError: string | null; stages: {stt: StageView; tts: StageView} | null; downloads: DownloadsView; voiceTools: {previewing: string | null; previewNote: string; prepareNote: string; gpuSetAside: boolean}; machines: MachineView[]; pairing: PairingPromptView;
  integrations: IntegrationsView;
 }
 export interface SessionStore {

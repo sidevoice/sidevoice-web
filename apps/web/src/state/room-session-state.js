@@ -1,5 +1,6 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
 import { stageView } from './stage-settings.js';
+import { downloadsView } from './downloads-view.js';
 export const PRESENCE_LEVEL = .1;
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 export const GAP_BUFFER_SECONDS = 30;
@@ -55,6 +56,8 @@ export function initialSessionFacts() {
         // (stage-selection.js's record), and what the last check measured, for Diagnóstico (#90). In a page, what
         // the page itself has: its WebGPU adapter, whether it is cross-origin isolated, its threads and cores.
         stageChecks: {}, stageDiagnostics: {}, pageFacts: null,
+        // Every model or engine download in flight, and the ones that just ended (services/downloads.js).
+        downloads: [],
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -406,7 +409,7 @@ export function createRoomSessionStore(seed = {}) {
             audioDevices: facts.audioDevices, machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             integrations: { error: facts.integrationsError,
                 status: facts.integrationsStatus, rows: integrationsView(facts) },
-            bootError: facts.bootError, stages: stagesView(facts),
+            bootError: facts.bootError, stages: stagesView(facts), downloads: downloadsView(facts.downloads),
             voiceTools: { previewing: facts.previewJob?.language || null, previewNote: facts.previewNote, prepareNote: facts.prepareNote, gpuSetAside: facts.gpuSetAside } };
     }
     function publish() { if (depth || !dirty)

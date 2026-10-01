@@ -346,7 +346,7 @@ export function secondsText(ms) {
     if (ms == null || !Number.isFinite(ms)) return '—';
     return (ms / 1000).toFixed(ms < 10000 ? 2 : 1).replace('.', ',') + ' s';
 }
-function bytesText(bytes) { return bytes >= 1e9 ? (bytes / 1e9).toFixed(1).replace('.', ',') + ' GB' : (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0).replace('.', ',') + ' MB'; }
+export function bytesText(bytes) { return bytes >= 1e9 ? (bytes / 1e9).toFixed(1).replace('.', ',') + ' GB' : (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0).replace('.', ',') + ' MB'; }
 /** A stage's model in a few words: a catalogue model by its label, a provider's as `Provider · model`. */
 export function stageLabel(ctx, task, stage) {
     if (!stage) return '';

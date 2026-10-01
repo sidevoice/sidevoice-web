@@ -455,7 +455,7 @@ class RoomVoice {
  fail(error){this.announce(error.message,this.ready?'inline':'error');this.ready=false;const job=this.job;this.note('fail',error?.message||'error');if(!job)return;this.job=null;this.stopProgress(job);this.stopClock(job);clearTimeout(job.timer);this.silence(job);this.worker?.terminate();this.worker=null;job.reject(error)}
  receive(d){const job=this.job;if(!job||d.id!==job.id)return;
   clearTimeout(job.timer);job.timer=setTimeout(()=>this.fail(Error('El modelo tardó demasiado. Vuelve a prepararlo.')),180000);
-  if(d.type==='progress'){const p=d.progress;const text=p.status==='voice'?'Cargando la voz seleccionada…':p.status==='generating'?'Preparando el primer audio…':'Cargando modelo'+(p.file?' · '+p.file:'')+(p.progress!=null?' · '+Math.round(p.progress)+'%':'');job.status(text);if(!this.ready&&!job.playing)this.announce(text,'loading',p.progress??null)}
+  if(d.type==='progress'){const p=d.progress;this.loadProgress?.(p);const text=p.status==='voice'?'Cargando la voz seleccionada…':p.status==='generating'?'Preparando el primer audio…':'Cargando modelo'+(p.file?' · '+p.file:'')+(p.progress!=null?' · '+Math.round(p.progress)+'%':'');job.status(text);if(!this.ready&&!job.playing)this.announce(text,'loading',p.progress??null)}
   if(d.type==='fallback'){job.status('GPU no disponible · Preparando CPU');this.announce('GPU no disponible · Preparando CPU')}
   if(d.type==='ready'){this.ready=true;this.announce('','hidden');job.status('Modelo listo · '+(this.kind==='native'?'en este dispositivo':d.accelerator==='webgpu'?'GPU':'CPU'));if(job.load)this.complete(job)}
   if(d.type==='error')this.fail(Error(d.error));
@@ -503,7 +503,10 @@ class RoomVoice {
    })().catch(error=>{if(this.job===job)this.fail(error)});
   });
  }
- prepare(options,status){return this.run('load',options,status)}
+ /* `progress` hears the engine's own progress events while it loads (what the room's downloads count in bytes). */
+ prepare(options,status,progress){this.loadProgress=progress||null;const loading=this.run('load',options,status);const done=()=>{if(this.loadProgress===progress)this.loadProgress=null};loading.then(done,done);return loading}
+ /* What the worker was loading is dropped, download included: the worker goes, and the next utterance makes another. */
+ abandon(){this.cancel();const worker=this.worker;this.worker=null;this.kind=null;this.ready=false;this.loadProgress=null;worker?.terminate()}
  speak(options,status,onPlaying,onProgress){return this.run('speak',options,status,onPlaying,onProgress)}
 }
 window.roomVoice=new RoomVoice();

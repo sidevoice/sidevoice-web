@@ -50,8 +50,8 @@ test("a transcription model is downloaded with progress in bytes, loaded, then c
   expect(result).toMatchObject({ ok: true, step: "done", loaded: true, language: "es", slow: false });
   expect(result.passes).toHaveLength(2);
   expect(result.latency_ms).toBe(result.passes[1].latency_ms);
-  expect(progress).toContainEqual({ step: "download", done: 30, total: 100 });
-  expect(progress).toContainEqual({ step: "load", done: 60, total: 100 });
+  expect(progress).toContainEqual({ step: "download", done: 30, total: 100, bytes_per_s: null });
+  expect(progress).toContainEqual({ step: "load", done: 60, total: 100, bytes_per_s: null });
   expect(progress).toContainEqual({ step: "check", pass: 2, passes: 2 });
   expect(fake.posted.map((m) => m.type)).toEqual(["load", "transcribe", "transcribe"]);
   expect(fake.posted[1]).toMatchObject({ language: "es", accelerator: "wasm" });

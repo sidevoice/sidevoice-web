@@ -12,6 +12,10 @@
  * success carries the worker, loaded, for the caller to put in place of the one in use — and a failure has
  * already let it go. Whether to ask about a slow model, and what to store, is stage-selection.js's. */
 import {clip,phrase,transcriptProblem,audioProblem,slow,wavSamples,failure} from '../../../../packages/browser-audio/model-check.js';
+import {byteCounter} from './downloads.js';
+
+// What the desktop app answers when a cancel stopped its install, or an unload its load: a cancel, never a failure.
+const CANCELLED = new Set(['install_cancelled', 'load_cancelled']);
 
 const PASSES = 2;
 const now = () => globalThis.performance?.now?.() ?? Date.now();
@@ -37,38 +41,32 @@ function ask(worker, message, { onProgress, onAudio, signal } = {}) {
     });
 }
 
-/* Download progress across the files a load fetches, in bytes: the catalogue's size is the total until the
- * files themselves say more. The step is the download while a file is still arriving, the load after. */
+/* Download progress across the files a load fetches, in bytes (downloads.js's counter, which also carries the
+ * desktop app's own speed). The step is the download while a file is still arriving, the load after. */
 function tracker(expected, onProgress, download) {
-    const files = new Map();
-    const state = { step: download ? 'download' : 'load', loadFrom: null, downloading: false };
-    const total = () => Math.max(expected || 0, [...files.values()].reduce((sum, file) => sum + (file.total || 0), 0));
-    const done = () => [...files.values()].reduce((sum, file) => sum + (file.loaded || 0), 0);
+    const files = new Map(), bytes = byteCounter(expected);
+    const state = { step: download ? 'download' : 'load', loadFrom: null };
     return {
         state,
         progress(event) {
-            const name = String(event.file || event.name || '');
+            const name = String(event.job || event.file || event.name || '');
             if (event.status === 'loading') { state.step = 'load'; state.loadFrom = now(); onProgress({ step: 'load' }); return; }
-            if (event.status === 'progress' || event.status === 'download' || event.status === 'initiate') {
-                const file = files.get(name) || {};
-                if (Number.isFinite(event.loaded)) file.loaded = event.loaded;
-                if (Number.isFinite(event.total)) file.total = event.total;
-                file.finished = false;
-                files.set(name, file);
-                state.downloading = true;
-                // A model already on disk is read from the cache with the same events: that is its load, not a download.
-                if (download) onProgress({ step: 'download', done: done(), total: total() || null });
-            } else if (event.status === 'done') {
-                const file = files.get(name);
-                if (file) { file.finished = true; if (file.total) file.loaded = file.total; }
-                if ([...files.values()].every((each) => each.finished)) {
-                    state.step = 'load'; state.loadFrom = now(); state.downloading = false;
-                    onProgress(download ? { step: 'load', done: done(), total: total() || null } : { step: 'load' });
+            const counted = bytes(event);
+            if (!counted) return;
+            if (event.status === 'done') {
+                files.set(name, true);
+                if ([...files.values()].every(Boolean)) {
+                    state.step = 'load'; state.loadFrom = now();
+                    onProgress(download ? { step: 'load', ...counted } : { step: 'load' });
                 }
+                return;
             }
+            files.set(name, false);
+            // A model already on disk is read from the cache with the same events: that is its load, not a download.
+            if (download) onProgress({ step: 'download', ...counted });
         },
         // A failure while a file is still arriving is the download's; after, the load's.
-        failedStep() { return download && [...files.values()].some((file) => !file.finished) ? 'download' : 'load'; },
+        failedStep() { return download && [...files.values()].some((finished) => !finished) ? 'download' : 'load'; },
     };
 }
 
@@ -82,14 +80,15 @@ export async function verifyDevice({ task, build, open, fetchClip, language, voi
     const progress = tracker(expected, (value) => onProgress(value), download);
     const fail = (stepName, error) => {
         worker?.terminate();
-        if (error?.name === 'AbortError') return { ok: false, cancelled: true, step: stepName, passes, loaded, load_ms };
+        if (error?.name === 'AbortError' || CANCELLED.has(error?.reason?.key)) return { ok: false, cancelled: true, step: stepName, passes, loaded, load_ms };
         // A refusal the engine handed on wins over the words of its message.
         return { ok: false, step: stepName, reason: failure(stepName, error?.reason || error), passes, loaded, load_ms };
     };
     try {
         worker = open(build.native);
         const started = now();
-        const ready = await ask(worker, { id: 1, type: 'load', model: build.model, engine: build.engine, accelerator: build.accelerator, native: build.native },
+        // A page voice may fall back to WASM when WebGPU fails to load it: the worker does that on the load itself.
+        const ready = await ask(worker, { id: 1, type: 'load', model: build.model, engine: build.engine, accelerator: build.accelerator, native: build.native, ...(build.fallback ? { fallback: build.fallback } : {}) },
             { onProgress: (event) => progress.progress(event), signal });
         loaded = true;
         runtime = ready.runtime || { model: build.model, engine: build.engine, accelerator: ready.accelerator || build.accelerator };
@@ -159,7 +158,8 @@ export async function verifyProvider({ task, stage, language, request, signal })
     if (!answer.ok || !body || typeof body !== 'object') {
         const detail = body?.detail;
         const reason = detail && typeof detail === 'object' ? detail : { key: 'host_unreachable', message: typeof detail === 'string' ? detail : `The machine answered ${answer.status}.` };
-        return { ok: false, step: 'host', reason, passes: [] };
+        // Too many checks is the machine's budget speaking (sidevoice-core#25): the check failed, the machine answered.
+        return { ok: false, step: answer.status === 429 ? 'check' : 'host', reason, passes: [] };
     }
     return { passes: [], ...body };
 }

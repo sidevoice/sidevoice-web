@@ -541,3 +541,22 @@ test('A checked voice takes over loaded; one sounding finishes on the old worker
  assert.equal(s.voice.ready,true);
  checked.onmessage({data:{type:'done',id:checked.last.id}});await next;
 });
+
+test('A voice load that is abandoned lets its worker go; a checked voice waiting to take over is kept',async()=>{
+ const s=setup();await s.voice.unlock();const seen=[];
+ const loading=s.voice.prepare({model:'kokoro-82m-v1.0',accelerator:'wasm'},()=>{},p=>seen.push(p));
+ const rejection=assert.rejects(loading,{name:'AbortError'});
+ const old=s.workers[0];
+ old.onmessage({data:{type:'progress',id:old.last.id,progress:{status:'progress',file:'model.onnx',loaded:10,total:90}}});
+ assert.deepEqual(seen.map(p=>p.loaded),[10]);
+ const checked=s.voice.candidate(false);
+ s.voice.adopt(checked,{native:false,model:'kokoro-82m-v1.0',accelerator:'webgpu'});
+ s.voice.abandon();
+ await rejection;
+ assert.equal(old.terminated,true);
+ assert.notEqual(checked.terminated,true,'the checked worker is not the one abandoned');
+ s.voice.speak({text:'hola',model:'kokoro-82m-v1.0',accelerator:'webgpu'}).catch(()=>{});
+ assert.equal(s.voice.worker,checked,'and it takes over at the next utterance');
+ s.voice.cancel();
+ s.voice.cancel();
+});

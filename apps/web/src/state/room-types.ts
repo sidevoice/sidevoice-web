@@ -204,6 +204,15 @@ export type StageCheckView = { model: string; previous: string; recheck: boolean
   | { phase: "done"; rows: { label: string; value: string }[] }
 );
 
+/** The room's downloads (#124 §6): a row per download and what the indicator says while any runs. */
+export interface DownloadsView {
+  rows: { id: string; label: string; task: string; state: "running" | "done" | "failed" | "cancelled"; status: string;
+    fraction: number | null; amount: string; speed: string; left: string; error: string; cancellable: boolean }[];
+  running: number;
+  fraction: number | null;
+  failed: boolean;
+}
+
 export interface SidevoiceActions {
   cancelInput(): Promise<void>;
   skipReply(): Promise<void>;
@@ -228,6 +237,8 @@ export interface SidevoiceActions {
   recheckStage(task: StageTask): void;
   /** Copy a stage's diagnostics as text. Resolves with whether it was copied. */
   copyDiagnostics(task: StageTask): Promise<boolean>;
+  /** Stop one download, whoever started it: the page's, or the desktop app's through the bridge. */
+  cancelDownload(id: string): void;
   previewVoice(language: string): Promise<void>;
   /** Load this device's chosen voice model ahead of the first reply. */
   prepareVoice(): Promise<void>;

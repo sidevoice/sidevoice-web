@@ -48,7 +48,7 @@ test("a model takes effect only after its check passed, and the previous one is 
   await s.finish();
   await done;
   expect(s.order).toEqual(["verify", "verified", "activate"]);
-  expect(s.hooks.activate).toHaveBeenCalledWith("stt", BASE, expect.objectContaining({ ok: true }));
+  expect(s.hooks.activate).toHaveBeenCalledWith("stt", BASE, expect.objectContaining({ ok: true }), { signal: expect.any(AbortSignal) });
   expect(s.hooks.discard).not.toHaveBeenCalled();
   expect(s.last()).toMatchObject({ phase: "done" });
 });
@@ -133,7 +133,7 @@ test("a newer selection of the same stage replaces the one in flight; the older 
   await s.finish();
   await Promise.all([first, replaced]);
   expect(s.hooks.activate).toHaveBeenCalledTimes(1);
-  expect(s.hooks.activate).toHaveBeenCalledWith("stt", TINY, expect.anything());
+  expect(s.hooks.activate).toHaveBeenCalledWith("stt", TINY, expect.anything(), expect.anything());
 });
 
 test("a recheck measures what is in use and changes nothing", async () => {
@@ -146,4 +146,31 @@ test("a recheck measures what is in use and changes nothing", async () => {
   expect(s.hooks.activate).not.toHaveBeenCalled();
   expect(s.hooks.discard).toHaveBeenCalledTimes(1);
   expect(s.last()).toMatchObject({ phase: "done", recheck: true });
+});
+
+test("an activation the call refuses is a failure with its reason; the candidate is let go (review R01)", async () => {
+  const s = selection();
+  s.hooks.activate.mockImplementationOnce(async () => { throw Object.assign(new Error("refused"), { reason: { key: "switch_refused", message: "x", detail: "no key" } }); });
+  const done = s.it.select("stt", BASE);
+  await settle(); await s.finish(); await done;
+  expect(s.published).toContainEqual(expect.objectContaining({ phase: "running", progress: { step: "apply" } }));
+  expect(s.last()).toMatchObject({ phase: "failed", step: "apply", reason: { key: "switch_refused", detail: "no key" } });
+  expect(s.hooks.discard).toHaveBeenCalledTimes(1);
+});
+
+test("cancelling while it takes effect reaches the activation, and says nothing after", async () => {
+  const s = selection();
+  let signal: AbortSignal | null = null;
+  s.hooks.activate.mockImplementationOnce(async (...args: unknown[]) => {
+    signal = (args[3] as { signal: AbortSignal }).signal;
+    await new Promise((resolve) => signal!.addEventListener("abort", resolve));
+    throw new Error("cancelled");
+  });
+  const done = s.it.select("stt", BASE);
+  await settle(); await s.finish();
+  s.it.cancel("stt");
+  await done;
+  expect(signal!.aborted).toBe(true);
+  expect(s.last()).toBeNull();
+  expect(s.hooks.discard).toHaveBeenCalledTimes(1);
 });

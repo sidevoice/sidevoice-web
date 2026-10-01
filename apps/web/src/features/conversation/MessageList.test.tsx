@@ -50,6 +50,7 @@ test("keeps the active transcribed draft cancellable after listening text disapp
     cancelStage: vi.fn(),
     recheckStage: vi.fn(),
     copyDiagnostics: vi.fn(),
+    cancelDownload: vi.fn(),
     previewVoice: vi.fn(),
     prepareVoice: vi.fn(),
     retryIntegrations: vi.fn(),

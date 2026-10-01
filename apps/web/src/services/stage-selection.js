@@ -5,8 +5,9 @@
  *
  * The stage in use is never touched until a check passed: a failure, a cancel or "elegir otro" let the candidate go
  * (`discard`) and the previous model stays active and loaded. Only a passed check (and, when it was slow, the
- * person's "usar igualmente") calls `activate`, which stores the choice and puts the candidate in place of the
- * previous model — and only then unloads that one. A newer selection of the same stage replaces one in flight.
+ * person's "usar igualmente") calls `activate`, which hands the candidate over (in a call, the call has to take it),
+ * and only once that went through stores the choice and unloads the previous model; an activation that fails throws
+ * (its `reason`, a refusal) having changed nothing, and the candidate is let go. A newer selection of the same stage replaces one in flight.
  *
  * The how is injected — `consent(task, stage)` says what a download costs (null when there is none),
  * `verify(task, stage, {onProgress, signal})` is load-and-verify.js's, `activate` and `discard` are the
@@ -59,11 +60,14 @@ export function createStageSelection({ publish, consent, verify, activate, disca
                 publish(task, { phase: 'slow', stage, result });
                 if (!await decision() || !live()) { discard(task, stage, result); if (live()) { delete runs[task]; publish(task, null); } return; }
             }
-            await activate(task, stage, result);
+            // Taking effect is part of the selection: a call that refuses the change leaves everything as it was, and
+            // only an activation that went through is done (review R01).
+            publish(task, { phase: 'running', stage, progress: { step: 'apply' } });
+            await activate(task, stage, result, { signal: run.controller.signal });
             if (live()) publish(task, { phase: 'done', stage, result });
         } catch (error) {
             if (result?.ok) discard(task, stage, result);
-            if (live()) publish(task, { phase: 'failed', stage, step: 'apply', reason: { key: 'apply_failed', message: String(error?.message || error) }, result, recheck });
+            if (live()) publish(task, { phase: 'failed', stage, step: 'apply', reason: error?.reason || { key: 'apply_failed', message: String(error?.message || error) }, result, recheck });
         } finally {
             if (runs[task] === run) delete runs[task];
         }

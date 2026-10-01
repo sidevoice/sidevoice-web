@@ -16,6 +16,7 @@ export const REFUSALS={
  download_failed:()=>'La descarga se interrumpió.',
  download_corrupt:()=>'Lo descargado no es el archivo que nombra el catálogo (la suma de comprobación no coincide).',
  install_failed:()=>'No se pudo instalar lo descargado.',
+ install_cancelled:()=>'Descarga cancelada.',
  memory_insufficient:()=>'No hay memoria suficiente para este modelo.',
  model_needs_memory:()=>'No hay memoria suficiente para este modelo.',
  load_failed:()=>'El motor no pudo cargar el modelo en este dispositivo.',
@@ -25,10 +26,14 @@ export const REFUSALS={
  check_silent:()=>'El modelo cargó, pero no produjo nada.',
  check_mismatch:refusal=>'El modelo entendió otra cosa: «'+String(refusal.heard||'')+'»',
  check_duration:()=>'El audio generado no dura lo que debería.',
+ check_invalid_audio:()=>'El modelo produjo un audio que no es una onda válida.',
  provider_key_refused:refusal=>label(refusal.provider)+' rechazó la clave.',
  provider_unreachable:refusal=>'No se pudo contactar con '+label(refusal.provider)+'.',
  provider_failed:refusal=>label(refusal.provider)+' falló: '+String(refusal.detail||''),
  host_unreachable:()=>'No se pudo contactar con la máquina.',
+ check_rate_limited:()=>'Demasiadas comprobaciones seguidas; vuelve a intentarlo en un momento.',
+ switch_refused:refusal=>'La llamada no aceptó el cambio'+(refusal.detail?': '+String(refusal.detail):'.'),
+ apply_cancelled:()=>'Se canceló el cambio.',
 };
 /** A refusal (an object with a key, an Error carrying one, or plain text) as the sentence to show. */
 export function refusalText(refusal,fallback=''){
