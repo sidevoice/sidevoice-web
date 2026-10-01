@@ -22,6 +22,7 @@ import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-s
 import { effectiveStage as effectiveStageOf, withModel, withPlace } from "../../state/stage-settings.js";
 import { StageEditor, StageFlowContext } from "../settings/StageEditor";
 import { playEnter } from "../../components/brand/EnterSplash";
+import { EnterButton } from "../../components/brand/EnterButton";
 import { offeredSentence } from "../settings/try-samples";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
 import { MessageGroup } from "../conversation/MessageGroup";
@@ -60,7 +61,8 @@ export function Wizard() {
     <dialog ref={ref} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title">
       <div className="wizard-head">
         <span className="wizard-brand"><SidevoiceMark size={18} /> {t("wizard.eyebrow")}</span>
-        <Button variant="ghost" size="compact" className="wizard-later" onClick={() => void hosts.deferWizard()}>{t("wizard.later")}</Button>
+        {/* At the end there is nothing left to put off (operator, 2026-10-02). */}
+        {wizard.step !== "W6" && <Button variant="ghost" size="compact" className="wizard-later" onClick={() => void hosts.deferWizard()}>{t("wizard.later")}</Button>}
       </div>
       <Indicator step={wizard.step} />
       <h2 id="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[wizard.step])}</h2>
@@ -76,7 +78,9 @@ function Actions({ children }: { children?: React.ReactNode }) {
   const t = useT();
   const hosts = useHostsController();
   const wizard = useHosts((s) => s.wizard);
-  const back = wizard.step === "W6" ? null : previousStep(wizard.step, wizard.path);
+  const flow = useContext(StageFlowContext);
+  // From the end, «Atrás» goes back to change something (operator, 2026-10-02): in B to the voice, there is no test step.
+  const back = wizard.step === "W6" && flow === "configure" ? "W4v" : previousStep(wizard.step, wizard.path);
   return (
     <div className="wizard-actions">
       {back && <Button variant="default" className="wizard-back" onClick={() => hosts.goTo(back, back === "W1" ? null : undefined)}>{t("wizard.back")}</Button>}
@@ -477,7 +481,7 @@ function W6() {
     <>
       <p className="done-lead">{t("wizard.w6.lead")}</p>
       <p className="ask-agent">«{t("wizard.w6.ask")}»</p>
-      <Actions><Button variant="primary" onClick={() => { void hosts.finishWizard(); playEnter(); }}>{t("wizard.w6.go")}</Button></Actions>
+      <Actions><EnterButton onClick={() => { void hosts.finishWizard(); playEnter(); }}>{t("wizard.w6.go")}</EnterButton></Actions>
     </>
   );
 }
