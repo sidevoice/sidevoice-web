@@ -396,10 +396,6 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .try-send:disabled { opacity: .45; cursor: default }
 /* The voice test inside Sidevoice's bubble: one line and ▶. */
 .try-speak { display: grid; gap: .3rem; width: min(100%, 28rem) }
-.try-speak-row { display: flex; align-items: center; gap: .5rem }
-.try-speak input { flex: 1; min-width: 0; padding: .3rem 0; border: 0; border-bottom: 1px solid #ffffff26; background: transparent; color: inherit; font: inherit; outline: none }
-.try-speak input:focus { border-bottom-color: var(--sv-primary) }
-.try-speak input::placeholder { color: var(--sv-muted) }
 /* The button that enters Sidevoice: its own, not a design-system variant. */
 /* «Atrás» at its left, the button in the middle. */
 .wizard-actions:has(.enter-button) { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 1.6rem }
@@ -459,3 +455,14 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stages-copy { display: flex; align-items: flex-end; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--sv-border) }
 .stages-copy .ui-field { flex: 1 1 14rem; margin: 0 }
 .settings-view label.choice-card { display: flex; margin: 0 }
+/* The voice test's line grows with its text (a hidden copy sizes it); its rule shows only while writing. */
+.try-speak-grow { display: grid }
+.try-speak-grow::after { content: attr(data-value); grid-area: 1 / 1; visibility: hidden; white-space: pre-wrap; overflow-wrap: anywhere; padding: .3rem 0; border-bottom: 1px solid transparent; font: inherit; line-height: inherit }
+.try-speak-grow textarea { grid-area: 1 / 1; min-width: 0; width: 100%; padding: .3rem 0; margin: 0; border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: transparent; color: inherit; font: inherit; line-height: inherit; resize: none; overflow: hidden; outline: none }
+.try-speak-grow textarea:focus { border-bottom-color: var(--sv-primary) }
+.try-speak-grow textarea::placeholder { color: var(--sv-muted) }
+.settings-view .try-speak-grow textarea { display: block; margin: 0; padding: .3rem 0; border: 0; border-bottom: 1px solid transparent; border-radius: 0; background-color: transparent }
+.settings-view .try-speak-grow textarea:focus { border-bottom-color: var(--sv-primary) }
+/* Each try's button on its speaker's side. */
+.try-row[data-side=person] { justify-content: flex-end }
+.try-row[data-side=sidevoice] { padding-inline-start: 2.5rem }

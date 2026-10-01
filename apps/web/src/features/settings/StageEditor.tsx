@@ -613,11 +613,12 @@ function SpeakBubble({ name, value, placeholder, language, languageLabel, onChan
         <Avatar name={name} icon={<SidevoiceMark size={16} />} decorative />
         <article className="chat-bubble try-speak" data-role="assistant" data-position="only">
           <span className="chat-sender">{name}</span>
-          <span className="try-speak-row">
-            <input type="text" maxLength={TEXT_MAX} lang={language} value={value} placeholder={placeholder}
+          {/* It grows with what is written, no scroll (operator, 2026-10-02): the hidden copy sizes it. */}
+          <span className="try-speak-grow" data-value={(value || placeholder) + " "}>
+            <textarea rows={1} maxLength={TEXT_MAX} lang={language} value={value} placeholder={placeholder}
               aria-label={languageLabel ? t("stagecard.text.labelIn", { language: languageLabel }) : t("stagecard.text.label")}
               onChange={(event) => onChange(event.currentTarget.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onPlay(); } }} />
+              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onPlay(); } }} />
           </span>
         </article>
       </div>
@@ -690,7 +691,7 @@ function TryIt({ task, trial, input, languageLabel, onText, onStart, inFooter, o
         </div>
       )}
       {!inFooter && !busy && (state === "idle" || state === "failed" || no) && (
-        <span className="try-row">
+        <span className="try-row" data-side={task === "stt" ? "person" : "sidevoice"}>
           <Button variant={no ? "default" : "primary"} size="compact" onClick={onStart}>
             {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />} {state === "idle" ? t(task === "stt" ? "stagecard.speak" : "stagecard.listen") : t("stagecard.next.again")}
           </Button>
@@ -710,7 +711,7 @@ function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart
   return (
     <div className="stage-configure">
       <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} onStart={onStart} />
-      <span className="try-row">
+      <span className="try-row" data-side={task === "stt" ? "person" : "sidevoice"}>
         {!inFooter && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
           {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />}{" "}
           {trial.state === "listening" ? t("stagecard.listening") : trial.state === "transcribing" ? t("stagecard.transcribing") : trial.state === "playing" ? t("stagecard.playing")
