@@ -4,7 +4,7 @@ import { ProviderIcon } from "../../components/ui/Icons";
 import { OptionsForm } from "../../components/options/OptionFields";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
-import type { StageTask } from "../../state/room-types";
+import type { StageTask, StageView } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { StageCheck } from "./StageCheck";
 import { StageDiagnostics } from "./StageDiagnostics";
@@ -22,10 +22,13 @@ const WHERE_NOTES: Record<string, string> = { page: "stage.where.page", app: "st
 /** `onPlaceChange` / `onModelChange` / `onOptionChange` / `onBuildChange`: what choosing does — by default the room's
  *  actions (a device model asks to be downloaded and checked); the stage editor only selects, and prepares and tests on
  *  its own card, which is also where the voice is heard (`hideVoiceTools`). */
-export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, onOptionChange, onBuildChange, afterModel, hideCheck, hidePlaceNote, hideVoiceTools }: {
+/** `optionsView`: the options as the editor shows them (the voice for one language); `beforeOptions` / `afterOptions`:
+ *  what goes just above and below them. */
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, onOptionChange, onBuildChange, afterModel, hideCheck, hidePlaceNote, hideVoiceTools, optionsView, beforeOptions, afterOptions }: {
   task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void;
   onModelChange?: (model: string) => void; onOptionChange?: (id: string, value: unknown, language?: string) => void; onBuildChange?: (value: string) => void;
   afterModel?: ReactNode; hideCheck?: boolean; hidePlaceNote?: boolean; hideVoiceTools?: boolean;
+  optionsView?: (options: StageView["options"]) => StageView["options"]; beforeOptions?: ReactNode; afterOptions?: ReactNode;
 }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
@@ -74,11 +77,13 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
       {afterModel}
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
       {!hidePlaceNote && WHERE_NOTES[view.where] && <p className="muted">{t(WHERE_NOTES[view.where])}</p>}
-      <OptionsForm task={task} options={view.options} disabled={locked}
+      {beforeOptions}
+      <OptionsForm task={task} options={optionsView ? optionsView(view.options) : view.options} disabled={locked}
         onChange={(id, value, language) => onOptionChange ? onOptionChange(id, value, language) : actions()?.setStageOption(task, id, value, language)}
         onPreview={task === "tts" && !hideVoiceTools ? (language) => void actions()?.previewVoice(language) : undefined}
         previewing={task === "tts" && !hideVoiceTools ? tools.previewing : null} />
       {task === "tts" && !hideVoiceTools && <p className="muted" role="status">{tools.previewNote}</p>}
+      {afterOptions}
       {(view.advanced || view.diagnostics) && (
         <details className="stage-advanced">
           <summary>{t("stage.advanced")}</summary>

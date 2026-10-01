@@ -7,7 +7,7 @@ import { createRoot } from "react-dom/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../styles/tokens.css";
 import "./shell.css";
-import { readParams, SCENARIOS, TOGGLES, writeParams, scenarioById, type Toggles, type View } from "./scenario";
+import { FLOW_TOGGLE, readParams, SCENARIOS, TOGGLES, writeParams, scenarioById, type Toggles, type View } from "./scenario";
 
 function SidevoiceMark({ size = 16 }: { size?: number }) {
   return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><rect x="1.5" y="9" width="3" height="6" rx="1.5" /><rect x="6" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="1.5" width="3" height="21" rx="1.5" /><rect x="15" y="6" width="3" height="12" rx="1.5" style={{ fill: "var(--sv-voice)" }} /><rect x="19.5" y="9" width="3" height="6" rx="1.5" /></svg>;
@@ -71,7 +71,7 @@ function Shell() {
     else send({ type: "toggles", toggles: next });
   }
   function choose(id: string) { setAt(null); setScenario(id); const s = scenarioById(id); setView(s.view ?? (s.inApp ? "app" : "browser")); setGeneration((g) => g + 1); }
-  const groups = [...new Set(TOGGLES.map((d) => d.group))];
+  const groups = [...new Set(TOGGLES.filter((d) => d.id !== FLOW_TOGGLE).map((d) => d.group))];
   const active = Object.values(toggles).filter(Boolean).length;
   const effectiveView: View = narrow ? (view === "app" ? "app" : "phone") : view;
 
@@ -137,6 +137,15 @@ function Shell() {
                 <button key={v} type="button" aria-pressed={lang === v} onClick={() => { setLang(v); setGeneration((g) => g + 1); }}>{label}</button>
               ))}
             </div>
+            <fieldset className="flow-pick">
+              <legend>Paso de cada modelo (transcripción y voz)</legend>
+              <div className="seg" role="group" aria-label="Paso de cada modelo">
+                <button type="button" aria-pressed={toggles[FLOW_TOGGLE] !== "B"} onClick={() => setToggle(FLOW_TOGGLE, "")}>A · Probar y confirmar</button>
+                <button type="button" aria-pressed={toggles[FLOW_TOGGLE] === "B"} onClick={() => setToggle(FLOW_TOGGLE, "B")}>B · Comprobar y configurar</button>
+              </div>
+              <p className="hint"><b>A</b>: descargar y preparar → «Probar» → «¿Es lo que has dicho? / ¿Te suena bien?» → «Sí, funciona».</p>
+              <p className="hint"><b>B</b>: la app lo comprueba sola (descarga, carga, sale audio) → configurar y escuchar tu texto las veces que quieras → «Usar esta voz».</p>
+            </fieldset>
             {hosts.length > 0 && (
               <details className="codes" open>
                 <summary>Códigos de emparejamiento</summary>

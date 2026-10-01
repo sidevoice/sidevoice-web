@@ -5,7 +5,7 @@ import modelCatalog from "../../../../../packages/browser-audio/models.json";
 import type { EchoEvents, VerifyOutcome, VerifyProgress } from "../../state/hosts/hosts-store";
 import type { Stage, Task } from "../../state/hosts/stage-scope";
 import type { Toggles } from "../scenario";
-import { saySample } from "../../features/settings/try-samples";
+import { offeredSentence, saySample } from "../../features/settings/try-samples";
 
 const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
   const timer = setTimeout(resolve, ms);
@@ -84,7 +84,7 @@ export function createFakeEngine(toggles: Toggles, capabilities: Parameters<type
     await sleep(800, signal);
     const es = language() === "es";
     // What was offered to say, as if it had been said.
-    const heard = saySample(language());
+    const heard = offeredSentence.current || saySample(language());
     events.heard(heard);
     await sleep(600, signal);
     if (signal.aborted) return;

@@ -10,10 +10,12 @@
  * line under «Dónde». Switching model releases the previous one from memory; it stays on disk. Every change — place,
  * model, engine, voice, language — is tried again: what was said to work is that exact configuration, on that machine.
  *
+ * Two flows are compared in the prototype (StageFlow, below); this is "try".
+ *
  * In the wizard the next step is the footer's primary button (operator, 2026-10-01): «Descargar y preparar», «Probar»,
  * «Sí, funciona» — whatever this model still needs — and «Continuar» only once nothing is pending; the card then keeps
  * only what goes beside it (Cancelar, No, Elegir otro modelo). */
-import { useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { createContext, useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { Button } from "../../components/ui/Button";
 import { MicrophoneIcon, SpeakerIcon } from "../../components/ui/Icons";
 import { currentLanguage, useT } from "../../i18n";
@@ -24,10 +26,11 @@ import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-s
 import { effectiveStage as effectiveStageOf, withBuild, withModel, withOption, withPlace } from "../../state/stage-settings.js";
 import { bytesText } from "../hosts/common";
 import { StageSettings } from "./StageSettings";
-import { saySample } from "./try-samples";
+import { offeredSentence, saySample } from "./try-samples";
+import { LanguageSelect } from "../../components/options/OptionFields";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
 import { MessageGroup } from "../conversation/MessageGroup";
-import type { ChatMessage } from "../../state/room-types";
+import type { ChatMessage, StageOptionView } from "../../state/room-types";
 
 /** What the person said works, per stage, for this session: the whole configuration on one machine. A wizard step
  *  resumed after a restart is past it already (resumeStep skips a stage that is set), so this does not need to outlive
@@ -43,8 +46,19 @@ function useStageContext() {
   return store ? stageContext(store.facts) : null;
 }
 
-/** A provider's key, in one line: required, checked with the provider, kept on the machine; once accepted it stays in
- *  the field, masked, and can be replaced (a refused replacement leaves the previous key in place). */
+/** How a model is taken through its step. The prototype compares two (operator, 2026-10-01), undecided:
+ *  - "try": prepare it, the person tries it and says whether it works («¿Es lo que has dicho?» → «Sí, funciona»);
+ *  - "configure": the app checks it by itself (download, load, audio comes out), then the person configures it and
+ *    listens to their own text as often as they like, and keeps it («Usar esta voz» / «Usar este modelo»). */
+export type StageFlow = "try" | "configure";
+export const StageFlowContext = createContext<StageFlow>("try");
+
+/** The longest text the voice test plays. */
+const TEXT_MAX = 200;
+
+/** A provider's key, in one line: required, checked with the provider, kept on the machine. Its state — required,
+ *  checking, valid, refused — is said inside the field, beside the masked last characters of the key kept (operator,
+ *  2026-10-01); a refused replacement leaves the previous key in place. */
 interface KeyHandle { submit(): void }
 
 /** `ownSubmit`: its own «Validar» while a typed key is unchecked; in the wizard that is the footer's button. */
@@ -63,26 +77,30 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
     setState("checking");
     try { await hosts.putKey(fp, provider, value); } catch { if (sent.current === value) setState("refused"); return; }
     setChecked(value);
+    setKey("");
     setState("");
   }
   const input = useRef<HTMLInputElement>(null);
   // From the footer: an empty field is where to start; a typed key is checked.
   useImperativeHandle(ref, () => ({ submit() { if (!key.trim()) input.current?.focus(); else void check(); } }));
   const typed = key.trim();
-  const valid = configured && state !== "refused" && (!typed || typed === checked);
-  const unsent = !!typed && typed !== checked && state === "";
+  const valid = configured && state !== "refused" && !typed;
+  const unsent = !!typed && state === "";
+  const said = state === "checking" ? t("stagecard.key.checking")
+    : state === "refused" ? t(configured ? "stagecard.key.refusedKept" : "stagecard.key.refused")
+    : unsent ? "" : valid ? t("stagecard.key.valid") : t("stagecard.key.required");
   return (
     <div className="key-line" data-state={state || (valid ? "valid" : undefined)}>
-      <input ref={input} id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
-        placeholder={configured && hint ? "•••• " + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
-        onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
-        onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
-      {unsent && ownSubmit && <Button size="compact" onMouseDown={(event) => event.preventDefault()} onClick={() => void check()}>{t("stagecard.keyCheck")}</Button>}
-      <span className="key-line-state" role="status">
-        {state === "checking" ? t("integrations.checking")
-          : state === "refused" ? (configured ? t("wizard.w4.keyRefusedKept", { provider: label }) : t("wizard.w4.keyRefused", { provider: label }))
-          : unsent ? "" : valid ? t("wizard.w4.keyValid") : t("wizard.w4.keyRequired")}
+      <span className="key-field">
+        <input ref={input} id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
+          placeholder={configured && hint ? "•••• " + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
+          aria-describedby={"key-state-" + provider}
+          onChange={(event) => { setKey(event.currentTarget.value); if (state === "refused") setState(""); }}
+          onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
+        <span className="key-state" id={"key-state-" + provider} role="status"
+          title={state === "refused" ? t(configured ? "wizard.w4.keyRefusedKept" : "wizard.w4.keyRefused", { provider: label }) : undefined}>{said}</span>
       </span>
+      {unsent && ownSubmit && <Button size="compact" onMouseDown={(event) => event.preventDefault()} onClick={() => void check()}>{t("stagecard.keyCheck")}</Button>}
       {onCancel && <Button variant="ghost" size="compact" onClick={onCancel}>{t("common.cancel")}</Button>}
     </div>
   );
@@ -90,48 +108,51 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
 
 type TrialState = "idle" | "listening" | "transcribing" | "heard" | "playing" | "played" | "failed";
 type Trial = ReturnType<typeof useTrial>;
+/** What a try says or plays: the language, and the text (the sentence offered to say, or the person's own to hear). */
+interface TryInput { language: string; text: string }
 
-/** Trying a prepared stage: listening to the person (stt) or playing the sample (tts). A newer try or a reset makes a
+/** Trying a prepared stage: listening to the person (stt) or playing the text (tts). A newer try or a reset makes a
  *  late result of the previous one count for nothing. */
 function useTrial(task: Task) {
   const hosts = useHostsController();
   const inUse = useHosts((s) => s.inUse);
-  const language = useRoomStore((s) => s.facts.speechLanguage);
   const [state, setState] = useState<TrialState>("idle");
   const [failure, setFailure] = useState("");
   const [heard, setHeard] = useState("");
-  const [level, setLevel] = useState(0);
+  const [played, setPlayed] = useState("");
   const [no, setNo] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const run = useRef(0);
   useEffect(() => () => { run.current++; abort.current?.abort(); }, []);
-  function begin() { abort.current?.abort(); setHeard(""); setNo(false); setFailure(""); setLevel(0); return ++run.current; }
-  const fail = (key: string) => { setFailure(key); setState("failed"); setLevel(0); };
-  function listen() {
+  function begin() { abort.current?.abort(); setHeard(""); setNo(false); setFailure(""); return ++run.current; }
+  const fail = (key: string) => { setFailure(key); setState("failed"); };
+  function listen(input: TryInput) {
     const id = begin();
     const controller = new AbortController();
     abort.current = controller;
     setState("listening");
+    offeredSentence.current = input.text;
     const live = () => run.current === id && !controller.signal.aborted;
     void hosts.echoTest(inUse, {
-      level: (value) => { if (live()) setLevel(value); },
+      level: () => undefined,
       transcribing: () => { if (live()) setState("transcribing"); },
-      heard: (text) => { if (live()) { setHeard(text); setState("heard"); setLevel(0); controller.abort(); } },
+      heard: (text) => { if (live()) { setHeard(text); setState("heard"); controller.abort(); } },
       replied: () => undefined,
       failed: (key) => { if (live()) fail(key); },
       silent: () => { if (live()) fail("silent"); },
     }, controller.signal);
   }
-  // «¿Te suena bien?» once it has been heard: when playback ends, not after a guess at how long it takes.
-  async function play() {
+  // Answered once it has been heard: when playback ends, not after a guess at how long it takes.
+  async function play(input: TryInput) {
     const id = begin();
+    setPlayed(input.text);
     setState("playing");
-    try { await window.sidevoiceActions?.previewVoice(language); if (run.current === id) setState("played"); }
+    try { await window.sidevoiceActions?.previewVoice(input.language, input.text); if (run.current === id) setState("played"); }
     catch { if (run.current === id) fail("play"); }
   }
   return {
-    state, failure, heard, level, no, setNo,
-    start() { if (task === "stt") listen(); else void play(); },
+    state, failure, heard, played, no, setNo,
+    start(input: TryInput) { if (task === "stt") listen(input); else void play(input); },
     reset() { begin(); setState("idle"); },
   };
 }
@@ -144,6 +165,7 @@ export interface PendingStep { label: string; disabled?: boolean; run?: () => vo
  *  scrolling box the editor sits in, above the footer. */
 export function StageEditor({ task, footer, bodyClassName }: { task: Task; footer?: (pending: PendingStep | null) => ReactNode; bodyClassName?: string }) {
   const t = useT();
+  const flow = useContext(StageFlowContext);
   const hosts = useHostsController();
   const room = useContext(RoomStoreContext);
   const inUse = useHosts((s) => s.inUse);
@@ -151,6 +173,8 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const saved = useHosts((s) => effectiveStage(s.scope, s.inUse, task));
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
   const rawDraft = useRoomStore((s) => (s.facts.stageDraft?.[task] ?? null) as Stage | null);
+  const speechLanguage = useRoomStore((s) => s.facts.speechLanguage);
+  const voiceLanguages = useRoomStore((s) => s.facts.voiceLanguages);
   // The draft holds both stages; this one's is a draft only when it differs from what is kept.
   const draft = rawDraft && !same(rawDraft, saved) ? rawDraft : null;
   const ctx = useStageContext();
@@ -159,6 +183,13 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   // Prepared from this card: in Configuración it is in use from then on, which the card says until it is tried.
   const [preparedHere, setPreparedHere] = useState(false);
   const [works, setWorks] = useState(() => !!saved && verified.get(task) === keyOf(inUse, saved));
+  // The voice is configured and heard one language at a time (its voices are that language's); the test text starts
+  // as a sentence in it, and is the person's to change — in any language — up to TEXT_MAX characters.
+  const [voiceLanguage, setVoiceLanguage] = useState(speechLanguage);
+  const sampleIn = (language: string) => voiceLanguages?.find((l) => l.id === language)?.sample ?? "";
+  const [text, setText] = useState(() => sampleIn(speechLanguage));
+  useEffect(() => { setText(sampleIn(voiceLanguage).slice(0, TEXT_MAX)); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceLanguage]);
   const trial = useTrial(task);
   const keyLine = useRef<KeyHandle>(null);
   // A try is about the configuration it tried.
@@ -213,6 +244,21 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     if (draft || !saved) select(withOption(ctx!, task, current, id, value, language));
     else window.sidevoiceActions?.setStageOption(task, id, value, language);
   }
+  // Transcription: the sentence offered is in the stage's language, or the person's when it detects it.
+  const sttLanguage = view.options.find((o) => o.kind === "language");
+  const sayLanguage = sttLanguage && sttLanguage.value !== "auto" ? sttLanguage.value : speechLanguage;
+  const input: TryInput = task === "stt" ? { language: sayLanguage, text: saySample(sayLanguage) } : { language: voiceLanguage, text };
+  const start = () => trial.start(input);
+  // The voice's options for the language being heard: its own voices only (sidevoice-core#23 filters a provider's by
+  // language), and the language chosen once, above them.
+  const voiceOption = view.options.find((o) => o.kind === "voice" && o.perLanguage) as Extract<StageOptionView, { kind: "voice" }> | undefined;
+  const voiceRows = voiceOption && voiceOption.perLanguage ? voiceOption.rows : [];
+  const optionsView = (options: StageOptionView[]) => options.map((o) => o.kind === "voice" && o.perLanguage
+    ? { ...o, rows: o.rows.filter((r) => r.language === voiceLanguage).map((r) => ({ ...r, choices: r.choices.filter((c) => !c.other) })) } : o);
+  const languagePicker = task === "tts" && voiceRows.length > 0 ? (
+    <LanguageSelect id="tts-test-language" label={t("stage.voiceLanguage")} value={voiceLanguage}
+      choices={voiceRows.map((r) => ({ value: r.language, label: r.label }))} onChange={setVoiceLanguage} />
+  ) : null;
   const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
   const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
   const keyPanel = keyProvider && inUse && listing
@@ -221,6 +267,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : null;
   const rawStep = rawCheck?.phase === "running" ? rawCheck.progress?.step ?? "load" : null;
   const lang = currentLanguage();
+  const keep = t(task === "tts" ? "stagecard.b.useVoice" : "stagecard.b.useModel");
   // What is still to do, in the order the card shows it.
   const pending: PendingStep | null =
     keyFor || (keyProvider && listing && !listing.configured) ? { label: t("stagecard.next.key"), run: () => keyLine.current?.submit() }
@@ -230,41 +277,55 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : check?.phase === "slow" ? { label: t("check.useAnyway"), run: () => window.sidevoiceActions?.decideStage(task, true) }
     : !prepared ? { label: !needsDownload ? t("stagecard.prepare") : offer?.download_size ? t("stagecard.downloadPrepare", { size: bytesText(offer.download_size, lang) }) : t("stagecard.downloadPrepareOnly"), run: prepare }
     : works ? null
+    // B: checked already; what is left is keeping it, whenever the person likes what they heard.
+    : flow === "configure" ? { label: keep, run: () => answer(true) }
     : trial.state === "listening" ? { label: t("stagecard.listening"), disabled: true }
     : trial.state === "transcribing" ? { label: t("stagecard.transcribing"), disabled: true }
     : trial.state === "playing" ? { label: t("stagecard.playing"), disabled: true }
     // The answer is the action bar: «No» beside «Sí, funciona».
     : (trial.state === "heard" || trial.state === "played") && !trial.no
       ? { label: t("stagecard.yesWorks"), run: () => answer(true), secondary: { label: t("common.noCap"), run: () => trial.setNo(true) } }
-    : trial.state === "idle" ? { label: t("stagecard.next.try"), run: trial.start }
-    : { label: t("stagecard.next.again"), run: trial.start };
+    : trial.state === "idle" ? { label: t("stagecard.next.try"), run: start }
+    : { label: t("stagecard.next.again"), run: start };
+  const configure = flow === "configure" && prepared && !keyFor;
   const settings = (
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor} hideCheck hidePlaceNote hideVoiceTools
       onPlaceChange={placeChosen}
       onModelChange={(model) => select(withModel(ctx, task, current, model))}
       onOptionChange={optionChosen}
       onBuildChange={(value) => select(withBuild(ctx, task, current, value))}
+      optionsView={optionsView}
+      beforeOptions={<>
+        {configure && <h3 className="stage-configure-title">{t(task === "tts" ? "stagecard.b.title.tts" : "stagecard.b.title.stt")}</h3>}
+        {languagePicker}
+      </>}
+      afterOptions={configure ? (
+        <ConfigureAndListen task={task} trial={trial} input={input} onText={setText} onStart={start} works={works} inFooter={!!footer}
+          onKeep={() => answer(true)} keepLabel={keep} />
+      ) : null}
       afterModel={keyFor || !view.model ? null : (
-        <StageCard task={task} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
-          runningStep={rawStep} inUseNote={!footer && preparedHere} inFooter={!!footer} trial={trial}
+        <StageCard task={task} flow={flow} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
+          runningStep={rawStep} inUseNote={!footer && preparedHere && flow === "try"} inFooter={!!footer} trial={trial} input={input} onText={setText} onStart={start}
           freed={freed} onPrepare={prepare} onAnswer={answer} onRetry={retry}
           onTry={(model) => select(withModel(ctx, task, current, model))} />
       )} />
   );
-  return <>{bodyClassName ? <div className={bodyClassName}>{settings}</div> : settings}{footer?.(pending)}</>;
+  const body = <div className="stage-editor">{settings}</div>;
+  return <>{bodyClassName ? <div className={bodyClassName}>{body}</div> : body}{footer?.(pending)}</>;
 }
 
 function labelOf(ctx: NonNullable<ReturnType<typeof stageContext>>, model: string): string {
   return ((ctx?.catalog as { models?: { id: string; label?: string }[] } | null)?.models?.find((m) => m.id === model)?.label) ?? model;
 }
 
-type Phase = "download" | "prepare" | "test";
+type Phase = "download" | "prepare" | "test" | "check";
 
-/** The card under the model: the three phases as a strip, and what the current one needs. */
-function StageCard({ task, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, freed, onPrepare, onAnswer, onRetry, onTry }: {
-  task: Task; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
+/** The card under the model: its phases as a strip, and what the current one needs. In "try" the last phase is the
+ *  person's («Probar»); in "configure" it is the app's own check («Comprobar»), and trying it is configuring it, below. */
+function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, input, onText, onStart, freed, onPrepare, onAnswer, onRetry, onTry }: {
+  task: Task; flow: StageFlow; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
   /** The next step is the wizard's footer button: the card does not repeat it. */
-  inFooter: boolean; trial: Trial;
+  inFooter: boolean; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void;
   freed: string | null;
   onPrepare: () => void; onAnswer: (ok: boolean) => void; onRetry: () => void; onTry: (model: string) => void;
 }) {
@@ -274,21 +335,24 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
   const check = view.check;
   const model = view.models.find((m) => m.id === view.model);
   const running = check?.phase === "running";
+  const last: Phase = flow === "configure" ? "check" : "test";
   // The same strip every time: a model that runs here is downloaded first (done when it is on disk); a provider has
   // nothing to download.
-  const phases: Phase[] = view.place === "device" ? ["download", "prepare", "test"] : ["prepare", "test"];
-  // While it runs, the strip follows the progress: downloading, then loading and checking.
+  const phases: Phase[] = view.place === "device" ? ["download", "prepare", last] : ["prepare", last];
+  // While it runs, the strip follows the progress: downloading, then loading, then checking.
   const downloading = runningStep === "download";
   const downloaded = !needsDownload || (!!runningStep && !downloading);
-  const at: Phase = prepared ? "test" : !downloaded || downloading ? "download" : "prepare";
+  const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : "prepare";
   const lang = currentLanguage();
+  const chooseOther = () => document.getElementById(`${task}-model`)?.click();
   return (
     <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-works={works || undefined}>
       <div className="stage-card-head">
         <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{model?.detail && <span className="muted small">{model.detail}</span>}</span>
         <ol className="stage-card-phases">
           {phases.map((phase) => {
-            const done = phase === "download" ? downloaded && !downloading : prepared ? phase !== "test" || works : phases.indexOf(phase) < phases.indexOf(at);
+            const done = phase === "download" ? downloaded && !downloading
+              : prepared ? phase !== "test" || works : phases.indexOf(phase) < phases.indexOf(at);
             const state = done ? "done" : phase === at ? "current" : "next";
             return <li key={phase} data-state={state} aria-current={state === "current" ? "step" : undefined}>{t("stagecard.phase." + phase)}</li>;
           })}
@@ -305,7 +369,10 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
       ) : check?.phase === "failed" && !prepared ? (
         <div className="stage-card-body" role="alert">
           <span className="row-error small">{t("check.failed", { step: check.step, cause: check.cause })}</span>
-          {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>}
+          <span className="try-row">
+            {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>{t("common.retry")}</Button>}
+            {flow === "configure" && <Button size="compact" onClick={chooseOther}>{t("stagecard.chooseOther")}</Button>}
+          </span>
         </div>
       ) : check?.phase === "slow" ? (
         <div className="stage-card-body" role="alert">
@@ -317,10 +384,14 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
         </div>
       ) : !prepared ? (
         <div className="stage-card-body">
-          <span className="muted small">{t(needsDownload ? "stagecard.needsDownload" : "stagecard.needsPrepare")}</span>
+          <span className="muted small">{t(needsDownload ? "stagecard.needsDownload" : flow === "configure" ? "stagecard.b.needsPrepare" : "stagecard.needsPrepare")}</span>
           {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>
             {!needsDownload ? t("stagecard.prepare") : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly")}
           </Button>}
+        </div>
+      ) : flow === "configure" ? (
+        <div className="stage-card-body" role="status">
+          <span className="ok-line small">{t(task === "tts" ? "stagecard.b.checked.tts" : "stagecard.b.checked.stt")}</span>
         </div>
       ) : works ? (
         <div className="stage-card-body stage-card-works" role="status">
@@ -329,46 +400,65 @@ function StageCard({ task, needsDownload, downloadSize, prepared, works, running
         </div>
       ) : (<>
         {inUseNote && <p className="muted small" role="status">{t("stagecard.inUse")}</p>}
-        <TryIt task={task} trial={trial} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
+        <TryIt task={task} trial={trial} input={input} onText={onText} onStart={onStart} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
       </>)}
       {freed && prepared && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}
     </section>
   );
 }
 
-/** Phase 3: the person tries it, in the call's own bubbles (operator, 2026-10-01: the real components, so a change to
- *  them shows here too). Transcription: a sentence to say, the person's live bubble with its waveform while they speak,
- *  then what it understood. Voice: the agent's bubble with the sentence as it plays. Then «¿Es lo que has dicho?» /
- *  «¿Te suena bien?»: yes is what counts; no offers another model. In the wizard the buttons are the action bar's. */
-function TryIt({ task, trial, inFooter, onAnswer, onTry }: { task: Task; trial: Trial; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void }) {
+/** The voice test's text: a sentence in the language being heard to begin with, the person's to change. */
+function TestText({ value, language, onChange, disabled }: { value: string; language: string; onChange: (text: string) => void; disabled?: boolean }) {
   const t = useT();
-  const language = useRoomStore((s) => s.facts.speechLanguage);
+  return (
+    <label className="try-text">
+      <span className="ui-field-label">{t("stagecard.text.label")}</span>
+      <textarea rows={2} maxLength={TEXT_MAX} lang={language} value={value} disabled={disabled} onChange={(event) => onChange(event.currentTarget.value)} />
+      <span className="try-count">{t("stagecard.text.count", { n: value.length, max: TEXT_MAX })}</span>
+    </label>
+  );
+}
+
+/** What a try shows, in the call's own bubbles (operator, 2026-10-01: the real components, so a change to them shows
+ *  here too): the person's live bubble with its waveform while they speak, then what it understood; the agent's
+ *  bubble with the text as the voice plays it. Before that: the sentence to say, or the text to hear. */
+function TryShow({ task, trial, input, onText }: { task: Task; trial: Trial; input: TryInput; onText: (text: string) => void }) {
+  const t = useT();
+  const { state, failure, heard, played } = trial;
+  const busy = state === "listening" || state === "transcribing" || state === "playing";
+  const spoken = useSpokenSoFar(played, state === "playing");
+  const message = (role: "user" | "assistant", text: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
+  return (<>
+    {task === "stt" && <blockquote className="try-sample" lang={input.language}>«{input.text}»</blockquote>}
+    {task === "tts" && !busy && <TestText value={input.text} language={input.language} onChange={onText} />}
+    <div className="try-chat">
+      {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
+      {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
+      {task === "tts" && (state === "playing" || state === "played") && (
+        <MessageGroup group={{ id: "try", role: "assistant", name: "Sidevoice", messages: [message("assistant", played, {
+          playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null })] }} />
+      )}
+    </div>
+    <div role="alert">{state === "failed" && <p className="row-error small">
+      {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}
+    </p>}</div>
+  </>);
+}
+
+/** Flow "try", phase 3: the person tries it, then «¿Es lo que has dicho?» / «¿Te suena bien?»: yes is what counts;
+ *  no offers another model. In the wizard the buttons are the action bar's. */
+function TryIt({ task, trial, input, onText, onStart, inFooter, onAnswer, onTry }: { task: Task; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void }) {
+  const t = useT();
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
-  // What is played is the voice catalogue's sentence for the language, so it is the one shown.
-  const hearSample = useRoomStore((s) => s.facts.voiceLanguages?.find((l) => l.id === s.facts.speechLanguage)?.sample ?? "");
-  const { state, failure, heard, no, setNo } = trial;
-  const sample = task === "stt" ? saySample(language) : hearSample;
+  const { state, no, setNo } = trial;
   const others = (view?.models ?? []).filter((m) => m.id !== view?.model);
   const answered = state === "heard" || state === "played";
   const busy = state === "listening" || state === "transcribing" || state === "playing";
-  const spoken = useSpokenSoFar(sample, state === "playing");
-  const message = (role: "user" | "assistant", text: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
-    ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
   return (
     <div className="stage-card-body try-it">
       {!answered && !busy && <p className="small">{t((task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts") + (inFooter ? ".footer" : ""))}</p>}
-      {(task === "stt" || (!busy && !answered)) && sample && <blockquote className="try-sample">«{sample}»</blockquote>}
-      <div className="try-chat">
-        {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
-        {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
-        {task === "tts" && (state === "playing" || state === "played") && (
-          <MessageGroup group={{ id: "try", role: "assistant", name: "Sidevoice", messages: [message("assistant", sample, {
-            playback: state === "playing" ? "playing" : "complete", karaoke: state === "playing" && spoken ? { from: 0, to: spoken, mode: "word" } : null })] }} />
-        )}
-      </div>
-      <div role="alert">{state === "failed" && <p className="row-error small">
-        {t(failure === "play" ? "stagecard.playFailed" : ["mic-denied", "no-mic", "stt-error"].includes(failure) ? "stagecard.fail." + failure : "stagecard.notHeard")}
-      </p>}</div>
+      <TryShow task={task} trial={trial} input={input} onText={onText} />
       {answered && !no && (
         <div className="try-question">
           <p>{t(task === "stt" ? "stagecard.ask.stt" : "stagecard.ask.tts")}</p>
@@ -388,7 +478,7 @@ function TryIt({ task, trial, inFooter, onAnswer, onTry }: { task: Task; trial: 
       )}
       {!inFooter && !busy && (state === "idle" || state === "failed" || no) && (
         <span className="try-row">
-          <Button variant={no ? "default" : "primary"} size="compact" onClick={trial.start}>
+          <Button variant={no ? "default" : "primary"} size="compact" onClick={onStart}>
             {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />} {state === "idle" ? t(task === "stt" ? "stagecard.speak" : "stagecard.listen") : t("stagecard.next.again")}
           </Button>
         </span>
@@ -397,8 +487,32 @@ function TryIt({ task, trial, inFooter, onAnswer, onTry }: { task: Task; trial: 
   );
 }
 
-/** How far the voice has got through the sentence, word by word, at a speaking pace — for the bubble's karaoke while
- *  the engine gives no word timings of its own. */
+/** Flow "configure", second part: under the options, the test — the person's text and «Escuchar» with the settings as
+ *  they are now (or a sentence to say and «Hablar»), as often as they like — and keeping it. No question asked. */
+function ConfigureAndListen({ task, trial, input, onText, onStart, works, inFooter, onKeep, keepLabel }: {
+  task: Task; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void; works: boolean; inFooter: boolean; onKeep: () => void; keepLabel: string;
+}) {
+  const t = useT();
+  const busy = trial.state === "listening" || trial.state === "transcribing" || trial.state === "playing";
+  return (
+    <div className="stage-configure">
+      {task === "stt" && <p className="small">{t("stagecard.b.say")}</p>}
+      <TryShow task={task} trial={trial} input={input} onText={onText} />
+      <span className="try-row">
+        <Button size="compact" onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
+          {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />}{" "}
+          {trial.state === "listening" ? t("stagecard.listening") : trial.state === "transcribing" ? t("stagecard.transcribing") : trial.state === "playing" ? t("stagecard.playing")
+            : t(task === "stt" ? "stagecard.speak" : "stagecard.listen")}
+        </Button>
+        {!inFooter && !works && <Button variant="primary" size="compact" onClick={onKeep}>{keepLabel}</Button>}
+        {works && <span className="ok-line small" role="status">{t(task === "tts" ? "stagecard.b.inUse.tts" : "stagecard.b.inUse.stt")}</span>}
+      </span>
+    </div>
+  );
+}
+
+/** How far the voice has got through the text, word by word, at a speaking pace — for the bubble's karaoke while the
+ *  engine gives no word timings of its own. */
 function useSpokenSoFar(text: string, playing: boolean): number {
   const [to, setTo] = useState(0);
   useEffect(() => {

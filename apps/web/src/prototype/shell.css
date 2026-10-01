@@ -74,3 +74,5 @@ button, select, input { font: inherit }
   .proto[data-panel]:not([data-narrow]) .window { width: min(1240px, calc(100% - 25rem)); margin-inline-end: 23rem }
   .proto[data-panel]:not([data-narrow]):not([data-view=app]) { padding-inline-end: 23.5rem }
 }
+.flow-pick { margin: .55rem 0; padding: .45rem .6rem .55rem; border: 1px solid #c9b48a; border-radius: 9px; background: #fff8e6 }
+.flow-pick legend { padding: 0 .3rem; font-weight: 700; font-size: 12px }

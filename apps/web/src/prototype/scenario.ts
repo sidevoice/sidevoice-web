@@ -43,7 +43,10 @@ export const scenarioById = (id: string | null) => SCENARIOS.find((s) => s.id ==
 export type View = "app" | "browser" | "phone";
 
 export interface ToggleDef { id: string; group: string; label: string; options?: string[]; reload?: boolean }
+/** The per-model step: A (default) or B, shown on its own in the panel to compare them. */
+export const FLOW_TOGGLE = "stageFlow";
 export const TOGGLES: ToggleDef[] = [
+  { id: FLOW_TOGGLE, group: "Flujo", label: "Paso de cada modelo", options: ["", "B"], reload: true },
   { id: "offline", group: "Entorno", label: "Sin red: hosts remotos y descargas fallan" },
   { id: "noWebgpu", group: "Entorno", label: "Navegador sin WebGPU (solo WASM)", reload: true },
   { id: "slowDownload", group: "Entorno", label: "Descargas lentas (×6)" },

@@ -272,13 +272,7 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .choice-check { flex: none; width: 1rem; text-align: center; color: var(--sv-primary); font-size: .8rem }
 .choice-desc { color: var(--sv-muted); font-size: .74rem; line-height: 1.35 }
 .key-line { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .6rem; margin: -.4rem 0 .9rem }
-.key-line input { flex: 1 1 14rem; min-width: 10rem; height: 2.5rem; padding: 0 .7rem; border: 1px solid var(--sv-selected-border); border-radius: .65rem; background: #141b23; color: inherit; font: inherit }
-.key-line-state { flex: 0 1 auto; font-size: .74rem; color: var(--sv-muted) }
-.key-line[data-state=refused] input { border-color: var(--sv-danger) }
-.key-line[data-state=refused] .key-line-state { color: #f4b4ab }
 .choice-icon svg { display: block }
-.key-line[data-state=valid] .key-line-state { color: #9ed3b4 }
-.key-line[data-state=valid] input { border-color: #3d6b55 }
 .stage-advanced summary { width: max-content; cursor: pointer }
 .try-stage { display: grid; gap: .45rem }
 .try-stage p { margin: 0 }
@@ -318,3 +312,23 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .try-chat .message-group { margin: .2rem 0 }
 .try-question { display: grid; gap: .5rem; padding-top: .6rem; border-top: 1px solid var(--sv-border) }
 .try-question p { margin: 0; font-size: .9rem; font-weight: 600 }
+/* The key's field carries its state inside, at its end, beside the masked key kept. */
+.key-field { flex: 1 1 14rem; min-width: 10rem; display: flex; align-items: center; gap: .5rem; height: 2.5rem; padding: 0 .7rem; border: 1px solid var(--sv-selected-border); border-radius: .65rem; background: #141b23 }
+.key-field:focus-within { outline: 2px solid var(--sv-primary-dim); outline-offset: 1px }
+.key-field input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; outline: none }
+.key-state { flex: none; font-size: .74rem; color: var(--sv-muted); white-space: nowrap }
+.key-line[data-state=refused] .key-field { border-color: var(--sv-danger) }
+.key-line[data-state=refused] .key-state { color: #f4b4ab }
+.key-line[data-state=valid] .key-field { border-color: #3d6b55 }
+.key-line[data-state=valid] .key-state { color: #9ed3b4 }
+.key-line[data-state=checking] .key-state { color: var(--sv-text) }
+/* The voice test's text, and the second part of the "configure" flow. */
+.try-text { display: grid; gap: .3rem; justify-self: stretch; margin: 0 }
+.try-text textarea { width: 100%; min-height: 3.4rem; padding: .5rem .65rem; border: 1px solid var(--sv-border); border-radius: .6rem; background: #141b23; color: inherit; font: inherit; font-size: .9rem; resize: vertical }
+.try-count { justify-self: end; font-size: .7rem; color: var(--sv-muted) }
+.stage-editor h3.stage-configure-title { margin: 1.1rem 0 .2rem; font-size: .95rem; letter-spacing: 0; text-transform: none }
+.stage-configure { display: grid; gap: .5rem; margin: .4rem 0 .8rem; padding: .75rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22 }
+.stage-configure p { margin: 0 }
+/* The voice is configured for the language chosen above it: its row needs no language label of its own. */
+.stage-editor .stage-settings[data-task=tts] .voice-language { display: none }
+.stage-editor .stage-settings[data-task=tts] .voice-row { grid-template-columns: minmax(0, 1fr); padding-top: 0 }

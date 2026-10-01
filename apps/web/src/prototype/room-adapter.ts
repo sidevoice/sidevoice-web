@@ -17,7 +17,9 @@ type Facts = RoomStore["facts"];
 const REMOTE_MODELS = {
   "elevenlabs:tts": {
     models: [{ id: "eleven_flash_v2_5", label: "Flash v2.5", description: "Latencia baja, 32 idiomas" }, { id: "eleven_multilingual_v2", label: "Multilingual v2", description: "Más expresiva, más lenta" }],
-    voices: [{ id: "lucia", label: "Lucía", languages: ["es"] }, { id: "mateo", label: "Mateo", languages: ["es"] }, { id: "rachel", label: "Rachel", languages: ["en"] }, { id: "adam", label: "Adam", languages: ["en"] }],
+    voices: [{ id: "lucia", label: "Lucía", languages: ["es"] }, { id: "mateo", label: "Mateo", languages: ["es"] }, { id: "valentina", label: "Valentina", languages: ["es"] },
+      { id: "rachel", label: "Rachel", languages: ["en"] }, { id: "adam", label: "Adam", languages: ["en"] }, { id: "celine", label: "Céline", languages: ["fr"] },
+      { id: "giulia", label: "Giulia", languages: ["it"] }, { id: "ines", label: "Inês", languages: ["pt"] }, { id: "aarav", label: "Aarav", languages: ["hi"] }],
   },
   "openai:stt": { models: [{ id: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe" }, { id: "gpt-4o-transcribe", label: "gpt-4o-transcribe" }, { id: "whisper-1", label: "whisper-1" }] },
 };
@@ -169,8 +171,8 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
     cancelDownload() {},
     // Resolves once the sample has been heard, rejects when it does not play (the «tts-error» variant). The browser's
     // synthesis stands in for the chosen voice; where it has none, the time it would take stands in for it.
-    async previewVoice(language) {
-      const sample = voiceCatalog.languages.find((l) => l.id === language)?.sample ?? "";
+    async previewVoice(language, text) {
+      const sample = text?.trim() || voiceCatalog.languages.find((l) => l.id === language)?.sample || "";
       room.patch({ previewNote: t("proto.note.preview") });
       const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       if (previewFails) { await wait(900); throw new Error("tts-error"); }

@@ -239,7 +239,8 @@ export interface SidevoiceActions {
   copyDiagnostics(task: StageTask): Promise<boolean>;
   /** Stop one download, whoever started it: the page's, or the desktop app's through the bridge. */
   cancelDownload(id: string): void;
-  previewVoice(language: string): Promise<void>;
+  /** `text`: what to say instead of the language's sample (the voice test's own text). */
+  previewVoice(language: string, text?: string): Promise<void>;
   /** Load this device's chosen voice model ahead of the first reply. */
   prepareVoice(): Promise<void>;
   /** Ask the machine for its integrations again, after a failed read. */
