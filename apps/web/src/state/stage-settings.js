@@ -123,7 +123,7 @@ export function defaultStage(ctx, task) {
 export function placeModels(ctx, place, task) {
     if (place === DEVICE) {
         if (!ctx.offers) return null;
-        return taskOffers(ctx.offers, task).map((offer) => ({ id: offer.model, label: familyOf(ctx.catalog, offer.model)?.model?.label || offer.model, offer }));
+        return taskOffers(ctx.offers, task).map((offer) => ({ id: offer.model, label: familyOf(ctx.catalog, offer.model)?.model?.label || offer.model, description: familyOf(ctx.catalog, offer.model)?.model?.description, offer }));
     }
     const provider = providerOf(ctx.catalog, place, task);
     if (!provider) return [];

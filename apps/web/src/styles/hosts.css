@@ -365,7 +365,6 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-card-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
 .stage-card-phases { flex: none }
 .stage-card-phases li { padding: .08rem .42rem; font-size: .64rem }
-.stage-card-desc { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-height: 1.2em }
 .stage-card-track { height: 4px; border-radius: 99px; background: #ffffff12; overflow: hidden; position: relative }
 .stage-card-track span { display: block; height: 100%; border-radius: inherit; background: var(--sv-primary); transition: width .2s linear }
 .stage-card-track[data-tone=done] span { background: #5fae86 }
@@ -378,3 +377,8 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-card-actions .ui-button { min-height: 0; height: 1.9rem; padding-block: 0 }
 .stage-card-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .8rem }
 .stage-card-actions { flex: none; display: inline-flex; gap: .4rem }
+.stage-card-about { overflow: hidden; text-overflow: ellipsis }
+/* «?» beside an option's name: what it is for, in a tooltip. */
+.field-label-row { display: inline-flex; align-items: center; gap: .4rem }
+.field-help { display: inline-grid; place-items: center; width: 1.05rem; height: 1.05rem; padding: 0; border: 1px solid var(--sv-border); border-radius: 50%; background: transparent; color: var(--sv-muted); font: 600 .66rem/1 inherit; cursor: help }
+.field-help:hover, .field-help:focus-visible { color: var(--sv-text); border-color: var(--sv-selected-border) }

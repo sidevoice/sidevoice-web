@@ -530,7 +530,8 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
     <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-tone={tone} data-works={works || undefined}>
       <div className="stage-card-head">
         {/* Its size only: whether it is here is the phases' to say. */}
-        <span className="stage-card-name"><strong>{model?.label ?? view.model}</strong>{view.place === "device" && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}</span>
+        <span className="stage-card-name" title={model?.description}><strong>{model?.label ?? view.model}</strong>{view.place === "device" && downloadSize > 0 && <span className="muted small">{bytesText(downloadSize, lang)}</span>}
+          {model?.description && <span className="muted small stage-card-about">— {model.description}</span>}</span>
         <ol className="stage-card-phases">
           {phases.map((phase) => {
             const done = phase === "download" ? downloaded && !downloading
@@ -540,7 +541,6 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
           })}
         </ol>
       </div>
-      <p className="stage-card-desc muted small" title={model?.description}>{model?.description || " "}</p>
       <div className="stage-card-track" data-tone={tone} data-busy={busyBar || undefined} role={running ? "progressbar" : undefined}
         aria-valuemin={running ? 0 : undefined} aria-valuemax={running ? 100 : undefined} aria-valuenow={running && !busyBar ? Math.round(fill * 100) : undefined}>
         <span style={{ width: Math.round(fill * 100) + "%" }} />

@@ -548,4 +548,9 @@ export const es: Record<string, string> = {
   "stagecard.status.notDownloaded": "Sin descargar",
   "stagecard.status.downloaded": "Descargado",
   "stagecard.status.unchecked": "Sin comprobar",
+  "option.help.context": "Palabras que le ayudan a transcribir bien: nombres propios, términos técnicos, siglas. Por ejemplo: Sidevoice, Kokoro, ElevenLabs.",
+  "option.help.language": "El idioma en que hablas. «Detectar automáticamente» lo reconoce en cada turno.",
+  "option.help.speed": "Lo rápido que habla la voz. 1,00× es su ritmo normal.",
+  "option.help.instructions": "Cómo quieres que hable: tono, estilo, pronunciación.",
+  "option.help.voice": "La voz con la que te habla en cada idioma. «Automática» usa la primera de ese idioma.",
 };

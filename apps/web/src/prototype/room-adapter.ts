@@ -6,7 +6,7 @@ import { diagnosticsText, deviceBuild, stageLabel, withBuild, withModel, withOpt
 import { offers as resolveOffers } from "../../../../packages/browser-audio/offers";
 import modelCatalog from "../../../../packages/browser-audio/models.json";
 import voiceCatalog from "../../../../packages/browser-audio/catalog.json";
-import { t } from "../i18n";
+import { currentLanguage, t } from "../i18n";
 import type { RoomStore } from "../state/room-store";
 import type { SidevoiceActions, StageTask } from "../state/room-types";
 import type { HostsController } from "../state/hosts/hosts-store";
@@ -23,6 +23,19 @@ const REMOTE_MODELS = {
   },
   "openai:stt": { models: [{ id: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe" }, { id: "gpt-4o-transcribe", label: "gpt-4o-transcribe" }, { id: "whisper-1", label: "whisper-1" }] },
 };
+
+/** PROTOTYPE: a description per model, as the catalogue would carry them (design/RESEARCH-HANDY.md). */
+const DESCRIPTIONS: Record<string, { es: string; en: string }> = {
+  "whisper-tiny": { es: "El más ligero: rápido, menos preciso", en: "The lightest: fast, less accurate" },
+  "whisper-base": { es: "Equilibrado: rápido y bastante preciso", en: "Balanced: fast and fairly accurate" },
+  "whisper-small": { es: "Más preciso, algo más lento", en: "More accurate, a bit slower" },
+  "whisper-large-v3-turbo": { es: "El más preciso; pide más memoria", en: "The most accurate; needs more memory" },
+  "kokoro-82m-v1.0": { es: "Natural y ligera, 8 idiomas", en: "Natural and light, 8 languages" },
+};
+function describe(catalog: typeof modelCatalog) {
+  const lang = currentLanguage() === "es" ? "es" : "en";
+  return { ...catalog, models: catalog.models.map((m) => ({ ...m, description: DESCRIPTIONS[m.id]?.[lang] })) };
+}
 
 export interface AdapterOptions {
   room: RoomStore;
@@ -45,7 +58,7 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
   const inUse = () => hosts.store.getState().inUse;
 
   room.patch({
-    modelCatalog: modelCatalog as never, voiceLanguages: voiceCatalog.languages as never, deviceCapabilities: capabilities as never,
+    modelCatalog: describe(modelCatalog) as never, voiceLanguages: voiceCatalog.languages as never, deviceCapabilities: capabilities as never,
     deviceOffers: offers as never, installedBuilds: installedBuilds(), remoteModels: REMOTE_MODELS as never,
     audioDevices: { ...f().audioDevices, inputs: [{ id: "default", label: t("proto.mic.default") }, { id: "mbp", label: "MacBook Pro" }, { id: "airpods", label: "AirPods" }],
       outputs: [{ id: "default", label: t("proto.mic.default") }] },

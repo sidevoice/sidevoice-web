@@ -548,4 +548,9 @@ export const en: Record<string, string> = {
   "stagecard.status.notDownloaded": "Not downloaded",
   "stagecard.status.downloaded": "Downloaded",
   "stagecard.status.unchecked": "Not checked yet",
+  "option.help.context": "Words that help it transcribe right: names, technical terms, acronyms. For example: Sidevoice, Kokoro, ElevenLabs.",
+  "option.help.language": "The language you speak. «Detect automatically» recognises it on every turn.",
+  "option.help.speed": "How fast the voice speaks. 1.00× is its normal pace.",
+  "option.help.instructions": "How you want it to speak: tone, style, pronunciation.",
+  "option.help.voice": "The voice it uses for each language. «Automatic» takes that language's first voice.",
 };
