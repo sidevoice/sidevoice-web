@@ -422,3 +422,10 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .enter-button:hover .enter-button-arrow { transform: translateX(.25rem) }
 @keyframes enter-button-voice { 0%, 100% { transform: scaleY(.55) } 50% { transform: scaleY(1) } }
 @media (prefers-reduced-motion: reduce) { .enter-button-mark rect { animation: none } .enter-button, .enter-button-arrow { transition: none } }
+/* A shortcut as key caps, and the field that records one. */
+.keys { display: inline-flex; align-items: center; gap: .3rem }
+.keys kbd { display: inline-grid; place-items: center; min-width: 1.9rem; height: 1.9rem; padding: 0 .5rem; border: 1px solid var(--sv-border); border-bottom-width: 3px; border-radius: .45rem; background: #232a33; color: var(--sv-text); font: 600 .82rem/1 inherit }
+.keys kbd[data-mod] { font-size: 1rem }
+.shortcut-field { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap }
+.shortcut-value { display: inline-flex; align-items: center; min-height: 2.6rem; padding: .3rem .6rem; border: 1px solid var(--sv-border); border-radius: .65rem; background: #141b23; outline: none }
+.shortcut-field[data-recording] .shortcut-value { border-color: var(--sv-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-primary) 25%, transparent) }

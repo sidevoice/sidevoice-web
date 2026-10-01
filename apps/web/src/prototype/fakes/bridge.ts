@@ -87,7 +87,7 @@ export function createFakeBridge(scenario: Scenario, toggles: Toggles, hosts: Fa
 
   const host: DesktopHost = {
     version: 1,
-    platform: scenario.platform ?? "macos-aarch64",
+    platform: String(toggles.appPlatform || "") || (scenario.platform ?? "macos-aarch64"),
     hostsAgents: (scenario.platform ?? "macos-aarch64") === "macos-aarch64",
     localHost: {
       async state() { return state; },

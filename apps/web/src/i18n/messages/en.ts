@@ -323,7 +323,7 @@ export const en: Record<string, string> = {
 
   "app.shortcut.title": "Shortcuts",
   "app.shortcut.label": "Global mute shortcut",
-  "app.shortcut.hint": "Works even with Sidevoice in the background. Empty turns it off. Format: CmdOrCtrl+Shift+M, Alt+F9…",
+  "app.shortcut.hint": "Works even with Sidevoice in the background.",
   "app.shortcut.saved": "Saved.",
   "app.shortcut.refused": "Not saved: {message}",
   "app.controls.title": "Call controls",
@@ -555,4 +555,9 @@ export const en: Record<string, string> = {
   "option.help.voice": "The voice it uses for each language. «Automatic» takes that language's first voice.",
   "stagecard.key.clear": "Remove the {provider} key from this machine",
   "wizard.group.done": "Done",
+  "keys.space": "Space",
+  "keys.recording": "Press the combination…  (Esc to leave it)",
+  "keys.none": "None",
+  "keys.change": "Change",
+  "keys.remove": "Remove",
 };

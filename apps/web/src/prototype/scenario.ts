@@ -51,6 +51,7 @@ export const TOGGLES: ToggleDef[] = [
   { id: "offline", group: "Entorno", label: "Sin red: hosts remotos y descargas fallan" },
   { id: "noWebgpu", group: "Entorno", label: "Navegador sin WebGPU (solo WASM)", reload: true },
   { id: "slowDownload", group: "Entorno", label: "Descargas lentas (×6)" },
+  { id: "appPlatform", group: "Entorno", label: "Plataforma de la app", options: ["", "windows-x64", "linux-x64"], reload: true },
   { id: "coreFailing", group: "Entorno", label: "El núcleo falla al (re)arrancar" },
   { id: "delayedHost", group: "Entorno", label: "Hosts remotos tardan 3 s en contestar" },
   { id: "w1NoAgents", group: "W1–W2", label: "No se encuentran agentes (W1 y W3)" },

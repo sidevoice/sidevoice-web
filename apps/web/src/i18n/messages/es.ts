@@ -323,7 +323,7 @@ export const es: Record<string, string> = {
 
   "app.shortcut.title": "Atajos",
   "app.shortcut.label": "Atajo global para silenciar",
-  "app.shortcut.hint": "Funciona aunque Sidevoice esté en segundo plano. Vacío lo desactiva. Formato: CmdOrCtrl+Shift+M, Alt+F9…",
+  "app.shortcut.hint": "Funciona aunque Sidevoice esté en segundo plano.",
   "app.shortcut.saved": "Guardado.",
   "app.shortcut.refused": "No se guardó: {message}",
   "app.controls.title": "Controles de llamada",
@@ -555,4 +555,9 @@ export const es: Record<string, string> = {
   "option.help.voice": "La voz con la que te habla en cada idioma. «Automática» usa la primera de ese idioma.",
   "stagecard.key.clear": "Borrar la clave de {provider} de esta máquina",
   "wizard.group.done": "Listo",
+  "keys.space": "Espacio",
+  "keys.recording": "Pulsa la combinación…  (Esc para dejarla)",
+  "keys.none": "Ninguno",
+  "keys.change": "Cambiar",
+  "keys.remove": "Quitar",
 };

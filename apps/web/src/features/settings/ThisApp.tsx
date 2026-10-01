@@ -3,6 +3,8 @@
  * diagnostics (this computer, the native engine, each stage) and «Borrar datos…». Only in the app. */
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
+import { keyPlatform, ShortcutField } from "../../components/ui/Shortcut";
+import { desktopHost } from "../../services/desktop-host";
 import { currentLanguage, useT } from "../../i18n";
 import { useRoomStore } from "../../state/room-store";
 import { useHosts, useHostsController } from "../../state/hosts/hosts-store";
@@ -29,9 +31,10 @@ export function ThisApp() {
   const lang = currentLanguage();
   const yes = (v: boolean) => t(v ? "common.yes" : "common.no");
 
-  async function saveShortcut() {
-    if (shortcut === settings?.muteShortcut) return;
-    const result = await hosts.updateApp({ muteShortcut: shortcut });
+  async function saveShortcut(next = shortcut) {
+    if (next === settings?.muteShortcut) return;
+    setShortcut(next);
+    const result = await hosts.updateApp({ muteShortcut: next });
     setNote(result.ok ? { text: result.warning ? t("app." + result.warning) : t("app.shortcut.saved"), warn: !!result.warning }
       : { text: known(t, "app." + result.error.key, { value: result.error.detail ?? "" }) ?? t("app.shortcut.refused", { message: result.error.message ?? result.error.key }), warn: true });
   }
@@ -61,10 +64,11 @@ export function ThisApp() {
       <h3>{t("settings.thisApp")}</h3>
 
       <h4>{t("app.shortcut.title")}</h4>
-      <label className="ui-field">{t("app.shortcut.label")}
-        <input value={shortcut} spellCheck={false} placeholder="CmdOrCtrl+Shift+M" onChange={(e) => setShortcut(e.currentTarget.value)} onBlur={() => void saveShortcut()}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveShortcut(); } }} />
-      </label>
+      {/* The keys as keys, in this platform's words, recorded rather than typed (operator, 2026-10-02). */}
+      <div className="ui-field">
+        <span className="ui-field-label">{t("app.shortcut.label")}</span>
+        <ShortcutField value={shortcut} platform={keyPlatform(desktopHost()?.platform)} label={t("app.shortcut.label")} onChange={(next) => void saveShortcut(next)} />
+      </div>
       <p className="muted small">{t("app.shortcut.hint")}</p>
       {note && <p className={note.warn ? "warn-line" : "ok-line"} role="status">{note.text}</p>}
 
