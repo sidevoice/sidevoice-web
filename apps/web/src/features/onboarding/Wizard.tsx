@@ -18,7 +18,8 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { useHosts, useHostsController, type VerifyOutcome } from "../../state/hosts/hosts-store";
 import { previousStep, stepGroups, type Step } from "../../state/hosts/onboarding";
 import { proposeStages, type ProposalRow } from "../../state/hosts/proposal";
-import { effectiveStage, type Task } from "../../state/hosts/stage-scope";
+import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-scope";
+import { effectiveStage as effectiveStageOf, withModel, withPlace } from "../../state/stage-settings.js";
 import { StageSettings } from "../settings/StageSettings";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
@@ -325,39 +326,42 @@ function KeyLine({ fp, provider, label, configured, hint }: { fp: string; provid
 function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
+  const room = useContext(RoomStoreContext);
   const inUse = useHosts((s) => s.inUse);
   const integrations = useHosts((s) => (s.inUse ? s.integrations[s.inUse] : undefined));
-  const chosen = useHosts((s) => !!effectiveStage(s.scope, s.inUse, task));
+  const saved = useHosts((s) => effectiveStage(s.scope, s.inUse, task));
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
+  const draft = useRoomStore((s) => s.facts.stageDraft?.[task] ?? null);
   const ctx = useStageContext();
-  const [advancing, setAdvancing] = useState(false);
   const [keyFor, setKeyFor] = useState<string | null>(null);
+  const [freed, setFreed] = useState<string | null>(null);
   const check = view?.check ?? null;
   const ready = !!ctx?.offers && integrations?.status !== "loading";
   useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
-  const next = task === "stt" ? "W4v" : "W5";
-  // «Descargar y continuar»: once the shown model is checked and saved, the wizard moves on by itself.
-  useEffect(() => { if (advancing && chosen && check?.phase !== "running") hosts.goTo(next); }, [advancing, chosen, check?.phase, hosts, next]);
-  useEffect(() => { if (check?.phase === "failed" || check === null) setAdvancing(false); }, [check]);
-  // A key typed here, accepted by its provider, makes its place choosable: the panel goes.
+  // A key typed here, accepted by its provider, makes that provider the place.
   const keyed = useHosts((s) => !!keyFor && !!s.inUse && !!s.integrations[s.inUse]?.value?.providers.find((p) => p.id === keyFor)?.configured);
   useEffect(() => {
-    if (!keyed || !keyFor) return;
-    window.sidevoiceActions?.chooseStagePlace(task, keyFor);
+    if (!keyed || !keyFor || !ctx) return;
+    select(withPlace(ctx, task, null, keyFor, null));
     setKeyFor(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyed, keyFor, task]);
-  if (!ready || !view) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
-  const offer = (ctx?.offers as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
-  const installed = !!offer && (ctx?.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
+  if (!ready || !view || !ctx || !room) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
+  /** Choosing only selects (a draft); «Descargar y probar» is what downloads, loads and checks it. */
+  function select(stage: unknown) {
+    room!.patch({ stageDraft: { ...(room!.facts.stageDraft ?? {}), [task]: stage as Record<string, unknown> } });
+  }
+  const shown = (draft ?? saved ?? null) as Stage | null;
+  const current = shown ?? (stageViewStage(ctx, task));
+  const testedOk = !draft && !!saved && (!check || check.phase === "done");
+  const offer = (ctx.offers as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
+  const installed = !!offer && (ctx.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
   const needsDownload = view.place === "device" && !!offer && !installed;
   const busy = !!check && ["running", "slow"].includes(check.phase);
-  function proceed() {
-    setAdvancing(true);
-    if (chosen) { hosts.goTo(next); return; }
-    const actions = window.sidevoiceActions;
-    if (check?.phase === "consent") { actions?.decideStage(task, true); return; }
-    actions?.chooseStageModel(task, view!.model);
-    actions?.decideStage(task, true);
+  const next = task === "stt" ? "W4v" : "W5";
+  function test() {
+    if (saved && saved.model !== view!.model && saved.place === "device") setFreed(familyLabel(ctx!, saved.model));
+    window.sidevoiceActions?.testStage?.(task, { place: view!.place, model: view!.model, options: current?.options ?? {}, build: null });
   }
   // The key line stays while a provider is the place: pending, or chosen with its key (shown masked, replaceable).
   const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
@@ -371,15 +375,65 @@ function StageStep({ task }: { task: Task }) {
       {view.unconfigured && !keyFor && <p className="problem">{t("wizard.w4.noOffer")}</p>}
       <div className="wizard-stage">
         {/* A provider with no key asks for it here, not in Configuración. */}
-        <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor} />
+        <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor}
+          onPlaceChange={(place) => select(withPlace(ctx, task, current, place, null))}
+          onModelChange={(model) => select(withModel(ctx, task, current, model))}
+          afterModel={testedOk ? <TryStage task={task} freed={freed} /> : null} />
       </div>
       <Actions>
-        <Button variant="primary" disabled={!!keyFor || busy || advancing && !chosen || !view.model}
-          onClick={proceed}>
-          {chosen && !check ? t("wizard.continue") : needsDownload ? t("wizard.w4.downloadContinue", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.useContinue")}
-        </Button>
+        {testedOk
+          ? <Button variant="primary" onClick={() => hosts.goTo(next)}>{t("wizard.continue")}</Button>
+          : <Button variant="primary" disabled={!!keyFor || busy || !view.model} onClick={test}>
+              {needsDownload ? t("wizard.w4.downloadTest", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.test")}
+            </Button>}
       </Actions>
     </>
+  );
+}
+
+function stageViewStage(ctx: ReturnType<typeof stageContext>, task: Task): Stage | null {
+  return (effectiveStageOf(ctx, task, null) as Stage | null) ?? null;
+}
+function familyLabel(ctx: ReturnType<typeof stageContext>, model: string): string {
+  return ((ctx.catalog as { models?: { id: string; label?: string }[] } | null)?.models?.find((m) => m.id === model)?.label) ?? model;
+}
+
+/** Once a stage passed its check, it can be tried for real: say something and read it back, or listen to the voice. */
+function TryStage({ task, freed }: { task: Task; freed: string | null }) {
+  const t = useT();
+  const hosts = useHostsController();
+  const inUse = useHosts((s) => s.inUse);
+  const language = useRoomStore((s) => s.facts.speechLanguage);
+  const [state, setState] = useState<"" | "listening" | "heard">("");
+  const [heard, setHeard] = useState("");
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+  function listen() {
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setState("listening"); setHeard("");
+    void hosts.echoTest(inUse, {
+      level: () => undefined,
+      heard: (text) => { if (!controller.signal.aborted) { setHeard(text); setState("heard"); controller.abort(); } },
+      replied: () => undefined, failed: () => setState(""), silent: () => setState(""),
+    }, controller.signal);
+  }
+  return (
+    <div className="try-stage">
+      <p className="ok-line small">{t("wizard.w4.ready")}</p>
+      {task === "stt" ? (
+        <div className="try-row">
+          <Button size="compact" onClick={listen} disabled={state === "listening"}>{state === "listening" ? t("wizard.w4.tryListening") : t("wizard.w4.trySay")}</Button>
+          {heard && <span className="muted small">{t("wizard.w4.tryHeard", { text: heard })}</span>}
+        </div>
+      ) : (
+        <div className="try-row">
+          <Button size="compact" onClick={() => void window.sidevoiceActions?.previewVoice(language)}>{t("wizard.w4.tryListen")}</Button>
+        </div>
+      )}
+      {freed && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}
+    </div>
   );
 }
 

@@ -262,4 +262,7 @@ export interface SidevoiceActions {
   clearIntegrationKey(id: string): Promise<void>;
   /** Open Integraciones at that provider's row: what a pane's "Configurar" does. */
   openIntegration(id: string): void;
+  /** Download (if needed), load and check this stage, and keep it once it passes — no question first: the person
+   *  already asked for it («Descargar y probar»). */
+  testStage?(task: StageTask, stage: Record<string, unknown>): void;
 }

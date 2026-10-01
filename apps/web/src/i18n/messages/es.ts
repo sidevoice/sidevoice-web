@@ -443,4 +443,12 @@ export const es: Record<string, string> = {
   "proto.keys": "Claves de proveedores",
   "wizard.w4.keyValid": "Válida ✓",
   "wizard.w4.keyRefusedKept": "{provider} rechazó esta clave; sigue la anterior",
+  "wizard.w4.downloadTest": "Descargar y preparar · {size}",
+  "wizard.w4.test": "Preparar",
+  "wizard.w4.ready": "Preparado. Pruébalo tú:",
+  "wizard.w4.trySay": "Di algo",
+  "wizard.w4.tryListening": "Escuchando…",
+  "wizard.w4.tryHeard": "Ha entendido: «{text}»",
+  "wizard.w4.tryListen": "Escuchar la voz",
+  "wizard.w4.freed": "{model} se ha liberado de la memoria; sigue descargado.",
 };

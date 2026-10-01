@@ -22,7 +22,9 @@ const WHERE_NOTES = {
  *  asks for the key in place. */
 /** `pendingPlace`: a provider chosen whose key is still being asked for — shown as the place, with the model and its
  *  options waiting until the key is in. */
-export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null }) {
+/** `onPlaceChange` / `onModelChange`: what choosing does — by default the room's actions (a device model asks to be
+ *  downloaded and checked); the wizard only selects, and tests on its own button. */
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, afterModel }: { task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void; onModelChange?: (model: string) => void; afterModel?: ReactNode }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
@@ -49,6 +51,7 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace }
           onChange={(id) => {
             const place = view.places.find((p) => p.id === id);
             if (place?.state === "missing") (onMissingPlace ?? ((p: string) => actions()?.openIntegration(p)))(id);
+            else if (onPlaceChange) onPlaceChange(id);
             else actions()?.chooseStagePlace(task, id);
           }} />
       </div>
@@ -59,10 +62,11 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace }
           disabled={!!pendingPlace || locked || view.modelsLoading || !view.models.length}
           placeholder={pendingPlace ? t("stage.keyFirst") : view.modelsLoading ? "Cargando modelos…" : "—"}
           choices={view.models.map((model) => ({ value: model.id, label: model.label, detail: model.detail || undefined, description: model.description }))}
-          onChange={(model) => actions()?.chooseStageModel(task, model)} />
+          onChange={(model) => onModelChange ? onModelChange(model) : actions()?.chooseStageModel(task, model)} />
       </div>
       {pendingPlace ? null : <>
       {view.check && <StageCheck task={task} check={view.check} />}
+      {afterModel}
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
       {WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
       <OptionsForm task={task} options={view.options} disabled={locked}

@@ -79,7 +79,7 @@ export function ChoiceSelect({ id, value, choices, onChange, disabled, placehold
                     {choice.icon && <span className="choice-icon">{choice.icon}</span>}
                     <span className="choice-label">{choice.label}</span>
                     {choice.detail && <span className="choice-detail">{choice.detail}</span>}
-                    {choice.value === value && <span className="choice-check" aria-hidden="true">✓</span>}
+                    <span className="choice-check" aria-hidden="true">{choice.value === value ? "✓" : ""}</span>
                   </span>
                   {choice.description && <span className="choice-desc">{choice.description}</span>}
                 </li>

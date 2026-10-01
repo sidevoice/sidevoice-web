@@ -79,6 +79,8 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
     const fp = inUse();
     if (stage.place !== DEVICE && !fp) return;
     hosts.chooseStage(fp, task, (task === "tts" ? withVoicesChosen(ctx(), stage) : stage) as Stage);
+    // What is kept is no longer a draft.
+    if (f().stageDraft?.[task]) { const draft = { ...f().stageDraft }; delete draft[task]; room.patch({ stageDraft: Object.keys(draft).length ? draft : null }); }
   };
   const setCheck = (task: StageTask, check: Record<string, unknown> | null) => room.patch({ stageChecks: { ...f().stageChecks, [task]: check } });
 
@@ -186,6 +188,7 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
       }
     },
     async clearIntegrationKey(id) { const fp = keyFp(); if (fp) await hosts.deleteKey(fp, id); },
+    testStage(task, stage) { void runCheck(task, stage as unknown as Stage); },
     openIntegration(id) {
       const fp = inUse();
       if (!fp) return;
