@@ -69,7 +69,8 @@ export interface Capabilities {
   os?: string;
   arch?: string;
   has: string[];
-  memory_mb?: number;
+  /** Absent or null when the place cannot tell (pages usually; a native bridge may say null): no model is left out for it. */
+  memory_mb?: number | null;
 }
 
 export interface Choice {

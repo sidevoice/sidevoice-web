@@ -85,7 +85,7 @@ test('Echo coverage reports observed AEC and sink facts without inferring detect
   assert.equal(echoCoverage({connected:true,track:true,aec:true,health:{output:'element'},...patch}).state,expected);
 });
 test('The engine badge derives processing, fallback and output health from runtime facts',async()=>{
- const api=await moduleReady;const s=facts(api,{engineReady:true,voicePreferences:{stt_provider:'browser',stt_model:'whisper-base'},sttRuntime:{device:'wasm',fallback_from:'webgpu'},outputHealth:'recovering'});
+ const api=await moduleReady;const s=facts(api,{engineReady:true,voicePreferences:{stt:{place:'device',model:'whisper-base'}},sttRuntime:{model:'whisper-base',engine:'transformers-js',accelerator:'wasm',fallback_from:'webgpu'},outputHealth:'recovering'});
  assert.match(api.engineView(s).text,/Whisper base · CPU \(GPU falló\) · smart-turn · audio ↻/);
  assert.equal(api.engineView({...s,engineReady:false}).text,'');
 });

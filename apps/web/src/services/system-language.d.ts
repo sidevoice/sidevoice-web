@@ -4,6 +4,4 @@ export const SPEECH_LANGUAGES: string[];
 export function systemLanguage(supported: string[], preferred?: readonly (string | undefined)[] | null): string;
 export function systemPreferences(preferred?: readonly (string | undefined)[] | null): {
   ui_language: string;
-  stt_language: string;
-  default_tts_language: string;
 };

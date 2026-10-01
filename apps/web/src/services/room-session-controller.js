@@ -1,10 +1,17 @@
-import {createRoomSessionStore,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE,reachNote,keyedProvider} from '../state/room-session-state.js';
+import {createRoomSessionStore,stageContext,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE,reachNote,keyedProvider} from '../state/room-session-state.js';
 import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
+import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem} from '../state/stage-settings.js';
+import {offers as resolveOffers} from '../../../../packages/browser-audio/offers';
+import modelCatalog from '../../../../packages/browser-audio/models.json';
+import voiceCatalogFile from '../../../../packages/browser-audio/catalog.json';
+import {refusalText as sayRefusal} from '../../../../packages/browser-audio/refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
+// What the stages are chosen from, as this page was built: the model catalogue and the speech languages (#124).
+roomStore.patch({modelCatalog,voiceLanguages:voiceCatalogFile.languages,speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.nativeEngine});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
 const $=id=>document.getElementById(id);
 function setRoomError(message){const value=message||null;if(window.sidevoiceUI)window.sidevoiceUI.setBootError(value);else $("error").textContent=value||""}
@@ -15,9 +22,10 @@ function showPreparation(d){
  const transcription=d.kind==='transcription';
  box.dataset.kind=d.kind||'voice';
  $('loading-title').textContent=d.title||(d.phase==='error'?'No se pudo preparar la voz':'Preparando voz');
- $('loading-note').textContent=transcription
-  ?'La primera vez se descarga Whisper en este navegador. Después se reutiliza su caché local.'
-  :'La primera vez se descargan el modelo y la voz. Después se reutiliza la caché de este navegador.';
+ $('loading-note').textContent=state.inApp
+  ?'La primera vez se descarga el modelo en este dispositivo. Después se reutiliza.'
+  :transcription?'La primera vez se descarga Whisper en este dispositivo. Después se reutiliza su caché local.'
+  :'La primera vez se descargan el modelo y la voz. Después se reutilizan.';
  $('loading-detail').textContent=d.text||'';
  if(d.progress==null){$('loading-progress').removeAttribute('value');$('loading-percent').textContent=''}else{const progress=Math.max(0,Math.min(100,Number(d.progress)||0));$('loading-progress').value=progress;$('loading-percent').textContent=Math.round(progress)+' %'}
  $('loading-cancel').textContent=d.phase==='error'?'Cerrar':'Cancelar';
@@ -46,7 +54,8 @@ function joinFailureText(step,error){
  const name=String(error?.name||''),message=String(error?.message||error||'');
  if(step==='microphone'){
   if(/NotAllowedError|SecurityError/.test(name)||/permiso|permission|denied/i.test(message))
-   return 'El micrófono está bloqueado para esta página. Dale permiso en el navegador y vuelve a pulsar para entrar.';
+   return state.inApp?'El micrófono está bloqueado para Sidevoice. Dale permiso en los ajustes del sistema y vuelve a pulsar para entrar.'
+    :'El micrófono está bloqueado para esta página. Dale permiso en el navegador y vuelve a pulsar para entrar.';
   if(/NotFoundError|OverconstrainedError|NotReadableError/.test(name))
    return 'No se pudo usar el micrófono elegido. Conéctalo o elige otro en los dispositivos de audio, y vuelve a entrar.';
   return 'No se pudo abrir el micrófono: '+message+'. Revísalo y vuelve a entrar.';
@@ -68,17 +77,12 @@ function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?'
  * null, and nothing of a node is asked: every such request carries this device's token. */
 const target=pageTarget();
 let nodeBase=null;
-/* The desktop app's native engine, when this page runs inside it: which of the page's models it can run, per task
- * (page model ids; filled in once, further down). null outside the app. */
-let nativeModels=null;
-/** Where a model may run on this device: the page's own, and the desktop app's native engine when there is one. */
-function deviceChoices(){return nativeModels?['auto','webgpu','wasm','native']:['auto','webgpu','wasm']}
 // This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
 let pairings=readPairings(pageStorage());
 function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,machinesAt:Date.now()})}
-function keepPairings(next){pairings=next;const storage=pageStorage();if(storage)writePairings(storage,next);publishPairings()}
+function keepPairings(next){const moved=next.inUse!==pairings.inUse;pairings=next;if(moved)switchStages();const storage=pageStorage();if(storage)writePairings(storage,next);publishPairings()}
 function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
 function withToken(options,token){return {...options,headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
 // Every request to the node carries the token of the pairing in use; one the node refuses means that pairing is
@@ -143,7 +147,7 @@ async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
  // call, and by the end of the preparation chain that gesture has expired.
  if(!(state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
- if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','Este navegador no permite mantener la pantalla encendida.');return}
+ if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','Este dispositivo no permite mantener la pantalla encendida.');return}
  const epoch=wakeEpoch;
  const request=(async()=>{
   try{
@@ -192,7 +196,7 @@ async function refreshAudioDevices(){
    inputs:deviceOptions(listed,'audioinput',inputDeviceId),outputs:deviceOptions(listed,'audiooutput',outputDeviceId),
    inputId:inputDeviceId,outputId:outputDeviceId};
   state.deviceNote=outputs?'Los nombres aparecen tras conceder permiso al micrófono.'
-   :'Cambia la salida desde los ajustes del sistema; este navegador no permite elegirla aquí.';
+   :'Cambia la salida desde los ajustes del sistema; aquí no se puede elegir.';
  }catch(error){state.deviceNote=error.message||'No se pudieron enumerar los dispositivos.'}
 }
 /* Choosing one is an action, not an event on a node: React calls this and the runtime does the work. */
@@ -271,16 +275,16 @@ function setupAudioControls(){
 
  globalThis.navigator?.mediaDevices?.addEventListener?.('devicechange',()=>{refreshAudioDevices();followDefaultRoute()});
 }
-let voiceCatalog=null;let voiceDraft={};let editingLanguage=null;let callExecution='browser';let pendingBotText=[];
+let pendingBotText=[];
 let textAttempt=null;
-const SHOW_ALL_VOICES='__show_all_voices__';let defaultVoicesExpanded=false;const expandedVoiceLanguages=new Set();
 try{state.roomSeen=JSON.parse(sessionStorage.getItem('voice-room-seen')||'{}')}catch{}
 try{state.history=JSON.parse(sessionStorage.getItem('voice-room-transcript')||'[]');if(!Array.isArray(state.history))state.history=[]}catch{}
 function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringify(state.history.slice(-1000)))}catch{}}
 function targetId(){return state.roomBinding?.thread_id||null}
 function historyThreadId(){return state.viewedThread||targetId()}
 
-async function api(path,options){const r=await request(path,options);if(r.status===401)throw Error(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw Error(d.detail||'No se pudo completar la operación');return d}
+// A refusal is a sentence, or a key with its English sentence (sidevoice-core's newer refusals): the sentence is said.
+async function api(path,options){const r=await request(path,options);if(r.status===401)throw Error(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw Error(sayRefusal(d.detail,'No se pudo completar la operación'));return d}
 const post=(path,body,method='POST')=>api(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 
 /* What the microphone heard while the room was unreachable, said plainly. The person spoke to
@@ -467,6 +471,8 @@ function settleBase(found,reach,pairing){
   if(base!=null&&reachFailure&&state.joinFailure===reachFailure){state.joinFailure='';reachFailure=''}
  });
  if(moved&&base!=null){refresh();refreshPeople();refreshHistory()}
+ // Settings open on another machine: its integrations and its providers' lists are read afresh (F13).
+ if(base!=null&&state.integrationsStatus==='idle'&&$('language-settings')?.open)void loadIntegrations().then(()=>loadStageLists(true));
 }
 /* ----- pairing this device with a machine (docs/DEVICE_PAIRING.md) ----- */
 function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
@@ -558,7 +564,7 @@ function renderLatencyStats(snapshot,thread){
 const LATENCY_STAGES=[
  ['Silencio hasta cerrar el turno',r=>r.input_ms?.endpoint_silence_ms,'endpoint_silence'],
  ['Turno cerrado → texto',r=>r.input_ms?.recognition_ms,'recognition'],
- ['Whisper en este navegador',r=>r.input_ms?.request_to_transcript_ms,'request_to_transcript'],
+ ['Whisper en este dispositivo',r=>r.input_ms?.request_to_transcript_ms,'request_to_transcript'],
  ['Texto → entregado al agente',r=>r.input_ms?.transcript_to_delivery_ms,'transcript_to_delivery'],
  ['Entregado → leído por la conversación',r=>r.server_ms?.delivery_accepted_to_read_ms??r.server_ms?.input_queued_to_read_ms,'delivery_to_read'],
  ['Leído → primera respuesta',r=>r.server_ms?.read_to_reply_received_ms,'read_to_reply'],
@@ -648,7 +654,7 @@ async function copyLatencyAggregates(){
   if(!clipboard?.writeText)throw Error('sin portapapeles');
   await clipboard.writeText(statsAggregatesText(statsReplies));
   status.textContent='Copiado como texto.';
- }catch{status.textContent='Este navegador no dejó copiar; selecciona la tabla a mano.'}
+ }catch{status.textContent='No se pudo copiar; selecciona la tabla a mano.'}
 }
 
 // ----- the ambient bed: this browser's turn is in the conversation's hands (#42) -----
@@ -743,20 +749,19 @@ function renderConnectionStats(data,roundTrip){
  const flag=value=>value===true||value==='all'?'Activado':value===false?'Desactivado':'No confirmado';
  const socket=['Conectando','Conectado','Cerrando','Desconectado'][state.ws?.readyState]||'Desconectado';
  const context=window.roomVoice?.context||audioContext,stt=call?.transcription;
- const sttReasons={explicit:'Selección explícita',auto_key:'Automático · clave disponible',auto_no_key:'Automático · sin clave, fallback local',openai_without_key:'OpenAI solicitado sin clave · fallback local'};
- const sttExecution=!stt?'—':stt.location==='local'
-  ?[stt.device,stt.compute_type].filter(Boolean).join(' · ')
+ // Where it runs: this device on an accelerator (and the one it fell back from), or a provider, remotely.
+ const sttExecution=!stt?'—':stt.place==='device'
+  ?[stt.accelerator,stt.fallback_from&&'antes '+stt.fallback_from].filter(Boolean).join(' · ')||'—'
   :'Remota';
  const facts=[
   ...versionFacts(),
   ['WebSocket',socket],
   ['Consulta al servidor (HTTP)',statsDuration(roundTrip)],
   ['Sesión',state.sessionId||'Sin llamada'],
-  ['Servidor y navegador',call?'Misma sesión':state.sessionId?'Sesión no confirmada':'Sin llamada'],
-  ['Transcripción',stt?[stt.provider,stt.model].filter(Boolean).join(' · '):'—'],
+  ['Servidor y este dispositivo',call?'Misma sesión':state.sessionId?'Sesión no confirmada':'Sin llamada'],
+  ['Transcripción',stt?[stt.place,stt.model].filter(Boolean).join(' · '):'—'],
   ['Motor STT',stt?.engine||'—'],
   ['Ejecución STT',sttExecution],
-  ['Selección STT',sttReasons[stt?.reason]||stt?.reason||'—'],
   ['Motor de audio',({running:'Activo',suspended:'Suspendido',closed:'Cerrado'})[context?.state]||'No iniciado'],
   ...audioOutputFacts(window.roomVoice?.health?.()),
   ['Micrófono',track?.label||selectedLabel('input')],
@@ -779,7 +784,7 @@ function micPathFact(){
  const link=state.sessionId&&micLink?.sessionId===state.sessionId?micLink:null;if(!link)return '—';
  if(link.path==='webrtc')return 'WebRTC';
  const socket=state.rendezvous==='room'?'Socket (relé)':'Socket';
- const why=({negotiating:'preparando WebRTC…',recovering:'WebRTC interrumpido; esperando a que vuelva'})[link.state]||({page_off:'WebRTC desactivado en este dispositivo',unsupported:'este navegador no tiene WebRTC',unavailable:'la máquina no ofrece WebRTC',node_off:'la máquina tiene WebRTC desactivado',offer:'la máquina no aceptó la conexión WebRTC',timeout:'WebRTC no llegó a conectar',failed:'la conexión WebRTC falló',closed:'la conexión WebRTC se cerró',disconnected:'WebRTC se cortó y no volvió',track:'el micrófono nuevo no pasó a WebRTC',error:'no se pudo preparar WebRTC'})[link.reason];
+ const why=({negotiating:'preparando WebRTC…',recovering:'WebRTC interrumpido; esperando a que vuelva'})[link.state]||({page_off:'WebRTC desactivado en este dispositivo',unsupported:'este dispositivo no tiene WebRTC',unavailable:'la máquina no ofrece WebRTC',node_off:'la máquina tiene WebRTC desactivado',offer:'la máquina no aceptó la conexión WebRTC',timeout:'WebRTC no llegó a conectar',failed:'la conexión WebRTC falló',closed:'la conexión WebRTC se cerró',disconnected:'WebRTC se cortó y no volvió',track:'el micrófono nuevo no pasó a WebRTC',error:'no se pudo preparar WebRTC'})[link.reason];
  return why?socket+' · '+why+(link.detail&&['offer','error','unavailable'].includes(link.reason)?': '+link.detail:''):socket;
 }
 function resetStats(){renderLatencyStats(null,null);$('stats-connection').replaceChildren();$('stats-updated').textContent=''}
@@ -842,7 +847,7 @@ function latencyKey(thread,revision){return JSON.stringify([state.sessionId,thre
 // The turn's root span is this page's: the room announces the turn, this browser opens the span and
 // hands the room its W3C traceparent, so every stage the room measures hangs from the same trace.
 function openTurnTrace(threadId,revision){
- const traceparent=window.sidevoiceTelemetry?.startTurn?.(threadId,revision,{'sidevoice.stt_provider':state.voicePreferences?.stt_provider,'sidevoice.turn_end_mode':state.voicePreferences?.turn_end_mode});
+ const traceparent=window.sidevoiceTelemetry?.startTurn?.(threadId,revision,{'sidevoice.stt_place':state.voicePreferences?.stt?.place,'sidevoice.turn_end_mode':state.voicePreferences?.turn_end_mode});
  if(!traceparent||!state.ws||state.ws.readyState!==1||!state.sessionId)return;
  try{state.ws.send(JSON.stringify({type:'voice-turn-trace',data:{session_id:state.sessionId,thread_id:threadId,revision,traceparent}}))}catch{}
 }
@@ -905,9 +910,9 @@ function recordMessage(raw, socket) {
             return;
         const runtime = window.roomTranscription;
         if (typeof runtime?.transcribe !== 'function')
-            return refuseTranscription(d, 'Este navegador no tiene lista la transcripción.');
+            return refuseTranscription(d, 'Este dispositivo no tiene lista la transcripción.');
         try { runtime.transcribe(d); }
-        catch (error) { refuseTranscription(d, error?.message || 'La transcripción falló en este navegador.'); }
+        catch (error) { refuseTranscription(d, error?.message || 'La transcripción falló en este dispositivo.'); }
         return;
     }
     if (t === 'voice-speech') {
@@ -1061,7 +1066,7 @@ function recordMessage(raw, socket) {
         }
     }
     if (t === 'error')
-        setRoomError(d.message || d.error || 'Error de conexión');
+        setRoomError(sayRefusal(d, d.error || 'Error de conexión'));
 }
 function stopMeter(){cancelAnimationFrame(meterFrame);meterFrame=null;captureNode?.disconnect();captureNode=null;micSource?.disconnect();analyser?.disconnect();if(audioContext&&audioContext!==window.roomVoice?.context)audioContext.close().catch(()=>{});audioContext=null;analyser=null;micSource=null;$('mute').style.setProperty('--mic-fill','0%');$('mic-control').dataset.signal='quiet';$('mic-level-meter').setAttribute('aria-valuenow','0');waveLevels.fill(0);updateWave(0)}
 /* The bubble of the turn being recorded draws this microphone: the waveform pulls the samples the meter's
@@ -1082,7 +1087,7 @@ function measureMic(samples,enabled){
 }
 function startMeter(rate){try{audioContext=window.roomVoice?.context||roomAudioContext(rate);analyser=audioContext.createAnalyser();analyser.fftSize=1024;micSource=audioContext.createMediaStreamSource(state.stream);micSource.connect(analyser);const data=new Float32Array(1024);let clipUntil=0,lastWave=0;function tick(){if(!analyser)return;analyser.getFloatTimeDomainData(data);const enabled=!!state.stream?.getAudioTracks()[0]?.enabled,level=measureMic(data,enabled);if(level.signal==='clip')clipUntil=Date.now()+600;const signal=enabled&&Date.now()<clipUntil?'clip':level.state;$('mute').style.setProperty('--mic-fill',level.value+'%');const meter=$('mic-level-meter'),mic=$('mic-control');mic.dataset.signal=signal;if(Date.now()-lastWave>=80){updateWave(level.value);lastWave=Date.now()}meter.setAttribute('aria-valuenow',String(level.value));const description=signal==='clip'?'Posible saturación del micrófono':signal==='high'?'Nivel de micrófono alto':'Nivel de micrófono';if(meter.dataset.signal!==signal){meter.dataset.signal=signal;meter.setAttribute('title',description);meter.setAttribute('aria-label',description)}meterFrame=requestAnimationFrame(tick)}tick()}catch{}}
 function roomSocketUrl(){if(nodeBase==null)throw Error(reachNote(state)||NO_MACHINE);return callSocketUrl(nodeBase,location)}
-const ROOM_IS_FULL='La sala ya tiene el máximo de navegadores conectados. Espera a que salga alguien y vuelve a entrar.';
+const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.';
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
  * can lose both: a phone read only «La sala rechazó la conexión» while the room had written that it
@@ -1120,14 +1125,14 @@ function openSession(socket,hello={}){return new Promise((resolve,reject)=>{cons
   // either, and nobody is left looking at a join line while a request hangs.
   timer=setTimeout(()=>fail('La sala rechazó la conexión'),3000);
   roomRefusal().then(admission=>fail(refusalText(admission,broken),admission?.admitted===false))};
- socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='voice-preparation'){if(m.data?.phase==='loading'){clearTimeout(timer);timer=null}showPreparation(m.data||{});noteJoinPreparation(m.data||{});return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?.message||m.data?.error||refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);showPreparation({phase:'hidden'});resolve(m.data)}})}
+ socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='voice-preparation'){if(m.data?.phase==='loading'){clearTimeout(timer);timer=null}showPreparation(m.data||{});noteJoinPreparation(m.data||{});return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=sayRefusal(m.data,m.data?.error||refusal);refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);showPreparation({phase:'hidden'});resolve(m.data)}})}
 // Capturing at the room's rate lets the browser resample; the worklet covers browsers that refuse the rate.
 function roomAudioContext(rate){try{return new AudioContext({sampleRate:rate})}catch{return new AudioContext()}}
 async function startCapture(socket,session){if(!micSource)throw Error('No se pudo capturar el micrófono');
  // A context created outside the click gesture can start suspended, and a suspended context never
  // runs the worklet: no audio would leave the page and nothing would say why.
  if(audioContext.state!=='running'){try{await audioContext.resume()}catch{}}
- if(audioContext.state!=='running')throw Error('El navegador no autorizó la captura de audio. Vuelve a pulsar para unirte.');
+ if(audioContext.state!=='running')throw Error('Este dispositivo no autorizó la captura de audio. Vuelve a pulsar para unirte.');
  const context=audioContext,source=micSource,epoch=connectEpoch;
  await context.audioWorklet.addModule('/voice/mic_capture.js?v='+encodeURIComponent(window.sidevoiceBuildId||'dev'));
  if(state.ws!==socket||audioContext!==context||epoch!==connectEpoch)return;
@@ -1206,7 +1211,7 @@ function disconnect() {
 async function toggleCall(){if(state.ws||state.connecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  const pairing=pairingInUse(pairings);if(!pairing||pairing.revoked){openPairing(pairing?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await loadPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt_provider!=='openai')joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;callExecution='browser';if(callExecution==='browser'&&(state.voicePreferences.default_model||'kokoro')==='kokoro'){joinStatus('voice');await window.roomVoice.prepare({device:state.voicePreferences.tts_device},text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
+ personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await callPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt.place===DEVICE)joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;if(state.voicePreferences.tts.place===DEVICE){joinStatus('voice');await window.roomVoice.prepare(ttsRequest(state.voicePreferences.tts),text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
 // A room restart or a network blip must not end the call: the microphone permission, the media stream
 // and the unlocked output all survive it; only the socket needs reopening, with the same hello.
@@ -1234,7 +1239,7 @@ async function joinRoom(epoch,context){
  let session;
  // The hello carries this browser's call span, so the room's own spans are inside it instead of
  // being a second trace about the same call. With no collector configured there is no span to carry.
- const traceparent=window.sidevoiceTelemetry?.startCall?.({'sidevoice.stt_provider':state.voicePreferences?.stt_provider,'sidevoice.stt_model':state.voicePreferences?.stt_model});
+ const traceparent=window.sidevoiceTelemetry?.startCall?.({'sidevoice.stt_place':state.voicePreferences?.stt?.place,'sidevoice.stt_model':state.voicePreferences?.stt?.model});
  try{session=await openSession(socket,{conversation:rememberedThread(),sessions:rememberedSessions(),settings:state.voicePreferences,transcription:context.sttRuntime,...(traceparent?{telemetry:{traceparent}}:{})})}
  // A swap that failed leaves nothing behind: this socket never became the call's, and a refusal
  // that timed out could still be open and still be talking to a page that is not listening.
@@ -1257,7 +1262,7 @@ async function joinRoom(epoch,context){
  socket.onmessage=e=>{if(state.ws===socket)message(e.data,socket)};
  state.sessionId=session.session_id;state.roomRevision=0;rememberSession(state.sessionId);
  window.sidevoiceTelemetry?.noteSession?.(state.sessionId);
- if(context.browserStt)window.roomTranscription.start({socket,language:state.voicePreferences.stt_language});
+ if(context.browserStt)window.roomTranscription.start({socket,language:state.voicePreferences.stt?.options?.language});
  else window.roomTranscription?.stop();
  stopMeter();startMeter(session.sample_rate);await startCapture(socket,session);
  if(state.ws===socket&&state.sessionId===session.session_id)startMicLink(socket,session.session_id);
@@ -1301,7 +1306,7 @@ async function lostConnection(event,epoch,context){
     personSignal();
     setRoomError('');clearJoinStatus();
     return;
-   }catch(e){if(epoch!==connectEpoch)return;state.ws=null;if(refusedForGood(e)){disconnect();failJoin(e.message||'La sala no deja entrar a este navegador.');return}}
+   }catch(e){if(epoch!==connectEpoch)return;state.ws=null;if(refusedForGood(e)){disconnect();failJoin(e.message||'La sala no deja entrar a este dispositivo.');return}}
   }
  }finally{state.reconnecting=false;disarmGapBuffer()}
 }
@@ -1394,157 +1399,29 @@ function sendGapAudio(socket){
  }
  return total;
 }
-function speedLimits(model){return providerFor(model)==='elevenlabs'?[.7,1.2]:[.5,2]}
-function effectiveSpeed(model,value){const [min,max]=speedLimits(model);return Math.max(min,Math.min(max,Number(value)||1))}
-function updateSpeedRange(){
- const model=$('default-model').value,[min,max]=speedLimits(model),input=$('tts-speed');
- const previous=Number(input.value)||1;
- input.min=String(min);input.max=String(max);input.value=String(effectiveSpeed(model,previous));
- $('speed-value').textContent=Number(input.value).toFixed(2)+'×';
- $('speed-note').textContent=providerFor(model)==='elevenlabs'
-  ?'ElevenLabs genera la voz a esta velocidad (0,7–1,2×). Los valores heredados se ajustan al rango del motor.'
-  :'Velocidad de Kokoro: 0,5–2×. ElevenLabs admite 0,7–1,2× en las voces por idioma.';
-}
-function modelInfo(id){return voiceCatalog?.models?.find(model=>model.id===id)||{id,label:id,provider:id==='kokoro'?'kokoro':'elevenlabs'}}
-function setInfoContent(button,description){
- if(!button)return;
- button.hidden=!description;button.dataset.tooltip=description||"";button.setAttribute("aria-expanded","false");
- if(description){button.title=description;if(!window.sidevoiceUI)button.onclick=event=>{event.stopPropagation();button.setAttribute("aria-expanded",String(button.getAttribute("aria-expanded")!=="true"))}}
-}
-function setModelInfo(button,id){setInfoContent(button,modelInfo(id).description)}
-function modelInfoButton(id){
- const button=document.createElement('button');button.type='button';button.className='model-info';button.textContent='ⓘ';
- button.setAttribute('aria-label','Descripción del modelo');setModelInfo(button,id);return button;
-}
-document.addEventListener('click',()=>document.querySelectorAll('.model-info[aria-expanded=true]').forEach(button=>button.setAttribute('aria-expanded','false')));
-
-function providerFor(model){return modelInfo(model||'kokoro').provider||'kokoro'}
-/* Voices are chosen the way transcription is: the provider first, then what that provider offers. A flat
- * list of models mixed Kokoro with every ElevenLabs model and had nowhere to put what belongs to the
- * provider itself — where the model runs, when the provider is this browser. Its key is not the pane's: a
- * provider that needs one is offered as the machine's integrations say (#64). */
-const VOICE_PROVIDERS={
- kokoro:{label:'Este navegador',browser:true},
- elevenlabs:{label:'ElevenLabs',key:'elevenlabs'},
-};
-function voiceProviders(){
- const seen=[];
- for(const model of voiceCatalog?.models||[])if(!seen.includes(model.provider||'kokoro'))seen.push(model.provider||'kokoro');
- return seen;
-}
-function voiceProviderLabel(id){return VOICE_PROVIDERS[id]?.label||id}
-function modelsOf(provider){return (voiceCatalog?.models||[]).filter(model=>(model.provider||'kokoro')===provider)}
-function selectedVoiceProvider(){return $('tts-provider')?.value||providerFor($('default-model')?.value)}
-/* Where a browser voice runs, said in the same words transcription uses, and disabled when this browser
- * cannot do it. WebGPU is a property of the browser, so the answer comes from the same probe. */
-function renderVoiceDevice(saved){
- const device=$('tts-device'),note=$('tts-device-note');
- if(!device)return;
- const entries=[['auto','Automático · GPU si está disponible']];
- if(sttCapabilities?.webgpu)entries.push(["webgpu","GPU · WebGPU"]);
- entries.push(['wasm','CPU · WebAssembly']);
- if(nativeModels?.tts?.length)entries.push(['native','Este equipo · motor nativo de la app']);
- const wanted=saved||device.value||'auto';
- entriesFor(device,entries,entries.some(([id])=>id===wanted)?wanted:'auto');
- if(note)note.textContent=device.value==='auto'
-  ?(sttCapabilities?.webgpu?'Automático usará la GPU de este navegador.':'Automático usará la CPU: este navegador no expone WebGPU.')
-  :device.value==='native'?'La app genera la voz con el procesador de este equipo, fuera de la página. El modelo se descarga una vez.'
-  :device.value==='webgpu'?'La voz se generará en la GPU. Si falla, se reintenta en CPU y se te dice.'
-  :'La voz se generará en la CPU. Más lenta, pero funciona en cualquier navegador.';
-}
-function renderVoiceProvider(savedModel,savedVoice){
- const select=$('tts-provider');
- if(!select||!voiceCatalog)return;
- const providers=voiceProviders();
- const wanted=select.value||providerFor(savedModel||$('default-model').value);
- offerProviders(select,providers.map(id=>[id,voiceProviderLabel(id),!!VOICE_PROVIDERS[id]?.key]),wanted);
- const provider=select.value,meta=VOICE_PROVIDERS[provider]||{};
- $('tts-browser-options').hidden=!meta.browser;
- $('prepare-model').hidden=!meta.browser;
- const models=modelsOf(provider),current=$('default-model').value;
- const keep=models.some(model=>model.id===current)?current:(models.some(model=>model.id===savedModel)?savedModel:models[0]?.id);
- entriesFor($('default-model'),models.map(model=>[model.id,model.label]),keep);
- renderVoiceDevice();
- renderDefaultVoices(savedVoice);
-}
-
-/* The providers a pane offers, from [id, label, needs a key]: one that needs a key is left out when this device
- * is not shown it, and greyed out while the machine has no key for it — the pane's "Configurar" says why (#64). */
-function offerProviders(select,entries,wanted){
- const offered=entries.flatMap(([id,label,keyed])=>{
-  const access=keyed?keyedProvider(state,id):'ready';
-  return access==='hidden'?[]:[[id,access==='missing'?label+' · sin clave':label,access==='missing']];
- });
- // A provider this device is not shown is not slipped back in as an option of its own.
- entriesFor(select,offered,offered.some(([id])=>id===wanted)?wanted:null);
-}
-function entriesFor(select,entries,value){select.replaceChildren();const values=new Set(entries.map(entry=>entry[0]));if(value&& !values.has(value))entries=[[value,value],...entries];for(const [id,label,disabled] of entries){const option=document.createElement('option');option.value=id;option.textContent=label;if(disabled)option.disabled=true;select.append(option)}const usable=entries.filter(entry=>!entry[2]);select.value=usable.some(entry=>entry[0]===value)?value:(usable[0]?.[0]??'')}
-function elevenVoiceItems(){return voiceCatalog?.providers?.elevenlabs?.voices||[]}
-function conciseVoiceLabel(label){return String(label||"").split(" · ")[0].trim()}
-function voicesFor(model,language,showAll=false){
- if(providerFor(model)!=="elevenlabs")return (voiceCatalog.languages.find(item=>item.id===language)?.voices||[]).map(([id,label])=>[id,conciseVoiceLabel(label)]);
- const voices=elevenVoiceItems(),visible=showAll?voices:voices.filter(item=>item.languages?.includes(language));
- return visible.map(item=>[item.id,conciseVoiceLabel(item.label)]);
-}
-function voiceEntriesFor(model,language,showAll=false){
- const voices=voicesFor(model,language,showAll);
- if(providerFor(model)==='elevenlabs'&&!showAll&&voices.length<elevenVoiceItems().length)return [...voices,[SHOW_ALL_VOICES,'Mostrar todas las voces…']];
- return voices;
-}
-function validVoice(entries,value){return entries.some(([id])=>id!==SHOW_ALL_VOICES&&id===value)?value:entries.find(([id])=>id!==SHOW_ALL_VOICES)?.[0]}
-function renderDefaultVoices(value){
- const model=$('default-model').value,language=$('default-tts-language').value||systemLanguage(SPEECH_LANGUAGES),voices=voiceEntriesFor(model,language,defaultVoicesExpanded);
- setModelInfo($('default-model-info'),model);entriesFor($('default-voice'),voices,validVoice(voices,value));
- const cloud=providerFor(model)==='elevenlabs';updateSpeedRange();
- $('model-status').textContent=cloud&&keyedProvider(state,'elevenlabs')!=='ready'?'ElevenLabs no tiene clave en esta máquina: configúrala en Integraciones para cargar las voces de la cuenta.':'';
-}
+/* The voice pane's preview: a sample in one language, with the voice and speed the pane shows now (saved or not). */
 function stopPreview(){return roomStore.batch(()=>stopPreviewJob())}
-function stopPreviewJob(){const job=state.previewJob;state.previewJob=null;if(!job)return;job.controller.abort();if(job.browser)window.roomVoice?.cancel();$('preview-audio').pause();$('preview-audio').removeAttribute('src');if(job.url)URL.revokeObjectURL(job.url);for(const item of voiceCatalog?.languages||[])$('preview-'+item.id).textContent='▶'}
-async function previewVoice(language){if(!$('language-form').reportValidity())return;if(state.previewJob){stopPreview();$('preview-status').textContent='Prueba detenida';return}if(state.botLive){$('preview-status').textContent='Espera a que termine la locución antes de probar una voz.';return}const track=state.stream?.getAudioTracks()[0],choice=selectedVoice(language),job={controller:new AbortController(),track,enabled:track?.enabled};state.previewJob=job;$('preview-'+language).textContent='■';$('preview-status').textContent='Preparando muestra…';try{job.browser=true;await window.roomVoice.unlock();if(state.previewJob!==job)return;const sample=voiceCatalog.languages.find(item=>item.id===language).sample;if(choice.provider==='elevenlabs'){const audio=await post('/api/presentation/synthesis/preview',{...choice,text:sample});if(state.previewJob!==job)return;await window.roomVoice.playEncoded(audio,text=>$('preview-status').textContent=text)}else{job.browser=true;await window.roomVoice.unlock();await window.roomVoice.speak({...choice,text:sample},text=>$('preview-status').textContent=text)}if(state.previewJob===job){stopPreview();$('preview-status').textContent='Prueba terminada'}}catch(e){if(state.previewJob!==job)return;stopPreview();$('preview-status').textContent=e.name==='AbortError'?'Prueba detenida':e.message}}
-function selectedVoice(language){const selected=$('model-'+language).value,model=(selected==='inherit'?$('default-model').value:selected)||'kokoro',provider=providerFor(model),item=voiceCatalog.languages.find(item=>item.id===language);let voice=$('voice-'+language).value;if(voice==='inherit')voice=$('default-voice').value;if(provider==='kokoro'&&!item.voices.some(value=>value[0]===voice))voice=item.voices[0][0];return {model,provider,voice,speed:effectiveSpeed(model,$('speed-'+language).value||$('tts-speed').value),device:$('tts-device').value}}
-function storeLanguage(){for(const item of voiceCatalog.languages)voiceDraft[item.id]={model:$('model-'+item.id).value,voice:$('voice-'+item.id).value,speed:$('speed-'+item.id).value===''?null:Number($('speed-'+item.id).value)}}
-function renderLanguageRows(){
- const rows=$('language-rows');
- if(window.sidevoiceUI){
-  const defaultModel=$('default-model').value,defaultVoice=$('default-voice').selectedOptions[0]?.textContent||$('default-voice').value,globalSpeed=$('tts-speed').value;
-  window.sidevoiceUI.setLanguageModels(voiceCatalog.languages.map(item=>{
-   const draft=voiceDraft[item.id]||{model:'inherit',voice:'inherit',speed:null},actualModel=(draft.model==='inherit'?defaultModel:draft.model)||'kokoro',[speedMin,speedMax]=speedLimits(actualModel);
-   const choices=voiceEntriesFor(actualModel,item.id,expandedVoiceLanguages.has(item.id)),voice=draft.voice==='inherit'||choices.some(([id])=>id===draft.voice)?(draft.voice||'inherit'):'inherit';
-   return {language:item.id,label:item.label,model:draft.model||'inherit',actualModel,modelDescription:modelInfo(actualModel).description,
-    modelOptions:[{value:'inherit',label:'Usar por defecto'},
-     ...voiceProviders().filter(provider=>!VOICE_PROVIDERS[provider]?.key||keyedProvider(state,provider)!=='hidden').map(provider=>({
-      label:voiceProviderLabel(provider)+(VOICE_PROVIDERS[provider]?.key&&keyedProvider(state,provider)==='missing'?' · sin clave':''),
-      options:modelsOf(provider).map(entry=>({value:entry.id,label:entry.label}))}))],
-    voice,voiceOptions:[["inherit","Usar voz predeterminada"],...choices].map(([value,label])=>({value,label})),
-    speed:draft.speed==null?null:effectiveSpeed(actualModel,draft.speed),speedMin,speedMax,inheritedSpeed:effectiveSpeed(actualModel,globalSpeed)};
-  }));return;
- }
- rows.replaceChildren();const header=document.createElement('div');header.className='language-row language-row-head';
- for(const label of ['Idioma','Modelo','Voz','Velocidad','']){const cell=document.createElement('span');cell.textContent=label;header.append(cell)}rows.append(header);
- for(const item of voiceCatalog.languages){
-  const row=document.createElement('div'),draft=voiceDraft[item.id]||{model:'inherit',voice:'inherit'};row.className='language-row';
-  const name=document.createElement('strong');name.textContent=item.label;row.append(name);
-  const model=document.createElement('select');model.id='model-'+item.id;model.setAttribute('aria-label','Modelo · '+item.label);entriesFor(model,[['inherit','Usar por defecto'],...voiceCatalog.models.map(entry=>[entry.id,entry.label])],draft.model);
-  model.onchange=()=>{expandedVoiceLanguages.delete(item.id);voiceDraft[item.id]={...voiceDraft[item.id],model:model.value,voice:'inherit'};renderLanguageRows()};
-  const actual=model.value==='inherit'?$('default-model').value:model.value,modelCell=document.createElement('span');modelCell.className='model-picker';modelCell.append(model,modelInfoButton(actual));row.append(modelCell);
-  const voice=document.createElement('select'),choices=voiceEntriesFor(actual,item.id,expandedVoiceLanguages.has(item.id));voice.id='voice-'+item.id;voice.setAttribute('aria-label','Voz · '+item.label);
-  const selected=draft.voice==='inherit'||choices.some(([id])=>id===draft.voice)?draft.voice:'inherit';entriesFor(voice,[['inherit','Usar voz predeterminada'],...choices],selected);
-  voice.onchange=()=>{if(voice.value===SHOW_ALL_VOICES){expandedVoiceLanguages.add(item.id);renderLanguageRows();return}voiceDraft[item.id]={...voiceDraft[item.id],voice:voice.value}};
-  row.append(voice);
-  const speed=document.createElement('input'),[speedMin,speedMax]=speedLimits(actual);speed.type='number';speed.min=String(speedMin);speed.max=String(speedMax);speed.step='0.05';speed.id='speed-'+item.id;speed.value=draft.speed==null?'':effectiveSpeed(actual,draft.speed);speed.placeholder=effectiveSpeed(actual,$('tts-speed').value).toFixed(2)+'×';speed.title='Vacío: velocidad global, ajustada al rango del motor ('+speedMin+'–'+speedMax+'×).';speed.onchange=()=>{voiceDraft[item.id]={...voiceDraft[item.id],speed:speed.value===''?null:Number(speed.value)}};speed.setAttribute('aria-label','Velocidad · '+item.label);row.append(speed);
-  const button=document.createElement('button');button.type='button';button.id='preview-'+item.id;button.textContent='▶';button.setAttribute('aria-label','Probar voz · '+item.label);button.title='Probar voz · '+item.label;button.onclick=()=>previewVoice(item.id);row.append(button);rows.append(row);
- }
+function stopPreviewJob(){const job=state.previewJob;state.previewJob=null;if(!job)return;job.controller.abort();if(job.browser)window.roomVoice?.cancel();$('preview-audio')?.pause();$('preview-audio')?.removeAttribute('src');if(job.url)URL.revokeObjectURL(job.url)}
+function paneStage(task){return effectiveStage(stageContext(state),task,(state.stageDraft||state.voicePreferences||{})[task])}
+async function previewVoice(language){
+ if(state.previewJob){stopPreview();state.previewNote='Prueba detenida';return}
+ if(state.botLive){state.previewNote='Espera a que termine la locución antes de probar una voz.';return}
+ const stage=paneStage('tts');if(!stage)return;
+ const ctx=stageContext(state),voice=voiceFor(ctx,stage,language),speed=stage.options.speed??1;
+ const sample=state.voiceLanguages.find(item=>item.id===language)?.sample||'';
+ const job={controller:new AbortController(),language,browser:true};state.previewJob=job;state.previewNote='Preparando muestra…';
+ try{
+  await window.roomVoice.unlock();if(state.previewJob!==job)return;
+  if(stage.place!==DEVICE){const audio=await post('/api/presentation/synthesis/preview',{model:stage.model,voice,speed,text:sample});if(state.previewJob!==job)return;await window.roomVoice.playEncoded(audio,text=>{state.previewNote=text})}
+  else{await measureDevice();if(state.previewJob!==job)return;await window.roomVoice.speak({...ttsRequest(stage),voice,speed,text:sample},text=>{state.previewNote=text})}
+  if(state.previewJob===job){stopPreview();state.previewNote='Prueba terminada'}
+ }catch(e){if(state.previewJob!==job)return;stopPreview();state.previewNote=e.name==='AbortError'?'Prueba detenida':e.message}
 }
-function populateVoiceSettings(p){
- defaultVoicesExpanded=false;expandedVoiceLanguages.clear();voiceDraft=JSON.parse(JSON.stringify(p.language_overrides||{}));
- for(const [lang,prefix] of [['es','spanish'],['en','english']]){const voice=p[prefix+'_voice'],standard=lang==='es'?'ef_dora':'af_heart';voiceDraft[lang]??={model:p[prefix+'_model']||'inherit',voice:voice===standard?'inherit':voice||'inherit'}}
- entriesFor($('default-model'),voiceCatalog.models.map(item=>[item.id,item.label]),p.default_model);
- if($('tts-provider'))$('tts-provider').value=providerFor(p.default_model);
- for(const id of ['default-tts-language','stt-language']){const select=$(id),preference=p[id.replaceAll('-','_')];select.replaceChildren();const entries=id==='stt-language'?[{id:'auto',label:'Detectar automáticamente'},...voiceCatalog.languages]:voiceCatalog.languages;for(const item of entries){const option=document.createElement('option');option.value=item.id;option.textContent=item.label;select.append(option)}select.value=preference||select.value}
- renderVoiceProvider(p.default_model,p.default_voice);renderLanguageRows();
+async function prepareVoice(){
+ if(state.activeSpeech||state.previewJob){state.prepareNote='Espera a que termine la voz.';return}
+ try{await window.roomVoice.unlock();await measureDevice();const request=ttsRequest(paneStage('tts'));if(!request)return;await window.roomVoice.prepare(request,text=>{state.prepareNote=text})}
+ catch(e){state.prepareNote=e.message}
 }
-$('reset-languages').onclick=()=>{stopPreview();voiceDraft={};renderLanguageRows();$('preview-status').textContent='Todos los idiomas usan los valores por defecto. Pulsa Guardar cambios para aplicarlo.'};
-$('prepare-model').onclick=async()=>{if(state.activeSpeech||state.previewJob){$('model-status').textContent='Espera a que termine la voz.';return}const button=$('prepare-model');button.disabled=true;try{await window.roomVoice.unlock();await window.roomVoice.prepare({device:$('tts-device').value},text=>$('model-status').textContent=text)}catch(e){$('model-status').textContent=e.message}finally{button.disabled=false}};
 // The job identity belongs to the async adapter; the store holds its observable facts.
 let speechJob=null;
 function cancelBrowserSpeech(skip=false){
@@ -1592,7 +1469,7 @@ async function receiveBrowserSpeech(d,cloud=false){
   utterance_id:d.utterance_id,status,...(status==='playing'?{timings_ms:browserLatency(d,receivedAt)}:{})});
  const finish=()=>roomStore.batch(()=>{clearKaraoke(d);speechJob=null;roomStore.patch({activeSpeech:null,botLive:false})});
  try{
-  await window.roomVoice[cloud?'playEncoded':'speak'](d,()=>{},()=>{
+  await window.roomVoice[cloud?'playEncoded':'speak'](cloud?d:{...d,...ttsRequest(state.voicePreferences?.tts)},()=>{},()=>{
    if(speechJob!==d||d.session_id!==state.sessionId)return;
    roomStore.batch(()=>{roomStore.patch({activeSpeech:{...d,started:true},botLive:true});if(d.replay)markReplay(d.history_id,'playing')});
    receipt('playing').catch(()=>{});
@@ -1606,37 +1483,30 @@ async function receiveBrowserSpeech(d,cloud=false){
   if(speechJob!==d)return
   finish();
   if(d.replay)markReplay(d.history_id,'cancelled');
-  if(e.name!=='AbortError'){setRoomError((cloud?'Audio de ElevenLabs: ':'Voz del navegador: ')+e.message);receipt('failed').catch(()=>{})}
+  if(e.name!=='AbortError'){setRoomError((cloud?'Audio de ElevenLabs: ':'Voz de este dispositivo: ')+e.message);receipt('failed').catch(()=>{})}
  }
 }
 function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 
 $('settings-open').onclick=async()=>{try{
- forgetKeyChecks();
+ // A new opening is a new settings session: whatever the last one still has on its way is dropped.
+ integrationEpoch++;forgetKeyChecks();
  // Voices, transcription and keys are a machine's; pairing one is not. With none connected the dialog still
  // opens — on Máquinas, the one pane that has something to do — instead of failing on a catalogue nobody serves.
  if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
- const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);state.voicePreferences=p;
- for(const key of ['stt_language','default_tts_language','tts_speed','ui_language','tts_device','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
+ const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
+ roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
+ for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
  for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
  $('presence-sound').value=(p.presence_sound??'on')==='off'?'off':'on';
  $('locked-call').value=p.locked_call==='off'?'off':'on';
-
- $('speed-value').textContent=Number(p.tts_speed).toFixed(2)+'×';$('settings-error').textContent='Cargando catálogos…';
+ $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
- // The provider lists are derived from the integrations, so those are read first: a saved OpenAI rendered before
- // its key was known would fall back to this browser, and saving would keep the fallback.
- const [catalog]=await Promise.all([api('/api/presentation/voice-catalog'),loadIntegrations().then(loadTranscription)]);
- voiceCatalog=catalog;const eleven=voiceCatalog.providers?.elevenlabs||{};
- populateVoiceSettings(p);renderDefaultVoices(p.default_voice);renderLanguageRows();
- $('settings-error').textContent=eleven.error||'';
+ // What the stages are chosen from: the machine's integrations and what this device can run. Each opening asks
+ // again, so a provider's lists are the account's as it is now.
+ await Promise.all([loadIntegrations(),measureDevice().catch(error=>{$('settings-error').textContent=error.message})]);
+ loadStageLists(true);
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-$('tts-speed').oninput=()=>{$('speed-value').textContent=Number($('tts-speed').value).toFixed(2)+'×';if(voiceCatalog){storeLanguage();renderLanguageRows()}};
-$('default-model').onchange=()=>{storeLanguage();defaultVoicesExpanded=false;expandedVoiceLanguages.clear();renderDefaultVoices();renderLanguageRows()};
-$('tts-provider').onchange=()=>{storeLanguage();defaultVoicesExpanded=false;expandedVoiceLanguages.clear();renderVoiceProvider();renderLanguageRows()};
-$('tts-device').onchange=()=>renderVoiceDevice($('tts-device').value);
-$('default-voice').onchange=()=>{if($('default-voice').value===SHOW_ALL_VOICES){defaultVoicesExpanded=true;renderDefaultVoices();renderLanguageRows();return}storeLanguage();renderLanguageRows()};
-$('default-tts-language').onchange=()=>{defaultVoicesExpanded=false;renderDefaultVoices();renderLanguageRows()};
 function settingsSection(name){for(const section of ['general','voice','transcription','integrations','machines','advanced']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}if(name!=='integrations'&&state.integrationFocus)state.integrationFocus=null}
 $('settings-advanced').onclick=()=>settingsSection('advanced');
 $('settings-general').onclick=()=>settingsSection('general');
@@ -1645,90 +1515,108 @@ $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').valu
 $('settings-voice').onclick=()=>settingsSection('voice');
 $('settings-transcription').onclick=()=>settingsSection('transcription');
 $('settings-integrations').onclick=()=>settingsSection('integrations');
-let sttCatalog=null,sttCapabilities=null;
-const sttRemote={openai:{loaded:false,loading:false,error:null}};
-function sttProvider(id){return (sttCatalog?.providers||[]).find(provider=>provider.id===id)}
-function renderTranscription(){
- if(!sttCatalog||!sttCapabilities)return;
- const provider=$('stt-provider').value||state.voicePreferences?.stt_provider||'browser',entry=sttProvider(provider),modelSelect=$('stt-model');
- $('stt-browser-options').hidden=provider!=='browser';
- $('stt-provider-note').textContent=entry?.note||'';
- const current=modelSelect.value,saved=state.voicePreferences?.stt_provider===provider?state.voicePreferences?.stt_model:null;
- if(provider==='browser'){
-  // Processing comes first: what this browser can run decides which models are offered.
-  // The browser may offer WebGPU and still fail to load Whisper on it (iPhone); that failure is remembered per device.
-  const gpuFailed=!!storedPreferences().stt_gpu_failed;
-  const device=$('stt-device'),savedDevice=device.value||state.voicePreferences?.stt_device||'auto',entries=[['auto','Automático']];
-  if(sttCapabilities.webgpu)entries.push(['webgpu',gpuFailed?'GPU · WebGPU (falló al cargar Whisper aquí)':'GPU · WebGPU']);
-  if(sttCapabilities.wasm)entries.push(['wasm','CPU · WebAssembly']);
-  if(nativeModels)entries.push(['native','Este equipo · motor nativo de la app']);
-  entriesFor(device,entries,entries.some(([id])=>id===savedDevice)?savedDevice:'auto');
-  const effective=device.value==='auto'?(sttCapabilities.webgpu&&!gpuFailed?'webgpu':'wasm'):device.value;
-  $('stt-device-note').textContent=device.value==='auto'?(!sttCapabilities.webgpu?'Automático usará la CPU: WebGPU no está disponible en este navegador.':gpuFailed?'Automático usará la CPU: este navegador ofrece WebGPU pero no pudo cargar Whisper con ella.':'Automático usará la GPU: WebGPU está disponible en este navegador.'):(effective==='webgpu'?'Aceleración WebGPU. Si falla al cargar, se pasará a CPU.':'Procesamiento en CPU mediante WebAssembly.');
-  if(effective==='native')$('stt-device-note').textContent='La app transcribe con el procesador de este equipo, fuera de la página. Cada modelo se descarga una vez.';
-  const all=entry?.models||[];
-  const runnable=model=>!!model.devices?.includes(effective)&&!!(effective==='native'?nativeModels?.stt:sttCapabilities.models)?.includes(model.id);
-  const reason=model=>effective==='native'?'no disponible en el motor nativo':!model.devices?.includes(effective)?(effective==='wasm'?'requiere GPU':'solo CPU'):'no disponible en este navegador';
-  const enabled=all.filter(runnable),ids=enabled.map(model=>model.id);
-  const preferred=ids.includes(current)?current:ids.includes(saved)?saved:ids.includes(entry?.default_model)?entry.default_model:ids[0];
-  entriesFor(modelSelect,all.map(model=>[model.id,runnable(model)?model.label:model.label+' · '+reason(model),!runnable(model)]),preferred);
-  modelSelect.disabled=!enabled.length;
-  const selected=all.find(model=>model.id===modelSelect.value);
-  setInfoContent($("stt-model-info"),selected?.description||"");
-  $("stt-model-note").textContent=enabled.length?"":"Ningún modelo local puede correr con este procesamiento en este navegador.";
- }else{
-  const models=entry?.models||[],remote=sttRemote.openai;
-  modelSelect.disabled=remote.loading;
-  // What was chosen stays chosen while the provider still offers it; otherwise its default, otherwise the
-  // first one. A model that is no longer in the list is never left selected and never becomes an option
-  // of its own, so a key change cannot leave the list of the account before it (#72).
-  const preferred=[current,saved,entry?.default_model].find(id=>id&&models.some(model=>model.id===id))||models[0]?.id;
-  entriesFor(modelSelect,remote.loading?[['','Cargando modelos de OpenAI…']]:models.map(model=>[model.id,model.label]),remote.loading?'':preferred);
-  const selected=models.find(model=>model.id===modelSelect.value);
-  const description=remote.loading?"Consultando los modelos disponibles en tu cuenta…":remote.error||selected?.description||(models.length?models.length+" modelos compatibles cargados directamente desde OpenAI.":"OpenAI no devolvió modelos compatibles para esta cuenta.");setInfoContent($("stt-model-info"),description);$("stt-model-note").textContent=remote.loading||remote.error?description:"";
- }
+/* The stages (#124): what this device measured about itself, the resolver's offers for it, and the edits the
+ * panes make. The panes read all of it from the store (stage-settings.js); nothing here renders. */
+function nativeEngine(){return window.__sidevoiceDesktop?.host?.nativeEngine||null}
+function engineRuns(id){return state.modelCatalog?.engines?.find(engine=>engine.id===id)?.runs||'page'}
+// WebKit on the iPhone offers WebGPU and then fails to load Whisper on it: once that happened, this device is
+// taken not to have WebGPU at all, so nothing that needs it is offered again (it was a setting of its own before).
+const WEBGPU_FAILED_KEY='sidevoice.webgpu-failed';
+function webgpuFailed(){try{return localStorage.getItem(WEBGPU_FAILED_KEY)==='1'}catch{return false}}
+/* Whether a failed load says something about the GPU. A download that did not arrive, a network that dropped or
+ * a load somebody cancelled says nothing about it, and must not hide the models that need it (review R11). */
+function acceleratorFailure(error){
+ if(error?.name==='AbortError')return false;
+ return !/fetch|network|download|could not locate|unauthori[sz]ed|forbidden|http|status|\b[45]\d\d\b|load failed|timed? ?out|cancel|offline|quota/i.test(String(error?.message||error));
 }
-
-async function loadTranscriptionModels(provider,refresh=false){
- if(provider!=='openai'||!sttCatalog)return;
- const remote=sttRemote.openai;if(remote.loading||remote.loaded&&!refresh)return;
- remote.loading=true;remote.error=null;renderTranscription();
+/* Asked from Avanzado: this device's GPU is tried again, and what needs it is offered again. */
+async function retryGpu(){try{localStorage.removeItem(WEBGPU_FAILED_KEY)}catch{}await measureDevice(true).catch(()=>{})}
+let measuring=null;
+/* What this device can run. In the desktop app only what its native engine reports (D5: no page engine in the app,
+ * and no "navegador"); in a page, what the page's own engines find. Once per page, unless asked afresh. */
+function measureDevice(fresh=false){
+ if(measuring&&!fresh)return measuring;
+ measuring=(async()=>{
+  const engine=nativeEngine();let capabilities,installed=[];
+  if(engine){capabilities=await engine.capabilities();try{installed=await engine.installed()}catch{}}
+  else{
+   const found=await window.roomTranscription.capabilities(),gpu=!!found.webgpu&&!webgpuFailed();
+   roomStore.patch({gpuSetAside:!!found.webgpu&&webgpuFailed()});
+   capabilities={runs:'page',has:[...(gpu?['webgpu']:[]),...(gpu&&found.webgpuFp16?['webgpu-f16']:[]),...(found.wasm?['wasm']:[])]};
+  }
+  roomStore.patch({deviceCapabilities:capabilities,deviceOffers:resolveOffers(state.modelCatalog,capabilities,'device'),installedBuilds:Array.isArray(installed)?installed:[]});
+  return state.deviceOffers;
+ })();
+ measuring.catch(()=>{measuring=null});
+ return measuring;
+}
+/** The build a device stage runs on, as the engines are asked for it. */
+function buildRequest(build){
+ if(!build)return build;
+ // A page voice on WebGPU may try WASM when WebGPU fails to load it, if this device offers that build too.
+ const offer=state.deviceOffers?.find(item=>item.model===build.model);
+ const wasm=build.accelerator==='webgpu'&&[offer,...(offer?.alternatives||[])].some(choice=>choice?.engine===build.engine&&choice.accelerator==='wasm');
+ return {...build,native:engineRuns(build.engine)==='native',...(wasm?{fallback:'wasm'}:{})};
+}
+function ttsRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage)||deviceBuild(state.deviceOffers,defaultStage(stageContext(state),'tts')))}
+function editStage(task,next){roomStore.patch({stageDraft:{...(state.stageDraft||{stt:state.voicePreferences?.stt,tts:state.voicePreferences?.tts}),[task]:next}})}
+function chooseStagePlace(task,place){
+ editStage(task,withPlace(stageContext(state),task,paneStage(task),place,state.voicePreferences?.[task]));
+ if(place!==DEVICE)void loadRemote(place,task);
+}
+function chooseStageModel(task,model){editStage(task,withModel(stageContext(state),task,paneStage(task),model))}
+function setStageOption(task,id,value,language){editStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
+function chooseStageBuild(task,value){editStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+/* A provider's own lists — OpenAI's transcription models, ElevenLabs' models and the account's voices — asked for
+ * only when a stage is on that provider, and only of the machine they were asked of (see integrationScope). */
+function patchRemote(key,entry){roomStore.patch({remoteModels:{...state.remoteModels,[key]:entry}})}
+async function loadRemote(place,task,refresh=false){
+ const key=place+':'+task,scope=integrationScope();
+ if(!refresh&&state.remoteModels[key]?.models)return;
+ if(keyedProvider(state,place)!=='ready')return;
+ patchRemote(key,{});
  try{
-  const data=await api('/api/presentation/transcription/models?provider='+encodeURIComponent(provider));
-  const entry=sttProvider(provider);if(entry)entry.models=Array.isArray(data.models)?data.models:[];
-  remote.loaded=true;remote.error=data.error||null;
- }catch(error){remote.error=error.message||'No se pudo cargar el catálogo.'}
- finally{remote.loading=false;if($('stt-provider').value===provider)renderTranscription()}
+  let entry;
+  // A read that failed is not an empty account: it leaves the lists unknown, so nothing chosen is replaced (R05).
+  if(task==='stt'){const data=await api('/api/presentation/transcription/models?provider='+encodeURIComponent(place));entry=data.error?{error:data.error}:{models:Array.isArray(data.models)?data.models:[],error:''}}
+  else{const data=await api('/api/presentation/voice-catalog'),own=data.providers?.[place]||{};entry=own.error?{error:own.error}:{models:own.models||[],voices:own.voices||[],error:''}}
+  if(sameScope(scope))patchRemote(key,entry);
+ }catch(error){if(sameScope(scope))patchRemote(key,{error:error.message||'No se pudo cargar el catálogo.'})}
 }
-async function loadTranscription(){
- const data=await api('/api/presentation/transcription');sttCatalog=data.catalog;
- // Each opening brings a fresh catalogue whose OpenAI list is empty: the "already loaded" flag belonged to the
- // previous copy, and trusting it left the model list empty on every reopening.
- sttRemote.openai.loaded=false;
- sttCapabilities=await window.roomTranscription.capabilities();
- renderTranscriptionProviders(state.voicePreferences?.stt_provider||'browser');
- $('stt-device').disabled=false;renderTranscription();
- if($('stt-provider').value==='openai')void loadTranscriptionModels('openai');
-}
-function renderTranscriptionProviders(wanted=$('stt-provider').value){
- if(!sttCatalog||!sttCapabilities)return;
- offerProviders($('stt-provider'),(sttCatalog.providers||[]).filter(provider=>provider.id!=='browser'||sttCapabilities.webgpu||sttCapabilities.wasm).map(provider=>[provider.id,provider.label,!!provider.needs_key]),wanted);
-}
-$('stt-provider').onchange=()=>{$('stt-model').replaceChildren();renderTranscription();if($('stt-provider').value==='openai')void loadTranscriptionModels('openai',true)};
-$('stt-device').onchange=renderTranscription;$('stt-model').onchange=renderTranscription;
-/* Integrations (#64): the machine's key for each provider, one per provider whatever it is used for, written by
- * its owner from any device and never read back. The machine lists them with what can be said about a key —
+function loadStageLists(refresh=false){for(const task of TASKS){const stage=paneStage(task);if(stage&&stage.place!==DEVICE)void loadRemote(stage.place,task,refresh)}}
+/* Integrations (#64): the machine's key for each provider, one per provider whatever it is used for, written from
+ * any paired device — each has the machine's full authority — and never read back. The machine lists them with what can be said about a key —
  * whether there is one, where from, its last four — and that listing is the one fact the panes derive from:
- * a provider that needs a key is offered, greyed out, or not shown at all, as it says.
+ * a provider that needs a key is offered, or greyed out with Configurar, as it says.
  *
  * A key checks itself where it is typed: leaving the field, a pause while typing, or Enter sends it, and the
  * machine stores only a key its provider accepted. What that provider offers is asked for right away and fills
- * the other panes in place — whoever has just pasted a key sees it work without saving, closing the dialog and
- * opening it again (#72). A key the provider refuses changes nothing: the one installed keeps working, and the
- * line under the field says so. Removing a key is the ✕ in the field, and acts at once. */
+ * the other panes in place (#72). A key the provider refuses changes nothing: the one installed keeps working,
+ * and the line under the field says so. Removing a key is the ✕ in the field, and acts at once.
+ *
+ * Everything here belongs to one machine and one opening of the settings (integrationScope): a key typed for one
+ * machine is never sent to another, and an answer from a machine this device has left is dropped (review F13).
+ * The checks and removals of one provider run one after another, so a removal is never undone by a check still
+ * in flight from this page; the machine itself refuses a check that a later removal superseded (F16). */
 const KEY_CHECK_PAUSE=1500;
-const keyChecks={};   // provider -> the plumbing of its check; what its row says is the store's
-function keyCheck(id){return keyChecks[id]||(keyChecks[id]={timer:null,job:null,sent:null})}
+let keyChecks={};   // provider -> the plumbing of its check in this scope; what its row says is the store's
+let integrationEpoch=0;
+function integrationScope(){return {host:pairings.inUse,epoch:integrationEpoch}}
+function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===integrationEpoch}
+/* Another machine, or none: its listing, its keys being typed and every answer still on its way are forgotten,
+ * and the stages are that machine's own (D7: a composition per client × host), switched in the same step. */
+function switchStages(){
+ resetIntegrations();
+ const {stt:_stt,tts:_tts,...rest}=state.voicePreferences||{};
+ roomStore.patch({stageDraft:null,voicePreferences:state.voicePreferences&&{...rest,...storedStages(pairings.inUse)}});
+}
+function resetIntegrations(){
+ integrationEpoch++;
+ for(const check of Object.values(keyChecks))clearTimeout(check.timer);
+ keyChecks={};
+ roomStore.patch({integrations:null,integrationsStatus:'idle',integrationsError:'',integrationDrafts:{},integrationChecks:{},integrationFocus:null,remoteModels:{}});
+}
+function keyCheck(id){return keyChecks[id]||(keyChecks[id]={timer:null,chain:Promise.resolve(),sent:null})}
 function integrationRow(id){return state.integrations?.providers?.find(row=>row.id===id)}
 function keyNote(id,note,status){
  const checks={...state.integrationChecks};
@@ -1738,58 +1626,78 @@ function keyNote(id,note,status){
 function keyDraft(id,value){state.integrationDrafts={...state.integrationDrafts,[id]:value}}
 function forgetKeyCheck(id){const check=keyCheck(id);clearTimeout(check.timer);Object.assign(check,{timer:null,sent:null});keyNote(id,'')}
 function forgetKeyChecks(){roomStore.batch(()=>{for(const id of Object.keys(keyChecks))forgetKeyCheck(id);state.integrationDrafts={}})}
+/* The listing of the machine in use. Not reading it is not a listing without providers: the panes keep the
+ * choice they have and wait for it, with a way to ask again (F18). */
 async function loadIntegrations(){
- try{const listing=await api('/api/presentation/integrations');roomStore.patch({integrations:listing,integrationsError:''})}
- catch(error){roomStore.patch({integrationsError:'No se pudieron leer las integraciones de esta máquina: '+error.message})}
+ const scope=integrationScope();
+ roomStore.patch({integrationsStatus:'loading',integrationsError:''});
+ try{const listing=await api('/api/presentation/integrations');if(sameScope(scope))roomStore.patch({integrations:listing,integrationsStatus:'ready'})}
+ catch(error){if(sameScope(scope))roomStore.patch({integrationsStatus:'failed',integrationsError:'No se pudieron leer las integraciones de esta máquina: '+error.message})}
 }
+async function retryIntegrations(){await loadIntegrations();if(state.integrationsStatus==='ready')loadStageLists(true)}
+/* One provider's key work, in order: a check, a removal, the next check. */
+function queueKey(id,work){const check=keyCheck(id),run=check.chain.then(work,work);check.chain=run.catch(()=>{});return run}
 function typeIntegrationKey(id,value){
- const check=keyCheck(id);clearTimeout(check.timer);check.timer=null;
+ const check=keyCheck(id),scope=integrationScope();clearTimeout(check.timer);check.timer=null;
  keyDraft(id,value);
- if(String(value||'').trim()){check.timer=setTimeout(()=>checkIntegrationKey(id),KEY_CHECK_PAUSE);return}
+ if(String(value||'').trim()){check.timer=setTimeout(()=>{if(sameScope(scope))void checkIntegrationKey(id)},KEY_CHECK_PAUSE);return}
  // Emptying the field takes the complaint about what was in it away with it.
  check.sent=null;keyNote(id,'');
 }
-async function checkIntegrationKey(id){
- const check=keyCheck(id);
+function checkIntegrationKey(id){
+ const check=keyCheck(id),scope=integrationScope();
  clearTimeout(check.timer);check.timer=null;
- if(check.job){await check.job;return checkIntegrationKey(id)}
- const key=String(state.integrationDrafts[id]||'').trim();
- if(!key||key===check.sent)return;
- check.sent=key;keyNote(id,'Comprobando la clave…','checking');
- check.job=verifyIntegrationKey(id,key);
- try{await check.job}finally{check.job=null}
+ return queueKey(id,async()=>{
+  if(!sameScope(scope))return;
+  const key=String(state.integrationDrafts[id]||'').trim();
+  if(!key||key===check.sent)return;
+  check.sent=key;keyNote(id,'Comprobando la clave…','checking');
+  await verifyIntegrationKey(id,key,scope);
+ });
 }
-async function verifyIntegrationKey(id,key){
+async function verifyIntegrationKey(id,key,scope){
  let listing;
+ // The scope is checked right before the request, which reads the machine in use when it is made: a key
+ // typed for one machine never leaves for another.
+ if(!sameScope(scope))return;
  try{listing=await post('/api/presentation/integrations/'+encodeURIComponent(id),{key},'PUT')}
  catch(error){
+  if(!sameScope(scope))return;
   // Nothing was stored, so the field keeps what was typed: a key with one wrong character is corrected, not retyped.
   keyNote(id,'Clave rechazada · '+error.message+' · '+(integrationRow(id)?.configured?'La clave anterior sigue en uso':'No hay ninguna clave guardada'),'refused');
   return;
  }
+ if(!sameScope(scope))return;
  // A stored key leaves the field — unless the person already typed something else in it.
  roomStore.batch(()=>{state.integrations=listing;if(String(state.integrationDrafts[id]||'').trim()===key)keyDraft(id,'')});
- keyNote(id,'Clave verificada · '+await followIntegration(id),'verified');
+ const news=await followIntegration(id,scope);
+ // Its lists took a while: a note about this machine is not put on the next one's row (review R04).
+ if(sameScope(scope))keyNote(id,'Clave verificada · '+news,'verified');
 }
-async function clearIntegrationKey(id){
- forgetKeyCheck(id);$('settings-error').textContent='';
- try{state.integrations=await api('/api/presentation/integrations/'+encodeURIComponent(id),{method:'DELETE'})}
- catch(e){$('settings-error').textContent=e.message;return}
- await followIntegration(id);
+function clearIntegrationKey(id){
+ const scope=integrationScope(),check=keyCheck(id);
+ // What was typed goes with the key: a later blur or save must not install it again.
+ clearTimeout(check.timer);check.timer=null;check.sent=null;keyNote(id,'');keyDraft(id,'');$('settings-error').textContent='';
+ return queueKey(id,async()=>{
+  if(!sameScope(scope))return;
+  let listing;
+  try{listing=await api('/api/presentation/integrations/'+encodeURIComponent(id),{method:'DELETE'})}
+  catch(e){if(sameScope(scope))$('settings-error').textContent=e.message;return}
+  if(!sameScope(scope))return;
+  state.integrations=listing;
+  await followIntegration(id,scope);
+ });
 }
-/* What a changed key changes elsewhere: the catalogue of each capability its provider serves is asked for again,
- * and says what it brought. The provider lists themselves follow the listing on their own (see below). */
-async function followIntegration(id){
- const news=[],capabilities=integrationRow(id)?.capabilities||[];
- if(capabilities.includes('transcription')&&sttCatalog){
-  const entry=sttProvider(id);if(entry)entry.models=[];Object.assign(sttRemote[id]||{},{loaded:false,loading:false,error:null});
-  if(integrationRow(id)?.configured&&sttRemote[id]){await loadTranscriptionModels(id,true);news.push(sttRemote[id].error||'Modelos actualizados')}
-  renderTranscription();
- }
- if(capabilities.includes('voice')&&voiceCatalog){
-  try{voiceCatalog=await api('/api/presentation/voice-catalog');news.push('Voces actualizadas')}
-  catch(error){news.push(error.message)}
-  renderVoiceProvider();renderLanguageRows();
+/* What a changed key changes elsewhere: each list its provider serves a stage with is asked for again, and says
+ * what it brought. The places themselves follow the listing on their own (stage-settings.js). */
+async function followIntegration(id,scope){
+ const news=[],provider=(state.modelCatalog?.providers||[]).find(item=>item.id===id);
+ for(const task of provider?.tasks||[]){
+  const key=id+':'+task;
+  if(!integrationRow(id)?.configured){const {[key]:_,...rest}=state.remoteModels;roomStore.patch({remoteModels:rest});continue}
+  await loadRemote(id,task,true);
+  if(!sameScope(scope))return '';
+  news.push(state.remoteModels[key]?.error||(task==='tts'?'Voces actualizadas':'Modelos actualizados'));
  }
  return news.join(' · ')||'Guardada en la máquina';
 }
@@ -1805,13 +1713,7 @@ async function settleIntegrationKeys(){
  }
 }
 function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
-// The provider lists are derived from the listing: whenever it changes — read, a key stored or removed — they follow.
-roomStore.subscribe((view,previous)=>{
- if(view.facts.integrations===previous.facts.integrations)return;
- renderTranscriptionProviders();renderTranscription();
- renderVoiceProvider();if(voiceCatalog)renderLanguageRows();
-});
-$('reset-settings').onclick=async()=>{try{localStorage.removeItem(SETTINGS_KEY);localStorage.removeItem('sidevoice.mic')}catch{}voiceDraft={};await $('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
+$('reset-settings').onclick=async()=>{try{localStorage.removeItem(SETTINGS_KEY);localStorage.removeItem(STAGES_KEY);localStorage.removeItem(WEBGPU_FAILED_KEY)}catch{}await measureDevice(true).catch(()=>{});await $('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
 $('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$('language-settings').addEventListener('close',stopPreview);
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
 // The only thing a device says about turn detection. The seconds behind each word are the room's, in one
@@ -1819,12 +1721,34 @@ $('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$
 // and the fix never reached the person it was written for (2026-09-20).
 const MIC_KEYS=['turn_patience'];
 // Every setting belongs to this device. The room answers with its defaults and keeps no copy; what this browser saved wins.
-// Between the two, what depends on the person's language comes from their system (system-language.js).
-const SETTINGS_KEY='sidevoice.settings';
-function storedPreferences(){for(const key of [SETTINGS_KEY,'sidevoice.mic']){try{const stored=JSON.parse(localStorage.getItem(key)||'null');if(stored&&typeof stored==='object')return stored}catch{}}return {}}
-function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(p));localStorage.removeItem('sidevoice.mic')}catch{}}
+// Between the two, what depends on the person's language comes from their system (system-language.js), and the
+// stages from what this device can run (stage-settings.js). Only the settings of today's shape are read back:
+// anything else a browser kept from before is dropped, not translated (greenfield, review F11).
+// The stages are kept per machine, by its pairing's fingerprint: what this device does with one machine — its
+// provider, that account's voices — is not what it does with another (D7, review R04). The rest is the device's.
+const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages';
+const DEVICE_KEYS=['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS];
+function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||'null');return stored&&typeof stored==='object'?stored:{}}catch{return {}}}
+function storedStages(fp){const stages=fp?readStored(STAGES_KEY)[fp]:null;return Object.fromEntries(TASKS.filter(task=>stages?.[task]).map(task=>[task,stages[task]]))}
+function storedPreferences(){const stored=readStored(SETTINGS_KEY);return {...Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]])),...storedStages(pairings.inUse)}}
+function storePreferences(p,fp=pairings.inUse){try{
+ localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))));
+ if(fp)localStorage.setItem(STAGES_KEY,JSON.stringify({...readStored(STAGES_KEY),[fp]:Object.fromEntries(TASKS.filter(task=>p[task]).map(task=>[task,p[task]]))}));
+}catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
-async function loadPreferences(){const defaults=await api('/api/presentation/languages');return {...defaults,...devicePreferences()}}
+// The room's stage defaults are not this device's: it cannot know what this device runs, so they are left out.
+async function loadPreferences(){const {stt:_stt,tts:_tts,...defaults}=await api('/api/presentation/languages');return {...defaults,...devicePreferences()}}
+/* The preferences a call is made with: both stages resolved against what this device can run now. */
+async function callPreferences(){
+ const p=await loadPreferences();
+ await measureDevice().catch(()=>{});
+ const ctx=stageContext(state),stages={stt:effectiveStage(ctx,'stt',p.stt),tts:effectiveStage(ctx,'tts',p.tts)};
+ // A call is only built from stages that can run: this device's, or a provider with its model (and voice). One
+ // that cannot is a configuration to finish, said as such — never a stage made up for it (review R06).
+ const problem=TASKS.map(task=>stageProblem(ctx,task,stages[task])).find(Boolean);
+ if(problem)throw Error(problem+' Configúralo en Configuración.');
+ return {...p,...stages};
+}
 // WebKit on the iPhone offers WebGPU and then fails while loading Whisper on it. A failed GPU load falls back to
 // CPU for this call and is remembered for this device, so 'automatic' starts on CPU next time; choosing GPU explicitly still tries it.
 // What this call is actually using, said small next to the controls: engine, model and processor, plus how the turn ends.
@@ -1836,44 +1760,48 @@ function noteOutputHealth(kind){
  if(next&&next!==state.outputHealth){state.outputHealth=next}
 }
 window.addEventListener('voice-output',event=>noteOutputHealth(event.detail?.kind));
-async function prepareLocalWhisper(model,device){
- const caps=sttCapabilities||(window.roomTranscription.capabilities?await window.roomTranscription.capabilities():{wasm:true});
- if(device==='auto'&&storedPreferences().stt_gpu_failed)device='wasm';
- try{return await window.roomTranscription.prepare({model,device})}
+function modelLabel(id){return state.modelCatalog?.models?.find(model=>model.id===id)?.label||id}
+/* A device stage's transcription model, on its build. WebGPU that fails to load it (the iPhone) falls back to the
+ * same engine on WASM when this device has it, and this device stops offering WebGPU from then on. */
+async function prepareLocalWhisper(build){
+ try{return await window.roomTranscription.prepare(buildRequest(build))}
  catch(error){
-  if(device==='wasm'||device==='native'||!caps.wasm)throw error;
-  state.liveNote='La GPU no pudo cargar '+model.split('/').pop()+'; este dispositivo usa la CPU';
-  storePreferences({...(state.voicePreferences||{}),stt_device:'wasm',stt_gpu_failed:true});if(state.voicePreferences)state.voicePreferences.stt_device='wasm';
-  const runtime=await window.roomTranscription.prepare({model,device:'wasm'});
-  return {...runtime,fallback_from:device,fallback_error:String(error?.message||error).slice(0,300)};
+  const offer=state.deviceOffers?.find(item=>item.model===build.model);
+  const fallback=build.accelerator==='webgpu'&&[offer,...(offer?.alternatives||[])].find(choice=>choice?.engine===build.engine&&choice.accelerator==='wasm');
+  if(!fallback)throw error;
+  state.liveNote='La GPU no pudo cargar '+modelLabel(build.model)+'; este dispositivo usa la CPU';
+  if(acceleratorFailure(error)){try{localStorage.setItem(WEBGPU_FAILED_KEY,'1')}catch{}void measureDevice(true).catch(()=>{})}
+  const runtime=await window.roomTranscription.prepare(buildRequest({...build,accelerator:'wasm'}));
+  return {...runtime,fallback_from:'webgpu',fallback_error:String(error?.message||error).slice(0,300)};
  }
 }
-// What this device runs before it can transcribe locally: the model it saved, or the best one this
-// browser can actually load, with the GPU→CPU fallback and the preparation indicator behind it.
+// What this device runs before it can transcribe itself: the model it saved on its build, or the best one it can
+// actually load, with the GPU→CPU fallback and the preparation indicator behind it.
 async function prepareTranscription(preferences){
- if(preferences?.stt_provider==='openai')return {browserStt:false,sttRuntime:null};
- let {stt_model:model,stt_device:device}=preferences||{};
- const caps=device==='native'&&nativeModels?{models:nativeModels.stt,wasm:false}:await window.roomTranscription.capabilities();
- if(!caps.models.includes(model)){
-  const fallback=caps.models[0];
-  if(!fallback)throw Error('Este navegador no puede transcribir en local; elige OpenAI en Configuración.');
-  state.liveNote='Este navegador no puede con el modelo guardado; se usa '+fallback.split('/').pop();
-  model=fallback;device='auto';
+ if(preferences?.stt?.place!==DEVICE)return {browserStt:false,sttRuntime:null};
+ await measureDevice();
+ let build=deviceBuild(state.deviceOffers,preferences.stt);
+ if(!build){
+  const first=taskOffers(state.deviceOffers,'stt')[0];
+  if(!first)throw Error('Este dispositivo no puede transcribir; elige un proveedor en Configuración.');
+  state.liveNote='Este dispositivo no puede con el modelo guardado; se usa '+modelLabel(first.model);
+  build={model:first.model,engine:first.engine,accelerator:first.accelerator};
  }
- return {browserStt:true,sttRuntime:await prepareLocalWhisper(model,device)};
+ return {browserStt:true,sttRuntime:await prepareLocalWhisper(build)};
 }
+const same=(a,b)=>JSON.stringify(a??null)===JSON.stringify(b??null);
 function micSettingsChanged(previous,next){return MIC_KEYS.some(key=>String(previous?.[key]??'')!==String(next?.[key]??''))}
-function sttSettingsChanged(previous,next){return ['stt_provider','stt_model','stt_device','stt_language','stt_context'].some(key=>String(previous?.[key]??'')!==String(next?.[key]??''))}
-// The room builds its pipeline once per socket, out of the hello: who transcribes, in which language
-// and with what context, and how this device's turns are detected, are fixed for that call. The local
-// Whisper model is not one of them — the room never runs it — unless OpenAI is the one being asked.
+function sttSettingsChanged(previous,next){return !same(previous?.stt,next?.stt)}
+// The room builds its pipeline once per socket, out of the hello: who transcribes, in which language and with what
+// context, and how this device's turns are detected, are fixed for that call. The model this device runs itself is
+// not one of them — the room never runs it — unless a provider is the one being asked.
 function pipelineSettingsChanged(previous,next){
  return micSettingsChanged(previous,next)
-  ||['stt_provider','stt_language','stt_context'].some(key=>String(previous?.[key]??'')!==String(next?.[key]??''))
-  ||(next?.stt_provider==='openai'&&String(previous?.stt_model??'')!==String(next?.stt_model??''));
+  ||previous?.stt?.place!==next?.stt?.place||!same(previous?.stt?.options,next?.stt?.options)
+  ||(next?.stt?.place!==DEVICE&&previous?.stt?.model!==next?.stt?.model);
 }
-// Only the model this page itself runs changed: the room's pipeline stays as it is.
-function localModelSwap(previous,next){return !!state.ws&&next?.stt_provider!=='openai'&&!pipelineSettingsChanged(previous,next)&&sttSettingsChanged(previous,next)}
+// Only the model this device itself runs changed: the room's pipeline stays as it is.
+function localModelSwap(previous,next){return !!state.ws&&next?.stt?.place===DEVICE&&!pipelineSettingsChanged(previous,next)&&sttSettingsChanged(previous,next)}
 /* Changing the pipeline used to hang up, and a hang-up in the middle of a conversation is not a
  * setting taking effect. The page opens a second socket instead: whatever has to load (a local
  * Whisper model, its GPU→CPU fallback) loads while the call goes on over the socket it already has,
@@ -1924,18 +1852,39 @@ async function applyTranscriptionSettings(previous,next){
  const socket=state.ws,epoch=connectEpoch;state.switchingTranscription=true;
  window.roomTranscription.stop({cancelTurn:true});
  try{
-  const runtime=await prepareLocalWhisper(next.stt_model,next.stt_device);
+  const {sttRuntime:runtime}=await prepareTranscription(next);
   if(state.ws!==socket||connectEpoch!==epoch)return false;
   socket.send(JSON.stringify({type:'voice-stt-ready',data:{session_id:state.sessionId,...runtime}}));roomStore.patch({engineReady:true,enginePreferences:next,voicePreferences:next,sttRuntime:runtime});
-  window.roomTranscription.start({socket,language:next.stt_language});
+  window.roomTranscription.start({socket,language:next.stt.options?.language});
   return 'local';
  }finally{state.switchingTranscription=false}
 }
-async function saveSettings(){storeLanguage();try{await settleIntegrationKeys()}catch(error){$('settings-error').textContent=error.message;return}const previous=state.voicePreferences,p={...state.voicePreferences,tts_execution:'browser',language_overrides:voiceDraft};// A control the person never saw is not a decision they made: a select with nothing in it (its pane hidden,
-// its catalogue still loading) keeps what was saved before instead of writing an empty string — which is
-// how a saved OpenAI transcription silently became the browser's (2026-09-20).
-const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.value:'';return raw===''||raw==null?previous?.[key]:raw};
-for(const key of ['stt_language','stt_device','default_tts_language','tts_speed','ui_language','tts_device','default_model','default_voice','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['tts_speed','audio_grace_seconds','presence_volume','replay_on_return_seconds'].includes(key)?Number(value):value;if((key==='stt_device'||key==='tts_device')&&!deviceChoices().includes(p[key]))p[key]=deviceChoices().includes(previous?.[key])?previous[key]:'auto'}p.stt_provider=field('stt_provider')||'browser';p.stt_model=field('stt_model')||previous?.stt_model;let hotSwap=false;try{storePreferences(p);if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));hotSwap=localModelSwap(previous,p);state.voicePreferences=p;applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();const applied=await applyTranscriptionSettings(previous,p);state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas'}catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}}
+async function saveSettings(){
+ const scope=integrationScope();
+ try{await settleIntegrationKeys()}catch(error){$('settings-error').textContent=error.message;return}
+ // The machine changed while a key was being settled: what the panes show is now the other machine's.
+ if(!sameScope(scope)){$('settings-error').textContent='Cambiaste de máquina: revisa la configuración y vuelve a guardar.';return}
+ const previous=state.voicePreferences,ctx=stageContext(state),draft=state.stageDraft||previous||{},p={...previous};
+ // The stages as the panes show them: a choice that waits for the machine's listing is saved as it was (F18), a
+ // provider's "Automática" voice as the voice it names (R02), and one that cannot run is not saved at all.
+ for(const task of TASKS)p[task]=withVoicesChosen(ctx,effectiveStage(ctx,task,draft[task]));
+ // Before this device has measured itself it cannot say what it runs: the saved stages stay as they were.
+ if(state.deviceOffers===null)for(const task of TASKS)if(!p[task])p[task]=previous?.[task];
+ const problem=TASKS.map(task=>stageProblem(ctx,task,p[task])).find(Boolean);
+ if(problem){$('settings-error').textContent=problem;return}
+ // A control the person never saw is not a decision they made: a field with nothing in it keeps what was saved
+ // before instead of writing an empty string (2026-09-20).
+ const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.value:'';return raw===''||raw==null?previous?.[key]:raw};
+ for(const key of ['ui_language','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['audio_grace_seconds','replay_on_return_seconds'].includes(key)?Number(value):value}
+ let hotSwap=false;
+ try{
+  storePreferences(p,scope.host);
+  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));
+  hotSwap=localModelSwap(previous,p);roomStore.patch({voicePreferences:p,stageDraft:null});applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();
+  const applied=await applyTranscriptionSettings(previous,p);
+  state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas';
+ }catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}
+}
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
 $('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){$('settings-error').textContent=reachNote(state)||NO_MACHINE;return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
@@ -1961,17 +1910,14 @@ window.sidevoiceActions={
   }
   await refresh();await refreshPeople();await refreshHistory()
  },
- updateLanguageModel(language,model){
-  expandedVoiceLanguages.delete(language);voiceDraft[language]={...voiceDraft[language],model,voice:'inherit'};renderLanguageRows();
- },
- updateLanguageVoice(language,voice){
-  if(voice===SHOW_ALL_VOICES){expandedVoiceLanguages.add(language);renderLanguageRows();return}
-  voiceDraft[language]={...voiceDraft[language],voice};renderLanguageRows();
- },
- updateLanguageSpeed(language,speed){
-  voiceDraft[language]={...voiceDraft[language],speed};renderLanguageRows();
- },
+ chooseStagePlace,
+ chooseStageModel,
+ setStageOption,
+ chooseStageBuild,
  previewVoice,
+ prepareVoice,
+ retryIntegrations,
+ retryGpu,
  typeIntegrationKey,
  checkIntegrationKey,
  clearIntegrationKey,
@@ -2006,15 +1952,6 @@ function applyLockedCall(){
 // So the call owns it with an element of its own: a faint looping file, far below the microphone's
 // detector, playing while the microphone is open and paused while it is muted. A click then toggles the
 // microphone. It never touches the call's own output element, which is what echo cancellation listens to.
-// Ask the desktop app's native engine once what it can run; the settings re-render when it answers.
-(async()=>{
- const engine=window.__sidevoiceDesktop?.host?.nativeEngine;if(!engine)return;
- try{const info=await engine.available(),ids=info.pageIds||{},offers=info.offers||[];
-  const of=task=>Object.entries(ids).filter(([,id])=>offers.some(o=>o.model===id&&o.task===task)).map(([page])=>page);
-  nativeModels={stt:of('stt'),tts:of('tts')};
-  renderTranscription();renderVoiceDevice();
- }catch{}
-})();
 let nowPlaying=null;
 function faintLoop(){
  const rate=8000,seconds=2,count=rate*seconds,bytes=new DataView(new ArrayBuffer(44+count*2));

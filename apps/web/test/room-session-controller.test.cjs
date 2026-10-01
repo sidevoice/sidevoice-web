@@ -9,17 +9,22 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element())}
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
- // Each module the controller imports becomes one object in the context, and its import line a destructuring of it.
- const modules={'../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','./system-language.js':'SystemLanguage'};
- const imports=source=>source.replace(/^import \{(.*)\} from '(.*)';\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
+ // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
+ // a JSON import is its content. The resolver is TypeScript (packages/browser-audio/offers.ts), transpiled here.
+ const modules={'../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','./system-language.js':'SystemLanguage','../../../../packages/browser-audio/offers':'Offers','../../../../packages/browser-audio/refusals.js':'Refusals'};
+ const files={StageSettings:sourceRoot+'/state/stage-settings.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:sourceRoot+'/../../../packages/browser-audio/offers.ts',Refusals:sourceRoot+'/../../../packages/browser-audio/refusals.js'};
+ const imports=(source,dir)=>source.replace(/^import (\w+) from '(.*\.json)'[^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
+  .replace(/^import \{(.*)\} from '(.*)';\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
- for(const [from,name] of Object.entries(modules)){
-  const dependency=imports(fs.readFileSync(sourceRoot+'/services/'+from,'utf8'));
-  const exports=[...dependency.matchAll(/^export (?:async function|function|const) (\w+)/gm)].map(m=>m[1]);
+ for(const name of new Set(Object.values(modules))){
+  let text=fs.readFileSync(files[name],'utf8');
+  if(files[name].endsWith('.ts'))text=require('typescript').transpileModule(text,{compilerOptions:{target:99,module:99}}).outputText;
+  const dependency=imports(text,require('node:path').dirname(files[name]));
+  const exports=[...dependency.matchAll(/^export (?:async function|function|const|class) (\w+)/gm)].map(m=>m[1]);
   vm.runInContext('const '+name+'=(()=>{'+dependency.replace(/^export /gm,'')+';return {'+exports.join(',')+'}})();',context);
  }
  const source=fs.readFileSync(sourceRoot+'/services/room-session-controller.js','utf8');
- const loaded=imports(source);
+ const loaded=imports(source,sourceRoot+'/services');
  vm.runInContext('"use strict";\n'+loaded,context);
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
  if(paired)vm.runInContext("nodeBase='';verified.set('',Date.now());roomStore.patch({node:pairings.inUse,nodeReach:'ok'})",context);
@@ -98,22 +103,31 @@ test('The controller publishes serializable snapshots through the React store br
  assert.equal(snapshots.bootError,'fallo');
  assert.equal(s.run("$('messages').children.length"),0,'React owns rendering when the bridge is installed');
 });
-// The machine's integrations as it lists them to its owner (#64): one row per provider, never a key.
+// The machine's integrations as it lists them to any paired device (#64): one row per provider, never a key.
 const OPENAI=(extra={})=>({id:'openai',label:'OpenAI',capabilities:['transcription'],configured:false,source:null,hint:null,environment:'VOICE_STT_API_KEY',...extra});
 const ELEVEN=(extra={})=>({id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:false,source:null,hint:null,environment:'VOICE_ELEVENLABS_API_KEY',...extra});
-const LISTING=(...providers)=>({owner:true,providers});
+const LISTING=(...providers)=>({providers});
 // What the page holds lives in its own realm; compared by value.
 const plain=value=>JSON.parse(JSON.stringify(value));
+// ----- the stages (#124 phase 2): place → model → options, derived by the store from what this device measured -----
+const PAGE_CAPS={webgpu:true,webgpuFp16:true,wasm:true};
+const stage=(place,model,options={},build=null)=>({place,model,options,build});
+const STT=(model='whisper-tiny',options={language:'es',context:''})=>stage('device',model,options);
+const TTS=(options={voice:{},speed:1})=>stage('device','kokoro-82m-v1.0',options);
+async function measured(s,caps=PAGE_CAPS){s.context.__caps=caps;s.run('window.roomTranscription=Object.assign(window.roomTranscription||{},{capabilities:async()=>__caps})');await s.run('measureDevice(true)')}
+const stageView=(s,task)=>plain(s.run('roomStore.getState().stages.'+task));
+function listed(s,listing){s.run(`roomStore.patch({integrations:${JSON.stringify(listing)},integrationsStatus:'ready'})`)}
+function openaiPane(s,listing){listed(s,listing);s.run(`roomStore.patch({voicePreferences:{stt:${JSON.stringify(stage('openai','gpt-4o-mini-transcribe',{language:'es',context:''}))}}})`)}
 test('The React component tree initializes without inventing missing DOM elements',()=>{
  const s=setup({strictDOM:true});
  assert.equal(s.run("$('missing-element')"),null);
  assert.equal(s.run("typeof $('settings-integrations').onclick"),'function','Integraciones is a section like the others');
- for(const action of ['toggleCall','toggleMic','cancelInput','typeIntegrationKey','checkIntegrationKey','clearIntegrationKey','openIntegration'])
+ for(const action of ['toggleCall','toggleMic','cancelInput','typeIntegrationKey','checkIntegrationKey','clearIntegrationKey','openIntegration','chooseStagePlace','chooseStageModel','setStageOption','chooseStageBuild','previewVoice','prepareVoice','retryIntegrations'])
   assert.equal(s.run("typeof window.sidevoiceActions."+action),'function','React calls '+action+', it does not reach into the DOM');
- for(const id of ['stt-provider','tts-provider','pane-integrations','settings-integrations'])
+ for(const id of ['pane-integrations','settings-integrations','pane-voice','pane-transcription'])
   assert.ok(s.run("$('"+id+"')"),id);
- for(const id of ['stt-key','elevenlabs-key','stt-credential','elevenlabs-credential'])
-  assert.equal(s.run("$('"+id+"')"),null,'a pane chooses, it does not authenticate: '+id);
+ for(const id of ['stt-provider','tts-provider','stt-device','tts-device','stt-key','elevenlabs-key'])
+  assert.equal(s.run("$('"+id+"')"),null,'the panes are the store\'s, and a pane does not authenticate: '+id);
 });
 test('Each integration shows its key masked, what it serves, and where the key came from',()=>{
  const s=setup({strictDOM:true});
@@ -131,13 +145,71 @@ test('Each integration shows its key masked, what it serves, and where the key c
  const [none]=s.run('roomStore.getState().integrations.rows');
  assert.equal(none.placeholder,'Sin clave','an empty field says so where the key would go');
  assert.equal(none.canClear,false);
- assert.deepEqual(plain(s.run('roomStore.getState().integrations.missing')),{transcription:[{id:'openai',label:'OpenAI'}],voice:[]});
+});
+test('A WASM-only page offers the three models it can run; WebGPU with f16 offers all five, and never a native build',async()=>{
+ const s=setup({strictDOM:true});
+ await measured(s,{webgpu:false,webgpuFp16:false,wasm:true});
+ assert.deepEqual(plain(s.run('deviceCapabilities')),{runs:'page',has:['wasm']});
+ assert.deepEqual(stageView(s,'stt').models.map(m=>m.id),['whisper-tiny','whisper-base']);
+ assert.deepEqual(stageView(s,'tts').models.map(m=>m.id),['kokoro-82m-v1.0']);
+ await measured(s,PAGE_CAPS);
+ assert.deepEqual(stageView(s,'stt').models.map(m=>m.id),['whisper-tiny','whisper-base','whisper-small','whisper-large-v3-turbo']);
+ assert.ok(plain(s.run('deviceOffers')).every(offer=>offer.engine==='transformers-js'),'a page runs page engines only');
+ assert.deepEqual(stageView(s,'stt').places.map(p=>[p.id,p.label]),[['device','Este dispositivo']]);
+ assert.equal(stageView(s,'stt').where,'page','only a page says it runs in the browser');
+});
+test('Inside the desktop app only the native engine\'s report counts: no page build, no WebGPU, and what is on disk says so',async()=>{
+ const s=setup({strictDOM:true});let asked=0;
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{
+  capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:16384}),
+  installed:async()=>[{model:'whisper-small',engine:'sherpa-onnx'}]}}};
+ s.run('roomStore.patch({inApp:true})');
+ s.context.window.roomTranscription={capabilities:async()=>{asked++;return PAGE_CAPS}};
+ await s.run('measureDevice(true)');
+ assert.equal(asked,0,'the page\'s own engines are not even asked');
+ const offers=plain(s.run('deviceOffers'));
+ assert.deepEqual(offers.map(o=>o.model),['whisper-tiny','whisper-base','whisper-small','whisper-large-v3-turbo','kokoro-82m-v1.0']);
+ assert.ok(offers.every(o=>o.engine==='sherpa-onnx'&&[o,...o.alternatives].every(c=>!['webgpu','wasm'].includes(c.accelerator))));
+ const stt=stageView(s,'stt');
+ assert.equal(stt.where,'app');
+ assert.match(stt.models.find(m=>m.id==='whisper-small').detail,/descargado/);
+ assert.doesNotMatch(stt.models.find(m=>m.id==='whisper-tiny').detail,/descargado/);
+ assert.equal(stt.advanced.choices[0].label,'Automático (sherpa-onnx · CPU)');
+ assert.ok(!JSON.stringify(stageView(s,'tts')).match(/navegador|WebGPU|WASM/),'no page words in the app');
+});
+test('A place change makes the model list follow; a model change makes the options follow its family',async()=>{
+ const s=setup({strictDOM:true});
+ await measured(s);
+ listed(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}),ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ s.run("roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT())+"}})");
+ s.context.fetch=async()=>({ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],error:null})});
+ assert.deepEqual(stageView(s,'stt').places.map(p=>p.id),['device','openai']);
+ await s.run("window.sidevoiceActions.chooseStagePlace('stt','openai')");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ let stt=stageView(s,'stt');
+ assert.equal(stt.place,'openai');
+ assert.deepEqual(stt.models.map(m=>m.id),['gpt-4o-transcribe'],'the provider\'s own list');
+ assert.equal(stt.advanced,null,'a provider has no build to choose');
+ assert.deepEqual(stt.options.map(o=>o.id),['language','context'],'the provider\'s option schema');
+ s.run("window.sidevoiceActions.chooseStagePlace('stt','device')");
+ assert.equal(stageView(s,'stt').model,'whisper-tiny','back on this device, its first offer');
+ s.run("window.sidevoiceActions.setStageOption('stt','language','fr')");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-small')");
+ stt=stageView(s,'stt');
+ assert.equal(stt.model,'whisper-small');
+ assert.equal(stt.options.find(o=>o.id==='language').value,'fr','a value the new model still takes is kept');
+ const tts=stageView(s,'tts');
+ assert.deepEqual(tts.options.map(o=>[o.id,o.kind]),[['voice','voice'],['speed','range']],'Kokoro\'s family: a voice per language and a speed');
+ assert.deepEqual(tts.options[0].rows.find(r=>r.language==='es').choices.map(c=>c.value),['','ef_dora','em_alex','em_santa']);
+ s.run("window.sidevoiceActions.setStageOption('tts','voice','em_alex','es')");
+ assert.deepEqual(plain(s.run('stageDraft.tts.options.voice')),{es:'em_alex'});
+ s.run("window.sidevoiceActions.chooseStageBuild('stt','transformers-js/wasm')");
+ assert.equal(stageView(s,'stt').advanced.value,'auto','a build this model cannot run here is not kept');
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-tiny');window.sidevoiceActions.chooseStageBuild('stt','transformers-js/wasm')");
+ assert.equal(stageView(s,'stt').advanced.value,'transformers-js/wasm');
 });
 
 // ----- a key checks itself where it is typed, and its models arrive with it (#72) -----
-function openaiPane(s,listing,models=[]){
- s.run(`integrations=${JSON.stringify(listing)};voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-mini-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',needs_key:true,default_model:'gpt-4o-transcribe',models:${JSON.stringify(models)},models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};renderTranscriptionProviders('openai');renderTranscription()`);
-}
 test('A pasted OpenAI key is checked on leaving the field and brings its models into Transcripción',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.fetch=async(path,options)=>{
@@ -146,20 +218,18 @@ test('A pasted OpenAI key is checked on leaving the field and brings its models 
   if(path.includes('/transcription/models'))return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'},{id:'gpt-4o-mini-transcribe',label:'GPT-4o mini'}],error:null})};
   throw Error('unexpected request: '+path);
  };
- openaiPane(s,LISTING(OPENAI()));
- assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>[o.value,o.textContent,!!o.disabled])")),[['browser','Browser',false],['openai','OpenAI · sin clave',true]],
-  'a provider with no key is greyed out, not gone');
- assert.equal(s.run("$('stt-provider').value"),'browser','and cannot stay chosen');
+ await measured(s);openaiPane(s,LISTING(OPENAI()));
+ assert.deepEqual(stageView(s,'stt').places.map(p=>[p.id,p.state]),[['device','ready'],['openai','missing']],'a provider with no key is greyed out, not gone');
  s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-nueva')");
  await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.deepEqual(calls.map(call=>call[0]),['PUT','GET'],'the key is sent once, and its models asked for once');
  assert.match(calls[0][1],/\/api\/presentation\/integrations\/openai$/);
  assert.equal(calls[0][2],JSON.stringify({key:'sk-nueva'}));
  assert.match(calls[1][1],/transcription\/models\?provider=openai/);
- assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>[o.value,!!o.disabled])")),[['browser',false],['openai',false]],'the provider list follows the listing by itself');
- s.run("$('stt-provider').value='openai';renderTranscription()");
- assert.deepEqual(plain(s.run("$('stt-model').children.map(option=>option.value)")),['gpt-4o-transcribe','gpt-4o-mini-transcribe'],'the dropdown fills in place, with no save and no reopen');
- assert.equal(s.run("$('stt-model').value"),'gpt-4o-mini-transcribe','the model already chosen stays chosen while it is still offered');
+ const stt=stageView(s,'stt');
+ assert.deepEqual(stt.places.map(p=>[p.id,p.state]),[['device','ready'],['openai','ready']],'the places follow the listing by themselves');
+ assert.deepEqual(stt.models.map(m=>m.id),['gpt-4o-transcribe','gpt-4o-mini-transcribe'],'the list fills in place, with no save and no reopen');
+ assert.equal(stt.model,'gpt-4o-mini-transcribe','the model already chosen stays chosen while it is still offered');
  const [row]=s.run('roomStore.getState().integrations.rows');
  assert.equal(row.note,'Clave verificada · Modelos actualizados');
  assert.equal(row.draft,'','a verified key is stored, so it leaves the field');
@@ -180,15 +250,105 @@ test('A pause while typing checks the key without waiting for the field to be le
  openaiPane(s,LISTING(OPENAI()));
  s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-nueva')");
  assert.equal(calls.length,0,'nothing travels while the key is still being typed');
- await pause();
+ pause();await s.run('keyChecks.openai.chain');
  assert.deepEqual(calls.map(call=>call[0]),['PUT','GET']);
- assert.equal(s.run("sttProvider('openai').models.length"),1);
+ assert.equal(s.run("remoteModels['openai:stt'].models.length"),1);
+});
+test('A key typed for one machine is never sent to another, and the first machine\'s answers are dropped (F13)',async()=>{
+ const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
+ const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
+ const calls=[];let pause=null,answer;
+ s.context.setTimeout=fn=>{pause=fn;return 1};s.context.clearTimeout=()=>{pause=null};
+ s.context.fetch=(path,options)=>{calls.push([options?.method||'GET',path,options?.headers?.Authorization]);return new Promise(resolve=>{answer=resolve})};
+ openaiPane(s,LISTING(OPENAI()));
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','SYNTHETIC_KEY_FOR_A')");
+ const listing=s.run('loadIntegrations()');   // machine A's listing, still on its way
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'));nodeBase='https://b.example'");
+ assert.equal(s.run('integrationsStatus'),'idle','another machine: nothing of the first one is kept');
+ assert.deepEqual(plain(s.run('integrationDrafts')),{},'what was typed for it is gone');
+ assert.equal(s.run('integrations'),null);
+ pause?.();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.ok(!calls.some(call=>call[0]==='PUT'),'the old pause does not send the key anywhere');
+ answer({ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…aaaa'}))});await listing;
+ assert.equal(s.run('integrations'),null,'and machine A\'s late listing does not land on machine B');
+ s.run("$('language-settings').open=true;settleBase({base:'https://b.example',via:'node'},'ok',pairingInUse(pairings))");
+ const reread=calls.filter(call=>call[1].includes('/api/presentation/integrations'));
+ assert.deepEqual(reread.at(-1).slice(1),['https://b.example/api/presentation/integrations','Bearer tok-b'],'the settings open on B read B\'s listing, with B\'s token');
+});
+test('The stages are each machine\'s own: switching machine switches them, drafts included, and saving on one leaves the other\'s (R04)',async()=>{
+ const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
+ const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
+ const A_STT=stage('openai','model-of-a',{language:'es',context:'Proyecto A'});
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:A_STT}});
+ await measured(s);
+ s.run("ws=null;roomStore.patch({voicePreferences:{ui_language:'es',...storedPreferences()}})");
+ assert.equal(stageView(s,'stt').model,'model-of-a');
+ s.run("roomStore.patch({integrationsStatus:'ready'});window.sidevoiceActions.setStageOption('stt','context','sin guardar')");
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ assert.equal(s.run('stageDraft'),null,'the unsaved draft of A does not follow to B');
+ assert.equal(s.run('voicePreferences.stt'),undefined,'B has no stages of its own yet');
+ assert.equal(s.run('storedPreferences().stt'),undefined);
+ assert.equal(stageView(s,'stt').place,'device','B starts from this device\'s best offer');
+ s.run("$('language-settings').close=()=>{}");
+ await s.run('saveSettings()');
+ const stages=JSON.parse(s.saved['sidevoice.stages']);
+ assert.deepEqual(stages[PAIRED.fp].stt,A_STT,'saving on B leaves A\'s stages as they were');
+ assert.equal(stages['fp-nuc'].stt.place,'device');
+ s.run("keepPairings(usingPairing(pairings,'fp-mac'))");
+ assert.equal(s.run('voicePreferences.stt.model'),'model-of-a','and back on A, A\'s are there');
+});
+test('A key verified on one machine does not label the next machine\'s row, however late its lists arrive (R04)',async()=>{
+ const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
+ const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
+ let releaseModels;
+ s.context.fetch=async(path,options)=>{
+  if(options?.method==='PUT')return {ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}))};
+  if(path.includes('/transcription/models')){await new Promise(resolve=>{releaseModels=resolve});return {ok:true,json:async()=>({models:[{id:'m'}]})}}
+  return new Promise(()=>{});
+ };
+ openaiPane(s,LISTING(OPENAI()));
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-a')");
+ const checking=s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
+ for(let i=0;i<50&&!releaseModels;i++)await new Promise(resolve=>setTimeout(resolve,1));
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ releaseModels();await checking;
+ assert.deepEqual(plain(s.run('integrationChecks')),{},'nothing was verified on B, so B\'s row says nothing');
+});
+test('A device that runs no model gets no made-up provider stage: the pane asks for a place, and joining stops at "configure" (R06)',async()=>{
+ const s=setup({strictDOM:true});
+ const WINDOWS={runs:'native',os:'windows',arch:'x86_64',has:['cpu'],memory_mb:null};
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>WINDOWS,installed:async()=>[]}}};
+ await s.run('measureDevice(true)');
+ assert.deepEqual(plain(s.run('deviceOffers')),[],'no native package for this platform');
+ s.context.fetch=async()=>({ok:true,json:async()=>({ui_language:'es'})});
+ await assert.rejects(()=>s.run('callPreferences()'),/Elige dónde transcribir: este dispositivo no puede ejecutar ningún modelo\. Configúralo en Configuración\./);
+ listed(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}),ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ s.run("roomStore.patch({voicePreferences:{}})");
+ const stt=stageView(s,'stt');
+ assert.deepEqual([stt.unconfigured,stt.place,stt.model],[true,'','']);
+ assert.deepEqual(stt.places.map(p=>p.id),['openai'],'the places there are, and no device');
+ // A saved provider stage with its model (and, for the voice, its voice) is what a call is built from.
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:stage('openai','gpt-4o-transcribe',{language:'es'}),tts:stage('elevenlabs','eleven_v3',{voice:{es:'v1'},speed:1})}});
+ const p=plain(await s.run('callPreferences()'));
+ assert.deepEqual([p.stt.place,p.stt.model,p.tts.place,p.tts.options.voice],['openai','gpt-4o-transcribe','elevenlabs',{es:'v1'}]);
+});
+test('Joining on a device that runs nothing, with nothing configured, opens no socket and says what to do (R06)',async()=>{
+ const s=setup({strictDOM:true});const sockets=[];
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'windows',arch:'x86_64',has:['cpu']}),installed:async()=>[]}}};
+ s.context.WebSocket=class{constructor(){sockets.push(this)}};
+ s.context.fetch=async()=>({ok:true,json:async()=>({ui_language:'es'})});
+ s.context.window.roomVoice={unlock:async()=>{},prepare:async()=>{},cancel(){}};
+ s.context.window.roomTranscription={stop(){}};
+ await s.run('toggleCall()');
+ assert.equal(sockets.length,0);
+ assert.match(s.run('joinView(state).text'),/Elige dónde transcribir/);
+ assert.equal(s.run('joinView(state).failed'),true);
 });
 test('A key the provider refuses leaves the previous one in place and says so',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.fetch=async path=>{calls.push(path);return {ok:false,json:async()=>({detail:'OpenAI rejected the key.'})}};
- openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…vieja'})),[{id:'gpt-4o-transcribe',label:'GPT-4o'}]);
- s.run("sttRemote.openai.loaded=true;window.sidevoiceActions.typeIntegrationKey('openai','sk-mala')");
+ openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…vieja'})));
+ s.run("patchRemote('openai:stt',{models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],error:''});window.sidevoiceActions.typeIntegrationKey('openai','sk-mala')");
  await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.equal(calls.length,1,'a refused key is not followed by a request for models');
  const row=()=>s.run('roomStore.getState().integrations.rows')[0];
@@ -196,7 +356,7 @@ test('A key the provider refuses leaves the previous one in place and says so',a
  assert.equal(row().status,'refused');
  assert.equal(row().draft,'sk-mala','what was typed stays, to be corrected instead of retyped');
  assert.match(row().placeholder,/…vieja/,'and the key that was working is still the installed one');
- assert.deepEqual(plain(s.run("$('stt-model').children.map(option=>option.value)")),['gpt-4o-transcribe'],'the models of the key that works are untouched');
+ assert.deepEqual(stageView(s,'stt').models.map(m=>m.id),['gpt-4o-transcribe','gpt-4o-mini-transcribe'],'the models of the key that works are untouched, and the saved one is still there');
  await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.equal(calls.length,1,'leaving the field again does not send a key already refused');
  await assert.rejects(()=>s.run('settleIntegrationKeys()'),/Clave rechazada/,'saving does not close over a key the provider refused');
@@ -211,16 +371,6 @@ test('A key field the browser filled in on its own never blocks saving (iPhone, 
  await s.run('settleIntegrationKeys()');
  assert.equal(calls.length,0,'nobody typed it, so nobody asked for it to be installed');
 });
-test('Reopening Settings asks for the OpenAI models again, because each opening brings a fresh catalogue',async()=>{
- const s=setup({strictDOM:true});
- s.run(`integrations=${JSON.stringify(LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'})))};sttRemote.openai.loaded=true;window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true,models:[]})};voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'}`);
- s.context.fetch=async path=>({ok:true,json:async()=>path.includes('/transcription/models')
-  ?{models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}]}
-  :{catalog:{providers:[{id:'openai',label:'OpenAI',needs_key:true,default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]}}});
- await s.run('loadTranscription()');
- await new Promise(resolve=>setTimeout(resolve,0));
- assert.deepEqual(plain(s.run("$('stt-model').children.map(option=>option.value)")),['gpt-4o-transcribe']);
-});
 test('A key with nothing stored behind it says that nothing is saved',async()=>{
  const s=setup({strictDOM:true});
  s.context.fetch=async()=>({ok:false,json:async()=>({detail:'The key is empty.'})});
@@ -229,45 +379,80 @@ test('A key with nothing stored behind it says that nothing is saved',async()=>{
  await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.equal(s.run('roomStore.getState().integrations.rows')[0].note,'Clave rechazada · The key is empty. · No hay ninguna clave guardada');
 });
-test('A verified ElevenLabs key lights up its provider in Voces and brings its models, with no save',async()=>{
+test('A verified ElevenLabs key lights up its place in Voz and brings its models and voices, with no save',async()=>{
  const s=setup({strictDOM:true});const calls=[];
- s.context.window.sidevoiceUI={setLanguageModels(){}};
- s.elements.get('default-voice').selectedOptions=[{textContent:'Dora'}];
- const catalog={models:[{id:'kokoro',label:'Kokoro · 82M',provider:'kokoro'},{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',provider:'elevenlabs'},{id:'eleven_v3',label:'Eleven v3',provider:'elevenlabs'}],
-  languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}]};
  s.context.fetch=async(path,options)=>{
   calls.push([options?.method||'GET',path]);
   if(path.includes('/integrations/elevenlabs'))return {ok:true,json:async()=>LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'}))};
-  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({...catalog,providers:{elevenlabs:{voices:[{id:'v1',label:'Nube',languages:['es']}]}}})};
+  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({providers:{elevenlabs:{models:[{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5'},{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'v1',label:'Nube',languages:['es']}]}}})};
   throw Error('unexpected request: '+path);
  };
- s.run(`integrations=${JSON.stringify(LISTING(ELEVEN()))};voiceCatalog=${JSON.stringify({...catalog,providers:{elevenlabs:{voices:[]}}})};
-  sttCapabilities={webgpu:false,wasm:true};voiceDraft={};
-  $('default-tts-language').value='es';$('default-model').value='kokoro';$('tts-provider').value='kokoro';renderVoiceProvider('kokoro','ef_dora')`);
- assert.deepEqual(plain(s.run("$('tts-provider').children.map(o=>[o.value,o.textContent,!!o.disabled])")),[['kokoro','Este navegador',false],['elevenlabs','ElevenLabs · sin clave',true]],
-  'a provider with no key is greyed out');
+ await measured(s);listed(s,LISTING(ELEVEN()));
+ assert.deepEqual(stageView(s,'tts').places.map(p=>[p.id,p.state]),[['device','ready'],['elevenlabs','missing']]);
  s.run("window.sidevoiceActions.typeIntegrationKey('elevenlabs','eleven-nueva')");
  await s.run("window.sidevoiceActions.checkIntegrationKey('elevenlabs')");
  assert.deepEqual(calls.map(call=>call[0]),['PUT','GET'],'the key is sent once, and the catalogue asked for once');
  assert.match(calls[1][1],/voice-catalog/);
- assert.deepEqual(plain(s.run("$('tts-provider').children.map(o=>[o.value,!!o.disabled])")),[['kokoro',false],['elevenlabs',false]],'the provider is offered as soon as its key is verified');
- s.run("$('tts-provider').value='elevenlabs';renderVoiceProvider()");
- assert.deepEqual(plain(s.run("$('default-model').children.map(option=>option.value)")),['eleven_flash_v2_5','eleven_v3'],'and its models fill the dropdown in place');
+ s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");
+ const tts=stageView(s,'tts');
+ assert.deepEqual(tts.models.map(m=>m.id),['eleven_flash_v2_5','eleven_v3'],'its models fill the list in place');
+ const es=tts.options[0].rows.find(r=>r.language==='es');
+ assert.deepEqual(es.choices.map(c=>[c.value,!!c.other]),[['',false],['v1',false]],'the account\'s voices, its own language first');
+ assert.equal(tts.options[1].max,1.2,'and the provider\'s own speed range');
  const [row]=s.run('roomStore.getState().integrations.rows');
  assert.equal(row.note,'Clave verificada · Voces actualizadas');
  assert.equal(row.draft,'');
- assert.match(row.placeholder,/…11ab/);
 });
-test('Removing a key acts at once, and the pane that used it greys the provider out',async()=>{
- const s=setup({strictDOM:true});const calls=[];
- s.context.fetch=async(path,options)=>{calls.push([options?.method||'GET',path]);return {ok:true,json:async()=>LISTING(OPENAI())}};
- openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'})),[{id:'gpt-4o-transcribe',label:'GPT-4o'}]);
- assert.equal(s.run("$('stt-provider').value"),'openai');
- await s.run("window.sidevoiceActions.clearIntegrationKey('openai')");
- assert.deepEqual(calls,[['DELETE','/api/presentation/integrations/openai']],'no models are asked for with no key');
- assert.equal(s.run("$('stt-provider').value"),'browser');
- assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>[o.value,!!o.disabled])")),[['browser',false],['openai',true]]);
- assert.equal(s.run("sttProvider('openai').models.length"),0,'the models of a key that is gone go with it');
+test('A provider\'s "Automática" voice is the voice the preview speaks, and it is saved with the stage (R02)',async()=>{
+ const s=setup({strictDOM:true});const stored=[],spoken=[];
+ s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ s.context.AbortController=AbortController;
+ s.context.fetch=async()=>({ok:true,json:async()=>({audio_base64:'SUQz'})});
+ s.context.window.roomVoice={unlock:async()=>{},cancel(){},playEncoded:async()=>{}};
+ await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ s.run("$('preview-audio').pause=()=>{};ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'voice-1',label:'Nube',languages:['en']}]})");
+ s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");
+ const row=stageView(s,'tts').options[0].rows.find(r=>r.language==='en');
+ assert.deepEqual([row.value,row.choices[0].label],['','Automática · Nube'],'the automatic choice says which voice it is');
+ const origFetch=s.context.fetch;s.context.fetch=async(path,options)=>{spoken.push(JSON.parse(options.body));return origFetch()};
+ await s.run("previewVoice('en')");
+ assert.equal(spoken[0].voice,'voice-1');
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+ const {tts}=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
+ assert.equal(tts.options.voice.en,'voice-1','the call speaks the voice the preview spoke: the node has no automatic of its own');
+});
+test('A provider\'s voice stage with no voice to choose from is not saved (R02)',async()=>{
+ const s=setup({strictDOM:true});const stored=[];
+ s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ s.run("ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[]})");
+ s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+ assert.equal(s.run("$('settings-error').textContent"),'Elige una voz de ElevenLabs.');
+ assert.equal(stored.length,0,'nothing is saved that the call could not speak');
+});
+test('Removing a key acts at once, greys the place out, and takes what was typed with it (F16)',async()=>{
+ const s=setup({strictDOM:true});const calls=[];let release;
+ s.context.fetch=async(path,options)=>{
+  calls.push([options?.method||'GET',path]);
+  if(options?.method==='PUT'){await new Promise(resolve=>{release=resolve});return {ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…nuev'}))}}
+  return {ok:true,json:async()=>LISTING(OPENAI())};
+ };
+ await measured(s);openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'})));
+ s.run("patchRemote('openai:stt',{models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],error:''})");
+ s.run("window.sidevoiceActions.typeIntegrationKey('openai','sk-nueva')");
+ const checking=s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ const clearing=s.run("window.sidevoiceActions.clearIntegrationKey('openai')");
+ assert.equal(s.run('integrationDrafts.openai'),'','the key being typed goes with the one removed');
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual(calls.map(c=>c[0]),['PUT'],'the removal waits for the check this page still has in flight');
+ release();await checking;await clearing;
+ assert.deepEqual(calls.map(c=>c[0]),['PUT','GET','DELETE'],'and then goes, last: nothing of this page can undo it');
+ assert.equal(stageView(s,'stt').places.find(p=>p.id==='openai').state,'missing');
+ assert.equal(s.run("remoteModels['openai:stt']"),undefined,'the models of a key that is gone go with it');
+ await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
+ assert.equal(calls.length,3,'and a later blur has nothing to send');
 });
 test('"Configurar" opens Integraciones at the provider\'s row',()=>{
  const s=setup({strictDOM:true});
@@ -280,147 +465,116 @@ test('"Configurar" opens Integraciones at the provider\'s row',()=>{
  s.run("settingsSection('general')");
  assert.equal(s.run('integrationFocus'),null,'leaving the section lets the row go');
 });
-test('Opening Settings reads the integrations before offering providers, so a saved OpenAI stays chosen',async()=>{
- const s=setup({strictDOM:true});
- s.saved['sidevoice.settings']=JSON.stringify({stt_provider:'openai',stt_model:'gpt-4o-transcribe'});
- s.run("window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true,models:[]})};window.roomI18n={setLanguage(){}}");
- const later=ms=>new Promise(resolve=>setTimeout(resolve,ms));
- s.context.fetch=async path=>{
-  // The machine takes longest over its integrations: nothing may be offered before they arrive.
-  if(path.includes('/integrations')){await later(20);return {ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}),ELEVEN())}}
+function settingsFetch({integrations=async()=>({ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}),ELEVEN())})}={}){
+ const calls=[];
+ const fetch=async path=>{
+  calls.push(path);
+  if(path.includes('/integrations'))return integrations();
   if(path.includes('/transcription/models'))return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}]})};
-  if(path.includes('/transcription'))return {ok:true,json:async()=>({catalog:{providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',needs_key:true,default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]}})};
-  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({models:[{id:'kokoro',label:'Kokoro',provider:'kokoro'}],languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}],providers:{elevenlabs:{voices:[]}}})};
-  return {ok:true,json:async()=>({stt_provider:'browser',stt_language:'auto',default_tts_language:'es',tts_speed:1,ui_language:'es',tts_device:'auto',audio_grace_seconds:1,replay_on_return_seconds:120,default_model:'kokoro',default_voice:'ef_dora'})};
+  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({providers:{elevenlabs:{models:[],voices:[]}}})};
+  return {ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:1,replay_on_return_seconds:120,turn_patience:'normal',stt:{place:'device',model:'whisper-tiny',options:{},build:null}})};
  };
- s.elements.get('default-voice').selectedOptions=[{textContent:'Dora'}];
+ return {fetch,calls};
+}
+test('Opening Settings reads the integrations and each opening asks a provider\'s models again, so a saved OpenAI stays chosen',async()=>{
+ const s=setup({strictDOM:true});
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})}});
+ s.run("window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true})};window.roomI18n={setLanguage(){}}");
+ const {fetch,calls}=settingsFetch();s.context.fetch=fetch;
  await s.run("$('settings-open').onclick()");
- assert.equal(s.run("$('stt-provider').value"),'openai');
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(stageView(s,'stt').place,'openai');
+ assert.deepEqual(stageView(s,'stt').models.map(m=>m.id),['gpt-4o-transcribe']);
  assert.equal(s.run("$('settings-error').textContent"),'');
+ await s.run("$('settings-open').onclick()");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(calls.filter(path=>path.includes('/transcription/models')).length,2,'a fresh list on every opening');
 });
-test('A device that is not the owner never sees a provider nobody configured',()=>{
+test('A listing the machine could not give keeps the saved provider, locks the choice, and can be asked again (F18)',async()=>{
  const s=setup({strictDOM:true});
- // What the machine lists to a guest: only what can be chosen, and nothing about the key.
- s.run(`integrations={owner:false,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]}`);
- openaiPane(s,{owner:false,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]});
- assert.deepEqual(plain(s.run("$('stt-provider').children.map(o=>o.value)")),['browser'],'not greyed out: not there at all');
- assert.deepEqual(plain(s.run('roomStore.getState().integrations.missing')),{transcription:[],voice:[]},'so no "Configurar" either');
- assert.equal(s.run('roomStore.getState().integrations.owner'),false);
- assert.equal(s.run("keyedProvider(state,'elevenlabs')"),'ready');
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})}});
+ s.run("window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true})};window.roomI18n={setLanguage(){}}");
+ let fail=true;
+ const {fetch}=settingsFetch({integrations:async()=>fail?{ok:false,status:502,json:async()=>({detail:'La máquina no respondió'})}:{ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}))}});
+ s.context.fetch=fetch;
+ await s.run("$('settings-open').onclick()");
+ let stt=stageView(s,'stt');
+ assert.equal(stt.integrations,'failed');
+ assert.equal(stt.place,'openai','an outage is not evidence the provider is gone');
+ assert.deepEqual(stt.places.map(p=>[p.id,p.state]),[['device','ready'],['openai','unknown']]);
+ assert.equal(stt.editable,false,'what depends on the listing waits for it');
+ s.run("$('language-settings').close=()=>{}");
+ await s.run('saveSettings()');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.place,'openai','saving something else keeps the saved provider');
+ fail=false;
+ await s.run('window.sidevoiceActions.retryIntegrations()');
+ stt=stageView(s,'stt');
+ assert.equal(stt.integrations,'ready');assert.equal(stt.editable,true);
+ assert.equal(stt.places.find(p=>p.id==='openai').state,'ready');
 });
-test('A model list that no longer holds the saved model falls back to the first one offered',()=>{
+test('Every paired device sees every provider the machine lists: keyed ones ready, unkeyed ones greyed with Configurar',async()=>{
  const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'openai',stt_model:'whisper-1'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-mini-transcribe',label:'GPT-4o mini'}],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};$('stt-provider').value='openai';renderTranscription()");
- assert.deepEqual(s.run("$('stt-model').children.map(option=>option.value)"),['gpt-4o-mini-transcribe'],'a model this account does not offer never becomes an option of its own');
- assert.equal(s.run("$('stt-model').value"),'gpt-4o-mini-transcribe');
+ await measured(s);
+ listed(s,LISTING(OPENAI(),ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ assert.deepEqual(stageView(s,'stt').places.map(p=>[p.id,p.state]),[['device','ready'],['openai','missing']],'no owner and no guest: nobody is shown less');
+ assert.deepEqual(stageView(s,'tts').places.map(p=>[p.id,p.state]),[['device','ready'],['elevenlabs','ready']]);
+ assert.equal('owner' in s.run('roomStore.getState().integrations'),false);
+ listed(s,LISTING(ELEVEN()));
+ assert.deepEqual(stageView(s,'stt').places.map(p=>p.id),['device'],'a provider the machine does not list at all is one it cannot call');
 });
-
-test('Voices are chosen the way transcription is: the provider first, then what it offers',()=>{
+test('A saved provider model the account\'s list does not name is kept and shown, not replaced (R05)',()=>{
  const s=setup({strictDOM:true});
- s.run(`voiceCatalog={models:[{id:'kokoro',label:'Kokoro · 82M',provider:'kokoro'},
-   {id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',provider:'elevenlabs'},
-   {id:'eleven_v3',label:'Eleven v3',provider:'elevenlabs'}],
-  languages:[{id:'es',label:'Español',voices:[['ef_dora','Dora']]}],providers:{elevenlabs:{voices:[{id:'v1',label:'Nube',languages:['es']}]}}};
-  sttCapabilities={webgpu:false,wasm:true};voiceDraft={};integrations={owner:true,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]};
-  $('default-tts-language').value='es';$('default-model').value='kokoro';renderVoiceProvider('kokoro','ef_dora')`);
- assert.equal(JSON.stringify(s.run("$('tts-provider').children.map(o=>o.value)")),JSON.stringify(['kokoro','elevenlabs']));
- assert.equal(JSON.stringify(s.run("$('default-model').children.map(o=>o.value)")),JSON.stringify(['kokoro']),
-  'the model list belongs to the chosen provider');
- assert.equal(s.run("$('tts-browser-options').hidden"),false,'the browser provider shows where it runs');
- assert.match(s.run("$('tts-device-note').textContent"),/CPU/,'a browser without WebGPU says so, like transcription does');
- // Switching provider takes its models, and drops what only the browser has.
- s.run("$('tts-provider').value='elevenlabs';renderVoiceProvider()");
- assert.equal(JSON.stringify(s.run("$('default-model').children.map(o=>o.value)")),JSON.stringify(['eleven_flash_v2_5','eleven_v3']));
- assert.equal(s.run("$('tts-browser-options').hidden"),true);
- assert.equal(s.run("$('prepare-model').hidden"),true,'nothing to preload when the voice is not this browser\'s');
+ openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…test'})));
+ s.run("roomStore.patch({voicePreferences:{stt:"+JSON.stringify(stage('openai','future-model',{}))+"}});patchRemote('openai:stt',{models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],error:''})");
+ const stt=stageView(s,'stt');
+ assert.equal(stt.model,'future-model','a provider ships models before we list them');
+ assert.deepEqual(stt.models.map(m=>m.id),['gpt-4o-transcribe','future-model']);
 });
-
-test('Processing comes first and decides which local models are offered',()=>{
+test('A provider model list that failed to load leaves the saved model, and saving keeps it (R05)',async()=>{
+ const s=setup({strictDOM:true});const stored=[];
+ s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ s.context.fetch=async()=>({ok:true,json:async()=>({provider:'openai',configured:true,models:[],error:'OpenAI answered 503 when loading the models.'})});
+ await measured(s);openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…test'})));
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(stage('openai','future-model',{language:'es'}))+"}})");
+ await s.run("loadRemote('openai','stt',true)");
+ const stt=stageView(s,'stt');
+ assert.deepEqual([stt.model,stt.modelsError,stt.modelsLoading],['future-model','OpenAI answered 503 when loading the models.',false]);
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+ assert.equal(stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp].stt.model,'future-model','an outage is not a new choice');
+});
+test('A new provider choice takes the first listed model, and one with an empty list is not saved (R05)',async()=>{
+ const s=setup({strictDOM:true});const stored=[];
+ s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ await measured(s);listed(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…test'})));
+ s.run("ws=null;roomStore.patch({voicePreferences:{}});patchRemote('openai:stt',{models:[{id:'gpt-4o-transcribe'}],error:''});window.sidevoiceActions.chooseStagePlace('stt','openai')");
+ assert.equal(stageView(s,'stt').model,'gpt-4o-transcribe');
+ s.run("window.sidevoiceActions.chooseStagePlace('stt','device');patchRemote('openai:stt',{models:[],error:''});window.sidevoiceActions.chooseStagePlace('stt','openai')");
+ assert.equal(stageView(s,'stt').model,'','an account that lists no model gives a new choice none');
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+ assert.equal(s.run("$('settings-error').textContent"),'Elige un modelo de OpenAI.');
+ assert.equal(stored.length,0);
+});
+test('A provider\'s list still loading never masquerades as a one-option catalogue',()=>{
  const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'browser',stt_device:'auto',stt_model:'onnx-community/whisper-small'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[{id:'onnx-community/whisper-tiny',label:'Tiny',description:'light',devices:['webgpu','wasm']},{id:'onnx-community/whisper-small',label:'Small',description:'quality',devices:['webgpu']}]},{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-transcribe',label:'GPT'}]}]};sttCapabilities={webgpu:true,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-small']};$('stt-provider').value='browser';renderTranscription()");
- assert.deepEqual(s.run("$('stt-device').children.map(x=>x.value)"),['auto','webgpu','wasm']);
- assert.match(s.run("$('stt-device-note').textContent"),/usará la GPU/);
- assert.equal(JSON.stringify(s.run("$('stt-model').children.map(x=>[x.value,!!x.disabled])")),JSON.stringify([['onnx-community/whisper-tiny',false],['onnx-community/whisper-small',false]]));
- assert.equal(s.run("$('stt-model').value"),'onnx-community/whisper-small');
- assert.equal(s.run("$('stt-model-info').dataset.tooltip"),'quality');
- s.run("$('stt-device').value='wasm';$('stt-device').onchange()");
- assert.equal(JSON.stringify(s.run("$('stt-model').children.map(x=>[x.textContent,!!x.disabled])")),JSON.stringify([['Tiny',false],['Small · requiere GPU',true]]));
- assert.equal(s.run("$('stt-model').value"),'onnx-community/whisper-tiny','a model the processing cannot run is never left selected');
- s.run("sttCapabilities={webgpu:false,wasm:true,models:['onnx-community/whisper-tiny']};$('stt-device').value='auto';renderTranscription()");
- assert.deepEqual(s.run("$('stt-device').children.map(x=>x.value)"),['auto','wasm']);
- assert.match(s.run("$('stt-device-note').textContent"),/no está disponible/);
- assert.equal(JSON.stringify(s.run("$('stt-model').children.map(x=>[x.textContent,!!x.disabled])")),JSON.stringify([['Tiny',false],['Small · requiere GPU',true]]));
-
- // A GPU that already failed to load Whisper here makes automatic mean CPU, and says so.
- s.context.localStorage={getItem:key=>key==='sidevoice.settings'?JSON.stringify({stt_gpu_failed:true}):null,setItem(){},removeItem(){}};
- s.run("sttCapabilities={webgpu:true,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-small']};$('stt-device').value='auto';renderTranscription()");
- assert.match(s.run("$('stt-device-note').textContent"),/no pudo cargar Whisper/);
- assert.match(s.run("$('stt-device').children[1].textContent"),/falló/);
- assert.equal(JSON.stringify(s.run("$('stt-model').children.map(x=>!!x.disabled)")),JSON.stringify([false,true]));
-});
-
-
-test('OpenAI with a key on the machine is chosen here, and its key is not asked for here',()=>{
- const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',note:'Cloud',default_model:'gpt-4o-transcribe',models:[{id:'gpt-4o-transcribe',label:'GPT'}]}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};$('stt-provider').value='openai';renderTranscription()");
- assert.equal(s.run("$('stt-browser-options').hidden"),true);
- assert.deepEqual(s.run("$('stt-model').children.map(x=>x.value)"),['gpt-4o-transcribe']);
-});
-test('OpenAI model loading never masquerades as a one-option catalogue',()=>{
- const s=setup({strictDOM:true});
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe'};sttCatalog={providers:[{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};sttRemote.openai.loading=true;$('stt-provider').value='openai';renderTranscription()");
- assert.equal(s.run("$('stt-model').disabled"),true);
- assert.deepEqual(s.run("$('stt-model').children.map(x=>x.textContent)"),['Cargando modelos de OpenAI…']);
- assert.match(s.run("$('stt-model-note').textContent"),/Consultando/);
-});
-test('OpenAI models are fetched only when its provider is selected',async()=>{
- const s=setup({strictDOM:true});let requests=[];
- s.context.fetch=async path=>{requests.push(path);return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'gpt-4o-transcribe'},{id:'gpt-4o-mini-transcribe',label:'gpt-4o-mini-transcribe'}],error:null})}};
- s.run("voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-mini-transcribe'};sttCatalog={providers:[{id:'browser',label:'Browser',models:[]},{id:'openai',label:'OpenAI',default_model:'gpt-4o-transcribe',models:[],models_source:'remote'}]};sttCapabilities={webgpu:false,wasm:true,models:[]};integrations={owner:true,providers:[{id:'openai',label:'OpenAI',capabilities:['transcription'],configured:true,source:'stored',hint:'…test'}]};$('stt-provider').value='openai';renderTranscription()");
- assert.equal(requests.length,0);
- await s.run("loadTranscriptionModels('openai',true)");
- assert.equal(requests.length,1);
- assert.match(requests[0],/transcription\/models\?provider=openai/);
- assert.deepEqual(s.run("$('stt-model').children.map(x=>x.value)"),['gpt-4o-transcribe','gpt-4o-mini-transcribe']);
- assert.equal(s.run("$('stt-model').value"),'gpt-4o-mini-transcribe');
- assert.equal(s.run("$('stt-model-note').textContent"),'');
- assert.match(s.run("$('stt-model-info').dataset.tooltip"),/2 modelos compatibles/);
-});
-test('Model descriptions stay out of labels and appear in optional tooltips',()=>{
- const s=setup({strictDOM:true});
- s.run("voiceCatalog={models:[{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',provider:'elevenlabs',description:'Rápido'}]};entriesFor($('default-model'),voiceCatalog.models.map(x=>[x.id,x.label]),'eleven_flash_v2_5');setModelInfo($('default-model-info','stt-model-info'),'eleven_flash_v2_5')");
- assert.equal(s.run("$('default-model').children[0].textContent"),'Eleven Flash v2.5');
- assert.equal(s.run("$('default-model-info','stt-model-info').dataset.tooltip"),'Rápido');
- assert.equal(s.run("$('default-model-info','stt-model-info').hidden"),false);
-});
-test('ElevenLabs voices are filtered by primary language until all voices are requested',()=>{
- const s=setup({strictDOM:true});
- s.run(`voiceCatalog={
-  models:[{id:'eleven_flash_v2_5',label:'Eleven Flash',provider:'elevenlabs'}],
-  languages:[{id:'es',label:'Español',voices:[]}],
-  providers:{elevenlabs:{voices:[
-   {id:'lucia',label:'Lucía · premade',languages:['es']},
-   {id:'alice',label:'Alice',languages:['en']},
-   {id:'mystery',label:'Sin idioma',languages:[]}
-  ]}}
- };integrations={owner:true,providers:[{id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:true}]};$('tts-device').closest=()=>({hidden:false});$('default-model').value='eleven_flash_v2_5';$('default-tts-language').value='es';renderDefaultVoices('alice')`);
- assert.deepEqual(s.run("$('default-voice').children.map(x=>x.value)"),['lucia','__show_all_voices__']);
- assert.equal(s.run("$('default-voice').children[0].textContent"),'Lucía');
- assert.equal(s.run("$('default-voice').value"),'lucia','a stored voice from another language must not bypass the filter');
- s.run("window.sidevoiceUI={setLanguageModels(){}};$('default-voice').selectedOptions=[{textContent:'Lucía'}];$('default-voice').value=SHOW_ALL_VOICES;$('default-voice').onchange()");
- assert.deepEqual(s.run("$('default-voice').children.map(x=>x.value)"),['lucia','alice','mystery']);
+ openaiPane(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…test'})));
+ s.run("patchRemote('openai:stt',{})");
+ const stt=stageView(s,'stt');
+ assert.equal(stt.modelsLoading,true);
+ assert.equal(stt.model,'gpt-4o-mini-transcribe','the saved one is kept while the list is not in');
 });
 test('Joining with ElevenLabs reaches microphone capture without loading Kokoro',async()=>{
- for(const model of ['eleven_flash_v2_5','kokoro']){
+ for(const place of ['elevenlabs','device']){
   const s=setup({strictDOM:true});let prepared=0,captured=0,unlocked=false;
-  s.context.fetch=async()=>{assert.equal(unlocked,true,'audio unlock must precede network I/O');return {ok:true,json:async()=>({default_model:model,tts_device:'auto'})}};
+  s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:stage('openai','gpt-4o-transcribe',{}),tts:place==='device'?TTS():stage('elevenlabs','eleven_flash_v2_5',{voice:{es:'v1'},speed:1})}});
+  s.context.fetch=async()=>{assert.equal(unlocked,true,'audio unlock must precede network I/O');return {ok:true,json:async()=>({ui_language:'es'})}};
   s.context.window.roomVoice={unlock:async()=>{unlocked=true},prepare:async()=>{prepared++},cancel(){}};
+  s.context.window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true}),stop(){}};
   s.context.navigator={mediaDevices:{getUserMedia:async()=>{captured++;throw Error('Microphone test boundary')}}};
   await s.run('toggleCall()');
-  assert.equal(captured,1,model);
-  assert.equal(prepared,model==='kokoro'?1:0,model);
+  assert.equal(captured,1,place);
+  assert.equal(prepared,place==='device'?1:0,place);
   // The failure is a fact in the store; JoinStatus is the one that paints it.
-  assert.match(s.run('joinView(state).text'),/No se pudo abrir el micrófono: Microphone test boundary/,model);
+  assert.match(s.run('joinView(state).text'),/No se pudo abrir el micrófono: Microphone test boundary/,place);
   assert.equal(s.run('joinView(state).failed'),true);
   assert.equal(s.run('connecting'),false);
  }
@@ -544,15 +698,18 @@ test('Space repeats and release suppress native button activation without toggli
  assert.equal(s.run('track.enabled'),true);
 });
 
-test('Preview resolves the same language voice and effective speed as the settings',()=>{
- const s=setup();s.run("voiceCatalog={languages:[{id:'en',voices:[['af_heart','Heart'],['af_bella','Bella']]}]};$('voice-en').value='inherit';$('default-voice').value='ef_dora';$('speed-en').value='0.85';$('tts-speed').value='1.5';$('tts-device').value='auto'");
- assert.equal(s.run("selectedVoice('en').speed"),0.85);
- assert.equal(s.run("selectedVoice('en').voice"),'af_heart');
- s.run("$('speed-en').value='';$('voice-en').value='af_bella'");
- assert.equal(s.run("selectedVoice('en').speed"),1.5);
- assert.equal(s.run("selectedVoice('en').voice"),'af_bella');
+test('Preview resolves the voice and speed the pane shows, saved or not',async()=>{
+ const s=setup();await measured(s);const spoken=[];
+ s.context.AbortController=AbortController;
+ s.context.window.roomVoice={unlock:async()=>{},cancel(){},speak:async options=>{spoken.push(options)}};
+ s.run("$('preview-audio').pause=()=>{};roomStore.patch({voicePreferences:{tts:"+JSON.stringify(TTS({voice:{},speed:1.5}))+"}})");
+ await s.run("previewVoice('en')");
+ assert.deepEqual([spoken[0].voice,spoken[0].speed,spoken[0].model,spoken[0].engine],['af_heart',1.5,'kokoro-82m-v1.0','transformers-js'],'with no voice chosen, the model\'s first for the language');
+ s.run("window.sidevoiceActions.setStageOption('tts','voice','af_bella','en');window.sidevoiceActions.setStageOption('tts','speed',0.85)");
+ await s.run("previewVoice('en')");
+ assert.deepEqual([spoken[1].voice,spoken[1].speed],['af_bella',0.85],'the draft, before any save');
+ assert.equal(s.run('previewNote'),'Prueba terminada');
 });
-
 
 test('A delivery receipt never fabricates a typing or working indicator',()=>{
  const s=setup();s.run("add('user','Hola','user-turn:1','a');history[0].delivery='delivered';markHistorySeen()");
@@ -595,7 +752,7 @@ test('The UI distinguishes audio suppression reasons without inferring unknown o
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'call_ended',time:1000},0,{seconds:120,now:60000})"),'Sin audio · No estabas en la llamada · Se repite al volver');
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'call_ended',time:1000},0,{seconds:120,now:200000})"),'Sin audio · No estabas en la llamada','past the window it promises nothing');
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'focus_changed',time:1000},0,{seconds:0,now:2000})"),'Sin audio · No estabas en esta conversación','nor when this device turned repetition off');
- assert.equal(s.run("audioNote({audio:'failed',audio_reason:'unconfirmed'})"),'Audio sin confirmar · El navegador no dijo si llegó a sonar','a reply the room stopped waiting for does not claim it failed to play (#60)');
+ assert.equal(s.run("audioNote({audio:'failed',audio_reason:'unconfirmed'})"),'Audio sin confirmar · Este dispositivo no dijo si llegó a sonar','a reply the room stopped waiting for does not claim it failed to play (#60)');
 });
 
 test('A reply held behind another reply says so, not that the person is talking',()=>{
@@ -714,13 +871,13 @@ test('Cloud preview stays active and leaves the microphone enabled until audio e
  const s=setup();let finish;s.context.AbortController=AbortController;
  s.context.fetch=async()=>({ok:true,json:async()=>({audio_base64:'SUQz'})});
  s.context.window.roomVoice={unlock:async()=>{},cancel(){},playEncoded(){return new Promise(resolve=>finish=resolve)}};
- s.run("voiceCatalog={languages:[{id:'es',sample:'Hola',voices:[]}]};$('language-form').reportValidity=()=>true;$('preview-audio').pause=()=>{};var track={enabled:true};stream={getAudioTracks:()=>[track]};$('model-es').value='inherit';$('default-model').value='eleven_v3';$('voice-es').value='inherit';$('default-voice').value='custom';$('speed-es').value='';$('tts-speed').value='1'");
+ s.run("$('preview-audio').pause=()=>{};var track={enabled:true};stream={getAudioTracks:()=>[track]};roomStore.patch({voicePreferences:{tts:"+JSON.stringify(stage('elevenlabs','eleven_v3',{voice:{es:'custom'},speed:1}))+"}})");
  const preview=s.run("previewVoice('es')");
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(s.run('track.enabled'),true);assert.equal(s.run('previewJob!==null'),true);
  finish();await preview;
  assert.equal(s.run('track.enabled'),true);assert.equal(s.run('previewJob'),null);
- assert.equal(s.run("$('preview-status').textContent"),'Prueba terminada');
+ assert.equal(s.run('previewNote'),'Prueba terminada');
 });
 
 test('AEC includes local playback when supported and keeps capture enabled',async()=>{
@@ -808,13 +965,14 @@ test('Failed and cancelled microphone changes preserve or release the right stre
  resolve({getAudioTracks:()=>[{}],getTracks:()=>[{stop(){stopped++}}]});
  await pending;assert.equal(stopped,1);assert.equal(s.run('inputDeviceId'),'default');
 });
-test('Preview uses ElevenLabs native speed limits while Kokoro retains its range',()=>{
+test('A saved speed outside the provider\'s range is brought into it, not refused',()=>{
  const s=setup();
- assert.equal(s.run("effectiveSpeed('eleven_flash_v2_5',1.5)"),1.2);
- assert.equal(s.run("effectiveSpeed('eleven_flash_v2_5',.5)"),.7);
- assert.equal(s.run("effectiveSpeed('kokoro',1.5)"),1.5);
+ listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ s.run("roomStore.patch({voicePreferences:{tts:"+JSON.stringify(stage('elevenlabs','eleven_v3',{voice:{},speed:1.5}))+"}})");
+ assert.equal(stageView(s,'tts').options.find(o=>o.id==='speed').value,1.2);
+ s.run("roomStore.patch({voicePreferences:{tts:"+JSON.stringify(TTS({voice:{},speed:1.5}))+"}})");
+ assert.equal(stageView(s,'tts').options.find(o=>o.id==='speed').value,1.5,'Kokoro keeps its wider range');
 });
-
 test('Capture shares the playback context, streams PCM to the room, and hangup only disconnects the microphone graph',async()=>{
  const s=setup();let closed=0,sentFrames=0,nodeOptions;
  const source={connect(){},disconnect(){}};
@@ -960,14 +1118,29 @@ test('Stats handle old servers, network failures and other call sessions without
 });
 test('Stats renders device and session values as text and does not mislabel HTTP as audio latency',()=>{
  const s=setup({strictDOM:true});
- s.run(`ws={readyState:1};stream={getAudioTracks:()=>[{label:'<img onerror=boom>',readyState:'live',enabled:true,getSettings:()=>({echoCancellation:true,noiseSuppression:false,sampleRate:48000})}]};renderConnectionStats({call:{id:'s',transcription:{provider:'local',model:'turbo',reason:'openai_without_key',engine:'faster-whisper',location:'local',device:'cpu',compute_type:'int8'},mic:{frames:20,bytes:1024,last_gap_ms:20,max_gap_ms:610,gaps_over_250ms:2}}},36)`);
+ s.run(`ws={readyState:1};stream={getAudioTracks:()=>[{label:'<img onerror=boom>',readyState:'live',enabled:true,getSettings:()=>({echoCancellation:true,noiseSuppression:false,sampleRate:48000})}]};renderConnectionStats({call:{id:'s',transcription:{place:'device',model:'whisper-large-v3-turbo',engine:'sherpa-onnx',accelerator:'wasm',fallback_from:'webgpu'},mic:{frames:20,bytes:1024,last_gap_ms:20,max_gap_ms:610,gaps_over_250ms:2}}},36)`);
  const values=s.run("$('stats-connection').children.map(n=>n.textContent)");
  assert.ok(values.includes('<img onerror=boom>'));assert.ok(values.includes('Consulta al servidor (HTTP)'));
  assert.ok(values.includes('36 ms'));assert.ok(values.includes('48000 Hz'));assert.ok(values.includes('610 ms'));assert.ok(values.includes('2'));assert.ok(values.includes('Misma sesión'));
- assert.ok(values.includes('local · turbo'));assert.ok(values.includes('faster-whisper'));assert.ok(values.includes('cpu · int8'));
- assert.ok(values.includes('OpenAI solicitado sin clave · fallback local'));
+ assert.ok(values.includes('device · whisper-large-v3-turbo'));assert.ok(values.includes('Servidor y este dispositivo'),'no browser in the app\'s statistics (R10)');assert.ok(values.includes('sherpa-onnx'));assert.ok(values.includes('wasm · antes webgpu'));
 });
 
+test('A voice this device failed to speak is said as this device\'s, in the app as in a page (R10)',async()=>{
+ const s=setup();const errors=[];
+ s.context.window.sidevoiceUI={setBootError:value=>errors.push(value)};
+ s.context.fetch=async()=>({ok:true,json:async()=>({})});
+ s.context.window.roomVoice={cancel(){},speak:async()=>{throw Error('el motor no cargó')}};
+ s.run("roomStore.patch({inApp:true,voicePreferences:{tts:"+JSON.stringify(TTS())+"}})");
+ await s.run("receiveBrowserSpeech({session_id:'s',thread_id:'a',revision:1,utterance_id:'u',text:'Hola',voice:'ef_dora',speed:1})");
+ assert.equal(errors.at(-1),'Voz de este dispositivo: el motor no cargó');
+});
+test('A refusal the machine gives with a key is said by that key, the same way the app\'s native refusals are (D06)',async()=>{
+ const s=setup();
+ s.context.fetch=async()=>({ok:false,status:409,json:async()=>({detail:{key:'integration_superseded',message:'This key was replaced or removed while it was being checked, so it was not saved.'}})});
+ await assert.rejects(()=>s.run("api('/api/presentation/integrations/openai',{method:'PUT'})"),/La clave se cambió o se quitó mientras se comprobaba/);
+ assert.equal(s.run("sayRefusal({key:'voice_missing',provider:'elevenlabs',message:'Choose a voice for ElevenLabs before connecting.'})"),'Elige una voz de ElevenLabs antes de conectar.');
+ assert.equal(s.run("sayRefusal({key:'unknown_to_this_page',message:'Said in English.'})"),'Said in English.');
+});
 test('Changing only the local Whisper model swaps it on the socket the call already has',async()=>{
  const s=setup({strictDOM:true});
  s.run(`
@@ -975,33 +1148,33 @@ test('Changing only the local Whisper model swaps it on the socket the call alre
   ws={readyState:1,sent:[],send(value){this.sent.push(JSON.parse(value))}};
   sessionId='call-1';connectEpoch=7;
   window.roomTranscription={
+   capabilities:async()=>({webgpu:true,webgpuFp16:true,wasm:true}),
    stop(options){actions.push(['stop',options.cancelTurn])},
-   prepare:async options=>{actions.push(['prepare',options.model,options.device]);return {model:options.model,device:'webgpu'}},
+   prepare:async options=>{actions.push(['prepare',options.model,options.accelerator]);return {model:options.model,engine:options.engine,accelerator:options.accelerator}},
    start(options){actions.push(['start',options.language])}
   };
  `);
  // The room never runs this model, so its pipeline does not change: no second socket, no reconnection.
- const previous={stt_provider:'browser',stt_model:'tiny',stt_device:'wasm',stt_language:'es'};
- const next={stt_provider:'browser',stt_model:'small',stt_device:'webgpu',stt_language:'es'};
+ const previous={stt:STT('whisper-tiny'),tts:TTS()};
+ const next={stt:STT('whisper-small'),tts:TTS()};
  assert.equal(await s.run('applyTranscriptionSettings('+JSON.stringify(previous)+','+JSON.stringify(next)+')'),'local');
- assert.equal(JSON.stringify(s.run('actions')),JSON.stringify([['stop',true],['prepare','small','webgpu'],['start','es']]));
+ assert.equal(JSON.stringify(s.run('actions')),JSON.stringify([['stop',true],['prepare','whisper-small','webgpu'],['start','es']]));
  assert.equal(s.run('ws.sent[0].type'),'voice-stt-ready');
- assert.equal(s.run('ws.sent[0].data.model'),'small');
+ assert.deepEqual([s.run('ws.sent[0].data.model'),s.run('ws.sent[0].data.engine'),s.run('ws.sent[0].data.accelerator')],['whisper-small','transformers-js','webgpu']);
  assert.equal(s.run('ws.sent[0].data.session_id'),'call-1');
  assert.equal(await s.run('applyTranscriptionSettings('+JSON.stringify(next)+','+JSON.stringify(next)+')'),false);
  assert.equal(s.run('actions.length'),3);
  // What the room does own is a new pipeline every time, and the local model alone never is.
  assert.equal(s.run('pipelineSettingsChanged('+JSON.stringify(previous)+','+JSON.stringify(next)+')'),false);
- for(const change of [{stt_provider:'openai'},{stt_language:'auto'},{stt_context:'Sidevoice'},{turn_patience:'calm'}])
+ for(const change of [{stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})},{stt:STT('whisper-tiny',{language:'auto',context:''})},{stt:STT('whisper-tiny',{language:'es',context:'Sidevoice'})},{turn_patience:'calm'}])
   assert.equal(s.run('pipelineSettingsChanged('+JSON.stringify(previous)+','+JSON.stringify({...previous,...change})+')'),true,JSON.stringify(change));
  // Voices, speed and grace travel live over the socket: they must never open a second one.
- for(const change of [{default_model:'eleven_flash_v2_5'},{spanish_voice:'em_alex'},{tts_speed:1.2},{audio_grace_seconds:4}]){
+ for(const change of [{tts:stage('elevenlabs','eleven_flash_v2_5',{voice:{},speed:1})},{tts:TTS({voice:{es:'em_alex'},speed:1.2})},{audio_grace_seconds:4}]){
   assert.equal(s.run('pipelineSettingsChanged('+JSON.stringify(previous)+','+JSON.stringify({...previous,...change})+')'),false,JSON.stringify(change));
   assert.equal(await s.run('applyTranscriptionSettings('+JSON.stringify(previous)+','+JSON.stringify({...previous,...change})+')'),false);
  }
  assert.equal(s.run('actions.length'),3,'nothing was prepared or restarted for a voice change');
 });
-
 /* A pipeline change (who transcribes, in what language, how the turn ends) used to hang up. Now the
  * page opens a second socket while the first one is still carrying the call. */
 function switching(){
@@ -1023,8 +1196,8 @@ function switching(){
   startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
   window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};
   window.roomTranscription={
-   capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny']}),
-   prepare:async options=>{prepared.push(options.model);return {model:options.model,device:'wasm'}},
+   capabilities:async()=>({webgpu:false,wasm:true}),
+   prepare:async options=>{prepared.push(options.model);return {model:options.model,engine:options.engine,accelerator:options.accelerator}},
    start(options){started.push(options.language)},stop(){stopped++}
   };
   stream={getAudioTracks:()=>[{enabled:true}]};
@@ -1032,12 +1205,12 @@ function switching(){
  `);
  return {s,sockets,old:sockets[0],status};
 }
-const OLD_SETTINGS={stt_provider:'browser',stt_model:'onnx-community/whisper-tiny',stt_device:'auto',stt_language:'es',stt_context:'',turn_end_mode:'smart_turn'};
+const OLD_SETTINGS={stt:STT('whisper-tiny'),tts:TTS(),turn_end_mode:'smart_turn'};
 function apply(s,next){s.run('voicePreferences='+JSON.stringify(next));return s.run('applyTranscriptionSettings('+JSON.stringify(OLD_SETTINGS)+','+JSON.stringify(next)+')')}
 
 test('Changing the transcription provider swaps sessions without ending the call',async()=>{
  const {s,sockets,old,status}=switching();
- const pending=apply(s,{...OLD_SETTINGS,stt_provider:'openai',stt_model:'gpt-4o-transcribe'});
+ const pending=apply(s,{...OLD_SETTINGS,stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})});
  await new Promise(resolve=>setTimeout(resolve,5));
  // While the room has not answered, the call is still the old one: same socket, same session, mic untouched.
  assert.equal(sockets.length,2,'a second socket is opened');
@@ -1049,7 +1222,7 @@ test('Changing the transcription provider swaps sessions without ending the call
  const next=sockets[1];next.readyState=1;next.onopen();
  const hello=JSON.parse(next.sent[0]);
  assert.equal(hello.data.conversation,'t-1','the tab keeps the conversation it had chosen');
- assert.equal(hello.data.settings.stt_provider,'openai','the new hello carries the new settings');
+ assert.equal(hello.data.settings.stt.place,'openai','the new hello carries the new settings');
  next.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
  assert.equal(await pending,'switched');
  assert.equal(status.at(-1),null,'the line goes away once the new session is up');
@@ -1066,7 +1239,7 @@ test('Changing how patient the room is rebuilds the pipeline the same way, loadi
  const {s,sockets,old,status}=switching();
  const pending=apply(s,{...OLD_SETTINGS,turn_patience:'calm'});
  await new Promise(resolve=>setTimeout(resolve,5));
- assert.equal(s.run('JSON.stringify(prepared)'),'["onnx-community/whisper-tiny"]','the runtime is ready before the socket is swapped');
+ assert.equal(s.run('JSON.stringify(prepared)'),'["whisper-tiny"]','the runtime is ready before the socket is swapped');
  assert.match(status.at(-1).text,/micrófono/);
  assert.equal(s.run('ws'),old,'the call runs on the old pipeline while the new one is prepared');
  const next=sockets[1];next.readyState=1;next.onopen();
@@ -1079,7 +1252,7 @@ test('Changing how patient the room is rebuilds the pipeline the same way, loadi
 
 test('A room that refuses the new session leaves the call exactly as it was, and says why',async()=>{
  const {s,sockets,old,status}=switching();
- const pending=apply(s,{...OLD_SETTINGS,stt_provider:'openai',stt_model:'gpt-4o-transcribe'});
+ const pending=apply(s,{...OLD_SETTINGS,stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})});
  await new Promise(resolve=>setTimeout(resolve,5));
  const next=sockets[1];next.readyState=1;next.onopen();
  next.onmessage({data:JSON.stringify({type:'error',data:{message:'OpenAI necesita una clave de API antes de conectar.'}})});
@@ -1097,7 +1270,7 @@ test('A room that refuses the new session leaves the call exactly as it was, and
 test('Cancelling the preparation abandons the swap and not the call',async()=>{
  const {s,sockets,old}=switching();
  s.run("window.roomTranscription.prepare=()=>new Promise(()=>{})");
- const pending=apply(s,{...OLD_SETTINGS,stt_model:'onnx-community/whisper-tiny',stt_language:'auto'});
+ const pending=apply(s,{...OLD_SETTINGS,stt:STT('whisper-tiny',{language:'auto',context:''})});
  await new Promise(resolve=>setTimeout(resolve,5));
  assert.equal(s.run('switchingSession'),true);
  s.run('cancelPreparation()');
@@ -1236,10 +1409,10 @@ test('Stopping playback reports it for this browser and keeps the shared message
 
 test('The engine badge says what this call uses, in a few words',()=>{
  const s=setup();
- assert.equal(s.run("engineBadgeText({stt_provider:'openai',stt_model:'gpt-4o-transcribe',turn_end_mode:'smart_turn'},null)"),'OpenAI · gpt-4o-transcribe · smart-turn');
- assert.equal(s.run("engineBadgeText({stt_provider:'browser',stt_model:'onnx-community/whisper-base',turn_end_mode:'timer',user_speech_timeout:2.5},{model:'onnx-community/whisper-base',device:'wasm'})"),'Whisper base · CPU · silencio 2,5 s');
- assert.equal(s.run("engineBadgeText({stt_provider:'browser',stt_model:'onnx-community/whisper-tiny',turn_end_mode:'smart_turn'},{model:'onnx-community/whisper-tiny',device:'wasm',fallback_from:'webgpu'})"),'Whisper tiny · CPU (GPU falló) · smart-turn');
- s.run("roomStore.patch({engineReady:true,voicePreferences:{stt_provider:'openai',stt_model:'x'}})");
+ assert.equal(s.run("engineBadgeText({stt:{place:'openai',model:'gpt-4o-transcribe'},turn_end_mode:'smart_turn'},null)"),'OpenAI · gpt-4o-transcribe · smart-turn');
+ assert.equal(s.run("engineBadgeText({stt:{place:'device',model:'whisper-base'},turn_end_mode:'timer',user_speech_timeout:2.5},{model:'whisper-base',engine:'transformers-js',accelerator:'wasm'})"),'Whisper base · CPU · silencio 2,5 s');
+ assert.equal(s.run("engineBadgeText({stt:{place:'device',model:'whisper-tiny'},turn_end_mode:'smart_turn'},{model:'whisper-tiny',engine:'transformers-js',accelerator:'wasm',fallback_from:'webgpu'})"),'Whisper tiny · CPU (GPU falló) · smart-turn');
+ s.run("roomStore.patch({engineReady:true,voicePreferences:{stt:{place:'openai',model:'x'}}})");
  assert.ok(s.run('SessionState.engineView(state).text'),'an engine that is ready has something to say');
  s.run("state.engineReady=false");
  assert.equal(s.run('SessionState.engineView(state).text'),'','and one that is not says nothing, which is what hides it');
@@ -1281,7 +1454,7 @@ test('The stages view lists the last turn in order with bars scaled to the longe
  s.run("renderLatencyStages({reply_revision:4,input_ms:{endpoint_silence_ms:610,recognition_ms:900,transcript_to_delivery_ms:12},server_ms:{input_queued_to_reply_received_ms:9000},browser_ms:{audio_received_to_playback_scheduled_ms:40}})");
  const items=s.run("$('stats-stages').children.map(li=>[li.children[0].textContent,!!li.children[1].hidden,li.children[1].style.width||'',li.children[2].textContent])");
  assert.equal(JSON.stringify(items[0]),JSON.stringify(['Silencio hasta cerrar el turno',false,'7%','610 ms']));
- assert.equal(JSON.stringify(items[2]),JSON.stringify(['Whisper en este navegador',true,'','—']));
+ assert.equal(JSON.stringify(items[2]),JSON.stringify(['Whisper en este dispositivo',true,'','—']));
  assert.equal(JSON.stringify(items[6]),JSON.stringify(['Agente: entrega → primera respuesta',false,'100%','9.00 s']));
  assert.equal(JSON.stringify(items[4]),JSON.stringify(['Entregado → leído por la conversación',true,'','—']));
  assert.match(s.run("$('stats-stages-note').textContent"),/Turno 4/);
@@ -1338,7 +1511,7 @@ test('The aggregates section covers the whole session and splits per conversatio
  assert.equal(session.length,s.run('LATENCY_STAGES.length'));
  assert.equal(JSON.stringify(session[0]),JSON.stringify(['Silencio hasta cerrar el turno','2','800 ms','600 ms','1.00 s','1.00 s']));
  assert.equal(JSON.stringify(session[6]),JSON.stringify(['Agente: entrega → primera respuesta','3','11.00 s','9.00 s','21.00 s','21.00 s']),'the session table counts every conversation, not the selected one');
- assert.equal(JSON.stringify(session[2]),JSON.stringify(['Whisper en este navegador','—','—','—','—','—']),'what nobody measured stays a dash');
+ assert.equal(JSON.stringify(session[2]),JSON.stringify(['Whisper en este dispositivo','—','—','—','—','—']),'what nobody measured stays a dash');
  assert.match(s.run("$('stats-aggregates-note').textContent"),/no se deben sumar/);
  assert.equal(s.run("$('stats-aggregates-copy').disabled"),false);
  // One conversation, one table.
@@ -1373,7 +1546,7 @@ test('Copying the aggregates puts a plain-text table on the clipboard and says s
  // A browser that refuses the clipboard says so instead of pretending it copied.
  s.context.navigator={};
  await s.run('copyLatencyAggregates()');
- assert.match(s.run("$('stats-aggregates-copied').textContent"),/no dejó copiar/);
+ assert.match(s.run("$('stats-aggregates-copied').textContent"),/No se pudo copiar/);
  s.run('renderLatencyStats(null,null)');
  await s.run('copyLatencyAggregates()');
  assert.equal(copied.length,1,'nothing measured, nothing copied');
@@ -1420,7 +1593,7 @@ test('When the room goes away the call stays up: the socket is reopened by itsel
  s.context.WebSocket.OPEN=1;
  const joinLine=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>value=>{if(name==='setJoinStatus')joinLine.push(value?value.text:null)}});s.context.crypto={randomUUID:()=>'hello-id'};
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:null,room:{revision:0},clients:[],call:null,participants:[]})});
- s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};voicePreferences={stt_provider:'openai'};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1}");
+ s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1}");
  s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
  const epoch=s.run('connectEpoch');
  // The room restarts: the socket closes with a code that is not a refusal.
@@ -1447,7 +1620,7 @@ test('When the room goes away the call stays up: the socket is reopened by itsel
 
 test('The engine badge carries the audio output health: recovering on a stall, failed on a refusal, clean once something plays',()=>{
  const s=setup();
- s.run("roomStore.patch({engineReady:true,voicePreferences:{stt_provider:'openai',stt_model:'gpt-4o'}})");
+ s.run("roomStore.patch({engineReady:true,voicePreferences:{stt:{place:'openai',model:'gpt-4o'}}})");
  assert.equal(s.run('SessionState.engineView(state).text'),'OpenAI · gpt-4o · smart-turn');
  s.run("noteOutputHealth('stall')");
  assert.equal(s.run('SessionState.engineView(state).text'),'OpenAI · gpt-4o · smart-turn · audio ↻');
@@ -1485,7 +1658,7 @@ test('The echo light says whether the page can expect its own voice to be cancel
 
 /* One indicator from the tap to the room: these two tests are the sequence a person reads, and what
  * takes its place when a step fails. */
-function joining(s,{preferences={},capabilities={webgpu:false,wasm:true,models:['onnx-community/whisper-tiny']},prepareVoice,prepareWhisper,getUserMedia,admission={admitted:true,reason:null,message:null,clients:1,max:8}}={}){
+function joining(s,{preferences={},capabilities={webgpu:false,wasm:true},prepareVoice,prepareWhisper,getUserMedia,admission={admitted:true,reason:null,message:null,clients:1,max:8}}={}){
  const published=[],sockets=[],track={enabled:true,stop(){},getSettings:()=>({echoCancellation:true}),applyConstraints:async()=>{}};
  s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>value=>{if(name==='setJoinStatus')published.push(value?value.text:null)}});
  s.context.crypto={randomUUID:()=>'hello-id'};
@@ -1494,12 +1667,12 @@ function joining(s,{preferences={},capabilities={webgpu:false,wasm:true,models:[
  s.context.WebSocket.OPEN=1;
  s.context.fetch=async path=>{if(admission==='unreachable'&&path.includes('/admission'))throw Error('Failed to fetch');return {ok:true,json:async()=>
   path.includes('/admission')?admission
-  :path.includes('/languages')?{stt_provider:'browser',stt_model:'onnx-community/whisper-tiny',stt_device:'auto',default_model:'kokoro',tts_device:'auto',...preferences}
+  :path.includes('/languages')?{ui_language:'es',...preferences}
   :path.includes('/participants')?{participants:[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]}
   :{binding:null,room:{revision:0},clients:[],call:null,participants:[]}}};
  s.context.window.roomVoice={unlock:async()=>{},cancel(){},prepare:prepareVoice||(async()=>{s.handlers['voice-preparation']({detail:{phase:'loading',progress:42}})})};
  s.context.window.roomTranscription={capabilities:async()=>capabilities,start(){},stop(){},
-  prepare:prepareWhisper||(async({model})=>{s.handlers['voice-preparation']({detail:{kind:'transcription',phase:'loading',progress:17}});return {model,device:'wasm'}})};
+  prepare:prepareWhisper||(async({model})=>{s.handlers['voice-preparation']({detail:{kind:'transcription',phase:'loading',progress:17}});return {model,engine:'transformers-js',accelerator:'wasm'}})};
  s.context.navigator={mediaDevices:{getUserMedia:getUserMedia||(async()=>({getAudioTracks:()=>[track],getTracks:()=>[track]}))}};
  s.run("startMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};people=[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
  return {published,sockets,tap:()=>s.run('toggleCall')()};
@@ -1543,7 +1716,7 @@ test('A step that fails leaves its reason, and what to do, where the step was',a
  const socket=await firstSocket(room.sockets);
  socket.onclose({code:1013});
  await joined;
- assert.equal(room.published.at(-1),'La sala ya tiene el máximo de navegadores conectados. Espera a que salga alguien y vuelve a entrar.');
+ assert.equal(room.published.at(-1),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.');
 });
 
 /* What the room wrote must reach the person, and a tunnel keeps none of it: the close arrived without
@@ -1556,7 +1729,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const socket=await firstSocket(room.sockets);
  socket.onerror();socket.onclose({code:1006});   // everything the socket could have said, lost on the way
  await joined;
- assert.equal(room.published.at(-1),'La sala ya tiene el máximo de navegadores conectados. Espera a que salga alguien y vuelve a entrar.',
+ assert.equal(room.published.at(-1),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.',
   'the reason came from the room, asked over a request no proxy rewrites');
 
  // The frame that does arrive says the same thing, by name: one reason, one sentence.
@@ -1568,7 +1741,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
   message:'The room already has the maximum number of browsers connected.'}})});
  telling.onclose({code:1006});
  await tellJoined;
- assert.equal(framed.published.at(-1),'La sala ya tiene el máximo de navegadores conectados. Espera a que salga alguien y vuelve a entrar.');
+ assert.equal(framed.published.at(-1),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.');
 
  // A room that answers nothing at all is not a room that refused: the page says which it was.
  const gone=setup({strictDOM:true});
@@ -1627,42 +1800,39 @@ test('A browser that cannot transcribe refuses at once instead of being waited f
 });
 
 test('A control the person never saw does not decide anything',async()=>{
- // A pane that is hidden, or a catalogue still loading, leaves its select empty. Reading that as a choice
- // turned a saved OpenAI transcription into the browser's, silently (2026-09-20).
+ // A field that is hidden, or not filled yet, reads back empty. Reading that as a choice turned a saved OpenAI
+ // transcription into the browser's, silently (2026-09-20). The stages are the store's, and are saved as shown.
  const s=setup();const stored=[];
  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
- s.run(`ws=null;voiceCatalog={languages:[],models:[]};
-  voicePreferences={stt_provider:'openai',stt_model:'gpt-4o-transcribe',stt_device:'auto',default_model:'eleven_flash_v2_5',turn_patience:'calm'}`);
- for(const id of ['stt-provider','stt-model','tts-device','default-model','turn-patience'])s.run(`$('${id}').value=''`);
+ s.run("ws=null;roomStore.patch({integrationsStatus:'ready',voicePreferences:{stt:"+JSON.stringify(stage('openai','gpt-4o-transcribe',{language:'es',context:''}))+",tts:"+JSON.stringify(stage('elevenlabs','eleven_flash_v2_5',{voice:{es:'v1'},speed:1}))+",turn_patience:'calm'}})");
+ s.run("$('turn-patience').value=''");
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
- const saved=stored.at(-1)[1];
- assert.equal(saved.stt_provider,'openai','an empty provider select is not a switch to the browser');
- assert.equal(saved.stt_model,'gpt-4o-transcribe');
- assert.equal(saved.default_model,'eleven_flash_v2_5');
- assert.equal(saved.turn_patience,'calm');
- assert.equal(saved.tts_device,'auto');
+ const saved=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
+ assert.equal(saved.stt.place,'openai','a provider whose listing is not in is not a switch to this device');
+ assert.equal(saved.stt.model,'gpt-4o-transcribe');
+ assert.equal(saved.tts.model,'eleven_flash_v2_5');
+ assert.equal(stored.find(([key])=>key==='sidevoice.settings')[1].turn_patience,'calm');
 });
-
-test('Saving the settings form stores every device setting, the ambient bed among them',async()=>{
+test('Saving the settings form stores every device setting, the ambient bed among them, and only today\'s shape',async()=>{
  const s=setup();const stored=[];
  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
- s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto'};voiceCatalog={languages:[],models:[]}");
- for(const [id,value] of [['stt-language','es'],['stt-device',''],['default-tts-language','es'],['tts-speed','1'],['ui-language','es'],
-  ['tts-device','auto'],['default-model','kokoro'],['default-voice','ef_dora'],['audio-grace-seconds','2'],['presence-sound','on'],['presence-volume','5'],['replay-on-return-seconds','300'],
-  ['turn-end-mode','smart_turn'],['user-speech-timeout','2.5'],['smart-turn-min-silence','0.6'],['smart-turn-max-silence','3'],
-  ['vad-confidence','0.6'],['vad-min-volume','0.35'],['vad-start-secs','0.2']])
+ await measured(s,{webgpu:false,wasm:true});
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt_provider:'openai',tts_execution:'browser',spanish_voice:'em_alex'}})");
+ for(const [id,value] of [['ui-language','es'],['audio-grace-seconds','2'],['presence-sound','on'],['locked-call','on'],['replay-on-return-seconds','300'],['turn-patience','fast']])
   s.run(`$('${id}').value=${JSON.stringify(value)}`);
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
  assert.ok(!s.run("$('settings-error').textContent"),'the form reached the end without throwing');
  assert.match(s.run("liveNote"),/Preferencias guardadas/,"the notice is a fact; the live region renders it");
  const saved=stored.find(([key])=>key==='sidevoice.settings')?.[1];
  assert.ok(saved,'something was stored at all');
- assert.equal(saved.stt_device,'auto','a hidden select reading back empty keeps the last valid value');
- assert.equal('vad_start_secs' in saved,false,'the detector is tuned in the room, not here');
+ assert.deepEqual(Object.keys(saved).sort(),['audio_grace_seconds','locked_call','presence_sound','replay_on_return_seconds','turn_patience','ui_language'],
+  'old fields are dropped, not translated (F11)');
+ const stages=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
+ assert.deepEqual(stages.stt,{place:'device',model:'whisper-tiny',options:{language:s.run('speechLanguage')},build:null},'with nothing chosen, this device\'s best offer');
+ assert.equal(stages.tts.model,'kokoro-82m-v1.0');
  assert.equal(saved.presence_sound,'on');
  assert.equal(saved.replay_on_return_seconds,300,'how far back to repeat is this device\'s, and a number');
 });
-
 // ----- what the microphone kept hearing while the socket was down (#46) -----
 // 20 ms frames of 16 kHz PCM, the shape the capture worklet posts to the page.
 const GAP_FRAMES=`makeFrames=peaks=>peaks.map(peak=>{const frame=new Int16Array(320);for(let i=0;i<320;i++)frame[i]=Math.round(peak*32767*(i%2?1:-1));return frame.buffer});
@@ -1738,7 +1908,7 @@ test('A room that stays away is tried again for as long as it takes, and only a 
  s.run(`RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);
   startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
   window.roomVoice={unlock:async()=>{},cancel(){},signal(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
-  voicePreferences={stt_provider:'openai'};stream={getAudioTracks:()=>[{enabled:true}],getTracks:()=>[]};sessionId='old-session';ws={readyState:1}`);
+  voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};stream={getAudioTracks:()=>[{enabled:true}],getTracks:()=>[]};sessionId='old-session';ws={readyState:1}`);
  const pending=s.run('lostConnection')({code:1006},s.run('connectEpoch'),{browserStt:false,sttRuntime:null});
  const settle=()=>new Promise(resolve=>setTimeout(resolve,15));
  // A tunnel: every attempt finds nobody. The old page gave up after six.
@@ -1765,7 +1935,7 @@ test('While the room is away the microphone keeps being captured, and the new se
  s.run(`RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);
   var meterStops=0;startMeter=()=>{};stopMeter=()=>{meterStops++};startCapture=async()=>{};keepScreenAwake=()=>{};
   window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
-  voicePreferences={stt_provider:'openai'};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1};
+  voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1};
   ${GAP_FRAMES}`);
  const pending=s.run('lostConnection')({code:1006},s.run('connectEpoch'),{browserStt:false,sttRuntime:null});
  assert.equal(s.run('meterStops'),0,'losing the socket never stops the capture: the microphone was not paused');
@@ -1944,7 +2114,7 @@ test('The tab names the sessions it has used, so the room can answer what this b
  s.context.sessionStorage={getItem:key=>store[key]??null,setItem:(key,value)=>{store[key]=value},removeItem:key=>{delete store[key]}};
  s.run(`startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
   window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
-  voicePreferences={stt_provider:'openai'};stream={getAudioTracks:()=>[{enabled:true}]}`);
+  voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};stream={getAudioTracks:()=>[{enabled:true}]}`);
  for(const id of ['first-session','second-session']){
   const joining=s.run('joinRoom')(s.run('connectEpoch'),{browserStt:false,sttRuntime:null});
   const socket=sockets.at(-1);socket.readyState=1;socket.onopen();
@@ -2268,7 +2438,7 @@ test('A reconnection comes back to the same machine by whichever of its addresse
  s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
  s.run(`RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
   window.roomVoice={unlock:async()=>{},cancel(){},signal(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
-  voicePreferences={stt_provider:'openai'};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1};
+  voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};stream={getAudioTracks:()=>[{enabled:true}]};sessionId='old-session';ws={readyState:1};
   nodeBase='http://127.0.0.1:8768';verified.set(nodeBase,Date.now());${GAP_FRAMES}`);
  // The laptop left the network: its direct address is gone, its room still reaches it.
  s.context.fetch=network({at:{'https://room.example/nodes/mac':node}}).get;
@@ -2296,7 +2466,7 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
  assert.equal(away.message,'Esa máquina no está conectada a la sala ahora mismo.');
  assert.equal(away.refused,false,'a machine restarting may be back at the next attempt');
  const full=await refused(null);
- assert.match(full.message,/máximo de navegadores/,'the close code alone still means a full room');
+ assert.match(full.message,/máximo de dispositivos/,'the close code alone still means a full room');
  assert.equal(full.refused,true);
 });
 // ----- the microphone over WebRTC (docs/RENDEZVOUS.md, phase 4) -----
@@ -2324,7 +2494,7 @@ function webrtcCall({search='',rtc={enabled:true,ice_servers:[{urls:['stun:stun.
  const track={enabled:true,stop(){}};
  s.run(`startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
   window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
-  voicePreferences={stt_provider:'openai'};rendezvous='room';node='mac';nodeBase='/nodes/mac'`);
+  voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};rendezvous='room';node='mac';nodeBase='/nodes/mac'`);
  s.context.__track=track;s.run("stream={getAudioTracks:()=>[globalThis.__track],getTracks:()=>[globalThis.__track]}");
  const join=async(id,context={})=>{
   const joining=s.run('joinRoom')(s.run('connectEpoch'),{browserStt:false,sttRuntime:null,...context});
@@ -2410,17 +2580,17 @@ test('Switched off on this device, or by the machine, the microphone stays on th
  await stored.join('call-1');
  assert.equal(FakePeer.all.length,0,'localStorage sidevoice.webrtc=off keeps the socket too');
 });
-test('Inside the desktop app, its native engine is one more place a voice can run',()=>{
+test('A native build goes to the app\'s engine, a page build to the page\'s worker, by the offer and nothing else',async()=>{
  const s=setup({strictDOM:true});
- s.run("renderVoiceDevice('auto')");
- const before=s.run("$('tts-device').children.map(option=>option.value)");
- assert.ok(!before.includes('native'),'a browser has no native engine');
- s.run("nativeModels={stt:['onnx-community/whisper-small'],tts:['onnx-community/Kokoro-82M-v1.0-ONNX']};renderVoiceDevice('native')");
- assert.ok(s.run("$('tts-device').children.map(option=>option.value)").includes('native'));
- assert.equal(s.run("$('tts-device').value"),'native','a saved native choice stays chosen');
- assert.match(s.run("$('tts-device-note').textContent"),/procesador de este equipo/);
-});
-test('When the desktop app answers the headset buttons, the page does not answer them too',()=>{
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:8192}),installed:async()=>[]}}};
+ await s.run('measureDevice(true)');
+ assert.deepEqual(plain(s.run("ttsRequest("+JSON.stringify(TTS())+")")),{model:'kokoro-82m-v1.0',engine:'sherpa-onnx',accelerator:'cpu',native:true});
+ s.run("window.sidevoiceActions.chooseStageBuild('tts','sherpa-onnx/coreml')");
+ assert.equal(plain(s.run("ttsRequest(paneStage('tts'))")).accelerator,'coreml','Avanzado overrides the accelerator');
+ s.context.window.__sidevoiceDesktop=undefined;
+ await measured(s,PAGE_CAPS);
+ assert.deepEqual(plain(s.run("ttsRequest("+JSON.stringify(TTS())+")")),{model:'kokoro-82m-v1.0',engine:'transformers-js',accelerator:'webgpu',native:false,fallback:'wasm'});
+});test('When the desktop app answers the headset buttons, the page does not answer them too',()=>{
  const s=setup({strictDOM:true});
  const registered=[];
  s.context.navigator={mediaSession:{setActionHandler:(action,handler)=>registered.push([action,!!handler]),metadata:null}};
@@ -2432,34 +2602,65 @@ test('When the desktop app answers the headset buttons, the page does not answer
  s.run("applyLockScreen(true)");
  assert.equal(registered.length,0,'with the app answering them, one click must not toggle the microphone twice');
 });
-test('Inside the desktop app a native device choice is saved, and outside it is not',async()=>{
- for(const [native,expected] of [[true,'native'],[false,'auto']]){
-  const s=setup();const stored=[];
-  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
-  s.run("ws=null;voicePreferences={stt_provider:'openai',stt_device:'auto',tts_device:'auto'};voiceCatalog={languages:[],models:[]}");
-  if(native)s.run("nativeModels={stt:['onnx-community/whisper-small'],tts:['onnx-community/Kokoro-82M-v1.0-ONNX']}");
-  s.run("$('tts-device').value='native'");
-  await s.run("$('language-form').onsubmit({preventDefault(){}})");
-  const saved=stored.find(([key])=>key==='sidevoice.settings')?.[1];
-  assert.equal(saved.tts_device,expected,native?'the app\'s engine is a device like the others':'a page without the app cannot choose it');
- }
+test('A page whose WebGPU failed to load Whisper falls back to WASM once and stops offering WebGPU',async()=>{
+ const s=setup();const saved={};
+ s.context.localStorage={getItem:key=>saved[key]??null,setItem:(key,value)=>{saved[key]=value},removeItem(key){delete saved[key]}};
+ await measured(s,PAGE_CAPS);
+ const tried=[];
+ s.run("window.roomTranscription.prepare=async options=>{__tried.push(options.accelerator);if(options.accelerator==='webgpu')throw Error('GPU lost');return {model:options.model,engine:options.engine,accelerator:options.accelerator}}");
+ s.context.__tried=tried;
+ const runtime=plain(await s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"));
+ assert.deepEqual(tried,['webgpu','wasm']);
+ assert.equal(runtime.sttRuntime.accelerator,'wasm');
+ assert.equal(runtime.sttRuntime.fallback_from,'webgpu');
+ assert.equal(saved['sidevoice.webgpu-failed'],'1');
+ await s.run('measuring');
+ assert.deepEqual(plain(s.run('deviceCapabilities.has')),['wasm'],'this device no longer has WebGPU as far as the offers go');
+ assert.ok(!stageView(s,'stt').models.some(m=>m.id==='whisper-small'));
 });
-
+test('A model download that failed on WebGPU falls back once and leaves the GPU offered; a GPU failure sets it aside until retried (R11)',async()=>{
+ const s=setup();const saved={};
+ s.context.localStorage={getItem:key=>saved[key]??null,setItem:(key,value)=>{saved[key]=value},removeItem(key){delete saved[key]}};
+ await measured(s,PAGE_CAPS);
+ let failure;
+ s.context.__failure=()=>failure;
+ s.run("window.roomTranscription.prepare=async options=>{if(options.accelerator==='webgpu')throw __failure();return {model:options.model,engine:options.engine,accelerator:options.accelerator}}");
+ const count=()=>stageView(s,'stt').models.length;
+ for(const error of [Error('Failed to fetch model download'),Object.assign(Error('cancelled'),{name:'AbortError'}),Error('Could not locate file: "https://huggingface.co/…/encoder_model.onnx"')]){
+  failure=error;
+  const runtime=plain(await s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"));
+  assert.equal(runtime.sttRuntime.accelerator,'wasm','the call still goes on, on the CPU');
+  assert.equal(saved['sidevoice.webgpu-failed'],undefined,error.message+' says nothing about the GPU');
+ }
+ await s.run('measureDevice(true)');
+ assert.equal(count(),4,'every GPU model is still offered');
+ failure=Error('WebGPU device lost: no adapter for this shader');
+ await s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})");
+ assert.equal(saved['sidevoice.webgpu-failed'],'1');
+ await s.run('measuring');
+ assert.equal(count(),2,'a GPU that failed is set aside');
+ assert.equal(s.run('roomStore.getState().voiceTools.gpuSetAside'),true,'and the pane offers to try it again');
+ await s.run('window.sidevoiceActions.retryGpu()');
+ assert.equal(count(),4,'tried again, its models are back');
+ assert.equal(s.run('roomStore.getState().voiceTools.gpuSetAside'),false);
+});
 test('A person who never chose gets their system language, English when it is none of ours, and a saved choice wins',async()=>{
  const s=setup();
- // The room's defaults are English: a node cannot know the person's system.
- s.context.fetch=async()=>({ok:true,json:async()=>({ui_language:'en',stt_language:'en',default_tts_language:'en',default_voice:'af_heart'})});
- s.context.navigator={languages:['de-DE','fr-FR']};
- let p=await s.run('loadPreferences()');
- assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['en','fr','fr']);
+ // The room's defaults are English: a node cannot know the person's system. Its stages are not this device's.
+ s.context.fetch=async()=>({ok:true,json:async()=>({ui_language:'en',stt:{place:'device',model:'whisper-large-v3-turbo',options:{},build:null}})});
+ await measured(s,{webgpu:false,wasm:true});
+ const speech=languages=>{s.context.navigator={languages};s.run('roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES)})')};
+ s.context.navigator={languages:['de-DE','fr-FR']};speech(['de-DE','fr-FR']);
+ let p=await s.run('callPreferences()');
+ assert.deepEqual([p.ui_language,p.stt.model,p.stt.options.language],['en','whisper-tiny','fr']);
+ s.context.navigator={languages:['es-ES']};speech(['es-ES']);
+ p=await s.run('callPreferences()');
+ assert.deepEqual([p.ui_language,p.stt.options.language],['es','es']);
+ speech(['de-DE']);s.context.navigator={languages:['de-DE']};
+ p=await s.run('callPreferences()');
+ assert.deepEqual([p.ui_language,p.stt.options.language],['en','en']);
  s.context.navigator={languages:['es-ES']};
- p=await s.run('loadPreferences()');
- assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['es','es','es']);
- s.context.navigator={languages:['de-DE']};
- p=await s.run('loadPreferences()');
- assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['en','en','en']);
- s.context.navigator={languages:['es-ES']};
- s.context.localStorage={getItem:key=>key==='sidevoice.settings'?JSON.stringify({ui_language:'en',stt_language:'auto'}):null,setItem(){},removeItem(){}};
- p=await s.run('loadPreferences()');
- assert.deepEqual([p.ui_language,p.stt_language,p.default_tts_language],['en','auto','es']);
+ s.context.localStorage={getItem:key=>key==='sidevoice.settings'?JSON.stringify({ui_language:'en'}):key==='sidevoice.stages'?JSON.stringify({[PAIRED.fp]:{stt:STT('whisper-base',{language:'auto'})}}):null,setItem(){},removeItem(){}};
+ p=await s.run('callPreferences()');
+ assert.deepEqual([p.ui_language,p.stt.model,p.stt.options.language],['en','whisper-base','auto']);
 });

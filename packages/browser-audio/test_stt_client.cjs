@@ -16,26 +16,26 @@ function setup(){
   window:{dispatchEvent(){},sidevoiceSessionId:()=> 'session-1'},
  });
  vm.runInContext(fs.readFileSync(__dirname+'/stt-client.js','utf8'),context);
- const client=context.window.roomTranscription;client.runtime={model:'model',device:'webgpu'};
+ const client=context.window.roomTranscription;client.runtime={model:'model',engine:'transformers-js',accelerator:'webgpu'};
  client.start({socket:{readyState:1,send:value=>sent.push(JSON.parse(value))},language:'auto'});
  return {client,sent,context,setNow:value=>now=value};
 }
 
 test('a finished turn from the room is transcribed and answered with its metrics',async()=>{
  const {client,sent,setNow}=setup();let received;
- client._request=async(type,data)=>{received={type,...data};setNow(3250);return {text:'Hola desde el navegador',elapsed_ms:120,device:'webgpu',model:'model'}};
+ client._request=async(type,data)=>{received={type,...data};setNow(3250);return {text:'Hola desde el navegador',elapsed_ms:120,accelerator:'webgpu',model:'model'}};
  await client.transcribe({request_id:'req-1',audio_base64:wavBase64(new Array(16000).fill(1000)),language:null});
  assert.equal(received.type,'transcribe');assert.equal(received.model,'model');assert.equal(received.language,'auto');
  assert.equal(new Float32Array(received.audio).length,16000);
  assert.deepEqual(sent.map(item=>item.type),['voice-transcript']);
  assert.equal(sent[0].data.request_id,'req-1');assert.equal(sent[0].data.session_id,'session-1');
  assert.equal(sent[0].data.text,'Hola desde el navegador');
- assert.deepEqual({...sent[0].data.metrics},{audio_ms:1000,recognition_ms:120,request_to_transcript_ms:250,device:'webgpu',model:'model'});
+ assert.deepEqual({...sent[0].data.metrics},{audio_ms:1000,recognition_ms:120,request_to_transcript_ms:250,accelerator:'webgpu',model:'model'});
 });
 
 test('the room language wins over the browser default and a resampled WAV keeps its duration',async()=>{
  const {client,sent}=setup();let received;
- client._request=async(type,data)=>{received=data;return {text:'Bonjour',elapsed_ms:10,device:'webgpu',model:'model'}};
+ client._request=async(type,data)=>{received=data;return {text:'Bonjour',elapsed_ms:10,accelerator:'webgpu',model:'model'}};
  await client.transcribe({request_id:'req-2',audio_base64:wavBase64(new Array(48000).fill(0),48000),language:'fr'});
  assert.equal(received.language,'fr');
  assert.equal(new Float32Array(received.audio).length,16000);
@@ -44,7 +44,7 @@ test('the room language wins over the browser default and a resampled WAV keeps 
 
 test('degenerate symbol repetition is reported instead of reaching the agent',async()=>{
  const {client,sent}=setup();
- client._request=async()=>({text:'* '.repeat(200),elapsed_ms:100,device:'webgpu',model:'model'});
+ client._request=async()=>({text:'* '.repeat(200),elapsed_ms:100,accelerator:'webgpu',model:'model'});
  await client.transcribe({request_id:'req-3',audio_base64:wavBase64(new Array(1600).fill(0))});
  assert.deepEqual(sent.map(item=>item.type),['voice-transcript-error']);
  assert.equal(sent[0].data.request_id,'req-3');
@@ -60,7 +60,7 @@ test('an unprepared model answers with an error rather than silence',async()=>{
 
 test('stopping the provider drops an in-flight answer and rejects pending work',async()=>{
  const {client,sent}=setup();
- client._request=()=>new Promise(resolve=>setTimeout(()=>resolve({text:'Tarde',elapsed_ms:1,device:'webgpu',model:'model'}),5));
+ client._request=()=>new Promise(resolve=>setTimeout(()=>resolve({text:'Tarde',elapsed_ms:1,accelerator:'webgpu',model:'model'}),5));
  const pending=client.transcribe({request_id:'req-5',audio_base64:wavBase64(new Array(1600).fill(0))});
  client.stop();
  await pending;
@@ -74,8 +74,8 @@ test('switching between the page\'s engine and the native one fails what was wai
  context.Worker=class{constructor(){this.terminated=false}postMessage(message){posted.push(message)}terminate(){this.terminated=true}};
  context.window.sidevoiceNativeWorkers=context.sidevoiceNativeWorkers={transcription:()=>({postMessage(message){posted.push({native:true,...message})},terminate(){}})};
  client.worker=null;client.native=false;
- const pending=client._request('transcribe',{device:'wasm',audio:new ArrayBuffer(4)});
- const switched=client._request('load',{device:'native',model:'m'});
+ const pending=client._request('transcribe',{native:false,audio:new ArrayBuffer(4)});
+ const switched=client._request('load',{native:true,model:'m'});
  await assert.rejects(pending,/motor de transcripción/);
  assert.ok(posted.some(message=>message.native&&message.type==='load'),'the native engine got the load');
  client.pending.clear();void switched.catch(()=>{});

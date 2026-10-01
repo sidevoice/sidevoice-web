@@ -19,7 +19,7 @@ afterEach(() => {
 describe("the page's half of a turn's trace", () => {
   it("puts the turn inside the call and hands the room a traceparent for both", () => {
     const { exporter, telemetry } = telemetryUnderTest();
-    const call = telemetry.startCall({ "sidevoice.stt_provider": "browser" });
+    const call = telemetry.startCall({ "sidevoice.stt_place": "device" });
     const turn = telemetry.startTurn("a", 1);
     expect(call).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/);
     expect(turn).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/);

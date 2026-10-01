@@ -1,27 +1,28 @@
 import {StyleTextToSpeech2Model,AutoTokenizer,Tensor,env} from '@huggingface/transformers';
 import ESpeakNG from '/voice-browser/assets/espeak-ng.js';
 import {KOKORO} from './page-models.js';
-const MODEL=KOKORO.repository;
-const REVISION=KOKORO.revision;
 env.allowLocalModels=false;
 env.backends.onnx.wasm.wasmPaths='/voice-browser/assets/';
 env.backends.onnx.wasm.numThreads=1;
 import catalog from './catalog.json';
 const allowed=new Set(catalog.languages.flatMap(l=>l.voices.map(v=>v[0])));
 const voiceCache=new Map();
-let model,tokenizer,device;
-export async function initialize(preference,progress){
- if(model&&device===preference)return device;
- await model?.dispose();model=null;
- device=preference;
- tokenizer=await AutoTokenizer.from_pretrained(MODEL,{revision:REVISION,progress_callback:progress});
- model=await StyleTextToSpeech2Model.from_pretrained(MODEL,{revision:REVISION,device,dtype:KOKORO.dtype[device==='webgpu'?'webgpu':'wasm'],progress_callback:progress});
- return device;
+let model,tokenizer,active=null,source=null;
+/* A catalogue model of the kokoro family on one accelerator, as the offer chose it. */
+export async function initialize(id,accelerator,progress){
+ const entry=KOKORO[id];
+ if(!entry)throw Error('Modelo de voz no compatible');
+ if(model&&active===id+':'+accelerator)return accelerator;
+ await model?.dispose();model=null;active=null;source=entry;
+ tokenizer=await AutoTokenizer.from_pretrained(entry.repository,{revision:entry.revision,progress_callback:progress});
+ model=await StyleTextToSpeech2Model.from_pretrained(entry.repository,{revision:entry.revision,device:accelerator,dtype:entry.dtype[accelerator],progress_callback:progress});
+ active=id+':'+accelerator;
+ return accelerator;
 }
 async function voiceData(voice,progress){
  if(voiceCache.has(voice))return voiceCache.get(voice);
  progress?.({status:'voice',file:voice+'.bin'});
- const url=`https://huggingface.co/${MODEL}/resolve/${REVISION}/voices/${voice}.bin`;
+ const url=`https://huggingface.co/${source.repository}/resolve/${source.revision}/voices/${voice}.bin`;
  let cache;try{cache=await caches.open('voice-room-kokoro-v1')}catch{}
  let response=await cache?.match(url);
  if(!response){response=await fetch(url);if(!response.ok)throw Error(`Voice download failed: ${response.status}`);try{await cache?.put(url,response.clone())}catch{}}
@@ -43,9 +44,6 @@ export async function phonemes(text,voice){
  if(!language.startsWith('en')){for(const [from,to] of Object.entries(mapping))result=result.replaceAll(from,to);result=result.replaceAll('^','').replaceAll('-','')}
  else{result=result.replaceAll('^','').replaceAll('ʲ','j').replaceAll('r','ɹ').replaceAll('x','k').replaceAll('ɬ','l')}
  return result.trim();
-}
-export function splitText(text,limit=160){
- const chunks=[];let current='';for(const word of text.trim().split(/\s+/)){if(current&&(current.length+word.length+1)>limit){chunks.push(current);current=''}current+=(current?' ':'')+word;if(/[.!?;:]$/.test(word)){chunks.push(current);current=''}}if(current)chunks.push(current);return chunks;
 }
 export async function synthesize(text,voice,speed,progress){
  if(!allowed.has(voice))throw Error('Unsupported voice');

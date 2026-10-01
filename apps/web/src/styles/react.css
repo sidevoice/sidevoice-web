@@ -325,3 +325,15 @@ body,
   .ui-button--ghost:hover { background:transparent }
   .call-bar .engine-slot .engine-toggle:hover,.call-bar .engine-slot[data-open] .engine-toggle { background:transparent;color:#9aa6b3 }
 }
+
+/* A stage (#124 §5): where → model → options → Avanzado. */
+.segmented { display:flex;flex-wrap:wrap;gap:.35rem }
+.segmented .segment { border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill) }
+.segmented .segment[aria-pressed=true] { border-color:var(--sv-primary);background:var(--sv-selected, #ffffff14);color:var(--sv-primary-soft) }
+.segmented .segment[data-state=missing] { opacity:.55 }
+.voice-picker { margin:1rem 0 }
+.voice-row { display:grid;grid-template-columns:minmax(5.5rem,.6fr) minmax(0,1.4fr) 2.5rem;gap:.6rem;align-items:center;padding:.35rem 0 }
+.ui-text-field { display:block;width:100%;margin-top:.45rem;background:#141b23;color:inherit;border:1px solid #526173;border-radius:8px;padding:.55rem;font:inherit;resize:vertical }
+.stage-advanced { margin-top:1.2rem }
+.stage-advanced summary { cursor:pointer }
+.stage-options input[type=range] { display:block;width:100% }

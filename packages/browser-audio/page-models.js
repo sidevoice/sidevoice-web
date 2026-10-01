@@ -9,7 +9,8 @@ function entry(model){
  return {repository:build.config.repository,revision:build.config.revision,label:model.label,devices:build.accelerators||engine.accelerators,dtype:build.config.dtype,requiresFp16:(build.needs||[]).includes('webgpu-f16')};
 }
 const family=name=>catalog.models.filter(model=>model.family===name&&pageBuild(model));
-/* stt-engine.js's MODELS: Hugging Face repository → revision, label, devices, dtype per device, requiresFp16. */
-export const WHISPER=Object.fromEntries(family('whisper').map(model=>{const {repository,...rest}=entry(model);return [repository,rest]}));
-/* engine.js's Kokoro: repository, revision, dtype per device. */
-export const KOKORO=entry(family('kokoro')[0]);
+/* The page's adapters' models by catalogue id (the id a stage saves): repository, revision, label, devices,
+ * dtype per device, requiresFp16. stt-engine.js runs the whisper family, engine.js the kokoro family. */
+const byId=name=>Object.fromEntries(family(name).map(model=>[model.id,entry(model)]));
+export const WHISPER=byId('whisper');
+export const KOKORO=byId('kokoro');

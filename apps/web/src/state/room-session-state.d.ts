@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationView, IntegrationListing, IntegrationsView, JoinStatusView, LanguageModelView, MachineView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
+import type { ChatMessage, ConversationView, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
 export interface AudioDevices {
  inputs: {id: string; label: string}[]; outputs: {id: string; label: string}[];
@@ -19,7 +19,7 @@ export interface SessionFacts {
  screenLock: {state: string; note: string}; deviceNote: string; holding: boolean; userQuietAt: number;
  audioDevices: AudioDevices; liveNote: string;
  harness: Record<string, boolean>; turns: Record<string, {session: string; thread: string; status?: string; settled?: boolean; harnessEnded?: boolean; readyAt?: number}>;
- now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null; languageModels: LanguageModelView[];
+ now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null;
  /** The machines this device is paired with (never their tokens), the one in use, and the clock they were read at. */
  pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number;
  /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */
@@ -31,6 +31,14 @@ export interface SessionFacts {
  /** What is typed in each integration's row and not stored yet, what the machine said about it, the row to open. */
  integrationDrafts: Record<string, string>; integrationChecks: Record<string, {note: string; status: 'checking' | 'verified' | 'refused'}>;
  integrationFocus: string | null;
+ integrationsStatus: 'idle' | 'loading' | 'ready' | 'failed';
+ modelCatalog: Record<string, unknown> | null; voiceLanguages: {id: string; label: string; voices?: [string, string][]; sample?: string}[];
+ speechLanguage: string; inApp: boolean;
+ deviceCapabilities: {runs: 'page' | 'native'; has: string[]; os?: string; arch?: string; memory_mb?: number | null} | null;
+ deviceOffers: Record<string, unknown>[] | null; installedBuilds: {model: string; engine: string}[];
+ remoteModels: Record<string, {models?: {id: string; label?: string; description?: string}[]; voices?: {id: string; label?: string; languages?: string[]}[]; error?: string}>;
+ stageDraft: {stt?: Record<string, unknown>; tts?: Record<string, unknown>} | null;
+ previewNote: string; prepareNote: string; gpuSetAside: boolean;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';
@@ -46,7 +54,7 @@ export interface SessionSnapshot {
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string}; deviceNote: string;
- bootError: string | null; languageModels: LanguageModelView[]; machines: MachineView[]; pairing: PairingPromptView;
+ bootError: string | null; stages: {stt: StageView; tts: StageView} | null; voiceTools: {previewing: string | null; previewNote: string; prepareNote: string; gpuSetAside: boolean}; machines: MachineView[]; pairing: PairingPromptView;
  integrations: IntegrationsView;
 }
 export interface SessionStore {
@@ -62,7 +70,10 @@ export function shortModel(name: string | null | undefined): string;
 export const NO_MACHINE: string;
 export const UNPAIRED: string;
 export function machinesView(s: SessionFacts): MachineView[];
-export function keyedProvider(s: SessionFacts, id: string): 'ready' | 'missing' | 'hidden';
+export function keyedProvider(s: SessionFacts, id: string): 'ready' | 'missing' | 'absent';
 export function reachNote(s: SessionFacts): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;
 export function sinceText(seconds: number | null | undefined, now: number): string;
+/** What a stage is chosen from, as stage-settings.js reads it. */
+export function stageContext(s: SessionFacts): Record<string, unknown> & { keyed(id: string): 'ready' | 'missing' | 'absent' };
+export function stagesView(s: SessionFacts): {stt: StageView; tts: StageView} | null;

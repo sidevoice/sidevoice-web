@@ -20,7 +20,6 @@ export function useRoomStore<T>(selector: (state: RoomViewState) => T): T {
 export function installRoomBridge(store: RoomStore) {
   window.sidevoiceUI = {
     store,
-    setLanguageModels: (languageModels) => store.patch({ languageModels }),
     setBootError: (bootError) => store.patch({ bootError }),
   };
 }

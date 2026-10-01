@@ -103,8 +103,8 @@ export interface PairingPromptView {
   note: string;
 }
 
-/** One provider as the machine lists it (#64): whether it has a key, never the key. `source`, `hint` and
- *  `environment` are only told to the owner. */
+/** One provider as the machine lists it (#64) to any paired device: whether it has a key, where it came from and
+ *  its last four characters, never the key. */
 export interface IntegrationProvider {
   id: string;
   label: string;
@@ -116,7 +116,6 @@ export interface IntegrationProvider {
 }
 
 export interface IntegrationListing {
-  owner: boolean;
   providers: IntegrationProvider[];
 }
 
@@ -136,12 +135,9 @@ export interface IntegrationRowView {
 }
 
 export interface IntegrationsView {
-  /** null until the machine has said. */
-  owner: boolean | null;
   error: string;
+  status: "idle" | "loading" | "ready" | "failed";
   rows: IntegrationRowView[];
-  /** Providers of each capability the machine lists without a key: greyed out in that pane, with "Configurar". */
-  missing: Record<"transcription" | "voice", {id: string; label: string}[]>;
 }
 
 export interface SelectOption {
@@ -149,19 +145,49 @@ export interface SelectOption {
   label: string;
 }
 
-export interface LanguageModelView {
-  language: string;
+export type StageTask = "stt" | "tts";
+
+/** A place a stage can be put (#124 D7–D8): this device, or a provider the machine lists. 'missing' is a provider
+ *  without a key (greyed out, with Configurar); 'unknown' one whose listing is not in yet, kept as it was chosen. */
+export interface StagePlaceView {
+  id: string;
   label: string;
+  state: "ready" | "missing" | "unknown";
+}
+
+export interface StageChoiceView {
+  value: string;
+  label: string;
+  /** A remote voice listed under "other languages". */
+  other?: boolean;
+}
+
+/** One option of a model's family (or of a provider), as the schema renderer draws it. */
+export type StageOptionView =
+  | { id: string; kind: "language"; label: string; value: string; choices: StageChoiceView[] }
+  | { id: string; kind: "text"; label: string; value: string; max: number }
+  | { id: string; kind: "range"; label: string; value: number; min: number; max: number; step: number }
+  | { id: string; kind: "voice"; label: string; perLanguage: true; loading: boolean; rows: { language: string; label: string; value: string; choices: StageChoiceView[] }[] }
+  | { id: string; kind: "voice"; label: string; perLanguage: false; value: string; choices: StageChoiceView[] };
+
+export interface StageView {
+  task: StageTask;
+  places: StagePlaceView[];
+  place: string;
+  /** False while the choice depends on a machine listing that is not in: the saved choice stays. */
+  editable: boolean;
+  integrations: "idle" | "loading" | "ready" | "failed";
+  models: { id: string; label: string; description?: string; detail: string }[];
+  modelsLoading: boolean;
+  modelsError: string;
   model: string;
-  actualModel: string;
-  modelDescription?: string;
-  modelOptions: ({value: string; label: string; options?: undefined} | {value?: undefined; label: string; options: {value: string; label: string}[]})[];
-  voice: string;
-  voiceOptions: SelectOption[];
-  speed: number | null;
-  speedMin: number;
-  speedMax: number;
-  inheritedSpeed: number;
+  options: StageOptionView[];
+  /** The build this device runs the model on, automatic by default (D9); null off this device. */
+  advanced: { value: string; choices: StageChoiceView[]; reason: string } | null;
+  /** Where the work happens: in this page, in the desktop app, or at a provider. */
+  where: "page" | "app" | "provider";
+  /** Nothing chosen, and this device runs nothing for the stage: a place has to be chosen. */
+  unconfigured?: boolean;
 }
 
 export interface SidevoiceActions {
@@ -173,10 +199,20 @@ export interface SidevoiceActions {
   toggleCall(): Promise<void>;
   selectParticipant(threadId: string): void;
   closeParticipant(threadId: string): Promise<void>;
-  updateLanguageModel(language: string, model: string): void;
-  updateLanguageVoice(language: string, voice: string): void;
-  updateLanguageSpeed(language: string, speed: number | null): void;
+  /** Put a stage somewhere else: this device, or a provider. */
+  chooseStagePlace(task: StageTask, place: string): void;
+  chooseStageModel(task: StageTask, model: string): void;
+  /** One option's value; a per-language option names the language. */
+  setStageOption(task: StageTask, id: string, value: unknown, language?: string): void;
+  /** Avanzado: 'auto' or 'engine/accelerator'. */
+  chooseStageBuild(task: StageTask, value: string): void;
   previewVoice(language: string): Promise<void>;
+  /** Load this device's chosen voice model ahead of the first reply. */
+  prepareVoice(): Promise<void>;
+  /** Ask the machine for its integrations again, after a failed read. */
+  retryIntegrations(): Promise<void>;
+  /** Try this page's GPU again after a model failed to load on it. */
+  retryGpu(): Promise<void>;
   /** Talk to this paired machine from now on, on this device. In a call it hangs up and joins that machine's. */
   chooseMachine(id: string): void;
   /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */

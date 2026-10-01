@@ -5,7 +5,7 @@
 
 /** What the page itself can be shown in (room-i18n.js). */
 export const UI_LANGUAGES = ['es', 'en'];
-/** What a device's `stt_language` and `default_tts_language` accept (sidevoice-core's settings.py owns it). */
+/** The speech languages a stage's language and voices are chosen in (sidevoice-core's voice catalogue). */
 export const SPEECH_LANGUAGES = ['es', 'en', 'fr', 'it', 'pt', 'hi'];
 
 export function systemLanguage(supported, preferred = globalThis.navigator?.languages ?? [globalThis.navigator?.language]) {
@@ -16,8 +16,8 @@ export function systemLanguage(supported, preferred = globalThis.navigator?.lang
   return 'en';
 }
 
-/** Every default that depends on the person's language, from one reading of the system's. */
+/** The device settings that default to the person's language. The stages' language options default to the
+ *  system's speech language too, where the stage is built (stage-settings.js `defaultStage`). */
 export function systemPreferences(preferred) {
-  const speech = systemLanguage(SPEECH_LANGUAGES, preferred);
-  return { ui_language: systemLanguage(UI_LANGUAGES, preferred), stt_language: speech, default_tts_language: speech };
+  return { ui_language: systemLanguage(UI_LANGUAGES, preferred) };
 }

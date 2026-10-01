@@ -8,7 +8,7 @@ self.onmessage=({data})=>{
   const progress=value=>send('progress',{progress:value});
   try{
    if(data.type==='capabilities'){send('capabilities',{capabilities:await capabilities()});return}
-   if(data.type==='load'){const runtime=await initialize(data.model,data.device,progress);if(epoch===generation)send('ready',{runtime});return}
+   if(data.type==='load'){const runtime=await initialize(data.model,data.accelerator,progress);if(epoch===generation)send('ready',{runtime});return}
    if(data.type==='transcribe'){
     const started=performance.now(),audio=new Float32Array(data.audio);
     const result=await transcribe(audio,data,progress);

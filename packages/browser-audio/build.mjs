@@ -16,4 +16,5 @@ await copyFile(new URL('./room-client.js',import.meta.url),new URL('./room-clien
 
 await copyFile(new URL('./room-i18n.js',import.meta.url),new URL('./room-i18n.js',out));
 await copyFile(new URL('./stt-client.js',import.meta.url),new URL('./stt-client.js',out));
-await copyFile(new URL('./native-worker.js',import.meta.url),new URL('./native-worker.js',out));
+// A classic script the page loads with a <script> tag, bundled for the chunker it shares with the page's voice.
+await build({entryPoints:[fileURLToPath(new URL('./native-worker.js',import.meta.url))],outfile:fileURLToPath(new URL('./native-worker.js',out)),bundle:true,format:'iife',platform:'browser',minify:true});

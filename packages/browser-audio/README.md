@@ -36,20 +36,22 @@ The core's `tests/test_catalog_contract.py` checks the copies against it when `S
 names this checkout. `page-models.js` reads `models.json` for the page's Whisper list (`stt-engine.js`
 `MODELS`) and Kokoro's repository, revision and dtypes (`engine.js`); nothing in the page names a
 model. `offers.ts` is the resolver (#124 §4) in TypeScript, passing the same vectors as the core's
-Python and the desktop app's Rust; it is not wired into the settings yet.
+Python and the desktop app's Rust. The web computes *Este dispositivo* with it: in a page from what the
+page measures (`wasm`, `webgpu`, `webgpu-f16`), in the desktop app only from the native bridge's
+`capabilities()`. The chosen offer decides the worker: a page family adapter (`stt-engine.js` for
+whisper, `engine.js` for kokoro) on the offer's accelerator, or `native-worker.js` with the catalogue
+model id and engine. Both are keyed by catalogue model id; there is no page-id mapping.
 
 ## Room integration
 
-`catalog.json` declares the available model, six languages and voice IDs. Python
-validates preferences against this same catalog; the engine bundles it. Japanese
-and Mandarin are listed as unavailable until their G2P implementations exist.
-Preferences contain defaults plus `language_overrides`; a default voice from another
-language falls back to the first compatible voice. Explicit language overrides win.
-The settings reset button resets language overrides, leaving speed and defaults alone.
+`catalog.json` declares six speech languages, their voices' names and a preview sentence each.
+Each device keeps one setting per stage (`stt`, `tts`): a place (`device` or a provider), a
+catalogue model, the options its family's schema declares (Kokoro: a voice per language and a
+speed), and an optional build override. sidevoice-core validates it against the catalogue.
 
-A room negotiates `tts_execution: browser` on join. The server dispatches `voice-speech`
-(text, voice, speed, device, task/session/revision/utterance) over the room WebSocket,
-without invoking server TTS. The browser acknowledges playing and playback_finished
+With the voice on `device`, the node dispatches `voice-speech` (text, model, voice, speed,
+language, session/revision/utterance) over the room WebSocket, without invoking server TTS; the
+page runs it on its own resolved build. The browser acknowledges playing and playback_finished
 only after the last AudioBufferSource ends. This confirms browser playout, not human
 comprehension. The next utterance waits for this receipt. Generation errors mark failed.
 Server VAD starts and binding changes send cancellation; the client stops all scheduled
@@ -61,10 +63,6 @@ cache; preparing loads the model into memory and initializes the GPU/CPU. Cleari
 site data, eviction, another browser/origin, or a changed model can require download again.
 GPU and CPU use different weight variants. Browser synthesis is the active room path.
 STT can run locally in this package through Transformers.js or use the server-mediated OpenAI provider; cloud keys never move into the browser.
-
-Per-language `speed` is nullable: null inherits global `tts_speed`. The row preview
-uses unsaved voice/speed selections; actual speech uses saved resolved settings.
-Resetting language overrides resets speed inheritance too, without changing global speed.
 
 2026-09-13 UI update: the main room now always uses browser synthesis; the server
 choice and native preview route were removed. UI language (Spanish/English) is

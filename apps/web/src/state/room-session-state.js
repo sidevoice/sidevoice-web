@@ -1,4 +1,5 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
+import { stageView } from './stage-settings.js';
 export const PRESENCE_LEVEL = .1;
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 export const GAP_BUFFER_SECONDS = 30;
@@ -22,7 +23,7 @@ export function initialSessionFacts() {
         joinStep: null, joinFailure: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, deviceNote: '', holding: false, userQuietAt: 0, liveNote: '',
         audioDevices: { inputs: [], outputs: [], inputId: 'default', outputId: 'default', available: true, outputAvailable: true, busy: false },
-        harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null, languageModels: [],
+        harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
         // The machines this device is paired with (never their tokens), the one in use, and the clock of the
         // moment they were read so a row can say "hace 3 días" without reading one (docs/DEVICE_PAIRING.md).
         pairings: [], pairingInUse: null, machinesAt: 0,
@@ -35,6 +36,21 @@ export function initialSessionFacts() {
         // (#64) — or null until read; why they could not be read; what is typed in each row and not yet
         // stored, what the machine said about it, and the row a pane's "Configurar" opened.
         integrations: null, integrationsError: '', integrationDrafts: {}, integrationChecks: {}, integrationFocus: null,
+        // Whether that listing is the current machine's: 'loading', 'ready', or 'failed' (then `integrationsError`
+        // says why). A listing that is not in is not a listing without providers: a pane keeps the choice it has.
+        integrationsStatus: 'idle',
+        // What the stages (transcription, voice) are chosen from (#124): the model catalogue this page was built
+        // with, the speech languages and their voices' names, the person's system language, whether this page
+        // runs inside the desktop app, what this device measured about itself and the resolver's offers for it,
+        // the builds already on its disk (the app's), and each provider's own lists keyed `place:task`.
+        modelCatalog: null, voiceLanguages: [], speechLanguage: 'en', inApp: false,
+        deviceCapabilities: null, deviceOffers: null, installedBuilds: [], remoteModels: {},
+        // The settings dialog's unsaved stages ({stt, tts}), or null when it shows what is saved.
+        stageDraft: null,
+        // What the voice pane says about a preview and about preloading the model.
+        previewNote: '', prepareNote: '',
+        // This page's WebGPU failed to load a model and is set aside, until the person asks to try it again.
+        gpuSetAside: false,
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -83,7 +99,7 @@ export function echoCoverage(f) {
     if (f.aec === false)
         return { state: 'off', note: 'El micrófono no tiene cancelación de eco: la voz de la sala por el altavoz abrirá intervenciones.' };
     if (f.aec !== true)
-        return { state: 'partial', note: 'El navegador no confirma la cancelación de eco del micrófono.' };
+        return { state: 'partial', note: 'Este dispositivo no confirma la cancelación de eco del micrófono.' };
     // Off the iPhone the voice plays straight through the context on purpose (#80), and the browser cancels it.
     if (f.health && f.health.strategy === 'context' && f.health.output === 'context')
         return { state: 'on', note: 'Cancelación de eco activa; la voz sale directa por el contexto de audio.' };
@@ -126,7 +142,16 @@ export function engineView(s) {
     const base = s.engineReady ? engineBadgeText(s.enginePreferences || s.voicePreferences, s.sttRuntime) : '';
     return { text: base ? base + OUTPUT_MARKS[s.outputHealth] : '', title: base ? base + ' · ' + OUTPUT_TITLES[s.outputHealth] : '', output: s.outputHealth };
 }
-const VOICE_LABELS = { kokoro: 'Kokoro · en este navegador' };
+/** A stage's model as a few words: a catalogue model by its label, a provider's by its own id. */
+function stageModelText(s, stage, runtime) {
+    if (!stage)
+        return '';
+    if (stage.place !== 'device')
+        return (s.modelCatalog?.providers?.find(p => p.id === stage.place)?.label || stage.place) + ' · ' + (stage.model || '');
+    const id = runtime?.model || stage.model;
+    return (s.modelCatalog?.models?.find(m => m.id === id)?.label || id || '') + ' · en este dispositivo';
+}
+const ACCELERATOR_WORDS = { webgpu: 'GPU', wasm: 'CPU', cpu: 'CPU', coreml: 'Core ML', metal: 'Metal', cuda: 'CUDA' };
 const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1);
 /** The model a conversation thinks with, said the way a person says it: the family and its version,
  *  without the vendor prefix or the build date (`claude-fable-5-1` → `Fable 5.1`, `gpt-5.6-terra` →
@@ -146,15 +171,11 @@ export function shortModel(name) {
 export function enginePanel(s) {
     const p = s.enginePreferences || s.voicePreferences, runtime = s.sttRuntime, rows = [];
     if (p) {
-        const local = String(runtime?.model || p.stt_model || '').split('/').pop().replace('whisper-', 'Whisper ');
         rows.push({ id: 'stt', label: 'STT',
-            value: p.stt_provider === 'openai' ? 'OpenAI · ' + (p.stt_model || '') : local + ' · en este navegador',
+            value: stageModelText(s, p.stt, runtime),
             state: runtime?.fallback_from ? 'warn' : 'ok',
             note: runtime?.fallback_from ? 'La GPU no pudo con el modelo; va por CPU.' : '' });
-        const model = String(p.default_model || 'kokoro');
-        rows.push({ id: 'tts', label: 'TTS',
-            value: VOICE_LABELS[model] || 'ElevenLabs · ' + model.replace(/^eleven_/, '').replace(/_/g, ' '),
-            state: 'ok', note: '' });
+        rows.push({ id: 'tts', label: 'TTS', value: stageModelText(s, p.tts, null), state: 'ok', note: '' });
     }
     const engine = s.people?.find(person => person.thread_id === selectedThread(s))?.engine;
     if (engine?.model)
@@ -167,9 +188,9 @@ export function enginePanel(s) {
  *  screen. Facts about the device, not choices, which is why they sit apart from the models. */
 export function capabilityPanel(s) {
     const rows = [], runtime = s.sttRuntime;
-    if (runtime?.device)
-        rows.push({ id: 'device', label: runtime.device === 'webgpu' ? 'GPU' : 'CPU',
-            value: runtime.device === 'webgpu' ? 'La transcripción usa la GPU' : 'La transcripción usa la CPU',
+    if (runtime?.accelerator)
+        rows.push({ id: 'device', label: ACCELERATOR_WORDS[runtime.accelerator] || runtime.accelerator,
+            value: 'La transcripción usa ' + (runtime.accelerator === 'webgpu' ? 'la GPU' : ['wasm', 'cpu'].includes(runtime.accelerator) ? 'la CPU' : ACCELERATOR_WORDS[runtime.accelerator] || runtime.accelerator),
             state: runtime.fallback_from ? 'warn' : 'ok',
             note: runtime.fallback_from ? 'Se pidió GPU y no pudo con el modelo.' : '' });
     const echo = echoCoverage({ ...s.echoFacts, connected: !!s.ws, track: !!s.stream });
@@ -287,7 +308,7 @@ export function machinesView(s) {
     });
 }
 const CAPABILITY_LABELS = { transcription: 'transcripción', voice: 'voz' };
-/** One row per provider of the machine in use, for its owner: the key as far as anyone may see it (masked,
+/** One row per provider of the machine in use, for any paired device: the key as far as anyone may see it (masked,
  *  its last four), where it came from, what the provider can do, and what is typed in the row and not stored. */
 export function integrationsView(s) {
     return (s.integrations?.providers || []).map(p => {
@@ -300,16 +321,24 @@ export function integrationsView(s) {
     });
 }
 /** A provider that needs a key, as a pane offers it (#64): 'ready' with its key, 'missing' — greyed out, with a
- *  way to configure it — when the machine lists it without one, and 'hidden' when this device is not shown it
- *  (a device that is not the owner never sees a provider nobody configured) or the list is not known. */
+ *  way to configure it — when the machine lists it without one, to any paired device (there is no owner and no
+ *  guest: every paired device has the machine's full authority), and 'absent' when the machine does not list it
+ *  at all — it cannot call that provider — or the list is not known. */
 export function keyedProvider(s, id) {
     const row = s.integrations?.providers?.find(p => p.id === id);
-    return !row ? 'hidden' : row.configured ? 'ready' : 'missing';
+    return !row ? 'absent' : row.configured ? 'ready' : 'missing';
 }
-/** The providers of a capability that only need a key, for the note under the pane's provider choice. */
-export function missingIntegrations(s, capability) {
-    return (s.integrations?.providers || []).filter(p => !p.configured && p.capabilities?.includes(capability))
-        .map(p => ({ id: p.id, label: p.label }));
+/** What a stage is chosen from, as stage-settings.js reads it. */
+export function stageContext(s) {
+    return { catalog: s.modelCatalog, offers: s.deviceOffers, installed: s.installedBuilds, inApp: s.inApp, language: s.speechLanguage,
+        languages: s.voiceLanguages, remote: s.remoteModels, integrations: s.integrationsStatus, keyed: (id) => keyedProvider(s, id) };
+}
+/** Transcription and voice as their panes show them: the draft while the dialog edits one, else what is saved. */
+export function stagesView(s) {
+    if (!s.modelCatalog)
+        return null;
+    const ctx = stageContext(s), source = s.stageDraft || s.voicePreferences || {};
+    return { stt: stageView(ctx, 'stt', source.stt), tts: stageView(ctx, 'tts', source.tts) };
 }
 /** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). */
 export function reachNote(s) {
@@ -370,9 +399,10 @@ export function createRoomSessionStore(seed = {}) {
             mic: micView(facts), call: callView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
             enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
             audioDevices: facts.audioDevices, machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
-            integrations: { owner: facts.integrations ? !!facts.integrations.owner : null, error: facts.integrationsError,
-                rows: integrationsView(facts), missing: { transcription: missingIntegrations(facts, 'transcription'), voice: missingIntegrations(facts, 'voice') } },
-            bootError: facts.bootError, languageModels: facts.languageModels };
+            integrations: { error: facts.integrationsError,
+                status: facts.integrationsStatus, rows: integrationsView(facts) },
+            bootError: facts.bootError, stages: stagesView(facts),
+            voiceTools: { previewing: facts.previewJob?.language || null, previewNote: facts.previewNote, prepareNote: facts.prepareNote, gpuSetAside: facts.gpuSetAside } };
     }
     function publish() { if (depth || !dirty)
         return; dirty = false; const previous = snapshot; snapshot = project(); for (const listener of listeners)
@@ -429,7 +459,7 @@ export function audioNote(r, ahead = 0, replay = null) {
     if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)
         return 'Audio interrumpido' + (reason ? ' · ' + reason : '') + ' · El texto puede incluir partes que no sonaron';
     if (r.audio === 'failed' && r.audio_reason === 'unconfirmed')
-        return 'Audio sin confirmar · El navegador no dijo si llegó a sonar';
+        return 'Audio sin confirmar · Este dispositivo no dijo si llegó a sonar';
     if (r.audio === 'failed')
         return 'Audio no reproducido · Falló la reproducción';
     return '';
@@ -438,8 +468,9 @@ export function engineBadgeText(p, runtime) {
     if (!p)
         return '';
     const turn = p.turn_end_mode === 'timer' ? 'silencio ' + String(p.user_speech_timeout ?? 2.5).replace('.', ',') + ' s' : 'smart-turn';
-    if (p.stt_provider === 'openai')
-        return 'OpenAI · ' + (p.stt_model || '') + ' · ' + turn;
-    const model = String(runtime?.model || p.stt_model || '').split('/').pop().replace('whisper-', 'Whisper '), where = runtime?.device === 'webgpu' ? 'GPU' : runtime?.device === 'wasm' ? 'CPU' : '';
+    const stage = p.stt;
+    if (stage && stage.place !== 'device')
+        return (stage.place === 'openai' ? 'OpenAI' : stage.place) + ' · ' + (stage.model || '') + ' · ' + turn;
+    const model = String(runtime?.model || stage?.model || '').replace(/^whisper-/, 'Whisper ').replace('large-v3-turbo', 'large v3 turbo'), where = ACCELERATOR_WORDS[runtime?.accelerator] || '';
     return [model, where + (runtime?.fallback_from ? ' (GPU falló)' : ''), turn].filter(Boolean).join(' · ');
 }

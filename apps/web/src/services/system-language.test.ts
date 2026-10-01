@@ -14,8 +14,7 @@ test("English when the system speaks nothing a setting supports", () => {
   expect(systemLanguage(SPEECH_LANGUAGES, null)).toBe("en");
 });
 
-test("each setting reads the same system list against what it supports", () => {
-  expect(systemPreferences(["de-DE", "fr-FR"])).toEqual({ ui_language: "en", stt_language: "fr", default_tts_language: "fr" });
-  expect(systemPreferences(["es-419", "en-US"])).toEqual({ ui_language: "es", stt_language: "es", default_tts_language: "es" });
-  expect(systemPreferences(["de-DE"])).toEqual({ ui_language: "en", stt_language: "en", default_tts_language: "en" });
+test("the interface's language is the system's, English when it is not one of ours", () => {
+  expect(systemPreferences(["de-DE", "fr-FR"])).toEqual({ ui_language: "en" });
+  expect(systemPreferences(["es-419", "en-US"])).toEqual({ ui_language: "es" });
 });

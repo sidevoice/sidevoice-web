@@ -4,7 +4,7 @@ import { CloseIcon, IntegrationsIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 
 /** The machine's integrations (#64): one row per provider it can call, with the one key that serves everything
- *  the provider does — transcription, voice — for every device of the owner's that uses this machine.
+ *  the provider does — transcription, voice — for every device paired with this machine.
  *
  *  A key is written here and never read back: a stored one shows itself masked, with the four characters the
  *  machine returns. It checks itself where it is typed, as the panes' fields did (#72) — leaving the field, a
@@ -66,21 +66,3 @@ export function IntegrationList() {
   );
 }
 
-/** Under a pane's provider choice: each provider of that capability the machine could call but has no key for.
- *  It is greyed out in the list, and this says why and opens the row that fixes it. Only the owner is ever
- *  shown one: anyone else never sees a provider nobody configured. */
-export function MissingIntegrations({ capability }: { capability: "transcription" | "voice" }) {
-  const missing = useRoomStore((state) => state.integrations.missing[capability]);
-  if (!missing.length) return null;
-  return (
-    <div className="missing-integrations" id={`missing-${capability}`}>
-      {missing.map((provider) => (
-        <p className="missing-integration muted" key={provider.id}>
-          <span>{provider.label} necesita una clave de API.</span>
-          <Button variant="ghost" size="compact" aria-label={`Configurar ${provider.label}`}
-            onClick={() => window.sidevoiceActions?.openIntegration(provider.id)}>Configurar</Button>
-        </p>
-      ))}
-    </div>
-  );
-}

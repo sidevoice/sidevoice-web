@@ -5,6 +5,7 @@ import { TranscriptPanel } from "./TranscriptPanel";
 import { CallToolbar } from "../call/CallToolbar";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
+import catalog from "../../../../../packages/browser-audio/models.json";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -21,7 +22,7 @@ test("the call bar carries the lights at its left edge and the models at its rig
   act(() => {
     store.patch({ ws: {}, stream: {}, echoFacts: { aec: false }, screenLock: { state: "on", note: "" },
       roomBinding: { thread_id: "t-1", binding_id: "b-1", title: "Sidevoice" },
-      enginePreferences: { stt_provider: "openai", stt_model: "gpt-transcribe", default_model: "eleven_flash_v2_5" },
+      modelCatalog: catalog, enginePreferences: { stt: { place: "openai", model: "gpt-transcribe" }, tts: { place: "elevenlabs", model: "eleven_flash_v2_5" } },
       people: [{ thread_id: "t-1", title: "Sidevoice", available: true, engine: { model: "claude-opus-5", effort: "high" } }] });
   });
   const lights = document.getElementById("capability-column")!;
