@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { createRoomSessionStore } from "./room-session-state.js";
 import { useStore } from "zustand";
+import { createMicLevelChannel } from "./mic-level";
 
 export type RoomViewState = import('./room-session-state.js').SessionSnapshot;
 export type RoomStore = import('./room-session-state.js').SessionStore;
@@ -21,5 +22,6 @@ export function installRoomBridge(store: RoomStore) {
   window.sidevoiceUI = {
     store,
     setBootError: (bootError) => store.patch({ bootError }),
+    micLevel: createMicLevelChannel(),
   };
 }

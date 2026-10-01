@@ -87,6 +87,17 @@ export function sessionStatus(s) {
         working: busy, bed: busy && speaker === 'nobody' && userSettled(s) && !s.activeSpeech && !s.previewJob &&
             !s.reconnecting && !s.switching && !s.switchingSession && !s.switchingTranscription && s.voicePreferences?.presence_sound !== 'off' };
 }
+/** What the desktop app's call controls card shows (sidevoice/sidevoice-desktop#4), projected from the facts: the
+ *  agent and the person are independent — both can speak at once, and the agent works while a turn is transcribed —
+ *  and the card names the conversation the call is on (the microphone's), never a transcript being browsed. */
+export function callCardView(s) {
+    const selected = selectedThread(s);
+    const agentSpeaking = !!(s.botLive || s.activeSpeech?.started);
+    const agent = agentSpeaking ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
+    const row = selected ? s.people.find(p => p.thread_id === selected) : null;
+    return { agent, youTalking: !!s.userLive, canSkip: !!s.activeSpeech, conversation: selected,
+        title: row?.title || s.roomBinding?.title || '' };
+}
 export function joinView(s) {
     if (s.joinFailure)
         return { step: 'failed', text: s.joinFailure, progress: null, failed: true };
@@ -404,7 +415,7 @@ export function createRoomSessionStore(seed = {}) {
     function project() {
         return { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants: participantsView(facts),
             join: joinView(facts), engine: engineView(facts), echo: echoCoverage({ ...facts.echoFacts, connected: !!facts.ws, track: !!facts.stream }), live: liveText(facts),
-            mic: micView(facts), call: callView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
+            mic: micView(facts), call: callView(facts), callCard: callCardView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
             enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
             audioDevices: facts.audioDevices, machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             integrations: { error: facts.integrationsError,

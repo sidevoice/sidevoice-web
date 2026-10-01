@@ -1,0 +1,31 @@
+import type { MessageKey } from "./en";
+
+/** The call controls card's texts in Spanish. A missing key falls back to English. */
+export const es: Partial<Record<MessageKey, string>> = {
+  "card.agent.idle": "El agente está parado",
+  "card.agent.working": "El agente está trabajando",
+  "card.agent.speaking": "El agente está hablando",
+  "card.reconnecting": "Reconectando…",
+  "card.switchConversation": "Cambiar de conversación",
+  "card.conversations": "Conversaciones",
+  "card.openApp": "Abrir Sidevoice",
+  "card.mute": "Silenciar",
+  "card.unmute": "Activar micrófono",
+  "card.shortcut": "{action} ({shortcut})",
+  "card.devices": "Micrófono y altavoz",
+  "card.microphone": "Micrófono",
+  "card.speaker": "Altavoz",
+  "card.systemDefault": "Predeterminado del sistema",
+  "card.skip": "Saltar lo que está sonando",
+  "card.hangUp": "Colgar",
+  "card.yourMicrophone": "Tu micrófono",
+  "card.reach.holding": "no puede recibir",
+  "card.reach.offline": "sin conexión",
+  "card.unread": "{n} sin leer",
+  "card.microphoneNumber": "Micrófono {n}",
+  "card.speakerNumber": "Altavoz {n}",
+  "card.deviceMissing": "Dispositivo elegido · desconectado",
+  "card.deviceFailed": "La sala siguió con el dispositivo anterior: ese no se pudo usar.",
+  "card.devicesInSystem": "Elige este dispositivo en los ajustes del sistema.",
+  "card.youAreMuted": "Estás silenciado",
+};
