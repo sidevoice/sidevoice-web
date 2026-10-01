@@ -2,16 +2,16 @@ import {splitText} from './split-text.js';
 import {refusalText} from './refusals.js';
 /* The desktop app's native engine behind the same message protocol as this package's workers, so the
  * transcription and voice clients do not change: a build whose engine runs natively gets one of these instead of
- * a Web Worker. The engine is the app's (`window.__sidevoiceDesktop.host.nativeEngine`, the bridge contract of
- * rubasace/sidevoice#124 phases 2 and 3): it is asked by catalogue model id and engine — the offer the page
+ * a Web Worker. The engine is the app's (`window.__sidevoiceDesktop.host.nativeEngine`, the bridge contract the
+ * desktop app implements): it is asked by catalogue model id and engine — the offer the page
  * resolved — installs a build the first time, loads it into memory (`load`, which `loaded` lists) and runs it on the
  * machine's own hardware, on the offer's accelerator (or the one chosen under Avanzado). When a model is unloaded is
- * the app's (D13), apart from the swap after a model check, which the page asks for with `unload`. Nothing here
+ * the app's, apart from the swap after a model check, which the page asks for with `unload`. Nothing here
  * maps ids or chooses. build.mjs bundles it, with the page's own chunker. */
 (function(){
  function host(){return globalThis.__sidevoiceDesktop?.host?.nativeEngine||null}
  /* A failure with the step it happened at (download, load, run) and, when the app refused with one, its refusal:
-  * what a model check names when it says why a model did not take effect (#124 §6). */
+  * what a model check names when it says why a model did not take effect (sidevoice/sidevoice-core#21). */
  class StepError extends Error{
   constructor(step,cause){
    super(refusalText(cause,String(cause?.message||cause||'')));
@@ -20,7 +20,7 @@ import {refusalText} from './refusals.js';
  }
  async function at(step,work){try{return await work()}catch(error){throw error instanceof StepError?error:new StepError(step,error)}}
  /* The build on this machine's disk, downloaded first when it is not (the engine's package too, if missing), then
-  * in memory on the accelerator asked for (the app keeps it there while a call uses it, D13). The install is one job
+  * in memory on the accelerator asked for (the app keeps it there while a call uses it). The install is one job
   * of the app's (`promise.job`), which `stand` keeps while it runs so a cancel can stop it there; its progress is the
   * app's, speed included. A cancel (the worker's epoch moved past `epoch`) is looked for after every step: nothing
   * is loaded for a worker that was let go, and a load it had started is released (Stand.release). */
@@ -42,7 +42,7 @@ import {refusalText} from './refusals.js';
   if(!inMemory){
    // This worker owns the instance it loads until the page has it: through the load, and after it until its `ready`
    // is delivered (Stand.emit). A cancel anywhere in that span releases it (an unload also stops a load still in
-   // flight); one that completes after the cancel is released then (review R04).
+   // flight); one that completes after the cancel is released then.
    const build={model,engine:name,accelerator};
    progress({status:'loading',file:model});stand.loading=build;stand.released.delete(model+'/'+name+'/'+accelerator);
    try{load_ms=Number((await at('load',()=>engine.load(model,name,accelerator)))?.load_ms)||0}

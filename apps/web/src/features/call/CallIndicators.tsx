@@ -5,7 +5,7 @@ import { NativeSelect } from "../../components/ui/NativeSelect";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
- * writes them: the runtime records the fact, React paints it (#53). The microphone level is the one
+ * writes them: the runtime records the fact, React paints it. The microphone level is the one
  * exception, and it is not here — it changes per animation frame and the meter owns its own pixels. */
 
 export function ScreenLock() {

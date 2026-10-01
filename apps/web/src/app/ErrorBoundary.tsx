@@ -3,7 +3,7 @@ import { Button } from "../components/ui/Button";
 
 /* React unmounts the whole root when a render throws, and a blank room is the worst thing that can
  * happen to someone who is driving: the call is still up, but nothing on screen says so. The boundary
- * keeps the failure inside one panel, says so out loud, and reports it to the room (#58). */
+ * keeps the failure inside one panel, says so out loud, and reports it to the room. */
 
 interface BoundaryState {
   message: string;

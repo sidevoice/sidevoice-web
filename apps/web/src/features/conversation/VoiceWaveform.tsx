@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 /* The bubble of the turn being recorded is the microphone itself: a canvas that pulls the meter's analyser
  * once per animation frame and paints its own pixels. React renders this element once per phase, never per
- * frame, and the runtime keeps owning the audio graph (docs/FRONTEND.md). */
+ * frame, and the runtime keeps owning the audio graph. */
 
 const COLUMN_MS = 55; // one column of history per ~55 ms, so the scroll follows time and not the frame rate
 const CELL = 5; // column pitch in CSS pixels

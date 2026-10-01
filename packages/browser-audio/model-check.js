@@ -1,4 +1,4 @@
-/* What a model check runs on this device and how its output is judged (#124 §6 step 5, #90). A model is selected
+/* What a model check runs on this device and how its output is judged (sidevoice/sidevoice-core#21, sidevoice/sidevoice-core#13). A model is selected
  * by loading it and checking it before it takes effect: a transcription model transcribes a bundled clip of about
  * five seconds and must give back text close to what the clip says; a voice model speaks a fixed phrase and must
  * give back audio that is not silent and lasts a plausible time.
@@ -61,7 +61,7 @@ export function audioProblem(samples,rate){
  if(seconds<low||seconds>high)return {key:'check_duration',seconds:Math.round(seconds*100)/100,message:`The model produced ${seconds.toFixed(1)} s of audio for a phrase that takes about five.`};
  return null;
 }
-/** Whether a transcription's turn-final latency is above the comfort line: said, and the person decides (D12). */
+/** Whether a transcription's turn-final latency is above the comfort line: said, and the person decides. */
 export function slow(latencyMs){return latencyMs>spec.stt.comfort_ms}
 
 /** A clip's samples: the checks are 16 kHz mono 16-bit PCM WAV, as checks.json says. */

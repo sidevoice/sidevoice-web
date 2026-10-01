@@ -1,5 +1,5 @@
 # The Sidevoice web interface as a static site, for people who cannot install the desktop app.
-# It holds no secret: a device pairs with a node using the code the node issues (docs/DEVICE_PAIRING.md).
+# It holds no secret: a device pairs with a node using the code the node issues.
 #
 #   docker build -f deploy/web-static/Dockerfile -t sidevoice-web .
 #   docker run -p 8080:8080 -e SIDEVOICE_TARGET=https://rendezvous.example sidevoice-web

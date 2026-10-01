@@ -104,20 +104,20 @@ test('The controller publishes serializable snapshots through the React store br
  assert.equal(snapshots.bootError,'fallo');
  assert.equal(s.run("$('messages').children.length"),0,'React owns rendering when the bridge is installed');
 });
-// The machine's integrations as it lists them to any paired device (#64): one row per provider, never a key.
+// The machine's integrations as it lists them to any paired device: one row per provider, never a key.
 const OPENAI=(extra={})=>({id:'openai',label:'OpenAI',capabilities:['transcription'],configured:false,source:null,hint:null,environment:'VOICE_STT_API_KEY',...extra});
 const ELEVEN=(extra={})=>({id:'elevenlabs',label:'ElevenLabs',capabilities:['voice'],configured:false,source:null,hint:null,environment:'VOICE_ELEVENLABS_API_KEY',...extra});
 const LISTING=(...providers)=>({providers});
 // What the page holds lives in its own realm; compared by value.
 const plain=value=>JSON.parse(JSON.stringify(value));
-// ----- the stages (#124 phase 2): place → model → options, derived by the store from what this device measured -----
+// ----- the stages (sidevoice/sidevoice-core#21): place → model → options, derived by the store from what this device measured -----
 const PAGE_CAPS={webgpu:true,webgpuFp16:true,wasm:true};
 const stage=(place,model,options={},build=null)=>({place,model,options,build});
 const STT=(model='whisper-tiny',options={language:'es',context:''})=>stage('device',model,options);
 const TTS=(options={voice:{},speed:1})=>stage('device','kokoro-82m-v1.0',options);
 async function measured(s,caps=PAGE_CAPS){s.context.__caps=caps;s.run('window.roomTranscription=Object.assign(window.roomTranscription||{},{capabilities:async()=>__caps})');await s.run('measureDevice(true)')}
 const stageView=(s,task)=>plain(s.run('roomStore.getState().stages.'+task));
-// Choosing a place, a model or a build checks it before it takes effect (#124 §6). Where a test is about what the
+// Choosing a place, a model or a build checks it before it takes effect (sidevoice/sidevoice-core#21). Where a test is about what the
 // panes show and save, every check passes at once, with nothing to download.
 function passing(s){s.run("consentFor=async()=>null;verifyStage=async()=>({ok:true,step:'done',passes:[],latency_ms:1,slow:false})")}
 const settle=async()=>{for(let i=0;i<5;i++)await new Promise(resolve=>setTimeout(resolve,0))};
@@ -216,7 +216,7 @@ test('A place change makes the model list follow; a model change makes the optio
  assert.equal(stageView(s,'stt').advanced.value,'transformers-js/wasm');
 });
 
-// ----- a key checks itself where it is typed, and its models arrive with it (#72) -----
+// ----- a key checks itself where it is typed, and its models arrive with it -----
 test('A pasted OpenAI key is checked on leaving the field and brings its models into Transcripción',async()=>{
  const s=setup({strictDOM:true});const calls=[];
  s.context.fetch=async(path,options)=>{
@@ -765,7 +765,7 @@ test('The UI distinguishes audio suppression reasons without inferring unknown o
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'call_ended',time:1000},0,{seconds:120,now:60000})"),'Sin audio · No estabas en la llamada · Se repite al volver');
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'call_ended',time:1000},0,{seconds:120,now:200000})"),'Sin audio · No estabas en la llamada','past the window it promises nothing');
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'focus_changed',time:1000},0,{seconds:0,now:2000})"),'Sin audio · No estabas en esta conversación','nor when this device turned repetition off');
- assert.equal(s.run("audioNote({audio:'failed',audio_reason:'unconfirmed'})"),'Audio sin confirmar · Este dispositivo no dijo si llegó a sonar','a reply the room stopped waiting for does not claim it failed to play (#60)');
+ assert.equal(s.run("audioNote({audio:'failed',audio_reason:'unconfirmed'})"),'Audio sin confirmar · Este dispositivo no dijo si llegó a sonar','a reply the room stopped waiting for does not claim it failed to play');
 });
 
 test('A reply held behind another reply says so, not that the person is talking',()=>{
@@ -863,7 +863,7 @@ test('The room speaks first: the page adopts its call id and treats anything ear
  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'call-1',sample_rate:16000,channels:1}})});
  assert.deepEqual(await session,{session_id:'call-1',sample_rate:16000,channels:1});
  // A close that says nothing: the page asks the room, and a room that would have admitted it says
- // nothing more than that the connection was refused (#63).
+ // nothing more than that the connection was refused.
  s.context.fetch=async()=>({ok:true,json:async()=>({admitted:true,reason:null,message:null,clients:1,max:8})});
  const refused={send(){}};const rejection=s.run('openSession')(refused);refused.onclose();
  await assert.rejects(rejection,{message:'La sala rechazó la conexión'});
@@ -1305,7 +1305,7 @@ test('Every room query names the browser asking, so the answer is never another 
  assert.equal(s.run("roomQuery('/api/presentation')"),'/api/presentation');
 });
 
-test('A late or session-less refresh does not cancel the reply the room is replaying on return (#73)',async()=>{
+test('A late or session-less refresh does not cancel the reply the room is replaying on return',async()=>{
  const s=setup(),answers=[];
  s.context.fetch=async path=>new Promise(resolve=>answers.push({path,resolve}));
  const answer=(i,body)=>answers[i].resolve({ok:true,json:async()=>body});
@@ -1328,7 +1328,7 @@ test('A late or session-less refresh does not cancel the reply the room is repla
  assert.equal(s.run("activeSpeech"),null);
 });
 
-test('A call with no sign of a person asks, then leaves, and only this browser leaves (#63)',()=>{
+test('A call with no sign of a person asks, then leaves, and only this browser leaves',()=>{
  const s=setup();
  s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS+30000;checkIdle()");
  assert.equal(s.run('idleWarned'),true,'a minute before, it asks');
@@ -1340,7 +1340,7 @@ test('A call with no sign of a person asks, then leaves, and only this browser l
  assert.equal(s.run('state.ws'),null,'with no answer the browser leaves the call');
  assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/Saliste de la llamada/);
 });
-test('What was being said when the room went away is sent again with the gap, and what was confirmed is not (#102)',()=>{
+test('What was being said when the room went away is sent again with the gap, and what was confirmed is not',()=>{
  const s=setup();
  s.run("captureRate=16000;openSpokenTurn(3);holdSpokenAudio(new Int16Array([1200,-1500,900]).buffer)");
  assert.equal(s.run('unconfirmed.samples'),3);
@@ -1355,7 +1355,7 @@ test('What was being said when the room went away is sent again with the gap, an
  s.run("disarmGapBuffer();holdSpokenAudio(new Int16Array([5,6]).buffer)");
  assert.equal(s.run('unconfirmed.samples'),0);
 });
-test('A reply this page already played to the end is not played again when the room offers it after a drop (#59)',async()=>{
+test('A reply this page already played to the end is not played again when the room offers it after a drop (sidevoice/sidevoice-web#4)',async()=>{
  const s=setup(),posted=[];
  s.context.fetch=async(path,options)=>{posted.push([path,options?.body&&JSON.parse(options.body)]);return {ok:true,json:async()=>({})}};
  s.run("sessionId='s';roomBinding={thread_id:'a',binding_id:'b'};playedToEnd.add('s:voice:u1');window.roomVoice={playEncoded:async()=>{throw Error('must not play')}}");
@@ -1365,7 +1365,7 @@ test('A reply this page already played to the end is not played again when the r
  assert.equal(receipt[1].utterance_id,'u1:replay:s');
 });
 
-test('A repetition asked for from the bubble plays even a reply this page already heard (#100)',async()=>{
+test('A repetition asked for from the bubble plays even a reply this page already heard',async()=>{
  const s=setup();let played=0;
  s.context.fetch=async()=>({ok:true,json:async()=>({})});
  s.run("sessionId='s';roomBinding={thread_id:'a',binding_id:'b'};playedToEnd.add('s:voice:u1')");
@@ -1733,7 +1733,7 @@ test('A step that fails leaves its reason, and what to do, where the step was',a
 });
 
 /* What the room wrote must reach the person, and a tunnel keeps none of it: the close arrived without
- * the 1013 the room closed with, and the error frame it sent just before never came (#63). */
+ * the 1013 the room closed with, and the error frame it sent just before never came. */
 test('Somebody the room refuses reads the room\'s own reason, not the page\'s guess',async()=>{
  const full=setup({strictDOM:true});
  const room=joining(full,{admission:{admitted:false,reason:'room_is_full',
@@ -1767,7 +1767,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
 });
 
 test('The page answers when the room asks whether anybody is still there',()=>{
- // The room asks because a closed tab behind a tunnel leaves its socket up and its seat taken (#63).
+ // The room asks because a closed tab behind a tunnel leaves its socket up and its seat taken.
  const s=setup();const answered=[],other=[];
  s.context.sentFrame=value=>answered.push(JSON.parse(value));
  s.context.otherFrame=value=>other.push(JSON.parse(value));
@@ -1781,7 +1781,7 @@ test('The page answers when the room asks whether anybody is still there',()=>{
  assert.equal(answered.length,1,'the call\'s socket was not made to answer for the other one');
 });
 
-// ----- the ambient bed while the conversation works on this browser's turn (#42) -----
+// ----- the ambient bed while the conversation works on this browser's turn -----
 function presenceSetup(preferences="{presence_sound:'on'}"){
  const s=setup(),calls=[],timers=new Map();let serial=0;
  s.context.setTimeout=(fn,ms)=>{const id=++serial;timers.set(id,{fn,ms});return id};
@@ -1846,7 +1846,7 @@ test('Saving the settings form stores every device setting, the ambient bed amon
  assert.equal(saved.presence_sound,'on');
  assert.equal(saved.replay_on_return_seconds,300,'how far back to repeat is this device\'s, and a number');
 });
-// ----- what the microphone kept hearing while the socket was down (#46) -----
+// ----- what the microphone kept hearing while the socket was down -----
 // 20 ms frames of 16 kHz PCM, the shape the capture worklet posts to the page.
 const GAP_FRAMES=`makeFrames=peaks=>peaks.map(peak=>{const frame=new Int16Array(320);for(let i=0;i<320;i++)frame[i]=Math.round(peak*32767*(i%2?1:-1));return frame.buffer});
  feed=peaks=>{for(const buffer of makeFrames(peaks))bufferGapAudio(buffer)};
@@ -2057,7 +2057,7 @@ test('A correlated harness end closes telemetry once even while a newer turn kee
  assert.equal(s.run('roomStore.getState().session.working'),true);
 });
 
-// ----- what the room plays back when this browser comes back (#52) -----
+// ----- what the room plays back when this browser comes back -----
 // Driving out of a tunnel, the transcript has the text and the driver cannot read it. The page's part
 // is naming the sessions it used, saying on the bubble that a reply is a repetition, and stopping.
 function replaySetup(){
@@ -2209,7 +2209,7 @@ test('Typed-message receipts keep their bubble ID and replies settle fallback st
  assert.equal(s.run('roomStore.getState().session.working'),false,'a repeated receipt cannot reopen a settled turn');
 });
 
-// ----- this device's pairing with a machine (docs/DEVICE_PAIRING.md; docs/RENDEZVOUS.md, "Web client contract") -----
+// ----- this device's pairing with a machine (`device-pairing.js`, `rendezvous.js`) -----
 /** A machine as far as the page can tell: a P-256 key, and the answers only the holder of that key can give. */
 async function fakeNode(host='macbook'){
  const {subtle}=globalThis.crypto;
@@ -2483,7 +2483,7 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
  assert.match(full.message,/máximo de dispositivos/,'the close code alone still means a full room');
  assert.equal(full.refused,true);
 });
-// ----- the microphone over WebRTC (docs/RENDEZVOUS.md, phase 4) -----
+// ----- the microphone over WebRTC (`webrtc-mic.js`) -----
 // Neither this harness nor this pod has WebRTC: the peer connection below is a fake that records what the page
 // asked of it and moves when the test says so. A real browser, a real node and a real network are not covered.
 class FakePeer{
@@ -2679,7 +2679,7 @@ test('A person who never chose gets their system language, English when it is no
  p=await s.run('callPreferences()');
  assert.deepEqual([p.ui_language,p.stt.model,p.stt.options.language],['en','whisper-base','auto']);
 });
-/* Select = load and verify (#124 §6), through the real check (load-and-verify.js, the core's Spanish clip) against the
+/* Select = load and verify (sidevoice/sidevoice-core#21), through the real check (load-and-verify.js, the core's Spanish clip) against the
  * desktop app's bridge and a checked worker that answer as told. */
 function selecting({installed=[{model:'whisper-tiny',engine:'sherpa-onnx'},{model:'whisper-base',engine:'sherpa-onnx'}],load,heard}={}){
  const s=setup({strictDOM:true}),log=[];
@@ -2771,7 +2771,7 @@ test('A slow model is shown with its latency and takes effect only if the person
  assert.equal(s.run('voicePreferences.stt.model'),'whisper-base');
 });
 
-/* Review R01: taking effect in a call is part of the selection. A native Whisper tiny call; OpenAI selected and its
+/* Taking effect in a call is part of the selection. A native Whisper tiny call; OpenAI selected and its
  * check passed; the room then refuses, accepts, or the person cancels the new session. */
 async function handover(){
  const {s,sockets,old}=switching(),unloads=[];
@@ -2825,7 +2825,7 @@ test('Cancelling a change while the room is still answering leaves the call, the
  assert.equal(s.run('stageChecks.stt'),null);
 });
 
-/* Review R02: a provider chosen before its account's voices were listed stays a draft; when the voices come and Save
+/* A provider chosen before its account's voices were listed stays a draft; when the voices come and Save
  * is pressed, the choice is still selected — checked — and stored only if the check passes. */
 async function deferredVoices(outcome){
  const s=setup({strictDOM:true});const stored=[];let checks=0;
@@ -2868,7 +2868,7 @@ test('Saving an option of the model already in use stores it without a check',as
  assert.equal(s.run('voicePreferences.stt.options.language'),'fr');
 });
 
-/* Review R05: the app keeps one instance per accelerator, so the page lets go of exactly the one it no longer needs. */
+/* The app keeps one instance per accelerator, so the page lets go of exactly the one it no longer needs. */
 async function acceleratorSwap(heard){
  const {s,log,worker}=selecting({heard});
  const unloads=[];s.context.window.__sidevoiceDesktop.host.nativeEngine.unload=async(...args)=>{unloads.push(args);return null};
@@ -2891,7 +2891,7 @@ test('Switching the model in use from CPU to Core ML releases the CPU instance, 
  assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']]);
 });
 
-/* The room's downloads (#124 §6, operator 2026-10-01): a selection's download is listed in the room with its bytes and
+/* The room's downloads (sidevoice/sidevoice-core#21): a selection's download is listed in the room with its bytes and
  * the app's own speed, and Cancelar there stops it — in the app through the bridge's cancel(job). The real native
  * worker, over sidevoice-desktop#3's bridge. */
 const NATIVE_WORKER=require('esbuild').buildSync({entryPoints:[__dirname+'/../../../packages/browser-audio/native-worker.js'],bundle:true,format:'iife',write:false}).outputFiles[0].text;
@@ -2993,7 +2993,7 @@ test('A keyed cancel from the desktop app ends the preparation the same way, and
  assert.deepEqual(calls,['webgpu'],'the join that owned it is gone: no second attempt');
 });
 
-/* Review R01 (re-check): a Cancel that lands after the room admitted the new session — while the page is still
+/* A Cancel that lands after the room admitted the new session — while the page is still
  * finishing the switch (here: audio unlock held open) — is past the commit point: the change completes, stored,
  * and the previous model is let go, consistently. */
 test('A cancel after the room admitted the new session does not half-undo it: the change finishes and is stored (R01)',async()=>{

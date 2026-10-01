@@ -1,6 +1,6 @@
 # Browser Kokoro audio
 
-From the repository root, build with `npm ci && npm run build`. The Python room serves this package at `/voice-browser/`. The React `/voice/` application consumes `room-client.js` for browser-local synthesis and transcription; `/voice-browser/` remains a diagnostic page. Requires HTTPS or localhost for WebGPU.
+From the repository root, build with `npm ci && npm run build`. The static web that `scripts/assemble-static-web.mjs` assembles carries this package's `dist` at `/voice-browser/`, and the desktop app bundles the same layout. The React `/voice/` application (`apps/web`) consumes `room-client.js` for browser-local synthesis and transcription; `/voice-browser/` remains a diagnostic page. Requires HTTPS or localhost for WebGPU.
 
 Actual synthesis and phonemization run in a browser Worker. Models are fetched
 from a fixed Hugging Face revision and cached by Transformers.js. Voice embeddings
@@ -8,7 +8,7 @@ use Cache API. eSpeak-NG 1.0.2 is bundled with its full language data, unlike th
 English-only phonemizer distribution used by kokoro-js. Spanish phoneme mappings
 follow Misaki's EspeakG2P conventions; human pronunciation evaluation remains due.
 
-Validated in the Codex embedded browser on this Mac:
+Validated in a desktop browser on an Apple Silicon Mac:
 - WebGPU Spanish Dora: 4.325 s audio / 1.018 s inference+phonemization (warm model).
 - WebGPU English Heart: 4.425 s audio / .998 s inference+phonemization.
 - WASM Spanish Dora: 4.325 s audio / 9.503 s inference+phonemization, one thread.
@@ -20,7 +20,7 @@ later outputs. A running model operation can finish computing; it is not replaye
 The model queue is serial. CPU fallback currently covers GPU initialization failure;
 runtime/device-loss recovery remains to be tested before integrating into calls.
 
-The package exposes both the production browser runtime and a standalone diagnostic page. Room lifecycle and durable delivery remain the responsibility of `apps/web` and `apps/server`.
+The package exposes both the production browser runtime and a standalone diagnostic page. Room lifecycle and durable delivery remain the responsibility of `apps/web` and of the node (sidevoice-core).
 
 Dependencies retain their licenses: Transformers.js/ONNX Runtime (Apache/MIT as
 shipped upstream), Kokoro model (Apache-2.0), eSpeak-NG JS/WASM (GPL-3.0-or-later).
@@ -29,13 +29,13 @@ reviewed as references: https://github.com/steveseguin/tts-web.
 
 ## Catalogues: copies of sidevoice-core's
 
-`catalog.json` (voices), `models.json` (the model catalogue, rubasace/sidevoice#124 §3) and
+`catalog.json` (voices), `models.json` (the model catalogue, sidevoice/sidevoice-core#21) and
 `models.vectors.json` (the resolver's shared vectors) belong to sidevoice/sidevoice-core and are
 copied here byte for byte, never edited: `node copy-core-catalogs.mjs <sidevoice-core checkout>`.
 The core's `tests/test_catalog_contract.py` checks the copies against it when `SIDEVOICE_REPOSITORY`
 names this checkout. `page-models.js` reads `models.json` for the page's Whisper list (`stt-engine.js`
 `MODELS`) and Kokoro's repository, revision and dtypes (`engine.js`); nothing in the page names a
-model. `offers.ts` is the resolver (#124 §4) in TypeScript, passing the same vectors as the core's
+model. `offers.ts` is the resolver in TypeScript, passing the same vectors as the core's
 Python and the desktop app's Rust. The web computes *Este dispositivo* with it: in a page from what the
 page measures (`wasm`, `webgpu`, `webgpu-f16`), in the desktop app only from the native bridge's
 `capabilities()`. The chosen offer decides the worker: a page family adapter (`stt-engine.js` for
@@ -43,8 +43,8 @@ whisper, `engine.js` for kokoro) on the offer's accelerator, or `native-worker.j
 model id and engine. Both are keyed by catalogue model id; there is no page-id mapping.
 
 `checks/` is sidevoice-core's too (`models/checks/`, copied by the same script; `build.mjs` serves it
-at `/voice-browser/checks/`): the clips and phrases a model is checked with before it takes effect
-(#124 §6), and the thresholds it is judged by. `model-check.js` judges what came back, as the core's
+at `/voice-browser/checks/`): the clips and phrases a model is checked with before it takes effect,
+and the thresholds it is judged by. `model-check.js` judges what came back, as the core's
 `verdicts.py` does for a provider. A check runs in a worker of its own — `stt-client.js` and
 `room-client.js` hand one out with `candidate()` — and a model that passed takes the place of the one
 in use with `adopt()`: the old worker finishes what it was doing, then is let go. In the desktop app the
@@ -70,11 +70,9 @@ server, so onset latency includes microphone transport; client-side VAD is futur
 Model weights download automatically from the pinned Hugging Face revision into browser
 cache; preparing loads the model into memory and initializes the GPU/CPU. Clearing
 site data, eviction, another browser/origin, or a changed model can require download again.
-GPU and CPU use different weight variants. Browser synthesis is the active room path.
-STT can run locally in this package through Transformers.js or use the server-mediated OpenAI provider; cloud keys never move into the browser.
+GPU and CPU use different weight variants. STT can run locally in this package through
+Transformers.js or use a provider through the node; cloud keys never move into the browser.
 
-2026-09-13 UI update: the main room now always uses browser synthesis; the server
-choice and native preview route were removed. UI language (Spanish/English) is
-independent of speech language. Joining or previewing automatically opens a progress
-dialog for model loading, voice assets and first synthesis. Explicit preload is optional.
+UI language (Spanish/English) is independent of speech language. Joining or previewing
+automatically opens a progress dialog for model loading, voice assets and first synthesis. Explicit preload is optional.
 User text and task titles are excluded from UI translation.

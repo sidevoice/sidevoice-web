@@ -26,7 +26,7 @@ export function initialSessionFacts() {
         audioDevices: { inputs: [], outputs: [], inputId: 'default', outputId: 'default', available: true, outputAvailable: true, busy: false },
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
         // The machines this device is paired with (never their tokens), the one in use, and the clock of the
-        // moment they were read so a row can say "hace 3 días" without reading one (docs/DEVICE_PAIRING.md).
+        // moment they were read so a row can say "hace 3 días" without reading one.
         pairings: [], pairingInUse: null, machinesAt: 0,
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
@@ -34,13 +34,13 @@ export function initialSessionFacts() {
         // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
         pairingOpen: false, pairingNote: '',
         // The machine's integrations as it listed them for this device — never a key, only whether there is one
-        // (#64) — or null until read; why they could not be read; what is typed in each row and not yet
+        // — or null until read; why they could not be read; what is typed in each row and not yet
         // stored, what the machine said about it, and the row a pane's "Configurar" opened.
         integrations: null, integrationsError: '', integrationDrafts: {}, integrationChecks: {}, integrationFocus: null,
         // Whether that listing is the current machine's: 'loading', 'ready', or 'failed' (then `integrationsError`
         // says why). A listing that is not in is not a listing without providers: a pane keeps the choice it has.
         integrationsStatus: 'idle',
-        // What the stages (transcription, voice) are chosen from (#124): the model catalogue this page was built
+        // What the stages (transcription, voice) are chosen from (sidevoice/sidevoice-core#21): the model catalogue this page was built
         // with, the speech languages and their voices' names, the person's system language, whether this page
         // runs inside the desktop app, what this device measured about itself and the resolver's offers for it,
         // the builds already on its disk (the app's), and each provider's own lists keyed `place:task`.
@@ -52,8 +52,8 @@ export function initialSessionFacts() {
         previewNote: '', prepareNote: '',
         // This page's WebGPU failed to load a model and is set aside, until the person asks to try it again.
         gpuSetAside: false,
-        // Selecting a model loads and checks it first (#124 §6): per stage, the selection in flight or just over
-        // (stage-selection.js's record), and what the last check measured, for Diagnóstico (#90). In a page, what
+        // Selecting a model loads and checks it first (sidevoice/sidevoice-core#21): per stage, the selection in flight or just over
+        // (stage-selection.js's record), and what the last check measured, for Diagnóstico (sidevoice/sidevoice-core#13). In a page, what
         // the page itself has: its WebGPU adapter, whether it is cross-origin isolated, its threads and cores.
         stageChecks: {}, stageDiagnostics: {}, pageFacts: null,
         // Every model or engine download in flight, and the ones that just ended (services/downloads.js).
@@ -107,7 +107,7 @@ export function echoCoverage(f) {
         return { state: 'off', note: 'El micrófono no tiene cancelación de eco: la voz de la sala por el altavoz abrirá intervenciones.' };
     if (f.aec !== true)
         return { state: 'partial', note: 'Este dispositivo no confirma la cancelación de eco del micrófono.' };
-    // Off the iPhone the voice plays straight through the context on purpose (#80), and the browser cancels it.
+    // Off the iPhone the voice plays straight through the context on purpose, and the browser cancels it.
     if (f.health && f.health.strategy === 'context' && f.health.output === 'context')
         return { state: 'on', note: 'Cancelación de eco activa; la voz sale directa por el contexto de audio.' };
     if (f.health && f.health.output !== 'element')
@@ -327,7 +327,7 @@ export function integrationsView(s) {
             draft: s.integrationDrafts[p.id] || '', focused: s.integrationFocus === p.id };
     });
 }
-/** A provider that needs a key, as a pane offers it (#64): 'ready' with its key, 'missing' — greyed out, with a
+/** A provider that needs a key, as a pane offers it: 'ready' with its key, 'missing' — greyed out, with a
  *  way to configure it — when the machine lists it without one, to any paired device (there is no owner and no
  *  guest: every paired device has the machine's full authority), and 'absent' when the machine does not list it
  *  at all — it cannot call that provider — or the list is not known. */
@@ -459,7 +459,7 @@ export function audioNote(r, ahead = 0, replay = null) {
         return 'Audio pendiente · Breve pausa antes de hablar';
     if (r.audio === 'waiting_for_turn')
         return 'Audio pendiente · Esperando a que termines de hablar';
-    // Held behind another reply, not behind anybody's voice (#61): say which wait it is, and how long the line is.
+    // Held behind another reply, not behind anybody's voice: say which wait it is, and how long the line is.
     if (r.audio === 'queued' && r.audio_reason === 'previous_reply')
         return 'Audio pendiente · ' + (ahead > 1 ? 'Hay ' + ahead + ' respuestas antes' : 'Esperando a que termine la respuesta anterior');
     if (r.audio === 'text_only')

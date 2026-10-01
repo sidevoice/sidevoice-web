@@ -3,11 +3,11 @@ import { Button } from "../../components/ui/Button";
 import { CloseIcon, IntegrationsIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 
-/** The machine's integrations (#64): one row per provider it can call, with the one key that serves everything
+/** The machine's integrations: one row per provider it can call, with the one key that serves everything
  *  the provider does — transcription, voice — for every device paired with this machine.
  *
  *  A key is written here and never read back: a stored one shows itself masked, with the four characters the
- *  machine returns. It checks itself where it is typed, as the panes' fields did (#72) — leaving the field, a
+ *  machine returns. It checks itself where it is typed, as the panes' fields did — leaving the field, a
  *  pause, or Enter sends it, the machine keeps it only once the provider took it, and what that provider
  *  offers arrives in the other panes without saving. A key the provider refuses changes nothing and stays in
  *  the field to be corrected. Removing one is the ✕, and acts at once; a key from the machine's environment

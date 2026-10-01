@@ -255,7 +255,7 @@ body,
 /* The skip button is always there, dimmed while nothing plays. */
 #skip-reply:disabled { opacity:.35 }
 
-/* Listen again: a small play mark on the bubble's own line, beside the time (#100). */
+/* Listen again: a small play mark on the bubble's own line, beside the time. */
 /* The time and what follows it share one line and one height: ticks on the person's messages, the play
    mark on the conversation's, both after the time and the same size. */
 .chat-meta time,.chat-meta .receipt { display:inline-flex;align-items:center;height:.9rem }
@@ -326,7 +326,7 @@ body,
   .call-bar .engine-slot .engine-toggle:hover,.call-bar .engine-slot[data-open] .engine-toggle { background:transparent;color:#9aa6b3 }
 }
 
-/* A stage (#124 §5): where → model → options → Avanzado. */
+/* A stage (sidevoice/sidevoice-core#21): where → model → options → Avanzado. */
 .segmented { display:flex;flex-wrap:wrap;gap:.35rem }
 .segmented .segment { border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill) }
 .segmented .segment[aria-pressed=true] { border-color:var(--sv-primary);background:var(--sv-selected, #ffffff14);color:var(--sv-primary-soft) }
@@ -337,7 +337,7 @@ body,
 .stage-advanced { margin-top:1.2rem }
 .stage-advanced summary { cursor:pointer }
 .stage-options input[type=range] { display:block;width:100% }
-/* Selecting a model (#124 §6) and its diagnostics (#90). */
+/* Selecting a model (sidevoice/sidevoice-core#21) and its diagnostics (sidevoice/sidevoice-core#13). */
 .stage-check { margin:.8rem 0; padding:.7rem .85rem; border-radius:10px; border:1px solid #3b4652; background:#1a2027; font-size:12px; line-height:1.5 }
 .stage-check p { margin:0 0 .35rem }
 .stage-check[data-phase=failed] { border-color:#6b4046; background:#2c2226 }
@@ -351,7 +351,7 @@ body,
 .stage-check-rows dd { margin:0; overflow-wrap:anywhere; font-variant-numeric:tabular-nums }
 .stage-diagnostics { margin-top:1rem }
 .stage-diagnostics h4 { margin:0 0 .4rem; font-size:12px; font-weight:600 }
-/* Downloads in the room, beside the model indicators (#124 §6). */
+/* Downloads in the room, beside the model indicators (sidevoice/sidevoice-core#21). */
 .call-bar .engine-slot { display:flex; align-items:center; gap:10px }
 .downloads { position:relative }
 .downloads-toggle { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#c9d2db; font-variant-numeric:tabular-nums }

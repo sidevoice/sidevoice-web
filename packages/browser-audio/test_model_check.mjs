@@ -58,7 +58,7 @@ test('a page engine\'s failure becomes the refusal its step means; the app\'s ow
  assert.equal(failure('download',own),own);
 });
 
-test('audio that is not numbers, or a rate that is not one, is never audible (review R10)',()=>{
+test('audio that is not numbers, or a rate that is not one, is never audible',()=>{
  for(const value of [NaN,Infinity,-Infinity]){
   assert.equal(audioProblem(new Float32Array(16000*5).fill(value),16000)?.key,'check_invalid_audio',String(value));
   const one=Float32Array.from({length:16000*5},(_,i)=>.3*Math.sin(i/10));one[777]=value;

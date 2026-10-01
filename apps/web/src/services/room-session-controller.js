@@ -15,7 +15,7 @@ import voiceCatalogFile from '../../../../packages/browser-audio/catalog.json';
 import {refusalText as sayRefusal} from '../../../../packages/browser-audio/refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
-// Selecting a model checks it before it takes effect (#124 §6): the state machine, its steps below (selectStage).
+// Selecting a model checks it before it takes effect (sidevoice/sidevoice-core#21): the state machine, its steps below (selectStage).
 const selection=createStageSelection({
  publish:(task,check)=>roomStore.patch({stageChecks:{...state.stageChecks,[task]:check&&{...check,previous:stageLabel(stageContext(state),task,activeStage(task))}}}),
  consent:(...step)=>consentFor(...step),verify:(...step)=>verifyStage(...step),activate:(...step)=>activateStage(...step),discard:(...step)=>discardCandidate(...step),
@@ -24,7 +24,7 @@ const selection=createStageSelection({
 const downloads=createDownloads({publish:items=>roomStore.patch({downloads:items})});
 // A load the desktop app's native worker started and no longer wants is let go — unless a stage here runs it (R04).
 if(globalThis.sidevoiceNativeWorkers)globalThis.sidevoiceNativeWorkers.keeps=build=>inUse(build);
-// What the stages are chosen from, as this page was built: the model catalogue and the speech languages (#124).
+// What the stages are chosen from, as this page was built: the model catalogue and the speech languages (sidevoice/sidevoice-core#21).
 roomStore.patch({modelCatalog,voiceLanguages:voiceCatalogFile.languages,speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.nativeEngine});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
 const $=id=>document.getElementById(id);
@@ -85,7 +85,7 @@ $('loading-cancel').onclick=cancelPreparation;$('voice-loading').addEventListene
 // The room holds several browsers at once, so every question this page asks the
 // room carries its own session: the answer is about this browser and no other.
 function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?')+'session_id='+encodeURIComponent(state.sessionId):path}
-/* Where each request goes (docs/RENDEZVOUS.md, docs/DEVICE_PAIRING.md): a conversation's, the call and this
+/* Where each request goes (`rendezvous.js`, `device-pairing.js`): a conversation's, the call and this
  * device's own pairing to the node this device is paired with; telemetry to the target. The node base is an
  * address that proved — with the key pinned when pairing — that it is that node. Until one has there is none,
  * null, and nothing of a node is asked: every such request carries this device's token. */
@@ -116,7 +116,7 @@ function rememberedThread(){try{return sessionStorage.getItem(SELECTED_KEY)||nul
 function rememberThread(id){try{if(id)sessionStorage.setItem(SELECTED_KEY,id);else sessionStorage.removeItem(SELECTED_KEY)}catch{}}
 /* A reconnection is a new client id in the room, so nothing there would tie the browser that comes back
  * to the one that left. This tab names the ids it has used, and the room answers from its own journal
- * which replies *this* browser never heard (#52). Naming an id can only take a reply out of the
+ * which replies *this* browser never heard. Naming an id can only take a reply out of the
  * catch-up, never put someone else's in, so a stale id costs at most one repetition. */
 const SESSIONS_KEY='sidevoice.sessions',REMEMBERED_SESSIONS=8;
 function rememberedSessions(){try{const stored=JSON.parse(sessionStorage.getItem(SESSIONS_KEY)||'[]');return Array.isArray(stored)?stored.filter(id=>typeof id==='string').slice(-REMEMBERED_SESSIONS):[]}catch{return []}}
@@ -127,7 +127,7 @@ let connectEpoch=0;
 let openingSocket=null,switchEpoch=0;
 window.sidevoiceSessionId=()=>state.sessionId;
 let audioContext=null,analyser=null,micSource=null,meterFrame=null,holding=false,spaceDown=false;
-// How long a call may go without a sign of a person before it asks, and then leaves (#63).
+// How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
 let inputDeviceId='default',outputDeviceId='default',captureNode=null,deviceEpoch=0,captureRate=16000;
 let screenWakeLock=null,wakeRequest=null,wakeEpoch=0,wakeRetries=0;
@@ -188,7 +188,7 @@ function releaseScreenWakeLock(){
 }
 /* The list of microphones and speakers is a fact about this device, and the selects that show it are
  * React's. The browser only names a device once the microphone has been granted, so the list is refreshed
- * rather than read once (#53). */
+ * rather than read once. */
 function deviceOptions(devices,kind,selected){
   const listed=devices.filter(d=>d.kind===kind&&d.deviceId&&d.deviceId!=='default');
   const options=[{id:'default',label:'Predeterminado del sistema'},
@@ -305,7 +305,7 @@ const post=(path,body,method='POST')=>api(path,{method,headers:{'Content-Type':'
 /* What the microphone heard while the room was unreachable, said plainly. The person spoke to
  * nobody for a moment, and how much of it survived is a fact they are entitled to read. */
 
-/* What the room is repeating because this browser never heard it (#52), said on the bubble itself so a
+/* What the room is repeating because this browser never heard it, said on the bubble itself so a
  * reply from two minutes ago is never taken for something just said. The mark follows what actually
  * happened to the repetition — queued, sounding, finished, cancelled by a new turn, or an audio the
  * room no longer has — because promising a repetition that never played would be the same lie. */
@@ -363,7 +363,7 @@ document.addEventListener('click',event=>{if(!$('call-controls').contains(event.
 document.addEventListener('keydown',event=>{if(event.key==='Escape')setDevicesOpen(false);if(event.key==='Escape')for(const menu of document.querySelectorAll('.participant-menu[open],.call-menu[open]'))menu.open=false});
 async function select(id){if(state.switching||id===targetId()||!state.sessionId)return;state.switching=true;try{await post('/api/presentation/select',{thread_id:id,session_id:state.sessionId});rememberThread(id);await refresh()}catch(e){setRoomError(e.message)}finally{state.switching=false}}
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
-// would read as the binding changing and cancel a reply just handed to this page (#73).
+// would read as the binding changing and cancel a reply just handed to this page.
 let refreshAsked=0,refreshApplied=0;
 /* A page older than the one the room serves keeps its old behaviour until somebody reloads it, and an iPhone
  * kept the old one through reloads (2026-09-26). Out of a call it reloads itself — under an address naming
@@ -445,7 +445,7 @@ async function refreshPeople(){const base=nodeBase;try{const data=await api(room
 function refreshMachines(){roomStore.patch({machinesAt:Date.now()});void locate()}
 /* Which address the machine in use answers at is asked when it matters: on load, on the beat while there is
  * none, before a join that has none, and before each reconnection attempt after the first. An address that
- * proved itself is trusted for a few minutes (docs/DEVICE_PAIRING.md). A call in progress is never moved by it
+ * proved itself is trusted for a few minutes. A call in progress is never moved by it
  * — changing machine is a hang-up, and the person's to make. A reconnecting call (`hold`) keeps the address it
  * had while that one's proof is recent: the machine may be restarting, and the socket is the better probe. */
 const verified=new Map();
@@ -489,7 +489,7 @@ function settleBase(found,reach,pairing){
  // Settings open on another machine: its integrations and its providers' lists are read afresh (F13).
  if(base!=null&&state.integrationsStatus==='idle'&&$('language-settings')?.open)void loadIntegrations().then(()=>loadStageLists(true));
 }
-/* ----- pairing this device with a machine (docs/DEVICE_PAIRING.md) ----- */
+/* ----- pairing this device with a machine (`device-pairing.js`) ----- */
 function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
 function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // The machine no longer knows this device's token: the pairing is kept, saying so, and a new code is asked for.
@@ -672,7 +672,7 @@ async function copyLatencyAggregates(){
  }catch{status.textContent='No se pudo copiar; selecciona la tabla a mano.'}
 }
 
-// ----- the ambient bed: this browser's turn is in the conversation's hands (#42) -----
+// ----- the ambient bed: this browser's turn is in the conversation's hands -----
 // Feedback with no model in it. Between the moment the conversation has read what this browser sent and
 // the moment it speaks, a driver cannot tell work from a hang, and the silence is the whole problem. So
 // The harness report is authoritative. Without one, receipts and replies record turn work;
@@ -723,7 +723,7 @@ function reportAudioHealth(reason){
 }
 window.addEventListener('voice-output',event=>{const kind=event.detail?.kind;if(REPORTED_OUTPUT_EVENTS.has(kind))reportAudioHealth(kind)});
 
-// ----- uncaught errors: nobody can read a phone's console while driving (#58) -----
+// ----- uncaught errors: nobody can read a phone's console while driving -----
 // An uncaught error in the interface unmounts React and leaves a blank room, and the person it
 // happens to is the one who cannot look. The room keeps the last few reports next to the audio ones,
 // so the reason is read from the server. Never any transcript text: the message and the stack only.
@@ -907,7 +907,7 @@ function recordMessage(raw, socket) {
     }
     const t = m.type, d = m.data || {};
     // The room asks whether anyone is still here, because a closed tab behind a tunnel leaves its
-    // socket up and its seat taken (#63). The page keeps no clock of its own for this: a background
+    // socket up and its seat taken. The page keeps no clock of its own for this: a background
     // tab's timers are throttled, but the frame that arrives still wakes this handler, and a muted
     // browser sends no audio the room could have taken for an answer.
     if (t === 'voice-ping') {
@@ -1086,7 +1086,7 @@ function recordMessage(raw, socket) {
 function stopMeter(){cancelAnimationFrame(meterFrame);meterFrame=null;captureNode?.disconnect();captureNode=null;micSource?.disconnect();analyser?.disconnect();if(audioContext&&audioContext!==window.roomVoice?.context)audioContext.close().catch(()=>{});audioContext=null;analyser=null;micSource=null;$('mute').style.setProperty('--mic-fill','0%');$('mic-control').dataset.signal='quiet';$('mic-level-meter').setAttribute('aria-valuenow','0');waveLevels.fill(0);updateWave(0)}
 /* The bubble of the turn being recorded draws this microphone: the waveform pulls the samples the meter's
  * own analyser already holds, once per animation frame and from the canvas itself. No second audio graph, no
- * capture of its own, and nothing that renders React at meter frequency (docs/FRONTEND.md). */
+ * capture of its own, and nothing that renders React at meter frequency. */
 let waveSamples=null;
 window.sidevoiceAudio={readWaveform(){
  if(!analyser)return null;
@@ -1106,7 +1106,7 @@ const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espe
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
  * can lose both: a phone read only «La sala rechazó la conexión» while the room had written that it
- * was full, and restarting the room was what let it in (#63). An HTTP request is the one path no
+ * was full, and restarting the room was what let it in. An HTTP request is the one path no
  * proxy rewrites. `null` means the room could not be reached at all, which is a different sentence.
  * A seat freed between the refusal and this question makes the room say it would admit us now; that
  * is a truthful answer to a question asked a moment too late, and it costs only the generic line. */
@@ -1158,9 +1158,9 @@ async function startCapture(socket,session){if(!micSource)throw Error('No se pud
  };source.connect(node);node.connect(context.destination)/* reachable from the destination so it keeps running; its output stays silent */}
 // One frame of what the microphone heard. The socket is gone but the call is not: this is what the gap buffer exists
 // for. While WebRTC carries the microphone the socket sends none of it, and the page still keeps its own copy of an
-// unconfirmed turn (#102): a machine that restarts mid-sentence loses it whichever path it came by.
+// unconfirmed turn: a machine that restarts mid-sentence loses it whichever path it came by.
 function sendMicFrame(socket,data){if(state.ws===socket&&socket.readyState===WebSocket.OPEN){if(!micOnWebrtc(socket))socket.send(data);holdSpokenAudio(data)}else bufferGapAudio(data)}
-/* ----- the microphone over WebRTC (docs/RENDEZVOUS.md, phase 4) -----
+/* ----- the microphone over WebRTC (`webrtc-mic.js`; the node side: sidevoice-core `server/webrtc.py`) -----
  * Once a call has its session, the track the page already captures is offered to the machine; while that
  * connection is up the socket stops carrying the microphone and carries everything else exactly as before. The
  * attempt belongs to its session and to the socket that session came on: a new session closes it and tries again. */
@@ -1222,7 +1222,7 @@ function disconnect() {
     updateMic();
     applyLockedCall();
 }
-// Joining and leaving are the same button, and it belongs to React: this is what it calls (#53).
+// Joining and leaving are the same button, and it belongs to React: this is what it calls.
 async function toggleCall(){if(state.ws||state.connecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  const pairing=pairingInUse(pairings);if(!pairing||pairing.revoked){openPairing(pairing?reachNote(state):'');return}
@@ -1271,7 +1271,7 @@ async function joinRoom(epoch,context){
  const replaced=context.keepCurrent&&state.ws&&state.ws!==socket?state.ws:null;
  state.ws=socket;
  if(replaced)dropReplacedSession(replaced);
- // From here the call is on the new session: a swap that got this far is done, never undone (review R01).
+ // From here the call is on the new session: a swap that got this far is done, never undone.
  context.onCommit?.();
  // What reopens this socket by itself is the call, never the swap that opened it.
  const again={browserStt:context.browserStt,sttRuntime:context.sttRuntime};
@@ -1319,7 +1319,7 @@ async function lostConnection(event,epoch,context){
     // Words said to one machine's conversation are never handed to another's.
     if(state.node===node)sendGapAudio(state.ws);
     window.roomVoice?.signal?.('back');
-    // Time spent in a tunnel is not time spent away: the idle clock starts again with the call (#63).
+    // Time spent in a tunnel is not time spent away: the idle clock starts again with the call.
     personSignal();
     setRoomError('');clearJoinStatus();
     return;
@@ -1336,11 +1336,11 @@ const GAP_FRAME_MS=20,GAP_VOICE_PEAK=.02,GAP_MARGIN_MS=250,GAP_SLICE_SAMPLES=327
 const gap={armed:false,rate:16000,chunks:[],samples:0,dropped:false,startedAt:0};
 function armGapBuffer(rate){
  Object.assign(gap,{armed:true,rate:rate||16000,chunks:[],samples:0,dropped:false,startedAt:0});
- // What was being said when the socket went is the start of the gap, not something already delivered (#102).
+ // What was being said when the socket went is the start of the gap, not something already delivered.
  if(unconfirmed.samples){Object.assign(gap,{chunks:[...unconfirmed.chunks],samples:unconfirmed.samples,dropped:unconfirmed.dropped,startedAt:unconfirmed.startedAt})}
  forgetSpokenAudio();
 }
-/* ----- what was said and not yet confirmed (#102) -----
+/* ----- what was said and not yet confirmed -----
  * A room that restarts mid-sentence loses the turn it was holding: the audio lived in its memory only. So
  * the page keeps its own copy of what it streamed from the moment a turn opens until the room confirms
  * the message reached the conversation (delivered or read), or the turn ends with nothing to deliver. If
@@ -1463,7 +1463,7 @@ async function replayReply(historyId){
  catch(error){setRoomError(error.message||'No se pudo volver a reproducir.')}
 }
 // What this page played to the end, by the reply's row. A socket that dropped before the room heard the
-// receipt makes the room offer it again on the way back; the page knows better, and says so (#59).
+// receipt makes the room offer it again on the way back; the page knows better, and says so (sidevoice/sidevoice-web#4).
 const playedToEnd=new Set();
 async function receiveBrowserSpeech(d,cloud=false){
  const receivedAt=latencyNow();
@@ -1533,7 +1533,7 @@ $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').valu
 $('settings-voice').onclick=()=>settingsSection('voice');
 $('settings-transcription').onclick=()=>settingsSection('transcription');
 $('settings-integrations').onclick=()=>settingsSection('integrations');
-/* The stages (#124): what this device measured about itself, the resolver's offers for it, and the edits the
+/* The stages (sidevoice/sidevoice-core#21): what this device measured about itself, the resolver's offers for it, and the edits the
  * panes make. The panes read all of it from the store (stage-settings.js); nothing here renders. */
 function nativeEngine(){return window.__sidevoiceDesktop?.host?.nativeEngine||null}
 function engineRuns(id){return state.modelCatalog?.engines?.find(engine=>engine.id===id)?.runs||'page'}
@@ -1542,7 +1542,7 @@ function engineRuns(id){return state.modelCatalog?.engines?.find(engine=>engine.
 const WEBGPU_FAILED_KEY='sidevoice.webgpu-failed';
 function webgpuFailed(){try{return localStorage.getItem(WEBGPU_FAILED_KEY)==='1'}catch{return false}}
 /* Whether a failed load says something about the GPU. A download that did not arrive, a network that dropped or
- * a load somebody cancelled says nothing about it, and must not hide the models that need it (review R11). */
+ * a load somebody cancelled says nothing about it, and must not hide the models that need it. */
 function acceleratorFailure(error){
  if(error?.name==='AbortError')return false;
  return !/fetch|network|download|could not locate|unauthori[sz]ed|forbidden|http|status|\b[45]\d\d\b|load failed|timed? ?out|cancel|offline|quota/i.test(String(error?.message||error));
@@ -1550,7 +1550,7 @@ function acceleratorFailure(error){
 /* Asked from Avanzado: this device's GPU is tried again, and what needs it is offered again. */
 async function retryGpu(){try{localStorage.removeItem(WEBGPU_FAILED_KEY)}catch{}await measureDevice(true).catch(()=>{})}
 let measuring=null;
-/* What this device can run. In the desktop app only what its native engine reports (D5: no page engine in the app,
+/* What this device can run. In the desktop app only what its native engine reports (no page engine in the app,
  * and no "navegador"); in a page, what the page's own engines find. Once per page, unless asked afresh. */
 function measureDevice(fresh=false){
  if(measuring&&!fresh)return measuring;
@@ -1591,7 +1591,7 @@ async function chooseStagePlace(task,place){
 function chooseStageModel(task,model){selectStage(task,withModel(stageContext(state),task,paneStage(task),model))}
 function setStageOption(task,id,value,language){editStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
 function chooseStageBuild(task,value){selectStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
-/* Select = load and verify (#124 §6, D11–D12). A model chosen in a pane is checked first — on this device in a worker
+/* Select = load and verify. A model chosen in a pane is checked first — on this device in a worker
  * of its own (load-and-verify.js), so the one in use goes on working; at a provider by the machine with its key —
  * and only a passed check puts it in effect: stored, swapped in for the model in use (in a call too, without ending
  * it) and only then the previous one let go. A failure, a cancel or "elegir otro" leave everything as it was.
@@ -1608,7 +1608,7 @@ function selectStage(task,next){
 function deviceRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage))}
 /** Whether a build is what a stage in use runs (the other stage, or this one after a swap): never unloaded then. The
  *  desktop app keeps one instance per accelerator, and lets go of exactly one (`unload(model, engine, accelerator)`):
- *  the same model on another accelerator is another instance (review R05). */
+ *  the same model on another accelerator is another instance. */
 function inUse(build){return TASKS.some(task=>{const used=deviceRequest(activeStage(task));return used&&used.model===build.model&&used.engine===build.engine&&used.accelerator===build.accelerator})}
 function release(build){if(build?.native&&!inUse(build))nativeEngine()?.unload(build.model,build.engine,build.accelerator)?.catch?.(()=>{})}
 const onDisk=build=>(state.installedBuilds||[]).some(item=>item.model===build.model&&item.engine===build.engine);
@@ -1681,7 +1681,7 @@ async function recordDiagnostics(task,stage,result,build){
  roomStore.patch({stageDiagnostics:{...state.stageDiagnostics,[task]:{at:Date.now(),stage,ok:!!result.ok,step:result.step,reason:result.reason||null,
   build:build&&{engine:build.engine,accelerator:result.runtime?.accelerator||build.accelerator},load_ms:result.load_ms??null,passes:result.passes||[],memory,language:result.language||null}}});
 }
-/* Step 6 and the swap, as one transaction (review R01): the candidate is handed over — in a call, the call has to take
+/* Step 6 and the swap, as one transaction: the candidate is handed over — in a call, the call has to take
  * it — and only once that went through is the choice stored and the previous model let go. A handover the call
  * refuses, or one cancelled meanwhile, puts back what was there and throws its reason: nothing is stored, nothing is
  * unloaded, and the selection lets the candidate go. */
@@ -1698,7 +1698,7 @@ async function activateStage(task,stage,result,{signal,commit}={}){
    switchRefusal=null;
    // The commit point is the call taking the change (its new session admitted, or a local swap starting): before
    // it a cancel aborts the handover and nothing changes; from it the change is finished, stored and the previous
-   // model let go, whatever arrives meanwhile (review R01).
+   // model let go, whatever arrives meanwhile.
    applied=await applyTranscriptionSettings(previous,next,{onCommit:commit});
    if(signal?.aborted)throw Object.assign(Error('The change was cancelled.'),{reason:{key:'apply_cancelled',message:'The change was cancelled.'}});
    // A change the call has to rebuild its pipeline for went through only if the new session did.
@@ -1725,7 +1725,7 @@ function discardCandidate(task,stage,result){
  result?.worker?.terminate();
  if(result?.loaded)release(result.build);
 }
-/* Diagnóstico's copy (#90, #123): its rows as text, in the page's language, with the build and the browser. */
+/* Diagnóstico's copy (sidevoice/sidevoice-core#13, sidevoice/sidevoice-web#16): its rows as text, in the page's language, with the build and the browser. */
 async function copyDiagnostics(task){
  const view=roomStore.getState().stages?.[task]?.diagnostics;if(!view)return false;
  const text=diagnosticsText(task,view,[{label:'Compilación',value:globalThis.sidevoiceBuildId||'dev'},{label:'User agent',value:navigator.userAgent}],value=>window.roomI18n?.translate?.(value)??value);
@@ -1748,18 +1748,18 @@ async function loadRemote(place,task,refresh=false){
  }catch(error){if(sameScope(scope))patchRemote(key,{error:error.message||'No se pudo cargar el catálogo.'})}
 }
 function loadStageLists(refresh=false){for(const task of TASKS){const stage=paneStage(task);if(stage&&stage.place!==DEVICE)void loadRemote(stage.place,task,refresh)}}
-/* Integrations (#64): the machine's key for each provider, one per provider whatever it is used for, written from
+/* Integrations: the machine's key for each provider, one per provider whatever it is used for, written from
  * any paired device — each has the machine's full authority — and never read back. The machine lists them with what can be said about a key —
  * whether there is one, where from, its last four — and that listing is the one fact the panes derive from:
  * a provider that needs a key is offered, or greyed out with Configurar, as it says.
  *
  * A key checks itself where it is typed: leaving the field, a pause while typing, or Enter sends it, and the
  * machine stores only a key its provider accepted. What that provider offers is asked for right away and fills
- * the other panes in place (#72). A key the provider refuses changes nothing: the one installed keeps working,
+ * the other panes in place. A key the provider refuses changes nothing: the one installed keeps working,
  * and the line under the field says so. Removing a key is the ✕ in the field, and acts at once.
  *
  * Everything here belongs to one machine and one opening of the settings (integrationScope): a key typed for one
- * machine is never sent to another, and an answer from a machine this device has left is dropped (review F13).
+ * machine is never sent to another, and an answer from a machine this device has left is dropped.
  * The checks and removals of one provider run one after another, so a removal is never undone by a check still
  * in flight from this page; the machine itself refuses a check that a later removal superseded (F16). */
 const KEY_CHECK_PAUSE=1500;
@@ -1768,7 +1768,7 @@ let integrationEpoch=0;
 function integrationScope(){return {host:pairings.inUse,epoch:integrationEpoch}}
 function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===integrationEpoch}
 /* Another machine, or none: its listing, its keys being typed and every answer still on its way are forgotten,
- * and the stages are that machine's own (D7: a composition per client × host), switched in the same step. */
+ * and the stages are that machine's own (a composition per client × host), switched in the same step. */
 function switchStages(){
  resetIntegrations();
  for(const task of TASKS)selection.cancel(task);
@@ -1836,7 +1836,7 @@ async function verifyIntegrationKey(id,key,scope){
  // A stored key leaves the field — unless the person already typed something else in it.
  roomStore.batch(()=>{state.integrations=listing;if(String(state.integrationDrafts[id]||'').trim()===key)keyDraft(id,'')});
  const news=await followIntegration(id,scope);
- // Its lists took a while: a note about this machine is not put on the next one's row (review R04).
+ // Its lists took a while: a note about this machine is not put on the next one's row.
  if(sameScope(scope))keyNote(id,'Clave verificada · '+news,'verified');
 }
 function clearIntegrationKey(id){
@@ -1888,9 +1888,9 @@ const MIC_KEYS=['turn_patience'];
 // Every setting belongs to this device. The room answers with its defaults and keeps no copy; what this browser saved wins.
 // Between the two, what depends on the person's language comes from their system (system-language.js), and the
 // stages from what this device can run (stage-settings.js). Only the settings of today's shape are read back:
-// anything else a browser kept from before is dropped, not translated (greenfield, review F11).
+// anything else a browser kept from before is dropped, not translated (greenfield).
 // The stages are kept per machine, by its pairing's fingerprint: what this device does with one machine — its
-// provider, that account's voices — is not what it does with another (D7, review R04). The rest is the device's.
+// provider, that account's voices — is not what it does with another. The rest is the device's.
 const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages';
 const DEVICE_KEYS=['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS];
 function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||'null');return stored&&typeof stored==='object'?stored:{}}catch{return {}}}
@@ -1909,7 +1909,7 @@ async function callPreferences(){
  await measureDevice().catch(()=>{});
  const ctx=stageContext(state),stages={stt:effectiveStage(ctx,'stt',p.stt),tts:effectiveStage(ctx,'tts',p.tts)};
  // A call is only built from stages that can run: this device's, or a provider with its model (and voice). One
- // that cannot is a configuration to finish, said as such — never a stage made up for it (review R06).
+ // that cannot is a configuration to finish, said as such — never a stage made up for it.
  const problem=TASKS.map(task=>stageProblem(ctx,task,stages[task])).find(Boolean);
  if(problem)throw Error(problem+' Configúralo en Configuración.');
  return {...p,...stages};
@@ -2069,7 +2069,7 @@ async function saveSettings(){
  const problem=TASKS.map(task=>stageProblem(ctx,task,p[task])).find(Boolean);
  if(problem){$('settings-error').textContent=problem;return}
  // A new place, model or build is never stored by saving — a provider's draft completed later included: it is
- // selected, checked first and stored only if it passes (review R02). Saving stores the rest, the options of what is
+ // selected, checked first and stored only if it passes. Saving stores the rest, the options of what is
  // already in use among them, and keeps the dialog open on the check.
  const selecting=TASKS.filter(task=>p[task]&&!sameChoice(p[task],activeStage(task))).map(task=>({task,stage:effectiveStage(ctx,task,draft[task])}));
  for(const {task} of selecting)p[task]=previous?.[task];
@@ -2150,16 +2150,16 @@ window.sidevoiceActions={
  openPairing:()=>openPairing(),
  closePairing,
 };
-// ----- the call with the screen locked (#59) -----
+// ----- the call with the screen locked (sidevoice/sidevoice-web#4) -----
 // On unless this device turned it off: the page keeps sounding when locked, and a faint floor keeps iOS from
 // freezing it while nobody speaks (measured on an iPhone, 2026-09-26). The lock-screen tile and the
-// headphones' button (#97) are not wired yet: the platform's rules for them are still being measured.
+// headphones' button (sidevoice/sidevoice-web#8) are not wired yet: the platform's rules for them are still being measured.
 function applyLockedCall(){
  const on=state.voicePreferences?.locked_call!=='off'&&!!(state.ws||state.connecting);
  window.roomVoice?.keepPlayingWhileHidden?.(on);
  applyLockScreen(on);
 }
-// ----- the lock screen and the headphones' button (#97) -----
+// ----- the lock screen and the headphones' button (sidevoice/sidevoice-web#8) -----
 // iOS gives the lock-screen tile — and with it what a headphone click sends — to an ordinary media element,
 // not to the live stream the call plays through (WebKit keeps calls from becoming "Now Playing" on purpose).
 // So the call owns it with an element of its own: a faint looping file, far below the microphone's
@@ -2239,7 +2239,7 @@ setupAudioControls();
 setupOutputOwner();
 setupIdleWatch();
 
-// ----- a call nobody is using ends itself, for this browser only (#63) -----
+// ----- a call nobody is using ends itself, for this browser only -----
 // The room went on hearing a room nobody was talking to, for a long while, and delivering what it heard. A
 // browser that gives no sign of a person — no speech, nothing typed, no touch, no key — for IDLE_MS is asked
 // "¿sigues ahí?" with a sound, and if nothing answers within IDLE_WARN_MS it leaves the call, the way a
@@ -2272,7 +2272,7 @@ function setupIdleWatch(){
 }
 function stopIdleWatch(){lastPersonSignal=Date.now();idleWarned=false}
 
-// ----- which of this browser's room tabs sounds (#96) -----
+// ----- which of this browser's room tabs sounds -----
 // A tab in the background keeps sounding, like any call; with the room open in two tabs only one may. The
 // last tab shown or touched claims the output; a claim carries its time, and a tab yields only to a newer
 // one, so two claims crossing each other still leave exactly one owner.
@@ -2310,8 +2310,8 @@ function publishSessionView(view = roomStore.getState()) {
     }
     // The join line has one owner: JoinStatus renders it from this same store. Writing its textContent
     // from here removed React's own children, and the next render threw NotFoundError trying to replace
-    // a node that was no longer there — which unmounts the whole root and leaves the room blank (#58).
-    // The badge, the echo light and the notes are React's, rendered from this same store (#53).
+    // a node that was no longer there — which unmounts the whole root and leaves the room blank.
+    // The badge, the echo light and the notes are React's, rendered from this same store.
     updateComposer();
 }
 roomStore.subscribe(reconcileSession);

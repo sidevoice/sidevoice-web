@@ -12,7 +12,7 @@ import type { StageTask } from "../../state/room-types";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-/* What a pane shows while a model is selected (#124 §6) and what Diagnóstico says (#90), from the store alone: the
+/* What a pane shows while a model is selected (sidevoice/sidevoice-core#21) and what Diagnóstico says (sidevoice/sidevoice-core#13), from the store alone: the
  * selection's record is stage-selection.js's, published by the controller. */
 const WASM: Capabilities = { runs: "page", has: ["wasm"] };
 const SAVED = { place: "device", model: "whisper-tiny", options: { language: "es" }, build: null };

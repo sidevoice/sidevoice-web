@@ -11,7 +11,7 @@ Never edit them by hand.
 |---|---|---|
 | Open / update a PR | anyone | `CI`: the build and the tests (Linux), and the static site assembled. **PR title is a conventional commit**. Nothing is packaged. |
 | Squash-merge into `main` | reviewer | The PR title becomes the commit. `CI` runs the same and packages the static site; when it is green, the `nightly` pre-release is replaced. release-please opens or updates the **release PR** ("chore(main): release X.Y.Z"). Nothing versioned is published. |
-| Merge the release PR | the operator | **This is the release.** release-please tags `vX.Y.Z` and creates a draft GitHub Release whose notes are that version's changelog; `CI` runs from the tag, attaches the assets and publishes the Release. |
+| Merge the release PR | a maintainer | **This is the release.** release-please tags `vX.Y.Z` and creates a draft GitHub Release whose notes are that version's changelog; `CI` runs from the tag, attaches the assets and publishes the Release. |
 
 Assets of a release:
 
@@ -34,8 +34,8 @@ Nothing is tagged by release-please yet: the manifest starts at 0.1.0 (the versi
 release-please reads the history from the commit where this repository became the web alone (`bootstrap-sha`).
 The first release PR proposes 0.2.0 if there is a `feat`. To publish another version, use `Release-As` (below).
 
-The `v0.4.3`, `v0.5.0` and `v0.6.0` tags in this repository are the monorepo's (rubasace/sidevoice), not
-releases of the web. A web version that reaches one of them would collide with it.
+The `v0.4.3`, `v0.5.0` and `v0.6.0` tags in this repository come from the history before the web had a
+repository of its own; they are not releases of the web. A web version that reaches one of them would collide with it.
 
 ## A release candidate, or any explicit version
 
@@ -65,7 +65,7 @@ Build artifacts on Actions runs are kept 7 days, for debugging only. Download fr
   the failed jobs of that `release-please` run (Actions). Nothing is published until every job passed.
 - A `nightly` run fails: the previous snapshot stays. The next green push replaces it.
 
-## What this needs from the repository settings (the operator's, `GITHUB-SETUP.md`)
+## What this needs from the repository settings
 
 - Settings → Actions → General → **Allow GitHub Actions to create and approve pull requests**: without it
   release-please cannot open its PR.

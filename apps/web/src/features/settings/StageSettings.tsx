@@ -13,7 +13,7 @@ const WHERE_NOTES = {
   provider: "",
 };
 
-/** One stage — transcription or voice — as #124 §5 draws it: where, which model, its options, and under
+/** One stage — transcription or voice — as sidevoice/sidevoice-core#21 draws it: where, which model, its options, and under
  *  Avanzado the build it runs on. Everything shown is the store's; every change is an action. */
 export function StageSettings({ task }: { task: StageTask }) {
   const view = useRoomStore((state) => state.stages?.[task] ?? null);

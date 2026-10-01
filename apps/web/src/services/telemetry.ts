@@ -55,7 +55,7 @@ export const telemetry: RoomTelemetry = {
 };
 
 /** Ask the room, and load the SDK only if it says a collector is waiting for the spans. The room is
- *  this page's target (docs/RENDEZVOUS.md), never the machine its call runs on. */
+ *  this page's target (`rendezvous.js`), never the machine its call runs on. */
 export function initTelemetry(): Promise<RoomTelemetry | null> {
   loading ??= (async () => {
     try {

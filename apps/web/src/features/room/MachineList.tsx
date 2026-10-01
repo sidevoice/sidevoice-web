@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { MachinesIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 
-/** The machines this device is paired with (docs/DEVICE_PAIRING.md), and the only place to change which one
+/** The machines this device is paired with (`services/device-pairing.js`), and the only place to change which one
  *  it talks to or to forget one.
  *
  *  A row says the machine's name, whether it is the one in use, and where this device reaches it — directly or

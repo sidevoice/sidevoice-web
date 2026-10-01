@@ -7,7 +7,7 @@ import { createRoomStore } from "../../state/room-store";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-/* The downloads in the room (#124 §6): from the store alone, as the controller records them. */
+/* The downloads in the room (sidevoice/sidevoice-core#21): from the store alone, as the controller records them. */
 const RUNNING = { id: "check:stt:whisper-base", label: "Whisper base", task: "stt" as const, kind: "native" as const, state: "running" as const,
   done: 20e6, total: 80e6, bytes_per_s: 4e6, eta_s: 15, error: "", started: 0, ended: null };
 

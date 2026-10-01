@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
-/* Review R11: a page voice that fails to load on WebGPU falls back to WASM on the check's own load, and both passes
+/* A page voice that fails to load on WebGPU falls back to WASM on the check's own load, and both passes
  * speak on WASM. The real voice worker (packages/browser-audio/worker.js) with only its engine faked: WebGPU
  * initialisation fails, WASM succeeds, and every synthesis says which accelerator it ran on. */
 const FAKE_ENGINE=`

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import type { StageTask, StageView } from "../../state/room-types";
 
-/** Diagnóstico (#90): where this stage's model runs and on what, the resolver's reason, and what its last check
- *  measured. Copiar resultados copies the same rows as text (#123). */
+/** Diagnóstico (sidevoice/sidevoice-core#13): where this stage's model runs and on what, the resolver's reason, and what its last check
+ *  measured. Copiar resultados copies the same rows as text (sidevoice/sidevoice-web#16). */
 export function StageDiagnostics({ task, diagnostics }: { task: StageTask; diagnostics: NonNullable<StageView["diagnostics"]> }) {
   const [copied, setCopied] = useState<"" | "yes" | "no">("");
   const actions = () => window.sidevoiceActions;

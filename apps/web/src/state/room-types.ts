@@ -16,7 +16,7 @@ export interface ChatMessage {
   draft?: boolean;
   cancellable?: boolean;
   interrupted?: boolean;
-  /** The room can play this reply again for this browser right now (#100). */
+  /** The room can play this reply again for this browser right now. */
   replayable?: boolean;
   delivery?: string;
   audio?: string;
@@ -29,7 +29,7 @@ export interface ChatMessage {
   /** The room's own word for this row: `pending`, `sending`, `read`, `not_sent`… */
   status?: string;
   audio_reason?: string | null;
-  /** Said on a reply the room is repeating because this browser never heard it through (#52). */
+  /** Said on a reply the room is repeating because this browser never heard it through. */
   replayNote?: string;
   karaoke?: KaraokeRange | null;
   playback?: "pending" | "playing" | "complete";
@@ -103,7 +103,7 @@ export interface PairingPromptView {
   note: string;
 }
 
-/** One provider as the machine lists it (#64) to any paired device: whether it has a key, where it came from and
+/** One provider as the machine lists it to any paired device: whether it has a key, where it came from and
  *  its last four characters, never the key. */
 export interface IntegrationProvider {
   id: string;
@@ -147,7 +147,7 @@ export interface SelectOption {
 
 export type StageTask = "stt" | "tts";
 
-/** A place a stage can be put (#124 D7–D8): this device, or a provider the machine lists. 'missing' is a provider
+/** A place a stage can be put: this device, or a provider the machine lists. 'missing' is a provider
  *  without a key (greyed out, with Configurar); 'unknown' one whose listing is not in yet, kept as it was chosen. */
 export interface StagePlaceView {
   id: string;
@@ -182,15 +182,15 @@ export interface StageView {
   modelsError: string;
   model: string;
   options: StageOptionView[];
-  /** The build this device runs the model on, automatic by default (D9); null off this device. */
+  /** The build this device runs the model on, automatic by default; null off this device. */
   advanced: { value: string; choices: StageChoiceView[]; reason: string } | null;
   /** Where the work happens: in this page, in the desktop app, or at a provider. */
   where: "page" | "app" | "provider";
   /** Nothing chosen, and this device runs nothing for the stage: a place has to be chosen. */
   unconfigured?: boolean;
-  /** The model being selected — asked, downloading, loading, checked — or the outcome of the last one (#124 §6). */
+  /** The model being selected — asked, downloading, loading, checked — or the outcome of the last one (sidevoice/sidevoice-core#21). */
   check: StageCheckView | null;
-  /** Where and on what this stage's model runs, and what its last check measured (#90). */
+  /** Where and on what this stage's model runs, and what its last check measured (sidevoice/sidevoice-core#13). */
   diagnostics: { rows: { label: string; value: string }[]; checked: boolean; busy: boolean } | null;
 }
 
@@ -204,7 +204,7 @@ export type StageCheckView = { model: string; previous: string; recheck: boolean
   | { phase: "done"; rows: { label: string; value: string }[] }
 );
 
-/** The room's downloads (#124 §6): a row per download and what the indicator says while any runs. */
+/** The room's downloads (sidevoice/sidevoice-core#21): a row per download and what the indicator says while any runs. */
 export interface DownloadsView {
   rows: { id: string; label: string; task: string; state: "running" | "done" | "failed" | "cancelled"; status: string;
     fraction: number | null; amount: string; speed: string; left: string; error: string; cancellable: boolean }[];
