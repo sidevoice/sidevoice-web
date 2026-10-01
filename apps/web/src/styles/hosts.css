@@ -353,3 +353,14 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .key-mask { position: absolute; inset: 0 auto 0 .7rem; width: min(17rem, calc(100% - 9rem)); display: flex; align-items: center; gap: .3rem; pointer-events: none; color: var(--sv-muted) }
 .key-dots { flex: 1; height: .5em; background-image: radial-gradient(circle, currentColor 0 .14em, transparent .16em); background-size: .55em .5em; background-repeat: space no-repeat; background-position: left center }
 .key-last { font-variant-numeric: tabular-nums; letter-spacing: .04em }
+/* What a check measured, plainly: how soon it answers (a word and a bar against a comfortable turn), and its load. */
+.metrics { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; margin-top: .15rem }
+.metric { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem }
+.metric-bar { width: 3.6rem; height: .32rem; border-radius: 99px; background: #ffffff14; overflow: hidden }
+.metric-bar span { display: block; height: 100%; border-radius: inherit; background: currentColor }
+.metric-verdict { padding: .05rem .45rem; border-radius: 99px; font-size: .68rem; font-weight: 600; background: #ffffff10 }
+.metric[data-verdict=fast] { color: #9ed3b4 }
+.metric[data-verdict=ok] { color: #e6c77a }
+.metric[data-verdict=slow] { color: #f4b4ab }
+.metric-text { color: var(--sv-text) }
+.metric-quiet { color: var(--sv-muted) }

@@ -28,6 +28,7 @@ import { ProviderIcon } from "../../components/ui/Icons";
 import { bytesText } from "../hosts/common";
 import { StageSettings } from "./StageSettings";
 import { offeredSentence, saySample } from "./try-samples";
+import checks from "../../../../../packages/browser-audio/checks/checks.json";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
 import { MessageGroup } from "../conversation/MessageGroup";
 import type { ChatMessage, StageOptionView, StageView } from "../../state/room-types";
@@ -324,7 +325,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     setPreparedHere(true);
     window.sidevoiceActions?.testStage?.(task, { place: stage.place, model: stage.model, options: stage.options ?? {}, build: stage.build ?? null });
   }
-  if (rawCheck?.phase === "done" && check?.phase === "done") remember(task, (rawCheck as unknown as { stage: Stage }).stage, check.rows ?? []);
+  if (rawCheck?.phase === "done") remember(task, (rawCheck as unknown as { stage: Stage; result?: Measured }).stage, (rawCheck as unknown as { result?: Measured }).result);
   const settings = (
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={list ? null : keyFor} hideCheck hidePlaceNote hideVoiceTools
       pickers={list ? <ModelList task={task} ctx={ctx} view={view} current={current} saved={saved} running={rawCheck} rawStep={rawStep} onPick={pick} onRetry={prepare} /> : undefined}
@@ -358,10 +359,38 @@ function labelOf(ctx: NonNullable<ReturnType<typeof stageContext>>, model: strin
 
 type Phase = "download" | "prepare" | "test" | "check";
 
+/** What a check measured: how long loading took, and how long the model takes to answer. */
+interface Measured { load_ms?: number; passes?: { latency_ms?: number; first_audio_ms?: number }[] }
 /** What each model measured when it was last checked here, per stage and place/model: shown on its card for good. */
-const measuredRows = new Map<string, { label: string; value: string }[]>();
-function remember(task: Task, stage: Stage, rows: { label: string; value: string }[]) {
-  if (stage && rows.length) measuredRows.set(task + ":" + stage.place + "/" + stage.model, rows);
+const measuredBy = new Map<string, Measured>();
+function remember(task: Task, stage: Stage | undefined, result: Measured | undefined) {
+  if (stage && result) measuredBy.set(task + ":" + stage.place + "/" + stage.model, result);
+}
+const measuredFor = (task: Task, place: string, model: string) => measuredBy.get(task + ":" + place + "/" + model);
+/** Past this a turn feels slow (checks.json, the same bound the check calls slow). */
+const COMFORT_MS = checks.stt.comfort_ms;
+
+/** What a check measured, said plainly (operator, 2026-10-01): how soon it understands you (or starts speaking), with
+ *  a word and a bar against a comfortable conversation, and how long it took to get ready. */
+function Metrics({ task, result }: { task: Task; result: Measured }) {
+  const t = useT();
+  const lang = currentLanguage();
+  const pass = result.passes?.at(-1);
+  const answer = task === "stt" ? pass?.latency_ms : pass?.first_audio_ms;
+  const seconds = (ms: number) => (ms / 1000).toLocaleString(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const verdict = answer == null ? null : answer <= COMFORT_MS / 3 ? "fast" : answer <= COMFORT_MS ? "ok" : "slow";
+  return (
+    <div className="metrics">
+      {answer != null && verdict && (
+        <span className="metric" data-verdict={verdict}>
+          <span className="metric-text">{t(task === "stt" ? "metrics.understands" : "metrics.speaks", { s: seconds(answer) })}</span>
+          <span className="metric-bar" aria-hidden="true"><span style={{ width: Math.min(100, Math.round((answer / COMFORT_MS) * 100)) + "%" }} /></span>
+          <span className="metric-verdict">{t("metrics." + verdict)}</span>
+        </span>
+      )}
+      {result.load_ms != null && <span className="metric metric-quiet">{t("metrics.ready", { s: seconds(result.load_ms) })}</span>}
+    </div>
+  );
 }
 
 /** Flow "list": every model of the stage as a card, this device first, then each provider (one without a key asks for
@@ -401,7 +430,7 @@ function ModelList({ task, ctx, view, current, saved, running, rawStep, onPick, 
                   const slow = check?.phase === "slow" && mine(running?.stage);
                   const here = model.offer ? installed(model.offer) : false;
                   const size = model.offer?.download_size ? bytesText(model.offer.download_size, lang) : "";
-                  const rows = measuredRows.get(task + ":" + place.id + "/" + model.id);
+                  const measured = measuredFor(task, place.id, model.id);
                   const phases: Phase[] = place.id === "device" ? ["download", "prepare", "check"] : ["check"];
                   const at: Phase = rawStep === "download" ? "download" : rawStep === "check" || place.id !== "device" ? "check" : "prepare";
                   return (
@@ -414,7 +443,7 @@ function ModelList({ task, ctx, view, current, saved, running, rawStep, onPick, 
                         </span>
                         {model.description && <span className="muted small">{model.description}</span>}
                         <span className="model-card-meta small">{[size, place.id === "device" ? (here ? t("list.here") : t("list.toDownload")) : ""].filter(Boolean).join(" · ")}</span>
-                        {rows && !busy && <span className="model-card-metrics small">{rows.map((r) => r.label + " " + r.value).join(" · ")}</span>}
+                        {measured && !busy && <Metrics task={task} result={measured} />}
                       </button>
                       {busy && (
                         <div className="model-card-progress" role="status">
@@ -481,7 +510,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : first;
   const lang = currentLanguage();
   const chooseOther = () => document.getElementById(`${task}-model`)?.click();
-  const measured = measuredRows.get(task + ":" + view.place + "/" + view.model);
+  const measured = measuredFor(task, view.place, view.model);
   return (
     <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-works={works || undefined}>
       <div className="stage-card-head">
@@ -497,7 +526,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
       </div>
       {model?.description && <p className="muted small">{model.description}</p>}
       {/* What the check measured — on this device or at the provider (a real request, timed) — stays in view. */}
-      {prepared && !running && measured && <p className="model-card-metrics small">{measured.map((r) => r.label + " " + r.value).join(" · ")}</p>}
+      {prepared && !running && measured && <Metrics task={task} result={measured} />}
 
       {running ? (
         <div className="stage-card-body" role="status">

@@ -538,4 +538,10 @@ export const en: Record<string, string> = {
   "try.agent": "Getting started",
   "try.guide.stt": "Say something, in any language. For example: «{sample}»",
   "try.guide.tts": "Write below what you want to hear, and I'll read it in this voice.",
+  "metrics.understands": "Understands you in {s} s",
+  "metrics.speaks": "Starts speaking in {s} s",
+  "metrics.ready": "Ready in {s} s",
+  "metrics.fast": "Fast",
+  "metrics.ok": "Fine",
+  "metrics.slow": "Slow",
 };
