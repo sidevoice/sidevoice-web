@@ -337,3 +337,35 @@ body,
 .stage-advanced { margin-top:1.2rem }
 .stage-advanced summary { cursor:pointer }
 .stage-options input[type=range] { display:block;width:100% }
+/* Selecting a model (#124 §6) and its diagnostics (#90). */
+.stage-check { margin:.8rem 0; padding:.7rem .85rem; border-radius:10px; border:1px solid #3b4652; background:#1a2027; font-size:12px; line-height:1.5 }
+.stage-check p { margin:0 0 .35rem }
+.stage-check[data-phase=failed] { border-color:#6b4046; background:#2c2226 }
+.stage-check[data-phase=slow] { border-color:#6d5a3a; background:#2a251d }
+.stage-check[data-phase=done] { border-color:#3d6b55 }
+.stage-check-progress { display:block; width:100%; height:8px; margin:.4rem 0; accent-color:var(--sv-primary) }
+.stage-check-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.4rem }
+.stage-check-rows { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:.15rem .9rem; margin:.3rem 0 0; font-size:12px }
+.stage-check-rows div { display:contents }
+.stage-check-rows dt { margin:0; color:#8d9aa8 }
+.stage-check-rows dd { margin:0; overflow-wrap:anywhere; font-variant-numeric:tabular-nums }
+.stage-diagnostics { margin-top:1rem }
+.stage-diagnostics h4 { margin:0 0 .4rem; font-size:12px; font-weight:600 }
+/* Downloads in the room, beside the model indicators (#124 §6). */
+.call-bar .engine-slot { display:flex; align-items:center; gap:10px }
+.downloads { position:relative }
+.downloads-toggle { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#c9d2db; font-variant-numeric:tabular-nums }
+.downloads[data-state=failed] .downloads-toggle { color:#f0afa6 }
+.downloads-count { min-width:1.2em; padding:0 4px; border-radius:8px; background:var(--sv-primary-muted); color:var(--sv-primary-soft); text-align:center }
+.downloads-panel { position:absolute; right:0; bottom:calc(100% + 10px); z-index:30; width:min(360px, calc(100vw - 24px)); padding:12px 14px;
+  background:#202124; border:1px solid #3a3d41; border-radius:14px; box-shadow:0 14px 34px #0008; font-size:12px }
+.downloads-panel h3 { margin:0 0 8px; font-size:12px; font-weight:600 }
+.downloads-panel ul { list-style:none; margin:0; padding:0; display:grid; gap:10px; max-height:50vh; overflow:auto }
+.downloads-panel li { display:grid; gap:4px }
+.downloads-row-head { display:flex; gap:8px; align-items:baseline }
+.downloads-status { margin-inline-start:auto; color:#9aa6b3 }
+.downloads-panel li[data-state=failed] .downloads-status { color:#f0afa6 }
+.downloads-panel li[data-state=done] .downloads-status { color:#9ed3b4 }
+.downloads-panel progress { width:100%; height:6px; accent-color:var(--sv-primary) }
+.downloads-row-facts { display:flex; flex-wrap:wrap; gap:4px 12px; font-variant-numeric:tabular-nums }
+.downloads-panel li button { justify-self:start }

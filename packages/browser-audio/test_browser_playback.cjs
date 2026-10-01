@@ -523,3 +523,55 @@ test('Hanging up has its own descending pair, and it too leaves the element with
  assert.equal(tail.every(v=>v===0),true,'silence after the notes, in the same buffer');
  assert.equal(s.voice.health().events.at(-1).kind,'hangup');
 });
+
+test('A checked voice takes over loaded; one sounding finishes on the old worker first (#124 §6)',async()=>{
+ const s=setup();await s.voice.unlock();
+ const speaking=s.voice.speak({text:'hola',model:'kokoro-82m-v1.0',accelerator:'wasm'});
+ const old=s.workers[0],id=old.last.id;
+ const checked=s.voice.candidate(false);
+ assert.notEqual(checked,old,'a check gets a worker of its own');
+ s.voice.adopt(checked,{native:false,model:'kokoro-82m-v1.0',accelerator:'webgpu'});
+ assert.equal(s.voice.worker,old,'the utterance in flight keeps its worker');
+ old.onmessage({data:{type:'audio',id,samples:new Float32Array(24),sampleRate:24}});old.onmessage({data:{type:'done',id}});
+ s.sources[0].onended();await speaking;
+ const next=s.voice.speak({text:'adiós',model:'kokoro-82m-v1.0',accelerator:'webgpu'});
+ assert.equal(old.terminated,true,'let go when the next utterance starts');
+ assert.equal(s.voice.worker,checked);
+ assert.equal(checked.last.type,'speak','spoken by the checked model, with no load in between');
+ assert.equal(s.voice.ready,true);
+ checked.onmessage({data:{type:'done',id:checked.last.id}});await next;
+});
+
+test('A voice load that is abandoned lets its worker go; a checked voice waiting to take over is kept',async()=>{
+ const s=setup();await s.voice.unlock();const seen=[];
+ const loading=s.voice.prepare({model:'kokoro-82m-v1.0',accelerator:'wasm'},()=>{},p=>seen.push(p));
+ const rejection=assert.rejects(loading,{name:'AbortError'});
+ const old=s.workers[0];
+ old.onmessage({data:{type:'progress',id:old.last.id,progress:{status:'progress',file:'model.onnx',loaded:10,total:90}}});
+ assert.deepEqual(seen.map(p=>p.loaded),[10]);
+ const checked=s.voice.candidate(false);
+ s.voice.adopt(checked,{native:false,model:'kokoro-82m-v1.0',accelerator:'webgpu'});
+ s.voice.abandon();
+ await rejection;
+ assert.equal(old.terminated,true);
+ assert.notEqual(checked.terminated,true,'the checked worker is not the one abandoned');
+ s.voice.speak({text:'hola',model:'kokoro-82m-v1.0',accelerator:'webgpu'}).catch(()=>{});
+ assert.equal(s.voice.worker,checked,'and it takes over at the next utterance');
+ s.voice.cancel();
+ s.voice.cancel();
+});
+
+test('A voice load the desktop app cancelled hands on its keyed refusal and shows no failure (N03)',async()=>{
+ const s=setup();await s.voice.unlock();
+ const loading=s.voice.prepare({model:'kokoro-82m-v1.0',accelerator:'cpu',native:false},()=>{});
+ const w=s.workers[0];
+ w.onmessage({data:{type:'error',id:w.last.id,error:'Descarga cancelada.',step:'download',reason:{key:'install_cancelled',message:'cancelled'}}});
+ await assert.rejects(loading,error=>error.step==='download'&&error.reason?.key==='install_cancelled');
+ assert.ok(!s.events.some(detail=>detail.phase==='error'),'no failure is announced');
+ assert.equal(s.events.filter(detail=>detail.phase).at(-1).phase,'hidden');
+ const failing=s.voice.prepare({model:'kokoro-82m-v1.0',accelerator:'cpu',native:false},()=>{});
+ const again=s.workers.at(-1);
+ again.onmessage({data:{type:'error',id:again.last.id,error:'El motor no pudo cargar el modelo en este dispositivo.',step:'load',reason:{key:'load_failed',message:'x'}}});
+ await assert.rejects(failing,error=>error.reason?.key==='load_failed');
+ assert.equal(s.events.filter(detail=>detail.phase).at(-1).phase,'error','a real failure is still said');
+});

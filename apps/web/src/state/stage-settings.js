@@ -10,6 +10,9 @@
  * `offers` are the resolver's (packages/browser-audio/offers.ts), computed by the controller from what this
  * device measured about itself; nothing here detects anything. */
 
+import { refusalText } from '../../../../packages/browser-audio/refusals.js';
+import { CHECKS } from '../../../../packages/browser-audio/model-check.js';
+
 export const TASKS = ['stt', 'tts'];
 export const DEVICE = 'device';
 
@@ -216,11 +219,24 @@ function optionView(ctx, stage, task, option, value) {
 
 /** Everything a stage pane shows. */
 export function stageView(ctx, task, stage) {
+    // While a model is being selected (#124 §6) the pane shows that one, and nothing else can be changed until
+    // the check is over: it takes effect, or the pane goes back to what was in use.
+    const check = ctx.checks?.[task] || null;
+    const selecting = check && ['consent', 'running', 'slow'].includes(check.phase) && !check.recheck;
+    const view = stageViewOf(ctx, task, selecting ? check.stage : stage);
+    if (selecting) view.editable = false;
+    view.check = checkView(ctx, task, check);
+    view.diagnostics = diagnosticsView(ctx, task, stage);
+    return view;
+}
+
+function stageViewOf(ctx, task, stage) {
     const current = effectiveStage(ctx, task, stage);
     if (!current) {
         // Nothing chosen and nothing this device runs: the pane offers the places there are, and says why.
         return { task, places: placesFor(ctx, task, null), place: '', editable: ctx.integrations === 'ready', integrations: ctx.integrations,
-            models: [], modelsLoading: !ctx.offers, modelsError: '', model: '', options: [], advanced: null, where: 'provider', unconfigured: !!ctx.offers };
+            models: [], modelsLoading: !ctx.offers, modelsError: '', model: '', options: [], advanced: null, where: 'provider', unconfigured: !!ctx.offers,
+            check: null, diagnostics: null };
     }
     const models = placeModels(ctx, current.place, task);
     const installed = (offer) => (ctx.installed || []).some((b) => b.model === offer.model && b.engine === offer.engine);
@@ -320,4 +336,100 @@ export function stageProblem(ctx, task, stage) {
     if (voice && !(chosen && (typeof chosen === 'string' || Object.keys(chosen).length)))
         return 'Elige una voz de ' + label + '.';
     return '';
+}
+
+// ----- selecting a model (#124 §6) and what was measured (#90), as the pane says them -----
+
+const STEP_LABELS = { download: 'Descarga', load: 'Carga', check: 'Comprobación', key: 'Clave', host: 'Máquina', apply: 'Aplicar' };
+/** A time in milliseconds, as the panes say it. */
+export function secondsText(ms) {
+    if (ms == null || !Number.isFinite(ms)) return '—';
+    return (ms / 1000).toFixed(ms < 10000 ? 2 : 1).replace('.', ',') + ' s';
+}
+export function bytesText(bytes) { return bytes >= 1e9 ? (bytes / 1e9).toFixed(1).replace('.', ',') + ' GB' : (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0).replace('.', ',') + ' MB'; }
+/** A stage's model in a few words: a catalogue model by its label, a provider's as `Provider · model`. */
+export function stageLabel(ctx, task, stage) {
+    if (!stage) return '';
+    if (stage.place === DEVICE) return familyOf(ctx.catalog, stage.model)?.model?.label || stage.model;
+    return (providerOf(ctx.catalog, stage.place, task)?.label || stage.place) + ' · ' + stage.model;
+}
+/** What a check measured, as label/value pairs: the load, then a transcription's turn-final latency or a voice's
+ *  first audio and speed — of the measured (second) pass. */
+function measured(result, task) {
+    const rows = [];
+    if (result?.load_ms != null) rows.push({ label: 'Carga', value: secondsText(result.load_ms) });
+    const pass = result?.passes?.at(-1);
+    if (!pass) return rows;
+    if (task === 'stt') rows.push({ label: 'Latencia al terminar el turno', value: secondsText(pass.latency_ms) });
+    else {
+        rows.push({ label: 'Primer audio', value: secondsText(pass.first_audio_ms) });
+        if (pass.realtime != null) rows.push({ label: 'Velocidad', value: String(pass.realtime).replace('.', ',') + '× tiempo real' });
+    }
+    return rows;
+}
+
+/** The pane's account of the selection in flight or just over, or null. */
+export function checkView(ctx, task, check) {
+    if (!check) return null;
+    const base = { phase: check.phase, model: stageLabel(ctx, task, check.stage), previous: check.previous || '', recheck: !!check.recheck };
+    if (check.phase === 'consent') return { ...base, size: check.size ? bytesText(check.size) : '' };
+    if (check.phase === 'running') {
+        const p = check.progress || {};
+        const step = STEP_LABELS[p.step] || STEP_LABELS.load;
+        const known = p.step === 'download' && p.total;
+        return { ...base, step: p.step === 'check' && p.pass ? step + ' ' + p.pass + '/' + p.passes : step,
+            amount: known ? bytesText(p.done || 0) + ' / ' + bytesText(p.total) : '',
+            fraction: known ? Math.min(1, (p.done || 0) / p.total) : null };
+    }
+    if (check.phase === 'failed')
+        return { ...base, step: STEP_LABELS[check.step] || check.step, cause: refusalText(check.reason, 'Motivo desconocido.') };
+    const rows = measured(check.result, task);
+    if (check.phase === 'slow')
+        return { ...base, latency: secondsText(check.result?.latency_ms), comfort: secondsText(CHECKS.stt.comfort_ms), rows };
+    return { ...base, rows };
+}
+
+const yesNo = (value) => (value ? 'Sí' : 'No');
+/** Diagnostics for a stage (#90): where and on what its model runs, and what its last check measured; on a page,
+ *  also what the page itself has. `rows` are label/value pairs, the same ones Copiar resultados copies. */
+export function diagnosticsView(ctx, task, stage) {
+    const current = effectiveStage(ctx, task, stage);
+    const record = ctx.diagnostics?.[task] || null;
+    const shown = record?.stage || current;
+    if (!shown) return null;
+    const rows = [{ label: 'Lugar', value: shown.place === DEVICE ? 'Este dispositivo' : providerOf(ctx.catalog, shown.place, task)?.label || shown.place },
+        { label: 'Modelo', value: stageLabel(ctx, task, shown) + (shown.place === DEVICE ? ' (' + shown.model + ')' : '') }];
+    if (shown.place === DEVICE) {
+        const build = record?.build || deviceBuild(ctx.offers, shown);
+        if (build) {
+            const engine = ctx.catalog?.engines?.find((e) => e.id === build.engine);
+            const format = familyOf(ctx.catalog, shown.model)?.model?.builds?.find((b) => b.engine === build.engine)?.format;
+            rows.push({ label: 'Motor', value: [build.engine, engine?.version, format].filter(Boolean).join(' · ') },
+                { label: 'Acelerador', value: ACCELERATOR_LABELS[build.accelerator] || build.accelerator });
+            const offer = (ctx.offers || []).find((o) => o.model === shown.model);
+            if (offer?.reason) rows.push({ label: 'Motivo', value: offer.reason });
+        }
+    }
+    if (record) {
+        rows.push({ label: 'Resultado', value: record.ok ? 'Correcto' : (STEP_LABELS[record.step] || record.step) + ' · ' + refusalText(record.reason, '') });
+        if (record.load_ms != null) rows.push({ label: 'Carga', value: secondsText(record.load_ms) });
+        (record.passes || []).forEach((pass, index) => rows.push({ label: 'Pasada ' + (index + 1),
+            value: task === 'stt' ? secondsText(pass.latency_ms) : secondsText(pass.first_audio_ms) + ' · ' + (pass.realtime != null ? String(pass.realtime).replace('.', ',') + '×' : '—') }));
+        if (record.memory?.total_mb) rows.push({ label: 'Memoria libre / total', value: (record.memory.available_mb ?? '—') + ' / ' + record.memory.total_mb + ' MB' });
+        else if (record.memory?.device_gb) rows.push({ label: 'Memoria del dispositivo', value: '≈ ' + record.memory.device_gb + ' GB' });
+    } else rows.push({ label: 'Resultado', value: 'Sin comprobar todavía' });
+    if (shown.place === DEVICE && ctx.pageFacts) {
+        const { adapter, crossOriginIsolated, threads, cores } = ctx.pageFacts;
+        rows.push({ label: 'Adaptador WebGPU', value: adapter ? [adapter.vendor, adapter.architecture, adapter.description].filter(Boolean).join(' · ') || 'Sí' : 'Ninguno' },
+            { label: 'crossOriginIsolated', value: yesNo(crossOriginIsolated) },
+            { label: 'Hilos', value: (threads ?? '—') + ' / ' + (cores ?? '—') });
+    }
+    if (record?.at) rows.push({ label: 'Comprobado', value: new Date(record.at).toLocaleString() });
+    return { rows, checked: !!record, busy: !!ctx.checks?.[task] && ['consent', 'running', 'slow'].includes(ctx.checks[task].phase) };
+}
+
+/** Diagnóstico as the text Copiar resultados copies: the stage, then one `label: value` line per row and per extra
+ *  fact (the build, the browser), each said through `say` — the page's translation. */
+export function diagnosticsText(task, diagnostics, extra = [], say = (text) => text) {
+    return [say(task === 'stt' ? 'Transcripción' : 'Voz'), ...[...(diagnostics?.rows || []), ...extra].map((row) => say(row.label) + ': ' + say(row.value))].join('\n');
 }

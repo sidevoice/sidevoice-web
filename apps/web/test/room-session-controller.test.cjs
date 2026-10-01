@@ -11,8 +11,9 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. The resolver is TypeScript (packages/browser-audio/offers.ts), transpiled here.
- const modules={'../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','./system-language.js':'SystemLanguage','../../../../packages/browser-audio/offers':'Offers','../../../../packages/browser-audio/refusals.js':'Refusals'};
- const files={StageSettings:sourceRoot+'/state/stage-settings.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:sourceRoot+'/../../../packages/browser-audio/offers.ts',Refusals:sourceRoot+'/../../../packages/browser-audio/refusals.js'};
+ const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','./system-language.js':'SystemLanguage','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection'};
+ const audio=sourceRoot+'/../../../packages/browser-audio/';
+ const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from '(.*\.json)'[^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from '(.*)';\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -116,6 +117,10 @@ const STT=(model='whisper-tiny',options={language:'es',context:''})=>stage('devi
 const TTS=(options={voice:{},speed:1})=>stage('device','kokoro-82m-v1.0',options);
 async function measured(s,caps=PAGE_CAPS){s.context.__caps=caps;s.run('window.roomTranscription=Object.assign(window.roomTranscription||{},{capabilities:async()=>__caps})');await s.run('measureDevice(true)')}
 const stageView=(s,task)=>plain(s.run('roomStore.getState().stages.'+task));
+// Choosing a place, a model or a build checks it before it takes effect (#124 §6). Where a test is about what the
+// panes show and save, every check passes at once, with nothing to download.
+function passing(s){s.run("consentFor=async()=>null;verifyStage=async()=>({ok:true,step:'done',passes:[],latency_ms:1,slow:false})")}
+const settle=async()=>{for(let i=0;i<5;i++)await new Promise(resolve=>setTimeout(resolve,0))};
 function listed(s,listing){s.run(`roomStore.patch({integrations:${JSON.stringify(listing)},integrationsStatus:'ready'})`)}
 function openaiPane(s,listing){listed(s,listing);s.run(`roomStore.patch({voicePreferences:{stt:${JSON.stringify(stage('openai','gpt-4o-mini-transcribe',{language:'es',context:''}))}}})`)}
 test('The React component tree initializes without inventing missing DOM elements',()=>{
@@ -183,18 +188,19 @@ test('A place change makes the model list follow; a model change makes the optio
  listed(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}),ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
  s.run("roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT())+"}})");
  s.context.fetch=async()=>({ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}],error:null})});
+ passing(s);
  assert.deepEqual(stageView(s,'stt').places.map(p=>p.id),['device','openai']);
  await s.run("window.sidevoiceActions.chooseStagePlace('stt','openai')");
- await new Promise(resolve=>setTimeout(resolve,0));
+ await settle();
  let stt=stageView(s,'stt');
  assert.equal(stt.place,'openai');
  assert.deepEqual(stt.models.map(m=>m.id),['gpt-4o-transcribe'],'the provider\'s own list');
  assert.equal(stt.advanced,null,'a provider has no build to choose');
  assert.deepEqual(stt.options.map(o=>o.id),['language','context'],'the provider\'s option schema');
- s.run("window.sidevoiceActions.chooseStagePlace('stt','device')");
+ s.run("window.sidevoiceActions.chooseStagePlace('stt','device')");await settle();
  assert.equal(stageView(s,'stt').model,'whisper-tiny','back on this device, its first offer');
  s.run("window.sidevoiceActions.setStageOption('stt','language','fr')");
- s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-small')");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-small')");await settle();
  stt=stageView(s,'stt');
  assert.equal(stt.model,'whisper-small');
  assert.equal(stt.options.find(o=>o.id==='language').value,'fr','a value the new model still takes is kept');
@@ -205,7 +211,8 @@ test('A place change makes the model list follow; a model change makes the optio
  assert.deepEqual(plain(s.run('stageDraft.tts.options.voice')),{es:'em_alex'});
  s.run("window.sidevoiceActions.chooseStageBuild('stt','transformers-js/wasm')");
  assert.equal(stageView(s,'stt').advanced.value,'auto','a build this model cannot run here is not kept');
- s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-tiny');window.sidevoiceActions.chooseStageBuild('stt','transformers-js/wasm')");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-tiny')");await settle();
+ s.run("window.sidevoiceActions.chooseStageBuild('stt','transformers-js/wasm')");await settle();
  assert.equal(stageView(s,'stt').advanced.value,'transformers-js/wasm');
 });
 
@@ -393,7 +400,8 @@ test('A verified ElevenLabs key lights up its place in Voz and brings its models
  await s.run("window.sidevoiceActions.checkIntegrationKey('elevenlabs')");
  assert.deepEqual(calls.map(call=>call[0]),['PUT','GET'],'the key is sent once, and the catalogue asked for once');
  assert.match(calls[1][1],/voice-catalog/);
- s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");
+ passing(s);
+ s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");await settle();
  const tts=stageView(s,'tts');
  assert.deepEqual(tts.models.map(m=>m.id),['eleven_flash_v2_5','eleven_v3'],'its models fill the list in place');
  const es=tts.options[0].rows.find(r=>r.language==='es');
@@ -411,7 +419,8 @@ test('A provider\'s "Automática" voice is the voice the preview speaks, and it 
  s.context.window.roomVoice={unlock:async()=>{},cancel(){},playEncoded:async()=>{}};
  await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
  s.run("$('preview-audio').pause=()=>{};ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'voice-1',label:'Nube',languages:['en']}]})");
- s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");
+ passing(s);
+ s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");await settle();
  const row=stageView(s,'tts').options[0].rows.find(r=>r.language==='en');
  assert.deepEqual([row.value,row.choices[0].label],['','Automática · Nube'],'the automatic choice says which voice it is');
  const origFetch=s.context.fetch;s.context.fetch=async(path,options)=>{spoken.push(JSON.parse(options.body));return origFetch()};
@@ -546,13 +555,17 @@ test('A new provider choice takes the first listed model, and one with an empty 
  const s=setup({strictDOM:true});const stored=[];
  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
  await measured(s);listed(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…test'})));
- s.run("ws=null;roomStore.patch({voicePreferences:{}});patchRemote('openai:stt',{models:[{id:'gpt-4o-transcribe'}],error:''});window.sidevoiceActions.chooseStagePlace('stt','openai')");
+ passing(s);
+ s.run("ws=null;roomStore.patch({voicePreferences:{}});patchRemote('openai:stt',{models:[{id:'gpt-4o-transcribe'}],error:''});window.sidevoiceActions.chooseStagePlace('stt','openai')");await settle();
  assert.equal(stageView(s,'stt').model,'gpt-4o-transcribe');
- s.run("window.sidevoiceActions.chooseStagePlace('stt','device');patchRemote('openai:stt',{models:[],error:''});window.sidevoiceActions.chooseStagePlace('stt','openai')");
+ s.run("window.sidevoiceActions.chooseStagePlace('stt','device')");await settle();
+ s.run("patchRemote('openai:stt',{models:[],error:''});window.sidevoiceActions.chooseStagePlace('stt','openai')");await settle();
  assert.equal(stageView(s,'stt').model,'','an account that lists no model gives a new choice none');
+ // What passed its check was stored when it took effect; the choice with no model is refused, and stores nothing.
+ const before=stored.length;
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
  assert.equal(s.run("$('settings-error').textContent"),'Elige un modelo de OpenAI.');
- assert.equal(stored.length,0);
+ assert.equal(stored.length,before);
 });
 test('A provider\'s list still loading never masquerades as a one-option catalogue',()=>{
  const s=setup({strictDOM:true});
@@ -2586,7 +2599,8 @@ test('A native build goes to the app\'s engine, a page build to the page\'s work
  s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:8192}),installed:async()=>[]}}};
  await s.run('measureDevice(true)');
  assert.deepEqual(plain(s.run("ttsRequest("+JSON.stringify(TTS())+")")),{model:'kokoro-82m-v1.0',engine:'sherpa-onnx',accelerator:'cpu',native:true});
- s.run("window.sidevoiceActions.chooseStageBuild('tts','sherpa-onnx/coreml')");
+ passing(s);
+ s.run("window.sidevoiceActions.chooseStageBuild('tts','sherpa-onnx/coreml')");await settle();
  assert.equal(plain(s.run("ttsRequest(paneStage('tts'))")).accelerator,'coreml','Avanzado overrides the accelerator');
  s.context.window.__sidevoiceDesktop=undefined;
  await measured(s,PAGE_CAPS);
@@ -2627,7 +2641,7 @@ test('A model download that failed on WebGPU falls back once and leaves the GPU 
  s.context.__failure=()=>failure;
  s.run("window.roomTranscription.prepare=async options=>{if(options.accelerator==='webgpu')throw __failure();return {model:options.model,engine:options.engine,accelerator:options.accelerator}}");
  const count=()=>stageView(s,'stt').models.length;
- for(const error of [Error('Failed to fetch model download'),Object.assign(Error('cancelled'),{name:'AbortError'}),Error('Could not locate file: "https://huggingface.co/…/encoder_model.onnx"')]){
+ for(const error of [Error('Failed to fetch model download'),Error('Could not locate file: "https://huggingface.co/…/encoder_model.onnx"')]){
   failure=error;
   const runtime=plain(await s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"));
   assert.equal(runtime.sttRuntime.accelerator,'wasm','the call still goes on, on the CPU');
@@ -2664,4 +2678,385 @@ test('A person who never chose gets their system language, English when it is no
  s.context.localStorage={getItem:key=>key==='sidevoice.settings'?JSON.stringify({ui_language:'en'}):key==='sidevoice.stages'?JSON.stringify({[PAIRED.fp]:{stt:STT('whisper-base',{language:'auto'})}}):null,setItem(){},removeItem(){}};
  p=await s.run('callPreferences()');
  assert.deepEqual([p.ui_language,p.stt.model,p.stt.options.language],['en','whisper-base','auto']);
+});
+/* Select = load and verify (#124 §6), through the real check (load-and-verify.js, the core's Spanish clip) against the
+ * desktop app's bridge and a checked worker that answer as told. */
+function selecting({installed=[{model:'whisper-tiny',engine:'sherpa-onnx'},{model:'whisper-base',engine:'sherpa-onnx'}],load,heard}={}){
+ const s=setup({strictDOM:true}),log=[];
+ const clip=fs.readFileSync(__dirname+'/../../../packages/browser-audio/checks/stt-es.wav');
+ const expected=JSON.parse(fs.readFileSync(__dirname+'/../../../packages/browser-audio/checks/checks.json','utf8')).stt.clips.es.text;
+ s.context.fetch=async url=>{if(String(url).includes('/voice-browser/checks/'))return {ok:true,arrayBuffer:async()=>clip.buffer.slice(clip.byteOffset,clip.byteOffset+clip.byteLength)};throw Error('unexpected '+url)};
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{
+  capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:16384}),
+  installed:async()=>installed,memory:async()=>({total_mb:16384,available_mb:9000}),
+  unload:async(model,engine)=>{log.push(['unload',model,engine])}}}};
+ const worker={posted:[],postMessage(message){this.posted.push(message);const reply=data=>setTimeout(()=>this.onmessage?.({data:{id:message.id,...data}}),0);
+   if(message.type==='load')reply(load||{type:'ready',runtime:{model:message.model,engine:message.engine,accelerator:message.accelerator,load_ms:321}});
+   if(message.type==='transcribe')reply({type:'result',result:{text:heard??expected}})},
+  terminate(){log.push(['terminate'])}};
+ s.context.window.roomTranscription={capabilities:async()=>({}),candidate:native=>{log.push(['candidate',native]);return worker},
+  adopt:(adopted,runtime)=>{log.push(['adopt',adopted===worker,runtime.model])},stop(){}};
+ return {s,log,worker};
+}
+test('Selecting a model checks it apart, puts it in place of the one in use, and only then unloads that one',async()=>{
+ const {s,log,worker}=selecting();
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");
+ await settle();await settle();
+ assert.deepEqual(worker.posted.map(m=>m.type),['load','transcribe','transcribe'],'loaded, then two passes');
+ assert.equal(worker.posted[1].language,'es');
+ assert.deepEqual(log,[['candidate',true],['adopt',true,'whisper-base'],['unload','whisper-tiny','sherpa-onnx']],'the previous model goes only after the swap');
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-base');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-base','stored once it passed');
+ const check=plain(s.run('stageChecks.stt'));
+ assert.equal(check.phase,'done');
+ assert.equal(check.result.load_ms,321,'the app\'s own load time');
+ const diagnostics=plain(s.run('stageDiagnostics.stt'));
+ assert.deepEqual([diagnostics.ok,diagnostics.build.engine,diagnostics.memory.available_mb,diagnostics.passes.length],[true,'sherpa-onnx',9000,2]);
+});
+test('A model that fails to load never becomes the setting: the one in use stays, loaded, and the step is named',async()=>{
+ const {s,log}=selecting({load:{type:'error',error:'whisper-base needs 2500 MB',step:'load',reason:{key:'model_needs_memory',needed_mb:2500,memory_mb:2048,message:'needs memory'}}});
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");
+ await settle();
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+ assert.equal(s.saved['sidevoice.stages'],undefined,'nothing stored');
+ assert.ok(!log.some(([kind])=>kind==='adopt'||kind==='unload'),'nothing swapped, nothing unloaded: the candidate never loaded');
+ const view=stageView(s,'stt');
+ assert.equal(view.model,'whisper-tiny','the pane is back on the model in use');
+ assert.deepEqual([view.check.phase,view.check.step,view.check.cause,view.check.previous],['failed','Carga','No hay memoria suficiente para este modelo.','Whisper tiny']);
+});
+test('A transcription that is not what the clip says fails the check; the candidate is let go',async()=>{
+ const {s,log}=selecting({heard:'Subtítulos realizados por la comunidad de Amara.org'});
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");
+ await settle();
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+ assert.deepEqual(plain(s.run('stageChecks.stt.step')),'check');
+ assert.ok(log.some(([kind])=>kind==='terminate'),'its worker is let go');
+ assert.deepEqual(log.filter(([kind])=>kind==='unload'),[['unload','whisper-base','sherpa-onnx']],'and the model it loaded, which nothing uses');
+});
+test('A model not on disk asks first, with the model and its engine package in the size; declining loads nothing',async()=>{
+ const {s,log}=selecting({installed:[]});
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");
+ await settle();
+ const catalog=JSON.parse(fs.readFileSync(__dirname+'/../../../packages/browser-audio/models.json','utf8'));
+ const model=catalog.models.find(m=>m.id==='whisper-base').builds.find(b=>b.engine==='sherpa-onnx').download.size;
+ const engine=catalog.engines.find(e=>e.id==='sherpa-onnx').packages[0].download.size;
+ assert.deepEqual(plain(s.run('stageChecks.stt')).size,model+engine);
+ assert.equal(stageView(s,'stt').check.phase,'consent');
+ s.run("window.sidevoiceActions.decideStage('stt',false)");
+ await settle();
+ assert.equal(s.run('stageChecks.stt'),null);
+ assert.deepEqual(log,[],'nothing downloaded, nothing loaded');
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+});
+test('A slow model is shown with its latency and takes effect only if the person says so',async()=>{
+ const {s}=selecting();
+ let at=0;s.context.performance={now:()=>(at+=2600)};
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");
+ await settle();
+ const view=stageView(s,'stt');
+ assert.deepEqual([view.check.phase,view.check.latency],['slow','2,60 s']);
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny','not yet');
+ s.run("window.sidevoiceActions.decideStage('stt',true)");
+ await settle();
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-base');
+});
+
+/* Review R01: taking effect in a call is part of the selection. A native Whisper tiny call; OpenAI selected and its
+ * check passed; the room then refuses, accepts, or the person cancels the new session. */
+async function handover(){
+ const {s,sockets,old}=switching(),unloads=[];
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:16384}),
+  installed:async()=>[{model:'whisper-tiny',engine:'sherpa-onnx'}],unload:async(...args)=>{unloads.push(args);return null}}}};
+ await s.run('measureDevice(true)');
+ listed(s,LISTING(OPENAI({configured:true,source:'stored',hint:'…test'})));
+ s.run("voicePreferences="+JSON.stringify(OLD_SETTINGS)+";patchRemote('openai:stt',{models:[{id:'whisper-1'}],error:''})");
+ passing(s);
+ await s.run("window.sidevoiceActions.chooseStagePlace('stt','openai')");
+ await settle();
+ return {s,sockets,old,unloads,next:sockets[1]};
+}
+test('A mid-call change the room refuses is not activated: nothing stored, the previous model stays loaded, the step and reason are said (R01)',async()=>{
+ const {s,old,unloads,next}=await handover();
+ assert.ok(next,'the change asks the room for a new session');
+ assert.equal(plain(s.run('stageChecks.stt')).progress.step,'apply','taking effect is a step of the selection');
+ next.readyState=1;next.onopen();
+ next.onmessage({data:JSON.stringify({type:'error',data:{message:'OpenAI necesita una clave de API antes de conectar.'}})});
+ next.close();
+ await settle();
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+ assert.equal(s.saved['sidevoice.stages'],undefined,'nothing stored');
+ assert.deepEqual(unloads,[],'the model the call still uses stays loaded');
+ assert.equal(s.run('ws'),old);
+ const check=plain(s.run('stageChecks.stt'));
+ assert.deepEqual([check.phase,check.step,check.reason.key],['failed','apply','switch_refused']);
+ assert.match(check.reason.detail,/OpenAI necesita una clave de API/);
+ assert.match(stageView(s,'stt').check.cause,/La llamada no aceptó el cambio: OpenAI necesita una clave de API/);
+});
+test('A mid-call change the room accepts is stored, and only then is the previous native model let go — that instance only (R01, R05)',async()=>{
+ const {s,unloads,next}=await handover();
+ next.readyState=1;next.onopen();
+ next.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
+ await settle();
+ assert.equal(s.run('sessionId'),'new-session');
+ assert.equal(s.run('voicePreferences.stt.place'),'openai');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-1');
+ assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']]);
+ assert.equal(plain(s.run('stageChecks.stt')).phase,'done');
+});
+test('Cancelling a change while the room is still answering leaves the call, the setting and the model as they were (R01)',async()=>{
+ const {s,old,unloads}=await handover();
+ s.run("window.sidevoiceActions.cancelStage('stt')");
+ await settle();
+ assert.equal(s.run('switchingSession'),false);
+ assert.equal(s.run('ws'),old);
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+ assert.equal(s.saved['sidevoice.stages'],undefined);
+ assert.deepEqual(unloads,[]);
+ assert.equal(s.run('stageChecks.stt'),null);
+});
+
+/* Review R02: a provider chosen before its account's voices were listed stays a draft; when the voices come and Save
+ * is pressed, the choice is still selected — checked — and stored only if the check passes. */
+async function deferredVoices(outcome){
+ const s=setup({strictDOM:true});const stored=[];let checks=0;
+ s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
+ s.context.__outcome=outcome;s.context.__checked=()=>checks++;
+ s.run("consentFor=async()=>null;verifyStage=async()=>{__checked();return __outcome}");
+ s.run("ws=null;roomStore.patch({voicePreferences:{tts:"+JSON.stringify(TTS())+"}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[]})");
+ await s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");await settle();
+ assert.equal(checks,0,'no voice yet: only a draft');
+ assert.equal(s.run('stageDraft.tts.place'),'elevenlabs');
+ s.run("patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'v1',label:'Nube',languages:['es']}]})");
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");await settle();
+ return {s,stored,checks:()=>checks};
+}
+const storedTts=stored=>stored.filter(([key])=>key==='sidevoice.stages').map(([,value])=>value[PAIRED.fp]?.tts?.place);
+test('A provider draft completed later is checked when saved, and a check that fails stores nothing (R02)',async()=>{
+ const {s,stored,checks}=await deferredVoices({ok:false,step:'key',reason:{key:'provider_key_refused',provider:'elevenlabs',message:'refused'},passes:[]});
+ assert.equal(checks(),1,'saving selects it: the check runs');
+ assert.equal(s.run('voicePreferences.tts.place'),'device');
+ assert.ok(!storedTts(stored).includes('elevenlabs'),'the provider is never stored');
+ assert.deepEqual(plain(s.run('stageChecks.tts')).step,'key');
+ assert.match(s.run("$('settings-error').textContent"),/se comprueba antes de usarse/);
+});
+test('A provider draft completed later and passing its check is stored by the selection, not by the save (R02)',async()=>{
+ const {s,stored,checks}=await deferredVoices({ok:true,step:'done',passes:[],latency_ms:300,slow:false});
+ assert.equal(checks(),1);
+ assert.equal(s.run('voicePreferences.tts.place'),'elevenlabs');
+ assert.equal(storedTts(stored).at(-1),'elevenlabs');
+ assert.equal(JSON.parse(JSON.stringify(stored.filter(([key])=>key==='sidevoice.stages').at(-1)[1][PAIRED.fp].tts.options.voice)).es,'v1','stored with the voice it names');
+});
+test('Saving an option of the model already in use stores it without a check',async()=>{
+ const s=setup({strictDOM:true});let checks=0;
+ await measured(s);
+ s.context.__checked=()=>checks++;s.run("verifyStage=async()=>{__checked();return {ok:true,passes:[]}}");
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+",tts:"+JSON.stringify(TTS())+"}})");
+ s.run("window.sidevoiceActions.setStageOption('stt','language','fr')");
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");await settle();
+ assert.equal(checks,0);
+ assert.equal(s.run('voicePreferences.stt.options.language'),'fr');
+});
+
+/* Review R05: the app keeps one instance per accelerator, so the page lets go of exactly the one it no longer needs. */
+async function acceleratorSwap(heard){
+ const {s,log,worker}=selecting({heard});
+ const unloads=[];s.context.window.__sidevoiceDesktop.host.nativeEngine.unload=async(...args)=>{unloads.push(args);return null};
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageBuild('stt','sherpa-onnx/coreml')");
+ await settle();await settle();
+ return {s,unloads,worker};
+}
+test('A Core ML candidate of the CPU model in use that fails its check releases its own instance only (R05)',async()=>{
+ const {s,unloads,worker}=await acceleratorSwap('Subtítulos realizados por la comunidad de Amara.org');
+ assert.equal(worker.posted[0].accelerator,'coreml');
+ assert.equal(plain(s.run('stageChecks.stt')).phase,'failed');
+ assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','coreml']],'the CPU instance the call uses stays');
+});
+test('Switching the model in use from CPU to Core ML releases the CPU instance, and only it (R05)',async()=>{
+ const {s,unloads}=await acceleratorSwap();
+ assert.equal(plain(s.run('stageChecks.stt')).phase,'done');
+ assert.deepEqual(plain(s.run('voicePreferences.stt.build')),{engine:'sherpa-onnx',accelerator:'coreml'});
+ assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']]);
+});
+
+/* The room's downloads (#124 §6, operator 2026-10-01): a selection's download is listed in the room with its bytes and
+ * the app's own speed, and Cancelar there stops it — in the app through the bridge's cancel(job). The real native
+ * worker, over sidevoice-desktop#3's bridge. */
+const NATIVE_WORKER=require('esbuild').buildSync({entryPoints:[__dirname+'/../../../packages/browser-audio/native-worker.js'],bundle:true,format:'iife',write:false}).outputFiles[0].text;
+async function nativeDownload(){
+ const s=setup({strictDOM:true}),calls=[];let reject;
+ const engine={capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:16384}),
+  installed:async()=>[{model:'whisper-tiny',engine:'sherpa-onnx'}],loaded:async()=>[],memory:async()=>null,
+  install(model,name,progress){calls.push(['install',model]);const running=new Promise((_,no)=>{reject=no});running.job='install-9';
+   setTimeout(()=>progress({job:'install-9',model,engine:name,done:8e6,total:216e6,bytes_per_s:4e6}),0);return running},
+  cancel:async job=>{calls.push(['cancel',job]);reject({key:'install_cancelled',message:'The download was cancelled.'});return true},
+  load:async(...args)=>{calls.push(['load',...args]);return {load_ms:1}},unload:async(...args)=>{calls.push(['unload',...args]);return null}};
+ s.context.window.__sidevoiceDesktop=s.context.__sidevoiceDesktop={host:{nativeEngine:engine}};
+ if(!s.context.setTimeout)s.context.setTimeout=setTimeout;
+ vm.runInContext(NATIVE_WORKER,s.context);
+ s.run("window.roomTranscription={capabilities:async()=>({}),candidate:native=>sidevoiceNativeWorkers.transcription(),adopt(){},stop(){}}");
+ await s.run('measureDevice(true)');
+ s.run("ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");await settle();
+ s.run("window.sidevoiceActions.decideStage('stt',true)");await settle();
+ return {s,calls};
+}
+test('A native download a selection starts is in the room with its bytes and the app\'s speed, and Cancelar there cancels the app\'s job',async()=>{
+ const {s,calls}=await nativeDownload();
+ const [item]=plain(s.run('state.downloads'));
+ assert.deepEqual([item.kind,item.state,item.label,item.done,item.total,item.bytes_per_s],['native','running','Whisper base',8e6,216e6,4e6]);
+ assert.equal(plain(s.run('roomStore.getState().downloads')).rows[0].speed,'4,0 MB/s');
+ s.run("window.sidevoiceActions.cancelDownload("+JSON.stringify(item.id)+")");await settle();
+ assert.deepEqual(calls,[['install','whisper-base'],['cancel','install-9']],'cancelled in the app, and never loaded');
+ assert.equal(plain(s.run('state.downloads'))[0].state,'cancelled');
+ assert.equal(s.run('stageChecks.stt'),null,'the selection is over');
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+});
+test('Cancelar in the settings pane cancels the same download, and the room says so',async()=>{
+ const {s,calls}=await nativeDownload();
+ s.run("window.sidevoiceActions.cancelStage('stt')");await settle();
+ assert.deepEqual(calls.at(-1),['cancel','install-9']);
+ assert.equal(plain(s.run('state.downloads'))[0].state,'cancelled');
+});
+test('A page download a selection starts is listed too, and Cancelar there lets its worker go',async()=>{
+ const s=setup({strictDOM:true});let terminated=0;
+ await measured(s,{webgpu:false,webgpuFp16:false,wasm:true});
+ s.context.__page={posted:[],postMessage(message){this.posted.push(message);if(message.type==='load')setTimeout(()=>this.onmessage?.({data:{id:message.id,type:'progress',progress:{status:'progress',file:'onnx/encoder_model_quantized.onnx',loaded:12e6,total:30e6}}}),0)},terminate(){terminated++}};
+ s.run("window.roomTranscription.candidate=()=>__page;ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");await settle();
+ s.run("window.sidevoiceActions.decideStage('stt',true)");await settle();
+ const [item]=plain(s.run('state.downloads'));
+ assert.deepEqual([item.kind,item.state,item.done],['page','running',12e6]);
+ assert.equal(item.total,79664191,'the catalogue\'s size until the files say more');
+ s.run("window.sidevoiceActions.cancelDownload("+JSON.stringify(item.id)+")");await settle();
+ assert.equal(terminated,1);
+ assert.equal(plain(s.run('state.downloads'))[0].state,'cancelled');
+});
+test('A download a call starts while connecting is listed, and cancelling it abandons the load and the join',async()=>{
+ const s=setup({strictDOM:true});let abandoned=0,progress;
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu'],memory_mb:16384}),installed:async()=>[]}}};
+ await s.run('measureDevice(true)');
+ s.context.__hold=value=>{progress=value};s.context.__abandoned=()=>abandoned++;
+ s.run("window.roomTranscription={prepare:(options,onProgress)=>{__hold(onProgress);return new Promise(()=>{})},abandon:()=>__abandoned(),stop(){}}");
+ s.run("prepareLocalWhisper({model:'whisper-base',engine:'sherpa-onnx',accelerator:'cpu'})");await settle();
+ progress({status:'progress',job:'install-2',loaded:5e6,total:216e6,bytes_per_s:3e6,file:'whisper-base'});
+ const [item]=plain(s.run('state.downloads'));
+ assert.deepEqual([item.task,item.kind,item.done,item.bytes_per_s],['stt','native',5e6,3e6]);
+ s.run("window.sidevoiceActions.cancelDownload("+JSON.stringify(item.id)+")");
+ assert.equal(abandoned,1);
+ assert.equal(plain(s.run('state.downloads'))[0].state,'cancelled');
+});
+
+/* Review N01: a cancel is the end of a preparation, never a reason to try the other accelerator. */
+test('Cancelling a call\'s WebGPU download from the room ends the preparation: no WASM copy is started (N01)',async()=>{
+ const s=setup();const saved={};
+ s.context.localStorage={getItem:key=>saved[key]??null,setItem:(key,value)=>{saved[key]=value},removeItem(key){delete saved[key]}};
+ await measured(s,PAGE_CAPS);
+ const calls=[];let reject,progress;
+ s.context.__prepare=(options,onProgress)=>{calls.push(options.accelerator);progress=onProgress;return new Promise((_,no)=>{reject=no})};
+ s.run("window.roomTranscription.prepare=(options,onProgress)=>__prepare(options,onProgress);window.roomTranscription.abandon=()=>{}");
+ const preparing=s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})");preparing.catch(()=>{});
+ await settle();
+ progress({status:'progress',file:'onnx/encoder_model_fp32.onnx',loaded:1e6,total:2e8});
+ const [row]=plain(s.run('state.downloads'));
+ s.run("window.sidevoiceActions.cancelDownload("+JSON.stringify(row.id)+")");
+ reject(Object.assign(Error('Transcripción cancelada'),{name:'AbortError'}));
+ await assert.rejects(preparing,{name:'AbortError'});
+ await settle();
+ assert.deepEqual(calls,['webgpu'],'nothing else is downloaded');
+ assert.deepEqual(plain(s.run('state.downloads')).map(item=>item.state),['cancelled']);
+ assert.equal(saved['sidevoice.webgpu-failed'],undefined,'and a cancel says nothing about the GPU');
+});
+test('A keyed cancel from the desktop app ends the preparation the same way, and a join that is gone tries nothing else (N01)',async()=>{
+ const s=setup();
+ await measured(s,PAGE_CAPS);
+ const calls=[];
+ s.context.__prepare=options=>{calls.push(options.accelerator);return Promise.reject(Object.assign(Error('Descarga cancelada.'),{reason:{key:'install_cancelled',message:'x'}}))};
+ s.run("window.roomTranscription.prepare=options=>__prepare(options)");
+ await assert.rejects(s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"),error=>error.reason?.key==='install_cancelled');
+ assert.deepEqual(calls,['webgpu']);
+ calls.length=0;
+ s.context.__prepare=options=>{calls.push(options.accelerator);s.run('connectEpoch++');return Promise.reject(Error('GPU device lost'))};
+ await assert.rejects(s.run("prepareTranscription({stt:"+JSON.stringify(STT('whisper-base'))+"})"),/GPU device lost/);
+ assert.deepEqual(calls,['webgpu'],'the join that owned it is gone: no second attempt');
+});
+
+/* Review R01 (re-check): a Cancel that lands after the room admitted the new session — while the page is still
+ * finishing the switch (here: audio unlock held open) — is past the commit point: the change completes, stored,
+ * and the previous model is let go, consistently. */
+test('A cancel after the room admitted the new session does not half-undo it: the change finishes and is stored (R01)',async()=>{
+ const {s,old,unloads,next}=await handover();
+ let unlock;s.context.__held=resolve=>{unlock=resolve};
+ s.run("window.roomVoice.unlock=()=>new Promise(resolve=>__held(resolve))");
+ next.readyState=1;next.onopen();
+ next.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
+ await settle();
+ assert.equal(typeof unlock,'function','the switch is past hello, waiting on the audio unlock');
+ assert.equal(old.closed,true,'the call is already on the new session');
+ s.run("window.sidevoiceActions.cancelStage('stt')");
+ unlock();
+ await settle();
+ assert.equal(s.run('sessionId'),'new-session');
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-1');
+ assert.equal(s.run('enginePreferences.stt.model'),'whisper-1');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-1','stored: the active choice and the stored one agree');
+ assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']],'the model the old session used is let go');
+ assert.equal(plain(s.run('stageChecks.stt')).phase,'done');
+});
+test('A cancel before the room answered still aborts the new session and changes nothing (R01)',async()=>{
+ const {s,old,unloads,next}=await handover();
+ s.run("window.sidevoiceActions.cancelStage('stt')");
+ await settle();
+ assert.equal(next.closed,true,'the opening socket is closed');
+ assert.equal(s.run('ws'),old);
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-tiny');
+ assert.equal(s.saved['sidevoice.stages'],undefined);
+ assert.deepEqual(unloads,[]);
+});
+
+/* Review N02: a configuration file that finished says nothing about the weights still to come. */
+test('A finished config file does not end the room\'s download: it stays running, with its Cancelar, which still works (N02)',async()=>{
+ const s=setup({strictDOM:true});let terminated=0;
+ await measured(s,{webgpu:false,webgpuFp16:false,wasm:true});
+ s.context.__page={posted:[],postMessage(message){this.posted.push(message);if(message.type!=='load')return;
+   const send=progress=>setTimeout(()=>this.onmessage?.({data:{id:message.id,type:'progress',progress}}),0);
+   send({status:'progress',file:'config.json',loaded:100,total:100});send({status:'done',file:'config.json'});
+   send({status:'progress',file:'onnx/encoder_model_quantized.onnx',loaded:1024,total:30e6})},terminate(){terminated++}};
+ s.run("window.roomTranscription.candidate=()=>__page;ws=null;roomStore.patch({voicePreferences:{stt:"+JSON.stringify(STT('whisper-tiny'))+"}})");
+ s.run("window.sidevoiceActions.chooseStageModel('stt','whisper-base')");await settle();
+ s.run("window.sidevoiceActions.decideStage('stt',true)");await settle();
+ const [item]=plain(s.run('state.downloads'));
+ assert.deepEqual([item.state,item.done],['running',1124]);
+ const view=plain(s.run('roomStore.getState().downloads'));
+ assert.deepEqual([view.running,view.rows[0].status,view.rows[0].cancellable],[1,'Descargando',true]);
+ assert.equal(plain(s.run('stageChecks.stt')).progress.step,'download');
+ assert.equal(s.run("downloads.cancel("+JSON.stringify(item.id)+")"),true);
+ await settle();
+ assert.equal(terminated,1,'the weights stop downloading');
+});
+
+/* Review N03: a cancel is an end, not a failure, wherever it comes from. */
+test('A voice download the desktop app cancelled while a call connects is said cancelled, not failed (N03)',async()=>{
+ const s=setup({strictDOM:true});
+ s.context.window.__sidevoiceDesktop={host:{nativeEngine:{capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu'],memory_mb:16384}),installed:async()=>[]}}};
+ await s.run('measureDevice(true)');
+ s.context.__reject=null;
+ s.run("window.roomVoice={prepare:(options,status,onProgress)=>new Promise((_,no)=>{__reject=no}),abandon(){},cancel(){}}");
+ const loading=s.run("trackedLoad('tts',ttsRequest("+JSON.stringify(TTS())+"),progress=>window.roomVoice.prepare({},()=>{},progress),()=>{})");loading.catch(()=>{});
+ await settle();
+ s.context.__reject(Object.assign(Error('Descarga cancelada.'),{step:'download',reason:{key:'install_cancelled',message:'x'}}));
+ await assert.rejects(loading);
+ assert.deepEqual(plain(s.run('state.downloads')).map(item=>[item.state,item.error]),[['cancelled','']]);
 });

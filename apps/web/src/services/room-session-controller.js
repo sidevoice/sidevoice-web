@@ -3,13 +3,27 @@ import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from
 import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
-import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem} from '../state/stage-settings.js';
+import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
 import {offers as resolveOffers} from '../../../../packages/browser-audio/offers';
+import {pageSize,pageCached} from '../../../../packages/browser-audio/page-models.js';
+import {languageFor} from '../../../../packages/browser-audio/model-check.js';
+import {verifyDevice,verifyProvider} from './load-and-verify.js';
+import {createStageSelection} from './stage-selection.js';
+import {createDownloads,byteCounter} from './downloads.js';
 import modelCatalog from '../../../../packages/browser-audio/models.json';
 import voiceCatalogFile from '../../../../packages/browser-audio/catalog.json';
 import {refusalText as sayRefusal} from '../../../../packages/browser-audio/refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
+// Selecting a model checks it before it takes effect (#124 §6): the state machine, its steps below (selectStage).
+const selection=createStageSelection({
+ publish:(task,check)=>roomStore.patch({stageChecks:{...state.stageChecks,[task]:check&&{...check,previous:stageLabel(stageContext(state),task,activeStage(task))}}}),
+ consent:(...step)=>consentFor(...step),verify:(...step)=>verifyStage(...step),activate:(...step)=>activateStage(...step),discard:(...step)=>discardCandidate(...step),
+});
+// Every model or engine download in flight, shown in the room with its own Cancelar (downloads.js, Downloads.tsx).
+const downloads=createDownloads({publish:items=>roomStore.patch({downloads:items})});
+// A load the desktop app's native worker started and no longer wants is let go — unless a stage here runs it (R04).
+if(globalThis.sidevoiceNativeWorkers)globalThis.sidevoiceNativeWorkers.keeps=build=>inUse(build);
 // What the stages are chosen from, as this page was built: the model catalogue and the speech languages (#124).
 roomStore.patch({modelCatalog,voiceLanguages:voiceCatalogFile.languages,speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.nativeEngine});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
@@ -1212,7 +1226,7 @@ function disconnect() {
 async function toggleCall(){if(state.ws||state.connecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  const pairing=pairingInUse(pairings);if(!pairing||pairing.revoked){openPairing(pairing?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await callPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt.place===DEVICE)joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;if(state.voicePreferences.tts.place===DEVICE){joinStatus('voice');await window.roomVoice.prepare(ttsRequest(state.voicePreferences.tts),text=>{state.liveNote=text})}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
+ personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await callPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt.place===DEVICE)joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;if(state.voicePreferences.tts.place===DEVICE){joinStatus('voice');const voice=ttsRequest(state.voicePreferences.tts);await trackedLoad('tts',voice,progress=>window.roomVoice.prepare(voice,text=>{state.liveNote=text},progress||undefined),()=>cancelJoinLoad('tts'))}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch)clearJoinStatus()}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
 // A room restart or a network blip must not end the call: the microphone permission, the media stream
 // and the unlocked output all survive it; only the socket needs reopening, with the same hello.
@@ -1257,6 +1271,8 @@ async function joinRoom(epoch,context){
  const replaced=context.keepCurrent&&state.ws&&state.ws!==socket?state.ws:null;
  state.ws=socket;
  if(replaced)dropReplacedSession(replaced);
+ // From here the call is on the new session: a swap that got this far is done, never undone (review R01).
+ context.onCommit?.();
  // What reopens this socket by itself is the call, never the swap that opened it.
  const again={browserStt:context.browserStt,sttRuntime:context.sttRuntime};
  socket.onclose=event=>{if(state.ws===socket)lostConnection(event,epoch,again)};
@@ -1420,7 +1436,7 @@ async function previewVoice(language){
 }
 async function prepareVoice(){
  if(state.activeSpeech||state.previewJob){state.prepareNote='Espera a que termine la voz.';return}
- try{await window.roomVoice.unlock();await measureDevice();const request=ttsRequest(paneStage('tts'));if(!request)return;await window.roomVoice.prepare(request,text=>{state.prepareNote=text})}
+ try{await window.roomVoice.unlock();await measureDevice();const request=ttsRequest(paneStage('tts'));if(!request)return;await trackedLoad('tts',request,progress=>window.roomVoice.prepare(request,text=>{state.prepareNote=text},progress||undefined),()=>window.roomVoice.abandon())}
  catch(e){state.prepareNote=e.message}
 }
 // The job identity belongs to the async adapter; the store holds its observable facts.
@@ -1497,6 +1513,7 @@ $('settings-open').onclick=async()=>{try{
  if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
  const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
  roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
+ for(const task of TASKS)selection.dismiss(task);
  for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
  for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
  $('presence-sound').value=(p.presence_sound??'on')==='off'?'off':'on';
@@ -1542,7 +1559,8 @@ function measureDevice(fresh=false){
   if(engine){capabilities=await engine.capabilities();try{installed=await engine.installed()}catch{}}
   else{
    const found=await window.roomTranscription.capabilities(),gpu=!!found.webgpu&&!webgpuFailed();
-   roomStore.patch({gpuSetAside:!!found.webgpu&&webgpuFailed()});
+   roomStore.patch({gpuSetAside:!!found.webgpu&&webgpuFailed(),
+    pageFacts:{adapter:found.adapter||null,crossOriginIsolated:!!globalThis.crossOriginIsolated,threads:found.threads??null,cores:globalThis.navigator?.hardwareConcurrency||null}});
    capabilities={runs:'page',has:[...(gpu?['webgpu']:[]),...(gpu&&found.webgpuFp16?['webgpu-f16']:[]),...(found.wasm?['wasm']:[])]};
   }
   roomStore.patch({deviceCapabilities:capabilities,deviceOffers:resolveOffers(state.modelCatalog,capabilities,'device'),installedBuilds:Array.isArray(installed)?installed:[]});
@@ -1561,13 +1579,158 @@ function buildRequest(build){
 }
 function ttsRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage)||deviceBuild(state.deviceOffers,defaultStage(stageContext(state),'tts')))}
 function editStage(task,next){roomStore.patch({stageDraft:{...(state.stageDraft||{stt:state.voicePreferences?.stt,tts:state.voicePreferences?.tts}),[task]:next}})}
-function chooseStagePlace(task,place){
- editStage(task,withPlace(stageContext(state),task,paneStage(task),place,state.voicePreferences?.[task]));
- if(place!==DEVICE)void loadRemote(place,task);
+/* A place, a model or a build chosen in a pane is a selection: checked before it takes effect (below). A provider's
+ * place waits for that account's lists, so there is a model to check; one that still lacks a model or a voice stays
+ * a draft, which "Guardar cambios" refuses until it is complete. Options are not checked: they are the draft it saves. */
+async function chooseStagePlace(task,place){
+ if(place!==DEVICE)await loadRemote(place,task);
+ const ctx=stageContext(state),next=withPlace(ctx,task,paneStage(task),place,state.voicePreferences?.[task]);
+ if(next&&place!==DEVICE&&stageProblem(ctx,task,withVoicesChosen(ctx,next))){editStage(task,next);return}
+ selectStage(task,next);
 }
-function chooseStageModel(task,model){editStage(task,withModel(stageContext(state),task,paneStage(task),model))}
+function chooseStageModel(task,model){selectStage(task,withModel(stageContext(state),task,paneStage(task),model))}
 function setStageOption(task,id,value,language){editStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
-function chooseStageBuild(task,value){editStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+function chooseStageBuild(task,value){selectStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+/* Select = load and verify (#124 §6, D11–D12). A model chosen in a pane is checked first — on this device in a worker
+ * of its own (load-and-verify.js), so the one in use goes on working; at a provider by the machine with its key —
+ * and only a passed check puts it in effect: stored, swapped in for the model in use (in a call too, without ending
+ * it) and only then the previous one let go. A failure, a cancel or "elegir otro" leave everything as it was.
+ * stage-selection.js is the state machine; what each of its steps does on this page is here. */
+function activeStage(task){return effectiveStage(stageContext(state),task,state.voicePreferences?.[task])}
+function sameChoice(a,b){return !!a&&!!b&&a.place===b.place&&a.model===b.model&&JSON.stringify(a.build||null)===JSON.stringify(b.build||null)}
+function selectStage(task,next){
+ if(!next)return;
+ // What is already in use is not selected again: an option changed with it is the draft's.
+ if(sameChoice(next,activeStage(task))){selection.cancel(task);editStage(task,next);return}
+ void selection.select(task,next);
+}
+/** The build a device stage is checked on, as the engines are asked for it. */
+function deviceRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage))}
+/** Whether a build is what a stage in use runs (the other stage, or this one after a swap): never unloaded then. The
+ *  desktop app keeps one instance per accelerator, and lets go of exactly one (`unload(model, engine, accelerator)`):
+ *  the same model on another accelerator is another instance (review R05). */
+function inUse(build){return TASKS.some(task=>{const used=deviceRequest(activeStage(task));return used&&used.model===build.model&&used.engine===build.engine&&used.accelerator===build.accelerator})}
+function release(build){if(build?.native&&!inUse(build))nativeEngine()?.unload(build.model,build.engine,build.accelerator)?.catch?.(()=>{})}
+const onDisk=build=>(state.installedBuilds||[]).some(item=>item.model===build.model&&item.engine===build.engine);
+/** The language a stage is checked in: a transcription's own when it has one, the person's speech language else. */
+function checkLanguage(task,stage){const own=task==='stt'?stage.options?.language:null;return own&&own!=='auto'?own:state.speechLanguage}
+/** What a native build downloads the first time: its files, and its engine's package unless that is already here. */
+function nativeSize(build){
+ const catalog=state.modelCatalog,capabilities=state.deviceCapabilities||{};
+ const files=catalog?.models?.find(model=>model.id===build.model)?.builds?.find(item=>item.engine===build.engine)?.download?.size||0;
+ const engine=catalog?.engines?.find(item=>item.id===build.engine);
+ const pkg=(engine?.packages||[]).find(item=>item.os===capabilities.os&&(item.arch===undefined||item.arch===capabilities.arch));
+ const engineHere=pkg?.bundled||(state.installedBuilds||[]).some(item=>item.engine===build.engine);
+ return files+(engineHere?0:pkg?.download?.size||0);
+}
+/* Step 1: a model not on this device yet is downloaded only with the person's consent, its size in view. */
+async function consentFor(task,stage){
+ if(stage.place!==DEVICE)return null;
+ const build=deviceRequest(stage);if(!build)return null;
+ if(build.native)return (state.installedBuilds||[]).some(item=>item.model===build.model&&item.engine===build.engine)?null:{size:nativeSize(build)};
+ return await pageCached(build.model,build.accelerator)?null:{size:pageSize(build.model,build.accelerator)};
+}
+async function fetchCheckClip(url){
+ const answer=await fetch(url+'?v='+encodeURIComponent(globalThis.sidevoiceBuildId||'dev'));
+ if(!answer.ok)throw Error('The check clip is missing ('+answer.status+').');
+ return answer.arrayBuffer();
+}
+/* Steps 2–5: download, load and check, here or at the provider; what was measured is kept for Diagnóstico. */
+async function verifyStage(task,stage,{signal,onProgress}){
+ const language=checkLanguage(task,stage);
+ if(stage.place!==DEVICE){
+  const checked=withVoicesChosen(stageContext(state),stage);
+  const result=await verifyProvider({task,stage:checked,language,request,signal});
+  if(!result.cancelled)await recordDiagnostics(task,stage,result,null);
+  return result;
+ }
+ await measureDevice();
+ const build=deviceRequest(stage);
+ if(!build)return {ok:false,step:'load',reason:{key:'build_unfit',message:stage.model+' does not run on this device.'},passes:[]};
+ const run=async chosen=>{
+  const download=!(chosen.native?onDisk(chosen):await pageCached(chosen.model,chosen.accelerator));
+  const expected=chosen.native?nativeSize(chosen):pageSize(chosen.model,chosen.accelerator);
+  // A download is also the room's: listed with its bytes, speed and time left, and cancelled there like here.
+  const id='check:'+task+':'+chosen.model+'/'+chosen.engine+'/'+chosen.accelerator;
+  if(download)downloads.start({id,label:modelLabel(chosen.model),task,kind:chosen.native?'native':'page',total:expected,cancel:()=>selection.cancel(task)});
+  const outcome=await verifyDevice({task,build:chosen,language,signal,download,expected,fetchClip:fetchCheckClip,
+   voice:task==='tts'?voiceFor(stageContext(state),stage,languageFor('tts',language)):undefined,speed:stage.options?.speed??1,
+   open:native=>task==='stt'?window.roomTranscription.candidate(native):window.roomVoice.candidate(native),
+   onProgress:progress=>{onProgress(progress);if(progress.step==='download')downloads.update(id,progress);else if(progress.step==='load'||progress.step==='check')downloads.end(id,'done')}});
+  if(download)downloads.end(id,outcome.cancelled?'cancelled':!outcome.ok&&outcome.step==='download'?'failed':'done',outcome.cancelled?'':sayRefusal(outcome.reason,''));
+  // What the app installed for this check is on its disk now: no second consent for it.
+  if(chosen.native&&outcome.loaded&&!onDisk(chosen))roomStore.patch({installedBuilds:[...(state.installedBuilds||[]),{model:chosen.model,engine:chosen.engine}]});
+  return outcome;
+ };
+ let used=build,result=await run(build);
+ // WebKit on the iPhone offers WebGPU and then fails to load models on it. With the build left automatic, the same
+ // engine is tried on WASM, and this device stops offering WebGPU (a voice's worker does this on its own).
+ const wasm=build.accelerator==='webgpu'&&!stage.build&&taskOffers(state.deviceOffers,task).find(offer=>offer.model===build.model);
+ if(!result.ok&&!result.cancelled&&result.step==='load'&&task==='stt'&&wasm&&[wasm,...wasm.alternatives].some(choice=>choice.engine===build.engine&&choice.accelerator==='wasm')&&acceleratorFailure(result.reason?.detail||result.reason?.message)){
+  try{localStorage.setItem(WEBGPU_FAILED_KEY,'1')}catch{}
+  void measureDevice(true).catch(()=>{});
+  used={...build,accelerator:'wasm'};result=await run(used);
+ }
+ if(!result.cancelled)await recordDiagnostics(task,stage,result,used);
+ return {...result,build:used,native:used.native};
+}
+async function recordDiagnostics(task,stage,result,build){
+ let memory=null;
+ if(build?.native){try{memory=await nativeEngine()?.memory?.()||null}catch{}}
+ else if(build&&globalThis.navigator?.deviceMemory)memory={device_gb:globalThis.navigator.deviceMemory};
+ roomStore.patch({stageDiagnostics:{...state.stageDiagnostics,[task]:{at:Date.now(),stage,ok:!!result.ok,step:result.step,reason:result.reason||null,
+  build:build&&{engine:build.engine,accelerator:result.runtime?.accelerator||build.accelerator},load_ms:result.load_ms??null,passes:result.passes||[],memory,language:result.language||null}}});
+}
+/* Step 6 and the swap, as one transaction (review R01): the candidate is handed over — in a call, the call has to take
+ * it — and only once that went through is the choice stored and the previous model let go. A handover the call
+ * refuses, or one cancelled meanwhile, puts back what was there and throws its reason: nothing is stored, nothing is
+ * unloaded, and the selection lets the candidate go. */
+let switchRefusal=null;
+async function activateStage(task,stage,result,{signal,commit}={}){
+ const previous=state.voicePreferences||devicePreferences(),ctx=stageContext(state);
+ const saved=withVoicesChosen(ctx,stage),next={...previous,[task]:saved};
+ const before=previous?.[task]?deviceRequest(effectiveStage(ctx,task,previous[task])):null;
+ let applied=false;
+ if(task==='stt'){
+  const handover=result.worker?window.roomTranscription.adopt(result.worker,result.runtime,result.native):null;
+  const cancel=()=>abortSwitch();signal?.addEventListener('abort',cancel);
+  try{
+   switchRefusal=null;
+   // The commit point is the call taking the change (its new session admitted, or a local swap starting): before
+   // it a cancel aborts the handover and nothing changes; from it the change is finished, stored and the previous
+   // model let go, whatever arrives meanwhile (review R01).
+   applied=await applyTranscriptionSettings(previous,next,{onCommit:commit});
+   if(signal?.aborted)throw Object.assign(Error('The change was cancelled.'),{reason:{key:'apply_cancelled',message:'The change was cancelled.'}});
+   // A change the call has to rebuild its pipeline for went through only if the new session did.
+   if(state.ws&&pipelineSettingsChanged(previous,next)&&applied!=='switched')
+    throw Object.assign(Error('The call refused the change.'),{reason:switchRefusal||{key:'switch_refused',message:'The call refused the change.'}});
+  }catch(error){handover?.restore();throw error}
+  finally{signal?.removeEventListener('abort',cancel)}
+  commit?.();
+  handover?.commit();
+ }else{
+  commit?.();
+  if(result.worker)window.roomVoice.adopt(result.worker,{native:result.native,model:result.build.model,accelerator:result.build.accelerator});
+ }
+ storePreferences(next);
+ // The pane keeps showing what the person chose (a provider's "Automática" voice too); what is stored names it.
+ roomStore.patch({voicePreferences:next,stageDraft:{...(state.stageDraft||{stt:previous?.stt,tts:previous?.tts}),[task]:stage}});
+ // A new session already carries the settings in its hello; otherwise the call is told.
+ if(applied!=='switched'&&state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:next}}));
+ if(applied)state.liveNote='Transcripción cambiada sin salir de la llamada';
+ release(before);
+}
+/* A candidate that does not take effect is let go: its worker, and in the app the model it loaded, unless in use. */
+function discardCandidate(task,stage,result){
+ result?.worker?.terminate();
+ if(result?.loaded)release(result.build);
+}
+/* Diagnóstico's copy (#90, #123): its rows as text, in the page's language, with the build and the browser. */
+async function copyDiagnostics(task){
+ const view=roomStore.getState().stages?.[task]?.diagnostics;if(!view)return false;
+ const text=diagnosticsText(task,view,[{label:'Compilación',value:globalThis.sidevoiceBuildId||'dev'},{label:'User agent',value:navigator.userAgent}],value=>window.roomI18n?.translate?.(value)??value);
+ try{await navigator.clipboard.writeText(text);return true}catch{return false}
+}
 /* A provider's own lists — OpenAI's transcription models, ElevenLabs' models and the account's voices — asked for
  * only when a stage is on that provider, and only of the machine they were asked of (see integrationScope). */
 function patchRemote(key,entry){roomStore.patch({remoteModels:{...state.remoteModels,[key]:entry}})}
@@ -1608,6 +1771,7 @@ function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===inte
  * and the stages are that machine's own (D7: a composition per client × host), switched in the same step. */
 function switchStages(){
  resetIntegrations();
+ for(const task of TASKS)selection.cancel(task);
  const {stt:_stt,tts:_tts,...rest}=state.voicePreferences||{};
  roomStore.patch({stageDraft:null,voicePreferences:state.voicePreferences&&{...rest,...storedStages(pairings.inUse)}});
 }
@@ -1764,15 +1928,41 @@ window.addEventListener('voice-output',event=>noteOutputHealth(event.detail?.kin
 function modelLabel(id){return state.modelCatalog?.models?.find(model=>model.id===id)?.label||id}
 /* A device stage's transcription model, on its build. WebGPU that fails to load it (the iPhone) falls back to the
  * same engine on WASM when this device has it, and this device stops offering WebGPU from then on. */
+/** Whether an error is a cancel — the page's own (AbortError), or the desktop app's keyed one — and not a failure. */
+function cancelled(error){return error?.name==='AbortError'||['install_cancelled','load_cancelled'].includes(error?.reason?.key)}
+/* A load that may download first — a call connecting with a model not on disk yet, or Precargar — is the room's
+ * download too: listed with its bytes, speed and time left, and cancelled there (`cancel`). `load(progress)` runs it. */
+async function trackedLoad(task,request,load,cancel){
+ if(!request||(request.native?onDisk(request):await pageCached(request.model,request.accelerator)))return load(null);
+ const id='load:'+task+':'+request.model+'/'+request.engine+'/'+request.accelerator;
+ const expected=request.native?nativeSize(request):pageSize(request.model,request.accelerator),count=byteCounter(expected);
+ downloads.start({id,label:modelLabel(request.model),task,kind:request.native?'native':'page',total:expected,cancel});
+ try{
+  const value=await load(event=>{if(event?.status==='loading')downloads.end(id,'done');else{const bytes=count(event);if(bytes)downloads.update(id,bytes)}});
+  downloads.end(id,'done');
+  if(request.native&&!onDisk(request))roomStore.patch({installedBuilds:[...(state.installedBuilds||[]),{model:request.model,engine:request.engine}]});
+  return value;
+ }catch(error){
+  const stopped=cancelled(error);
+  downloads.end(id,stopped?'cancelled':'failed',stopped?'':sayRefusal(error?.reason,String(error?.message||error)));
+  throw error;
+ }
+}
+/* Cancelling a download a call started while connecting is cancelling that join: the call is not half made. */
+function cancelJoinLoad(task){if(state.connecting)disconnect();if(task==='stt')window.roomTranscription?.abandon?.();else window.roomVoice?.abandon?.()}
 async function prepareLocalWhisper(build){
- try{return await window.roomTranscription.prepare(buildRequest(build))}
+ const prepare=chosen=>trackedLoad('stt',buildRequest(chosen),progress=>window.roomTranscription.prepare(buildRequest(chosen),progress||undefined),()=>cancelJoinLoad('stt'));
+ const epoch=connectEpoch;
+ try{return await prepare(build)}
  catch(error){
+  // A cancel is the end of this preparation, never a reason to try another copy; nor is a join that is gone (N01).
+  if(cancelled(error)||epoch!==connectEpoch)throw error;
   const offer=state.deviceOffers?.find(item=>item.model===build.model);
   const fallback=build.accelerator==='webgpu'&&[offer,...(offer?.alternatives||[])].find(choice=>choice?.engine===build.engine&&choice.accelerator==='wasm');
   if(!fallback)throw error;
   state.liveNote='La GPU no pudo cargar '+modelLabel(build.model)+'; este dispositivo usa la CPU';
   if(acceleratorFailure(error)){try{localStorage.setItem(WEBGPU_FAILED_KEY,'1')}catch{}void measureDevice(true).catch(()=>{})}
-  const runtime=await window.roomTranscription.prepare(buildRequest({...build,accelerator:'wasm'}));
+  const runtime=await prepare({...build,accelerator:'wasm'});
   return {...runtime,fallback_from:'webgpu',fallback_error:String(error?.message||error).slice(0,300)};
  }
 }
@@ -1808,7 +1998,8 @@ function localModelSwap(previous,next){return !!state.ws&&next?.stt?.place===DEV
  * Whisper model, its GPU→CPU fallback) loads while the call goes on over the socket it already has,
  * the new session only replaces the old one once the room has answered it, and a refusal leaves the
  * call exactly as it was — with the room's own reason for it said out loud. */
-async function switchSession(previous,next){
+let switchCommitted=0;
+async function switchSession(previous,next,{onCommit}={}){
  if(!state.ws)return false;
  // The last save wins: a swap still in flight is abandoned, never queued behind this one.
  if(state.switchingSession)abortSwitch();
@@ -1823,7 +2014,7 @@ async function switchSession(previous,next){
   const context=await prepareTranscription(next);
   if(stale())return false;
   phase='room';joinStatus(step);
-  const session=await joinRoom(epoch,{...context,keepCurrent:true});
+  const session=await joinRoom(epoch,{...context,keepCurrent:true,onCommit:()=>{switchCommitted=attempt;onCommit?.()}});
   if(stale()||!session)return false;
   await window.roomVoice?.unlock();
   roomStore.patch({engineReady:true,enginePreferences:next,voicePreferences:next,sttRuntime:context.sttRuntime});showEchoCover();
@@ -1835,21 +2026,25 @@ async function switchSession(previous,next){
   // Nothing was swapped: `ws` is still the socket the call was already on.
   showPreparation({phase:'hidden'});
   failJoin('No se pudo aplicar el cambio: '+joinFailureText(phase,error)+' La llamada sigue con los ajustes anteriores.');
+  switchRefusal={key:'switch_refused',detail:joinFailureText(phase,error),message:'The call refused the change.'};
 
   return false;
  }finally{if(attempt===switchEpoch)state.switchingSession=false}
 }
 // Cancelling the preparation abandons the swap, not the call: the old session was never touched.
 function abortSwitch(){
- if(!state.switchingSession)return;
+ // A swap the call has already taken (its new session admitted) is past cancelling: it finishes.
+ if(!state.switchingSession||switchCommitted===switchEpoch)return;
  ++switchEpoch;state.switchingSession=false;
  const opening=openingSocket;openingSocket=null;opening?.close();
  showPreparation({phase:'hidden'});clearJoinStatus();
 }
-async function applyTranscriptionSettings(previous,next){
+async function applyTranscriptionSettings(previous,next,{onCommit}={}){
  if(!state.ws)return false;
- if(pipelineSettingsChanged(previous,next))return await switchSession(previous,next)&&'switched';
+ if(pipelineSettingsChanged(previous,next))return await switchSession(previous,next,{onCommit})&&'switched';
  if(!localModelSwap(previous,next))return false;
+ // A local swap is not refused by anybody: it is committed as it starts.
+ onCommit?.();
  const socket=state.ws,epoch=connectEpoch;state.switchingTranscription=true;
  window.roomTranscription.stop({cancelTurn:true});
  try{
@@ -1873,6 +2068,11 @@ async function saveSettings(){
  if(state.deviceOffers===null)for(const task of TASKS)if(!p[task])p[task]=previous?.[task];
  const problem=TASKS.map(task=>stageProblem(ctx,task,p[task])).find(Boolean);
  if(problem){$('settings-error').textContent=problem;return}
+ // A new place, model or build is never stored by saving — a provider's draft completed later included: it is
+ // selected, checked first and stored only if it passes (review R02). Saving stores the rest, the options of what is
+ // already in use among them, and keeps the dialog open on the check.
+ const selecting=TASKS.filter(task=>p[task]&&!sameChoice(p[task],activeStage(task))).map(task=>({task,stage:effectiveStage(ctx,task,draft[task])}));
+ for(const {task} of selecting)p[task]=previous?.[task];
  // A control the person never saw is not a decision they made: a field with nothing in it keeps what was saved
  // before instead of writing an empty string (2026-09-20).
  const field=key=>{const node=$(key.replaceAll('_','-'));const raw=node?node.value:'';return raw===''||raw==null?previous?.[key]:raw};
@@ -1881,7 +2081,14 @@ async function saveSettings(){
  try{
   storePreferences(p,scope.host);
   if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));
-  hotSwap=localModelSwap(previous,p);roomStore.patch({voicePreferences:p,stageDraft:null});applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();$('language-settings').close();
+  hotSwap=localModelSwap(previous,p);
+  roomStore.patch({voicePreferences:p,stageDraft:selecting.length?{stt:p.stt,tts:p.tts,...Object.fromEntries(selecting.map(({task,stage})=>[task,stage]))}:null});
+  applyLockedCall();window.roomI18n?.setLanguage(p.ui_language);stopPreview();
+  if(selecting.length){
+   settingsSection(selecting[0].task==='stt'?'transcription':'voice');
+   $('settings-error').textContent='Guardado. El cambio de modelo se comprueba antes de usarse.';
+   for(const {task,stage} of selecting)void selection.select(task,stage);
+  }else $('language-settings').close();
   const applied=await applyTranscriptionSettings(previous,p);
   state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas';
  }catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}
@@ -1915,6 +2122,11 @@ window.sidevoiceActions={
  chooseStageModel,
  setStageOption,
  chooseStageBuild,
+ decideStage:(task,yes)=>selection.decide(task,yes),
+ cancelStage:task=>selection.cancel(task),
+ recheckStage:task=>{const stage=activeStage(task);if(stage)void selection.select(task,stage,{recheck:true})},
+ copyDiagnostics,
+ cancelDownload:id=>{downloads.cancel(id)},
  previewVoice,
  prepareVoice,
  retryIntegrations,
