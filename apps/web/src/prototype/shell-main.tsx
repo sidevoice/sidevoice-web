@@ -142,9 +142,11 @@ function Shell() {
               <div className="seg" role="group" aria-label="Paso de cada modelo">
                 <button type="button" aria-pressed={toggles[FLOW_TOGGLE] !== "B"} onClick={() => setToggle(FLOW_TOGGLE, "")}>A · Probar y confirmar</button>
                 <button type="button" aria-pressed={toggles[FLOW_TOGGLE] === "B"} onClick={() => setToggle(FLOW_TOGGLE, "B")}>B · Comprobar y configurar</button>
+                <button type="button" aria-pressed={toggles[FLOW_TOGGLE] === "C"} onClick={() => setToggle(FLOW_TOGGLE, "C")}>C · Lista y conversación</button>
               </div>
               <p className="hint"><b>A</b>: descargar y preparar → «Probar» → «¿Es lo que has dicho? / ¿Te suena bien?» → «Sí, funciona».</p>
               <p className="hint"><b>B</b>: la app lo comprueba sola (descarga, carga, sale audio) → configurar y escuchar tu texto las veces que quieras → «Usar esta voz».</p>
+              <p className="hint"><b>C</b>: lista de todos los modelos; al tocar uno se descarga y comprueba, con sus tiempos en la tarjeta → la prueba es al final, una conversación real.</p>
             </fieldset>
             {hosts.length > 0 && (
               <details className="codes" open>

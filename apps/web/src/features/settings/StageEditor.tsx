@@ -23,13 +23,14 @@ import { stageContext } from "../../state/room-session-state.js";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { useHosts, useHostsController } from "../../state/hosts/hosts-store";
 import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-scope";
-import { effectiveStage as effectiveStageOf, withBuild, withModel, withOption, withPlace } from "../../state/stage-settings.js";
+import { effectiveStage as effectiveStageOf, placeModels, withBuild, withModel, withOption, withPlace } from "../../state/stage-settings.js";
+import { ProviderIcon } from "../../components/ui/Icons";
 import { bytesText } from "../hosts/common";
 import { StageSettings } from "./StageSettings";
 import { offeredSentence, saySample } from "./try-samples";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
 import { MessageGroup } from "../conversation/MessageGroup";
-import type { ChatMessage, StageOptionView } from "../../state/room-types";
+import type { ChatMessage, StageOptionView, StageView } from "../../state/room-types";
 
 /** What the person said works, per stage, for this session: the whole configuration on one machine. A wizard step
  *  resumed after a restart is past it already (resumeStep skips a stage that is set), so this does not need to outlive
@@ -48,8 +49,11 @@ function useStageContext() {
 /** How a model is taken through its step. The prototype compares two (operator, 2026-10-01), undecided:
  *  - "try": prepare it, the person tries it and says whether it works («¿Es lo que has dicho?» → «Sí, funciona»);
  *  - "configure": the app checks it by itself (download, load, audio comes out), then the person configures it and
- *    listens to their own text as often as they like, and keeps it («Usar esta voz» / «Usar este modelo»). */
-export type StageFlow = "try" | "configure";
+ *    listens to their own text as often as they like, and keeps it («Usar esta voz» / «Usar este modelo»);
+ *  - "list": every model in one list of cards, by place (as Handy and Vowen do — design/RESEARCH-HANDY.md); touching
+ *    one downloads, loads and checks it, with what it measured on the card; the app's check is the only gate, and the
+ *    person's own test is the wizard's last step, a real conversation. */
+export type StageFlow = "try" | "configure" | "list";
 export const StageFlowContext = createContext<StageFlow>("try");
 
 /** The longest text the voice test plays. */
@@ -278,7 +282,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : check?.phase === "failed" && !prepared ? { label: t("common.retry"), run: prepare }
     : check?.phase === "slow" ? { label: t("check.useAnyway"), run: () => window.sidevoiceActions?.decideStage(task, true) }
     : !prepared ? { label: remote ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare") : offer?.download_size ? t("stagecard.downloadPrepare", { size: bytesText(offer.download_size, lang) }) : t("stagecard.downloadPrepareOnly"), run: prepare }
-    : works ? null
+    : works || flow === "list" ? null
     : trial.state === "listening" ? { label: t("stagecard.listening"), disabled: true }
     : trial.state === "transcribing" ? { label: t("stagecard.transcribing"), disabled: true }
     : trial.state === "playing" ? { label: t("stagecard.playing"), disabled: true }
@@ -291,8 +295,21 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     : trial.state === "idle" ? { label: t("stagecard.next.try"), run: start }
     : { label: t("stagecard.next.again"), run: start };
   const configure = flow === "configure" && prepared && !keyFor;
+  const list = flow === "list";
+  // List: touching a card selects that model and starts it at once — download, load, check.
+  function pick(place: string, model: string) {
+    setKeyFor(null);
+    const base = place === current?.place ? current : withPlace(ctx!, task, current, place, null);
+    const stage = withModel(ctx!, task, base, model) as Stage;
+    select(stage);
+    if (saved && same(saved, stage) && (!check || check.phase === "done")) return;
+    setPreparedHere(true);
+    window.sidevoiceActions?.testStage?.(task, { place: stage.place, model: stage.model, options: stage.options ?? {}, build: stage.build ?? null });
+  }
+  if (list && rawCheck?.phase === "done" && check?.phase === "done") remember(task, (rawCheck as unknown as { stage: Stage }).stage, check.rows ?? []);
   const settings = (
-    <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={keyFor} hideCheck hidePlaceNote hideVoiceTools
+    <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={list ? null : keyFor} hideCheck hidePlaceNote hideVoiceTools
+      pickers={list ? <ModelList task={task} ctx={ctx} view={view} current={current} saved={saved} running={rawCheck} rawStep={rawStep} onPick={pick} onRetry={prepare} /> : undefined}
       onPlaceChange={placeChosen}
       onModelChange={(model) => select(withModel(ctx, task, current, model))}
       onOptionChange={optionChosen}
@@ -306,7 +323,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
         <ConfigureAndListen task={task} trial={trial} input={input} languageLabel={testLanguageLabel} onText={setText} onStart={start} works={works} inFooter={!!footer}
           onKeep={() => answer(true)} keepLabel={keep} />
       ) : null}
-      afterModel={keyFor || !view.model ? null : (
+      afterModel={list || keyFor || !view.model ? null : (
         <StageCard task={task} flow={flow} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
           runningStep={rawStep} inUseNote={!footer && preparedHere && flow === "try"} inFooter={!!footer} trial={trial} input={input} languageLabel={testLanguageLabel} onText={setText} onStart={start}
           onPrepare={prepare} onAnswer={answer} onRetry={retry}
@@ -322,6 +339,103 @@ function labelOf(ctx: NonNullable<ReturnType<typeof stageContext>>, model: strin
 }
 
 type Phase = "download" | "prepare" | "test" | "check";
+
+/** What each model measured when it was last checked here, per stage and place/model: shown on its card for good. */
+const measuredRows = new Map<string, { label: string; value: string }[]>();
+function remember(task: Task, stage: Stage, rows: { label: string; value: string }[]) {
+  if (stage && rows.length) measuredRows.set(task + ":" + stage.place + "/" + stage.model, rows);
+}
+
+/** Flow "list": every model of the stage as a card, this device first, then each provider (one without a key asks for
+ *  it in its own group). A card says what the model is, its size and whether it is here, what it measured, and while
+ *  it is being made ready, its phases. */
+function ModelList({ task, ctx, view, current, saved, running, rawStep, onPick, onRetry }: {
+  task: Task; ctx: NonNullable<ReturnType<typeof stageContext>>; view: StageView; current: Stage | null; saved: Stage | null;
+  running: { phase: string; stage?: Stage } | null; rawStep: string | null; onPick: (place: string, model: string) => void; onRetry: () => void;
+}) {
+  const t = useT();
+  const inUse = useHosts((s) => s.inUse);
+  const integrations = useHosts((s) => (s.inUse ? s.integrations[s.inUse] : undefined));
+  const lang = currentLanguage();
+  const installed = (offer: { model: string; engine: string }) => (ctx.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
+  const groups = view.places.map((place) => {
+    const models = (placeModels(ctx, place.id, task) as { id: string; label: string; description?: string; offer?: { model: string; engine: string; download_size: number } }[] | null) ?? null;
+    return { place, models };
+  });
+  const check = view.check;
+  return (
+    <div className="model-list">
+      {groups.map(({ place, models }, index) => {
+        const listing = integrations?.value?.providers.find((p) => p.id === place.id);
+        return (
+          <section key={place.id} className="model-group" aria-label={place.label}>
+            <h3 className="model-group-title"><ProviderIcon id={place.id} /> {place.label}</h3>
+            {place.state === "missing" ? (
+              inUse && listing ? <KeyLine key={place.id} fp={inUse} provider={place.id} label={listing.label} configured={false} hint={null} ownSubmit /> : null
+            ) : !models ? <p className="muted small" role="status">{t("stage.modelsLoading")}</p> : (
+              <ul className="model-cards">
+                {models.map((model, i) => {
+                  const selected = current?.place === place.id && current?.model === model.id;
+                  const active = !!saved && saved.place === place.id && saved.model === model.id;
+                  const mine = (stage?: Stage | null) => !!stage && stage.place === place.id && stage.model === model.id;
+                  const busy = running?.phase === "running" && mine(running.stage);
+                  const failed = check?.phase === "failed" && mine(running?.stage);
+                  const slow = check?.phase === "slow" && mine(running?.stage);
+                  const here = model.offer ? installed(model.offer) : false;
+                  const size = model.offer?.download_size ? bytesText(model.offer.download_size, lang) : "";
+                  const rows = measuredRows.get(task + ":" + place.id + "/" + model.id);
+                  const phases: Phase[] = place.id === "device" ? ["download", "prepare", "check"] : ["check"];
+                  const at: Phase = rawStep === "download" ? "download" : rawStep === "check" || place.id !== "device" ? "check" : "prepare";
+                  return (
+                    <li key={model.id} className="model-card" data-selected={selected || undefined} data-active={active || undefined} data-busy={busy || undefined}>
+                      <button type="button" className="model-card-pick" aria-pressed={selected} onClick={() => onPick(place.id, model.id)} disabled={busy}>
+                        <span className="model-card-head">
+                          <strong>{model.label}</strong>
+                          {index === 0 && i === 0 && place.id === "device" && <span className="badge">{t("list.recommended")}</span>}
+                          {active && !busy && <span className="badge badge-active">{t("list.active")}</span>}
+                        </span>
+                        {model.description && <span className="muted small">{model.description}</span>}
+                        <span className="model-card-meta small">{[size, place.id === "device" ? (here ? t("list.here") : t("list.toDownload")) : ""].filter(Boolean).join(" · ")}</span>
+                        {rows && !busy && <span className="model-card-metrics small">{rows.map((r) => r.label + " " + r.value).join(" · ")}</span>}
+                      </button>
+                      {busy && (
+                        <div className="model-card-progress" role="status">
+                          <ol className="stage-card-phases">
+                            {phases.map((phase) => {
+                              const state = phases.indexOf(phase) < phases.indexOf(at) || (phase === "download" && here) ? "done" : phase === at ? "current" : "next";
+                              return <li key={phase} data-state={state} aria-current={state === "current" ? "step" : undefined}>{t("stagecard.phase." + phase)}</li>;
+                            })}
+                          </ol>
+                          {check?.phase === "running" && <><span className="small">{check.step}{check.amount ? " · " + check.amount : ""}</span><progress max={1} value={check.fraction ?? undefined} /></>}
+                          <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.cancelStage(task)}>{t("common.cancel")}</Button>
+                        </div>
+                      )}
+                      {failed && (
+                        <div className="model-card-progress" role="alert">
+                          <span className="row-error small">{t("check.failed", { step: check.step, cause: check.cause })}</span>
+                          <Button size="compact" onClick={onRetry}>{t("common.retry")}</Button>
+                        </div>
+                      )}
+                      {slow && (
+                        <div className="model-card-progress" role="alert">
+                          <span className="warn-line small">{t("check.slow", { seconds: check.latency.replace(/\s*s$/, "") })}</span>
+                          <span className="try-row">
+                            <Button size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, true)}>{t("check.useAnyway")}</Button>
+                            <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.decideStage(task, false)}>{t("stagecard.chooseOther")}</Button>
+                          </span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 /** The card under the model: its phases as a strip, and what the current one needs. In "try" the last phase is the
  *  person's («Probar»); in "configure" it is the app's own check («Comprobar»), and trying it is configuring it, below. */

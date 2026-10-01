@@ -329,3 +329,20 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-editor h3.stage-configure-title { margin: 1.1rem 0 .2rem; font-size: .95rem; letter-spacing: 0; text-transform: none }
 .stage-configure { display: grid; gap: .5rem; margin: .4rem 0 .8rem; padding: .75rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22 }
 .stage-configure p { margin: 0 }
+/* Flow "list": every model as a card, by place; touching one makes it ready. */
+.model-list { display: grid; gap: .9rem; margin-bottom: .6rem }
+.stage-editor h3.model-group-title { display: flex; align-items: center; gap: .45rem; margin: 0 0 .4rem; font-size: .85rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--sv-muted) }
+.model-cards { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none }
+.model-card { display: grid; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22; overflow: hidden }
+.model-card[data-selected] { border-color: var(--sv-selected-border) }
+.model-card[data-active] { border-color: #3d6b55 }
+.model-card-pick { display: grid; gap: .2rem; width: 100%; padding: .6rem .8rem; border: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer }
+.model-card-pick:hover:not(:disabled) { background: #ffffff08 }
+.model-card-pick:disabled { cursor: default; opacity: 1 }
+.model-card-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap }
+.model-card-head .badge-active { color: #9ed3b4; background: #1e3329 }
+.model-card-meta { color: var(--sv-muted) }
+.model-card-metrics { color: #9ed3b4 }
+.model-card-progress { display: grid; gap: .4rem; justify-items: start; padding: 0 .8rem .7rem }
+.model-card-progress progress { width: 100%; height: 6px; accent-color: var(--sv-primary) }
+.conversation-test { gap: .1rem; margin: .4rem 0 .6rem; padding: .7rem .8rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #13171c }

@@ -20,7 +20,11 @@ import { previousStep, stepGroups, type Step } from "../../state/hosts/onboardin
 import { proposeStages, type ProposalRow } from "../../state/hosts/proposal";
 import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-scope";
 import { effectiveStage as effectiveStageOf, withModel, withPlace } from "../../state/stage-settings.js";
-import { StageEditor } from "../settings/StageEditor";
+import { StageEditor, StageFlowContext } from "../settings/StageEditor";
+import { offeredSentence } from "../settings/try-samples";
+import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
+import { MessageGroup } from "../conversation/MessageGroup";
+import type { ChatMessage } from "../../state/room-types";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
 import { AgentRow, otherAgent } from "../hosts/AgentRow";
@@ -86,7 +90,7 @@ function StepBody({ step }: { step: Step }) {
     case "W3": return <W3 />;
     case "W4": return <StageStep key="stt" task="stt" />;
     case "W4v": return <StageStep key="tts" task="tts" />;
-    case "W5": return <W5 />;
+    case "W5": return <W5Step />;
     case "W6": return <W6 />;
   }
 }
@@ -306,6 +310,88 @@ function StageStep({ task }: { task: Task }) {
 }
 
 // ----- W5 -----
+/** The flow being compared decides the test: with the model list (flow "list") it is a real conversation turn. */
+function W5Step() {
+  return useContext(StageFlowContext) === "list" ? <W5Conversation /> : <W5 />;
+}
+
+type Turn = { state: "speaking" | "listening" | "transcribing" | "heard" | "replied" | "failed" | "silent"; heard?: string; reply?: string; error?: { key: string; stage?: Task } };
+
+/** The test as a conversation (operator, 2026-10-01), in the call's own bubbles: Sidevoice says «Dime algo, a ver si
+ *  te oigo» in the voice chosen, the person answers (their live bubble, with its waveform), and Sidevoice says back
+ *  what it understood. Nothing reaches an agent. Then: does it work? */
+function W5Conversation() {
+  const t = useT();
+  const hosts = useHostsController();
+  const inUse = useHosts((s) => s.inUse);
+  const language = useRoomStore((s) => s.facts.speechLanguage);
+  const [turn, setTurn] = useState<Turn>({ state: "speaking" });
+  const [no, setNo] = useState(false);
+  const abort = useRef<AbortController | null>(null);
+  const prompt = t("w5c.prompt");
+  async function start() {
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setNo(false);
+    setTurn({ state: "speaking" });
+    try { await window.sidevoiceActions?.previewVoice(language, prompt); } catch { /* the words are on screen */ }
+    if (controller.signal.aborted) return;
+    setTurn({ state: "listening" });
+    // Whatever the person says: nothing offered to repeat.
+    offeredSentence.current = "";
+    void hosts.echoTest(inUse, {
+      level: () => undefined,
+      transcribing: () => { if (!controller.signal.aborted) setTurn({ state: "transcribing" }); },
+      heard: (text) => { if (!controller.signal.aborted) setTurn({ state: "heard", heard: text }); },
+      replied: (text) => { if (!controller.signal.aborted) setTurn((x) => ({ ...x, state: "replied", reply: text })); },
+      failed: (key, stage) => { if (!controller.signal.aborted) setTurn((x) => ({ ...x, state: "failed", error: { key, stage } })); },
+      silent: () => { if (!controller.signal.aborted) setTurn({ state: "silent" }); },
+    }, controller.signal);
+  }
+  useEffect(() => { void start(); return () => abort.current?.abort(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  async function works() { abort.current?.abort(); await hosts.markOnboarding({ test_passed: true }); hosts.goTo("W6"); }
+  const message = (role: "user" | "assistant", text: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
+  const busy = turn.state === "speaking" || turn.state === "listening" || turn.state === "transcribing" || turn.state === "heard";
+  return (
+    <>
+      <p className="muted">{t("w5c.lead")}</p>
+      <div className="try-chat conversation-test">
+        <MessageGroup group={{ id: "prompt", role: "assistant", name: "Sidevoice", messages: [message("assistant", prompt, { playback: turn.state === "speaking" ? "playing" : "complete" })] }} />
+        {(turn.state === "listening" || turn.state === "transcribing") && <LiveDraftBubble phase={turn.state} />}
+        {turn.heard && <MessageGroup group={{ id: "heard", role: "user", name: t("stagecard.you"), messages: [message("user", turn.heard)] }} />}
+        {turn.reply && <MessageGroup group={{ id: "reply", role: "assistant", name: "Sidevoice", messages: [message("assistant", turn.reply)] }} />}
+      </div>
+      {turn.state === "silent" && <p className="row-error" role="alert">{t("wizard.w5.silent")}</p>}
+      {turn.state === "failed" && turn.error && (
+        <div className="problem" role="alert">
+          <p>{t("echo." + turn.error.key)}</p>
+          {t("echo." + turn.error.key + ".remedy") !== "echo." + turn.error.key + ".remedy" && <p className="muted">{t("echo." + turn.error.key + ".remedy")}</p>}
+        </div>
+      )}
+      {turn.state === "replied" && !no && <div className="try-question"><p>{t("w5c.ask")}</p></div>}
+      {(no || turn.state === "failed") && (
+        <div className="try-question">
+          <p>{t("w5c.whatFailed")}</p>
+          <span className="try-row">
+            <Button size="compact" onClick={() => hosts.goTo("W4")}>{t("w5c.badStt")}</Button>
+            <Button size="compact" onClick={() => hosts.goTo("W4v")}>{t("w5c.badTts")}</Button>
+          </span>
+        </div>
+      )}
+      <Actions>
+        {busy ? <Button variant="primary" disabled aria-busy>{t(turn.state === "speaking" ? "stagecard.playing" : turn.state === "listening" ? "stagecard.listening" : "stagecard.transcribing")}</Button>
+          : turn.state === "replied" && !no ? <>
+            <Button onClick={() => setNo(true)}>{t("common.noCap")}</Button>
+            <Button variant="primary" onClick={() => void works()}>{t("stagecard.yesWorks")}</Button>
+          </> : <Button variant="primary" onClick={() => void start()}>{t("wizard.w5.repeat")}</Button>}
+      </Actions>
+    </>
+  );
+}
+
 type Echo = { state: "idle" | "listening" | "heard" | "replied" | "failed" | "silent"; heard?: string; reply?: string; error?: { key: string; stage?: Task } };
 
 function W5() {

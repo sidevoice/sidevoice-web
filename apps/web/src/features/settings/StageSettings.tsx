@@ -24,13 +24,15 @@ const WHERE_NOTES: Record<string, string> = { page: "stage.where.page", app: "st
  *  its own card, which is also where the voice is heard (`hideVoiceTools`). */
 /** `optionsView`: the options as the editor shows them (the voice for one language); `beforeOptions` / `afterOptions`:
  *  what goes just above and below them. */
-export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, onOptionChange, onBuildChange, afterModel, hideCheck, hidePlaceNote, hideVoiceTools, optionsView, beforeOptions, afterOptions, onVoicePreview, voicePreviewing }: {
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, onOptionChange, onBuildChange, afterModel, hideCheck, hidePlaceNote, hideVoiceTools, optionsView, beforeOptions, afterOptions, onVoicePreview, voicePreviewing, pickers }: {
   task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void;
   onModelChange?: (model: string) => void; onOptionChange?: (id: string, value: unknown, language?: string) => void; onBuildChange?: (value: string) => void;
   afterModel?: ReactNode; hideCheck?: boolean; hidePlaceNote?: boolean; hideVoiceTools?: boolean;
   optionsView?: (options: StageView["options"]) => StageView["options"]; beforeOptions?: ReactNode; afterOptions?: ReactNode;
   /** The editor's own ▶ per language (it plays through the stage's test). */
   onVoicePreview?: (language: string) => void; voicePreviewing?: string | null;
+  /** Instead of «Dónde» and «Modelo»: the editor's own way of choosing (a list of models). */
+  pickers?: ReactNode;
 }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
@@ -48,6 +50,7 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
         </p>
       )}
       {view.unconfigured && <p className="muted" role="alert">{t("stage.unconfigured")}</p>}
+      {pickers ?? <>
       <div className="ui-field">
         {/* One list, whatever the number of providers (operator, 2026-10-01): this device first, the providers
             under it, a provider with no key said so — choosing it asks for the key. */}
@@ -74,6 +77,7 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
           choices={view.models.map((model) => ({ value: model.id, label: model.label, detail: model.detail || undefined, description: model.description }))}
           onChange={(model) => onModelChange ? onModelChange(model) : actions()?.chooseStageModel(task, model)} />
       </div>
+      </>}
       {pendingPlace ? null : <>
       {view.check && !hideCheck && <StageCheck task={task} check={view.check} />}
       {afterModel}
