@@ -1,6 +1,7 @@
 /* «Esta app» (ONBOARDING_AND_HOSTS.md §5.5): what the desktop app's native Settings window holds today, moved into
- * the one Settings — the global mute shortcut, the call controls, the headset, the agents on this computer, the
- * diagnostics (this computer, the native engine, each stage) and «Borrar datos…». Only in the app. */
+ * the one Settings — the global mute shortcut, the call controls, the headset, the agents on this computer and
+ * «Borrar datos…»: what one changes. What one only reads — this computer, the native engine, what each stage measured
+ * — is «Diagnóstico», under Avanzado (operator, 2026-10-02). Only in the app. */
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { keyPlatform, ShortcutField } from "../../components/ui/Shortcut";
@@ -23,13 +24,10 @@ export function ThisApp() {
   const diagnostics = useHosts((s) => s.diagnostics);
   const localFp = useHosts((s) => s.localPairing?.fp ?? null);
   const canHostAgents = useHosts((s) => s.canHostAgents);
-  const stages = useRoomStore((s) => s.stages);
   const [shortcut, setShortcut] = useState(settings?.muteShortcut ?? "");
   const [note, setNote] = useState<{ text: string; warn: boolean } | null>(null);
   const [testing, setTesting] = useState(false);
   useEffect(() => { setShortcut(settings?.muteShortcut ?? ""); }, [settings?.muteShortcut]);
-  const lang = currentLanguage();
-  const yes = (v: boolean) => t(v ? "common.yes" : "common.no");
 
   async function saveShortcut(next = shortcut) {
     if (next === settings?.muteShortcut) return;
@@ -38,26 +36,6 @@ export function ThisApp() {
     setNote(result.ok ? { text: result.warning ? t("app." + result.warning) : t("app.shortcut.saved"), warn: !!result.warning }
       : { text: known(t, "app." + result.error.key, { value: result.error.detail ?? "" }) ?? t("app.shortcut.refused", { message: result.error.message ?? result.error.key }), warn: true });
   }
-
-  const computerRows: [string, string][] = diagnostics ? [
-    [t("app.diag.version"), diagnostics.version],
-    [t("app.diag.system"), diagnostics.os + " · " + diagnostics.arch],
-    [t("app.diag.accelerators"), diagnostics.accelerators.join(", ")],
-    [t("app.diag.memory"), diagnostics.memory_mb ? new Intl.NumberFormat(lang, { style: "unit", unit: "gigabyte", maximumFractionDigits: 1 }).format(diagnostics.memory_mb / 1024) : t("app.diag.unknown")],
-    [t("app.diag.microphone"), yes(diagnostics.webview.microphone)],
-    [t("app.diag.secure"), yes(diagnostics.webview.secureContext)],
-    [t("app.diag.webcrypto"), yes(diagnostics.webview.webCrypto)],
-  ] : [];
-  const engineLines = diagnostics ? [
-    ...diagnostics.engine.packages.map((p) => t("app.engine.package", { engine: p.engine, version: p.version, size: bytesText(p.bytes, lang) })),
-    ...diagnostics.engine.builds.map((b) => t("app.engine.build", { model: b.model, task: t(b.task === "stt" ? "stage.sttLower" : "stage.ttsLower"), engine: b.engine, size: bytesText(b.bytes, lang) })),
-  ] : [];
-  const stageRows = (["stt", "tts"] as const).map((task) => ({ task, rows: stages?.[task]?.diagnostics?.rows ?? [] }));
-  const copyText = () => [
-    t("app.diag.computer"), ...computerRows.map(([k, v]) => k + ": " + v),
-    "", t("app.engine.title"), ...(engineLines.length ? engineLines : [t("app.engine.none")]),
-    ...stageRows.flatMap(({ task, rows }) => ["", t(task === "stt" ? "stage.stt" : "stage.tts"), ...rows.map((r) => r.label + ": " + r.value)]),
-  ].join("\n");
 
   return (
     <section className="pane this-app">
@@ -88,7 +66,43 @@ export function ThisApp() {
         : canHostAgents ? <><p className="muted small">{t("app.agents.none")}</p><Button size="compact" onClick={() => { hosts.closeSettings(); void hosts.choosePath("agents").then(() => hosts.openWizard("W1")); }}>{t("hosts.useAgentsHere")}</Button></>
           : <p className="muted small">{t("app.agents.unsupported")}</p>}
 
-      <h4>{t("app.diag.title")}</h4>
+      <h4>{t("app.data.title")}</h4>
+      <p className="muted small">{t("app.data.hint")}</p>
+      <Button variant="danger" size="compact" onClick={() => hosts.openReset()}>{t("app.data.reset")}</Button>
+    </section>
+  );
+}
+
+/** What this computer, its native engine and each stage say about themselves: read, and copied for a report. */
+export function AppDiagnostics() {
+  const t = useT();
+  const diagnostics = useHosts((s) => s.diagnostics);
+  const stages = useRoomStore((s) => s.stages);
+  const lang = currentLanguage();
+  const yes = (v: boolean) => t(v ? "common.yes" : "common.no");
+  const computerRows: [string, string][] = diagnostics ? [
+    [t("app.diag.version"), diagnostics.version],
+    [t("app.diag.system"), diagnostics.os + " · " + diagnostics.arch],
+    [t("app.diag.accelerators"), diagnostics.accelerators.join(", ")],
+    [t("app.diag.memory"), diagnostics.memory_mb ? new Intl.NumberFormat(lang, { style: "unit", unit: "gigabyte", maximumFractionDigits: 1 }).format(diagnostics.memory_mb / 1024) : t("app.diag.unknown")],
+    [t("app.diag.microphone"), yes(diagnostics.webview.microphone)],
+    [t("app.diag.secure"), yes(diagnostics.webview.secureContext)],
+    [t("app.diag.webcrypto"), yes(diagnostics.webview.webCrypto)],
+  ] : [];
+  const engineLines = diagnostics ? [
+    ...diagnostics.engine.packages.map((p) => t("app.engine.package", { engine: p.engine, version: p.version, size: bytesText(p.bytes, lang) })),
+    ...diagnostics.engine.builds.map((b) => t("app.engine.build", { model: b.model, task: t(b.task === "stt" ? "stage.sttLower" : "stage.ttsLower"), engine: b.engine, size: bytesText(b.bytes, lang) })),
+  ] : [];
+  const stageRows = (["stt", "tts"] as const).map((task) => ({ task, rows: stages?.[task]?.diagnostics?.rows ?? [] }));
+  const copyText = () => [
+    t("app.diag.computer"), ...computerRows.map(([k, v]) => k + ": " + v),
+    "", t("app.engine.title"), ...(engineLines.length ? engineLines : [t("app.engine.none")]),
+    ...stageRows.flatMap(({ task, rows }) => ["", t(task === "stt" ? "stage.stt" : "stage.tts"), ...rows.map((r) => r.label + ": " + r.value)]),
+  ].join("\n");
+
+  return (
+    <section className="pane app-diagnostics">
+      <h3>{t("app.diag.title")}</h3>
       <h5>{t("app.diag.computer")}</h5>
       <dl className="stage-check-rows">{computerRows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       <h5>{t("app.engine.title")}</h5>
@@ -102,9 +116,6 @@ export function ThisApp() {
       ))}
       <div className="row-actions"><CopyButton text={copyText} label={t("app.diag.copy")} /></div>
 
-      <h4>{t("app.data.title")}</h4>
-      <p className="muted small">{t("app.data.hint")}</p>
-      <Button variant="danger" size="compact" onClick={() => hosts.openReset()}>{t("app.data.reset")}</Button>
     </section>
   );
 }
