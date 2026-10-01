@@ -46,8 +46,13 @@
 .wizard-stages { max-height: 52dvh; overflow: auto; padding-inline-end: .3rem }
 .wizard-stages h3 { margin: 1rem 0 0; font-size: .95rem }
 .choice-cards { display: grid; gap: .6rem }
-.choice-card { display: grid; gap: .25rem; width: 100%; padding: .9rem 1rem; text-align: start; border: 1px solid var(--sv-border); border-radius: 14px; background: var(--sv-surface-raised); color: var(--sv-text); line-height: 1.4 }
-.choice-card[aria-checked=true] { border-color: var(--sv-primary); background: var(--sv-selected); box-shadow: inset 0 0 0 1px var(--sv-primary) }
+.choice-cards { margin: 0; padding: 0; border: 0 }
+.choice-cards + * { margin-top: .6rem }
+.choice-card input { margin: .25rem 0 0; accent-color: var(--sv-primary); width: 1rem; height: 1rem; flex: none }
+.choice-copy { display: grid; gap: .25rem }
+.choice-card { display: flex; gap: .7rem; align-items: flex-start; cursor: pointer; width: 100%; padding: .9rem 1rem; text-align: start; border: 1px solid var(--sv-border); border-radius: 14px; background: var(--sv-surface-raised); color: var(--sv-text); line-height: 1.4 }
+.choice-card:focus-within { outline: 2px solid var(--sv-primary); outline-offset: 2px }
+.choice-card[data-checked] { border-color: var(--sv-primary); background: var(--sv-selected); box-shadow: inset 0 0 0 1px var(--sv-primary) }
 .choice-card .muted { font-size: .8rem }
 .found-line { margin-top: .8rem !important; min-height: 1.4em }
 .install-steps, .reset-steps { display: grid; gap: .55rem; margin: .8rem 0; padding: 0; list-style: none }
@@ -179,6 +184,10 @@
 .room-banner { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; margin: 0 1.2rem .6rem; padding: .6rem .9rem; border: 1px solid #6b4046; border-radius: 12px; background: #2c2226; color: #f3d1cc; font-size: .88rem }
 .room-banner[data-state=stopped-by-person], .room-banner[data-state=not-installed], .room-banner[data-state=backoff], .room-banner[data-state=starting], .room-banner[data-state=incompatible] { border-color: #6d5a3a; background: #2a251d; color: #f0dfb8 }
 .room-banner .row-actions { margin: 0 }
+
+/* White on the room's #ea4335 is 3.9:1; destructive buttons here use a darker red (5.6:1). */
+.settings-shell .ui-button--danger, .reset-dialog .ui-button--danger, .host-page .ui-button--danger { background: #c5221f; border-color: #c5221f }
+.setup-banner { border-color: var(--sv-selected-border); background: var(--sv-selected); color: var(--sv-primary-soft) }
 
 /* F7 */
 .reset-dialog { width: min(32rem, calc(100vw - 1.5rem)); padding: 1.3rem 1.5rem; border-radius: var(--sv-radius-md); background: var(--sv-surface); border: 1px solid var(--sv-border) }

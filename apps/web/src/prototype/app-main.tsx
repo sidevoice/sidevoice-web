@@ -25,10 +25,11 @@ import { TranscriptPanel } from "../features/conversation/TranscriptPanel";
 import { CallToolbar } from "../features/call/CallToolbar";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { Wizard } from "../features/onboarding/Wizard";
-import { LocalHostBanner, NoMachine } from "../features/onboarding/NoMachine";
+import { LocalHostBanner, NoMachine, SetupBanner } from "../features/onboarding/NoMachine";
 import { SettingsShell } from "../features/settings/SettingsShell";
 import { ResetDialog } from "../features/settings/ResetDialog";
-import { IntegrationScopeContext } from "../features/hosts/HostPage";
+import { IntegrationScopeContext, QrRendererContext } from "../features/hosts/HostPage";
+import { FakeQr } from "./FakeQr";
 import { readParams, type Toggles } from "./scenario";
 import { createFakeHosts } from "./fakes/hosts";
 import { createFakeBridge } from "./fakes/bridge";
@@ -161,9 +162,11 @@ async function boot() {
     <RoomStoreContext.Provider value={room}>
       <HostsContext.Provider value={controller}>
         <IntegrationScopeContext.Provider value={adapter}>
-          <TooltipProvider>
-            <App />
-          </TooltipProvider>
+          <QrRendererContext.Provider value={(code) => <figure className="proto-qr"><FakeQr text={code} /><figcaption>{t("proto.qr")}</figcaption></figure>}>
+            <TooltipProvider>
+              <App />
+            </TooltipProvider>
+          </QrRendererContext.Provider>
         </IntegrationScopeContext.Provider>
       </HostsContext.Provider>
     </RoomStoreContext.Provider>,
@@ -187,6 +190,7 @@ function App() {
     <>
       <RoomHeader />
       <LocalHostBanner />
+      <SetupBanner />
       {noMachine ? <main className="no-machine-main"><NoMachine /></main> : (
         <main>
           <ParticipantSidebar />

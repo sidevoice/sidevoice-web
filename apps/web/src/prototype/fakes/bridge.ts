@@ -3,7 +3,7 @@
 import type { AppDiagnostics, AppSettings, BridgeResult, DesktopHost, InstallProgress, LocalHostState, LocalPairing, OnboardingState, ResetStep } from "../../services/desktop-host";
 import type { CallAnswer, Scenario, TimedState, Toggles } from "../scenario";
 import type { FakeHosts } from "./hosts";
-import { LOCAL_BASE } from "./hosts";
+import { LOCAL_BASE, ROOM_URL } from "./hosts";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const CORE = { pid: 4242, version: "0.4.0", api: 3, launch_id: "7c1d" };
@@ -110,6 +110,7 @@ export function createFakeBridge(scenario: Scenario, toggles: Toggles, hosts: Fa
         const answer = scripted("pairRoom");
         await sleep(answer?.delay_ms ?? 1200);
         if (answer && !answer.ok) return { ok: false, error: answer.error ?? { key: "failed" } };
+        if (local) local.rv = { url: ROOM_URL, node: "local-node" };
         play([{ state: "starting", after_ms: 0 }, { state: "running", after_ms: 1200 }]);
         return { ok: true };
       },
@@ -161,9 +162,9 @@ export function createFakeBridge(scenario: Scenario, toggles: Toggles, hosts: Fa
         if (patch.muteShortcut !== undefined) {
           const value = patch.muteShortcut.trim();
           if (value && !/^((CmdOrCtrl|Cmd|Ctrl|Alt|Option|Shift|Super)\+)+([A-Z0-9]|F\d{1,2}|Space)$/i.test(value))
-            return { ok: false, error: { key: "shortcut.invalid", message: "«" + value + "» no es un atajo válido. Formato: CmdOrCtrl+Shift+M, Alt+F9…" } };
+            return { ok: false, error: { key: "shortcut.invalid", detail: value } };
           settings = { ...settings, muteShortcut: value };
-          if (/^CmdOrCtrl\+Q$/i.test(value)) return { ok: true, warning: "Guardado, pero otra aplicación ya usa ese atajo: puede que no llegue a Sidevoice." };
+          if (/^CmdOrCtrl\+Q$/i.test(value)) return { ok: true, warning: "shortcut.conflict" };
           return { ok: true };
         }
         settings = { ...settings, ...patch };

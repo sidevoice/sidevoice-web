@@ -18,7 +18,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { useHosts, useHostsController, type VerifyOutcome } from "../../state/hosts/hosts-store";
 import { previousStep, stepGroups, type Step } from "../../state/hosts/onboarding";
 import { proposeStages, type ProposalRow } from "../../state/hosts/proposal";
-import type { Task } from "../../state/hosts/stage-scope";
+import { effectiveStage, type Task } from "../../state/hosts/stage-scope";
 import { StageSettings } from "../settings/StageSettings";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
@@ -114,16 +114,18 @@ function W1() {
   }
   return (
     <>
-      <div className="choice-cards" role="radiogroup" aria-label={t("wizard.w1.title")}>
-        <button type="button" role="radio" className="choice-card" aria-checked={choice === "agents"} onClick={() => setChoice("agents")}>
-          <strong>{t("wizard.w1.yes")}</strong>
-          <span className="muted">{t("wizard.w1.yesDetail")}</span>
-        </button>
-        <button type="button" role="radio" className="choice-card" aria-checked={choice === "remote"} onClick={() => setChoice("remote")}>
-          <strong>{t("wizard.w1.no")}</strong>
-          <span className="muted">{t("wizard.w1.noDetail")}</span>
-        </button>
-      </div>
+      <fieldset className="choice-cards">
+        <legend className="sr-only">{t("wizard.w1.title")}</legend>
+        {(["agents", "remote"] as const).map((value) => (
+          <label key={value} className="choice-card" data-checked={choice === value || undefined}>
+            <input type="radio" name="w1-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} />
+            <span className="choice-copy">
+              <strong>{t(value === "agents" ? "wizard.w1.yes" : "wizard.w1.no")}</strong>
+              <span className="muted">{t(value === "agents" ? "wizard.w1.yesDetail" : "wizard.w1.noDetail")}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
       <p className="muted found-line" role="status">
         {found === null ? t("wizard.w1.searching") : found.length ? t("wizard.w1.found", { names }) : t("wizard.w1.none")}
       </p>
@@ -328,6 +330,7 @@ function W4() {
   const ctx = useStageContext();
   const phone = typeof window !== "undefined" && window.matchMedia?.("(max-width: 750px)").matches;
   const [choosing, setChoosing] = useState(false);
+  const bothChosen = useHosts((s) => !!effectiveStage(s.scope, s.inUse, "stt") && !!effectiveStage(s.scope, s.inUse, "tts"));
   const [runs, setRuns] = useState<Partial<Record<Task, Run>> | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
@@ -372,8 +375,9 @@ function W4() {
         </div>
         <Actions>
           <Button variant="ghost" onClick={() => setChoosing(false)}>{t("wizard.w4.backToProposal")}</Button>
-          <Button variant="primary" onClick={() => hosts.goTo("W5")}>{t("wizard.continue")}</Button>
+          <Button variant="primary" disabled={!bothChosen} onClick={() => hosts.goTo("W5")}>{t("wizard.continue")}</Button>
         </Actions>
+        {!bothChosen && <p className="muted small">{t("wizard.w4.chooseBoth")}</p>}
       </>
     );
 
@@ -472,6 +476,7 @@ function W5() {
   const [echo, setEcho] = useState<Echo>({ state: "idle" });
   const [level, setLevel] = useState(0);
   const [picking, setPicking] = useState(false);
+  const [microphone, setMicrophone] = useState(() => inputs[0]?.id ?? "default");
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
   function start() {
@@ -511,7 +516,7 @@ function W5() {
       </div>
       {picking && (
         <label className="ui-field">{t("wizard.w5.microphone")}
-          <NativeSelect defaultValue={inputs[0]?.id} onChange={() => { setPicking(false); start(); }}>
+          <NativeSelect value={microphone} onChange={(event) => { setMicrophone(event.currentTarget.value); void window.sidevoiceActions?.selectAudioDevice("input", event.currentTarget.value); setPicking(false); start(); }}>
             {inputs.map((input) => <option key={input.id} value={input.id}>{input.label}</option>)}
           </NativeSelect>
         </label>

@@ -37,6 +37,20 @@ export function NoMachine() {
   );
 }
 
+/** Onboarding left for later once a host was connected: the no-machine screen is gone, so the room offers it. */
+export function SetupBanner() {
+  const t = useT();
+  const hosts = useHostsController();
+  const pending = useHosts((s) => !!s.onboarding?.deferred_at && !s.onboarding?.completed_at && s.rows.length > 0 && !s.wizard.open);
+  if (!pending) return null;
+  return (
+    <div className="room-banner setup-banner" role="status">
+      <span>{t("banner.setupPending")}</span>
+      <span className="row-actions"><Button size="compact" variant="primary" onClick={() => hosts.openWizard()}>{t("noMachine.resume")}</Button></span>
+    </div>
+  );
+}
+
 export function LocalHostBanner() {
   const t = useT();
   const hosts = useHostsController();

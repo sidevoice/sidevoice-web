@@ -16,6 +16,9 @@ import { IntegrationList } from "../settings/IntegrationList";
 import { agentStatusKey, ManualConfig } from "../onboarding/Wizard";
 import { CopyButton, formatWhen, HostDot, PhraseText } from "./common";
 
+/** Draws a pairing code as a QR. The web carries no encoder yet; with none provided, the code is shown as text only. */
+export const QrRendererContext = createContext<((code: string) => React.ReactNode) | null>(null);
+
 /** Who renders a host's integrations: a room store scoped to that host, kept by whoever wires the page to the room. */
 export const IntegrationScopeContext = createContext<{ storeFor(fp: string): RoomStore } | null>(null);
 
@@ -47,7 +50,15 @@ export function HostPage({ fp }: { fp: string }) {
       <div className="host-tabs" role="tablist" aria-label={t("host.sections")}>
         {TABS.map((id) => (
           <button key={id} type="button" role="tab" id={`host-tab-${id}`} aria-selected={tab === id} aria-controls="host-tabpanel"
-            onClick={() => hosts.openSettings("host", fp, id)}>
+            tabIndex={tab === id ? 0 : -1} onClick={() => hosts.openSettings("host", fp, id)}
+            onKeyDown={(event) => {
+              const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+              const to = event.key === "Home" ? TABS[0] : event.key === "End" ? TABS[TABS.length - 1] : step ? TABS[(TABS.indexOf(id) + step + TABS.length) % TABS.length] : null;
+              if (!to) return;
+              event.preventDefault();
+              hosts.openSettings("host", fp, to);
+              requestAnimationFrame(() => document.getElementById(`host-tab-${to}`)?.focus());
+            }}>
             {t("host.tab." + id)}{id === "agents" && row.newAgent && <span className="badge-dot" aria-label={t("hosts.newAgent")} />}
           </button>
         ))}
@@ -273,21 +284,6 @@ function IntegrationsTab({ fp }: { fp: string }) {
 }
 
 // ----- Dispositivos -----
-function FakeQr({ text }: { text: string }) {
-  // A deterministic pattern standing in for the QR the real screen draws (the prototype carries no QR encoder).
-  const cells: boolean[] = [];
-  let h = 2166136261;
-  for (let i = 0; i < 21 * 21; i++) { h = Math.imul(h ^ text.charCodeAt(i % text.length), 16777619); cells.push(((h >>> 7) & 1) === 1); }
-  const finder = (x: number, y: number) => [[0, 0], [14, 0], [0, 14]].some(([fx, fy]) => x >= fx && x < fx + 7 && y >= fy && y < fy + 7 && (x === fx || x === fx + 6 || y === fy || y === fy + 6 || (x >= fx + 2 && x <= fx + 4 && y >= fy + 2 && y <= fy + 4)));
-  const inFinder = (x: number, y: number) => [[0, 0], [14, 0], [0, 14]].some(([fx, fy]) => x >= fx && x < fx + 7 && y >= fy && y < fy + 7);
-  return (
-    <svg className="qr" viewBox="-1 -1 23 23" role="img" aria-label="QR">
-      <rect x="-1" y="-1" width="23" height="23" fill="#fff" />
-      {cells.map((on, i) => { const x = i % 21, y = Math.floor(i / 21); return (inFinder(x, y) ? finder(x, y) : on) ? <rect key={i} x={x} y={y} width="1" height="1" fill="#1b1d24" /> : null; })}
-    </svg>
-  );
-}
-
 function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
   const t = useT();
   const hosts = useHostsController();
@@ -301,6 +297,7 @@ function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
   const [roomUrl, setRoomUrl] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [roomBusy, setRoomBusy] = useState(false);
+  const qr = useContext(QrRendererContext);
   useEffect(() => { void hosts.loadDevices(fp); }, [fp, hosts]);
   const lang = currentLanguage();
   async function newCode() {
@@ -359,7 +356,7 @@ function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
           </div>
         ) : (
           <div className="code-card">
-            <FakeQr text={code.code} />
+            {qr?.(code.code)}
             <div>
               <p className="muted small">{t("devices.codeFor", { minutes: Math.round(code.expires_in / 60) })}</p>
               <pre className="code-text">{code.code}</pre>

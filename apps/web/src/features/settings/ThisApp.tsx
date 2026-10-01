@@ -8,6 +8,12 @@ import { useRoomStore } from "../../state/room-store";
 import { useHosts, useHostsController } from "../../state/hosts/hosts-store";
 import { bytesText, CopyButton } from "../hosts/common";
 
+/** The bundle's sentence for a key, or null when the bundles do not have it. */
+function known(t: ReturnType<typeof useT>, key: string, params: Record<string, string>): string | null {
+  const text = t(key, params);
+  return text === key ? null : text;
+}
+
 export function ThisApp() {
   const t = useT();
   const hosts = useHostsController();
@@ -26,7 +32,8 @@ export function ThisApp() {
   async function saveShortcut() {
     if (shortcut === settings?.muteShortcut) return;
     const result = await hosts.updateApp({ muteShortcut: shortcut });
-    setNote(result.ok ? { text: result.warning ?? t("app.shortcut.saved"), warn: !!result.warning } : { text: t("app.shortcut.refused", { message: result.error.message ?? result.error.key }), warn: true });
+    setNote(result.ok ? { text: result.warning ? t("app." + result.warning) : t("app.shortcut.saved"), warn: !!result.warning }
+      : { text: known(t, "app." + result.error.key, { value: result.error.detail ?? "" }) ?? t("app.shortcut.refused", { message: result.error.message ?? result.error.key }), warn: true });
   }
 
   const computerRows: [string, string][] = diagnostics ? [

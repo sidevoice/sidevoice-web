@@ -34,7 +34,8 @@ export function PairWithCode({ onPaired, submitLabel, use = true, renderActions 
   const t = useT();
   const hosts = useHostsController();
   const [code, setCode] = useState("");
-  const [name, setName] = useState(() => deviceName());
+  // device-pairing.js names this device in Spanish (#128); the platform it found is said through the bundles.
+  const [name, setName] = useState(() => { const where = deviceName().replace(/^Sidevoice( en )?/, ""); return where ? t("pair.deviceName", { where }) : "Sidevoice"; });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ key: string; text?: string } | null>(null);
 

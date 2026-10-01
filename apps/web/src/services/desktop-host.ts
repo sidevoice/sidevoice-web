@@ -117,6 +117,7 @@ export interface ResetStep { id: "hang-up" | "machine" | "revoke" | "app"; state
 
 export interface AppBridge {
   settings(): Promise<AppSettings>;
+  /** A refusal's key (`shortcut.invalid` with the value as detail); `warning` is a key too (`shortcut.conflict`). */
   update(patch: Partial<AppSettings>): Promise<BridgeResult<{ warning?: string }>>;
   diagnostics?(): Promise<AppDiagnostics>;
   headsetTest?(): Promise<void>;
