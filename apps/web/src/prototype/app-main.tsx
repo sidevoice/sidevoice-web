@@ -30,6 +30,7 @@ import { SettingsShell } from "../features/settings/SettingsShell";
 import { ResetDialog } from "../features/settings/ResetDialog";
 import { IntegrationScopeContext, QrRendererContext } from "../features/hosts/HostPage";
 import { StageFlowContext, VoiceTestContext } from "../features/settings/StageEditor";
+import { EnterSplash } from "../components/brand/EnterSplash";
 import { FakeQr } from "./FakeQr";
 import { readParams, type Toggles } from "./scenario";
 import { createFakeHosts } from "./fakes/hosts";
@@ -259,6 +260,7 @@ function App() {
       <SettingsShell />
       <ResetDialog />
       <Note />
+      <EnterSplash playOnMount={configured} />
       <audio id="preview-audio" />
     </>
   );

@@ -94,7 +94,7 @@ export const es: Record<string, string> = {
   "wizard.w6.title": "Listo",
   "wizard.w6.lead": "Abre una conversación con tu agente y pídele:",
   "wizard.w6.ask": "conéctate a Sidevoice",
-  "wizard.w6.go": "Ir a la sala",
+  "wizard.w6.go": "Entrar en Sidevoice",
 
   "echo.mic-denied": "Sidevoice no tiene permiso para usar el micrófono.",
   "echo.mic-denied.remedy": "Permítelo en Ajustes del Sistema › Privacidad y seguridad › Micrófono, y vuelve a probar.",
@@ -555,4 +555,5 @@ export const es: Record<string, string> = {
   "option.help.voice": "La voz con la que te habla en cada idioma. «Automática» usa la primera de ese idioma.",
   "stagecard.key.clear": "Borrar la clave de {provider} de esta máquina",
   "wizard.group.done": "Listo",
+  "brand.tagline": "Dale voz a tu agente.",
 };
