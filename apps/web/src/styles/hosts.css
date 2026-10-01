@@ -233,3 +233,6 @@
 .howto-wait { display: flex; align-items: center; gap: .45rem; font-size: .76rem; color: var(--sv-muted) }
 .wait-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--sv-primary); animation: host-pulse 1.2s ease-in-out infinite }
 @media (prefers-reduced-motion: reduce) { .wait-dot { animation: none } }
+
+/* Until the first-run setup is finished there is nothing to set: no gear, no «Configuración» in the call menu. */
+body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings-open { display: none !important }

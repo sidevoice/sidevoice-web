@@ -187,6 +187,9 @@ function App() {
   useT();
   const noMachine = useHosts((s) => s.rows.length === 0 && (!s.local || s.local.state === "absent"));
   const setupPending = useSetupPending();
+  // Settings come after setup (operator, 2026-10-01): the gear and the call menu's «Configuración» appear once it is done.
+  const configured = useHosts((s) => !!s.onboarding?.completed_at);
+  useEffect(() => { document.body.dataset.setup = configured ? "done" : "pending"; }, [configured]);
   return (
     <>
       <RoomHeader />
