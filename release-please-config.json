@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "55ea8dde4623c45215417317ce86f7f73a9d09fd",
+  "include-component-in-tag": false,
+  "draft": true,
+  "force-tag-creation": true,
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "bump-minor-pre-major": true,
+      "extra-files": [
+        { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.dependencies['@sidevoice/protocol']" },
+        { "type": "json", "path": "packages/browser-audio/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/protocol/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['apps/web'].version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['apps/web'].dependencies['@sidevoice/protocol']" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['packages/browser-audio'].version" },
+        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['packages/protocol'].version" }
+      ]
+    }
+  }
+}
