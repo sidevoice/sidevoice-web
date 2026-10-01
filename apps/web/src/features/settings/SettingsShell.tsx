@@ -1,8 +1,13 @@
-/* One Settings (ONBOARDING_AND_HOSTS.md §5.4): General · Voz · Transcripción · Avanzado · Esta app (in the app),
- * then Máquinas with each host and «Añadir». Integraciones is no longer a section of its own: a key is a host's,
- * so it lives on the host's page. The panes are the room's own; this frame decides which one shows. */
+/* One Settings (ONBOARDING_AND_HOSTS.md §5.4): General · Voz · Transcripción · Esta app (in the app), then Máquinas
+ * with each host and «Añadir», and Avanzado last. Integraciones is no longer a section of its own: a key is a host's,
+ * so it lives on the host's page. The panes are the room's own; this frame decides which one shows.
+ *
+ * It is a view of the app, not a window over it (operator, 2026-10-02): it takes the place of the conversations — the
+ * sections where the conversation list is, the section where the conversation is, in the same cards and colours —
+ * with «Volver» (or Esc) back to them. */
+import { useEffect } from "react";
 import { Button } from "../../components/ui/Button";
-import { AdvancedIcon, AppIcon, CloseIcon, GeneralIcon, MachinesIcon, SettingsIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, AppIcon, BackIcon, GeneralIcon, MachinesIcon, SettingsIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useT } from "../../i18n";
 import { useHosts, useHostsController, type SettingsPane } from "../../state/hosts/hosts-store";
 import type { Task } from "../../state/hosts/stage-scope";
@@ -10,7 +15,6 @@ import { HostDot } from "../hosts/common";
 import { HostList } from "../hosts/HostList";
 import { HostPage } from "../hosts/HostPage";
 import { PairWithCode } from "../hosts/PairWithCode";
-import { useModal } from "../hosts/common";
 import { AdvancedSettings, GeneralSettings } from "./SettingsDialog";
 import { StageScopeLine } from "./StageScopeLine";
 import { StageEditor } from "./StageEditor";
@@ -37,16 +41,21 @@ export function SettingsShell() {
   const settings = useHosts((s) => s.settings);
   const rows = useHosts((s) => s.rows);
   const inApp = useHosts((s) => s.inApp);
-  const ref = useModal(settings.open, () => hosts.closeSettings());
   const go = (pane: SettingsPane, host: string | null = null) => hosts.openSettings(pane, host);
   const pane = settings.pane;
+  useEffect(() => {
+    if (!settings.open) return;
+    // Esc goes back, unless a dialog of its own (a reset, a pairing) is the one open.
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape" && !document.querySelector("dialog[open]")) hosts.closeSettings(); };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [settings.open, hosts]);
+  if (!settings.open) return null;
   return (
-    <dialog ref={ref} id="settings-shell" className="settings-dialog settings-shell" aria-labelledby="settings-shell-title">
-      <div className="settings-heading">
-        <h2 id="settings-shell-title"><SettingsIcon size={18} /> {t("settings.title")}</h2>
-        <Button variant="ghost" size="icon" aria-label={t("settings.close")} title={t("common.close")} onClick={() => hosts.closeSettings()}><CloseIcon /></Button>
-      </div>
-      <div className="settings-layout">
+    <main id="settings-shell" className="settings-view settings-shell" aria-labelledby="settings-shell-title">
+      <aside className="settings-side">
+        <Button variant="ghost" size="compact" className="settings-back" onClick={() => hosts.closeSettings()}><BackIcon size={16} /> {t("settings.back")}</Button>
+        <h2 id="settings-shell-title"><SettingsIcon size={14} /> {t("settings.title")}</h2>
         <nav className="settings-nav" aria-label={t("settings.sections")}>
           <NavButton pane="general" current={pane === "general"} onClick={() => go("general")}><GeneralIcon /> {t("settings.general")}</NavButton>
           <NavButton pane="voice" current={pane === "voice"} onClick={() => go("voice")}><VoicesIcon /> {t("stage.tts")}</NavButton>
@@ -64,6 +73,8 @@ export function SettingsShell() {
           {/* Last: what one rarely needs, and the diagnostics (operator, 2026-10-02). */}
           <NavButton pane="advanced" current={pane === "advanced"} onClick={() => go("advanced")}><AdvancedIcon /> {t("settings.advanced")}</NavButton>
         </nav>
+      </aside>
+      <section className="transcript settings-main">
         <div className="settings-content">
           {pane === "general" && <div className="legacy-pane"><GeneralSettings /></div>}
           {pane === "voice" && <StagePane task="tts" />}
@@ -79,7 +90,7 @@ export function SettingsShell() {
             </section>
           )}
         </div>
-      </div>
-    </dialog>
+      </section>
+    </main>
   );
 }

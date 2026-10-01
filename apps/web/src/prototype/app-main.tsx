@@ -243,20 +243,23 @@ function App() {
   const setupPending = useSetupPending();
   // Settings come after setup (operator, 2026-10-01): the gear and the call menu's «Configuración» appear once it is done.
   const configured = useHosts((s) => !!s.onboarding?.completed_at);
+  const settingsOpen = useHosts((s) => s.settings.open);
+  const wizardOpen = useHosts((s) => s.wizard.open);
   useEffect(() => { document.body.dataset.setup = configured ? "done" : "pending"; }, [configured]);
   return (
     <>
       <RoomHeader />
       {!setupPending && <LocalHostBanner />}
-      {setupPending ? <main className="no-machine-main"><SetupPending /></main> : noMachine ? <main className="no-machine-main"><NoMachine /></main> : (
+      {/* Configuración takes the conversations' place (operator, 2026-10-02). */}
+      {setupPending ? <main className="no-machine-main"><SetupPending /></main> : settingsOpen ? <SettingsShell /> : noMachine ? <main className="no-machine-main"><NoMachine /></main> : (
         <main>
           <ParticipantSidebar />
           <TranscriptPanel />
         </main>
       )}
-      <CallToolbar />
+      {/* No call to make while setting up (operator, 2026-10-02). */}
+      {!setupPending && !wizardOpen && <CallToolbar />}
       <Wizard />
-      <SettingsShell />
       <ResetDialog />
       <Note />
       <audio id="preview-audio" />

@@ -112,7 +112,6 @@
 .pair-with-code > .ui-button { margin-top: .4rem }
 
 /* Settings shell (§5.4) */
-#settings-shell[open] { position: fixed; inset: 0; margin: auto; border-radius: 18px }
 .settings-shell .settings-heading { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--sv-border) }
 .settings-shell .settings-heading h2 { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: 1.05rem; text-transform: none; letter-spacing: 0; color: var(--sv-text) }
 .settings-shell .settings-layout { display: grid; grid-template-columns: 14.5rem minmax(0, 1fr); min-height: 0; overflow: hidden }
@@ -429,3 +428,31 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .shortcut-field { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap }
 .shortcut-value { display: inline-flex; align-items: center; min-height: 2.6rem; padding: .3rem .6rem; border: 1px solid var(--sv-border); border-radius: .65rem; background: #141b23; outline: none }
 .shortcut-field[data-recording] .shortcut-value { border-color: var(--sv-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-primary) 25%, transparent) }
+/* Configuración as a view of the app: the conversations' grid and cards (main, aside, .transcript), the sections in
+   the side card, the section in the main one. */
+.settings-view .settings-side { display: flex; flex-direction: column; gap: .2rem; padding: 12px 10px }
+.settings-view .settings-back { align-self: flex-start; gap: .35rem; margin: 0 0 .6rem; padding: .35rem .6rem; color: var(--sv-muted) }
+.settings-view .settings-back:hover { color: var(--sv-text) }
+.settings-view .settings-side > h2 { margin: .1rem .45rem .55rem }
+.settings-view .settings-nav { display: flex; flex-direction: column; gap: .15rem; padding: 0; border: 0; background: transparent; overflow: visible }
+.settings-view .settings-main { overflow: hidden }
+.settings-view .settings-content { flex: 1; min-height: 0; padding: 0 1.6rem 1.6rem; overflow: auto }
+@media (max-width: 750px) {
+  main.settings-view { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr) }
+  .settings-view .settings-side { padding: 8px }
+  .settings-view .settings-side > h2 { display: none }
+  .settings-view .settings-back { margin: 0 0 .3rem }
+  .settings-view .settings-nav { flex-direction: row; overflow-x: auto; gap: .3rem }
+  .settings-view .nav-item { width: auto; flex: none; white-space: nowrap }
+  .settings-view .nav-group { flex-direction: row; margin: 0; padding: 0 0 0 .3rem; border-top: 0; border-inline-start: 1px solid var(--sv-border) }
+  .settings-view .settings-content { padding: 0 1rem 1.2rem }
+}
+/* What the panes had from being inside a dialog (room.css «dialog …», react.css «.settings-dialog …»), for the view. */
+.settings-view > * { min-width: 0 }
+.settings-view label { display: block; margin: 16px 0; font-size: 13px }
+.settings-view select, .settings-view textarea { display: block; width: 100%; margin-top: 7px; padding: 10px 30px 10px 10px; border-radius: 8px; background-color: #141b23; color: inherit; border: 1px solid #526173 }
+.settings-view label, .settings-view input, .settings-view select { max-width: 100% }
+.settings-view .ui-native-select { min-width: 0; text-overflow: ellipsis; white-space: nowrap }
+.settings-view .settings-content > section { min-width: 0; max-width: 100% }
+/* Narrow: the steps under the title, so the name is read whole. */
+@media (max-width: 520px) { .stage-card-head { flex-wrap: wrap } .stage-card-title { flex: 1 1 100% } }

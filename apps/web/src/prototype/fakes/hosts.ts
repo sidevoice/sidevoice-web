@@ -104,6 +104,9 @@ export async function createFakeHosts(scenario: Scenario, toggles: Toggles, loca
   const spare = await identity();
   const seeds: Record<string, HostSeed> = { ...scenario.hosts };
   if (scenario.bridge?.localHost && !seeds.local) seeds.local = { name: "MacBook de Ana" };
+  // A machine to pair with is always there, so the panel always has codes to paste (operator, 2026-10-02): a scenario
+  // with no remote machine of its own gets an unpaired NUC.
+  if (!Object.keys(seeds).some((alias) => alias !== "local")) seeds.nuc = { name: "NUC" };
   for (const [alias, seed] of Object.entries(seeds)) {
     const { keys, publicKey, fp } = await identity(scenario.id + ":" + alias);
     const isLocal = alias === "local";

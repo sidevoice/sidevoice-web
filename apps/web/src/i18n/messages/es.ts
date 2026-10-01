@@ -560,4 +560,5 @@ export const es: Record<string, string> = {
   "keys.none": "Ninguno",
   "keys.change": "Cambiar",
   "keys.remove": "Quitar",
+  "settings.back": "Volver",
 };
