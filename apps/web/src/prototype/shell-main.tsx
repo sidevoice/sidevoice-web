@@ -180,7 +180,7 @@ function Shell() {
               <p className="hint">↻ reinicia el escenario. El resto se aplica en vivo, en la siguiente acción.</p>
             </details>
             <div className="panel-actions">
-              <button type="button" onClick={() => setGeneration((g) => g + 1)}>Reiniciar escenario</button>
+              <button type="button" onClick={() => { setAt(null); setGeneration((g) => g + 1); }}>Reiniciar escenario</button>
               <button type="button" onClick={() => { void navigator.clipboard.writeText(location.href); say("Enlace copiado"); }}>Copiar enlace</button>
               {active > 0 && <button type="button" onClick={() => { setToggles({}); setGeneration((g) => g + 1); }}>Quitar variantes</button>}
             </div>
