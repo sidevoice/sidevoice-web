@@ -84,7 +84,8 @@ let pairings=readPairings(pageStorage());
 function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,machinesAt:Date.now()})}
 function keepPairings(next){const moved=next.inUse!==pairings.inUse;pairings=next;if(moved)switchStages();const storage=pageStorage();if(storage)writePairings(storage,next);publishPairings()}
 function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
-function withToken(options,token){return {...options,headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
+// A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
+function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
 // Every request to the node carries the token of the pairing in use; one the node refuses means that pairing is
 // gone. An address that stops answering is looked at again on the next beat, in case another one answers.
 const request=async(path,options)=>{

@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import {
   base64ToBytes, bytesToBase64url, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven, pairingInUse,
-  pairingSummary, proveIdentity, readPairings, redeemPairingCode, revokedPairing, usingPairing, verifyIdentitySignature,
+  pairingSummary, proveIdentity, readPairings, redeemPairingCode, revokedPairing, secureBase, usingPairing, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
 } from "./device-pairing.js";
 
@@ -30,7 +30,7 @@ function network(bases: Record<string, Node>, asked: string[] = []) {
     const node = bases[base], path = url.slice(base.length);
     if (path.startsWith("/api/device/identity?nonce=")) {
       const nonce = decodeURIComponent(path.split("nonce=")[1]);
-      return json(200, { fingerprint: node.fp, public_key: node.public_key, host: node.host, signature: await node.sign(nonce) });
+      return json(200, { fingerprint: node.fp, public_key: node.public_key, signature: await node.sign(nonce) });
     }
     if (path === "/api/device/pair") {
       node.secrets.push(JSON.parse(String(init?.body)));
@@ -77,6 +77,30 @@ test("a code that cannot be used says why, in one sentence the person can act on
   expect(why(codeFor(payload({ fp }, { rv: { url: "https://room.example" } })))).toMatch(/incompleto o dañado/);
   expect(why(codeFor(payload({ fp }, { urls: [], rv: null })))).toMatch(/dónde encontrar la máquina/);
   expect(why(codeFor(payload({ fp }, { exp: NOW / 1000 })))).toMatch(/caducó/);
+});
+
+test("a code's plain-http addresses off this machine are left out, and a code left with none is refused", () => {
+  const fp = "A".repeat(43);
+  const decode = (extra: Record<string, unknown>) => decodePairingCode(codeFor(payload({ fp }, extra)), NOW);
+  for (const url of ["http://192.168.1.20:8768", "http://mac.lan", "http://node.voice.svc.cluster.local:8768"])
+    expect(decode({ urls: ["http://127.0.0.1:8768", url, "https://mac.example"] }).urls, url).toEqual(["http://127.0.0.1:8768", "https://mac.example"]);
+  expect(decode({ rv: { url: "http://room.example", node: "c-1" } }).rv).toBeNull();
+  expect(() => decode({ urls: ["http://mac.lan:8768"], rv: { url: "http://room.example", node: "c-1" } })).toThrow(/solo lleva a la máquina por http/);
+  expect(() => decode({ urls: ["http://mac.lan:8768"], rv: null })).toThrow(/solo lleva a la máquina por http/);
+  // Loopback is this same machine: plain http stays.
+  for (const url of ["http://127.0.0.1:8768", "http://localhost:8768", "http://[::1]:8768"]) expect(decode({ urls: [url], rv: null }).urls, url).toEqual([url]);
+});
+
+test("a secret or a token goes over https, or plain http to loopback only", () => {
+  for (const base of ["https://room.example/nodes/c-1", "http://127.0.0.1:8768", "http://localhost:1", "http://[::1]:8768"])
+    expect(secureBase(base), base).toBe(true);
+  for (const base of ["http://10.0.0.5:8768", "http://127.0.0.1.attacker.net", "ws://room.example", "ftp://x", "", "nonsense"])
+    expect(secureBase(base), base).toBe(false);
+  // A relative base is on the page's origin.
+  expect(secureBase("/nodes/c-1", "https://room.example")).toBe(true);
+  expect(secureBase("", "http://localhost:5173")).toBe(true);
+  expect(secureBase("/nodes/c-1", "http://room.example")).toBe(false);
+  expect(secureBase("/nodes/c-1")).toBe(false);
 });
 
 // ----- bytes, fingerprint, signature -----
@@ -142,9 +166,15 @@ test("candidate addresses follow the contract's order: the target if it is that 
   expect(candidateBases(pairing)).toEqual([
     { base: "http://127.0.0.1:8768", via: "direct" }, { base: "https://mac.example", via: "direct" }, { base: "https://room.example/nodes/c%2F1", via: "room" }]);
   // The target is that node: first.
-  expect(candidateBases(pairing, { target: "http://10.0.0.5:8768", about: { kind: "node", fingerprint: "fp-1" } })[0]).toEqual({ base: "http://10.0.0.5:8768", via: "direct" });
+  expect(candidateBases(pairing, { target: "https://node.example:8768", about: { kind: "node", fingerprint: "fp-1" } })[0]).toEqual({ base: "https://node.example:8768", via: "direct" });
   // Another node is not a candidate at all.
-  expect(candidateBases(pairing, { target: "http://10.0.0.5:8768", about: { kind: "node", fingerprint: "fp-2" } })).toHaveLength(3);
+  expect(candidateBases(pairing, { target: "https://node.example:8768", about: { kind: "node", fingerprint: "fp-2" } })).toHaveLength(3);
+  // Plain http off this machine is no candidate, whoever names it: the target, the pairing, the page's own origin.
+  expect(candidateBases(pairing, { target: "http://10.0.0.5:8768", about: { kind: "node", fingerprint: "fp-1" } })).toHaveLength(3);
+  expect(candidateBases({ ...pairing, urls: ["http://mac.lan:8768", ...pairing.urls], rv: { url: "http://room.lan", node: "c/1" } }).map((c) => c.base))
+    .toEqual(["http://127.0.0.1:8768", "https://mac.example"]);
+  expect(candidateBases(pairing, { target: "", about: { kind: "room" }, origin: "http://room.lan" }).map((c) => c.base))
+    .toEqual(["http://127.0.0.1:8768", "https://mac.example", "https://room.example/nodes/c%2F1"]);
   // A room: its relay to this node, first; the same room named twice is asked once.
   expect(candidateBases(pairing, { target: "https://other-room.example", about: { kind: "room" } })[0]).toEqual({ base: "https://other-room.example/nodes/c%2F1", via: "room" });
   expect(candidateBases(pairing, { target: "", about: { kind: "room" }, origin: "https://room.example" }).map((c) => c.base))
@@ -157,7 +187,7 @@ test("the first candidate in order that proves itself wins, all of them asked at
   const node = await fakeNode();
   const asked: string[] = [];
   const get = network({ "http://127.0.0.1:8768": node, "https://room.example/nodes/c-1": node }, asked);
-  const candidates = [{ base: "http://gone:1", via: "direct" as const }, { base: "http://127.0.0.1:8768", via: "direct" as const }, { base: "https://room.example/nodes/c-1", via: "room" as const }];
+  const candidates = [{ base: "https://gone:1", via: "direct" as const }, { base: "http://127.0.0.1:8768", via: "direct" as const }, { base: "https://room.example/nodes/c-1", via: "room" as const }];
   expect(await firstProven(candidates, node, { get, subtle })).toMatchObject({ base: "http://127.0.0.1:8768", via: "direct" });
   expect(asked.filter((line) => line.includes("/identity")).length).toBe(3);
   expect(await firstProven([candidates[0]], node, { get, subtle })).toBeNull();
@@ -180,6 +210,15 @@ test("redeeming: the secret goes only where the code's node proved itself, and t
   expect(base).toMatchObject({ base: "https://room.example/nodes/c-1", via: "room" });
   expect(pairing).toEqual({ fp: node.fp, public_key: node.public_key, host: "macbook", urls: ["http://127.0.0.1:8768"],
     rv: { url: "https://room.example", node: "c-1" }, device_id: "dev-1", token: "tok-1", paired_at: NOW / 1000 });
+});
+
+test("redeeming follows no redirect: neither the proof nor the secret goes anywhere a redirect points", async () => {
+  const node = await fakeNode(), seen: { url: string; redirect?: RequestRedirect }[] = [];
+  const base = network({ "http://127.0.0.1:8768": node });
+  const get = (async (url: string, init?: RequestInit) => { seen.push({ url, redirect: init?.redirect }); return base(url, init); }) as unknown as typeof fetch;
+  await redeemPairingCode(codeFor(payload(node, { rv: null })), { get, subtle, now: NOW });
+  expect(seen.map((request) => request.url.split("?")[0])).toEqual(["http://127.0.0.1:8768/api/device/identity", "http://127.0.0.1:8768/api/device/pair"]);
+  expect(seen.map((request) => request.redirect)).toEqual(["error", "error"]);
 });
 
 test("redeeming fails with the sentence the person needs: used code, wrong machine, nobody there", async () => {

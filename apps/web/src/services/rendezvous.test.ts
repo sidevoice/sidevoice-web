@@ -34,8 +34,8 @@ test("the page reads its target from the window a shell writes to, before its ow
 });
 
 test("what a target is: a node by its fingerprint, a room by the build it serves, or neither", () => {
-  expect(describeTarget({ kind: "node", id: "mac", host: "macbook", fingerprint: "fp-1" })).toEqual({ kind: "node", id: "mac", fingerprint: "fp-1", build: null });
-  expect(describeTarget({ kind: "room", nodes: [], web_build: "b1" })).toEqual({ kind: "room", id: null, fingerprint: null, build: "b1" });
+  expect(describeTarget({ kind: "node", fingerprint: "fp-1" })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
+  expect(describeTarget({ kind: "room", nodes: [], web_build: "b1" })).toEqual({ kind: "room", fingerprint: null, build: "b1" });
   // A 404's body, a static server's page, a room from before rendezvous: not a node, not a room.
   for (const answer of [null, {}, { binding: null }, { kind: "other" }]) expect(describeTarget(answer)).toBeNull();
 });
@@ -46,7 +46,7 @@ test("asking the target: a failure, or anything that is not a node or a room, is
 
   expect(await askTarget("https://room.example", answer(200, { kind: "room", nodes: [], web_build: "b2" }))).toMatchObject({ kind: "room", build: "b2" });
   expect(asked.at(-1)).toBe("https://room.example/api/rendezvous");
-  expect(await askTarget("", answer(200, { kind: "node", id: "mac", fingerprint: "fp" }))).toMatchObject({ kind: "node", fingerprint: "fp" });
+  expect(await askTarget("", answer(200, { kind: "node", fingerprint: "fp" }))).toMatchObject({ kind: "node", fingerprint: "fp" });
   expect(asked.at(-1)).toBe("/api/rendezvous");
   expect(await askTarget("", answer(404))).toBeNull();
   expect(await askTarget("", answer(502))).toBeNull();

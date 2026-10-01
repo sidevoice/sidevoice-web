@@ -53,14 +53,14 @@ export function callSocketUrl(nodeBase, location) {
         return path.replace(/^http/, 'ws');
     return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + path;
 }
-/** What a `GET /api/rendezvous` answer says the server is: a node (and which, by its fingerprint), a room (and
- *  the web build it serves), or — anything else, a 404, a static server's page — neither. */
+/** What a `GET /api/rendezvous` answer says the server is: a node (and which, by its fingerprint — all a node
+ *  tells a caller without a token), a room (and the web build it serves), or — anything else, a 404, a static
+ *  server's page — neither. */
 export function describeTarget(answer) {
     if (answer?.kind === 'node')
-        return { kind: 'node', id: typeof answer.id === 'string' ? answer.id : null,
-            fingerprint: typeof answer.fingerprint === 'string' ? answer.fingerprint : null, build: null };
+        return { kind: 'node', fingerprint: typeof answer.fingerprint === 'string' ? answer.fingerprint : null, build: null };
     if (answer?.kind === 'room')
-        return { kind: 'room', id: null, fingerprint: null, build: typeof answer.web_build === 'string' ? answer.web_build : null };
+        return { kind: 'room', fingerprint: null, build: typeof answer.web_build === 'string' ? answer.web_build : null };
     return null;
 }
 /** A question to a server that does not answer is no answer, after a while: an address that swallows packets

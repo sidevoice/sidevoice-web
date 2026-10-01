@@ -2242,6 +2242,7 @@ test('Every request to the machine carries this device\'s token; the call socket
  await s.run("post('/api/presentation/rtc/offer',{session_id:'s',sdp:'v=0',type:'offer'})");
  assert.ok(asked.length>=3);
  for(const [url,init] of asked)assert.equal(init.headers.Authorization,'Bearer tok-1',url);
+ for(const [url,init] of asked)assert.equal(init.redirect,'error',url+': a redirect never carries the token on');
  assert.equal(asked.at(-1)[1].headers['Content-Type'],'application/json','a request\'s own headers are kept');
  // An error report outlives the page like a beacon did, and — unlike a beacon — carries the token.
  s.run("reportClientError({kind:'uncaught',message:'boom'})");await new Promise(resolve=>setTimeout(resolve,0));

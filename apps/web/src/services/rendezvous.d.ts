@@ -1,8 +1,6 @@
 /** What a server's `GET /api/rendezvous` said it is. */
 export interface TargetDescription {
   kind: "room" | "node";
-  /** A node's id, as it names itself. */
-  id: string | null;
   /** A node's fingerprint (docs/DEVICE_PAIRING.md): whether the target is the node a pairing names. */
   fingerprint: string | null;
   /** The web build a room serves, when it said. */

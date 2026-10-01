@@ -57,6 +57,8 @@ export const VERIFIED_FOR_MS: number;
 export const IDENTITY_TIMEOUT_MS: number;
 export const NO_WEBCRYPTO: string;
 
+/** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback. */
+export function secureBase(base: string, origin?: string): boolean;
 export function bytesToBase64url(input: Uint8Array | ArrayBuffer): string;
 export function base64ToBytes(text: string): Uint8Array;
 export function utf8(text: string): Uint8Array;

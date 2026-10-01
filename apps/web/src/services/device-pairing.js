@@ -3,7 +3,12 @@
  * A node accepts this page only with a device token it minted when the person paired it: the node issues a
  * one-time code, the person pastes it here, the page redeems it and keeps the token. Before a token goes
  * anywhere the address has to prove it is the node that was paired — a signature with the key pinned at
- * pairing — because a relay, or whoever sits on a URL, could otherwise collect it.
+ * pairing — so that an address which is not the node, and cannot reach it, never gets the token.
+ *
+ * That proof does not make a relay safe. A room relaying to the node forwards the node's signature, terminates
+ * TLS on both sides, and sees the pairing secret, the token and everything the page and the node say: a room is
+ * trusted with all of it until there is an end-to-end encrypted channel to the pinned identity. And a secret or
+ * a token goes only over https, or plain http to this same machine (loopback): never in clear over a network.
  *
  * No DOM and no clock of its own: storage, fetch, WebCrypto and the time are handed in, so each step can be
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
@@ -62,6 +67,16 @@ function httpUrl(value) {
         return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin + url.pathname.replace(/\/+$/, '') : null;
     } catch { return null; }
 }
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
+/** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback.
+ *  A relative base is on `origin`, the page's own, and is judged by it. */
+export function secureBase(base, origin = '') {
+    try {
+        const url = new URL(base, origin || undefined);
+        return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
+    } catch { return false; }
+}
+const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.';
 
 // ----- the code -----
 /** What a pasted code says, or why it cannot be used, in one sentence the person can act on. The code may
@@ -84,11 +99,15 @@ export function decodePairingCode(code, now = Date.now()) {
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
         throw pairingError(DAMAGED);
     if (!urlList.length && !room) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
+    // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
+    // left with none cannot be used from here.
+    const secureUrls = urlList.filter(url => secureBase(url)), secureRoom = room && secureBase(room.url) ? room : null;
+    if (!secureUrls.length && !secureRoom) throw pairingError(PLAINTEXT);
     // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
     // address is probed.
     if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
     if (exp * 1000 <= now) throw pairingError('Este código ya caducó: duran 10 minutos. Pide uno nuevo.');
-    return { v: 1, fp, host: host || null, urls: urlList, rv: room, secret, exp };
+    return { v: 1, fp, host: host || null, urls: secureUrls, rv: secureRoom, secret, exp };
 }
 
 // ----- the node's identity -----
@@ -116,7 +135,7 @@ export async function proveIdentity(base, expected, { get = globalThis.fetch, su
     const crypto = webCrypto(subtle);
     let answer;
     try {
-        const response = await patiently(get(base + '/api/device/identity?nonce=' + encodeURIComponent(nonce), { headers: { accept: 'application/json' }, cache: 'no-store' }), timeoutMs);
+        const response = await patiently(get(base + '/api/device/identity?nonce=' + encodeURIComponent(nonce), { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), timeoutMs);
         if (!response.ok) return { ok: false, reason: 'unreachable' };
         answer = await response.json();
     } catch { return { ok: false, reason: 'unreachable' }; }
@@ -132,12 +151,13 @@ export async function proveIdentity(base, expected, { get = globalThis.fetch, su
 }
 /** Where a pairing (or a code) can be reached, in the contract's order: the target this page was pointed at when
  *  it is that node, or a room (then its relay to the node); each direct URL; then the node's own room. Each
- *  says how: `direct` or `room`. `about` is the target's own `/api/rendezvous` answer, `null` if it gave none. */
+ *  says how: `direct` or `room`. `about` is the target's own `/api/rendezvous` answer, `null` if it gave none.
+ *  An address a secret or a token may not go to (`secureBase`) is no candidate, wherever it came from. */
 export function candidateBases(pairing, { target = '', about = null, origin = '' } = {}) {
     const list = [], seen = new Set();
     const add = (base, via) => {
         const key = /^https?:\/\//.test(base) ? base : origin + base;
-        if (seen.has(key)) return;
+        if (seen.has(key) || !secureBase(base, origin)) return;
         seen.add(key); list.push({ base, via });
     };
     const relay = room => room + '/nodes/' + encodeURIComponent(pairing.rv.node);
@@ -178,8 +198,9 @@ export async function redeemPairingCode(code, { name = '', target = '', about = 
     if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.');
     let response, answer = null;
     try {
+        // Never redirected: a 307 would hand the secret, in the body, to wherever it pointed.
         response = await get(place.base + '/api/device/pair', { method: 'POST', headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-            body: JSON.stringify({ secret: payload.secret, name: String(name || '').trim().slice(0, 60) || deviceName() }), cache: 'no-store' });
+            body: JSON.stringify({ secret: payload.secret, name: String(name || '').trim().slice(0, 60) || deviceName() }), cache: 'no-store', redirect: 'error' });
     } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.'); }
     try { answer = await response.json(); } catch { /* no body */ }
     if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.');
