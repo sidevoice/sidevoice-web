@@ -83,7 +83,8 @@ async function boot() {
 
   if (inApp) window.__sidevoiceDesktop = { host: createFakeBridge(scenario, toggles, hosts, (note) => showNote(t("proto.note." + note)), (next) => post({ type: "relaunch", scenario: next })) };
 
-  const store = createHostsStore();
+  // A host the fixture says went silent hours ago: this client noticed then, not now.
+  const store = createHostsStore({ reach: Object.fromEntries([...hosts.byAlias.values()].filter((h) => h.seed.silent_hours).map((h) => [h.fp, { state: "unreachable" as const, since: Math.floor(Date.now() / 1000) - h.seed.silent_hours! * 3600 }])) });
   const controller = createHostsController(store, {
     storage, bridge: () => window.__sidevoiceDesktop?.host ?? null, now: () => Date.now(),
     verifyStage: engine.verifyStage, echoTest: engine.echoTest,

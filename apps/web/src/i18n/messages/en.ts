@@ -302,6 +302,7 @@ export const en: Record<string, string> = {
   "devices.localOnly": "This machine can only be reached from this computer",
   "devices.localOnly.detail": "For a phone or another computer to reach it, connect it to your room: in the room, «Pair machine», and paste its address and the code it shows here.",
   "devices.roomUrl": "Room address",
+  "devices.roomUrlPlaceholder": "https://room.example",
   "devices.roomCode": "Room code",
   "devices.roomPair": "Connect to the room",
   "devices.roomPairing": "Connecting to the room…",

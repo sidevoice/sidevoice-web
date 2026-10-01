@@ -302,6 +302,7 @@ export const es: Record<string, string> = {
   "devices.localOnly": "Esta máquina solo es alcanzable desde este ordenador",
   "devices.localOnly.detail": "Para que el móvil u otro ordenador lleguen a ella, conéctala a tu sala: en la sala, «Emparejar máquina», y pega aquí su dirección y el código que muestra.",
   "devices.roomUrl": "Dirección de la sala",
+  "devices.roomUrlPlaceholder": "https://sala.ejemplo",
   "devices.roomCode": "Código de la sala",
   "devices.roomPair": "Conectar a la sala",
   "devices.roomPairing": "Conectando a la sala…",

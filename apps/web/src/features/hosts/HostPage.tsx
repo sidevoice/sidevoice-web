@@ -353,7 +353,7 @@ function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
           <div className="notice">
             <p><strong>{t("devices.localOnly")}</strong></p>
             <p className="muted">{t("devices.localOnly.detail")}</p>
-            <label className="ui-field">{t("devices.roomUrl")}<input value={roomUrl} placeholder="https://sala.ejemplo" onChange={(e) => setRoomUrl(e.currentTarget.value)} /></label>
+            <label className="ui-field">{t("devices.roomUrl")}<input value={roomUrl} placeholder={t("devices.roomUrlPlaceholder")} onChange={(e) => setRoomUrl(e.currentTarget.value)} /></label>
             <label className="ui-field">{t("devices.roomCode")}<input value={roomCode} onChange={(e) => setRoomCode(e.currentTarget.value)} /></label>
             <Button variant="primary" size="compact" disabled={roomBusy || !roomUrl.trim() || !roomCode.trim()} onClick={() => void pairRoom()}>{roomBusy ? t("devices.roomPairing") : t("devices.roomPair")}</Button>
           </div>

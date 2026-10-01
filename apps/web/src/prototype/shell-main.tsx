@@ -108,7 +108,7 @@ function Shell() {
           {iframe}
         </div>
       ) : (
-        <div className="phone"><div className="phone-notch" />{iframe}</div>
+        <div className="phone"><div className="phone-notch" /><div className="phone-status"><span>9:41</span><span>5G ▮▮▮</span></div>{iframe}</div>
       )}
 
       <aside className="panel" data-open={panelOpen || undefined} aria-label="Prototipo">

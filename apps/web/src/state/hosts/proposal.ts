@@ -23,6 +23,7 @@ interface Ctx {
   offers: { task: string; model: string; engine: string; download_size: number }[] | null;
   installed: { model: string; engine: string }[];
   keyed(id: string): "ready" | "missing" | "absent";
+  remote?: Record<string, { models?: { id: string; label?: string }[] }>;
 }
 
 function providerStage(ctx: Ctx, task: Task): Stage | null {
@@ -48,7 +49,8 @@ export function proposeStages(ctx: Ctx, phone: boolean): Proposal {
       rows.push({ task, stage, place: "device", placeLabel: "", model: familyOf(ctx.catalog, stage.model)?.model?.label || stage.model,
         bytes: installed ? 0 : offer?.download_size ?? 0, installed });
     } else {
-      rows.push({ task, stage, place: "provider", placeLabel: providerOf(ctx.catalog, stage.place, task)?.label || stage.place, model: stage.model, bytes: 0, installed: true });
+      const listed = ctx.remote?.[stage.place + ":" + task]?.models?.find((m) => m.id === stage.model);
+      rows.push({ task, stage, place: "provider", placeLabel: providerOf(ctx.catalog, stage.place, task)?.label || stage.place, model: listed?.label || stage.model, bytes: 0, installed: true });
     }
   }
   return { rows, missing, bytes: rows.reduce((sum, row) => sum + row.bytes, 0) };

@@ -42,8 +42,9 @@ button, select, input { font: inherit }
 .browser { width: min(1240px, 100%); height: 100%; display: grid; grid-template-rows: 38px 1fr; overflow: hidden; border-radius: 11px; border: 1px solid #ffffff1f; box-shadow: 0 30px 80px #000c }
 .browser-bar { display: flex; align-items: center; gap: 1rem; padding: 0 .9rem; background: #2a2d33 }
 .address { flex: 1; max-width: 34rem; margin: 0 auto; padding: .28rem .8rem; border-radius: 8px; background: #1b1d22; color: #c4c9cf; font-size: 13px; text-align: center }
-.phone { position: relative; width: 390px; height: min(844px, 100%); padding: 14px; border-radius: 54px; background: #050506; box-shadow: 0 0 0 2px #2b2b2f, 0 30px 80px #000c }
-.phone .app-frame { border-radius: 40px }
+.phone { position: relative; width: 390px; height: min(844px, 100%); padding: 50px 14px 14px; border-radius: 54px; background: #050506; box-shadow: 0 0 0 2px #2b2b2f, 0 30px 80px #000c }
+.phone .app-frame { border-radius: 0 0 40px 40px }
+.phone-status { position: absolute; top: 22px; left: 44px; right: 44px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f2f2f5 }
 .phone-notch { position: absolute; z-index: 2; top: 24px; left: 50%; width: 112px; height: 30px; transform: translateX(-50%); border-radius: 20px; background: #050506 }
 .bare { position: fixed; inset: 0 }
 
@@ -73,7 +74,7 @@ button, select, input { font: inherit }
 .panel .hint { margin: .3rem 0 0; font-size: 11px; color: #6b5a3a }
 .panel-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem }
 .flash { margin: 0; padding: .45rem .8rem; border-top: 1px dashed #e0a82e; font-size: 12px }
-.proto[data-narrow] .panel { top: auto; bottom: .6rem; right: .6rem; left: auto; max-height: 75dvh }
+.proto[data-narrow] .panel { top: 4.4rem; bottom: auto; right: .5rem; left: auto; max-height: calc(100dvh - 5rem); opacity: .96 }
 .proto[data-narrow] .panel[data-open] { left: .6rem; width: auto }
 /* With the panel open, the window and the browser keep clear of it. */
 @media (min-width: 1100px) {

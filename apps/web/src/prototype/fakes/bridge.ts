@@ -31,6 +31,7 @@ export function createFakeBridge(scenario: Scenario, toggles: Toggles, hosts: Fa
   function emit(next: Partial<LocalHostState> & { state: LocalHostState["state"] }) {
     const { after_ms: _after, ...rest } = next as TimedState;
     state = { ...state, ...rest, since: Date.now() / 1000 };
+    if (state.failure && !state.failure.at) state.failure = { ...state.failure, at: Math.floor(Date.now() / 1000) - 40 };
     if (state.state === "running") { state.failure = null; state.core = { ...CORE, ...(rest.core ?? state.core ?? {}) }; }
     if (local && state.state === "running" && !local.refused) local.reachable = true;
     for (const listener of listeners) listener(state);
