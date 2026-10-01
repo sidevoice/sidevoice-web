@@ -519,7 +519,7 @@ export const en: Record<string, string> = {
   "stagecard.key.refusedKept": "✕ Refused · previous kept",
   "stagecard.text.label": "Test text",
   "stagecard.text.count": "{n}/{max}",
-  "stage.voiceLanguage": "Language",
+  "stage.voiceLanguage": "Voice language",
   "stagecard.phase.check": "Check",
   "stagecard.b.title.tts": "Configure and listen",
   "stagecard.b.title.stt": "Configure and try",
@@ -529,4 +529,6 @@ export const en: Record<string, string> = {
   "stagecard.b.inUse.tts": "✓ This voice is in use",
   "stagecard.b.inUse.stt": "✓ This model is in use",
   "stagecard.b.say.footer": "Press «Try it» and say something, in any language — for example:",
+  "stagecard.check": "Check",
+  "stagecard.next.checking": "Checking…",
 };

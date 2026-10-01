@@ -268,14 +268,16 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const rawStep = rawCheck?.phase === "running" ? rawCheck.progress?.step ?? "load" : null;
   const lang = currentLanguage();
   const keep = t(task === "tts" ? "stagecard.b.useVoice" : "stagecard.b.useModel");
+  // A provider has nothing to download or load here: its model is only checked (operator, 2026-10-01).
+  const remote = view.place !== "device";
   // What is still to do, in the order the card shows it.
   const pending: PendingStep | null =
     keyFor || (keyProvider && listing && !listing.configured) ? { label: t("stagecard.next.key"), run: () => keyLine.current?.submit() }
     : !view.model ? { label: t("wizard.continue"), disabled: true }
-    : rawStep ? { label: t(rawStep === "download" ? "stagecard.next.downloading" : "stagecard.next.preparing"), disabled: true }
+    : rawStep ? { label: t(rawStep === "download" ? "stagecard.next.downloading" : remote ? "stagecard.next.checking" : "stagecard.next.preparing"), disabled: true }
     : check?.phase === "failed" && !prepared ? { label: t("common.retry"), run: prepare }
     : check?.phase === "slow" ? { label: t("check.useAnyway"), run: () => window.sidevoiceActions?.decideStage(task, true) }
-    : !prepared ? { label: !needsDownload ? t("stagecard.prepare") : offer?.download_size ? t("stagecard.downloadPrepare", { size: bytesText(offer.download_size, lang) }) : t("stagecard.downloadPrepareOnly"), run: prepare }
+    : !prepared ? { label: remote ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare") : offer?.download_size ? t("stagecard.downloadPrepare", { size: bytesText(offer.download_size, lang) }) : t("stagecard.downloadPrepareOnly"), run: prepare }
     : works ? null
     : trial.state === "listening" ? { label: t("stagecard.listening"), disabled: true }
     : trial.state === "transcribing" ? { label: t("stagecard.transcribing"), disabled: true }
@@ -338,11 +340,13 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const last: Phase = flow === "configure" ? "check" : "test";
   // The same strip every time: a model that runs here is downloaded first (done when it is on disk); a provider has
   // nothing to download.
-  const phases: Phase[] = view.place === "device" ? ["download", "prepare", last] : ["prepare", last];
+  // A provider's model is only checked: there is nothing to download or load here.
+  const phases: Phase[] = view.place === "device" ? ["download", "prepare", last] : flow === "configure" ? ["check"] : ["check", "test"];
+  const first: Phase = view.place === "device" ? "prepare" : "check";
   // While it runs, the strip follows the progress: downloading, then loading, then checking.
   const downloading = runningStep === "download";
   const downloaded = !needsDownload || (!!runningStep && !downloading);
-  const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : "prepare";
+  const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : first;
   const lang = currentLanguage();
   const chooseOther = () => document.getElementById(`${task}-model`)?.click();
   return (
@@ -386,7 +390,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
         // What the phases mean is the strip's to say (operator, 2026-10-01: no notes about downloads or memory).
         !inFooter && <div className="stage-card-body">
           <Button variant="primary" size="compact" onClick={onPrepare}>
-            {!needsDownload ? t("stagecard.prepare") : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly")}
+            {view.place !== "device" ? t("stagecard.check") : !needsDownload ? t("stagecard.prepare") : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly")}
           </Button>
         </div>
       ) : flow === "configure" ? null
