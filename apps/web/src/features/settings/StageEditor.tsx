@@ -63,8 +63,6 @@ const TEXT_MAX = 200;
  *  checking, valid, refused — is said inside the field, beside the masked last characters of the key kept (operator,
  *  2026-10-01); a refused replacement leaves the previous key in place. */
 interface KeyHandle { submit(): void }
-/** The host says only a key's last four characters: the rest is drawn at a key's usual length. */
-const MASK = "•".repeat(28);
 
 /** `ownSubmit`: its own «Validar» while a typed key is unchecked; in the wizard that is the footer's button. */
 function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; onCancel?: () => void; ownSubmit: boolean; ref?: Ref<KeyHandle> }) {
@@ -101,7 +99,7 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
     <div className="key-line" data-state={state || (valid ? "valid" : undefined)}>
       <span className="key-field">
         <input ref={input} id={"key-" + provider} type="password" autoComplete="off" spellCheck={false} required aria-required="true" value={key}
-          placeholder={configured && hint ? MASK + hint : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
+          placeholder={configured && hint ? "" : t("wizard.w4.keyPlaceholder", { provider: label })} aria-label={t("wizard.w4.keyPlaceholder", { provider: label })}
           aria-describedby={"key-state-" + provider}
           onChange={(event) => {
             const value = event.currentTarget.value;
@@ -111,6 +109,7 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
           }}
           onPaste={(event) => { const value = event.clipboardData.getData("text"); if (value.trim()) { clearTimeout(idle.current); setTimeout(() => void check(value), 0); } }}
           onBlur={() => void check()} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void check(); } }} autoFocus={!configured} />
+        {configured && hint && !key && <span className="key-mask" aria-hidden="true"><span className="key-dots" /><span className="key-last">{hint}</span></span>}
         <span className="key-state" id={"key-state-" + provider} role="status"
           title={state === "refused" ? t(configured ? "wizard.w4.keyRefusedKept" : "wizard.w4.keyRefused", { provider: label }) : undefined}>{said}</span>
       </span>
@@ -325,7 +324,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
     setPreparedHere(true);
     window.sidevoiceActions?.testStage?.(task, { place: stage.place, model: stage.model, options: stage.options ?? {}, build: stage.build ?? null });
   }
-  if (list && rawCheck?.phase === "done" && check?.phase === "done") remember(task, (rawCheck as unknown as { stage: Stage }).stage, check.rows ?? []);
+  if (rawCheck?.phase === "done" && check?.phase === "done") remember(task, (rawCheck as unknown as { stage: Stage }).stage, check.rows ?? []);
   const settings = (
     <StageSettings task={task} onMissingPlace={setKeyFor} placeExtra={keyPanel} pendingPlace={list ? null : keyFor} hideCheck hidePlaceNote hideVoiceTools
       pickers={list ? <ModelList task={task} ctx={ctx} view={view} current={current} saved={saved} running={rawCheck} rawStep={rawStep} onPick={pick} onRetry={prepare} /> : undefined}
@@ -482,6 +481,7 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
   const at: Phase = prepared ? last : !downloaded || downloading ? "download" : flow === "configure" && runningStep === "check" ? "check" : first;
   const lang = currentLanguage();
   const chooseOther = () => document.getElementById(`${task}-model`)?.click();
+  const measured = measuredRows.get(task + ":" + view.place + "/" + view.model);
   return (
     <section className="stage-card" aria-label={t("stagecard.label", { model: model?.label ?? view.model })} data-works={works || undefined}>
       <div className="stage-card-head">
@@ -496,6 +496,8 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
         </ol>
       </div>
       {model?.description && <p className="muted small">{model.description}</p>}
+      {/* What the check measured — on this device or at the provider (a real request, timed) — stays in view. */}
+      {prepared && !running && measured && <p className="model-card-metrics small">{measured.map((r) => r.label + " " + r.value).join(" · ")}</p>}
 
       {running ? (
         <div className="stage-card-body" role="status">

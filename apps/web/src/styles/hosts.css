@@ -348,3 +348,8 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .conversation-test { gap: .1rem; margin: .4rem 0 .6rem; padding: .7rem .8rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #13171c }
 /* Sidevoice's own mark as the sender of a try («Primeros pasos»). */
 .ui-avatar[data-icon] { display: grid; place-items: center; color: var(--sv-primary) }
+/* A kept key: a key's length of dots, drawn (bullet glyphs sit lower than letters), then its last four. */
+.key-field { position: relative }
+.key-mask { position: absolute; inset: 0 auto 0 .7rem; width: min(17rem, calc(100% - 9rem)); display: flex; align-items: center; gap: .3rem; pointer-events: none; color: var(--sv-muted) }
+.key-dots { flex: 1; height: .5em; background-image: radial-gradient(circle, currentColor 0 .14em, transparent .16em); background-size: .55em .5em; background-repeat: space no-repeat; background-position: left center }
+.key-last { font-variant-numeric: tabular-nums; letter-spacing: .04em }
