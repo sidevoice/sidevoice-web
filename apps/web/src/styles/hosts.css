@@ -222,3 +222,10 @@
 .code-copy:hover { background: #232b34 }
 .howto-foot { display: flex; align-items: center; justify-content: space-between; gap: .6rem }
 .howto-arrow { fill: var(--sv-surface-raised) }
+
+/* Hover. The room's global `button:hover` paints every button grey, which left the lila primary button's dark text
+ * unreadable; here a primary button lightens instead, and a choice card answers the pointer before it is chosen. */
+:is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .howto-popover, .room-banner) .ui-button--primary:hover:not(:disabled) { background: var(--sv-primary-soft); border-color: var(--sv-primary-soft); color: var(--sv-on-primary) }
+:is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .howto-popover, .room-banner) .ui-button--primary:active:not(:disabled) { background: var(--sv-primary-dim) }
+.choice-card { transition: border-color .12s, background-color .12s }
+.choice-card:hover:not([data-checked]) { border-color: var(--sv-selected-border); background: #232a36 }
