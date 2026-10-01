@@ -36,24 +36,43 @@ class BrowserTranscription{
   if(this.worker&&!!this.native===native)return;
   // Whatever was waiting on the worker being replaced will never be answered: say so rather than hang.
   for(const request of this.pending.values())request.reject(Error('Se cambió el motor de transcripción.'));this.pending.clear();
-  this.worker?.terminate();this.worker=null;this.native=native;
-  if(native){this.worker=globalThis.sidevoiceNativeWorkers?.transcription?.()||null;if(!this.worker){this.native=false;throw Error('El motor nativo solo está en la app de escritorio de Sidevoice.')}}
-  else this.worker=new Worker('/voice-browser/stt-worker.js?v='+encodeURIComponent(globalThis.sidevoiceBuildId||'dev'),{type:'module'});
-  this.worker.onmessage=({data})=>{
-   const request=this.pending.get(data.id);if(!request)return;
+  this.worker?.terminate();this.worker=null;
+  this.worker=this.candidate(native);this.native=native;this._listen(this.worker);
+ }
+ /* A worker of its own for a model check (#124 §6): the same protocol as this client's, loaded and checked apart
+  * from the one a call is using, which keeps transcribing until the checked model takes its place (adopt). */
+ candidate(native=false){
+  if(!native)return new Worker('/voice-browser/stt-worker.js?v='+encodeURIComponent(globalThis.sidevoiceBuildId||'dev'),{type:'module'});
+  const worker=globalThis.sidevoiceNativeWorkers?.transcription?.()||null;
+  if(!worker)throw Error('El motor nativo solo está en la app de escritorio de Sidevoice.');
+  return worker;
+ }
+ /* A checked model takes the place of the one in use, already loaded: every request goes to its worker from now on.
+  * What the old worker was still doing finishes there, and then it is let go — in a page, with the memory it held. */
+ adopt(worker,runtime,native=false){
+  const previous=this.worker;
+  this.worker=worker;this.native=!!native;this.runtime=runtime;this._listen(worker);
+  if(previous&&previous!==worker)this._retire(previous);
+ }
+ _listen(worker){
+  worker.onmessage=({data})=>{
+   const request=this.pending.get(data.id);if(!request||request.worker!==worker)return;
    if(data.type==='progress'){request.progress?.(data.progress);return}
    this.pending.delete(data.id);
-   if(data.type==='error')request.reject(Error(data.error));
+   if(data.type==='error')request.reject(Object.assign(Error(data.error),{step:data.step,reason:data.reason}));
    else request.resolve(data.capabilities||data.runtime||data.result);
+   this._retire(worker);
   };
-  this.worker.onerror=error=>{
-   for(const request of this.pending.values())request.reject(Error(error.message||'Fallo el worker de transcripcion'));
-   this.pending.clear();
+  worker.onerror=error=>{
+   for(const [id,request] of this.pending)if(request.worker===worker){this.pending.delete(id);request.reject(Error(error.message||'Fallo el worker de transcripcion'))}
+   this._retire(worker);
   };
  }
+ /* A worker that is no longer the one in use goes once nothing waits on it. */
+ _retire(worker){if(worker!==this.worker&&![...this.pending.values()].some(request=>request.worker===worker))worker.terminate()}
  _request(type,data={},progress,transfer=[]){
-  this._ensureWorker(data.native);const id=++this.nextId;
-  return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject,progress});this.worker.postMessage({id,type,...data},transfer)});
+  this._ensureWorker(data.native);const id=++this.nextId,worker=this.worker;
+  return new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject,progress,worker});worker.postMessage({id,type,...data},transfer)});
  }
  /* What this browser can run in the page (never the native engine's list: that one is the app's). */
  async capabilities(){

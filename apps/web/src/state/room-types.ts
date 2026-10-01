@@ -188,7 +188,21 @@ export interface StageView {
   where: "page" | "app" | "provider";
   /** Nothing chosen, and this device runs nothing for the stage: a place has to be chosen. */
   unconfigured?: boolean;
+  /** The model being selected — asked, downloading, loading, checked — or the outcome of the last one (#124 §6). */
+  check: StageCheckView | null;
+  /** Where and on what this stage's model runs, and what its last check measured (#90). */
+  diagnostics: { rows: { label: string; value: string }[]; checked: boolean; busy: boolean } | null;
 }
+
+/** One model selection as its pane says it: a download to consent to (its size), the step it is at, why it failed
+ *  (the step and its cause, with the model still in use), a slow one to decide on, or the numbers it took effect with. */
+export type StageCheckView = { model: string; previous: string; recheck: boolean } & (
+  | { phase: "consent"; size: string }
+  | { phase: "running"; step: string; amount: string; fraction: number | null }
+  | { phase: "failed"; step: string; cause: string }
+  | { phase: "slow"; latency: string; comfort: string; rows: { label: string; value: string }[] }
+  | { phase: "done"; rows: { label: string; value: string }[] }
+);
 
 export interface SidevoiceActions {
   cancelInput(): Promise<void>;
@@ -206,6 +220,14 @@ export interface SidevoiceActions {
   setStageOption(task: StageTask, id: string, value: unknown, language?: string): void;
   /** Avanzado: 'auto' or 'engine/accelerator'. */
   chooseStageBuild(task: StageTask, value: string): void;
+  /** The person's answer to the selection's question: download it (consent), or use it although it is slow. */
+  decideStage(task: StageTask, yes: boolean): void;
+  /** Stop a selection in flight; the model in use stays. */
+  cancelStage(task: StageTask): void;
+  /** Check the model in use again, for its numbers (Diagnóstico). */
+  recheckStage(task: StageTask): void;
+  /** Copy a stage's diagnostics as text. Resolves with whether it was copied. */
+  copyDiagnostics(task: StageTask): Promise<boolean>;
   previewVoice(language: string): Promise<void>;
   /** Load this device's chosen voice model ahead of the first reply. */
   prepareVoice(): Promise<void>;

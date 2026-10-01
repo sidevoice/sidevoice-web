@@ -51,6 +51,10 @@ export function initialSessionFacts() {
         previewNote: '', prepareNote: '',
         // This page's WebGPU failed to load a model and is set aside, until the person asks to try it again.
         gpuSetAside: false,
+        // Selecting a model loads and checks it first (#124 §6): per stage, the selection in flight or just over
+        // (stage-selection.js's record), and what the last check measured, for Diagnóstico (#90). In a page, what
+        // the page itself has: its WebGPU adapter, whether it is cross-origin isolated, its threads and cores.
+        stageChecks: {}, stageDiagnostics: {}, pageFacts: null,
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -331,7 +335,8 @@ export function keyedProvider(s, id) {
 /** What a stage is chosen from, as stage-settings.js reads it. */
 export function stageContext(s) {
     return { catalog: s.modelCatalog, offers: s.deviceOffers, installed: s.installedBuilds, inApp: s.inApp, language: s.speechLanguage,
-        languages: s.voiceLanguages, remote: s.remoteModels, integrations: s.integrationsStatus, keyed: (id) => keyedProvider(s, id) };
+        languages: s.voiceLanguages, remote: s.remoteModels, integrations: s.integrationsStatus, keyed: (id) => keyedProvider(s, id),
+        checks: s.stageChecks, diagnostics: s.stageDiagnostics, pageFacts: s.pageFacts };
 }
 /** Transcription and voice as their panes show them: the draft while the dialog edits one, else what is saved. */
 export function stagesView(s) {

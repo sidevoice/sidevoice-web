@@ -4,6 +4,8 @@ import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import type { StageTask } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
+import { StageCheck } from "./StageCheck";
+import { StageDiagnostics } from "./StageDiagnostics";
 
 const WHERE_NOTES = {
   page: "Se ejecuta en este navegador; la primera vez se descarga y después se reutiliza su caché.",
@@ -47,6 +49,7 @@ export function StageSettings({ task }: { task: StageTask }) {
         {view.modelsLoading && !view.models.length && <option value="">Cargando modelos…</option>}
         {view.models.map((model) => <option key={model.id} value={model.id}>{model.label}{model.detail ? ` · ${model.detail}` : ""}</option>)}
       </ModelPicker>
+      {view.check && <StageCheck task={task} check={view.check} />}
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
       {WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
       <OptionsForm task={task} options={view.options} disabled={locked}
@@ -54,21 +57,26 @@ export function StageSettings({ task }: { task: StageTask }) {
         onPreview={task === "tts" ? (language) => void actions()?.previewVoice(language) : undefined}
         previewing={task === "tts" ? tools.previewing : null} />
       {task === "tts" && <p className="muted" role="status">{tools.previewNote}</p>}
-      {view.advanced && (
+      {(view.advanced || view.diagnostics) && (
         <details className="stage-advanced">
           <summary>Avanzado</summary>
-          <label className="ui-field">Motor
-            <NativeSelect id={`${task}-build`} value={view.advanced.value} disabled={locked} onChange={(event) => actions()?.chooseStageBuild(task, event.target.value)}>
-              {view.advanced.choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-            </NativeSelect>
-          </label>
-          <p className="muted">{view.advanced.reason}</p>
+          {view.advanced && (
+            <>
+              <label className="ui-field">Motor
+                <NativeSelect id={`${task}-build`} value={view.advanced.value} disabled={locked} onChange={(event) => actions()?.chooseStageBuild(task, event.target.value)}>
+                  {view.advanced.choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+                </NativeSelect>
+              </label>
+              <p className="muted">{view.advanced.reason}</p>
+            </>
+          )}
           {tools.gpuSetAside && view.where === "page" && (
             <p className="missing-integration muted">
               <span>La GPU no pudo cargar un modelo en este navegador; lo que la necesita no se ofrece.</span>
               <Button variant="ghost" size="compact" onClick={() => void actions()?.retryGpu()}>Volver a probar la GPU</Button>
             </p>
           )}
+          {view.diagnostics && <StageDiagnostics task={task} diagnostics={view.diagnostics} />}
         </details>
       )}
       {task === "tts" && view.place === "device" && (

@@ -8,12 +8,16 @@ env.backends.onnx.wasm.wasmPaths='/voice-browser/assets/';
 env.backends.onnx.wasm.numThreads=1;
 let transcriber=null,active=null;
 
-/* What this page has: the resolver (offers.ts) decides from it which models it offers. */
+/* What this page has: the resolver (offers.ts) decides from it which models it offers, and the diagnostics show
+ * the WebGPU adapter it found (#90). */
 export async function capabilities(){
  const wasm=typeof WebAssembly==='object'&&typeof WebAssembly.validate==='function';
  let adapter=null;
  try{adapter=navigator.gpu?await navigator.gpu.requestAdapter():null}catch{}
- return {webgpu:!!adapter,webgpuFp16:!!adapter?.features?.has?.('shader-f16'),wasm};
+ const info=adapter?.info||{};
+ return {webgpu:!!adapter,webgpuFp16:!!adapter?.features?.has?.('shader-f16'),wasm,
+  adapter:adapter?{vendor:info.vendor||'',architecture:info.architecture||'',device:info.device||'',description:info.description||''}:null,
+  threads:env.backends.onnx.wasm.numThreads};
 }
 async function dispose(){try{await transcriber?.dispose?.()}catch{}transcriber=null;active=null}
 /* A catalogue model on one accelerator, as the offer chose it: nothing is picked here. */

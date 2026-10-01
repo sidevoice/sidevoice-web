@@ -3,18 +3,33 @@ import {refusalText} from './refusals.js';
 /* The desktop app's native engine behind the same message protocol as this package's workers, so the
  * transcription and voice clients do not change: a build whose engine runs natively gets one of these instead of
  * a Web Worker. The engine is the app's (`window.__sidevoiceDesktop.host.nativeEngine`, the bridge contract of
- * rubasace/sidevoice#124 phase 2): it is asked by catalogue model id and engine — the offer the page resolved —
- * installs a build the first time, and runs it on the machine's own hardware, on the offer's accelerator (or the one
- * chosen under Avanzado). Nothing here maps ids or chooses. build.mjs bundles it, with the page's own chunker. */
+ * rubasace/sidevoice#124 phases 2 and 3): it is asked by catalogue model id and engine — the offer the page
+ * resolved — installs a build the first time, loads it into memory (`load`, which `loaded` lists) and runs it on the
+ * machine's own hardware, on the offer's accelerator (or the one chosen under Avanzado). When a model is unloaded is
+ * the app's (D13), apart from the swap after a model check, which the page asks for with `unload`. Nothing here
+ * maps ids or chooses. build.mjs bundles it, with the page's own chunker. */
 (function(){
  function host(){return globalThis.__sidevoiceDesktop?.host?.nativeEngine||null}
- /* The build on this machine's disk, downloaded first when it is not (the engine's package too, if missing). */
- async function ready(engine,model,name,progress){
+ /* A failure with the step it happened at (download, load, run) and, when the app refused with one, its refusal:
+  * what a model check names when it says why a model did not take effect (#124 §6). */
+ class StepError extends Error{
+  constructor(step,cause){
+   super(refusalText(cause,String(cause?.message||cause||'')));
+   this.step=step;this.reason=cause&&typeof cause==='object'&&typeof cause.key==='string'?{...cause}:null;
+  }
+ }
+ async function at(step,work){try{return await work()}catch(error){throw error instanceof StepError?error:new StepError(step,error)}}
+ /* The build on this machine's disk, downloaded first when it is not (the engine's package too, if missing), then
+  * in memory on the accelerator asked for (the app keeps it there while a call uses it, D13). */
+ async function ready(engine,model,name,accelerator,progress){
   if(!model||!name)throw Error('Falta el modelo o el motor que ejecutar en este dispositivo.');
   const installed=await engine.installed();
-  if((installed||[]).some(build=>build.model===model&&build.engine===name))return true;
-  await engine.install(model,name,(done,total)=>progress({status:'progress',progress:total?done*100/total:0,file:model}));
-  return false;
+  const cached=(installed||[]).some(build=>build.model===model&&build.engine===name);
+  if(!cached)await at('download',()=>engine.install(model,name,(done,total)=>progress({status:'progress',progress:total?done*100/total:0,loaded:done,total,file:model})));
+  const inMemory=(await engine.loaded()||[]).some(build=>build.model===model&&build.engine===name&&build.accelerator===accelerator);
+  let load_ms=0;
+  if(!inMemory){progress({status:'loading',file:model});load_ms=Number((await at('load',()=>engine.load(model,name,accelerator)))?.load_ms)||0}
+  return {cached,load_ms};
  }
  /* Posts to whoever set onmessage, asynchronously, like a Worker. */
  class Stand{
@@ -24,8 +39,9 @@ import {refusalText} from './refusals.js';
   postMessage(data){
    if(data?.type==='cancel'){this.epoch++;return}
    const epoch=this.epoch;
-   // The app refuses with {key, message, ...params}, like the node: said by its key where the page knows it.
-   this.chain=this.chain.then(()=>this.handle(data,epoch)).catch(error=>{if(epoch===this.epoch)this.emit({id:data.id,type:'error',error:refusalText(error,String(error))})});
+   // The app refuses with {key, message, ...params}, like the node: said by its key where the page knows it, and
+   // handed on with the step it failed at.
+   this.chain=this.chain.then(()=>this.handle(data,epoch)).catch(error=>{if(epoch===this.epoch)this.emit({id:data.id,type:'error',error:refusalText(error,String(error?.message||error)),step:error?.step||'run',reason:error instanceof StepError?error.reason:(error&&typeof error==='object'&&typeof error.key==='string'?{...error}:null)})});
   }
  }
  /* stt-worker.js's protocol: load {model, engine}, transcribe {audio, model, engine, language}. */
@@ -33,9 +49,9 @@ import {refusalText} from './refusals.js';
   async handle(data,epoch){
    const send=(type,extra={})=>{if(epoch===this.epoch)this.emit({id:data.id,type,...extra})};
    if(data.type==='load'){
-    const cached=await ready(this.engine,data.model,data.engine,progress=>send('progress',{progress}));
+    const {cached,load_ms}=await ready(this.engine,data.model,data.engine,data.accelerator,progress=>send('progress',{progress}));
     this.build={model:data.model,engine:data.engine,accelerator:data.accelerator};
-    send('ready',{runtime:{model:data.model,engine:data.engine,accelerator:data.accelerator,cached}});return;
+    send('ready',{runtime:{model:data.model,engine:data.engine,accelerator:data.accelerator,cached,load_ms}});return;
    }
    if(data.type==='transcribe'){
     const started=performance.now(),{model,engine,accelerator}=this.build||data;
@@ -49,12 +65,11 @@ import {refusalText} from './refusals.js';
  class NativeVoice extends Stand{
   async handle(data,epoch){
    const send=(type,extra={})=>{if(epoch===this.epoch)this.emit({id:data.id,type,...extra})};
-   if(!this.build||this.build.model!==data.model||this.build.engine!==data.engine){
-    await ready(this.engine,data.model,data.engine,progress=>send('progress',{progress}));
-    this.build={model:data.model,engine:data.engine};send('ready',{accelerator:data.accelerator});
-   }else if(data.type==='load')send('ready',{accelerator:data.accelerator});
-   // Another accelerator for the same build needs no download: the engine is asked on it from now on.
-   this.build.accelerator=data.accelerator;
+   if(!this.build||this.build.model!==data.model||this.build.engine!==data.engine||this.build.accelerator!==data.accelerator){
+    // Another accelerator for the same build needs no download, only loading on it.
+    const {load_ms}=await ready(this.engine,data.model,data.engine,data.accelerator,progress=>send('progress',{progress}));
+    this.build={model:data.model,engine:data.engine,accelerator:data.accelerator};send('ready',{accelerator:data.accelerator,load_ms});
+   }else if(data.type==='load')send('ready',{accelerator:data.accelerator,load_ms:0});
    if(data.type==='load')return;
    for(const text of splitText(data.text)){
     if(epoch!==this.epoch)return;

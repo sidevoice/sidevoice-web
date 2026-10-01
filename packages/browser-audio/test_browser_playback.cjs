@@ -523,3 +523,21 @@ test('Hanging up has its own descending pair, and it too leaves the element with
  assert.equal(tail.every(v=>v===0),true,'silence after the notes, in the same buffer');
  assert.equal(s.voice.health().events.at(-1).kind,'hangup');
 });
+
+test('A checked voice takes over loaded; one sounding finishes on the old worker first (#124 §6)',async()=>{
+ const s=setup();await s.voice.unlock();
+ const speaking=s.voice.speak({text:'hola',model:'kokoro-82m-v1.0',accelerator:'wasm'});
+ const old=s.workers[0],id=old.last.id;
+ const checked=s.voice.candidate(false);
+ assert.notEqual(checked,old,'a check gets a worker of its own');
+ s.voice.adopt(checked,{native:false,model:'kokoro-82m-v1.0',accelerator:'webgpu'});
+ assert.equal(s.voice.worker,old,'the utterance in flight keeps its worker');
+ old.onmessage({data:{type:'audio',id,samples:new Float32Array(24),sampleRate:24}});old.onmessage({data:{type:'done',id}});
+ s.sources[0].onended();await speaking;
+ const next=s.voice.speak({text:'adiós',model:'kokoro-82m-v1.0',accelerator:'webgpu'});
+ assert.equal(old.terminated,true,'let go when the next utterance starts');
+ assert.equal(s.voice.worker,checked);
+ assert.equal(checked.last.type,'speak','spoken by the checked model, with no load in between');
+ assert.equal(s.voice.ready,true);
+ checked.onmessage({data:{type:'done',id:checked.last.id}});await next;
+});

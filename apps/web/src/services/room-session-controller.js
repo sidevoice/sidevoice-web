@@ -3,13 +3,22 @@ import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from
 import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
-import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem} from '../state/stage-settings.js';
+import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
 import {offers as resolveOffers} from '../../../../packages/browser-audio/offers';
+import {pageSize,pageCached} from '../../../../packages/browser-audio/page-models.js';
+import {languageFor} from '../../../../packages/browser-audio/model-check.js';
+import {verifyDevice,verifyProvider} from './load-and-verify.js';
+import {createStageSelection} from './stage-selection.js';
 import modelCatalog from '../../../../packages/browser-audio/models.json';
 import voiceCatalogFile from '../../../../packages/browser-audio/catalog.json';
 import {refusalText as sayRefusal} from '../../../../packages/browser-audio/refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
+// Selecting a model checks it before it takes effect (#124 §6): the state machine, its steps below (selectStage).
+const selection=createStageSelection({
+ publish:(task,check)=>roomStore.patch({stageChecks:{...state.stageChecks,[task]:check&&{...check,previous:stageLabel(stageContext(state),task,activeStage(task))}}}),
+ consent:(...step)=>consentFor(...step),verify:(...step)=>verifyStage(...step),activate:(...step)=>activateStage(...step),discard:(...step)=>discardCandidate(...step),
+});
 // What the stages are chosen from, as this page was built: the model catalogue and the speech languages (#124).
 roomStore.patch({modelCatalog,voiceLanguages:voiceCatalogFile.languages,speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.nativeEngine});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
@@ -1497,6 +1506,7 @@ $('settings-open').onclick=async()=>{try{
  if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
  const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
  roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
+ for(const task of TASKS)selection.dismiss(task);
  for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
  for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
  $('presence-sound').value=(p.presence_sound??'on')==='off'?'off':'on';
@@ -1542,7 +1552,8 @@ function measureDevice(fresh=false){
   if(engine){capabilities=await engine.capabilities();try{installed=await engine.installed()}catch{}}
   else{
    const found=await window.roomTranscription.capabilities(),gpu=!!found.webgpu&&!webgpuFailed();
-   roomStore.patch({gpuSetAside:!!found.webgpu&&webgpuFailed()});
+   roomStore.patch({gpuSetAside:!!found.webgpu&&webgpuFailed(),
+    pageFacts:{adapter:found.adapter||null,crossOriginIsolated:!!globalThis.crossOriginIsolated,threads:found.threads??null,cores:globalThis.navigator?.hardwareConcurrency||null}});
    capabilities={runs:'page',has:[...(gpu?['webgpu']:[]),...(gpu&&found.webgpuFp16?['webgpu-f16']:[]),...(found.wasm?['wasm']:[])]};
   }
   roomStore.patch({deviceCapabilities:capabilities,deviceOffers:resolveOffers(state.modelCatalog,capabilities,'device'),installedBuilds:Array.isArray(installed)?installed:[]});
@@ -1561,13 +1572,126 @@ function buildRequest(build){
 }
 function ttsRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage)||deviceBuild(state.deviceOffers,defaultStage(stageContext(state),'tts')))}
 function editStage(task,next){roomStore.patch({stageDraft:{...(state.stageDraft||{stt:state.voicePreferences?.stt,tts:state.voicePreferences?.tts}),[task]:next}})}
-function chooseStagePlace(task,place){
- editStage(task,withPlace(stageContext(state),task,paneStage(task),place,state.voicePreferences?.[task]));
- if(place!==DEVICE)void loadRemote(place,task);
+/* A place, a model or a build chosen in a pane is a selection: checked before it takes effect (below). A provider's
+ * place waits for that account's lists, so there is a model to check; one that still lacks a model or a voice stays
+ * a draft, which "Guardar cambios" refuses until it is complete. Options are not checked: they are the draft it saves. */
+async function chooseStagePlace(task,place){
+ if(place!==DEVICE)await loadRemote(place,task);
+ const ctx=stageContext(state),next=withPlace(ctx,task,paneStage(task),place,state.voicePreferences?.[task]);
+ if(next&&place!==DEVICE&&stageProblem(ctx,task,withVoicesChosen(ctx,next))){editStage(task,next);return}
+ selectStage(task,next);
 }
-function chooseStageModel(task,model){editStage(task,withModel(stageContext(state),task,paneStage(task),model))}
+function chooseStageModel(task,model){selectStage(task,withModel(stageContext(state),task,paneStage(task),model))}
 function setStageOption(task,id,value,language){editStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
-function chooseStageBuild(task,value){editStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+function chooseStageBuild(task,value){selectStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+/* Select = load and verify (#124 §6, D11–D12). A model chosen in a pane is checked first — on this device in a worker
+ * of its own (load-and-verify.js), so the one in use goes on working; at a provider by the machine with its key —
+ * and only a passed check puts it in effect: stored, swapped in for the model in use (in a call too, without ending
+ * it) and only then the previous one let go. A failure, a cancel or "elegir otro" leave everything as it was.
+ * stage-selection.js is the state machine; what each of its steps does on this page is here. */
+function activeStage(task){return effectiveStage(stageContext(state),task,state.voicePreferences?.[task])}
+function sameChoice(a,b){return !!a&&!!b&&a.place===b.place&&a.model===b.model&&JSON.stringify(a.build||null)===JSON.stringify(b.build||null)}
+function selectStage(task,next){
+ if(!next)return;
+ // What is already in use is not selected again: an option changed with it is the draft's.
+ if(sameChoice(next,activeStage(task))){selection.cancel(task);editStage(task,next);return}
+ void selection.select(task,next);
+}
+/** The build a device stage is checked on, as the engines are asked for it. */
+function deviceRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage))}
+/** Whether a build is what a stage in use runs (the other stage, or this one after a swap): never unloaded then. */
+function inUse(build){return TASKS.some(task=>{const used=deviceRequest(activeStage(task));return used&&used.model===build.model&&used.engine===build.engine})}
+/** The language a stage is checked in: a transcription's own when it has one, the person's speech language else. */
+function checkLanguage(task,stage){const own=task==='stt'?stage.options?.language:null;return own&&own!=='auto'?own:state.speechLanguage}
+/** What a native build downloads the first time: its files, and its engine's package unless that is already here. */
+function nativeSize(build){
+ const catalog=state.modelCatalog,capabilities=state.deviceCapabilities||{};
+ const files=catalog?.models?.find(model=>model.id===build.model)?.builds?.find(item=>item.engine===build.engine)?.download?.size||0;
+ const engine=catalog?.engines?.find(item=>item.id===build.engine);
+ const pkg=(engine?.packages||[]).find(item=>item.os===capabilities.os&&(item.arch===undefined||item.arch===capabilities.arch));
+ const engineHere=pkg?.bundled||(state.installedBuilds||[]).some(item=>item.engine===build.engine);
+ return files+(engineHere?0:pkg?.download?.size||0);
+}
+/* Step 1: a model not on this device yet is downloaded only with the person's consent, its size in view. */
+async function consentFor(task,stage){
+ if(stage.place!==DEVICE)return null;
+ const build=deviceRequest(stage);if(!build)return null;
+ if(build.native)return (state.installedBuilds||[]).some(item=>item.model===build.model&&item.engine===build.engine)?null:{size:nativeSize(build)};
+ return await pageCached(build.model,build.accelerator)?null:{size:pageSize(build.model,build.accelerator)};
+}
+async function fetchCheckClip(url){
+ const answer=await fetch(url+'?v='+encodeURIComponent(globalThis.sidevoiceBuildId||'dev'));
+ if(!answer.ok)throw Error('The check clip is missing ('+answer.status+').');
+ return answer.arrayBuffer();
+}
+/* Steps 2–5: download, load and check, here or at the provider; what was measured is kept for Diagnóstico. */
+async function verifyStage(task,stage,{signal,onProgress}){
+ const language=checkLanguage(task,stage);
+ if(stage.place!==DEVICE){
+  const checked=withVoicesChosen(stageContext(state),stage);
+  const result=await verifyProvider({task,stage:checked,language,request,signal});
+  if(!result.cancelled)await recordDiagnostics(task,stage,result,null);
+  return result;
+ }
+ await measureDevice();
+ const build=deviceRequest(stage);
+ if(!build)return {ok:false,step:'load',reason:{key:'build_unfit',message:stage.model+' does not run on this device.'},passes:[]};
+ const run=async chosen=>verifyDevice({task,build:chosen,language,signal,onProgress,
+  voice:task==='tts'?voiceFor(stageContext(state),stage,languageFor('tts',language)):undefined,speed:stage.options?.speed??1,
+  download:!(chosen.native?(state.installedBuilds||[]).some(item=>item.model===chosen.model&&item.engine===chosen.engine):await pageCached(chosen.model,chosen.accelerator)),
+  expected:chosen.native?nativeSize(chosen):pageSize(chosen.model,chosen.accelerator),fetchClip:fetchCheckClip,
+  open:native=>task==='stt'?window.roomTranscription.candidate(native):window.roomVoice.candidate(native)});
+ let used=build,result=await run(build);
+ // WebKit on the iPhone offers WebGPU and then fails to load models on it. With the build left automatic, the same
+ // engine is tried on WASM, and this device stops offering WebGPU (a voice's worker does this on its own).
+ const wasm=build.accelerator==='webgpu'&&!stage.build&&taskOffers(state.deviceOffers,task).find(offer=>offer.model===build.model);
+ if(!result.ok&&!result.cancelled&&result.step==='load'&&task==='stt'&&wasm&&[wasm,...wasm.alternatives].some(choice=>choice.engine===build.engine&&choice.accelerator==='wasm')&&acceleratorFailure(result.reason?.detail||result.reason?.message)){
+  try{localStorage.setItem(WEBGPU_FAILED_KEY,'1')}catch{}
+  void measureDevice(true).catch(()=>{});
+  used={...build,accelerator:'wasm'};result=await run(used);
+ }
+ if(!result.cancelled)await recordDiagnostics(task,stage,result,used);
+ return {...result,build:used,native:used.native};
+}
+async function recordDiagnostics(task,stage,result,build){
+ let memory=null;
+ if(build?.native){try{memory=await nativeEngine()?.memory?.()||null}catch{}}
+ else if(build&&globalThis.navigator?.deviceMemory)memory={device_gb:globalThis.navigator.deviceMemory};
+ roomStore.patch({stageDiagnostics:{...state.stageDiagnostics,[task]:{at:Date.now(),stage,ok:!!result.ok,step:result.step,reason:result.reason||null,
+  build:build&&{engine:build.engine,accelerator:result.runtime?.accelerator||build.accelerator},load_ms:result.load_ms??null,passes:result.passes||[],memory,language:result.language||null}}});
+}
+/* Step 6 and the swap: the checked model is stored and put in place of the one in use — the call goes on — and only
+ * then is the previous one let go (a page's went with its worker; the app's is unloaded unless still in use). */
+async function activateStage(task,stage,result){
+ const previous=state.voicePreferences||devicePreferences(),ctx=stageContext(state);
+ const saved=withVoicesChosen(ctx,stage),next={...previous,[task]:saved};
+ const before=previous?.[task]?deviceRequest(effectiveStage(ctx,task,previous[task])):null;
+ if(result.worker){
+  if(task==='stt')window.roomTranscription.adopt(result.worker,result.runtime,result.native);
+  else window.roomVoice.adopt(result.worker,{native:result.native,model:result.build.model,accelerator:result.build.accelerator});
+ }
+ storePreferences(next);
+ // The pane keeps showing what the person chose (a provider's "Automática" voice too); what is stored names it.
+ roomStore.patch({voicePreferences:next,stageDraft:{...(state.stageDraft||{stt:previous?.stt,tts:previous?.tts}),[task]:stage}});
+ if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:next}}));
+ if(task==='stt'){
+  try{if(await applyTranscriptionSettings(previous,next))state.liveNote='Transcripción cambiada sin salir de la llamada'}
+  catch(error){setRoomError(error.message)}
+ }
+ if(before?.native&&!inUse(before))nativeEngine()?.unload(before.model,before.engine).catch(()=>{});
+}
+/* A candidate that does not take effect is let go: its worker, and in the app the model it loaded, unless in use. */
+function discardCandidate(task,stage,result){
+ result?.worker?.terminate();
+ const build=result?.build;
+ if(build?.native&&result.loaded&&!inUse(build))nativeEngine()?.unload(build.model,build.engine).catch(()=>{});
+}
+/* Diagnóstico's copy (#90, #123): its rows as text, in the page's language, with the build and the browser. */
+async function copyDiagnostics(task){
+ const view=roomStore.getState().stages?.[task]?.diagnostics;if(!view)return false;
+ const text=diagnosticsText(task,view,[{label:'Compilación',value:globalThis.sidevoiceBuildId||'dev'},{label:'User agent',value:navigator.userAgent}],value=>window.roomI18n?.translate?.(value)??value);
+ try{await navigator.clipboard.writeText(text);return true}catch{return false}
+}
 /* A provider's own lists — OpenAI's transcription models, ElevenLabs' models and the account's voices — asked for
  * only when a stage is on that provider, and only of the machine they were asked of (see integrationScope). */
 function patchRemote(key,entry){roomStore.patch({remoteModels:{...state.remoteModels,[key]:entry}})}
@@ -1608,6 +1732,7 @@ function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===inte
  * and the stages are that machine's own (D7: a composition per client × host), switched in the same step. */
 function switchStages(){
  resetIntegrations();
+ for(const task of TASKS)selection.cancel(task);
  const {stt:_stt,tts:_tts,...rest}=state.voicePreferences||{};
  roomStore.patch({stageDraft:null,voicePreferences:state.voicePreferences&&{...rest,...storedStages(pairings.inUse)}});
 }
@@ -1915,6 +2040,10 @@ window.sidevoiceActions={
  chooseStageModel,
  setStageOption,
  chooseStageBuild,
+ decideStage:(task,yes)=>selection.decide(task,yes),
+ cancelStage:task=>selection.cancel(task),
+ recheckStage:task=>{const stage=activeStage(task);if(stage)void selection.select(task,stage,{recheck:true})},
+ copyDiagnostics,
  previewVoice,
  prepareVoice,
  retryIntegrations,

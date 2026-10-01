@@ -42,6 +42,15 @@ page measures (`wasm`, `webgpu`, `webgpu-f16`), in the desktop app only from the
 whisper, `engine.js` for kokoro) on the offer's accelerator, or `native-worker.js` with the catalogue
 model id and engine. Both are keyed by catalogue model id; there is no page-id mapping.
 
+`checks/` is sidevoice-core's too (`models/checks/`, copied by the same script; `build.mjs` serves it
+at `/voice-browser/checks/`): the clips and phrases a model is checked with before it takes effect
+(#124 §6), and the thresholds it is judged by. `model-check.js` judges what came back, as the core's
+`verdicts.py` does for a provider. A check runs in a worker of its own — `stt-client.js` and
+`room-client.js` hand one out with `candidate()` — and a model that passed takes the place of the one
+in use with `adopt()`: the old worker finishes what it was doing, then is let go. In the desktop app the
+native worker also loads the build on the bridge (`load`, unless `loaded()` lists it) and says the step
+a failure happened at (download, load, run) with the app's refusal.
+
 ## Room integration
 
 `catalog.json` declares six speech languages, their voices' names and a preview sentence each.

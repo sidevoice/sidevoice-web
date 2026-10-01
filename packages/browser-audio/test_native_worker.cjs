@@ -10,11 +10,15 @@ function setup(engine){
  vm.runInContext(BUNDLED,context);
  return context.sidevoiceNativeWorkers;
 }
-/* The bridge contract (#124 phase 2): capabilities, installed builds, install, transcribe, synthesize — by catalogue
- * model id and engine. No offers and no page ids: the page resolves offers itself. */
+/* The bridge contract (#124 phases 2 and 3): capabilities, installed builds, install, load, loaded, unload, memory,
+ * transcribe, synthesize — by catalogue model id and engine. No offers and no page ids: the page resolves offers. */
 function engine(overrides={}){
- const calls=[];
- return {calls,
+ const calls=[],inMemory=[];
+ return {calls,inMemory,
+  load:async(model,eng,accelerator)=>{calls.push(['load',model,eng,accelerator]);inMemory.push({model,engine:eng,accelerator,since:0,last_used:0});return {load_ms:420}},
+  loaded:async()=>inMemory.slice(),
+  unload:async(model,eng)=>{calls.push(['unload',model,eng])},
+  memory:async()=>({total_mb:16384,available_mb:9000}),
   capabilities:async()=>({runs:'native',os:'macos',arch:'aarch64',has:['cpu','coreml'],memory_mb:16384}),
   installed:async()=>[{model:'kokoro-82m-v1.0',engine:'sherpa-onnx'}],
   install:async(model,eng,progress)=>{calls.push(['install',model,eng]);progress(50,100);progress(100,100)},
@@ -38,9 +42,10 @@ test('transcription: the offer\'s model and engine are installed with progress, 
  const fake=engine(),worker=setup(fake).transcription(),{seen,until}=talk(worker);
  worker.postMessage({id:2,type:'load',model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu'});
  const ready=await until('ready');
- assert.deepEqual({...ready.runtime},{model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu',cached:false});
- assert.ok(seen.some(m=>m.type==='progress'&&m.progress.progress===50));
- assert.deepEqual(fake.calls[0],['install','whisper-small','sherpa-onnx']);
+ assert.deepEqual({...ready.runtime},{model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu',cached:false,load_ms:420});
+ assert.ok(seen.some(m=>m.type==='progress'&&m.progress.progress===50&&m.progress.loaded===50&&m.progress.total===100));
+ assert.ok(seen.some(m=>m.type==='progress'&&m.progress.status==='loading'),'the step after the download is said');
+ assert.deepEqual(fake.calls.slice(0,2),[['install','whisper-small','sherpa-onnx'],['load','whisper-small','sherpa-onnx','cpu']],'downloaded, then loaded on the offer\'s accelerator');
  worker.postMessage({id:3,type:'transcribe',audio:new Float32Array(16000).buffer,language:'es'});
  const result=await until('result');
  assert.equal(result.result.text,'hola');
@@ -108,4 +113,47 @@ test('a native refusal {key, message, ...params} is said by its key where the pa
   worker.postMessage({id:1,type:'load',model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu'});
   assert.equal((await until('ready')).error,said);
  }
+});
+
+test('a model already in memory on that accelerator is not loaded again; on another one it is (D13)',async()=>{
+ const fake=engine({installed:async()=>[{model:'whisper-small',engine:'sherpa-onnx'}]});
+ fake.inMemory.push({model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu',since:0,last_used:0});
+ const worker=setup(fake).transcription(),{seen,until}=talk(worker);
+ worker.postMessage({id:1,type:'load',model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu'});
+ assert.equal((await until('ready')).runtime.load_ms,0);
+ assert.ok(!fake.calls.some(c=>c[0]==='load'));
+ seen.length=0;
+ worker.postMessage({id:2,type:'load',model:'whisper-small',engine:'sherpa-onnx',accelerator:'coreml'});
+ assert.equal((await until('ready')).runtime.load_ms,420);
+ assert.deepEqual(fake.calls.at(-1),['load','whisper-small','sherpa-onnx','coreml']);
+});
+
+test('a failure says the step it happened at and hands on the app\'s refusal (#124 §6)',async()=>{
+ const interrupted={key:'download_failed',url:'https://example.com/m.tar.bz2',message:'Could not download https://example.com/m.tar.bz2: reset'};
+ const nomemory={key:'model_needs_memory',needed_mb:2500,memory_mb:2048,message:'whisper-large needs 2500 MB of memory; this device has 2048 MB.'};
+ for(const [overrides,step,key] of [
+  [{install:async()=>{throw interrupted}},'download','download_failed'],
+  [{load:async()=>{throw nomemory}},'load','model_needs_memory'],
+  [{load:async()=>{throw Error('dlopen failed')}},'load',null],
+ ]){
+  const worker=setup(engine(overrides)).transcription(),{until}=talk(worker);
+  worker.postMessage({id:1,type:'load',model:'whisper-small',engine:'sherpa-onnx',accelerator:'cpu'});
+  const failed=await until('ready');
+  assert.equal(failed.type,'error');
+  assert.equal(failed.step,step);
+  assert.equal(failed.reason?.key??null,key);
+  assert.ok(failed.error);
+ }
+ const worker=setup(engine({transcribe:async()=>{throw Error('runtime')}})).transcription(),{until}=talk(worker);
+ worker.postMessage({id:1,type:'load',model:'kokoro-82m-v1.0',engine:'sherpa-onnx',accelerator:'cpu'});
+ await until('ready');
+ worker.postMessage({id:2,type:'transcribe',audio:new Float32Array(10).buffer,language:'es'});
+ assert.equal((await until('result')).step,'run');
+});
+
+test('voice: a load on the bridge says how long it took',async()=>{
+ const fake=engine(),worker=setup(fake).voice(),{until}=talk(worker);
+ worker.postMessage({id:1,type:'load',model:'kokoro-82m-v1.0',engine:'sherpa-onnx',accelerator:'cpu'});
+ assert.equal((await until('ready')).load_ms,420);
+ assert.deepEqual(fake.calls.at(-1),['load','kokoro-82m-v1.0','sherpa-onnx','cpu']);
 });

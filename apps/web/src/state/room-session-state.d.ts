@@ -39,6 +39,9 @@ export interface SessionFacts {
  remoteModels: Record<string, {models?: {id: string; label?: string; description?: string}[]; voices?: {id: string; label?: string; languages?: string[]}[]; error?: string}>;
  stageDraft: {stt?: Record<string, unknown>; tts?: Record<string, unknown>} | null;
  previewNote: string; prepareNote: string; gpuSetAside: boolean;
+ /** Per stage, the model selection in flight or just over (#124 §6), and what its last check measured (#90). */
+ stageChecks: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>; stageDiagnostics: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>;
+ pageFacts: {adapter: {vendor: string; architecture: string; device: string; description: string} | null; crossOriginIsolated: boolean; threads: number | null; cores: number | null} | null;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';

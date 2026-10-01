@@ -80,3 +80,22 @@ test('switching between the page\'s engine and the native one fails what was wai
  assert.ok(posted.some(message=>message.native&&message.type==='load'),'the native engine got the load');
  client.pending.clear();void switched.catch(()=>{});
 });
+
+test('a checked model takes over: the old worker finishes what it was doing, then is let go (#124 §6)',async()=>{
+ const {client}=setup();
+ class Fake{constructor(name){this.name=name;this.posted=[];this.terminated=false}postMessage(data){this.posted.push(data)}terminate(){this.terminated=true}}
+ const old=new Fake('old'),checked=new Fake('checked');
+ client.worker=old;client.native=false;client._listen(old);
+ const inFlight=client._request('transcribe',{native:false,model:'whisper-tiny'});
+ client.adopt(checked,{model:'whisper-base',engine:'transformers-js',accelerator:'wasm'},false);
+ assert.equal(client.runtime.model,'whisper-base');
+ assert.equal(old.terminated,false,'a transcription is still running on it');
+ const next=client._request('transcribe',{native:false,model:'whisper-base'});
+ assert.equal(checked.posted.length,1,'new work goes to the checked worker');
+ old.onmessage({data:{id:old.posted[0].id,type:'result',result:{text:'hola'}}});
+ assert.equal((await inFlight).text,'hola');
+ assert.equal(old.terminated,true,'let go once nothing waits on it');
+ checked.onmessage({data:{id:checked.posted[0].id,type:'result',result:{text:'adiós'}}});
+ assert.equal((await next).text,'adiós');
+ assert.equal(checked.terminated,false);
+});
