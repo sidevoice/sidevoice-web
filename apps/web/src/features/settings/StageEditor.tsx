@@ -7,7 +7,7 @@
  * Choosing only selects (a draft). The card's one button prepares it; once prepared it is kept, and the person tries it
  * for real — says a sentence and reads it back, or listens to it — and says whether it works. «Funciona» is what the
  * wizard waits for; in Configuración the same answer only closes the card. A provider without a key asks for it in one
- * line under «Dónde». Switching model releases the previous one from memory; it stays on disk. Every change — place,
+ * line under «Dónde». Every change — place,
  * model, engine, voice, language — is tried again: what was said to work is that exact configuration, on that machine.
  *
  * Two flows are compared in the prototype (StageFlow, below); this is "try".
@@ -179,7 +179,6 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const draft = rawDraft && !same(rawDraft, saved) ? rawDraft : null;
   const ctx = useStageContext();
   const [keyFor, setKeyFor] = useState<string | null>(null);
-  const [freed, setFreed] = useState<string | null>(null);
   // Prepared from this card: in Configuración it is in use from then on, which the card says until it is tried.
   const [preparedHere, setPreparedHere] = useState(false);
   const [works, setWorks] = useState(() => !!saved && verified.get(task) === keyOf(inUse, saved));
@@ -229,7 +228,6 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const installed = !!offer && (ctx.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
   const needsDownload = view.place === "device" && !!offer && !installed;
   function prepare() {
-    if (saved && saved.place === "device" && saved.model !== view!.model) setFreed(labelOf(ctx!, saved.model));
     setPreparedHere(true);
     window.sidevoiceActions?.testStage?.(task, { place: view!.place, model: view!.model, options: current?.options ?? {}, build: current?.build ?? null });
   }
@@ -306,7 +304,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
       afterModel={keyFor || !view.model ? null : (
         <StageCard task={task} flow={flow} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
           runningStep={rawStep} inUseNote={!footer && preparedHere && flow === "try"} inFooter={!!footer} trial={trial} input={input} onText={setText} onStart={start}
-          freed={freed} onPrepare={prepare} onAnswer={answer} onRetry={retry}
+          onPrepare={prepare} onAnswer={answer} onRetry={retry}
           onTry={(model) => select(withModel(ctx, task, current, model))} />
       )} />
   );
@@ -322,11 +320,10 @@ type Phase = "download" | "prepare" | "test" | "check";
 
 /** The card under the model: its phases as a strip, and what the current one needs. In "try" the last phase is the
  *  person's («Probar»); in "configure" it is the app's own check («Comprobar»), and trying it is configuring it, below. */
-function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, input, onText, onStart, freed, onPrepare, onAnswer, onRetry, onTry }: {
+function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, input, onText, onStart, onPrepare, onAnswer, onRetry, onTry }: {
   task: Task; flow: StageFlow; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
   /** The next step is the wizard's footer button: the card does not repeat it. */
   inFooter: boolean; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void;
-  freed: string | null;
   onPrepare: () => void; onAnswer: (ok: boolean) => void; onRetry: () => void; onTry: (model: string) => void;
 }) {
   const t = useT();
@@ -383,17 +380,14 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
           </span>
         </div>
       ) : !prepared ? (
-        <div className="stage-card-body">
-          <span className="muted small">{t(needsDownload ? "stagecard.needsDownload" : flow === "configure" ? "stagecard.b.needsPrepare" : "stagecard.needsPrepare")}</span>
-          {!inFooter && <Button variant="primary" size="compact" onClick={onPrepare}>
+        // What the phases mean is the strip's to say (operator, 2026-10-01: no notes about downloads or memory).
+        !inFooter && <div className="stage-card-body">
+          <Button variant="primary" size="compact" onClick={onPrepare}>
             {!needsDownload ? t("stagecard.prepare") : downloadSize ? t("stagecard.downloadPrepare", { size: bytesText(downloadSize, lang) }) : t("stagecard.downloadPrepareOnly")}
-          </Button>}
+          </Button>
         </div>
-      ) : flow === "configure" ? (
-        <div className="stage-card-body" role="status">
-          <span className="ok-line small">{t(task === "tts" ? "stagecard.b.checked.tts" : "stagecard.b.checked.stt")}</span>
-        </div>
-      ) : works ? (
+      ) : flow === "configure" ? null
+      : works ? (
         <div className="stage-card-body stage-card-works" role="status">
           <span className="ok-line">{t("stagecard.works")}</span>
           <Button variant="ghost" size="compact" onClick={onRetry}>{t("stagecard.tryAgain")}</Button>
@@ -402,7 +396,6 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
         {inUseNote && <p className="muted small" role="status">{t("stagecard.inUse")}</p>}
         <TryIt task={task} trial={trial} input={input} onText={onText} onStart={onStart} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
       </>)}
-      {freed && prepared && <p className="muted small">{t("wizard.w4.freed", { model: freed })}</p>}
     </section>
   );
 }
