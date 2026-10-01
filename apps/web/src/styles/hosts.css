@@ -236,3 +236,5 @@
 
 /* Until the first-run setup is finished there is nothing to set: no gear, no «Configuración» in the call menu. */
 body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings-open { display: none !important }
+.wizard-stage { max-height: 52dvh; overflow: auto; padding-inline-end: .3rem }
+.wizard-stage .stage-settings > .ui-field:first-child { margin-top: .2rem }

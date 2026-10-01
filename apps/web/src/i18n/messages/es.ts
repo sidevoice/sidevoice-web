@@ -424,4 +424,10 @@ export const es: Record<string, string> = {
   "agents.other.command": "Comando del servidor MCP:",
   "agents.other.json": "O, si tu agente usa JSON:",
   "agents.howto.waiting": "Cuando lo hayas ejecutado, se detecta solo.",
+  "wizard.group.transcription": "Transcripción",
+  "wizard.w4.title.stt": "Cómo te oye",
+  "wizard.w4.title.tts": "Cómo te habla",
+  "wizard.w4.lead.stt": "Te proponemos la transcripción que mejor va en este dispositivo. Puedes cambiarla ahora o luego en Configuración.",
+  "wizard.w4.lead.tts": "Te proponemos la voz que mejor va en este dispositivo. Escúchala y cámbiala si quieres.",
+  "wizard.w4.chooseOne": "Elige una opción para continuar.",
 };

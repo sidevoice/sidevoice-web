@@ -24,7 +24,7 @@ import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
 import { AgentRow, otherAgent } from "../hosts/AgentRow";
 
-const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title", W5: "wizard.w5.title", W6: "wizard.w6.title" };
+const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title.stt", W4v: "wizard.w4.title.tts", W5: "wizard.w5.title", W6: "wizard.w6.title" };
 
 function Indicator({ step }: { step: Step }) {
   const t = useT();
@@ -83,7 +83,8 @@ function StepBody({ step }: { step: Step }) {
     case "W2": return <W2 />;
     case "W2r": return <W2r />;
     case "W3": return <W3 />;
-    case "W4": return <W4 />;
+    case "W4": return <StageStep key="stt" task="stt" />;
+    case "W4v": return <StageStep key="tts" task="tts" />;
     case "W5": return <W5 />;
     case "W6": return <W6 />;
   }
@@ -284,155 +285,58 @@ export function ManualConfig({ agent }: { agent: DetectedAgent }) {
   );
 }
 
-// ----- W4 -----
-type Run = { phase: "waiting" | "download" | "load" | "check" | "done" | "failed" | "slow"; done?: number; total?: number; cause?: string; step?: string; latency?: number; outcome?: VerifyOutcome };
-
+// ----- W4 / W4v -----
 function useStageContext() {
   const store = useContext(RoomStoreContext);
   useRoomStore((s) => s.stages);
   return store ? stageContext(store.facts) : null;
 }
 
-function W4() {
+/** Transcription (W4) and voice (W4v): the stage's own settings pane, the same one Configuración shows, starting from
+ *  what suits this device best (model-first D14). A device model is downloaded, loaded and checked before it counts. */
+function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
   const inUse = useHosts((s) => s.inUse);
   const integrations = useHosts((s) => (s.inUse ? s.integrations[s.inUse] : undefined));
+  const chosen = useHosts((s) => !!effectiveStage(s.scope, s.inUse, task));
+  const check = useRoomStore((s) => s.stages?.[task]?.check ?? null);
   const ctx = useStageContext();
   const phone = typeof window !== "undefined" && window.matchMedia?.("(max-width: 750px)").matches;
-  const [choosing, setChoosing] = useState(false);
-  const bothChosen = useHosts((s) => !!effectiveStage(s.scope, s.inUse, "stt") && !!effectiveStage(s.scope, s.inUse, "tts"));
-  const [runs, setRuns] = useState<Partial<Record<Task, Run>> | null>(null);
-  const abort = useRef<AbortController | null>(null);
-  useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
-  useEffect(() => () => abort.current?.abort(), []);
-  const lang = currentLanguage();
   const proposal = ctx && ctx.offers ? proposeStages(ctx as never, !!phone) : null;
-  const allDone = !!runs && !!proposal && proposal.rows.every((row) => runs[row.task]?.phase === "done");
-  // Nothing is written until every stage passed: a cancel or a failure leaves the previous choice in place.
+  const row = proposal?.rows.find((r) => r.task === task) ?? null;
+  const ready = !!proposal && integrations?.status !== "loading";
+  useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
+  // Nothing chosen yet: start from the recommendation (its download is asked for in the pane, with its size).
+  const started = useRef(false);
   useEffect(() => {
-    if (allDone && proposal) for (const row of proposal.rows) hosts.chooseStage(inUse, row.task, row.stage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allDone]);
-  if (!proposal || integrations?.status === "loading") return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
-
-  async function accept(rows: ProposalRow[]) {
-    abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
-    setRuns((current) => ({ ...current, ...Object.fromEntries(rows.map((row) => [row.task, { phase: "waiting" }])) }));
-    await Promise.all(rows.map(async (row) => {
-      const outcome = await hosts.verifyStage(row.task, row.stage, inUse, (p) => {
-        if (!controller.signal.aborted) setRuns((current) => ({ ...current, [row.task]: { phase: p.phase, done: p.done, total: p.total } }));
-      }, controller.signal);
-      if (controller.signal.aborted) return;
-      const run: Run = outcome.ok
-        ? outcome.slow ? { phase: "slow", latency: outcome.slow.latency_ms, outcome } : { phase: "done", outcome }
-        : { phase: "failed", step: outcome.step, cause: refusalText(outcome.reason, ""), outcome };
-      setRuns((current) => ({ ...current, [row.task]: run }));
-    }));
-  }
-  function cancel() { abort.current?.abort(); setRuns(null); }
-  function acceptSlow(task: Task) { setRuns((current) => ({ ...current, [task]: { phase: "done" } })); }
-  const running = runs && Object.values(runs).some((run) => run && ["waiting", "download", "load", "check"].includes(run.phase));
-
-  if (choosing)
-    return (
-      <>
-        <p className="muted">{t("wizard.w4.chooseLead")}</p>
-        <div className="wizard-stages">
-          <h3>{t("stage.stt")}</h3><StageSettings task="stt" />
-          <h3>{t("stage.tts")}</h3><StageSettings task="tts" />
-        </div>
-        <Actions>
-          <Button variant="ghost" onClick={() => setChoosing(false)}>{t("wizard.w4.backToProposal")}</Button>
-          <Button variant="primary" disabled={!bothChosen} onClick={() => hosts.goTo("W5")}>{t("wizard.continue")}</Button>
-        </Actions>
-        {!bothChosen && <p className="muted small">{t("wizard.w4.chooseBoth")}</p>}
-      </>
-    );
-
-  if (integrations?.status === "failed" && proposal.missing.length)
+    if (started.current || chosen || !ready || !row) return;
+    started.current = true;
+    window.sidevoiceActions?.chooseStagePlace(task, row.stage.place);
+  }, [chosen, ready, row, task]);
+  const busy = !!check && ["consent", "running", "slow"].includes(check.phase);
+  if (!ready) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
+  if (!row && integrations?.status === "failed")
     return (
       <div className="problem" role="alert">
         <p>{t("wizard.w4.integrationsFailed")}</p>
         <Actions><Button variant="primary" onClick={() => inUse && void hosts.loadIntegrations(inUse)}>{t("common.retry")}</Button></Actions>
       </div>
     );
-  if (proposal.rows.length === 0)
+  if (!row && !chosen)
     return (
       <div className="problem" role="alert">
         <p>{t("wizard.w4.noOffer")}</p>
-        <Actions>
-          {inUse && <Button variant="primary" onClick={() => hosts.openSettings("host", inUse, "integrations")}>{t("wizard.w4.openIntegrations")}</Button>}
-        </Actions>
+        <Actions>{inUse && <Button variant="primary" onClick={() => hosts.openSettings("host", inUse, "integrations")}>{t("wizard.w4.openIntegrations")}</Button>}</Actions>
       </div>
     );
-
   return (
     <>
-      <ul className="proposal">
-        {proposal.rows.map((row) => {
-          const run = runs?.[row.task];
-          return (
-            <li key={row.task} className="proposal-row" data-phase={run?.phase}>
-              <span className="proposal-task">{t(row.task === "stt" ? "stage.stt" : "stage.tts")}</span>
-              <span className="proposal-model">
-                <strong>{row.model}</strong>
-                <span className="muted"> · {row.place === "device" ? t("stage.place.device") : row.placeLabel}{row.place === "device" && (row.installed ? " · " + t("stage.downloaded") : " · " + bytesText(row.bytes, lang))}</span>
-              </span>
-              {run && <RunLine run={run} t={t} lang={lang} onUse={() => acceptSlow(row.task)} onOther={() => setChoosing(true)} />}
-            </li>
-          );
-        })}
-        {proposal.missing.map((task) => (
-          <li key={task} className="proposal-row" data-phase="failed">
-            <span className="proposal-task">{t(task === "stt" ? "stage.stt" : "stage.tts")}</span>
-            <span className="muted">{t("wizard.w4.nothingFor")}</span>
-          </li>
-        ))}
-      </ul>
-      {!runs && <p className="muted">{proposal.bytes ? t("wizard.w4.total", { size: bytesText(proposal.bytes, lang) }) : t("wizard.w4.nothingToDownload")}</p>}
-      {!runs && <p className="muted small">{t("wizard.w4.nothingBefore")}</p>}
-      <Actions>
-        {!runs && <>
-          <Button variant="ghost" onClick={() => setChoosing(true)}>{t("wizard.w4.other")}</Button>
-          <Button variant="primary" disabled={proposal.missing.length > 0} onClick={() => void accept(proposal.rows)}>{t("wizard.w4.use")}</Button>
-        </>}
-        {running && <Button onClick={cancel}>{t("common.cancel")}</Button>}
-        {runs && !running && !allDone && <>
-          <Button variant="ghost" onClick={() => setChoosing(true)}>{t("wizard.w4.other")}</Button>
-          <Button variant="primary" onClick={() => void accept(proposal.rows.filter((row) => runs[row.task]?.phase !== "done"))}>{t("common.retry")}</Button>
-        </>}
-        {allDone && <Button variant="primary" onClick={() => hosts.goTo("W5")}>{t("wizard.continue")}</Button>}
-      </Actions>
+      <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
+      <div className="wizard-stage"><StageSettings task={task} /></div>
+      {!chosen && !busy && <p className="muted small">{t("wizard.w4.chooseOne")}</p>}
+      <Actions><Button variant="primary" disabled={!chosen || busy} onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button></Actions>
     </>
-  );
-}
-
-function RunLine({ run, t, lang, onUse, onOther }: { run: Run; t: Translate; lang: string; onUse: () => void; onOther: () => void }) {
-  if (run.phase === "waiting") return <span className="run-line muted">{t("check.waiting")}</span>;
-  if (run.phase === "download")
-    return (
-      <span className="run-line">
-        <span>{t("check.download")}{run.total ? ` · ${bytesText(run.done ?? 0, lang)} / ${bytesText(run.total, lang)}` : ""}</span>
-        <progress max={run.total || 1} value={run.total ? run.done : undefined} />
-      </span>
-    );
-  if (run.phase === "load" || run.phase === "check") return <span className="run-line"><span>{t("check." + run.phase)}</span><progress /></span>;
-  if (run.phase === "done") return <span className="run-line ok-line">{t("check.done")}</span>;
-  if (run.phase === "slow")
-    return (
-      <span className="run-line warn-line" role="alert">
-        <span>{t("check.slow", { seconds: ((run.latency ?? 0) / 1000).toLocaleString(lang, { maximumFractionDigits: 1 }) })}</span>
-        <span className="run-actions"><Button size="compact" variant="primary" onClick={onUse}>{t("check.useAnyway")}</Button><Button size="compact" variant="ghost" onClick={onOther}>{t("check.other")}</Button></span>
-      </span>
-    );
-  return (
-    <span className="run-line fail-line" role="alert">
-      <span>{t("check.failed", { step: t("check.step." + (run.step ?? "check")), cause: run.cause ?? "" })}</span>
-      <span className="muted">{t("check.previousKept")}</span>
-    </span>
   );
 }
 
@@ -481,7 +385,7 @@ function W5() {
           <div className="problem" role="alert">
             <p>{t("echo." + echo.error.key)}</p>
             {t("echo." + echo.error.key + ".remedy") !== "echo." + echo.error.key + ".remedy" && <p className="muted">{t("echo." + echo.error.key + ".remedy")}</p>}
-            {echo.error.stage && <Button size="compact" variant="ghost" onClick={() => hosts.goTo("W4")}>{t(echo.error.stage === "stt" ? "wizard.w5.changeStt" : "wizard.w5.changeTts")}</Button>}
+            {echo.error.stage && <Button size="compact" variant="ghost" onClick={() => hosts.goTo(echo.error?.stage === "stt" ? "W4" : "W4v")}>{t(echo.error.stage === "stt" ? "wizard.w5.changeStt" : "wizard.w5.changeTts")}</Button>}
           </div>
         )}
       </div>

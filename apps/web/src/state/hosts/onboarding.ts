@@ -5,7 +5,8 @@
  * paired, the agents step done, stages set for the host, the test passed. Pure. */
 import type { OnboardingState } from "../../services/desktop-host";
 
-export type Step = "W1" | "W2" | "W2r" | "W3" | "W4" | "W5" | "W6";
+/** W4 transcription, W4v voice (operator, 2026-10-01: two steps, each the stage's own settings pane). */
+export type Step = "W1" | "W2" | "W2r" | "W3" | "W4" | "W4v" | "W5" | "W6";
 export type Path = "agents" | "remote";
 
 export interface ResumeFacts {
@@ -14,8 +15,9 @@ export interface ResumeFacts {
   localReady: boolean;
   /** A remote host is paired (W2′'s outcome). */
   remoteReady: boolean;
-  /** Both stages have a choice for the host in use. */
-  stagesSet: boolean;
+  /** Transcription, and voice, have a choice for the host in use. */
+  sttSet: boolean;
+  ttsSet: boolean;
   /** This platform can host agents (§1 O2); elsewhere W1 is skipped onto the remote path. */
   canHostAgents: boolean;
 }
@@ -33,19 +35,21 @@ export function resumeStep(facts: ResumeFacts): Step {
     if (!facts.localReady) return "W2";
     if (!o.agents_done) return "W3";
   } else if (!facts.remoteReady) return "W2r";
-  if (!facts.stagesSet) return "W4";
+  if (!facts.sttSet) return "W4";
+  if (!facts.ttsSet) return "W4v";
   if (!o.test_passed) return "W5";
   return "W6";
 }
 
-/** The indicator's groups, in order, with the steps each one covers: the same four on both paths (operator,
+/** The indicator's groups, in order, with the steps each one covers: the same five on both paths (operator,
  *  2026-10-01), so going back always lands on the same places. On the remote path «Agentes» is connecting to the machine
  *  where the agents are. */
 export function stepGroups(_path: Path | null): { key: string; steps: Step[] }[] {
   return [
     { key: "wizard.group.where", steps: ["W1", "W2"] },
     { key: "wizard.group.agents", steps: ["W3", "W2r"] },
-    { key: "wizard.group.voice", steps: ["W4"] },
+    { key: "wizard.group.transcription", steps: ["W4"] },
+    { key: "wizard.group.voice", steps: ["W4v"] },
     { key: "wizard.group.test", steps: ["W5", "W6"] },
   ];
 }
@@ -58,7 +62,7 @@ export function opensByItself(onboarding: OnboardingState | null, inApp: boolean
 }
 
 export function previousStep(step: Step, path: Path | null): Step | null {
-  const order: Step[] = path === "remote" ? ["W1", "W2r", "W4", "W5", "W6"] : ["W1", "W2", "W3", "W4", "W5", "W6"];
+  const order: Step[] = path === "remote" ? ["W1", "W2r", "W4", "W4v", "W5", "W6"] : ["W1", "W2", "W3", "W4", "W4v", "W5", "W6"];
   const at = order.indexOf(step);
   // W2 is an action, not a choice: «Atrás» from the agents step goes to the question, not to the install.
   if (step === "W3") return "W1";

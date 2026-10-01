@@ -94,7 +94,7 @@ describe("host list (§4.1, §5.2)", () => {
 });
 
 describe("onboarding resume (§5.1)", () => {
-  const facts = { onboarding: null, localReady: false, remoteReady: false, stagesSet: false, canHostAgents: true };
+  const facts = { onboarding: null, localReady: false, remoteReady: false, sttSet: false, ttsSet: false, canHostAgents: true };
   it("starts at W1, or at W3 when an npx core already runs (F1)", () => {
     expect(resumeStep(facts)).toBe("W1");
     expect(resumeStep({ ...facts, localReady: true })).toBe("W3");
@@ -104,10 +104,11 @@ describe("onboarding resume (§5.1)", () => {
     expect(resumeStep(agents)).toBe("W2");
     expect(resumeStep({ ...agents, localReady: true })).toBe("W3");
     expect(resumeStep({ ...agents, localReady: true, onboarding: { ...agents.onboarding, agents_done: true } })).toBe("W4");
-    expect(resumeStep({ ...agents, localReady: true, stagesSet: true, onboarding: { ...agents.onboarding, agents_done: true } })).toBe("W5");
+    expect(resumeStep({ ...agents, localReady: true, sttSet: true, onboarding: { ...agents.onboarding, agents_done: true } })).toBe("W4v");
+    expect(resumeStep({ ...agents, localReady: true, sttSet: true, ttsSet: true, onboarding: { ...agents.onboarding, agents_done: true } })).toBe("W5");
     const remote = { ...facts, onboarding: { choice: "remote" as const } };
     expect(resumeStep(remote)).toBe("W2r");
-    expect(resumeStep({ ...remote, remoteReady: true, stagesSet: true, onboarding: { choice: "remote" as const, test_passed: true } })).toBe("W6");
+    expect(resumeStep({ ...remote, remoteReady: true, sttSet: true, ttsSet: true, onboarding: { choice: "remote" as const, test_passed: true } })).toBe("W6");
   });
   it("skips W1 where this platform cannot host agents", () => {
     expect(resumeStep({ ...facts, canHostAgents: false })).toBe("W2r");

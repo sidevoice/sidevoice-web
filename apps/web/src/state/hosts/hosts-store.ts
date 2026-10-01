@@ -357,7 +357,8 @@ export function createHostsController(store: HostsStore, deps: HostsDeps) {
         onboarding: f().onboarding,
         localReady: f().local?.state === "running" && !!f().localPairing,
         remoteReady: f().stored.list.length > 0,
-        stagesSet: !!(f().scope.default.stt || (inUse && f().scope.hosts[inUse]?.stt)) && !!(f().scope.default.tts || (inUse && f().scope.hosts[inUse]?.tts)),
+        sttSet: !!(f().scope.default.stt || (inUse && f().scope.hosts[inUse]?.stt)),
+        ttsSet: !!(f().scope.default.tts || (inUse && f().scope.hosts[inUse]?.tts)),
         canHostAgents: f().canHostAgents,
       });
     },
