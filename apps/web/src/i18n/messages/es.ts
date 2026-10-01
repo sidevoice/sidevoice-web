@@ -553,4 +553,5 @@ export const es: Record<string, string> = {
   "option.help.speed": "Lo rápido que habla la voz. 1,00× es su ritmo normal.",
   "option.help.instructions": "Cómo quieres que hable: tono, estilo, pronunciación.",
   "option.help.voice": "La voz con la que te habla en cada idioma. «Automática» usa la primera de ese idioma.",
+  "stagecard.key.clear": "Borrar la clave de {provider} de esta máquina",
 };

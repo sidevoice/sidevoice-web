@@ -14,9 +14,29 @@ import { effectiveStage, type Stage } from "../state/hosts/stage-scope";
 
 type Facts = RoomStore["facts"];
 
+/* ElevenLabs' text-to-speech models as its models API lists them (GET /v1/models: model_id, name, description,
+ * languages[{language_id, name}]), from elevenlabs.io/docs/models, 2026-10-02. Languages as ISO codes. */
+const EL_MULTILINGUAL_V2 = ["en", "ja", "zh", "de", "hi", "fr", "ko", "pt", "it", "es", "id", "nl", "tr", "fil", "pl", "sv", "bg", "ro", "ar", "cs", "el", "fi", "hr", "ms", "sk", "da", "ta", "uk", "ru"];
+const EL_FLASH_V2_5 = [...EL_MULTILINGUAL_V2, "hu", "no", "vi"];
+const EL_V3 = ["af", "ar", "hy", "as", "az", "be", "bn", "bs", "bg", "ca", "ceb", "ny", "hr", "cs", "da", "nl", "en", "et", "fil", "fi", "fr", "gl", "ka", "de", "el", "gu", "ha", "he", "hi", "hu", "is", "id", "ga", "it", "ja", "jv", "kn", "kk", "ky", "ko", "lv", "ln", "lt", "lb", "mk", "ms", "ml", "zh", "mr", "ne", "no", "ps", "fa", "pl", "pt", "pa", "ro", "ru", "sr", "sd", "sk", "sl", "so", "es", "sw", "sv", "ta", "te", "th", "tr", "uk", "ur", "vi", "cy"];
+const EL_V4 = ["af", "am", "ar", "hy", "as", "ast", "az", "be", "bn", "bs", "bg", "my", "yue", "ca", "ceb", "hr", "cs", "da", "nl", "en", "et", "fil", "fi", "fr", "ff", "gl", "ka", "de", "el", "gu", "ha", "he", "hi", "hu", "is", "id", "it", "ja", "jv", "kam", "kn", "kk", "ko", "ky", "lo", "lv", "ln", "lt", "lg", "lb", "mk", "ms", "ml", "mt", "zh", "mi", "mr", "mn", "ne", "nb", "oc", "or", "ps", "fa", "pl", "pt", "pa", "ro", "ru", "sr", "sn", "sd", "sk", "sl", "so", "ckb", "es", "sw", "sv", "tg", "ta", "te", "th", "tr", "uk", "ur", "uz", "vi", "cy", "wo", "zu"];
+const EL_MODELS: { id: string; label: string; languages: string[]; about: { es: string; en: string } }[] = [
+  { id: "eleven_flash_v2_5", label: "Flash v2.5", languages: EL_FLASH_V2_5, about: { es: "Rápido y económico; latencia muy baja (~75 ms)", en: "Fast and affordable; ultra-low latency (~75 ms)" } },
+  { id: "eleven_v4_turbo", label: "Eleven v4 Turbo", languages: EL_V4, about: { es: "El más expresivo en tiempo real (~100 ms)", en: "The most expressive in real time (~100 ms)" } },
+  { id: "eleven_v4", label: "Eleven v4", languages: EL_V4, about: { es: "El más rico en emoción y expresión", en: "The richest in emotion and expression" } },
+  { id: "eleven_v3_conversational", label: "Eleven v3 Conversational", languages: EL_V3, about: { es: "Expresivo y en tiempo real (~280 ms)", en: "Expressive and real-time (~280 ms)" } },
+  { id: "eleven_v3", label: "Eleven v3", languages: EL_V3, about: { es: "Natural y expresivo", en: "Human-like and expressive" } },
+  { id: "eleven_multilingual_v2", label: "Multilingual v2", languages: EL_MULTILINGUAL_V2, about: { es: "Natural, con emoción rica", en: "Lifelike, with rich emotional expression" } },
+  { id: "eleven_flash_v2", label: "Flash v2", languages: ["en"], about: { es: "Ultrarrápido, solo inglés", en: "Ultra-fast, English only" } },
+];
+const elevenModels = (lang: "es" | "en") => EL_MODELS.map((m) => ({
+  id: m.id, label: m.label, languages: m.languages,
+  description: m.about[lang] + " · " + (lang === "es" ? (m.languages.length === 1 ? "1 idioma" : m.languages.length + " idiomas") : (m.languages.length === 1 ? "1 language" : m.languages.length + " languages")),
+}));
+
 const REMOTE_MODELS = {
   "elevenlabs:tts": {
-    models: [{ id: "eleven_flash_v2_5", label: "Flash v2.5", description: "Latencia baja, 32 idiomas" }, { id: "eleven_multilingual_v2", label: "Multilingual v2", description: "Más expresiva, más lenta" }],
+    models: elevenModels("es"),
     voices: [{ id: "lucia", label: "Lucía", languages: ["es"] }, { id: "mateo", label: "Mateo", languages: ["es"] }, { id: "valentina", label: "Valentina", languages: ["es"] },
       { id: "rachel", label: "Rachel", languages: ["en"] }, { id: "adam", label: "Adam", languages: ["en"] }, { id: "celine", label: "Céline", languages: ["fr"] },
       { id: "giulia", label: "Giulia", languages: ["it"] }, { id: "ines", label: "Inês", languages: ["pt"] }, { id: "aarav", label: "Aarav", languages: ["hi"] }],
@@ -59,7 +79,7 @@ export function createRoomAdapter({ room, hosts, capabilities, installed, noOffe
 
   room.patch({
     modelCatalog: describe(modelCatalog) as never, voiceLanguages: voiceCatalog.languages as never, deviceCapabilities: capabilities as never,
-    deviceOffers: offers as never, installedBuilds: installedBuilds(), remoteModels: REMOTE_MODELS as never,
+    deviceOffers: offers as never, installedBuilds: installedBuilds(), remoteModels: { ...REMOTE_MODELS, "elevenlabs:tts": { ...REMOTE_MODELS["elevenlabs:tts"], models: elevenModels(currentLanguage() === "es" ? "es" : "en") } } as never,
     audioDevices: { ...f().audioDevices, inputs: [{ id: "default", label: t("proto.mic.default") }, { id: "mbp", label: "MacBook Pro" }, { id: "airpods", label: "AirPods" }],
       outputs: [{ id: "default", label: t("proto.mic.default") }] },
     pageFacts: capabilities.runs === "page" ? { adapter: capabilities.has.includes("webgpu") ? { vendor: "apple", architecture: "metal-3", device: "", description: "Apple M2" } : null, crossOriginIsolated: true, threads: 8, cores: 8 } : null,

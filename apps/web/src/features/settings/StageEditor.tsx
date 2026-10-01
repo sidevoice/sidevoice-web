@@ -66,7 +66,7 @@ const TEXT_MAX = 200;
 interface KeyHandle { submit(): void }
 
 /** `ownSubmit`: its own «Validar» while a typed key is unchecked; in the wizard that is the footer's button. */
-function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; onCancel?: () => void; ownSubmit: boolean; ref?: Ref<KeyHandle> }) {
+function KeyLine({ fp, provider, label, configured, hint, ownSubmit, ref }: { fp: string; provider: string; label: string; configured: boolean; hint: string | null; ownSubmit: boolean; ref?: Ref<KeyHandle> }) {
   const t = useT();
   const hosts = useHostsController();
   const [key, setKey] = useState("");
@@ -113,9 +113,11 @@ function KeyLine({ fp, provider, label, configured, hint, onCancel, ownSubmit, r
         {configured && hint && !key && <span className="key-mask" aria-hidden="true"><span className="key-dots" /><span className="key-last">{hint}</span></span>}
         <span className="key-state" id={"key-state-" + provider} role="status"
           title={state === "refused" ? t(configured ? "wizard.w4.keyRefusedKept" : "wizard.w4.keyRefused", { provider: label }) : undefined}>{said}</span>
+        {/* A kept key can be removed from the machine (operator, 2026-10-02). */}
+        {valid && <button type="button" className="key-clear" aria-label={t("stagecard.key.clear", { provider: label })} title={t("stagecard.key.clear", { provider: label })}
+          onClick={() => void hosts.deleteKey(fp, provider)}>×</button>}
       </span>
       {unsent && ownSubmit && <Button size="compact" onMouseDown={(event) => event.preventDefault()} onClick={() => void check()}>{t("stagecard.keyCheck")}</Button>}
-      {onCancel && <Button variant="ghost" size="compact" onClick={onCancel}>{t("common.cancel")}</Button>}
     </div>
   );
 }
@@ -275,8 +277,10 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   // voices (sidevoice-core#23 filters a provider's by language) and its ▶: hearing a language makes it the test's.
   const voiceOption = view.options.find((o) => o.kind === "voice" && o.perLanguage) as Extract<StageOptionView, { kind: "voice" }> | undefined;
   const voiceRows = voiceOption && voiceOption.perLanguage ? voiceOption.rows : [];
+  // A provider's model says which languages it speaks (ElevenLabs' models API: languages[].language_id): only those.
+  const spoken = (ctx.remote as Record<string, { models?: { id: string; languages?: string[] }[] }> | null)?.[view.place + ":" + task]?.models?.find((m) => m.id === view.model)?.languages;
   const optionsView = (options: StageOptionView[]) => options.map((o) => o.kind === "voice" && o.perLanguage
-    ? { ...o, rows: o.rows.map((r) => ({ ...r, choices: r.choices.filter((c) => !c.other) })) } : o);
+    ? { ...o, rows: o.rows.filter((r) => !spoken || spoken.includes(r.language)).map((r) => ({ ...r, choices: r.choices.filter((c) => !c.other) })) } : o);
   function hear(language: string) {
     setVoiceLanguage(language);
     if (prepared) trial.start({ language, text: sampleIn(language).slice(0, TEXT_MAX) });
@@ -286,7 +290,7 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
   const keyPanel = keyProvider && inUse && listing
     ? <KeyLine ref={keyLine} key={keyProvider} fp={inUse} provider={keyProvider} label={listing.label} configured={!!listing.configured} hint={listing.hint ?? null}
-        onCancel={keyFor ? () => setKeyFor(null) : undefined} ownSubmit={!footer} />
+        ownSubmit={!footer} />
     : null;
   const rawStep = rawCheck?.phase === "running" ? rawCheck.progress?.step ?? "load" : null;
   const lang = currentLanguage();
