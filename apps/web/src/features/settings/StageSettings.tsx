@@ -6,6 +6,7 @@ import type { StageTask } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { StageCheck } from "./StageCheck";
 import { StageDiagnostics } from "./StageDiagnostics";
+import { useT } from "../../i18n";
 
 const WHERE_NOTES = {
   page: "Se ejecuta en este navegador; la primera vez se descarga y después se reutiliza su caché.",
@@ -15,7 +16,10 @@ const WHERE_NOTES = {
 
 /** One stage — transcription or voice — as sidevoice/sidevoice-core#21 draws it: where, which model, its options, and under
  *  Avanzado the build it runs on. Everything shown is the store's; every change is an action. */
-export function StageSettings({ task }: { task: StageTask }) {
+/** `onMissingPlace`: what choosing a provider with no key does — by default, Integraciones at its row; the wizard
+ *  asks for the key in place. */
+export function StageSettings({ task, onMissingPlace }: { task: StageTask; onMissingPlace?: (id: string) => void }) {
+  const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
   const actions = () => window.sidevoiceActions;
@@ -31,17 +35,26 @@ export function StageSettings({ task }: { task: StageTask }) {
       )}
       {view.unconfigured && <p className="muted" role="alert">Este dispositivo no puede ejecutar ningún modelo: elige un proveedor.</p>}
       <div className="ui-field">
-        <span className="ui-field-label" id={`${task}-place-label`}>Dónde</span>
-        <div className="segmented" role="group" aria-labelledby={`${task}-place-label`}>
-          {view.places.map((place) => (
-            <Button key={place.id} id={`${task}-place-${place.id}`} variant="ghost" size="compact" className="segment"
-              aria-pressed={view.place === place.id} data-state={place.state}
-              disabled={locked && view.place !== place.id}
-              onClick={() => place.state === "missing" ? actions()?.openIntegration(place.id) : actions()?.chooseStagePlace(task, place.id)}>
-              {place.label}{place.state === "missing" ? " · Configurar" : ""}
-            </Button>
-          ))}
-        </div>
+        {/* One list, whatever the number of providers (operator, 2026-10-01): this device first, the providers
+            under it, a provider with no key said so — choosing it asks for the key. */}
+        <label className="ui-field-label" htmlFor={`${task}-place`}>Dónde</label>
+        <NativeSelect id={`${task}-place`} className="place-select" value={view.place} disabled={locked}
+          onChange={(event) => {
+            const id = event.currentTarget.value;
+            const place = view.places.find((p) => p.id === id);
+            if (place?.state === "missing") (onMissingPlace ?? ((p: string) => actions()?.openIntegration(p)))(id);
+            else actions()?.chooseStagePlace(task, id);
+          }}>
+          {!view.place && <option value="">—</option>}
+          {view.places.filter((p) => p.id === "device").map((place) => <option key={place.id} value={place.id}>{place.label}</option>)}
+          {view.places.some((p) => p.id !== "device") && (
+            <optgroup label={t("stage.place.providers")}>
+              {view.places.filter((p) => p.id !== "device").map((place) => (
+                <option key={place.id} value={place.id} data-state={place.state}>{place.label}{place.state === "missing" ? " · " + t("stage.place.noKey") : ""}</option>
+              ))}
+            </optgroup>
+          )}
+        </NativeSelect>
       </div>
       <ModelPicker label="Modelo" id={`${task}-model`} value={view.model} disabled={locked || view.modelsLoading || !view.models.length}
         description={view.models.find((model) => model.id === view.model)?.description}

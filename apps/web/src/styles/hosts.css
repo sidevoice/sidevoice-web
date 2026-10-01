@@ -239,3 +239,7 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .wizard-stage { max-height: 52dvh; overflow: auto; padding-inline-end: .3rem }
 .wizard-stage .stage-settings > .ui-field:first-child { margin-top: .2rem }
 .agent-ok { color: #9ed3b4 }
+.inline-key { display: grid; gap: .4rem; justify-items: start; margin-top: .6rem; padding: .75rem .8rem; border: 1px solid var(--sv-selected-border); border-radius: 12px; background: #171c22 }
+.inline-key > .integrations { width: 100% }
+.inline-key .integrations, .inline-key .integration-row { margin: 0 } .inline-key .integrations > *:empty { display: none }
+.stage-settings .place-select { display: block; width: 100%; height: 2.75rem; padding: 0 .7rem; border: 1px solid #526173; border-radius: .65rem; background-color: #141b23 }

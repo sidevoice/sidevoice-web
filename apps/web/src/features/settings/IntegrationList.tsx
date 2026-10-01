@@ -12,8 +12,9 @@ import { useRoomStore } from "../../state/room-store";
  *  offers arrives in the other panes without saving. A key the provider refuses changes nothing and stays in
  *  the field to be corrected. Removing one is the ✕, and acts at once; a key from the machine's environment
  *  cannot be removed from here, and says so. */
-export function IntegrationList() {
+export function IntegrationList({ only }: { only?: string[] } = {}) {
   const view = useRoomStore((state) => state.integrations);
+  const rows = only ? view.rows.filter((row) => only.includes(row.id)) : view.rows;
   const focused = view.rows.find((row) => row.focused)?.id;
   const fields = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -27,10 +28,10 @@ export function IntegrationList() {
 
   return (
     <div className="integrations" id="integrations">
-      <h3><IntegrationsIcon /> Integraciones</h3>
-      <p className="muted">Las claves de los proveedores que usa esta máquina. Se guardan en la máquina, que es quien llama al proveedor, y sirven a todos tus dispositivos; ninguno puede volver a leerlas. Una clave sirve para todo lo que hace su proveedor.</p>
+      {!only && <h3><IntegrationsIcon /> Integraciones</h3>}
+      {!only && <p className="muted">Las claves de los proveedores que usa esta máquina. Se guardan en la máquina, que es quien llama al proveedor, y sirven a todos tus dispositivos; ninguno puede volver a leerlas. Una clave sirve para todo lo que hace su proveedor.</p>}
       {view.error && <p className="muted" role="alert">{view.error}</p>}
-      {view.rows.map((row) => (
+      {rows.map((row) => (
         <div className="integration-row" key={row.id} data-configured={row.configured || undefined} data-focused={row.focused || undefined}>
           <label htmlFor={`integration-key-${row.id}`}>
             <span className="integration-name">{row.label}</span>

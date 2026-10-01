@@ -431,4 +431,9 @@ export const es: Record<string, string> = {
   "wizard.w4.lead.tts": "Te proponemos la voz que mejor va en este dispositivo. Escúchala y cámbiala si quieres.",
   "wizard.w4.chooseOne": "Elige una opción para continuar.",
   "agents.justConnected": "Ya tiene voz en las conversaciones nuevas",
+  "wizard.w4.downloadContinue": "Descargar y continuar · {size}",
+  "wizard.w4.useContinue": "Usar y continuar",
+  "wizard.w4.keyFor": "Clave de {provider}: se guarda en tu máquina.",
+  "stage.place.providers": "Proveedores",
+  "stage.place.noKey": "sin clave",
 };

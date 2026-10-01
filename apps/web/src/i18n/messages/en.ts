@@ -431,4 +431,9 @@ export const en: Record<string, string> = {
   "wizard.w4.lead.tts": "We suggest the voice that suits this device best. Listen to it and change it if you like.",
   "wizard.w4.chooseOne": "Choose an option to continue.",
   "agents.justConnected": "Has a voice in new conversations",
+  "wizard.w4.downloadContinue": "Download and continue · {size}",
+  "wizard.w4.useContinue": "Use and continue",
+  "wizard.w4.keyFor": "{provider} key: it's kept on your machine.",
+  "stage.place.providers": "Providers",
+  "stage.place.noKey": "no key",
 };

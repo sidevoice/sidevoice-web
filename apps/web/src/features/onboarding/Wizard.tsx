@@ -22,6 +22,8 @@ import { effectiveStage, type Task } from "../../state/hosts/stage-scope";
 import { StageSettings } from "../settings/StageSettings";
 import { bytesText, CopyButton, useModal } from "../hosts/common";
 import { PairWithCode } from "../hosts/PairWithCode";
+import { IntegrationScopeContext } from "../hosts/HostPage";
+import { IntegrationList } from "../settings/IntegrationList";
 import { AgentRow, otherAgent } from "../hosts/AgentRow";
 
 const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.title", W2r: "wizard.w2r.title", W3: "wizard.w3.title", W4: "wizard.w4.title.stt", W4v: "wizard.w4.title.tts", W5: "wizard.w5.title", W6: "wizard.w6.title" };
@@ -293,45 +295,58 @@ function useStageContext() {
 function StageStep({ task }: { task: Task }) {
   const t = useT();
   const hosts = useHostsController();
+  const scope = useContext(IntegrationScopeContext);
   const inUse = useHosts((s) => s.inUse);
   const integrations = useHosts((s) => (s.inUse ? s.integrations[s.inUse] : undefined));
   const chosen = useHosts((s) => !!effectiveStage(s.scope, s.inUse, task));
-  const check = useRoomStore((s) => s.stages?.[task]?.check ?? null);
+  const view = useRoomStore((s) => s.stages?.[task] ?? null);
   const ctx = useStageContext();
-  const phone = typeof window !== "undefined" && window.matchMedia?.("(max-width: 750px)").matches;
-  const proposal = ctx && ctx.offers ? proposeStages(ctx as never, !!phone) : null;
-  const row = proposal?.rows.find((r) => r.task === task) ?? null;
-  const ready = !!proposal && integrations?.status !== "loading";
+  const [advancing, setAdvancing] = useState(false);
+  const [keyFor, setKeyFor] = useState<string | null>(null);
+  const check = view?.check ?? null;
+  const ready = !!ctx?.offers && integrations?.status !== "loading";
   useEffect(() => { if (inUse && (!integrations || integrations.status === "idle")) void hosts.loadIntegrations(inUse); }, [inUse, integrations, hosts]);
-  // Nothing chosen yet: start from the recommendation (its download is asked for in the pane, with its size).
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current || chosen || !ready || !row) return;
-    started.current = true;
-    window.sidevoiceActions?.chooseStagePlace(task, row.stage.place);
-  }, [chosen, ready, row, task]);
-  const busy = !!check && ["consent", "running", "slow"].includes(check.phase);
-  if (!ready) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
-  if (!row && integrations?.status === "failed")
-    return (
-      <div className="problem" role="alert">
-        <p>{t("wizard.w4.integrationsFailed")}</p>
-        <Actions><Button variant="primary" onClick={() => inUse && void hosts.loadIntegrations(inUse)}>{t("common.retry")}</Button></Actions>
-      </div>
-    );
-  if (!row && !chosen)
-    return (
-      <div className="problem" role="alert">
-        <p>{t("wizard.w4.noOffer")}</p>
-        <Actions>{inUse && <Button variant="primary" onClick={() => hosts.openSettings("host", inUse, "integrations")}>{t("wizard.w4.openIntegrations")}</Button>}</Actions>
-      </div>
-    );
+  const next = task === "stt" ? "W4v" : "W5";
+  // «Descargar y continuar»: once the shown model is checked and saved, the wizard moves on by itself.
+  useEffect(() => { if (advancing && chosen && check?.phase !== "running") hosts.goTo(next); }, [advancing, chosen, check?.phase, hosts, next]);
+  useEffect(() => { if (check?.phase === "failed" || check === null) setAdvancing(false); }, [check]);
+  // A key typed here, accepted by its provider, makes its place choosable: the panel goes.
+  const keyed = useHosts((s) => !!keyFor && !!s.inUse && !!s.integrations[s.inUse]?.value?.providers.find((p) => p.id === keyFor)?.configured);
+  useEffect(() => { if (keyed) setKeyFor(null); }, [keyed]);
+  if (!ready || !view) return <p className="muted" role="status">{t("wizard.w4.measuring")}</p>;
+  const offer = (ctx?.offers as { model: string; engine: string; download_size: number }[] | null)?.find((o) => o.model === view.model);
+  const installed = !!offer && (ctx?.installed as { model: string; engine: string }[]).some((b) => b.model === offer.model && b.engine === offer.engine);
+  const needsDownload = view.place === "device" && !!offer && !installed;
+  const busy = !!check && ["running", "slow"].includes(check.phase);
+  function proceed() {
+    setAdvancing(true);
+    if (chosen) { hosts.goTo(next); return; }
+    const actions = window.sidevoiceActions;
+    if (check?.phase === "consent") { actions?.decideStage(task, true); return; }
+    actions?.chooseStageModel(task, view!.model);
+    actions?.decideStage(task, true);
+  }
   return (
     <>
       <p className="muted">{t(task === "stt" ? "wizard.w4.lead.stt" : "wizard.w4.lead.tts")}</p>
-      <div className="wizard-stage"><StageSettings task={task} /></div>
-      {!chosen && !busy && <p className="muted small">{t("wizard.w4.chooseOne")}</p>}
-      <Actions><Button variant="primary" disabled={!chosen || busy} onClick={() => hosts.goTo(task === "stt" ? "W4v" : "W5")}>{t("wizard.continue")}</Button></Actions>
+      {view.unconfigured && !keyFor && <p className="problem">{t("wizard.w4.noOffer")}</p>}
+      <div className="wizard-stage">
+        {/* A provider with no key asks for it here, not in Configuración. */}
+        <StageSettings task={task} onMissingPlace={setKeyFor} />
+      </div>
+      {keyFor && inUse && scope && (
+        <div className="inline-key">
+          <p className="howto-label">{t("wizard.w4.keyFor", { provider: view.places.find((p) => p.id === keyFor)?.label ?? keyFor })}</p>
+          <RoomStoreContext.Provider value={scope.storeFor(inUse)}><IntegrationList only={[keyFor]} /></RoomStoreContext.Provider>
+          <Button variant="ghost" size="compact" onClick={() => setKeyFor(null)}>{t("common.cancel")}</Button>
+        </div>
+      )}
+      <Actions>
+        <Button variant="primary" disabled={busy || advancing && !chosen || !view.model}
+          onClick={proceed}>
+          {chosen && !check ? t("wizard.continue") : needsDownload ? t("wizard.w4.downloadContinue", { size: bytesText(offer!.download_size, currentLanguage()) }) : t("wizard.w4.useContinue")}
+        </Button>
+      </Actions>
     </>
   );
 }
