@@ -148,8 +148,8 @@ function DetectedAgents({ found }: { found: DetectedAgent[] | null }) {
                 <span className="detected-copy">
                   <strong>{agent.label}</strong>
                   {agent.version && <span className="muted small">{agent.version}</span>}
+                  <SidevoiceLink registration={agent.registration} />
                 </span>
-                <SidevoiceLink registration={agent.registration} />
               </li>
             ))}
           </ul>
