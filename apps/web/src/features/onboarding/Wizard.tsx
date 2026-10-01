@@ -28,7 +28,7 @@ const TITLES: Record<Step, string> = { W1: "wizard.w1.title", W2: "wizard.w2.tit
 function Indicator({ step }: { step: Step }) {
   const t = useT();
   const path = useHosts((s) => s.wizard.path);
-  const groups = stepGroups(path ?? (step === "W2r" ? "remote" : "agents"));
+  const groups = stepGroups(path);
   const at = groups.findIndex((group) => group.steps.includes(step));
   return (
     <ol className="wizard-steps" aria-label={t("wizard.progress")}>

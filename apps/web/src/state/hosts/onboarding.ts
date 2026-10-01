@@ -38,11 +38,16 @@ export function resumeStep(facts: ResumeFacts): Step {
   return "W6";
 }
 
-/** The indicator's groups, in order, with the steps each one covers. */
-export function stepGroups(path: Path | null): { key: string; steps: Step[] }[] {
-  return path === "remote"
-    ? [{ key: "wizard.group.connection", steps: ["W1", "W2r"] }, { key: "wizard.group.voice", steps: ["W4"] }, { key: "wizard.group.test", steps: ["W5", "W6"] }]
-    : [{ key: "wizard.group.computer", steps: ["W1", "W2"] }, { key: "wizard.group.agents", steps: ["W3"] }, { key: "wizard.group.voice", steps: ["W4"] }, { key: "wizard.group.test", steps: ["W5", "W6"] }];
+/** The indicator's groups, in order, with the steps each one covers: the same four on both paths (operator,
+ *  2026-10-01), so going back always lands on the same places. On the remote path «Agentes» is connecting to the machine
+ *  where the agents are. */
+export function stepGroups(_path: Path | null): { key: string; steps: Step[] }[] {
+  return [
+    { key: "wizard.group.where", steps: ["W1", "W2"] },
+    { key: "wizard.group.agents", steps: ["W3", "W2r"] },
+    { key: "wizard.group.voice", steps: ["W4"] },
+    { key: "wizard.group.test", steps: ["W5", "W6"] },
+  ];
 }
 
 /** Whether the app opens the wizard by itself: first run (no onboarding record) on a computer with no host yet. A
