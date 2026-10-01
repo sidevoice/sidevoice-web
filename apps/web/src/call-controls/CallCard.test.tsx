@@ -225,7 +225,7 @@ test("a press that moves is a drag of the window, not a click", () => {
   fireEvent.pointerMove(title, { pointerId: 1, screenX: 110, screenY: 104 });
   fireEvent.pointerUp(title, { pointerId: 1, screenX: 120, screenY: 108 });
   fireEvent.click(title);
-  expect(vi.mocked(host.drag).mock.calls.map(([phase]) => phase)).toEqual(["start", "move", "end"]);
+  expect(vi.mocked(host.drag).mock.calls).toEqual([["start"], ["move"], ["end"]]);
   expect(screen.queryByText("brand/web")).not.toBeInTheDocument();
   // Buttons never start one.
   fireEvent.pointerDown(screen.getByRole("button", { name: "Hang up" }), { button: 0, pointerId: 2, screenX: 0, screenY: 0 });

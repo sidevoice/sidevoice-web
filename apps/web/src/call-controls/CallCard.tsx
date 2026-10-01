@@ -261,14 +261,14 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
       dragged.current = true;
       setPanel(null);
       event.currentTarget.setPointerCapture?.(event.pointerId);
-      host.drag("start", d.x, d.y);
+      host.drag("start");
     }
-    host.drag("move", event.screenX, event.screenY);
+    host.drag("move");
   };
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     drag.current = null;
-    if (d?.moving) host.drag("end", event.screenX, event.screenY);
+    if (d?.moving) host.drag("end");
   };
 
   return (

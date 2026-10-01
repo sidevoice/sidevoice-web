@@ -60,8 +60,9 @@ export interface CallControlsHost {
   run(command: CallCommand): void;
   /** The card's size in CSS pixels, its window's margin included: the app sizes the window to it. */
   layout(size: { width: number; height: number }): void;
-  /** Moving the card: the pointer's position on screen at the start, on every move, and at the end. */
-  drag(phase: "start" | "move" | "end", screenX: number, screenY: number): void;
+  /** Moving the card: when it starts, on every move, and when it ends. The host follows the pointer itself (it knows
+   *  where it is across displays of different scales), or hands the move to the window system. */
+  drag(phase: "start" | "move" | "end"): void;
 }
 
 declare global {
