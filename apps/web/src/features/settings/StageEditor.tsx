@@ -27,7 +27,6 @@ import { effectiveStage as effectiveStageOf, withBuild, withModel, withOption, w
 import { bytesText } from "../hosts/common";
 import { StageSettings } from "./StageSettings";
 import { offeredSentence, saySample } from "./try-samples";
-import { LanguageSelect } from "../../components/options/OptionFields";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
 import { MessageGroup } from "../conversation/MessageGroup";
 import type { ChatMessage, StageOptionView } from "../../state/room-types";
@@ -249,16 +248,17 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
   const sayLanguage = sttLanguage && sttLanguage.value !== "auto" ? sttLanguage.value : speechLanguage;
   const input: TryInput = task === "stt" ? { language: sayLanguage, text: saySample(sayLanguage) } : { language: voiceLanguage, text };
   const start = () => trial.start(input);
-  // The voice's options for the language being heard: its own voices only (sidevoice-core#23 filters a provider's by
-  // language), and the language chosen once, above them.
+  // The voice is configured per language, every language in view (operator, 2026-10-01), each with only its own
+  // voices (sidevoice-core#23 filters a provider's by language) and its ▶: hearing a language makes it the test's.
   const voiceOption = view.options.find((o) => o.kind === "voice" && o.perLanguage) as Extract<StageOptionView, { kind: "voice" }> | undefined;
   const voiceRows = voiceOption && voiceOption.perLanguage ? voiceOption.rows : [];
   const optionsView = (options: StageOptionView[]) => options.map((o) => o.kind === "voice" && o.perLanguage
-    ? { ...o, rows: o.rows.filter((r) => r.language === voiceLanguage).map((r) => ({ ...r, choices: r.choices.filter((c) => !c.other) })) } : o);
-  const languagePicker = task === "tts" && voiceRows.length > 0 ? (
-    <LanguageSelect id="tts-test-language" label={t("stage.voiceLanguage")} value={voiceLanguage}
-      choices={voiceRows.map((r) => ({ value: r.language, label: r.label }))} onChange={setVoiceLanguage} />
-  ) : null;
+    ? { ...o, rows: o.rows.map((r) => ({ ...r, choices: r.choices.filter((c) => !c.other) })) } : o);
+  function hear(language: string) {
+    setVoiceLanguage(language);
+    if (prepared) trial.start({ language, text: sampleIn(language).slice(0, TEXT_MAX) });
+  }
+  const testLanguageLabel = voiceRows.find((r) => r.language === voiceLanguage)?.label ?? "";
   const keyProvider = keyFor ?? (view.place && view.place !== "device" ? view.place : null);
   const listing = integrations?.value?.providers.find((p) => p.id === keyProvider);
   const keyPanel = keyProvider && inUse && listing
@@ -298,17 +298,17 @@ export function StageEditor({ task, footer, bodyClassName }: { task: Task; foote
       onOptionChange={optionChosen}
       onBuildChange={(value) => select(withBuild(ctx, task, current, value))}
       optionsView={optionsView}
+      onVoicePreview={task === "tts" ? hear : undefined} voicePreviewing={trial.state === "playing" ? voiceLanguage : null}
       beforeOptions={<>
         {configure && <h3 className="stage-configure-title">{t(task === "tts" ? "stagecard.b.title.tts" : "stagecard.b.title.stt")}</h3>}
-        {languagePicker}
       </>}
       afterOptions={configure ? (
-        <ConfigureAndListen task={task} trial={trial} input={input} onText={setText} onStart={start} works={works} inFooter={!!footer}
+        <ConfigureAndListen task={task} trial={trial} input={input} languageLabel={testLanguageLabel} onText={setText} onStart={start} works={works} inFooter={!!footer}
           onKeep={() => answer(true)} keepLabel={keep} />
       ) : null}
       afterModel={keyFor || !view.model ? null : (
         <StageCard task={task} flow={flow} needsDownload={needsDownload} downloadSize={offer?.download_size ?? 0} prepared={prepared} works={works}
-          runningStep={rawStep} inUseNote={!footer && preparedHere && flow === "try"} inFooter={!!footer} trial={trial} input={input} onText={setText} onStart={start}
+          runningStep={rawStep} inUseNote={!footer && preparedHere && flow === "try"} inFooter={!!footer} trial={trial} input={input} languageLabel={testLanguageLabel} onText={setText} onStart={start}
           onPrepare={prepare} onAnswer={answer} onRetry={retry}
           onTry={(model) => select(withModel(ctx, task, current, model))} />
       )} />
@@ -325,10 +325,10 @@ type Phase = "download" | "prepare" | "test" | "check";
 
 /** The card under the model: its phases as a strip, and what the current one needs. In "try" the last phase is the
  *  person's («Probar»); in "configure" it is the app's own check («Comprobar»), and trying it is configuring it, below. */
-function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, input, onText, onStart, onPrepare, onAnswer, onRetry, onTry }: {
+function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, runningStep, inUseNote, inFooter, trial, input, languageLabel, onText, onStart, onPrepare, onAnswer, onRetry, onTry }: {
   task: Task; flow: StageFlow; needsDownload: boolean; downloadSize: number; prepared: boolean; works: boolean; runningStep: string | null; inUseNote: boolean;
   /** The next step is the wizard's footer button: the card does not repeat it. */
-  inFooter: boolean; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void;
+  inFooter: boolean; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void; onStart: () => void;
   onPrepare: () => void; onAnswer: (ok: boolean) => void; onRetry: () => void; onTry: (model: string) => void;
 }) {
   const t = useT();
@@ -401,18 +401,18 @@ function StageCard({ task, flow, needsDownload, downloadSize, prepared, works, r
         </div>
       ) : (<>
         {inUseNote && <p className="muted small" role="status">{t("stagecard.inUse")}</p>}
-        <TryIt task={task} trial={trial} input={input} onText={onText} onStart={onStart} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
+        <TryIt task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} onStart={onStart} inFooter={inFooter} onAnswer={onAnswer} onTry={onTry} />
       </>)}
     </section>
   );
 }
 
 /** The voice test's text: a sentence in the language being heard to begin with, the person's to change. */
-function TestText({ value, language, onChange, disabled }: { value: string; language: string; onChange: (text: string) => void; disabled?: boolean }) {
+function TestText({ value, language, languageLabel, onChange, disabled }: { value: string; language: string; languageLabel: string; onChange: (text: string) => void; disabled?: boolean }) {
   const t = useT();
   return (
     <label className="try-text">
-      <span className="ui-field-label">{t("stagecard.text.label")}</span>
+      <span className="ui-field-label">{languageLabel ? t("stagecard.text.labelIn", { language: languageLabel }) : t("stagecard.text.label")}</span>
       <textarea rows={2} maxLength={TEXT_MAX} lang={language} value={value} disabled={disabled} onChange={(event) => onChange(event.currentTarget.value)} />
       <span className="try-count">{t("stagecard.text.count", { n: value.length, max: TEXT_MAX })}</span>
     </label>
@@ -422,7 +422,7 @@ function TestText({ value, language, onChange, disabled }: { value: string; lang
 /** What a try shows, in the call's own bubbles (operator, 2026-10-01: the real components, so a change to them shows
  *  here too): the person's live bubble with its waveform while they speak, then what it understood; the agent's
  *  bubble with the text as the voice plays it. Before that: the sentence to say, or the text to hear. */
-function TryShow({ task, trial, input, onText }: { task: Task; trial: Trial; input: TryInput; onText: (text: string) => void }) {
+function TryShow({ task, trial, input, languageLabel, onText }: { task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void }) {
   const t = useT();
   const { state, failure, heard, played } = trial;
   const busy = state === "listening" || state === "transcribing" || state === "playing";
@@ -434,7 +434,7 @@ function TryShow({ task, trial, input, onText }: { task: Task; trial: Trial; inp
     ({ segment: null, role, text, name: role === "user" ? t("stagecard.you") : "Sidevoice", time: 0, draft: true, ...extra });
   return (<>
     {task === "stt" && <blockquote className="try-sample" lang={input.language}>«{input.text}»</blockquote>}
-    {task === "tts" && !busy && <TestText value={input.text} language={input.language} onChange={onText} />}
+    {task === "tts" && !busy && <TestText value={input.text} language={input.language} languageLabel={languageLabel} onChange={onText} />}
     <div className="try-chat" ref={chat}>
       {task === "stt" && (state === "listening" || state === "transcribing") && <LiveDraftBubble phase={state} />}
       {task === "stt" && state === "heard" && <MessageGroup group={{ id: "try", role: "user", name: t("stagecard.you"), messages: [message("user", heard)] }} />}
@@ -451,7 +451,7 @@ function TryShow({ task, trial, input, onText }: { task: Task; trial: Trial; inp
 
 /** Flow "try", phase 3: the person tries it, then «¿Es lo que has dicho?» / «¿Te suena bien?»: yes is what counts;
  *  no offers another model. In the wizard the buttons are the action bar's. */
-function TryIt({ task, trial, input, onText, onStart, inFooter, onAnswer, onTry }: { task: Task; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void }) {
+function TryIt({ task, trial, input, languageLabel, onText, onStart, inFooter, onAnswer, onTry }: { task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void; onStart: () => void; inFooter: boolean; onAnswer: (ok: boolean) => void; onTry: (model: string) => void }) {
   const t = useT();
   const view = useRoomStore((s) => s.stages?.[task] ?? null);
   const { state, no, setNo } = trial;
@@ -461,7 +461,7 @@ function TryIt({ task, trial, input, onText, onStart, inFooter, onAnswer, onTry 
   return (
     <div className="stage-card-body try-it">
       {!answered && !busy && <p className="small">{t((task === "stt" ? "stagecard.try.stt" : "stagecard.try.tts") + (inFooter ? ".footer" : ""))}</p>}
-      <TryShow task={task} trial={trial} input={input} onText={onText} />
+      <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} />
       {answered && !no && (
         <div className="try-question">
           <p>{t(task === "stt" ? "stagecard.ask.stt" : "stagecard.ask.tts")}</p>
@@ -492,15 +492,15 @@ function TryIt({ task, trial, input, onText, onStart, inFooter, onAnswer, onTry 
 
 /** Flow "configure", second part: under the options, the test — the person's text and «Escuchar» with the settings as
  *  they are now (or a sentence to say and «Hablar»), as often as they like — and keeping it. No question asked. */
-function ConfigureAndListen({ task, trial, input, onText, onStart, works, inFooter, onKeep, keepLabel }: {
-  task: Task; trial: Trial; input: TryInput; onText: (text: string) => void; onStart: () => void; works: boolean; inFooter: boolean; onKeep: () => void; keepLabel: string;
+function ConfigureAndListen({ task, trial, input, languageLabel, onText, onStart, works, inFooter, onKeep, keepLabel }: {
+  task: Task; trial: Trial; input: TryInput; languageLabel: string; onText: (text: string) => void; onStart: () => void; works: boolean; inFooter: boolean; onKeep: () => void; keepLabel: string;
 }) {
   const t = useT();
   const busy = trial.state === "listening" || trial.state === "transcribing" || trial.state === "playing";
   return (
     <div className="stage-configure">
       {task === "stt" && <p className="small">{t(inFooter ? "stagecard.b.say.footer" : "stagecard.b.say")}</p>}
-      <TryShow task={task} trial={trial} input={input} onText={onText} />
+      <TryShow task={task} trial={trial} input={input} languageLabel={languageLabel} onText={onText} />
       <span className="try-row">
         {!inFooter && <Button size="compact" variant={trial.tried ? "default" : "primary"} onClick={onStart} disabled={busy || (task === "tts" && !input.text.trim())}>
           {task === "stt" ? <MicrophoneIcon size={15} /> : <SpeakerIcon size={15} />}{" "}

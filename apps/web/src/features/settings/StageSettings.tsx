@@ -24,11 +24,13 @@ const WHERE_NOTES: Record<string, string> = { page: "stage.where.page", app: "st
  *  its own card, which is also where the voice is heard (`hideVoiceTools`). */
 /** `optionsView`: the options as the editor shows them (the voice for one language); `beforeOptions` / `afterOptions`:
  *  what goes just above and below them. */
-export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, onOptionChange, onBuildChange, afterModel, hideCheck, hidePlaceNote, hideVoiceTools, optionsView, beforeOptions, afterOptions }: {
+export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, onPlaceChange, onModelChange, onOptionChange, onBuildChange, afterModel, hideCheck, hidePlaceNote, hideVoiceTools, optionsView, beforeOptions, afterOptions, onVoicePreview, voicePreviewing }: {
   task: StageTask; onMissingPlace?: (id: string) => void; placeExtra?: ReactNode; pendingPlace?: string | null; onPlaceChange?: (id: string) => void;
   onModelChange?: (model: string) => void; onOptionChange?: (id: string, value: unknown, language?: string) => void; onBuildChange?: (value: string) => void;
   afterModel?: ReactNode; hideCheck?: boolean; hidePlaceNote?: boolean; hideVoiceTools?: boolean;
   optionsView?: (options: StageView["options"]) => StageView["options"]; beforeOptions?: ReactNode; afterOptions?: ReactNode;
+  /** The editor's own ▶ per language (it plays through the stage's test). */
+  onVoicePreview?: (language: string) => void; voicePreviewing?: string | null;
 }) {
   const t = useT();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
@@ -80,8 +82,8 @@ export function StageSettings({ task, onMissingPlace, placeExtra, pendingPlace, 
       {beforeOptions}
       <OptionsForm task={task} options={optionsView ? optionsView(view.options) : view.options} disabled={locked}
         onChange={(id, value, language) => onOptionChange ? onOptionChange(id, value, language) : actions()?.setStageOption(task, id, value, language)}
-        onPreview={task === "tts" && !hideVoiceTools ? (language) => void actions()?.previewVoice(language) : undefined}
-        previewing={task === "tts" && !hideVoiceTools ? tools.previewing : null} />
+        onPreview={task !== "tts" ? undefined : onVoicePreview ?? (!hideVoiceTools ? (language) => void actions()?.previewVoice(language) : undefined)}
+        previewing={task !== "tts" ? null : onVoicePreview ? voicePreviewing ?? null : !hideVoiceTools ? tools.previewing : null} />
       {task === "tts" && !hideVoiceTools && <p className="muted" role="status">{tools.previewNote}</p>}
       {afterOptions}
       {(view.advanced || view.diagnostics) && (

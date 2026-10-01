@@ -329,6 +329,3 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .stage-editor h3.stage-configure-title { margin: 1.1rem 0 .2rem; font-size: .95rem; letter-spacing: 0; text-transform: none }
 .stage-configure { display: grid; gap: .5rem; margin: .4rem 0 .8rem; padding: .75rem .85rem; border: 1px solid var(--sv-border); border-radius: 12px; background: #171c22 }
 .stage-configure p { margin: 0 }
-/* The voice is configured for the language chosen above it: its row needs no language label of its own. */
-.stage-editor .stage-settings[data-task=tts] .voice-language { display: none }
-.stage-editor .stage-settings[data-task=tts] .voice-row { grid-template-columns: minmax(0, 1fr); padding-top: 0 }
