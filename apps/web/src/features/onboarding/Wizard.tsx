@@ -21,7 +21,6 @@ import { proposeStages, type ProposalRow } from "../../state/hosts/proposal";
 import { effectiveStage, type Stage, type Task } from "../../state/hosts/stage-scope";
 import { effectiveStage as effectiveStageOf, withModel, withPlace } from "../../state/stage-settings.js";
 import { StageEditor, StageFlowContext } from "../settings/StageEditor";
-import { playEnter } from "../../components/brand/EnterSplash";
 import { EnterButton } from "../../components/brand/EnterButton";
 import { offeredSentence } from "../settings/try-samples";
 import { LiveDraftBubble } from "../conversation/LiveDraftBubble";
@@ -481,7 +480,7 @@ function W6() {
     <>
       <p className="done-lead">{t("wizard.w6.lead")}</p>
       <p className="ask-agent">«{t("wizard.w6.ask")}»</p>
-      <Actions><EnterButton onClick={() => { void hosts.finishWizard(); playEnter(); }}>{t("wizard.w6.go")}</EnterButton></Actions>
+      <Actions><EnterButton onClick={() => void hosts.finishWizard()}>{t("wizard.w6.go")}</EnterButton></Actions>
     </>
   );
 }

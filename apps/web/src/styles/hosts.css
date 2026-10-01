@@ -401,24 +401,6 @@ body[data-setup=pending] #settings-open, body[data-setup=pending] #call-settings
 .try-speak input { flex: 1; min-width: 0; padding: .3rem 0; border: 0; border-bottom: 1px solid #ffffff26; background: transparent; color: inherit; font: inherit; outline: none }
 .try-speak input:focus { border-bottom-color: var(--sv-primary) }
 .try-speak input::placeholder { color: var(--sv-muted) }
-/* Entering Sidevoice, as the film closes: the button grows slowly into the window in the film's lavender, the mark
-   rises from dots in the film's colours, the name and the tagline follow, and the lavender fades into the app. */
-.enter-grow { position: fixed; inset: 0; z-index: 2147483000; background: #f0ebf6; pointer-events: none;
-  clip-path: circle(var(--r) at var(--x) var(--y)); animation: enter-grow 900ms cubic-bezier(.7, 0, .3, 1) forwards }
-@keyframes enter-grow { to { clip-path: circle(150vmax at var(--x) var(--y)) } }
-.enter-splash { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-content: center; justify-items: center; gap: .8rem; background: #f0ebf6; cursor: pointer }
-.enter-splash[data-leaving] { animation: enter-out .7s ease-in-out both }
-.enter-logo { display: flex; align-items: center; gap: .9rem }
-.enter-mark { overflow: visible }
-.enter-bar { fill: #4b2a74; transform-box: fill-box; transform-origin: center; transform: scaleY(var(--from)); opacity: 0; animation: enter-bar .6s cubic-bezier(.34, 1.56, .64, 1) both }
-.enter-bar[data-voice] { fill: #e3a72f }
-.enter-name { font-size: 2.6rem; font-weight: 700; letter-spacing: -.02em; color: #17151d; opacity: 0; animation: enter-name .55s ease-out .75s both }
-.enter-tagline { margin: 0; color: #4a4553; font-size: .95rem; opacity: 0; animation: enter-fade .55s ease-out 1.35s both }
-@keyframes enter-bar { 0% { opacity: 0; transform: scaleY(var(--from)) } 25% { opacity: 1; transform: scaleY(var(--from)) } 100% { opacity: 1; transform: scaleY(1) } }
-@keyframes enter-name { from { opacity: 0; transform: translateX(-.6rem) } to { opacity: 1; transform: none } }
-@keyframes enter-fade { from { opacity: 0 } to { opacity: 1 } }
-@keyframes enter-out { from { opacity: 1 } to { opacity: 0 } }
-@media (prefers-reduced-motion: reduce) { .enter-grow, .enter-splash { display: none } }
 /* The button that enters Sidevoice: its own, not a design-system variant. */
 /* «Atrás» at its left, the button in the middle. */
 .wizard-actions:has(.enter-button) { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 1.6rem }
