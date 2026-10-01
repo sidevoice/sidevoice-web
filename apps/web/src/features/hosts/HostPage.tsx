@@ -207,6 +207,8 @@ function AgentsTab({ fp }: { fp: string }) {
   const listing = useHosts((s) => s.agents[fp]);
   const now = useHosts((s) => s.now);
   const [connected, setConnected] = useState<string | null>(null);
+  // Said for a moment after connecting, then gone: the row's state says it from then on.
+  useEffect(() => { if (!connected) return; const timer = setTimeout(() => setConnected(null), 5000); return () => clearTimeout(timer); }, [connected]);
   // Opening Agentes rescans (F5).
   useEffect(() => { void hosts.loadAgents(fp, true); }, [fp, hosts]);
   const lang = currentLanguage();

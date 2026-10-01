@@ -207,25 +207,26 @@
 .reset-dialog h2 { margin: 0 0 .6rem; font-size: 1.2rem; text-transform: none; letter-spacing: 0; color: var(--sv-text) }
 
 /* W3 and Agentes: one line per agent; doing it by hand is a floating panel by its button. */
-.agent-row { display: flex; align-items: center; gap: .65rem; padding: .55rem .7rem }
+.agent-row { padding: 0; overflow: hidden }
+.agent-row[data-open] { border-color: var(--sv-selected-border) }
+.agent-main { display: flex; align-items: center; gap: .65rem; padding: .55rem .7rem }
+.howto-toggle .chevron-up { transform: rotate(180deg) }
+.howto-toggle svg { transition: transform .15s }
+.agent-howto { display: grid; gap: .45rem; padding: .75rem .8rem .8rem; border-top: 1px solid var(--sv-border); background: #171c22 }
+.agent-howto p { margin: 0 }
+.howto-label { font-size: .76rem; color: var(--sv-muted) }
 .agent-row .agent-copy { display: grid; gap: .1rem }
 .agent-row .agent-status { font-size: .74rem }
 .agent-end { margin-inline-start: auto; display: flex; align-items: center; gap: .35rem; flex: none }
-.howto-popover { z-index: 200; width: min(28rem, calc(100vw - 2rem)); padding: .85rem .9rem .9rem; border: 1px solid var(--sv-border); border-radius: 14px; background: var(--sv-surface-raised); color: var(--sv-text); box-shadow: var(--sv-shadow-dialog); display: grid; gap: .55rem }
-.howto-popover p { margin: 0 }
-.howto-head { display: flex; align-items: center; gap: .55rem }
-.howto-head strong { flex: 1; font-size: .92rem }
-.howto-head .agent-icon { width: 1.75rem; height: 1.75rem }
 .code-block { position: relative }
 .code-block pre { margin: 0; padding: .75rem 3.2rem .75rem .8rem; border-radius: 10px; background: #0b0e12; border: 1px solid #2a313a; font: .78rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; color: #e4e9ee; white-space: pre-wrap; word-break: break-all; user-select: all }
 .code-copy { position: absolute; top: .45rem; right: .45rem; display: inline-flex; align-items: center; gap: .3rem; height: 1.9rem; padding: 0 .5rem; border: 1px solid #36404b; border-radius: 8px; background: #1a2027; color: var(--sv-text); font-size: .72rem; cursor: pointer }
 .code-copy:hover { background: #232b34 }
-.howto-foot { display: flex; align-items: center; justify-content: space-between; gap: .6rem }
-.howto-arrow { fill: var(--sv-surface-raised) }
+.howto-foot { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin-top: .15rem }
 
 /* Hover. The room's global `button:hover` paints every button grey, which left the lila primary button's dark text
  * unreadable; here a primary button lightens instead, and a choice card answers the pointer before it is chosen. */
-:is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .howto-popover, .room-banner) .ui-button--primary:hover:not(:disabled) { background: var(--sv-primary-soft); border-color: var(--sv-primary-soft); color: var(--sv-on-primary) }
-:is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .howto-popover, .room-banner) .ui-button--primary:active:not(:disabled) { background: var(--sv-primary-dim) }
+:is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .room-banner) .ui-button--primary:hover:not(:disabled) { background: var(--sv-primary-soft); border-color: var(--sv-primary-soft); color: var(--sv-on-primary) }
+:is(.wizard-dialog, .settings-shell, .no-machine, .reset-dialog, .room-banner) .ui-button--primary:active:not(:disabled) { background: var(--sv-primary-dim) }
 .choice-card { transition: border-color .12s, background-color .12s }
 .choice-card:hover:not([data-checked]) { border-color: var(--sv-selected-border); background: #232a36 }

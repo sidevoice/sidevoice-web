@@ -271,7 +271,7 @@ export const en: Record<string, string> = {
   "agents.manualHint": "Add this to {file}:",
   "agents.connectFailed": "Couldn't connect: {message}",
   "agents.nextConversations": "It will be used in that agent's new conversations.",
-  "agents.nextConversationsNamed": "{name}: it will be used in that agent's new conversations.",
+  "agents.nextConversationsNamed": "{name} now has a voice in the conversations you open from now on.",
 
   "integrations.failed": "This machine's integrations couldn't be read.",
   "integrations.checking": "Checking the key…",

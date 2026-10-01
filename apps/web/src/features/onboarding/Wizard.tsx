@@ -244,6 +244,8 @@ function W3() {
   const fp = useHosts((s) => s.localPairing?.fp ?? null);
   const listing = useHosts((s) => (fp ? s.agents[fp] : undefined));
   const [connected, setConnected] = useState<string | null>(null);
+  // Said for a moment after connecting, then gone: the row's state says it from then on.
+  useEffect(() => { if (!connected) return; const timer = setTimeout(() => setConnected(null), 5000); return () => clearTimeout(timer); }, [connected]);
   useEffect(() => { if (fp) void hosts.loadAgents(fp, true); }, [fp, hosts]);
   const agents = useMemo(() => (listing?.value?.agents ?? []).filter((a) => a.present), [listing]);
   async function next() { await hosts.markOnboarding({ agents_done: true }); hosts.goTo("W4"); }

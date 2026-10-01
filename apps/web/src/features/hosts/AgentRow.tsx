@@ -2,10 +2,9 @@
  * «Conectar» runs the agent's own registration (`claude mcp add`, `codex mcp add`, Cursor's file); «Hacerlo yo» shows
  * what that is — the command, or the file and what to put in it — for whoever prefers to do it, and opens by itself
  * when the automatic way failed or does not exist. «Comprobar» asks the host to look again. */
-import { useEffect, useRef, useState } from "react";
-import * as Popover from "@radix-ui/react-popover";
+import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
-import { CloseIcon, ConnectorIcon, CopyIcon, HarnessIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useT } from "../../i18n";
 import type { DetectedAgent } from "../../services/desktop-host";
 import { useHosts, useHostsController } from "../../state/hosts/hosts-store";
@@ -23,8 +22,6 @@ export function SidevoiceLink({ registration }: { registration: DetectedAgent["r
   );
 }
 
-/** How to connect it by hand, in a floating panel by its button: the command (or the file and its snippet) as code,
- *  copied with one click, and «Ya está, comprobar» to have the host look again. */
 /** The id of the row that stands for any agent the connector has no module for. */
 export const OTHER = "other";
 
@@ -47,42 +44,29 @@ export function otherAgent(custom: { command: string; snippet: string } | null |
   return custom ? { id: OTHER, label, present: true, version: null, registration: "not-connected", connect: "manual", instructions: custom } : null;
 }
 
-function HowToPopover({ agent, fp, open, onOpenChange, label }: { agent: DetectedAgent; fp: string; open: boolean; onOpenChange: (open: boolean) => void; label: string }) {
+/** How to connect it by hand, unfolded inside the agent's own card (operator, 2026-10-01: no floating panel): the
+ *  command (or the file and its snippet) as code, copied with one click, and «Ya está, comprobar». */
+function HowToPanel({ agent, fp, id, onDone }: { agent: DetectedAgent; fp: string; id: string; onDone: () => void }) {
   const t = useT();
   const hosts = useHostsController();
-  const trigger = useRef<HTMLButtonElement>(null);
   const how = agent.instructions;
   const [checking, setChecking] = useState(false);
   const other = agent.id === OTHER;
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Trigger asChild>
-        <Button ref={trigger} variant="ghost" size="compact">{label}</Button>
-      </Popover.Trigger>
-      {/* Inside the dialog it opens from, so it is above the dialog and not behind it. */}
-      <Popover.Portal container={trigger.current?.closest("dialog") ?? undefined}>
-        <Popover.Content className="howto-popover" side="bottom" align="end" sideOffset={8} collisionPadding={16}>
-          <div className="howto-head">
-            <span className="agent-icon">{other ? <ConnectorIcon size={15} /> : <HarnessIcon harness={agent.id} size={16} />}</span>
-            <strong>{other ? t("agents.other.title") : t("agents.howto.title", { name: agent.label })}</strong>
-            <Popover.Close asChild><Button variant="ghost" size="icon" aria-label={t("common.close")}><CloseIcon size={16} /></Button></Popover.Close>
-          </div>
-          {!how ? <p className="muted small">{t("agents.howto.none")}</p> : <>
-            {other && <p className="muted small">{t("agents.other.detail")}</p>}
-            {how.command && <><p className="muted small">{other ? t("agents.other.command") : t("agents.howto.command")}</p><CodeBlock code={how.command} /></>}
-            {how.snippet && <><p className="muted small">{how.file ? t("agents.howto.file", { file: how.file }) : t("agents.other.json")}</p><CodeBlock code={how.snippet} /></>}
-            <div className="howto-foot">
-              <span className="muted small">{t("agents.howto.after")}</span>
-              <Button variant="primary" size="compact" disabled={checking}
-                onClick={async () => { setChecking(true); await hosts.loadAgents(fp, true); setChecking(false); onOpenChange(false); }}>
-                {checking ? t("agents.howto.checking") : t("agents.howto.check")}
-              </Button>
-            </div>
-          </>}
-          <Popover.Arrow className="howto-arrow" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <div className="agent-howto" id={id}>
+      {!how ? <p className="muted small">{t("agents.howto.none")}</p> : <>
+        {other && <p className="muted small">{t("agents.other.detail")}</p>}
+        {how.command && <><p className="howto-label">{other ? t("agents.other.command") : t("agents.howto.command")}</p><CodeBlock code={how.command} /></>}
+        {how.snippet && <><p className="howto-label">{how.file ? t("agents.howto.file", { file: how.file }) : t("agents.other.json")}</p><CodeBlock code={how.snippet} /></>}
+        <div className="howto-foot">
+          <span className="muted small">{t("agents.howto.after")}</span>
+          <Button variant="primary" size="compact" disabled={checking}
+            onClick={async () => { setChecking(true); await hosts.loadAgents(fp, true); setChecking(false); onDone(); }}>
+            {checking ? t("agents.howto.checking") : t("agents.howto.check")}
+          </Button>
+        </div>
+      </>}
+    </div>
   );
 }
 
@@ -94,6 +78,7 @@ export function AgentRow({ fp, agent, mode, onConnected }: { fp: string; agent: 
   const error = useHosts((s) => s.agentErrors[key]);
   const manualOnly = agent.connect === "manual";
   const [open, setOpen] = useState(false);
+  const panelId = "howto-" + fp.slice(0, 6) + "-" + agent.id;
   // A failed automatic connection opens the way to do it by hand.
   useEffect(() => { if (error) setOpen(true); }, [error]);
   const notConnected = agent.registration === "not-connected";
@@ -103,7 +88,8 @@ export function AgentRow({ fp, agent, mode, onConnected }: { fp: string; agent: 
     if (answer?.agent.registration === "connected") onConnected?.(answer.agent.label);
   }
   return (
-    <li className="agent-row" data-registration={agent.registration}>
+    <li className="agent-row" data-registration={agent.registration} data-open={open || undefined}>
+      <div className="agent-main">
       <span className="agent-icon">{agent.id === OTHER ? <ConnectorIcon size={16} /> : <HarnessIcon harness={agent.id} size={18} />}</span>
       <span className="agent-copy">
         <span className="agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}
@@ -121,10 +107,14 @@ export function AgentRow({ fp, agent, mode, onConnected }: { fp: string; agent: 
           </> : agent.registration === "foreign" ? <SidevoiceLink registration="foreign" />
           : <>
             {isNew && <Button variant="ghost" size="compact" onClick={() => void hosts.agentAction(fp, agent.id, "dismiss")}>{t("agents.notNow")}</Button>}
-            <HowToPopover agent={agent} fp={fp} open={open} onOpenChange={setOpen} label={manualOnly ? t("agents.howto.manualToggle") : t("agents.howto.toggle")} />
+            <Button variant="ghost" size="compact" className="howto-toggle" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>
+              {manualOnly ? t("agents.howto.manualToggle") : t("agents.howto.toggle")}<ChevronIcon size={14} className={open ? "chevron-up" : undefined} />
+            </Button>
             {!manualOnly && <Button variant="primary" size="compact" onClick={() => void connect()}>{t("agents.connect")}</Button>}
           </>}
       </span>
+      </div>
+      {open && notConnected && <HowToPanel agent={agent} fp={fp} id={panelId} onDone={() => setOpen(false)} />}
     </li>
   );
 }
