@@ -1,4 +1,4 @@
-import type { DownloadsView, ChatMessage, ConversationView, HostAgentsState, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, SettingsAgentRequest, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
+import type { DownloadsView, ChatMessage, ConversationView, HostAgentsState, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, SettingsAgentRequest, SettingsPreferencesLoad, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
 /** One device to choose. `system` is the system's own choice, `number` a device the system lists without a name (its
  *  place, from 1), `missing` the chosen one, no longer connected: whoever shows it words those itself. */
@@ -26,7 +26,7 @@ export interface SessionFacts {
  /** The machines this device is paired with (never their tokens), the one in use, and the clock they were read at. */
  pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number; machinesReady: boolean;
  /** Per-fingerprint host agent listings. A late response remains attached to its host. */
- hostAgents: Record<string, HostAgentsState>; settingsAgentRequest: SettingsAgentRequest | null;
+ hostAgents: Record<string, HostAgentsState>; settingsAgentRequest: SettingsAgentRequest | null; settingsPreferences: SettingsPreferencesLoad;
  localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number}>;
  /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */

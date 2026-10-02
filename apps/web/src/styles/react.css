@@ -157,6 +157,9 @@ body,
 .settings-dialog .settings-content { min-width:0;min-height:0;max-width:100%;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable }
 .settings-dialog .settings-content>section { min-width:0;max-width:100% }
 .settings-dialog .settings-footer { min-width:0;padding-bottom:max(1rem,env(safe-area-inset-bottom));padding-inline:max(1.5rem,env(safe-area-inset-left)) max(1.5rem,env(safe-area-inset-right)) }
+.settings-dialog .settings-preferences-status,.settings-dialog .settings-preferences-error { flex:1 1 100%;min-width:0;margin:0 }
+.settings-dialog .settings-preferences-error { display:flex;align-items:center;justify-content:space-between;gap:.5rem;color:#f0afa6 }
+.settings-dialog .settings-preferences-error span { min-width:0;overflow-wrap:anywhere }
 .settings-dialog label,.settings-dialog input,.settings-dialog select { max-width:100% }
 .settings-dialog .ui-native-select { min-width:0;text-overflow:ellipsis;white-space:nowrap }
 .settings-dialog .model-picker {

@@ -545,6 +545,67 @@ test('Opening Settings reads the integrations and each opening asks a provider\'
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(calls.filter(path=>path.includes('/transcription/models')).length,2,'a fresh list on every opening');
 });
+test('Settings opens on device preferences and Machines stays navigable while host languages never resolve',async()=>{
+ const s=setup({strictDOM:true});
+ s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en',audio_grace_seconds:2});
+ s.run("window.roomI18n={setLanguage(){}}");
+ s.context.fetch=path=>path==='/api/presentation/languages'?new Promise(()=>{}):new Promise(()=>{});
+
+ // Do not await the click: a host is allowed to leave its preference response pending indefinitely.
+ s.run("$('settings-open').click()");
+ assert.equal(!!s.run("$('language-settings').open"),true,'the click opens the actual dialog before waiting for the host');
+ assert.equal(s.run("$('ui-language').value"),'en','the dialog first uses this device\'s saved preference');
+ s.run("$('settings-machines').click()");
+ assert.equal(s.run("$('pane-machines').hidden"),false,'the Machines pane responds while the host request is pending');
+ assert.equal(s.run("$('pane-general').hidden"),true);
+});
+test('Late host preferences fill the saved host stage but preserve edits made after Settings opened',async()=>{
+ const s=setup({strictDOM:true});
+ const A_STT=stage('openai','model-of-a',{language:'es',context:'host A'});
+ s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en',audio_grace_seconds:2});
+ s.saved['sidevoice.stages']=JSON.stringify({default:{},hosts:{[PAIRED.fp]:{stt:A_STT}}});
+ s.run("window.roomI18n={setLanguage(){}}");
+ let release;const pending=new Promise(resolve=>{release=resolve});
+ s.context.fetch=path=>path==='/api/presentation/languages'?pending:new Promise(()=>{});
+
+ s.run("$('settings-open').click()");
+ assert.equal(s.run("$('ui-language').value"),'en','opening does not wait for host preferences');
+ assert.equal(s.run("$('audio-grace-seconds').value"),'2');
+ s.run("$('audio-grace-seconds').value='7'");
+ const draft=stage('device','whisper-base',{language:'en',context:'typed while loading'});
+ s.context.__draft=draft;s.run('roomStore.patch({stageDraft:{stt:__draft,tts:null}})');
+ release({ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:9,replay_on_return_seconds:45})});
+ await settle();
+
+ assert.equal(s.run("$('audio-grace-seconds').value"),'7','a value edited while the request was pending stays in the form');
+ assert.equal(s.run('voicePreferences.stt.model'),'model-of-a','the in-use host keeps its saved stage');
+ assert.equal(JSON.stringify(s.run('stageDraft.stt')),JSON.stringify(draft),'the user\'s unsaved stage draft survives the response');
+ assert.equal(s.run('settingsPreferences.status'),'ready');
+});
+test('Switching machines cancels the open Settings preference request before its host answer arrives',async()=>{
+ const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
+ const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
+ const B_STT=stage('device','whisper-base',{language:'en',context:'host B'});
+ s.saved['sidevoice.stages']=JSON.stringify({default:{},hosts:{[PAIRED.fp]:{stt:stage('openai','model-of-a')},[B.fp]:{stt:B_STT}}});
+ s.run("window.roomI18n={setLanguage(){}}");
+ let release;const pending=new Promise(resolve=>{release=resolve});
+ s.context.fetch=path=>path==='/api/presentation/languages'?pending:new Promise(()=>{});
+
+ s.run("$('settings-open').click()");
+ const oldRequest=s.run('settingsPreferences.request');
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ const switched=s.run('settingsPreferences');
+ assert.equal(switched.host,B.fp);
+ assert.equal(switched.status,'idle');
+ assert.ok(switched.request>oldRequest,'host selection invalidates the previous request epoch');
+ release({ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:9})});
+ await settle();
+
+ const after=s.run('settingsPreferences');
+ assert.equal(after.host,B.fp,'the previous host cannot claim the new selection');
+ assert.equal(after.status,'idle','the previous host response cannot change the current request state');
+ assert.equal(s.run('voicePreferences.stt.model'),'whisper-base','the newly selected host keeps its own saved stage');
+});
 test('A listing the machine could not give keeps the saved provider, locks the choice, and can be asked again (F18)',async()=>{
  const s=setup({strictDOM:true});
  s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})}});
@@ -552,7 +613,7 @@ test('A listing the machine could not give keeps the saved provider, locks the c
  let fail=true;
  const {fetch}=settingsFetch({integrations:async()=>fail?{ok:false,status:502,json:async()=>({detail:'La máquina no respondió'})}:{ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}))}});
  s.context.fetch=fetch;
- await s.run("$('settings-open').onclick()");
+ s.run("$('settings-open').onclick()");await settle();
  let stt=stageView(s,'stt');
  assert.equal(stt.integrations,'failed');
  assert.equal(stt.place,'openai','an outage is not evidence the provider is gone');

@@ -1712,27 +1712,7 @@ async function receiveBrowserSpeech(d,cloud=false){
 }
 function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 
-$('settings-open').onclick=async()=>{try{
- // A new opening is a new settings session: whatever the last one still has on its way is dropped.
- integrationEpoch++;forgetKeyChecks();
- scanPairedAgents(true);
- // Without an answered machine, use this device's saved app preferences and leave host-owned data alone.
- if(nodeBase==null)settingsSection('machines');else settingsSection('general');
- const p=nodeBase==null?devicePreferences():await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
- roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
- for(const task of TASKS)selection.dismiss(task);
- for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
- for(const key of MIC_KEYS)$(key.replaceAll('_','-')).value=p[key];
- $('presence-sound').value=(p.presence_sound??'on')==='off'?'off':'on';
- $('locked-call').value=p.locked_call==='off'?'off':'on';
- $('settings-error').textContent='';
- if(!$('language-settings').open)$('language-settings').showModal();
- // Existing provider keys and provider lists belong to the reachable host. No key is requested when there is no
- // machine to read; local model offers can still be measured for the no-machine note.
- const work=[measureDevice().catch(error=>{$('settings-error').textContent=error.message})];
- if(nodeBase!=null)work.push(loadIntegrations().then(()=>loadStageLists(true)));
- await Promise.all(work);
-}catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
+$('settings-open').onclick=()=>openSettings();
 function settingsSection(name){
  if(name==='integrations'){
   const fp=pairings.inUse;
@@ -1996,9 +1976,11 @@ function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===inte
  * and the stages are that machine's own (a composition per client × host), switched in the same step. */
 function switchStages(){
  resetIntegrations();
+ settingsPreferencesEpoch++;
  for(const task of TASKS)selection.cancel(task);
  const {stt:_stt,tts:_tts,...rest}=state.voicePreferences||{};
- roomStore.patch({stageDraft:null,voicePreferences:state.voicePreferences&&{...rest,...storedStages(pairings.inUse)}});
+ roomStore.patch({stageDraft:null,voicePreferences:state.voicePreferences&&{...rest,...storedStages(pairings.inUse)},
+  settingsPreferences:{host:pairings.inUse,request:settingsPreferencesEpoch,status:'idle'}});
 }
 function resetIntegrations(){
  integrationEpoch++;
@@ -2103,7 +2085,9 @@ async function settleIntegrationKeys(){
  }
 }
 function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
-$('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$('language-settings').addEventListener('close',stopPreview);
+function cancelSettingsPreferences(){settingsFormSeed=null;roomStore.patch({settingsPreferences:{host:null,request:++settingsPreferencesEpoch,status:'idle'}})}
+$('settings-close').onclick=()=>{stopPreview();cancelSettingsPreferences();$('language-settings').close()};
+$('language-settings').addEventListener('close',()=>{stopPreview();cancelSettingsPreferences()});
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
 // The only thing a device says about turn detection. The seconds behind each word are the room's, in one
 // place for everyone: a device that had saved the old numbers kept them after the room changed its mind,
@@ -2149,6 +2133,63 @@ function storePreferences(p,fp=pairings.inUse){try{
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
 // The room's stage defaults are not this device's: it cannot know what this device runs, so they are left out.
 async function loadPreferences(){const {stt:_stt,tts:_tts,...defaults}=await api('/api/presentation/languages');return {...defaults,...devicePreferences()}}
+const SETTINGS_FORM_DEFAULTS={audio_grace_seconds:1,replay_on_return_seconds:120,turn_patience:'normal',presence_sound:'on',locked_call:'on'};
+const SETTINGS_FORM_FIELDS={ui_language:'ui-language',audio_grace_seconds:'audio-grace-seconds',replay_on_return_seconds:'replay-on-return-seconds',
+ turn_patience:'turn-patience',presence_sound:'presence-sound',locked_call:'locked-call'};
+let settingsPreferencesEpoch=0,settingsFormSeed=null;
+function settingsFormValues(preferences){return {ui_language:preferences.ui_language||systemPreferences().ui_language,
+ ...Object.fromEntries(Object.entries(SETTINGS_FORM_DEFAULTS).map(([key,fallback])=>[key,preferences[key]??fallback]))}}
+function fillSettingsForm(preferences,unchangedSince=null){
+ const values=settingsFormValues(preferences);
+ for(const [key,id] of Object.entries(SETTINGS_FORM_FIELDS)){
+  const field=$(id);if(!field)continue;
+  if(unchangedSince&&String(field.value)!==String(unchangedSince[key]))continue;
+  field.value=String(values[key]);
+ }
+ return values;
+}
+function currentSettingsPreferences(scope){return !!$('language-settings')?.open&&scope.request===settingsPreferencesEpoch&&scope.host===pairings.inUse}
+async function loadSettingsPreferences(scope,initial){
+ roomStore.patch({settingsPreferences:{host:scope.host,request:scope.request,status:'loading'}});
+ try{
+  const preferences=await loadPreferences();if(!currentSettingsPreferences(scope))return;
+  const language=$('ui-language'),languageWasUnchanged=!language||String(language.value)===String(initial.ui_language);
+  fillSettingsForm(preferences,initial);
+  if(languageWasUnchanged)window.roomI18n?.setLanguage(settingsFormValues(preferences).ui_language);
+  // The panes read their saved choice from voicePreferences. A draft made while this read was in flight
+  // remains what the person sees, while the host-specific saved stage becomes the new baseline.
+  roomStore.patch({voicePreferences:preferences,stageDraft:state.stageDraft,
+   settingsPreferences:{host:scope.host,request:scope.request,status:'ready'}});
+ }catch{
+  if(currentSettingsPreferences(scope))roomStore.patch({settingsPreferences:{host:scope.host,request:scope.request,status:'failed'}});
+ }
+}
+function openSettings(){
+ // A new opening is a new settings session: whatever the last one still has on its way is dropped.
+ integrationEpoch++;forgetKeyChecks();
+ const request=++settingsPreferencesEpoch,host=nodeBase!=null?pairings.inUse:null,scope={request,host};
+ scanPairedAgents(true);
+ // Open on this device's known preferences first; the selected machine fills its own defaults in afterward.
+ settingsSection(host==null?'machines':'general');
+ const preferences=devicePreferences();settingsFormSeed=fillSettingsForm(preferences);
+ window.roomI18n?.setLanguage(settingsFormSeed.ui_language);
+ roomStore.patch({voicePreferences:preferences,stageDraft:null,previewNote:'',prepareNote:'',
+  settingsPreferences:{host,request,status:host?'loading':'idle'}});
+ for(const task of TASKS)selection.dismiss(task);
+ $('settings-error').textContent='';
+ if(!$('language-settings').open)$('language-settings').showModal();
+ if(host)void loadSettingsPreferences(scope,settingsFormSeed);
+ // Neither a device measurement nor a host catalogue is part of opening the dialog: each can finish on its own.
+ void measureDevice().catch(error=>{if(currentSettingsPreferences(scope))$('settings-error').textContent=error.message});
+ if(host)void loadIntegrations().then(()=>{if(currentSettingsPreferences(scope))loadStageLists(true)});
+}
+async function retrySettingsPreferences(){
+ const previous=state.settingsPreferences;
+ if(previous.status!=='failed'||!previous.host||previous.host!==pairings.inUse||!$('language-settings')?.open)return;
+ const scope={host:previous.host,request:++settingsPreferencesEpoch};
+ roomStore.patch({settingsPreferences:{host:scope.host,request:scope.request,status:'loading'}});
+ await loadSettingsPreferences(scope,settingsFormSeed||settingsFormValues(devicePreferences()));
+}
 /* The preferences a call is made with: both stages resolved against what this device can run now. */
 async function callPreferences(){
  const p=await loadPreferences();
@@ -2383,6 +2424,7 @@ window.sidevoiceActions={
  previewVoice,
  prepareVoice,
  retryIntegrations,
+ retrySettingsPreferences,
  retryGpu,
  typeIntegrationKey,
  checkIntegrationKey,
