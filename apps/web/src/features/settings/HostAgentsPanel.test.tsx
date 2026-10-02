@@ -172,6 +172,46 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
   }
 });
 
+test("foreign Codex manual replacement closes and confirms on connect, then stays closed after disconnect", () => {
+  vi.useFakeTimers();
+  const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
+    "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
+  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: { command: replacement, file: null, snippet: null } });
+  const store = createRoomStore();
+  const hostAgentAction = vi.fn(async () => {});
+  setActions({ hostAgentAction });
+  act(() => store.patch({ hostAgents: { fp: ready([foreign]) } }));
+  let view: ReturnType<typeof render> | undefined;
+  try {
+    view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+    const row = screen.getByText("Connected to a different MCP server").closest("li") as HTMLElement;
+    const reveal = within(row).getByRole("button", { name: "Replace manually" });
+    fireEvent.click(reveal);
+    expect(reveal).toHaveAttribute("aria-expanded", "true");
+    expect(row).toHaveTextContent("codex mcp remove sidevoice");
+
+    const connected = known("codex", { registration: "connected", actionable: false, instructions: null });
+    act(() => store.patch({ hostAgents: { fp: ready([connected]) } }));
+    expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
+    expect(row).toHaveTextContent("Codex is ready for new conversations.");
+    expect(within(row).getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(hostAgentAction).not.toHaveBeenCalled();
+
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(row).not.toHaveTextContent("Codex is ready for new conversations.");
+    fireEvent.click(within(row).getByRole("button", { name: "Disconnect" }));
+    expect(hostAgentAction).toHaveBeenCalledWith("fp", "codex", "disconnect");
+
+    const disconnected = known("codex", { registration: "not-connected", actionable: false });
+    act(() => store.patch({ hostAgents: { fp: ready([disconnected]) } }));
+    expect(within(row).getByRole("button", { name: "Do it myself" })).toHaveAttribute("aria-expanded", "false");
+    expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
+  } finally {
+    view?.unmount();
+    vi.useRealTimers();
+  }
+});
+
 test("foreign rows without host instructions stay read-only while an automatic connection failure opens manual setup", async () => {
   const foreign = known("claude", { registration: "foreign", actionable: false, instructions: null });
   const store = createRoomStore();

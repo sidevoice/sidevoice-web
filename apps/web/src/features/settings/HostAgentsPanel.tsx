@@ -83,7 +83,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
 
   useEffect(() => { if (error) setOpen(true); }, [error]);
   useEffect(() => {
-    if (previous.current === "not-connected" && agent.registration === "connected") {
+    if ((previous.current === "not-connected" || previous.current === "foreign") && agent.registration === "connected") {
       setOpen(false);
       setJustConnected(true);
     }
