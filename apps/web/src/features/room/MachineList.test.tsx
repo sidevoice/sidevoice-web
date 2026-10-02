@@ -209,6 +209,35 @@ test("an available Update click delegates to the optional desktop transaction", 
   expect(version).toHaveBeenCalledTimes(3);
 });
 
+test("copied Update errors omit unrecognized bridge keys and steps while retaining safe checks", async () => {
+  const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
+  const version = vi.fn(async () => available);
+  const update = vi.fn().mockRejectedValue({ key: "SV1.private-pairing-code", step: "token-secret",
+    params: { check: "archive-link", token: "raw-token" } });
+  setBridge({ version, update });
+  actions();
+  room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+
+  const writeText = vi.fn(async (_value: string) => {});
+  const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sidevoice could not prepare this computer.");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
+
+    const copied = writeText.mock.calls[0][0];
+    expect(JSON.parse(copied)).toEqual({ key: "install.unknown", params: { check: "archive-link" } });
+    expect(copied).not.toContain("SV1.private-pairing-code");
+    expect(copied).not.toContain("token-secret");
+    expect(copied).not.toContain("raw-token");
+  } finally {
+    if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
 test("a newer installed build found at click time is never downgraded", async () => {
   const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
   const newer: LocalHostVersion = { ...available, update: "newer-installed" };

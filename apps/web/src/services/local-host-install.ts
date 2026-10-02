@@ -32,9 +32,23 @@ const SAFE_VERIFICATION_CHECKS = new Set([
   "download-size", "archive-path", "archive-link", "archive-size", "archive-type",
 ]);
 const SAFE_NUMERIC_PARAMS = new Set(["attempt", "attempts", "limit", "bytes", "duration_ms"]);
+const SAFE_ERROR_KEYS = new Set([
+  "install.network", "install.proxy", "install.disk", "install.checksum", "install.no-bundle",
+  "install.authenticity", "install.self-test", "install.rollback", "install.rollback-failed",
+  "install.executable-missing", "install.unsafe", "install.cancelled", "install.unknown",
+  "cli.timeout", "unsupported", "service.failed", "service.start.failed", "launch.failed",
+  "bridge.invalid-response", "import.missing-module", "bind.port-in-use", "identity.unreadable",
+  "identity.unsafe-directory", "start.failed", "launch.missing-executable", "launch.permission",
+  "launch.exited", "hang", "ready.timeout", "executable-missing", "permission-denied", "start-limit",
+  "not-loaded",
+]);
+const SAFE_STEPS = new Set([
+  "download", "verification", "verify", "staging", "service-start", "service_start", "service",
+  "pairing", "wait", "commit", "rollback", "self-test",
+]);
 
 function safeStep(value: unknown) {
-  return typeof value === "string" && /^[\w.-]{1,100}$/.test(value) ? value : null;
+  return typeof value === "string" && SAFE_STEPS.has(value) ? value : null;
 }
 
 function safeParams(value: unknown) {
@@ -54,7 +68,7 @@ function safeParams(value: unknown) {
 export function normalizeLocalHostBridgeError(value: unknown, fallbackStep: string | null = null): LocalHostBridgeError {
   const outer = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const source = outer.failure && typeof outer.failure === "object" ? outer.failure as Record<string, unknown> : outer;
-  const key = typeof source.key === "string" && /^[\w.-]{1,100}$/.test(source.key) ? source.key : "install.unknown";
+  const key = typeof source.key === "string" && SAFE_ERROR_KEYS.has(source.key) ? source.key : "install.unknown";
   const params = safeParams(source.params);
   return {
     key,

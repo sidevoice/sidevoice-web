@@ -141,6 +141,27 @@ test("authenticity failures translate allowlisted connector check IDs", async ()
   expect(alert).not.toHaveTextContent("sigstore-bundle");
 });
 
+test("install details omit unrecognized bridge error keys and steps while retaining safe checks", async () => {
+  const failed = deferred<LocalHostStatus>();
+  const controller = fakeController({ install: vi.fn(() => operation("unsafe-error-job", failed.promise)) });
+  const writeText = vi.fn(async (_value: string) => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  render(<LocalHostInstallEntry showCta controller={controller} />);
+
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  await act(async () => {
+    failed.reject({ key: "SV1.private-pairing-code", step: "token-secret", params: { check: "archive-link" } });
+    await Promise.resolve();
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent("Sidevoice could not prepare this computer.");
+
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
+  const copied = writeText.mock.calls[0][0];
+  expect(JSON.parse(copied)).toEqual({ key: "install.unknown", params: { check: "archive-link" } });
+  expect(copied).not.toContain("SV1.private-pairing-code");
+  expect(copied).not.toContain("token-secret");
+});
+
 test("connecting to another machine dismisses a settled failure without changing remote pairing", async () => {
   const failed = deferred<LocalHostStatus>();
   const controller = fakeController({ install: vi.fn(() => operation("failed-job", failed.promise)) });
