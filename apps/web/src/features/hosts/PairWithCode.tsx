@@ -4,8 +4,10 @@ import { decodePairingCode } from "../../services/device-pairing.js";
 import { currentDeviceName } from "../../state/device-name";
 import { currentLanguage, useT } from "../../i18n";
 import { useHostsController } from "../../state/hosts/hosts-store";
+import { CopyButton } from "./common";
 
 const LOOPBACK = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(\/|$)/;
+const INSTALL = "npx @sidevoice/uplink install";
 
 /** Why a code could not be used, as a message key (W2′, §5.1). device-pairing.js still words its refusals in Spanish
  *  sentences (#128); they are recognised here by their stable start and said through the bundles. */
@@ -34,15 +36,12 @@ export function loopbackOnly(code: string): boolean {
   } catch { return false; }
 }
 
-/** W2′ «Conecta con tu máquina», and Configuración › Máquinas › «Añadir una máquina» (F4): a code and this
- *  device's name; the page redeems it. */
-export function PairWithCode({ onPaired, submitLabel, use = true, renderActions = (submit) => submit }: { onPaired: (fp: string) => void; submitLabel?: string; use?: boolean; renderActions?: (submit: ReactNode) => ReactNode }) {
+/** W2′ «Conecta con tu máquina», and Configuración › Máquinas › «Añadir una máquina» (F4): the installation
+ *  command, a code from the machine, and the name kept in General; the page redeems it. */
+export function PairWithCode({ onPaired, submitLabel, use = true, renderActions = (submit) => submit }: { onPaired: (fp: string) => void | Promise<void>; submitLabel?: string; use?: boolean; renderActions?: (submit: ReactNode) => ReactNode }) {
   const t = useT();
   const hosts = useHostsController();
   const [code, setCode] = useState("");
-  // device-pairing.js names this device in Spanish (#128); the platform it found is said through the bundles.
-  // The computer's name by default (operator, 2026-10-02), or the one chosen in General.
-  const [name, setName] = useState(() => currentDeviceName((where) => t("pair.deviceName", { where })));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ key: string; text?: string } | null>(null);
 
@@ -53,9 +52,11 @@ export function PairWithCode({ onPaired, submitLabel, use = true, renderActions 
     if (loopbackOnly(code)) { setError({ key: "pair.error.loopbackOnly" }); return; }
     setBusy(true);
     try {
+      // The name is set in General and applies to pairings made from now on.
+      const name = currentDeviceName((where) => t("pair.deviceName", { where }));
       const pairing = await hosts.addRemote(code, name, { use });
       setCode("");
-      onPaired(pairing.fp);
+      await onPaired(pairing.fp);
     } catch (reason) {
       setError(pairingFailureKey(reason));
     } finally {
@@ -65,6 +66,10 @@ export function PairWithCode({ onPaired, submitLabel, use = true, renderActions 
 
   return (
     <form className="pair-with-code" onSubmit={submit} aria-busy={busy}>
+      <div className="npx-hint">
+        <p className="muted">{t("noMachine.notReady")}</p>
+        <div className="npx-line"><code>{INSTALL}</code><CopyButton text={INSTALL} /></div>
+      </div>
       <ol className="pair-steps muted">
         <li>{t("pair.step1")}</li>
         <li>{t("pair.step2")} <code>sidevoice pair-device</code></li>
@@ -73,9 +78,6 @@ export function PairWithCode({ onPaired, submitLabel, use = true, renderActions 
       <label className="ui-field">{t("pair.code")}
         <textarea id="pair-code" className="pair-code" rows={3} value={code} placeholder="SV1.…" required disabled={busy}
           spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" onChange={(event) => setCode(event.currentTarget.value)} />
-      </label>
-      <label className="ui-field">{t("pair.name")}
-        <input id="pair-name" value={name} maxLength={60} autoComplete="off" disabled={busy} onChange={(event) => setName(event.currentTarget.value)} />
       </label>
       {error && <p className="form-error" role="alert">{error.text && currentLanguage() === "es" ? error.text : t(error.key)}</p>}
       {renderActions(<Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pair.connecting") : submitLabel ?? t("pair.connect")}</Button>)}

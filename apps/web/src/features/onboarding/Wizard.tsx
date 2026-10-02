@@ -237,7 +237,7 @@ function W2r() {
   return (
     <>
       <p className="muted">{t("wizard.w2r.lead")}</p>
-      <PairWithCode onPaired={(fp) => { void hosts.loadIntegrations(fp); hosts.goTo("W4"); }} renderActions={(submit) => <Actions>{submit}</Actions>} />
+      <PairWithCode onPaired={async (fp) => { await hosts.loadIntegrations(fp); hosts.goTo("W4"); }} renderActions={(submit) => <Actions>{submit}</Actions>} />
     </>
   );
 }

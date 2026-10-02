@@ -1,9 +1,10 @@
 /** Spanish. A missing key falls back to English. Copy as ONBOARDING_AND_HOSTS.md §5 words it. */
 export const es: Record<string, string> = {
   "prototype.scenario.P17.title": "Ordenador configurado, NUC sin configurar",
-  "prototype.scenario.P17.walk": "Abre NUC > Voz o Transcripción. Copia los modelos de este ordenador al NUC con «Copiar de otra máquina».",
+  "prototype.scenario.P17.walk": "Abre NUC > Voz o Transcripción para configurarlo. Este ordenador ya tiene sus propios modelos, visibles en sus pestañas.",
   "prototype.scenario.P18.title": "NUC configurado, ordenador sin configurar",
-  "prototype.scenario.P18.walk": "Abre Este ordenador > Voz o Transcripción y copia del NUC. Su transcripción se ejecuta allí y no se copia; la voz de ElevenLabs sí se copia tras poner una clave para este ordenador.",
+  "prototype.scenario.P18.walk": "Abre Este ordenador > Voz o Transcripción para configurarlo. El NUC ya tiene su propia configuración, visible en sus pestañas.",
+  "host.remote.connected": "Conectada",
   "common.cancel": "Cancelar",
   "common.close": "Cerrar",
   "common.retry": "Reintentar",

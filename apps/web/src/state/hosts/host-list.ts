@@ -58,11 +58,6 @@ export function failurePhrase(failure: { key: string; detail?: string } | null |
   return { key: "failure." + failure.key, params: { detail: failure.detail ?? "" } };
 }
 
-function hostOf(url: string | undefined): string {
-  if (!url) return "";
-  try { return new URL(url).host; } catch { return url; }
-}
-
 /** The local host's row line for each state (F6, §4.1 refused, §4.3 incompatible). */
 export function localSubtitle(local: LocalHostState): { dot: Dot; subtitle: Phrase; cause: Phrase | null } {
   const cause = failurePhrase(local.failure);
@@ -89,9 +84,7 @@ export function remoteSubtitle(pairing: StoredPairing, reach: RemoteReach | unde
     const since = reach.since ? sinceWords(now / 1000 - reach.since) : null;
     return { dot: "fail", subtitle: since ? { key: "host.remote.silentSince", params: since } : { key: "host.remote.silent" } };
   }
-  return reach.via === "room"
-    ? { dot: "ok", subtitle: { key: "host.remote.viaRoom", params: { where: hostOf(pairing.rv?.url) } } }
-    : { dot: "ok", subtitle: { key: "host.remote.direct", params: { where: hostOf(pairing.urls[0]) } } };
+  return { dot: "ok", subtitle: { key: "host.remote.connected" } };
 }
 
 /** "3 h", "12 min", "2 días" — the amount and its unit key, for «No responde desde hace …». */

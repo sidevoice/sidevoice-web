@@ -10,13 +10,12 @@ import { stageLabel } from "../../state/stage-settings.js";
 import { RoomStoreContext, useRoomStore, type RoomStore } from "../../state/room-store";
 import { failurePhrase, localSubtitle, remoteSubtitle, type StoredPairing } from "../../state/hosts/host-list";
 import { useHosts, useHostsController, type HostTab } from "../../state/hosts/hosts-store";
-import { effectiveStage, hasStages, type Task } from "../../state/hosts/stage-scope";
+import { type Task } from "../../state/hosts/stage-scope";
 import { KeyLine, StageEditor } from "../settings/StageEditor";
 import { ProviderIcon } from "../../components/ui/Icons";
 import type { IntegrationProvider } from "../../state/room-types";
 import { AgentRow, OtherAgentSection } from "./AgentRow";
 import { CopyButton, formatWhen, HostDot, PhraseText } from "./common";
-import { NativeSelect } from "../../components/ui/NativeSelect";
 
 /** Draws a pairing code as a QR. The web carries no encoder yet; with none provided, the code is shown as text only. */
 export const QrRendererContext = createContext<((code: string) => React.ReactNode) | null>(null);
@@ -34,18 +33,16 @@ export function HostPage({ fp }: { fp: string }) {
   const tab = useHosts((s) => s.settings.tab);
   const local = useHosts((s) => s.local);
   if (!entry || !row) return <p className="muted">{t("host.gone")}</p>;
-  const route = entry.local ? t("host.thisComputer") : <PhraseText phrase={row.subtitle} />;
   return (
     <section className="host-page" aria-labelledby="host-title">
       <header className="host-head">
         <HostDot dot={row.dot} />
         <div>
           <h3 id="host-title">{entry.name || t("hosts.unnamed")}{row.inUse && <span className="badge badge-in-use">{t("hosts.inUse")}</span>}</h3>
-          <p className="muted small host-facts">
-            <span>{route}</span>
-            {entry.local && local?.core?.version && <span> · {t("host.version", { version: local.core.version })}</span>}
-            <span> · <code title={fp}>{fp.slice(0, 8)}</code></span>
-          </p>
+          {entry.local && <p className="muted small host-facts">
+            <span>{t("host.thisComputer")}</span>
+            {local?.core?.version && <span> · {t("host.version", { version: local.core.version })}</span>}
+          </p>}
         </div>
         {!row.inUse && <Button variant="ghost" size="compact" disabled={!row.usable} onClick={() => hosts.use(fp)}>{t("hosts.use")}</Button>}
       </header>
@@ -369,8 +366,7 @@ function DevicesTab({ fp, local }: { fp: string; local: boolean }) {
 }
 
 // ----- Voz / Transcripción -----
-/** A machine's own transcription or voice (operator, 2026-10-02): the stage editor for it — it edits the machine in
- *  use, so another one is put in use first — and «Copiar de…» another machine that has a configuration. */
+/** A machine's own transcription or voice. The editor follows the machine in use. */
 function MachineStage({ fp, task, inUse }: { fp: string; task: Task; inUse: boolean }) {
   const t = useT();
   const hosts = useHostsController();
@@ -378,55 +374,11 @@ function MachineStage({ fp, task, inUse }: { fp: string; task: Task; inUse: bool
     <div className="stages-tab">
       <p className="muted small">{t("stages.notInUse")}</p>
       <Button size="compact" onClick={() => hosts.use(fp)}>{t("hosts.use")}</Button>
-      <StagesCopy fp={fp} />
     </div>
   );
   return (
     <div className="stages-tab">
       <StageEditor task={task} />
-      <StagesCopy fp={fp} />
     </div>
-  );
-}
-
-/** «Copiar de…»: only when another machine has something to copy — this device's models as they are, a provider as
- *  a choice (asking for this machine's key if it has none), never what runs at the other machine itself. */
-function StagesCopy({ fp }: { fp: string }) {
-  const t = useT();
-  const hosts = useHostsController();
-  const scope = useHosts((s) => s.scope);
-  const rows = useHosts((s) => s.rows);
-  const keys = useHosts((s) => s.integrations[fp]?.value?.providers ?? []);
-  const [from, setFrom] = useState("");
-  const [note, setNote] = useState<string | null>(null);
-  useEffect(() => { void hosts.loadIntegrations(fp); }, [hosts, fp]);
-  const nameOf = (row: { local: boolean; name: string }) => row.local ? t("host.thisComputer") : row.name;
-  const sources = rows.filter((row) => row.fp !== fp && hasStages(scope, row.fp));
-  if (!sources.length) return null;
-  function copy() {
-    const source = sources.find((row) => row.fp === from);
-    if (!source) return;
-    const result = hosts.copyStages(source.fp, fp, (provider) => !!keys.find((p) => p.id === provider)?.configured);
-    const what = (tasks: Task[]) => tasks.map((task) => t(task === "stt" ? "stage.sttLower" : "stage.ttsLower")).join(" · ");
-    setNote([
-      result.copied.length ? t("stages.copied", { from: nameOf(source), what: what(result.copied) }) : "",
-      result.needsKey.length ? t("stages.copyNeedsKey", { what: what(result.needsKey) }) : "",
-      result.notCopied.length ? t("stages.copyNotHere", { what: what(result.notCopied), from: nameOf(source) }) : "",
-    ].filter(Boolean).join(" "));
-    setFrom("");
-  }
-  return (
-    <>
-      <div className="stages-copy">
-        <label className="ui-field">{t("stages.copyFrom")}
-          <NativeSelect value={from} onChange={(event) => setFrom(event.currentTarget.value)}>
-            <option value="">{t("stages.copyPick")}</option>
-            {sources.map((row) => <option key={row.fp} value={row.fp}>{nameOf(row)}</option>)}
-          </NativeSelect>
-        </label>
-        <Button size="compact" disabled={!from} onClick={copy}>{t("stages.copy")}</Button>
-      </div>
-      {note && <p className="ok-line small" role="status">{note}</p>}
-    </>
   );
 }

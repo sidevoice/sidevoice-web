@@ -6,9 +6,7 @@ import { useT } from "../../i18n";
 import { localBanner } from "../../state/hosts/host-list";
 import { stepGroups, pathOf } from "../../state/hosts/onboarding";
 import { useHosts, useHostsController } from "../../state/hosts/hosts-store";
-import { CopyButton, PhraseText } from "../hosts/common";
-
-const NPX = "npx @sidevoice/uplink install";
+import { PhraseText } from "../hosts/common";
 
 export function NoMachine() {
   const t = useT();
@@ -26,10 +24,6 @@ export function NoMachine() {
           <Button onClick={async () => { await hosts.choosePath("remote"); hosts.openWizard("W2r"); }}>{t("noMachine.otherMachine")}</Button>
         </> : <>
           <Button variant="primary" onClick={() => hosts.openWizard("W2r")}>{t("noMachine.connect")}</Button>
-          <div className="npx-hint">
-            <p className="muted">{t("noMachine.notReady")}</p>
-            <div className="npx-line"><code>{NPX}</code><CopyButton text={NPX} /></div>
-          </div>
         </>}
       </div>
     </section>

@@ -85,7 +85,7 @@ describe("host list (§4.1, §5.2)", () => {
   it("says since when a remote host is silent", () => {
     const now = 1_000_000_000_000;
     expect(remoteSubtitle(remote("nuc"), { state: "unreachable", since: now / 1000 - 3 * 3600 }, now).subtitle).toEqual({ key: "host.remote.silentSince", params: { amount: 3, unit: "h" } });
-    expect(remoteSubtitle(remote("nuc"), { state: "ok", via: "room" }, now).subtitle).toEqual({ key: "host.remote.viaRoom", params: { where: "room.example" } });
+    expect(remoteSubtitle(remote("nuc"), { state: "ok", via: "room" }, now).subtitle).toEqual({ key: "host.remote.connected" });
     expect(remoteSubtitle(remote("nuc", { revoked: true }), undefined, now).dot).toBe("fail");
   });
 
