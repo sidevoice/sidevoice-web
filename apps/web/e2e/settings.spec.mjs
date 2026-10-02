@@ -36,7 +36,10 @@ async function respond(route, value, status = 200) {
 }
 
 async function installHarness(page, { languageMode = "pending" } = {}) {
-  const fake = { languageMode, scans: 0, hostMode: "normal", connectMode: "success", disconnectMode: "success", authorization: [] };
+  let releaseDeferredLanguage;
+  const deferredLanguage = new Promise((resolve) => { releaseDeferredLanguage = resolve; });
+  const fake = { languageMode, scans: 0, hostMode: "normal", connectMode: "success", disconnectMode: "success", authorization: [],
+    releaseDeferredLanguage: () => releaseDeferredLanguage() };
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -50,6 +53,10 @@ async function installHarness(page, { languageMode = "pending" } = {}) {
     if (pathname === "/api/presentation/languages") {
       if (fake.languageMode === "pending") return new Promise(() => {});
       if (fake.languageMode === "fail") return respond(route, { detail: "temporary preference read failure" }, 503);
+      if (fake.languageMode === "deferred") {
+        await deferredLanguage;
+        return respond(route, languagePreferences);
+      }
       return respond(route, languagePreferences);
     }
     if (pathname === "/api/presentation") return respond(route, { binding: null, call: null, room: { web_build: null } });
@@ -190,10 +197,11 @@ test("failed host preferences show a machine-keyed retry and a fresh read clears
   await expect(failure).toHaveAttribute("data-host", hostFingerprint);
   await expect(failure.getByRole("button", { name: "Retry" })).toBeVisible();
 
-  fake.languageMode = "success";
+  fake.languageMode = "deferred";
   await failure.getByRole("button", { name: "Retry" }).click();
   await expect(dialog.getByText("Loading settings for E2E Host…")).toBeVisible();
   await expect(dialog.locator(".settings-preferences-error")).toHaveCount(0);
+  fake.releaseDeferredLanguage();
   await expect(dialog.getByText("Loading settings for E2E Host…")).toHaveCount(0);
 });
 

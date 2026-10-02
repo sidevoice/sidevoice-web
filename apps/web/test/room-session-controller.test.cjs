@@ -2435,6 +2435,31 @@ test('the Agents API proves the paired host before sending its device token',asy
  assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
 });
 
+test('the Agents API accepts and reuses a proved same-origin empty base',async()=>{
+ const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
+ const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'':node}}),agentRequests=[];
+ s.context.location.origin='http://127.0.0.1:8768';
+ s.run(`targetAbout={kind:'node',fingerprint:${JSON.stringify(node.fp)}}`);
+ s.context.fetch=async(url,init={})=>{
+  if(String(url).startsWith('/api/host/agents')){
+   agentRequests.push({url:String(url),init});
+   return {ok:true,status:200,json:async()=>({agents:[],scanned_at:1})};
+  }
+  return net.get(String(url),init);
+ };
+
+ await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
+ await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
+
+ assert.equal(agentRequests.length,2,'each scan reaches the node through its authenticated same-origin API');
+ assert.deepEqual(agentRequests.map(request=>request.url),['/api/host/agents?rescan=1','/api/host/agents?rescan=1']);
+ assert.ok(agentRequests.every(request=>request.init.headers.Authorization==='Bearer tok-1'));
+ const identities=net.asked.filter(request=>request.url.startsWith('/api/device/identity?nonce='));
+ assert.equal(identities.length,1,'the empty string is cached as a proved base, not mistaken for no base');
+ assert.equal(identities[0].auth,null,'identity proof remains unauthenticated');
+ assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
+});
+
 test('forgetting a host during identity proof prevents the pending Agents request from sending its token',async()=>{
  const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
  const s=setup({stored:{in_use:null,pairings:[pairing]}}),net=network({at:{'http://127.0.0.1:8768':node}}),agentRequests=[];

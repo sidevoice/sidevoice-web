@@ -666,7 +666,7 @@ async function hostApi(fp,path,options={}){
  const pairing=pairings.list.find(item=>item.fp===fp);
  if(!pairing||pairing.revoked)throw Object.assign(Error('unreachable'),{key:'unreachable'});
  let base=pairing.local?pairing.urls[0]:hostAgentBases.get(fp);
- if(!base||!pairing.local&&Date.now()-(verified.get(base)||0)>=VERIFIED_FOR_MS){
+ if(base==null||!pairing.local&&Date.now()-(verified.get(base)||0)>=VERIFIED_FOR_MS){
   if(pairing.local)base=pairing.urls[0];
   else{
    let place=null;
@@ -678,7 +678,9 @@ async function hostApi(fp,path,options={}){
    base=place.base;verified.set(base,Date.now());hostAgentBases.set(fp,base);setRemoteHostStatus(fp,'connected');
   }
  }
- if(typeof base!=='string'||!base)throw Object.assign(Error('unreachable'),{key:'unreachable'});
+ // The page's own origin is a valid, empty prefix. Keep it distinct from a missing base so a node
+ // served by this page can be proved and its authenticated API can use root-relative paths.
+ if(typeof base!=='string')throw Object.assign(Error('unreachable'),{key:'unreachable'});
  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),23000);
  let response;
  try{response=await fetch(base+path,withToken({...options,signal:abort.signal,redirect:'error'},pairing.token))}
