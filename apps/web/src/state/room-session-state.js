@@ -28,6 +28,8 @@ export function initialSessionFacts() {
         // The machines this device is paired with (never their tokens), the one in use, and the clock of the
         // moment they were read so a row can say "hace 3 días" without reading one.
         pairings: [], pairingInUse: null, machinesAt: 0, machinesReady: false, remoteHostStatus: {},
+        // Host-owned agent state is keyed by fingerprint, never by the machine currently in use.
+        hostAgents: {}, settingsAgentRequest: null,
         localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
