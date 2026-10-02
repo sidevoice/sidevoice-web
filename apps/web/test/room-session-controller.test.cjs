@@ -318,6 +318,13 @@ test('Legacy general stages become the first host defaults, preserving its exist
  assert.deepEqual(scope.default,{},'general settings no longer float between machines');
  assert.deepEqual(scope.hosts[PAIRED.fp],{stt:existing,tts:general},'the first host receives only its missing stage');
  assert.equal(scope.hosts[B.fp],undefined,'another host does not inherit the general choice');
+ assert.deepEqual(JSON.parse(s.saved['sidevoice.settings']),{ui_language:'en'},'migration clears only the legacy stage fields');
+ assert.equal(s.saved['sidevoice.stages.legacy-defaults-migrated'],'true','the legacy migration is frozen after it is saved');
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ assert.equal(s.run('storedStages(pairings.inUse).stt'),undefined,'the next host starts without the first host\'s transcription choice');
+ assert.equal(s.run('storedStages(pairings.inUse).tts'),undefined,'the next host does not re-import the legacy voice choice');
+ s.run("keepPairings(usingPairing(pairings,'fp-mac'))");
+ assert.equal(s.run('storedStages(pairings.inUse).tts.model'),'eleven_v3','the first host keeps the migrated choice');
 });
 test('Before a machine is paired, stage choices stay in the device default scope',()=>{
  const s=setup({strictDOM:true,paired:false,stored:null});
@@ -327,6 +334,12 @@ test('Before a machine is paired, stage choices stay in the device default scope
  const scope=JSON.parse(s.saved['sidevoice.stages']);
  assert.deepEqual(scope.default,{stt:general});
  assert.deepEqual(scope.hosts,{});
+ s.context.__pairingProjection={inUse:PAIRED.fp,list:[PAIRED]};
+ s.run('pairings=__pairingProjection');
+ assert.equal(s.run('storedStages(pairings.inUse).stt.model'),'gpt-4o-transcribe','the first host adopts the no-machine default');
+ s.context.__pairingProjection={inUse:'fp-nuc',list:[PAIRED,{...PAIRED,fp:'fp-nuc'}]};
+ s.run('pairings=__pairingProjection');
+ assert.equal(s.run('storedStages(pairings.inUse).stt'),undefined,'a later host starts empty');
 });
 test('A key verified on one machine does not label the next machine\'s row, however late its lists arrive (R04)',async()=>{
  const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};

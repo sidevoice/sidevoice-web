@@ -2051,15 +2051,26 @@ const MIC_KEYS=['turn_patience'];
 // anything else a browser kept from before is dropped, not translated (greenfield).
 // The stages are kept per machine, by its pairing's fingerprint: what this device does with one machine — its
 // provider, that account's voices — is not what it does with another. The rest is the device's.
-const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages';
+const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages',LEGACY_STAGE_MIGRATION_KEY='sidevoice.stages.legacy-defaults-migrated';
 const DEVICE_KEYS=['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS];
 function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||'null');return stored&&typeof stored==='object'?stored:{}}catch{return {}}}
 function stageScope(){
- const raw=readStored(STAGES_KEY),legacy=readStored(SETTINGS_KEY),scope=normalizeStageScope(raw,TASKS,legacy);
+ const raw=readStored(STAGES_KEY);
+ let migrated=false;try{migrated=localStorage.getItem(LEGACY_STAGE_MIGRATION_KEY)==='true'}catch{}
+ const legacy=migrated?{}:readStored(SETTINGS_KEY),scope=normalizeStageScope(raw,TASKS,legacy);
  const hosts=pairings.list.filter(pairing=>!pairing.revoked),host=hosts.some(pairing=>pairing.fp===pairings.inUse)?pairings.inUse:hosts[0]?.fp||null;
  const adopted=adoptStageDefault(scope,host);
- const hasData=Object.keys(raw).length||Object.keys(legacy).some(key=>TASKS.includes(key));
- if(hasData&&JSON.stringify(adopted)!==JSON.stringify(raw))try{localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{}
+ const hasLegacyStages=TASKS.some(task=>Object.hasOwn(legacy,task));
+ if(!migrated){
+  try{
+   if(Object.keys(raw).length||hasLegacyStages)localStorage.setItem(STAGES_KEY,JSON.stringify(adopted));
+   localStorage.setItem(LEGACY_STAGE_MIGRATION_KEY,'true');
+   if(hasLegacyStages){
+    const remaining={...legacy};for(const task of TASKS)delete remaining[task];
+    if(Object.keys(remaining).length)localStorage.setItem(SETTINGS_KEY,JSON.stringify(remaining));else localStorage.removeItem(SETTINGS_KEY);
+   }
+  }catch{}
+ }else if((Object.keys(raw).length||hasLegacyStages)&&JSON.stringify(adopted)!==JSON.stringify(raw))try{localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{}
  return adopted;
 }
 function storedStages(fp){const scope=stageScope(),stages=fp?scope.hosts[fp]:scope.default;return Object.fromEntries(TASKS.filter(task=>stages?.[task]).map(task=>[task,stages[task]]))}

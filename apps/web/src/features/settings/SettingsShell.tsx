@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { AdvancedIcon, AppIcon, GeneralIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { hostTranslator } from "./host-i18n";
@@ -14,6 +14,8 @@ export function SettingsShell({ children, hasMachines, appAvailable }: SettingsS
   const t = hostTranslator();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("general");
+  const sidebarRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const selectSection = (event: Event) => {
@@ -24,11 +26,33 @@ export function SettingsShell({ children, hasMachines, appAvailable }: SettingsS
     return () => window.removeEventListener("sidevoice:settings-section", selectSection);
   }, []);
 
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const foldOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setMobileNavOpen(false);
+      toggleRef.current?.focus();
+    };
+    const foldOnOutsideTap = (event: PointerEvent) => {
+      if (event.target instanceof Node && sidebarRef.current?.contains(event.target)) return;
+      setMobileNavOpen(false);
+    };
+    document.addEventListener("keydown", foldOnEscape);
+    document.addEventListener("pointerdown", foldOnOutsideTap);
+    return () => {
+      document.removeEventListener("keydown", foldOnEscape);
+      document.removeEventListener("pointerdown", foldOnOutsideTap);
+    };
+  }, [mobileNavOpen]);
+
   return (
     <div className="settings-shell">
       <div className="settings-layout">
-        <aside className="settings-sidebar" data-open={mobileNavOpen || undefined}>
+        <aside ref={sidebarRef} className="settings-sidebar" data-open={mobileNavOpen || undefined}>
           <Button
+            ref={toggleRef}
             type="button"
             className="settings-nav-toggle"
             variant="ghost"

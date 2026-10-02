@@ -26,3 +26,28 @@ test("This App is present only when its bridge capability is available", () => {
   expect(screen.getByRole("button", { name: "Machines" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "General" })).toHaveAttribute("aria-pressed", "false");
 });
+
+test("Escape folds the mobile drawer and returns focus to its accessible toggle", () => {
+  render(<SettingsShell hasMachines appAvailable={false}><p>Settings content</p></SettingsShell>);
+  const toggle = screen.getByRole("button", { name: "Settings sections" });
+  const navigation = screen.getByRole("navigation", { name: "Settings sections" });
+  fireEvent.click(toggle);
+
+  expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(navigation).not.toHaveAttribute("data-mobile-open");
+  expect(document.activeElement).toBe(toggle);
+});
+
+test("a pointer tap outside the mobile sidebar folds the drawer", () => {
+  render(<SettingsShell hasMachines appAvailable={false}><p>Settings content</p></SettingsShell>);
+  const toggle = screen.getByRole("button", { name: "Settings sections" });
+  const navigation = screen.getByRole("navigation", { name: "Settings sections" });
+  fireEvent.click(toggle);
+  expect(navigation).toHaveAttribute("data-mobile-open", "true");
+
+  fireEvent.pointerDown(screen.getByText("Settings content"));
+
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(navigation).not.toHaveAttribute("data-mobile-open");
+});
