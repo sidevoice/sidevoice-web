@@ -138,8 +138,42 @@ test("Not now clears that host's agent notice from the menu and machine views", 
   expect(screen.getByRole("button", { name: "Review agents for NUC" }).querySelector(".host-agent-dot")).not.toBeInTheDocument();
 });
 
-test("foreign rows remain read-only and an automatic connection failure opens the host's manual instructions", async () => {
-  const foreign = known("claude", { registration: "foreign", actionable: false });
+test("a foreign Codex row exposes its host-provided replacement command and Copy without automatic actions", async () => {
+  const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
+    "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
+  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: { command: replacement, file: null, snippet: null } });
+  const store = createRoomStore();
+  const hostAgentAction = vi.fn(async () => {});
+  const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  const writeText = vi.fn(async (_value: string) => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  setActions({ hostAgentAction });
+  act(() => store.patch({ hostAgents: { fp: ready([foreign]) } }));
+  try {
+    render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+
+    expect(screen.getByText("Connected to a different MCP server")).toBeInTheDocument();
+    const foreignRow = screen.getByText("Connected to a different MCP server").closest("li");
+    expect(foreignRow).not.toBeNull();
+    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Connect" })).toBeNull();
+    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Disconnect" })).toBeNull();
+    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Not now" })).toBeNull();
+
+    fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Replace manually" }));
+    expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp remove sidevoice");
+    expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio");
+    expect(foreignRow as HTMLElement).toHaveTextContent("after you replace the agent configuration");
+    await act(async () => { fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Copy" })); });
+    expect(writeText).toHaveBeenCalledWith(replacement);
+    expect(hostAgentAction).not.toHaveBeenCalled();
+  } finally {
+    if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
+test("foreign rows without host instructions stay read-only while an automatic connection failure opens manual setup", async () => {
+  const foreign = known("claude", { registration: "foreign", actionable: false, instructions: null });
   const store = createRoomStore();
   act(() => store.patch({
     hostAgents: {
