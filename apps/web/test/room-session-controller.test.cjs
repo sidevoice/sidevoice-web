@@ -1346,9 +1346,8 @@ test('Storage the browser refuses is found once at start and said on top',async(
 
 test('the Agents API accepts and reuses a proved same-origin empty base',async()=>{
  const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
- const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'':node}}),agentRequests=[];
+ const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];
  s.context.location.origin='http://127.0.0.1:8768';
- s.run(`targetAbout={kind:'node',fingerprint:${JSON.stringify(node.fp)}}`);
  s.context.fetch=async(url,init={})=>{
   if(String(url).startsWith('/api/host/agents')){
    agentRequests.push({url:String(url),init});
@@ -1357,14 +1356,18 @@ test('the Agents API accepts and reuses a proved same-origin empty base',async()
   return net.get(String(url),init);
  };
 
+ await s.run('locate({move:true,fresh:true})');
+ assert.equal(s.run(`hostAgentBases.get(${JSON.stringify(node.fp)})`),'','rendezvous identifies the page origin as the paired host');
+ const identityProofs=net.asked.filter(request=>request.url.includes('/api/device/identity?nonce=')).length;
+
  await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
  await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
 
  assert.equal(agentRequests.length,2,'each scan reaches the node through its authenticated same-origin API');
  assert.deepEqual(agentRequests.map(request=>request.url),['/api/host/agents?rescan=1','/api/host/agents?rescan=1']);
  assert.ok(agentRequests.every(request=>request.init.headers.Authorization==='Bearer tok-1'));
- const identities=net.asked.filter(request=>request.url.startsWith('/api/device/identity?nonce='));
- assert.equal(identities.length,1,'the empty string is cached as a proved base, not mistaken for no base');
- assert.equal(identities[0].auth,null,'identity proof remains unauthenticated');
+ const identities=net.asked.filter(request=>request.url.includes('/api/device/identity?nonce='));
+ assert.equal(identities.length,identityProofs,'both scans reuse the previously proved empty base');
+ assert.ok(identities.every(request=>request.auth===null),'identity proof remains unauthenticated');
  assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
 });
