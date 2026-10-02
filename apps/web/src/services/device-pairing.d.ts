@@ -27,9 +27,11 @@ export interface Pairing {
   paired_at: number;
   /** The node said the token is no longer one of its devices. */
   revoked?: boolean;
+  /** Projected from the desktop bridge; the credential is app-owned and must never be persisted in page storage. */
+  local?: true;
 }
 /** A pairing as the interface may see it: no token. */
-export type PairingSummary = Omit<Pairing, "token" | "public_key" | "paired_at" | "revoked"> & { paired_at: number | null; revoked: boolean };
+export type PairingSummary = Omit<Pairing, "token" | "public_key" | "paired_at" | "revoked"> & { paired_at: number | null; revoked: boolean; local?: boolean };
 export interface Pairings {
   inUse: string | null;
   list: Pairing[];
@@ -77,6 +79,8 @@ export function redeemPairingCode(code: string, options?: { name?: string; targe
   get?: typeof fetch; subtle?: SubtleCrypto; now?: number }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
 export function deviceName(nav?: { userAgent?: string; platform?: string; userAgentData?: { platform?: string } }): string;
 export function readPairings(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;
+export function readPairingState(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;
+export function projectPairings(stored: Pairings, localPairing: Pairing | null): Pairings;
 export function writePairings(storage: Pick<Storage, "setItem">, pairings: Pairings): boolean;
 export function withPairing(pairings: Pairings, pairing: Pairing, options?: { use?: boolean }): Pairings;
 export function withoutPairing(pairings: Pairings, fp: string): Pairings;

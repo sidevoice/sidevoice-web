@@ -24,7 +24,9 @@ export interface SessionFacts {
  harness: Record<string, boolean>; turns: Record<string, {session: string; thread: string; status?: string; settled?: boolean; harnessEnded?: boolean; readyAt?: number}>;
  now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null;
  /** The machines this device is paired with (never their tokens), the one in use, and the clock they were read at. */
- pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number;
+ pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number; machinesReady: boolean;
+ localHostAvailable: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
+ remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number}>;
  /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */
  rendezvous: '' | 'room' | 'node'; node: string | null; nodeReach: NodeReach;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */

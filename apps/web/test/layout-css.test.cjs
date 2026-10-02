@@ -27,7 +27,9 @@ test("the settings dialog keeps one stable viewport and one scrolling content pa
 });
 
 test("settings controls reflow without overflowing on narrow screens",()=>{
- assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav \{[^}]*overflow-x:auto/);
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav \{[^}]*flex-wrap:wrap;[^}]*overflow:visible/);
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-footer \{[^}]*flex-wrap:wrap/);
+ assert.match(css,/\.host-action-list \{[^}]*display:flex;flex-wrap:wrap/);
  assert.match(css,/grid-template-areas:"name name name" "model model model" "voice speed preview"/);
  assert.match(css,/@media \(max-width:430px\)[\s\S]*?grid-template-areas:"name name" "model model" "voice voice" "speed preview"/);
 });

@@ -82,9 +82,20 @@ export interface MachineView {
   revoked: boolean;
   /** Where this device reaches it: directly, through the room, not at all, or — not in use — not asked. */
   reach: "direct" | "room" | "away" | "offline" | "checking" | "idle" | "revoked";
-  reachLabel: string;
-  state: "connected" | "offline" | "revoked";
+  state: "connected" | "checking" | "offline" | "revoked" | "failed";
+  /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
+  local?: boolean;
+  localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
   pairedLabel: string;
+}
+
+export interface HostDeviceView {
+  device_id: string;
+  name?: string | null;
+  kind?: "code" | "local" | string;
+  current?: boolean;
+  created_at?: string | number | null;
+  last_seen_at?: string | number | null;
 }
 
 /** The step a join (or a reconnection) is on, already written the way the person reads it. */
@@ -262,4 +273,7 @@ export interface SidevoiceActions {
   clearIntegrationKey(id: string): Promise<void>;
   /** Open Integraciones at that provider's row: what a pane's "Configurar" does. */
   openIntegration(id: string): void;
+  /** List or revoke another device on the desktop-owned local host. */
+  localHostDevices?(): Promise<HostDeviceView[]>;
+  revokeLocalHostDevice?(id: string): Promise<void>;
 }

@@ -1,6 +1,9 @@
 import {createRoomSessionStore,stageContext,working,joinView,conversationView,participantsView,echoCoverage as deriveEchoCoverage,offlineNote,audioNote,engineBadgeText,speechSegment,recordReceipt,recordReply,PRESENCE_LEVEL,GAP_BUFFER_SECONDS,BED_AFTER_USER_MS,REPLAY_NOTES,NO_MACHINE,reachNote,keyedProvider} from '../state/room-session-state.js';
 import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
-import {readPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
+import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
+import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
+import {currentDeviceName} from '../state/device-name.ts';
+import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
@@ -94,9 +97,54 @@ let nodeBase=null;
 // This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
-let pairings=readPairings(pageStorage());
+const pairingStorage=pageStorage(),storedPairingState=readPairingState(pairingStorage);
+let localPairing=null;
+// Keep the stored `in_use` pointer until the bridge has supplied its local projection. It can name that
+// projection, so validating against only browser pairings here would silently switch machines on app launch.
+let pairings={inUse:storedPairingState.inUse,list:storedPairingState.list};
+const desktopLocalHost=localHostBridge();
+roomStore.patch({localHostAvailable:!!desktopLocalHost});
 function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,machinesAt:Date.now()})}
-function keepPairings(next){const moved=next.inUse!==pairings.inUse;pairings=next;if(moved)switchStages();const storage=pageStorage();if(storage)writePairings(storage,next);publishPairings()}
+function keepPairings(next){
+ const projected=projectPairings(next,localPairing),moved=projected.inUse!==pairings.inUse;
+ pairings=projected;storedPairingState.inUse=projected.inUse;storedPairingState.list=projected.list.filter(p=>!p.local);
+ if(moved)switchStages();if(pairingStorage)writePairings(pairingStorage,pairings);publishPairings()
+}
+function setLocalPairing(value){
+ const next=normalizeLocalHostPairing(value),duplicates=next?storedPairingState.list.filter(p=>p.fp===next.fp):[];
+ localPairing=next;
+ const previous=pairings,projected=projectPairings(storedPairingState,localPairing),moved=projected.inUse!==previous.inUse;
+ storedPairingState.list=projected.list.filter(p=>!p.local);
+ pairings=projected;
+ if(moved)switchStages();if(pairingStorage)writePairings(pairingStorage,pairings);publishPairings();
+ // A stale code pairing for the same fingerprint is removed from storage, then revoked at an address which
+ // proves itself as that host. The app-owned local pairing always remains the one in the machine list.
+ for(const pairing of duplicates)void revokePairingCopy(pairing);
+}
+async function revokePairingCopy(pairing){
+ try{const place=await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+  if(place)await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
+}
+function setLocalHostStatus(status){
+ if(!status||typeof status!=='object'||typeof status.state!=='string')return;
+ roomStore.patch({localHostStatus:status});
+}
+function setRemoteHostStatus(fp,status){
+ roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{state:status,checkedAt:Date.now()}}});
+}
+async function refreshLocalHost(){
+ if(!desktopLocalHost){
+  pairings=projectPairings(storedPairingState,null);storedPairingState.inUse=pairings.inUse;storedPairingState.list=pairings.list;
+  roomStore.patch({machinesReady:true,localHostStatus:{state:'absent'}});publishPairings();return
+ }
+ const status=await Promise.resolve().then(()=>desktopLocalHost.state()).catch(()=>({state:'failed',failure:{key:'start.failed'}}));
+ setLocalHostStatus(status);
+ const pairing=await Promise.resolve().then(()=>desktopLocalHost.pairing()).catch(()=>null);
+ setLocalPairing(pairing);roomStore.patch({machinesReady:true});
+}
+if(desktopLocalHost){
+ try{desktopLocalHost.subscribe(status=>{setLocalHostStatus(status);void Promise.resolve().then(()=>desktopLocalHost.pairing()).then(setLocalPairing).catch(()=>{});})}catch{}
+}
 function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
 function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
@@ -456,8 +504,16 @@ async function locate({move=!(state.ws||state.connecting||state.reconnecting),fr
  const pairing=pairingInUse(pairings);
  if(!pairing){settleBase(null,'unpaired',null);return}
  if(pairing.revoked){settleBase(null,'revoked',pairing);return}
+ // Native verified the local identity over the peer-checked socket. Its per-launch proxy is the locator: never
+ // send the app's session secret to the core's TCP listener or probe another address with it.
+ if(pairing.local){
+  const local=localHostLocator(pairing,state.localHostStatus);
+  settleBase(local,local?'ok':'away',pairing);
+  return;
+ }
  const recent=base=>base!=null&&Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
  if(!fresh&&state.node===pairing.fp&&recent(nodeBase)&&doubted!==nodeBase)return;
+ setRemoteHostStatus(pairing.fp,'checking');
  const asked=++locateAsked,deps={get:fetch},started=new Map();
  let found=null,reach='away';
  try{
@@ -473,8 +529,9 @@ async function locate({move=!(state.ws||state.connecting||state.reconnecting),fr
  locateApplied=asked;
  // The page follows the build of whoever serves it: a room serving this page says which.
  if(target===''&&targetAbout?.kind==='room')followServedBuild(targetAbout.build);
- if(found){verified.set(found.base,Date.now());if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
+ if(found){verified.set(found.base,Date.now());setRemoteHostStatus(pairing.fp,'connected');if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
  if(hold&&state.node===pairing.fp&&recent(nodeBase))return;
+ setRemoteHostStatus(pairing.fp,'offline');
  settleBase(null,reach,pairing);
 }
 function settleBase(found,reach,pairing){
@@ -508,7 +565,12 @@ function pairingRefused(fp,{call=false}={}){
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
 async function pairDevice(code,name){
  const about=await askTarget(target,fetch);if(about)targetAbout=about;
- const {pairing,base}=await redeemPairingCode(code,{name,target,about,origin:location.origin,get:fetch});
+ const t=hostTranslator(),defaultName=currentDeviceName(where=>t('pair.deviceName',{where}));
+ const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,target,about,origin:location.origin,get:fetch});
+ if(localPairing?.fp===pairing.fp){
+  try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
+  closePairing();return {host:localPairing.host};
+ }
  const inCall=!!(state.ws||state.connecting||state.reconnecting),use=!inCall||pairings.inUse===pairing.fp;
  keepPairings(withPairing(pairings,pairing,{use}));
  verified.set(base.base,Date.now());
@@ -519,6 +581,7 @@ async function pairDevice(code,name){
 // Forgotten here at once; the machine is asked to revoke the token too, only at an address that proves it is that
 // machine — the token goes nowhere else — and without waiting on it: it is a courtesy, not a condition.
 async function forgetMachine(fp){
+ if(pairings.list.some(p=>p.fp===fp&&p.local))return;
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing)return;
  const wasInUse=pairings.inUse===fp,known=wasInUse&&state.node===fp?nodeBase:null;
  if(wasInUse&&(state.ws||state.connecting||state.reconnecting))disconnect();
@@ -530,6 +593,22 @@ async function forgetMachine(fp){
    :await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
   if(place)await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
  }catch{}
+}
+async function localHostApi(path,options={}){
+ const pairing=localPairing;
+ if(!pairing||!pairing.urls[0])throw Error('local-host-unavailable');
+ const response=await fetch(pairing.urls[0]+path,withToken({...options,redirect:'error'},pairing.token));
+ if(!response.ok)throw Error('local-host-request-failed');
+ return response;
+}
+async function localHostDevices(){
+ const data=await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json();
+ const rows=Array.isArray(data)?data:Array.isArray(data?.devices)?data.devices:[];
+ return rows.filter(row=>row&&(typeof row.device_id==='string'||typeof row.id==='string')).map(row=>({device_id:row.device_id||row.id,name:row.name||null,kind:row.kind||'code',current:!!row.current,
+  created_at:row.created_at??row.created??null,last_seen_at:row.last_seen_at??row.last_seen??null}));
+}
+async function revokeLocalHostDevice(id){
+ await localHostApi('/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}});
 }
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
 function callProtocols(){const token=pairingInUse(pairings)?.token;if(!token)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+token]}
@@ -1522,10 +1601,9 @@ function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 $('settings-open').onclick=async()=>{try{
  // A new opening is a new settings session: whatever the last one still has on its way is dropped.
  integrationEpoch++;forgetKeyChecks();
- // Voices, transcription and keys are a machine's; pairing one is not. With none connected the dialog still
- // opens — on Máquinas, the one pane that has something to do — instead of failing on a catalogue nobody serves.
- if(nodeBase==null){settingsSection('machines');$('settings-error').textContent=reachNote(state)||NO_MACHINE;if(!$('language-settings').open)$('language-settings').showModal();return}
- const p=await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
+ // Without an answered machine, use this device's saved app preferences and leave host-owned data alone.
+ if(nodeBase==null)settingsSection('machines');
+ const p=nodeBase==null?devicePreferences():await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
  roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
  for(const task of TASKS)selection.dismiss(task);
  for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds'])$(key.replaceAll('_','-')).value=p[key];
@@ -1534,10 +1612,11 @@ $('settings-open').onclick=async()=>{try{
  $('locked-call').value=p.locked_call==='off'?'off':'on';
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
- // What the stages are chosen from: the machine's integrations and what this device can run. Each opening asks
- // again, so a provider's lists are the account's as it is now.
- await Promise.all([loadIntegrations(),measureDevice().catch(error=>{$('settings-error').textContent=error.message})]);
- loadStageLists(true);
+ // Existing provider keys and provider lists belong to the reachable host. No key is requested when there is no
+ // machine to read; local model offers can still be measured for the no-machine note.
+ const work=[measureDevice().catch(error=>{$('settings-error').textContent=error.message})];
+ if(nodeBase!=null)work.push(loadIntegrations().then(()=>loadStageLists(true)));
+ await Promise.all(work);
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 function settingsSection(name){for(const section of ['general','voice','transcription','integrations','machines','advanced']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}if(name!=='integrations'&&state.integrationFocus)state.integrationFocus=null}
 $('settings-advanced').onclick=()=>settingsSection('advanced');
@@ -2107,9 +2186,16 @@ async function saveSettings(){
   state.liveNote=applied==='switched'?'Preferencias guardadas · '+(sttSettingsChanged(previous,p)?'Transcripción cambiada':'Micrófono aplicado')+' sin salir de la llamada':applied?'Preferencias guardadas · Transcripción actualizada':'Preferencias guardadas';
  }catch(e){if(hotSwap)disconnect();if(hotSwap)setRoomError(e.message);else $("settings-error").textContent=e.message}
 }
+function saveDeviceSettingsWithoutHost(){
+ const p=devicePreferences(),field=key=>$(key.replaceAll('_','-'))?.value;
+ for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS]){
+  const value=field(key);if(value!==undefined&&value!=='')p[key]=['audio_grace_seconds','replay_on_return_seconds'].includes(key)?Number(value):value;
+ }
+ storePreferences(p,null);roomStore.patch({voicePreferences:p});window.roomI18n?.setLanguage(p.ui_language);$('language-settings').close();
+}
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
-$('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){$('settings-error').textContent=reachNote(state)||NO_MACHINE;return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
+$('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){saveDeviceSettingsWithoutHost();return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
  skipReply:async()=>skipReply(),
@@ -2161,6 +2247,8 @@ window.sidevoiceActions={
  },
  forgetMachine,
  pairDevice,
+ localHostDevices,
+ revokeLocalHostDevice,
  openPairing:()=>openPairing(),
  closePairing,
 };
@@ -2241,13 +2329,18 @@ window.addEventListener('keydown',e=>{personSignal();
 },true);
 window.addEventListener('keyup',e=>{if(e.code==='Space'&&spaceDown){e.preventDefault();releaseHold()}},true);
 window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});window.addEventListener('beforeunload',()=>{state.ws?.close();state.stream?.getTracks().forEach(t=>t.stop())});updateMic();
-// The first questions wait for the machine to prove where it is: finding it asks for the conversations by itself.
-// A device paired with nothing is asked for a code at once. The interface language is this device's even with no
-// machine to ask.
-publishPairings();
-if(!pairingInUse(pairings))openPairing();
+// Discover the desktop-owned host before validating the persisted selection. Pairing remains an explicit action:
+// an unpaired browser shows setup guidance, and an unpaired desktop does not open a modal by itself.
 window.roomI18n?.setLanguage(devicePreferences().ui_language);
-locate().finally(()=>{loadPreferences().catch(()=>devicePreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language))});setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
+function startInitialLocate(){
+ publishPairings();
+ void locate().finally(()=>{loadPreferences().catch(()=>devicePreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language))});
+}
+// A normal browser has no native projection to wait for, so keep its existing first locate timing. The desktop
+// app must wait until its local pairing is projected before the persisted in-use pointer is resolved.
+if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
+else{void refreshLocalHost();startInitialLocate()}
+setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupAudioControls();
 setupOutputOwner();
