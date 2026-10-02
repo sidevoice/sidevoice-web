@@ -181,7 +181,7 @@ body,
 .settings-dialog .model-info { flex:none }
 
 @media (max-width:700px) {
-  .settings-dialog[open] { inset:0;width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0 }
+  #language-settings.settings-dialog[open] { inset:0;width:100vw;height:100dvh;max-width:none;max-height:100dvh;margin:0;border-radius:0 }
   .settings-dialog .settings-heading { padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) 1rem max(1rem,env(safe-area-inset-left)) }
   .settings-dialog .settings-layout { display:flex;flex-direction:column }
   .settings-dialog .settings-sidebar { flex:none;border-right:0;border-bottom:1px solid #3b4652;overflow:visible }

@@ -5,6 +5,7 @@ import type { MachineView, StageTask } from "../../state/room-types";
 import { IntegrationList } from "../settings/IntegrationList";
 import { StageSettings } from "../settings/StageSettings";
 import { hostTranslator } from "../settings/host-i18n";
+import { actionableAgent } from "../../services/host-agents";
 
 type HostTab = "status" | "agents" | "integrations" | "devices" | "voice" | "transcription";
 
@@ -13,7 +14,7 @@ interface HostPageProps {
   onBack(): void;
   statusPanel: ReactNode;
   devicesPanel: ReactNode;
-  /** Filled by the R2 agent capability when that API is available. */
+  /** The selected pairing's host-scoped Agents panel. */
   agentsPanel?: ReactNode;
   initialTab?: HostTab;
 }
@@ -22,12 +23,15 @@ interface HostPageProps {
 export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPanel, initialTab }: HostPageProps) {
   const t = hostTranslator();
   const remote = useRoomStore((state) => state.facts.remoteHostStatus[machine.pairingId ?? machine.id] ?? null);
-  const [tab, setTab] = useState<HostTab>(initialTab === "agents" && (!machine.capabilities?.agents || !agentsPanel) ? "status" : initialTab ?? "status");
+  const hostAgents = useRoomStore((state) => machine.pairingId ? state.facts.hostAgents[machine.pairingId] : undefined);
+  const showAgents = !!machine.pairingId && !machine.revoked && !!agentsPanel;
+  const agentNotice = !machine.revoked && hostAgents?.status === "ready" && hostAgents.value?.agents.some(actionableAgent) === true;
+  const [tab, setTab] = useState<HostTab>(initialTab === "agents" && !showAgents ? "status" : initialTab ?? "status");
   const [confirmForget, setConfirmForget] = useState(false);
   const hostLabel = machine.local ? t("hosts.thisComputer") : machine.host || t("hosts.unnamed");
   const tabs: { id: HostTab; label: string }[] = [
     { id: "status", label: t("hosts.tab.status") },
-    ...(machine.capabilities?.agents && agentsPanel ? [{ id: "agents" as const, label: t("settings.agents") }] : []),
+    ...(showAgents ? [{ id: "agents" as const, label: t("agents.tab") }] : []),
     { id: "integrations", label: t("settings.integrations") },
     { id: "devices", label: t("hosts.tab.devices") },
     { id: "voice", label: t("settings.voice") },
@@ -61,7 +65,7 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
               setTab(target);
               requestAnimationFrame(() => document.getElementById(`host-tab-${target}`)?.focus());
             }}>
-            {label}{id === "agents" && machine.newAgent && <span className="badge-dot" aria-label={t("hosts.newAgent")} />}
+            {label}{id === "agents" && agentNotice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}
           </button>
         ))}
       </div>

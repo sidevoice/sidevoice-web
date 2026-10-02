@@ -11,6 +11,7 @@ test("the chat width is contained at every layout boundary",()=>{
 });
 
 const roomCss=fs.readFileSync(__dirname+"/../src/styles/room.css","utf8").replace(/\s+/g," ");
+const agentsCss=fs.readFileSync(__dirname+"/../src/features/settings/host-agents.css","utf8").replace(/\s+/g," ");
 
 test("on a phone the conversations keep a rail of their own and the transcript keeps a column that can shrink",()=>{
  // Where the columns go on a phone is said once, in room.css. react.css used to say it too, from a
@@ -28,6 +29,7 @@ test("the settings dialog keeps one stable viewport and one scrolling content pa
 
 test("the mobile settings sidebar collapses vertically and leaves the content scrollable",()=>{
  assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog\[open\] \{[^}]*width:100vw;[^}]*height:100dvh/);
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?#language-settings\.settings-dialog\[open\] \{ inset:0;width:100vw;height:100dvh;max-width:none;max-height:100dvh;margin:0;border-radius:0/);
  assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav \{[^}]*display:none;flex-direction:column;[^}]*max-height:32dvh;overflow:auto/);
  assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav\[data-mobile-open\] \{ display:flex \}/);
  assert.match(css,/\.settings-dialog \.settings-nav-toggle \{ display:none \}/);
@@ -39,6 +41,20 @@ test("the mobile settings sidebar collapses vertically and leaves the content sc
  assert.match(css,/grid-template-areas:"name name name" "model model model" "voice speed preview"/);
  assert.match(css,/@media \(max-width:430px\)[\s\S]*?grid-template-areas:"name name" "model model" "voice voice" "speed preview"/);
  assert.match(css,/\.host-tabs \{[^}]*flex-wrap:nowrap;[^}]*overflow:auto/);
+});
+
+test("the 390×844 and 320×568 layouts keep the drawer, host tabs, and Agents actions usable",()=>{
+ const targetWidths=[390,320];
+ assert.ok(targetWidths.every(width=>width<=700),'both target phones use the full-screen vertical Settings layout');
+ assert.ok(targetWidths.every(width=>width<=550),'both target phones use the wrapped Agents action layout');
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav \{[^}]*max-height:32dvh;overflow:auto/);
+ assert.match(css,/\.settings-content \{[^}]*min-width:0;min-height:0;[^}]*overflow:auto/);
+ assert.match(css,/\.host-tabs \{[^}]*flex-wrap:wrap/);
+ assert.match(agentsCss,/@media\(max-width:550px\) \{/);
+ assert.match(agentsCss,/\.host-agent-main,.host-agent-other-head \{ align-items:flex-start;flex-wrap:wrap \}/);
+ assert.match(agentsCss,/\.host-agent-actions \{ margin-inline-start:2\.25rem;justify-content:flex-start;width:calc\(100% - 2\.25rem\)/);
+ assert.match(agentsCss,/\.host-agent-code pre \{[^}]*max-height:16rem;overflow:auto/);
+ assert.match(agentsCss,/\.host-agent-code button \{ flex:none;display:flex/);
 });
 
 test("the recording bubble is the waveform and cancelling sits inside it, on its own line",()=>{

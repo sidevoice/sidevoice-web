@@ -87,14 +87,47 @@ export interface MachineView {
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
-  /** Capability reported by a real host API. An absent capability keeps the corresponding UI out of the page. */
-  capabilities?: { agents?: boolean };
-  /** R2's new-agent signal. The Settings route opens the agent tab only when its capability is present. */
-  newAgent?: boolean;
   /** Whether this row has a pairing that may be selected for routing. */
   selectable?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
   pairedLabel: string;
+}
+
+/** A host's view of one supported coding agent. Instructions always come from that host's connector. */
+export interface DetectedAgent {
+  id: string;
+  label: string;
+  present: boolean;
+  version: string | null;
+  registration: "connected" | "not-connected" | "foreign" | "unknown";
+  connect: "auto" | "manual";
+  dismissed?: boolean;
+  actionable?: boolean;
+  instructions?: { command?: string; snippet?: string; file?: string | null } | null;
+}
+
+export interface HostAgentsListing {
+  agents: DetectedAgent[];
+  scanned_at: string | number;
+  custom?: { command: string; snippet: string; version?: string | null } | null;
+}
+
+export interface HostAgentError {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
+export interface HostAgentsState {
+  status: "idle" | "loading" | "ready" | "failed";
+  value: HostAgentsListing | null;
+  error: HostAgentError | null;
+  busy: Record<string, "connect" | "disconnect" | "dismiss">;
+  actionErrors: Record<string, { key: string; params?: Record<string, string | number> }>;
+}
+
+export interface SettingsAgentRequest {
+  fp: string | null;
+  id: number;
 }
 
 export interface HostDeviceView {
@@ -281,6 +314,12 @@ export interface SidevoiceActions {
   clearIntegrationKey(id: string): Promise<void>;
   /** Open Integraciones at that provider's row: what a pane's "Configurar" does. */
   openIntegration(id: string): void;
+  /** Read a paired machine's host-owned coding agent state. */
+  loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
+  /** Connect, disconnect, or dismiss an agent on the identified machine. */
+  hostAgentAction?(fp: string, id: string, action: "connect" | "disconnect" | "dismiss"): Promise<void>;
+  /** Open the temporary R2 Agents route from the main Settings gear. */
+  openAgentSettings?(fp: string | null): void;
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;
