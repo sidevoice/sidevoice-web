@@ -2,20 +2,21 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),asse
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null,localHost=null,localHostSelected=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={};
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element())}
- const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
+ const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. The resolver is TypeScript (packages/browser-audio/offers.ts), transpiled here.
- const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','./system-language.js':'SystemLanguage','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection'};
+ const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection'};
  const audio=sourceRoot+'/../../../packages/browser-audio/';
- const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js'};
- const imports=(source,dir)=>source.replace(/^import (\w+) from '(.*\.json)'[^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
-  .replace(/^import \{(.*)\} from '(.*)';\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
+ const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts'};
+ const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
+  .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
  for(const name of new Set(Object.values(modules))){
   let text=fs.readFileSync(files[name],'utf8');
@@ -2279,7 +2280,8 @@ test('The machine in use is reached at the first of its addresses that proves it
  await s.run('locate({move:true,fresh:true})');
  assert.equal(s.run('nodeBase'),'https://room.example/nodes/mac');
  assert.equal(s.run('state.rendezvous'),'room');
- assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),'A través de la sala');
+ assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
+ assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
  await s.run('refresh()');
  assert.ok(net.asked.some(r=>r.url==='https://room.example/nodes/mac/api/presentation?session_id=s'&&r.auth==='Bearer tok-1'));
  assert.equal(net.asked.filter(r=>r.url.startsWith('http://127.0.0.1')&&r.auth).length,0,'nothing carrying the token went to the address that could not prove itself');
@@ -2290,7 +2292,110 @@ test('The machine in use is reached at the first of its addresses that proves it
  const direct=network({at:{'http://127.0.0.1:8768':node,'https://room.example/nodes/mac':node}});s.context.fetch=direct.get;
  await s.run('locate({move:true,fresh:true})');
  assert.equal(s.run('nodeBase'),'http://127.0.0.1:8768');
- assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),'Conexión directa');
+ assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
+ assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
+});
+
+test('The native local pairing is projected before selection validation and uses only its per-launch proxy',async()=>{
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
+ const s=setup({paired:false,stored:{in_use:'fp-local',pairings:[PAIRED]},localHost:bridge}),asked=[];
+ s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return {ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
+ await new Promise(resolve=>setTimeout(resolve,10));
+ const snapshot=s.run('roomStore.getState()');
+ assert.equal(snapshot.facts.pairingInUse,'fp-local');
+ assert.equal(snapshot.facts.machinesReady,true);
+ assert.equal(snapshot.facts.nodeReach,'ok');
+ assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
+ assert.equal(JSON.stringify(snapshot.machines.map(machine=>[machine.id,machine.local])),JSON.stringify([['local-host',true],[PAIRED.fp,false]]));
+ assert.equal(asked.some(([url])=>url.includes('/api/device/identity?nonce=')),false,'native already verified the identity over its local socket');
+ assert.ok(asked.every(([url])=>url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy');
+ const saved=JSON.parse(s.saved['sidevoice.pairings']);
+ assert.equal(saved.in_use,'fp-local');
+ assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
+ assert.equal(JSON.stringify(saved).includes('local-session-secret'),false,'the proxy credential never reaches page storage');
+});
+
+test('A local row survives reload with no native pairing or stored local fingerprint',async()=>{
+ const status={state:'backoff',reachable:false,attempts:3,limit:8};
+ const bridge={state:()=>status,subscribe:()=>()=>{},pairing:()=>null};
+ const s=setup({paired:false,stored:{in_use:'@sidevoice/local-host',pairings:[PAIRED]},localHost:bridge,localHostSelected:true});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ const snapshot=s.run('roomStore.getState()'),local=snapshot.machines.find(machine=>machine.local);
+ assert.ok(local,'the native failure still projects a local machine row');
+ assert.equal(local.id,'local-host');
+ assert.equal(local.inUse,true);
+ assert.equal(local.selectable,false);
+ assert.equal(snapshot.facts.localHostSelected,true);
+ assert.equal(snapshot.facts.pairingInUse,'@sidevoice/local-host');
+ assert.equal(s.run('nodeBase'),null);
+ assert.equal(snapshot.facts.nodeReach,'away');
+ assert.equal(JSON.stringify(local).includes('127.0.0.1'),false);
+ assert.equal(JSON.stringify(local).includes('local-session-secret'),false);
+ const saved=JSON.parse(s.saved['sidevoice.pairings']);
+ assert.equal(saved.in_use,'@sidevoice/local-host');
+ assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
+ assert.equal(s.saved['sidevoice.local-host-selected'],'true');
+});
+
+test('A native status event that wins the initial state read still completes machine readiness',async()=>{
+ let resolveInitialState,onStatus;
+ const bridge={state:()=>new Promise(resolve=>{resolveInitialState=resolve}),subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>null};
+ const s=setup({paired:false,stored:null,localHost:bridge});
+ await Promise.resolve();
+ assert.equal(typeof resolveInitialState,'function','the initial native state read is pending');
+ onStatus({state:'backoff',reachable:false,attempts:2,limit:8});
+ assert.equal(s.run('roomStore.getState().facts.machinesReady'),true,'an accepted native report makes the host view ready immediately');
+ resolveInitialState({state:'running',reachable:true});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ const snapshot=s.run('roomStore.getState()');
+ assert.equal(snapshot.facts.machinesReady,true);
+ assert.equal(snapshot.facts.localHostStatus.state,'backoff','the older initial result cannot overwrite a newer native report');
+ assert.equal(snapshot.machines[0].id,'local-host');
+});
+
+test('A lost local pairing clears its per-launch locator and a reachable non-running core restores routing with fresh credentials',async()=>{
+ const oldLocal={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'old-launch-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const nextLocal={...oldLocal,token:'new-launch-secret',urls:['http://127.0.0.1:43218']};
+ let status={state:'running',reachable:true,installed:true,service:'launchd'},pairing=oldLocal,onStatus=()=>{},pendingPairing=null;
+ const bridge={state:()=>status,subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>pendingPairing||pairing};
+ const s=setup({paired:false,stored:{in_use:'fp-local',pairings:[]},localHost:bridge});
+ const asked=[];
+ s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return{ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
+ assert.equal(s.run('state.nodeReach'),'ok');
+
+ let resolveStalePairing;
+ pendingPairing=new Promise(resolve=>{resolveStalePairing=resolve});
+ status={state:'starting',reachable:true,installed:true,service:'launchd'};onStatus(status);
+ await Promise.resolve();
+ status={state:'stopped-by-person',reachable:false,installed:true,service:'launchd'};pairing=null;pendingPairing=null;onStatus(status);
+ resolveStalePairing(oldLocal);
+ await new Promise(resolve=>setTimeout(resolve,0));
+ let snapshot=s.run('roomStore.getState()');
+ assert.equal(s.run('nodeBase'),null,'the per-launch proxy is cleared as soon as reachability is lost');
+ assert.equal(snapshot.facts.node,null);
+ assert.equal(snapshot.facts.nodeReach,'away');
+ assert.equal(snapshot.machines[0].id,'local-host');
+ assert.equal(snapshot.machines[0].inUse,true);
+ assert.equal(snapshot.machines[0].selectable,false);
+ assert.equal(JSON.stringify(snapshot).includes('old-launch-secret'),false);
+ assert.equal(JSON.stringify(snapshot).includes('127.0.0.1:43127'),false);
+ assert.equal(JSON.stringify(JSON.parse(s.saved['sidevoice.pairings'])).includes('old-launch-secret'),false);
+
+ status={state:'stopped-by-person',reachable:true,installed:true,service:'launchd'};pairing=nextLocal;onStatus(status);
+ await new Promise(resolve=>setTimeout(resolve,10));
+ snapshot=s.run('roomStore.getState()');
+ assert.equal(s.run('nodeBase'),'http://127.0.0.1:43218');
+ assert.equal(snapshot.facts.nodeReach,'ok');
+ assert.equal(snapshot.machines[0].state,'connected','native reachable remains usable although the service state is not running');
+ assert.equal(snapshot.machines[0].selectable,true);
+ assert.deepEqual([...s.run('callProtocols()')],['sidevoice','sidevoice.token.new-launch-secret']);
+ assert.equal(asked.some(([url])=>url.includes('/api/device/identity?nonce=')),false,'native already verified this local identity');
+ const requestsBeforeRecovery=asked.length;
+ await s.run("refreshPeople()");
+ assert.ok(asked.slice(requestsBeforeRecovery).every(([url,options])=>!options.headers?.Authorization||options.headers.Authorization==='Bearer new-launch-secret'), 'only the current per-launch secret is sent after recovery');
 });
 
 test('With nothing proving itself the page says why, and joins nothing: not connected to the room, or not answering',async()=>{
@@ -2310,11 +2415,11 @@ test('With nothing proving itself the page says why, and joins nothing: not conn
  assert.equal(net.asked.filter(r=>r.auth).length,0,'and no token left the page');
  s.context.fetch=network({roomSays:null}).get;await s.run('locate({move:true,fresh:true})');
  s.run("joinFailure=''");
- assert.match(s.run('joinView(state).text'),/No se llega a «macbook» ni directamente ni a través de la sala/);
- // The settings open on Máquinas, saying the same, and a form no machine filled is never saved.
+ assert.match(s.run('reachNote(state)'),/No se llega a «macbook» ni directamente ni a través de la sala/);
+ // Settings opens on Máquinas with its own host row; it does not put an error in the settings form.
  await s.run("$('settings-open').onclick()");
  assert.equal(s.run("$('pane-machines').hidden"),false);
- assert.match(s.run("$('settings-error').textContent"),/No se llega a «macbook»/);
+ assert.equal(s.run("$('settings-error').textContent"),'');
  // The machine answering takes the note, and a failed join, away by themselves.
  s.run("failJoin(reachFailure=reachNote(state))");
  node.tokens.add('tok-1');s.context.fetch=network({at:{'https://room.example/nodes/mac':node}}).get;
@@ -2323,13 +2428,11 @@ test('With nothing proving itself the page says why, and joins nothing: not conn
  assert.equal(s.run('joinView(state)'),null);
 });
 
-test('A device paired with nothing is asked for a code on load and on join, and asks nothing of any machine',async()=>{
+test('A device paired with nothing gets explicit pairing on join, not an automatic dialog on load',async()=>{
  const s=setup({paired:false});const sockets=socketsOf(s);const net=network();s.context.fetch=net.get;
  await new Promise(resolve=>setTimeout(resolve,0));
- assert.equal(s.run('roomStore.getState().pairing.open'),true,'opened on load');
+ assert.equal(s.run('roomStore.getState().pairing.open'),false,'the onboarding screen keeps pairing explicit');
  assert.match(s.run('joinView(state).text'),/no está emparejado con ninguna máquina/);
- s.run("window.sidevoiceActions.closePairing()");
- assert.equal(s.run('roomStore.getState().pairing.open'),false,'and the page stays usable without it');
  await s.run('toggleCall()');
  assert.equal(s.run('roomStore.getState().pairing.open'),true,'joining asks for the code instead');
  assert.equal(s.run('state.connecting'),false);

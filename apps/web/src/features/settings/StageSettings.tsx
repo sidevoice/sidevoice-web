@@ -6,6 +6,7 @@ import type { StageTask } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { StageCheck } from "./StageCheck";
 import { StageDiagnostics } from "./StageDiagnostics";
+import { hostTranslator } from "./host-i18n";
 
 const WHERE_NOTES = {
   page: "Se ejecuta en este navegador; la primera vez se descarga y después se reutiliza su caché.",
@@ -16,13 +17,19 @@ const WHERE_NOTES = {
 /** One stage — transcription or voice — as sidevoice/sidevoice-core#21 draws it: where, which model, its options, and under
  *  Avanzado the build it runs on. Everything shown is the store's; every change is an action. */
 export function StageSettings({ task }: { task: StageTask }) {
+  const t = hostTranslator();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
+  const noMachine = useRoomStore((state) => state.facts.machinesReady && state.facts.nodeReach !== "ok");
   const actions = () => window.sidevoiceActions;
   if (!view) return <p className="muted" role="status">Cargando…</p>;
   const locked = !view.editable;
   return (
     <div className="stage-settings" data-task={task}>
+      {noMachine && <aside className="no-machine-stage-note">
+        <p>{t("noMachine.stageNote")}</p>
+        <Button variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.openPairing()}>{t("noMachine.connect")}</Button>
+      </aside>}
       {view.integrations === "failed" && (
         <p className="missing-integration muted" role="alert">
           <span>No se pudieron leer las integraciones de esta máquina; se mantiene lo guardado.</span>

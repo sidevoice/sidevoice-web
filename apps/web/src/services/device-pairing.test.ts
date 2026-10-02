@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import {
   base64ToBytes, bytesToBase64url, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven, pairingInUse,
-  pairingSummary, proveIdentity, readPairings, redeemPairingCode, revokedPairing, secureBase, usingPairing, verifyIdentitySignature,
+  pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, usingPairing, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
 } from "./device-pairing.js";
 
@@ -278,6 +278,33 @@ test("several pairings, one in use, remembered across reloads", () => {
   expect(readPairings(storage)).toEqual({ inUse: null, list: [] });
   expect(readPairings(null)).toEqual({ inUse: null, list: [] });
   expect(JSON.stringify(pairingSummary(pairing("z")))).not.toMatch(/t-z|pk-z/);
+});
+
+test("the local host is projected before in-use validation and its proxy credential never reaches page storage", () => {
+  const saved: Record<string, string> = {
+    [PAIRINGS_KEY]: JSON.stringify({ in_use: "local-fp", pairings: [pairing("remote-fp")] }),
+  };
+  const storage = { getItem: (key: string) => saved[key] ?? null, setItem: (key: string, value: string) => { saved[key] = value; } };
+  const local = pairing("local-fp", { local: true, host: "Mac", token: "session-secret", urls: ["http://127.0.0.1:40000"], rv: null });
+  const stored = readPairingState(storage);
+  expect(stored.inUse).toBe("local-fp");
+  expect(stored.list.map((item) => item.fp)).toEqual(["remote-fp"]);
+  const projected = projectPairings(stored, local);
+  expect(projected.inUse).toBe("local-fp");
+  expect(projected.list.map((item) => item.fp)).toEqual(["local-fp", "remote-fp"]);
+  writePairings(storage, projected);
+  const persisted = JSON.parse(saved[PAIRINGS_KEY]);
+  expect(persisted.in_use).toBe("local-fp");
+  expect(persisted.pairings.map((item: Pairing) => item.fp)).toEqual(["remote-fp"]);
+  expect(JSON.stringify(persisted)).not.toContain("session-secret");
+});
+
+test("a bridge-owned local host wins over a duplicate stored code pairing", () => {
+  const duplicate = pairing("same-fp", { device_id: "old-code-device", token: "old-token" });
+  const local = pairing("same-fp", { local: true, device_id: "native-local-device", token: "native-proxy-secret" });
+  const projected = projectPairings({ inUse: "same-fp", list: [duplicate, pairing("remote-fp")] }, local);
+  expect(projected.list.map((item) => item.device_id)).toEqual(["native-local-device", "d-remote-fp"]);
+  expect(projected.inUse).toBe("same-fp");
 });
 
 test("a device names itself after what it is, unless the person says otherwise", () => {

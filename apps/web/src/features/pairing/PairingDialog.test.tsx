@@ -14,38 +14,59 @@ function dialog(pairDevice: (code: string, name: string) => Promise<unknown>) {
   render(<RoomProvider store={store}><PairingDialog /></RoomProvider>);
   return { store, closePairing, element: () => document.getElementById("device-pairing") as HTMLDialogElement };
 }
-const code = () => screen.getByRole("textbox", { name: /Código de emparejamiento/ }) as HTMLTextAreaElement;
-const name = () => screen.getByRole("textbox", { name: /Nombre de este dispositivo/ }) as HTMLInputElement;
+const code = () => screen.getByRole("textbox", { name: "Pairing code" }) as HTMLTextAreaElement;
 const submit = () => document.querySelector(".pairing-form button[type=submit]") as HTMLButtonElement;
 
-test("it opens when the page asks, says why on top, and says where the code comes from", () => {
+test("it opens when asked with remote setup guidance before the code, and no device name field", () => {
   const { store, element } = dialog(vi.fn());
   expect(element().open).toBe(false);
   act(() => { store.patch({ pairingOpen: true, pairingNote: "«mac» ya no reconoce este dispositivo." }); });
   expect(element().open).toBe(true);
-  expect(screen.getByRole("heading", { name: "Emparejar este dispositivo" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Connect to a machine" })).toBeInTheDocument();
   expect(screen.getByText("«mac» ya no reconoce este dispositivo.")).toBeInTheDocument();
-  expect(element().textContent).toMatch(/Pide el código a tu agente \(«empareja un dispositivo»\) o ejecuta sidevoice pair-device en la máquina\./);
-  expect(name().value).toMatch(/^Sidevoice/);   // prefilled, and the person's to change
+  expect(element().textContent).toMatch(/npx @sidevoice\/uplink install/);
+  expect(element().textContent).toMatch(/After Sidevoice is running on that machine/);
+  expect(screen.queryByRole("textbox", { name: /device name/i })).toBeNull();
   expect(submit().disabled).toBe(true);           // nothing to redeem yet
 });
 
-test("a code is redeemed under the name given, busy while it is, and the dialog closes on success", async () => {
+test("a code is redeemed without asking for a device name, and the dialog closes on success", async () => {
+  window.localStorage.setItem("sidevoice.deviceName", "Kitchen iPad");
   let finish!: (value: unknown) => void;
   const pairDevice = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
   const { store, element } = dialog(pairDevice);
   act(() => { store.patch({ pairingOpen: true }); });
   fireEvent.change(code(), { target: { value: "SV1.abc" } });
-  fireEvent.change(name(), { target: { value: "Mi portátil" } });
   await act(async () => { fireEvent.submit(submit().form!); });
-  expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Mi portátil");
-  expect(submit().textContent).toBe("Emparejando…");
+  expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Kitchen iPad");
+  expect(submit().textContent).toBe("Connecting…");
   expect(submit().disabled).toBe(true);
   expect(code().disabled).toBe(true);
   await act(async () => { store.patch({ pairingOpen: false }); finish({ host: "mac" }); });
   expect(element().open).toBe(false);
   // A closed dialog is out of the accessibility tree; the field is still there, emptied for the next time.
   expect((document.getElementById("device-pairing-code") as HTMLTextAreaElement).value).toBe("");
+  window.localStorage.removeItem("sidevoice.deviceName");
+});
+
+test("the default pairing name follows the English UI language", async () => {
+  const previousName = navigator.userAgent;
+  const previousHost = window.__sidevoiceDesktop;
+  window.localStorage.removeItem("sidevoice.deviceName");
+  delete window.__sidevoiceDesktop;
+  Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" });
+  try {
+    const pairDevice = vi.fn().mockResolvedValue({ host: "Mac" });
+    const { store } = dialog(pairDevice);
+    act(() => { store.patch({ pairingOpen: true }); });
+    fireEvent.change(code(), { target: { value: "SV1.abc" } });
+    await act(async () => { fireEvent.submit(submit().form!); });
+    expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Sidevoice on iPhone");
+  } finally {
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: previousName });
+    if (previousHost) window.__sidevoiceDesktop = previousHost;
+    else delete window.__sidevoiceDesktop;
+  }
 });
 
 test("a code that does not work says why in an alert, and keeps what was pasted to try again", async () => {
@@ -54,7 +75,7 @@ test("a code that does not work says why in an alert, and keeps what was pasted 
   act(() => { store.patch({ pairingOpen: true }); });
   fireEvent.change(code(), { target: { value: "SV1.old" } });
   await act(async () => { fireEvent.submit(submit().form!); });
-  expect(screen.getByRole("alert")).toHaveTextContent("Este código ya caducó: duran 10 minutos. Pide uno nuevo.");
+  expect(screen.getByRole("alert")).toHaveTextContent("This code has expired or was already used. Ask the machine for a new code.");
   expect(code().value).toBe("SV1.old");
   expect(submit().disabled).toBe(false);
   expect(element().open).toBe(true);
@@ -63,7 +84,7 @@ test("a code that does not work says why in an alert, and keeps what was pasted 
 test("closing it tells the page, which keeps working without a machine", async () => {
   const { store, closePairing } = dialog(vi.fn());
   act(() => { store.patch({ pairingOpen: true }); });
-  await act(async () => { screen.getByRole("button", { name: "Cerrar emparejar este dispositivo" }).click(); });
+  await act(async () => { screen.getByRole("button", { name: "Close pairing" }).click(); });
   expect(closePairing).toHaveBeenCalled();
   expect(store.getState().pairing.open).toBe(false);
 });

@@ -178,9 +178,11 @@ body,
 @media (max-width:700px) {
   .settings-dialog[open] { width:calc(100vw - 1rem);height:calc(100dvh - 1rem) }
   .settings-dialog .settings-layout { display:flex;flex-direction:column }
-  .settings-dialog .settings-nav { display:flex;flex:none;gap:.35rem;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin }
-  .settings-dialog .settings-nav .ui-button { flex:0 0 auto;width:auto;min-width:max-content;margin:0;padding:.65rem .75rem }
+  .settings-dialog .settings-nav { display:flex;flex:none;flex-wrap:wrap;gap:.35rem;overflow:visible;scrollbar-width:auto }
+  .settings-dialog .settings-nav .ui-button { flex:1 1 calc(33.333% - .35rem);width:auto;min-width:0;white-space:normal;margin:0;padding:.65rem .75rem }
   .settings-dialog .settings-content { flex:1;padding-inline:1rem }
+  .settings-dialog .settings-footer { flex-wrap:wrap }
+  .settings-dialog .settings-footer #settings-error { flex:1 1 100%;min-width:0 }
   .settings-dialog .language-row {
     grid-template-columns:minmax(0,1fr) minmax(5.5rem,.45fr) 2.5rem;
     grid-template-areas:"name name name" "model model model" "voice speed preview";
@@ -199,6 +201,7 @@ body,
 }
 
 @media (max-width:430px) {
+  .settings-dialog .settings-nav .ui-button { flex-basis:calc(50% - .35rem);justify-content:flex-start }
   .settings-dialog .language-row {
     grid-template-columns:minmax(0,1fr) 2.5rem;
     grid-template-areas:"name name" "model model" "voice voice" "speed preview";
@@ -206,6 +209,51 @@ body,
   .settings-dialog .language-row input { max-width:none }
   .settings-dialog .settings-footer { gap:.5rem;padding-inline:1rem }
 }
+
+/* R1 host management: rows stay readable without exposing a machine's route or fingerprint. */
+.machine-list { display:flex;flex-direction:column;gap:.45rem }
+.machine-row[data-local] { border-color:#3d6b55 }
+.machine-row[data-state=failed] .machine-state .dot { background:#b96a6a }
+.machine-summary { cursor:default }
+.machine-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.35rem;min-width:0 }
+.machine-action { max-width:100%;white-space:normal }
+.host-detail { display:flex;flex-direction:column;gap:.7rem;min-width:0 }
+.host-detail-header h3 { margin:0 }
+.host-detail-header p { margin:.25rem 0 0 }
+.host-tabs { display:flex;flex-wrap:wrap;gap:.35rem;border-bottom:1px solid var(--sv-border);padding-bottom:.5rem }
+.host-tabs [aria-selected=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }
+.host-status-panel,.host-devices-panel { display:flex;flex-direction:column;gap:.6rem;min-width:0 }
+.host-status-panel p,.host-devices-panel p { margin:.2rem 0;line-height:1.5 }
+.host-status-summary { font-weight:650 }
+.host-failure-details { border-inline-start:2px solid #b96a6a;padding-inline-start:.8rem;overflow-wrap:anywhere }
+.host-failure-details pre { max-height:12rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#11171d;border-radius:.5rem;padding:.7rem;font-size:.75rem }
+.host-action-list { display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.35rem }
+.host-stop-confirm { display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;padding:.65rem;border:1px solid var(--sv-border);border-radius:.65rem;background:var(--sv-surface) }
+.host-devices-head { display:flex;align-items:center;justify-content:space-between;gap:.5rem }
+.host-devices-head h4,.pair-another-device h4 { margin:.3rem 0;font-size:1rem }
+.host-device-list { list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.45rem }
+.host-device-row { display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;min-width:0;padding:.65rem;border:1px solid var(--sv-border);border-radius:.65rem;background:var(--sv-surface) }
+.host-device-copy { display:flex;flex-direction:column;gap:.2rem;min-width:0;overflow-wrap:anywhere }
+.device-revoke-confirm { display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;max-width:15rem;text-align:right }
+.pair-another-device,.room-pair-form { display:flex;flex-direction:column;gap:.55rem;padding-top:.6rem;border-top:1px solid var(--sv-border) }
+.local-pairing-code { min-width:0;padding:.65rem;border:1px solid var(--sv-border);border-radius:.65rem;background:#11171d }
+.local-pairing-code output { display:block;max-width:100%;overflow-wrap:anywhere;font: .8rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;user-select:all }
+.room-pair-form input { display:block;width:100%;margin-top:.35rem;padding:.65rem;border:1px solid #526173;border-radius:.5rem;background:#141b23;color:inherit;font:inherit }
+.no-machine-stage-note { margin:.4rem 0 1rem;padding:.85rem;border:1px solid var(--sv-border);border-radius:.75rem;background:var(--sv-surface) }
+.no-machine-stage-note p { margin:0 0 .6rem;line-height:1.5 }
+.no-machine-screen { grid-column:1/-1;grid-row:1/-1;align-self:center;justify-self:center;width:min(48rem,100%);max-height:100%;overflow:auto;padding:clamp(1rem,4vw,2.5rem);border:1px solid var(--sv-border);border-radius:var(--sv-radius-md);background:var(--sv-surface) }
+.no-machine-copy { max-width:42rem }
+.no-machine-screen h1 { margin:.25rem 0 .6rem;font-size:clamp(1.5rem,4vw,2rem) }
+.no-machine-screen p { line-height:1.55 }
+.no-machine-setup { margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--sv-border) }
+.no-machine-setup h2 { margin:.25rem 0 .5rem;font-size:1.05rem }
+.setup-command { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.55rem;padding:.6rem;border:1px solid var(--sv-border);border-radius:.65rem;background:#11171d }
+.setup-command code { min-width:0;overflow-wrap:anywhere;font-size:.82rem }
+.no-machine-actions { display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1rem }
+.local-host-banner { display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.5rem;padding:.6rem 1rem;background:#2c2226;border-bottom:1px solid #6b4046;color:#f0c9c4;line-height:1.45;text-align:center }
+.remote-setup-guidance { margin:.5rem 0 1rem;padding:.8rem;border:1px solid var(--sv-border);border-radius:.75rem;background:var(--sv-surface) }
+.remote-setup-guidance h3 { margin:.15rem 0 .4rem;font-size:1rem }
+.remote-setup-guidance p { line-height:1.5 }
 
 /* One bubble per turn: bars while it is open (listening), slower while it is being transcribed. */
 .voice-bars{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 2px;color:currentColor}

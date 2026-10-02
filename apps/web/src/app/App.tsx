@@ -9,22 +9,39 @@ import { SettingsDialog } from "../features/settings/SettingsDialog";
 import { PairingDialog } from "../features/pairing/PairingDialog";
 import { PreparationDialog } from "../features/call/PreparationDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
+import { LocalHostBanner } from "../features/settings/LocalHostBanner";
+import { useRoomStore } from "../state/room-store";
+
+function RoomContent() {
+  const ready = useRoomStore((state) => state.facts.machinesReady);
+  const machines = useRoomStore((state) => state.machines);
+  const noMachine = ready && machines.length === 0;
+  return (
+    <>
+      <RoomHeader />
+      <LocalHostBanner />
+      <main>
+        {noMachine ? <NoMachineScreen /> : <>
+          <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
+          <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
+        </>}
+      </main>
+      {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
+      <ConnectionStatsDialog />
+      <SettingsDialog />
+      <PairingDialog />
+      <PreparationDialog />
+      <audio id="preview-audio" />
+    </>
+  );
+}
 
 export function App() {
   return (
     <RoomProvider>
       <TooltipProvider>
-        <RoomHeader />
-        <main>
-          <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
-          <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
-        </main>
-        <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
-        <ConnectionStatsDialog />
-        <SettingsDialog />
-        <PairingDialog />
-        <PreparationDialog />
-        <audio id="preview-audio" />
+        <RoomContent />
       </TooltipProvider>
     </RoomProvider>
   );

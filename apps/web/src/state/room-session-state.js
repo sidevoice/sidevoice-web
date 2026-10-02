@@ -27,7 +27,8 @@ export function initialSessionFacts() {
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
         // The machines this device is paired with (never their tokens), the one in use, and the clock of the
         // moment they were read so a row can say "hace 3 días" without reading one.
-        pairings: [], pairingInUse: null, machinesAt: 0,
+        pairings: [], pairingInUse: null, machinesAt: 0, machinesReady: false, remoteHostStatus: {},
+        localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
         rendezvous: '', node: null, nodeReach: '',
@@ -313,15 +314,36 @@ export function sinceText(seconds, now) {
  *  this device reaches it, and since when. A pairing the machine revoked stays listed, saying so, until the
  *  person pairs again or forgets it — a row that vanished would leave nothing to read about why. */
 export function machinesView(s) {
-    return (s.pairings || []).map(p => {
-        const inUse = p.fp === s.pairingInUse;
-        const routes = [p.urls?.length ? 'directa' : '', p.rv ? 'por la sala' : ''].filter(Boolean).join(' o ');
-        const reach = p.revoked ? 'revoked' : !inUse ? 'idle' : s.node === p.fp && s.rendezvous === 'room' ? 'room'
-            : s.node === p.fp && s.rendezvous === 'node' ? 'direct' : ['away', 'offline'].includes(s.nodeReach) ? s.nodeReach : 'checking';
-        const labels = { revoked: 'Revocada: ya no reconoce este dispositivo', idle: routes ? 'Conexión ' + routes : '',
-            room: 'A través de la sala', direct: 'Conexión directa', away: 'No responde', offline: 'Desconectada de la sala', checking: 'Buscándola…' };
-        return { id: p.fp, host: p.host || 'Máquina sin nombre', inUse, revoked: !!p.revoked, reach, reachLabel: labels[reach],
-            state: p.revoked ? 'revoked' : reach === 'room' || reach === 'direct' ? 'connected' : 'offline',
+    const local = (s.pairings || []).find(p => p.local);
+    const localStatus = s.localHostStatus?.state || 'absent';
+    const showLocal = !!local || (s.localHostAvailable && localStatus !== 'absent');
+    const localRow = showLocal ? {
+        fp: local?.fp || 'local-host', host: local?.host || null, local: true,
+        inUse: !!s.localHostSelected || (!!local && s.pairingInUse === local.fp),
+        selectable: !!local && s.localHostStatus?.reachable === true,
+        localStatus,
+    } : null;
+    const rows = [
+        ...(localRow ? [localRow] : []),
+        ...(s.pairings || []).filter(p => !p.local && p.fp !== local?.fp).map(p => ({ ...p, inUse: !s.localHostSelected && p.fp === s.pairingInUse, localStatus: null, selectable: true })),
+    ];
+    return rows.map(p => {
+        const inUse = !!p.inUse;
+        const status = p.local ? s.localHostStatus : null;
+        const localStatus = p.local ? status?.state || 'absent' : null;
+        const knownRemote = s.remoteHostStatus?.[p.fp];
+        const remoteReach = inUse && s.node === p.fp ? s.nodeReach === 'ok' ? 'connected'
+            : ['away', 'offline'].includes(s.nodeReach) ? 'offline' : 'checking' : knownRemote?.state || 'checking';
+        const reachableLocal = p.local && status?.reachable === true && !!local?.fp;
+        const reach = p.revoked ? 'revoked' : p.local ? reachableLocal ? 'direct'
+            : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'offline' : 'checking'
+            : remoteReach === 'connected' ? s.node === p.fp && s.rendezvous === 'room' ? 'room'
+                : s.node === p.fp && s.rendezvous === 'node' ? 'direct' : 'idle'
+            : remoteReach === 'offline' ? 'offline' : 'checking';
+        const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
+            : p.revoked ? 'revoked' : remoteReach;
+        return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', inUse, revoked: !!p.revoked, reach,
+            state, local: !!p.local, localStatus, selectable: p.selectable,
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
