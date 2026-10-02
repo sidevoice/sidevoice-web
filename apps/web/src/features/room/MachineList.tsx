@@ -8,6 +8,7 @@ import { useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator } from "../settings/host-i18n";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
+import { HostPage } from "../hosts/HostPage";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
@@ -20,11 +21,29 @@ export function MachineList() {
   const machines = useRoomStore((state) => state.machines);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<"status" | "agents" | "integrations" | "devices" | "voice" | "transcription">("status");
+  const [selectionRequest, setSelectionRequest] = useState(0);
   const localMachine = machines.find((machine) => machine.local) ?? null;
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
-  const selectedMachine = selected ? machines.find((machine) => machine.id === selected && machine.local) ?? null : null;
+  const selectedMachine = selected ? machines.find((machine) => machine.id === selected) ?? null : null;
 
-  if (selectedMachine && localMachine) return <HostDetail machine={selectedMachine} onBack={() => setSelected(null)} />;
+  useEffect(() => {
+    const openHost = (event: Event) => {
+      const detail = (event as CustomEvent<{ fp?: string; tab?: typeof selectedTab }>).detail;
+      const target = machines.find((machine) => machine.pairingId === detail?.fp || machine.id === detail?.fp);
+      if (!target) return;
+      setSelected(target.id);
+      setSelectedTab(detail.tab ?? "status");
+      setSelectionRequest((value) => value + 1);
+    };
+    window.addEventListener("sidevoice:open-host-settings", openHost);
+    return () => window.removeEventListener("sidevoice:open-host-settings", openHost);
+  }, [machines]);
+
+  if (selectedMachine) return <HostPage key={`${selectedMachine.id}:${selectionRequest}`} machine={selectedMachine} onBack={() => setSelected(null)}
+    initialTab={selectedTab}
+    statusPanel={selectedMachine.local ? <LocalHostStatusPanel status={status} /> : null}
+    devicesPanel={selectedMachine.local ? <LocalHostDevicesPanel machine={selectedMachine} /> : null} />;
 
   return (
     <div className="machines" id="machines">
@@ -49,8 +68,9 @@ export function MachineList() {
                 <span className="machine-actions">
                   {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
                     onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.use", { machine: machineName })}</Button>}
-                  {machine.local && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
-                    onClick={() => setSelected(machine.id)}>{t("hosts.open", { machine: machineName })}</Button>}
+                  <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
+                    onClick={() => { setSelected(machine.id);setSelectedTab(machine.newAgent && machine.capabilities?.agents ? "agents" : "status");setSelectionRequest((value) => value + 1); }}>{t("hosts.open", { machine: machineName })}</Button>
+                  {machine.newAgent && machine.capabilities?.agents && <span className="badge-dot" aria-label={t("hosts.newAgent")} />}
                 </span>
               </div>
             </div>
@@ -62,25 +82,6 @@ export function MachineList() {
         <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />
       </div>
     </div>
-  );
-}
-
-function HostDetail({ machine, onBack }: { machine: MachineView; onBack: () => void }) {
-  const t = hostTranslator();
-  const status = useRoomStore((state) => state.facts.localHostStatus);
-  const [tab, setTab] = useState<"status" | "devices">("status");
-  return (
-    <section className="host-detail" aria-labelledby="host-detail-title">
-      <Button variant="ghost" size="compact" onClick={onBack}>{t("hosts.pageBack")}</Button>
-      <header className="host-detail-header">
-        <div><h3 id="host-detail-title">{machine.host || t("hosts.unnamed")}</h3><p className="muted">{t("hosts.thisComputer")}</p></div>
-      </header>
-      <div className="host-tabs" role="tablist" aria-label={t("hosts.title")}>
-        <Button variant="ghost" role="tab" aria-selected={tab === "status"} onClick={() => setTab("status")}>{t("hosts.tab.status")}</Button>
-        <Button variant="ghost" role="tab" aria-selected={tab === "devices"} onClick={() => setTab("devices")}>{t("hosts.tab.devices")}</Button>
-      </div>
-      {tab === "status" ? <LocalHostStatusPanel status={status} /> : <LocalHostDevicesPanel machine={machine} />}
-    </section>
   );
 }
 

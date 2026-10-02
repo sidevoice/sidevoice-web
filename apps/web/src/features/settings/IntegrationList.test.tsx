@@ -56,11 +56,18 @@ test("typing, leaving the field and Enter are the runtime's to act on; Enter doe
   expect(document.querySelector('.integration-note[data-status="refused"]')!.textContent).toMatch(/Clave rechazada/);
 });
 
-test("Integraciones is a section of every paired device: the tab is there before and after the machine answers", () => {
+test("integrations are scoped to machine settings instead of appearing in the global sidebar", () => {
   actions();
   const store = room(<SettingsDialog />, { integrations: null });
-  const tab = () => document.getElementById("settings-integrations")!;
-  expect(tab()).not.toHaveAttribute("hidden");
+  expect(document.getElementById("settings-machines")).toBeInTheDocument();
+  expect(document.getElementById("settings-integrations")).toBeNull();
   act(() => { store.patch({ integrations: listing }); });
-  expect(tab()).not.toHaveAttribute("hidden");
+  expect(document.getElementById("settings-integrations")).toBeNull();
+});
+
+test("a previously selected but unavailable local host still keeps stages out of global defaults", () => {
+  room(<SettingsDialog />, { pairings: [], pairingInUse: "@sidevoice/local-host", localHostAvailable: true,
+    localHostSelected: true, localHostStatus: { state: "backoff", reachable: false } });
+  expect(document.getElementById("settings-voice")).toBeNull();
+  expect(document.getElementById("settings-transcription")).toBeNull();
 });

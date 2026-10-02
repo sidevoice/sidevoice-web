@@ -147,11 +147,16 @@ body,
   overflow:hidden;
 }
 .settings-dialog>#language-form { min-height:0;height:100%;overflow:hidden }
-.settings-dialog .settings-layout { height:100%;min-height:0;grid-template-columns:13.5rem minmax(0,1fr);overflow:hidden }
-.settings-dialog .settings-nav { min-width:0;overflow:auto }
+.settings-dialog .settings-shell,.settings-dialog .settings-layout { height:100%;min-height:0;min-width:0;overflow:hidden }
+.settings-dialog .settings-layout { grid-template-columns:13.5rem minmax(0,1fr) }
+.settings-dialog .settings-sidebar { display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:#1c242e;border-right:1px solid #3b4652 }
+.settings-dialog .settings-nav-toggle { display:none }
+.settings-dialog .settings-nav { display:flex;flex-direction:column;flex:none;min-width:0;gap:.3rem;overflow:auto;padding:1rem .7rem }
+.settings-dialog .settings-nav .ui-button { justify-content:flex-start;width:100%;min-width:0;margin:0;white-space:normal;text-align:left }
+.settings-dialog .settings-nav .ui-button[aria-pressed=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }
 .settings-dialog .settings-content { min-width:0;min-height:0;max-width:100%;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable }
 .settings-dialog .settings-content>section { min-width:0;max-width:100% }
-.settings-dialog .settings-footer { min-width:0;padding-bottom:max(1rem,env(safe-area-inset-bottom)) }
+.settings-dialog .settings-footer { min-width:0;padding-bottom:max(1rem,env(safe-area-inset-bottom));padding-inline:max(1.5rem,env(safe-area-inset-left)) max(1.5rem,env(safe-area-inset-right)) }
 .settings-dialog label,.settings-dialog input,.settings-dialog select { max-width:100% }
 .settings-dialog .ui-native-select { min-width:0;text-overflow:ellipsis;white-space:nowrap }
 .settings-dialog .model-picker {
@@ -176,12 +181,16 @@ body,
 .settings-dialog .model-info { flex:none }
 
 @media (max-width:700px) {
-  .settings-dialog[open] { width:calc(100vw - 1rem);height:calc(100dvh - 1rem) }
+  .settings-dialog[open] { inset:0;width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0 }
+  .settings-dialog .settings-heading { padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) 1rem max(1rem,env(safe-area-inset-left)) }
   .settings-dialog .settings-layout { display:flex;flex-direction:column }
-  .settings-dialog .settings-nav { display:flex;flex:none;flex-wrap:wrap;gap:.35rem;overflow:visible;scrollbar-width:auto }
-  .settings-dialog .settings-nav .ui-button { flex:1 1 calc(33.333% - .35rem);width:auto;min-width:0;white-space:normal;margin:0;padding:.65rem .75rem }
-  .settings-dialog .settings-content { flex:1;padding-inline:1rem }
-  .settings-dialog .settings-footer { flex-wrap:wrap }
+  .settings-dialog .settings-sidebar { flex:none;border-right:0;border-bottom:1px solid #3b4652;overflow:visible }
+  .settings-dialog .settings-nav-toggle { display:flex;justify-content:space-between;width:100%;min-height:2.75rem;border:0;border-radius:0;padding:.65rem 1rem;text-align:left }
+  .settings-dialog .settings-nav { display:none;flex-direction:column;flex-wrap:nowrap;max-height:32dvh;overflow:auto;border-top:1px solid #3b4652;padding:.5rem .65rem;scrollbar-width:thin }
+  .settings-dialog .settings-nav[data-mobile-open] { display:flex }
+  .settings-dialog .settings-nav .ui-button { flex:none;width:100%;min-height:2.5rem;padding:.6rem .75rem }
+  .settings-dialog .settings-content { flex:1;padding:0 1rem 1rem }
+  .settings-dialog .settings-footer { flex-wrap:wrap;padding-block:.75rem max(.75rem,env(safe-area-inset-bottom)) }
   .settings-dialog .settings-footer #settings-error { flex:1 1 100%;min-width:0 }
   .settings-dialog .language-row {
     grid-template-columns:minmax(0,1fr) minmax(5.5rem,.45fr) 2.5rem;
@@ -201,7 +210,6 @@ body,
 }
 
 @media (max-width:430px) {
-  .settings-dialog .settings-nav .ui-button { flex-basis:calc(50% - .35rem);justify-content:flex-start }
   .settings-dialog .language-row {
     grid-template-columns:minmax(0,1fr) 2.5rem;
     grid-template-areas:"name name" "model model" "voice voice" "speed preview";
@@ -218,6 +226,27 @@ body,
 .machine-actions { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.35rem;min-width:0 }
 .machine-action { max-width:100%;white-space:normal }
 .host-detail { display:flex;flex-direction:column;gap:.7rem;min-width:0 }
+.host-detail-header { display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;min-width:0 }
+.host-detail-header>div { min-width:0 }
+.host-detail-header h3 { overflow-wrap:anywhere }
+.host-tabs { display:flex;flex-wrap:nowrap;gap:.35rem;min-width:0;overflow:auto;padding-bottom:.5rem;border-bottom:1px solid var(--sv-border);scrollbar-width:thin }
+.host-tabs [role=tab] { flex:none;min-height:2.4rem;padding:.5rem .7rem;border:1px solid var(--sv-border);border-radius:.65rem;background:var(--sv-surface-raised);color:var(--sv-text);white-space:nowrap }
+.host-tabs [aria-selected=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }
+.host-tabpanel { min-width:0;overflow-wrap:anywhere }
+.host-status-panel,.host-devices-panel,.host-tab-prompt { display:grid;justify-items:start;gap:.5rem;padding:.75rem 0 }
+.host-status-summary { margin:0;font-weight:600 }
+.host-forget { display:flex;justify-content:flex-end;padding-top:.4rem;border-top:1px solid var(--sv-border) }
+.inline-confirm { display:flex;align-items:center;justify-content:flex-end;gap:.4rem;flex-wrap:wrap }
+.app-diagnostics { margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--sv-border) }
+.app-diagnostics-list { display:grid;gap:.45rem;margin:0 }
+.app-diagnostics-list>div { display:grid;grid-template-columns:minmax(7rem,.7fr) minmax(0,1fr);gap:.75rem }
+.app-diagnostics-list dt { color:var(--sv-muted) }
+.app-diagnostics-list dd { min-width:0;margin:0;overflow-wrap:anywhere }
+@media (max-width:430px) {
+  .host-detail-header { align-items:flex-start;flex-direction:column }
+  .host-forget,.inline-confirm { justify-content:flex-start }
+  .app-diagnostics-list>div { grid-template-columns:minmax(5.5rem,.7fr) minmax(0,1fr) }
+}
 .host-detail-header h3 { margin:0 }
 .host-detail-header p { margin:.25rem 0 0 }
 .host-tabs { display:flex;flex-wrap:wrap;gap:.35rem;border-bottom:1px solid var(--sv-border);padding-bottom:.5rem }
