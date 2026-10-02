@@ -36,6 +36,41 @@ export interface LocalPairingCode {
   reach: "room" | "direct" | "local-only";
 }
 
+export interface LocalHostInstallProgress {
+  step: string;
+  done: number | null;
+  total: number | null;
+  cancellable?: boolean;
+}
+
+/** Stable, machine-readable failure data. `message` is deliberately omitted from the web-facing type: UI copy
+ * comes from the English message bundle and native prose may contain implementation details. */
+export interface LocalHostBridgeError {
+  key: string;
+  step?: string;
+  params?: Record<string, string | number>;
+  log_tail?: string[];
+}
+
+export interface LocalHostInstallOperation extends Promise<LocalHostStatus> {
+  job: string;
+}
+
+export type LocalHostUpdateState = "available" | "current" | "newer-installed" | "incompatible" | "unknown";
+
+/** Build metadata stays opaque until desktop publishes the finalized R4-c metadata fields. */
+export interface LocalHostBuildMetadata {
+  [key: string]: unknown;
+}
+
+export interface LocalHostVersion {
+  bridge: number;
+  bundled: LocalHostBuildMetadata;
+  installed: LocalHostBuildMetadata | null;
+  core_api: number | null;
+  update: LocalHostUpdateState;
+}
+
 export interface LocalHostBridge {
   state(): Promise<LocalHostStatus> | LocalHostStatus;
   subscribe(listener: (status: LocalHostStatus) => void): () => void;
@@ -49,6 +84,11 @@ export interface LocalHostBridge {
   revealLog?(): Promise<unknown> | unknown;
   pairingCode?(): Promise<LocalPairingCode>;
   pairRoom?(url: string, code: string): Promise<unknown>;
+  install?(onProgress?: (event: LocalHostInstallProgress) => void): LocalHostInstallOperation;
+  cancel?(job: string): Promise<boolean>;
+  agents?(): Promise<{ agents: unknown[]; scanned_at: string }>;
+  update?(): Promise<LocalHostStatus>;
+  version?(): Promise<LocalHostVersion>;
 }
 
 export function localHostBridge(): LocalHostBridge | null {
