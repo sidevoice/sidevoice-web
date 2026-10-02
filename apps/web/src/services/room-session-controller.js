@@ -7,6 +7,7 @@ import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
+import {normalizeStageScope,adoptStageDefault,adoptStageDefaults,putStageScope} from '../state/stage-scope.js';
 import {offers as resolveOffers} from '../../../../packages/browser-audio/offers';
 import {pageSize,pageCached} from '../../../../packages/browser-audio/page-models.js';
 import {languageFor} from '../../../../packages/browser-audio/model-check.js';
@@ -571,6 +572,17 @@ async function locate({move=!(state.ws||state.connecting||state.reconnecting),fr
  if(hold&&state.node===pairing.fp&&recent(nodeBase))return;
  setRemoteHostStatus(pairing.fp,'offline');
  settleBase(null,reach,pairing);
+}
+async function checkMachine(fp){
+ const pairing=pairings.list.find(item=>item.fp===fp);
+ if(!pairing)return;
+ if(pairing.revoked){setRemoteHostStatus(fp,'offline');return}
+ setRemoteHostStatus(fp,'checking');
+ try{
+  const about=await askTarget(target,fetch);
+  const found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,{get:fetch});
+  setRemoteHostStatus(fp,found?'connected':'offline');
+ }catch{setRemoteHostStatus(fp,'offline')}
 }
 function settleBase(found,reach,pairing){
  const base=found?.base??null,moved=base!==nodeBase,machine=pairing?.fp??null,other=machine!==state.node;
@@ -1641,7 +1653,7 @@ $('settings-open').onclick=async()=>{try{
  // A new opening is a new settings session: whatever the last one still has on its way is dropped.
  integrationEpoch++;forgetKeyChecks();
  // Without an answered machine, use this device's saved app preferences and leave host-owned data alone.
- if(nodeBase==null)settingsSection('machines');
+ if(nodeBase==null)settingsSection('machines');else settingsSection('general');
  const p=nodeBase==null?devicePreferences():await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
  roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
  for(const task of TASKS)selection.dismiss(task);
@@ -1657,14 +1669,31 @@ $('settings-open').onclick=async()=>{try{
  if(nodeBase!=null)work.push(loadIntegrations().then(()=>loadStageLists(true)));
  await Promise.all(work);
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-function settingsSection(name){for(const section of ['general','voice','transcription','integrations','machines','advanced']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}if(name!=='integrations'&&state.integrationFocus)state.integrationFocus=null}
+function settingsSection(name){
+ if(name==='integrations'){
+  const fp=pairings.inUse;
+  name='machines';
+  if(fp)window.dispatchEvent(new CustomEvent('sidevoice:open-host-settings',{detail:{fp,tab:'integrations'}}));
+ }
+ if((name==='voice'||name==='transcription')&&pairings.inUse){
+  const tab=name;name='machines';
+  window.dispatchEvent(new CustomEvent('sidevoice:open-host-settings',{detail:{fp:pairings.inUse,tab}}));
+ }
+ for(const section of ['general','voice','transcription','app','machines','advanced']){
+  const panel=$('pane-'+section),button=$('settings-'+section);
+  if(panel)panel.hidden=section!==name;
+  if(button)button.setAttribute('aria-pressed',String(section===name));
+ }
+ window.dispatchEvent(new CustomEvent('sidevoice:settings-section',{detail:{name}}));
+ if(name!=='machines'&&state.integrationFocus)state.integrationFocus=null;
+}
 $('settings-advanced').onclick=()=>settingsSection('advanced');
 $('settings-general').onclick=()=>settingsSection('general');
 $('settings-machines').onclick=()=>settingsSection('machines');
+if($('settings-app'))$('settings-app').onclick=()=>settingsSection('app');
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
-$('settings-voice').onclick=()=>settingsSection('voice');
-$('settings-transcription').onclick=()=>settingsSection('transcription');
-$('settings-integrations').onclick=()=>settingsSection('integrations');
+if($('settings-voice'))$('settings-voice').onclick=()=>settingsSection('voice');
+if($('settings-transcription'))$('settings-transcription').onclick=()=>settingsSection('transcription');
 /* The stages (sidevoice/sidevoice-core#21): what this device measured about itself, the resolver's offers for it, and the edits the
  * panes make. The panes read all of it from the store (stage-settings.js); nothing here renders. */
 function nativeEngine(){return window.__sidevoiceDesktop?.host?.nativeEngine||null}
@@ -2010,7 +2039,6 @@ async function settleIntegrationKeys(){
  }
 }
 function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
-$('reset-settings').onclick=async()=>{try{localStorage.removeItem(SETTINGS_KEY);localStorage.removeItem(STAGES_KEY);localStorage.removeItem(WEBGPU_FAILED_KEY)}catch{}await measureDevice(true).catch(()=>{});await $('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
 $('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$('language-settings').addEventListener('close',stopPreview);
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
 // The only thing a device says about turn detection. The seconds behind each word are the room's, in one
@@ -2023,14 +2051,36 @@ const MIC_KEYS=['turn_patience'];
 // anything else a browser kept from before is dropped, not translated (greenfield).
 // The stages are kept per machine, by its pairing's fingerprint: what this device does with one machine — its
 // provider, that account's voices — is not what it does with another. The rest is the device's.
-const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages';
+const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages',LEGACY_STAGE_MIGRATION_KEY='sidevoice.stages.legacy-defaults-migrated';
 const DEVICE_KEYS=['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS];
 function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||'null');return stored&&typeof stored==='object'?stored:{}}catch{return {}}}
-function storedStages(fp){const stages=fp?readStored(STAGES_KEY)[fp]:null;return Object.fromEntries(TASKS.filter(task=>stages?.[task]).map(task=>[task,stages[task]]))}
+function stageScope(){
+ const raw=readStored(STAGES_KEY);
+ let migrated=false;try{migrated=localStorage.getItem(LEGACY_STAGE_MIGRATION_KEY)==='true'}catch{}
+ const legacy=migrated?{}:readStored(SETTINGS_KEY),scope=normalizeStageScope(raw,TASKS,legacy);
+ const hosts=pairings.list.filter(pairing=>!pairing.revoked),host=hosts.some(pairing=>pairing.fp===pairings.inUse)?pairings.inUse:hosts[0]?.fp||null;
+ // Snapshot legacy general choices into every paired host once; a later no-machine default stays first-host-only.
+ const adopted=migrated?adoptStageDefault(scope,host):adoptStageDefaults(scope,hosts.map(pairing=>pairing.fp));
+ const hasLegacyStages=TASKS.some(task=>Object.hasOwn(legacy,task));
+ if(!migrated){
+  let scopeSaved=true;
+  try{if(Object.keys(raw).length||hasLegacyStages)localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{scopeSaved=false}
+  if(scopeSaved){
+   try{localStorage.setItem(LEGACY_STAGE_MIGRATION_KEY,'true')}catch{}
+   if(hasLegacyStages)try{
+    const remaining={...legacy};for(const task of TASKS)delete remaining[task];
+    if(Object.keys(remaining).length)localStorage.setItem(SETTINGS_KEY,JSON.stringify(remaining));else localStorage.removeItem(SETTINGS_KEY);
+   }catch{}
+  }
+ }else if((Object.keys(raw).length||hasLegacyStages)&&JSON.stringify(adopted)!==JSON.stringify(raw))try{localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{}
+ return adopted;
+}
+function storedStages(fp){const scope=stageScope(),stages=fp?scope.hosts[fp]:scope.default;return Object.fromEntries(TASKS.filter(task=>stages?.[task]).map(task=>[task,stages[task]]))}
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return {...Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]])),...storedStages(pairings.inUse)}}
 function storePreferences(p,fp=pairings.inUse){try{
+ const current=stageScope(),scope=putStageScope(current,fp,{...storedStages(fp),...Object.fromEntries(TASKS.filter(task=>p[task]).map(task=>[task,p[task]]))},TASKS);
  localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))));
- if(fp)localStorage.setItem(STAGES_KEY,JSON.stringify({...readStored(STAGES_KEY),[fp]:Object.fromEntries(TASKS.filter(task=>p[task]).map(task=>[task,p[task]]))}));
+ localStorage.setItem(STAGES_KEY,JSON.stringify(scope));
 }catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
 // The room's stage defaults are not this device's: it cannot know what this device runs, so they are left out.
@@ -2230,7 +2280,7 @@ function saveDeviceSettingsWithoutHost(){
  for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS]){
   const value=field(key);if(value!==undefined&&value!=='')p[key]=['audio_grace_seconds','replay_on_return_seconds'].includes(key)?Number(value):value;
  }
- storePreferences(p,null);roomStore.patch({voicePreferences:p});window.roomI18n?.setLanguage(p.ui_language);$('language-settings').close();
+ storePreferences(p,pairings.inUse);roomStore.patch({voicePreferences:p});window.roomI18n?.setLanguage(p.ui_language);$('language-settings').close();
 }
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
@@ -2286,6 +2336,7 @@ window.sidevoiceActions={
  },
  forgetMachine,
  pairDevice,
+ checkMachine,
  localHostDevices,
  revokeLocalHostDevice,
  openPairing:()=>openPairing(),

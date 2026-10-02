@@ -87,6 +87,10 @@ export interface MachineView {
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
+  /** Capability reported by a real host API. An absent capability keeps the corresponding UI out of the page. */
+  capabilities?: { agents?: boolean };
+  /** R2's new-agent signal. The Settings route opens the agent tab only when its capability is present. */
+  newAgent?: boolean;
   /** Whether this row has a pairing that may be selected for routing. */
   selectable?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
@@ -280,4 +284,6 @@ export interface SidevoiceActions {
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;
+  /** Recheck one known remote host without changing which machine is in use. */
+  checkMachine?(id: string): Promise<void>;
 }

@@ -26,12 +26,19 @@ test("the settings dialog keeps one stable viewport and one scrolling content pa
  assert.match(css,/\.settings-dialog \.model-picker \{[^}]*grid-template-columns:minmax\(0,1fr\) 2\.65rem;[^}]*overflow:hidden/);
 });
 
-test("settings controls reflow without overflowing on narrow screens",()=>{
- assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav \{[^}]*flex-wrap:wrap;[^}]*overflow:visible/);
+test("the mobile settings sidebar collapses vertically and leaves the content scrollable",()=>{
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog\[open\] \{[^}]*width:100vw;[^}]*height:100dvh/);
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav \{[^}]*display:none;flex-direction:column;[^}]*max-height:32dvh;overflow:auto/);
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav\[data-mobile-open\] \{ display:flex \}/);
+ assert.match(css,/\.settings-dialog \.settings-nav-toggle \{ display:none \}/);
+ assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-nav-toggle \{ display:flex/);
+ assert.match(css,/\.settings-dialog \.settings-nav \{ display:flex;flex-direction:column/);
+ assert.match(css,/\.settings-dialog \.settings-content \{[^}]*min-width:0;min-height:0;[^}]*overflow:auto/);
  assert.match(css,/@media \(max-width:700px\)[\s\S]*?\.settings-dialog \.settings-footer \{[^}]*flex-wrap:wrap/);
  assert.match(css,/\.host-action-list \{[^}]*display:flex;flex-wrap:wrap/);
  assert.match(css,/grid-template-areas:"name name name" "model model model" "voice speed preview"/);
  assert.match(css,/@media \(max-width:430px\)[\s\S]*?grid-template-areas:"name name" "model model" "voice voice" "speed preview"/);
+ assert.match(css,/\.host-tabs \{[^}]*flex-wrap:nowrap;[^}]*overflow:auto/);
 });
 
 test("the recording bubble is the waveform and cancelling sits inside it, on its own line",()=>{
