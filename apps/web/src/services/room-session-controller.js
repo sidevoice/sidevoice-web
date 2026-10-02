@@ -6,6 +6,7 @@ import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
+import {pinTrialProviderRequest,transcriptionTrial} from './transcription-trial.ts';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
 import {normalizeStageScope,adoptStageDefault,adoptStageDefaults,putStageScope} from '../state/stage-scope.js';
@@ -20,6 +21,16 @@ import voiceCatalogFile from '../../../../packages/browser-audio/catalog.json';
 import {refusalText as sayRefusal} from '../../../../packages/browser-audio/refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
+const activeTranscriptionTrials=new Set();
+function cancelTranscriptionTrials(hostFp=null){
+ for(const trial of [...activeTranscriptionTrials])if(hostFp==null||trial.hostFp===hostFp){trial.handle.cancel();activeTranscriptionTrials.delete(trial)}
+}
+function startTranscriptionTrial(options){
+ const handle=transcriptionTrial(options),entry={hostFp:options.hostFp,handle};
+ activeTranscriptionTrials.add(entry);
+ void handle.result.then(()=>activeTranscriptionTrials.delete(entry),()=>activeTranscriptionTrials.delete(entry));
+ return handle;
+}
 // Selecting a model checks it before it takes effect (sidevoice/sidevoice-core#21): the state machine, its steps below (selectStage).
 const selection=createStageSelection({
  publish:(task,check)=>roomStore.patch({stageChecks:{...state.stageChecks,[task]:check&&{...check,previous:stageLabel(stageContext(state),task,activeStage(task))}}}),
@@ -119,6 +130,8 @@ function keepPairings(next){
  const previous=pairings,projected=projectPairings(next,localPairing);
  if(keepUnavailableLocal)projected.inUse=pairings.inUse;
  const moved=projected.inUse!==pairings.inUse;
+ const previousUse=pairingInUse(previous),nextUse=pairingInUse(projected);
+ if(previousUse?.fp!==nextUse?.fp||previousUse?.token!==nextUse?.token||previousUse?.revoked!==nextUse?.revoked)cancelTranscriptionTrials();
  localHostSelected=localPairing?projected.inUse===localPairing.fp:localHostSelected&&projected.inUse===pairings.inUse;
  pairings=projected;storedPairingState.inUse=projected.inUse;storedPairingState.list=projected.list.filter(p=>!p.local);
  discardChangedHostAgents(previous,projected);
@@ -137,6 +150,8 @@ function setLocalPairing(value){
  const projected=projectPairings(storedPairingState,localPairing);
  if(localHostSelected&&!localPairing)projected.inUse=storedPairingState.inUse||previous.inUse||LOCAL_HOST_SELECTION_ID;
  const moved=projected.inUse!==previous.inUse;
+ const previousUse=pairingInUse(previous),nextUse=pairingInUse(projected);
+ if(previousUse?.fp!==nextUse?.fp||previousUse?.token!==nextUse?.token||previousUse?.revoked!==nextUse?.revoked)cancelTranscriptionTrials();
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
  storedPairingState.inUse=projected.inUse;
@@ -590,6 +605,7 @@ async function checkMachine(fp){
 }
 function settleBase(found,reach,pairing){
  const base=found?.base??null,moved=base!==nodeBase,machine=pairing?.fp??null,other=machine!==state.node;
+ if(moved||other)cancelTranscriptionTrials();
  nodeBase=base;
  roomStore.batch(()=>{
   state.nodeReach=reach;state.rendezvous=found?(found.via==='room'?'room':'node'):'';
@@ -691,6 +707,20 @@ async function hostApi(fp,path,options={}){
   throw Object.assign(Error(key),{key,params});
  }
  return data;
+}
+/* A provider transcription trial captures this pairing's already proven route before it opens the microphone.
+ * It is deliberately limited to the selected machine; a settings pane for another host must select that host
+ * first instead of inheriting `nodeBase` from whichever machine happened to be in use. */
+function captureTranscriptionTrialRoute(fp){
+ const pairing=pairingInUse(pairings),base=nodeBase;
+ if(!fp||!pairing||pairing.fp!==fp||pairing.revoked||!base||state.node!==fp||state.nodeReach!=='ok')
+  throw Object.assign(Error('trial.host_unavailable'),{key:'trial.host_unavailable'});
+ const fresh=!!pairing.local||Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
+ const token=pairing.token;
+ return pinTrialProviderRequest({requestedFp:fp,selectedFp:pairings.inUse,pairingFp:pairing.fp,base,token,verified:fresh,revoked:pairing.revoked,
+  fetcher:fetch,
+  isCurrent:()=>{const current=pairingInUse(pairings);return pairings.inUse===fp&&current?.fp===fp&&!current.revoked&&current.token===token&&nodeBase===base&&state.node===fp},
+  onUnauthorized:()=>pairingRefused(fp)});
 }
 function hostAgentState(fp){return state.hostAgents[fp]}
 function setHostAgentState(fp,next){roomStore.patch({hostAgents:{...state.hostAgents,[fp]:next}})}
@@ -1808,14 +1838,15 @@ function editStage(task,next){roomStore.patch({stageDraft:{...(state.stageDraft|
  * place waits for that account's lists, so there is a model to check; one that still lacks a model or a voice stays
  * a draft, which "Guardar cambios" refuses until it is complete. Options are not checked: they are the draft it saves. */
 async function chooseStagePlace(task,place){
+ if(task==='stt')cancelTranscriptionTrials();
  if(place!==DEVICE)await loadRemote(place,task);
  const ctx=stageContext(state),next=withPlace(ctx,task,paneStage(task),place,state.voicePreferences?.[task]);
  if(next&&place!==DEVICE&&stageProblem(ctx,task,withVoicesChosen(ctx,next))){editStage(task,next);return}
  selectStage(task,next);
 }
-function chooseStageModel(task,model){selectStage(task,withModel(stageContext(state),task,paneStage(task),model))}
-function setStageOption(task,id,value,language){editStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
-function chooseStageBuild(task,value){selectStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+function chooseStageModel(task,model){if(task==='stt')cancelTranscriptionTrials();selectStage(task,withModel(stageContext(state),task,paneStage(task),model))}
+function setStageOption(task,id,value,language){if(task==='stt')cancelTranscriptionTrials();editStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
+function chooseStageBuild(task,value){if(task==='stt')cancelTranscriptionTrials();selectStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
 /* Select = load and verify. A model chosen in a pane is checked first — on this device in a worker
  * of its own (load-and-verify.js), so the one in use goes on working; at a provider by the machine with its key —
  * and only a passed check puts it in effect: stored, swapped in for the model in use (in a call too, without ending
@@ -1825,6 +1856,7 @@ function activeStage(task){return effectiveStage(stageContext(state),task,state.
 function sameChoice(a,b){return !!a&&!!b&&a.place===b.place&&a.model===b.model&&JSON.stringify(a.build||null)===JSON.stringify(b.build||null)}
 function selectStage(task,next){
  if(!next)return;
+ if(task==='stt')cancelTranscriptionTrials();
  // What is already in use is not selected again: an option changed with it is the draft's.
  if(sameChoice(next,activeStage(task))){selection.cancel(task);editStage(task,next);return}
  void selection.select(task,next);
@@ -2378,6 +2410,11 @@ window.sidevoiceActions={
  decideStage:(task,yes)=>selection.decide(task,yes),
  cancelStage:task=>selection.cancel(task),
  recheckStage:task=>{const stage=activeStage(task);if(stage)void selection.select(task,stage,{recheck:true})},
+ acquireTrialMicrophone:()=>acquireMicrophone(),
+ captureTranscriptionTrialRoute,
+ transcriptionTrialBuild:stage=>stage?.place===DEVICE?deviceRequest(stage):null,
+ releaseTranscriptionTrialBuild:build=>release(build),
+ transcriptionTrial:startTranscriptionTrial,
  copyDiagnostics,
  cancelDownload:id=>{downloads.cancel(id)},
  previewVoice,
