@@ -273,6 +273,8 @@ export interface DownloadsView {
 }
 
 export interface SidevoiceActions {
+  /** Open Settings on this device's saved preferences without waiting for the selected host. */
+  openSettings(): void;
   cancelInput(): Promise<void>;
   skipReply(): Promise<void>;
   replayReply(historyId: string | null): Promise<void>;

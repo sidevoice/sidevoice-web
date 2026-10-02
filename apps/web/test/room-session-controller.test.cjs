@@ -536,12 +536,12 @@ test('Opening Settings reads the integrations and each opening asks a provider\'
  s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:stage('openai','gpt-4o-transcribe',{language:'es',context:''})}});
  s.run("window.roomTranscription={capabilities:async()=>({webgpu:false,wasm:true})};window.roomI18n={setLanguage(){}}");
  const {fetch,calls}=settingsFetch();s.context.fetch=fetch;
- await s.run("$('settings-open').onclick()");
+ s.run('window.sidevoiceActions.openSettings()');
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(stageView(s,'stt').place,'openai');
  assert.deepEqual(stageView(s,'stt').models.map(m=>m.id),['gpt-4o-transcribe']);
  assert.equal(s.run("$('settings-error').textContent"),'');
- await s.run("$('settings-open').onclick()");
+ s.run('window.sidevoiceActions.openSettings()');
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(calls.filter(path=>path.includes('/transcription/models')).length,2,'a fresh list on every opening');
 });
@@ -552,7 +552,7 @@ test('Settings opens on device preferences and Machines stays navigable while ho
  s.context.fetch=path=>path==='/api/presentation/languages'?new Promise(()=>{}):new Promise(()=>{});
 
  // Do not await the click: a host is allowed to leave its preference response pending indefinitely.
- s.run("$('settings-open').click()");
+ s.run('window.sidevoiceActions.openSettings()');
  assert.equal(!!s.run("$('language-settings').open"),true,'the click opens the actual dialog before waiting for the host');
  assert.equal(s.run("$('ui-language').value"),'en','the dialog first uses this device\'s saved preference');
  s.run("$('settings-machines').click()");
@@ -568,7 +568,7 @@ test('Late host preferences fill the saved host stage but preserve edits made af
  let release;const pending=new Promise(resolve=>{release=resolve});
  s.context.fetch=path=>path==='/api/presentation/languages'?pending:new Promise(()=>{});
 
- s.run("$('settings-open').click()");
+ s.run('window.sidevoiceActions.openSettings()');
  assert.equal(s.run("$('ui-language').value"),'en','opening does not wait for host preferences');
  assert.equal(s.run("$('audio-grace-seconds').value"),'2');
  s.run("$('audio-grace-seconds').value='7'");
@@ -588,23 +588,57 @@ test('Switching machines cancels the open Settings preference request before its
  const B_STT=stage('device','whisper-base',{language:'en',context:'host B'});
  s.saved['sidevoice.stages']=JSON.stringify({default:{},hosts:{[PAIRED.fp]:{stt:stage('openai','model-of-a')},[B.fp]:{stt:B_STT}}});
  s.run("window.roomI18n={setLanguage(){}}");
- let release;const pending=new Promise(resolve=>{release=resolve});
- s.context.fetch=path=>path==='/api/presentation/languages'?pending:new Promise(()=>{});
+ const releases=[];
+ s.context.fetch=path=>String(path).endsWith('/api/presentation/languages')?new Promise(resolve=>releases.push(resolve)):new Promise(()=>{});
 
- s.run("$('settings-open').click()");
+ s.run('window.sidevoiceActions.openSettings()');
  const oldRequest=s.run('settingsPreferences.request');
  s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ s.run("settleBase(null,'',pairingInUse(pairings))");
+ s.run("settleBase({base:'https://b.example',via:'node'},'ok',pairingInUse(pairings))");
  const switched=s.run('settingsPreferences');
  assert.equal(switched.host,B.fp);
- assert.equal(switched.status,'idle');
+ assert.equal(switched.status,'loading','the selected host starts its own read when its address is proved');
  assert.ok(switched.request>oldRequest,'host selection invalidates the previous request epoch');
- release({ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:9})});
+ assert.equal(releases.length,2,'one request for A was dropped and a new one was sent to B');
+ s.run("$('audio-grace-seconds').value='6'");
+ releases[0]({ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:9,replay_on_return_seconds:33})});
  await settle();
 
  const after=s.run('settingsPreferences');
  assert.equal(after.host,B.fp,'the previous host cannot claim the new selection');
- assert.equal(after.status,'idle','the previous host response cannot change the current request state');
+ assert.equal(after.status,'loading','the previous host response cannot change the current request state');
+ assert.equal(s.run("$('audio-grace-seconds').value"),'6','editing B while it loads is protected from A\'s late answer');
+ releases[1]({ok:true,json:async()=>({ui_language:'fr',audio_grace_seconds:5,replay_on_return_seconds:55})});
+ await settle();
+ assert.equal(s.run('settingsPreferences.status'),'ready');
+ assert.equal(s.run("$('audio-grace-seconds').value"),'6','the new host response preserves an edit made after switching');
+ assert.equal(s.run("$('replay-on-return-seconds').value"),'55','B\'s defaults fill fields the user did not edit');
  assert.equal(s.run('voicePreferences.stt.model'),'whisper-base','the newly selected host keeps its own saved stage');
+});
+test('Switching a loaded Settings form reseeds device values, then fills the selected host defaults',async()=>{
+ const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
+ const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
+ s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en'});
+ s.run("window.roomI18n={setLanguage(){}}");
+ const releases=[];
+ s.context.fetch=path=>String(path).endsWith('/api/presentation/languages')?new Promise(resolve=>releases.push(resolve)):new Promise(()=>{});
+
+ s.run('window.sidevoiceActions.openSettings()');
+ releases[0]({ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:9,replay_on_return_seconds:33})});
+ await settle();
+ assert.deepEqual([s.run("$('audio-grace-seconds').value"),s.run("$('replay-on-return-seconds').value")],['9','33'],'host A fills its defaults');
+
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ s.run("settleBase(null,'',pairingInUse(pairings))");
+ assert.deepEqual([s.run("$('audio-grace-seconds').value"),s.run("$('replay-on-return-seconds').value")],['1','120'],'switching clears A\'s server defaults back to this device\'s safe values');
+ s.run("settleBase({base:'https://b.example',via:'node'},'ok',pairingInUse(pairings))");
+ assert.equal(releases.length,2,'the selected host is read after its new base is ready');
+ releases[1]({ok:true,json:async()=>({ui_language:'fr',audio_grace_seconds:5,replay_on_return_seconds:55})});
+ await settle();
+
+ assert.deepEqual([s.run("$('audio-grace-seconds').value"),s.run("$('replay-on-return-seconds').value")],['5','55'],'the new host, not A, fills the visible form');
+ assert.equal(s.run('settingsPreferences.host'),B.fp);
 });
 test('A listing the machine could not give keeps the saved provider, locks the choice, and can be asked again (F18)',async()=>{
  const s=setup({strictDOM:true});
@@ -613,7 +647,7 @@ test('A listing the machine could not give keeps the saved provider, locks the c
  let fail=true;
  const {fetch}=settingsFetch({integrations:async()=>fail?{ok:false,status:502,json:async()=>({detail:'La máquina no respondió'})}:{ok:true,json:async()=>LISTING(OPENAI({configured:true,source:'stored',hint:'…k3y9'}))}});
  s.context.fetch=fetch;
- s.run("$('settings-open').onclick()");await settle();
+ s.run('window.sidevoiceActions.openSettings()');await settle();
  let stt=stageView(s,'stt');
  assert.equal(stt.integrations,'failed');
  assert.equal(stt.place,'openai','an outage is not evidence the provider is gone');
@@ -1181,7 +1215,7 @@ test('Meet split control opens devices independently of mute and exposes setting
  // Settings are reached from the call menu. The device panel is the two pickers and a refresh, and
  // nothing else: a second way in, one row below the first, only made choosing a microphone slower.
  assert.equal(s.run("!!$('audio-settings-open')"),false);
- s.run("var settingsOpened=0;$('settings-open').onclick=()=>settingsOpened++;$('call-settings-open').click()");
+ s.run("var settingsOpened=0;window.sidevoiceActions={openSettings(){settingsOpened++}};$('call-settings-open').click()");
  assert.equal(s.run('settingsOpened'),1);
 });
 test('Stats omit missing durations and use first reply per turn, only for selected thread',()=>{
@@ -2580,7 +2614,7 @@ test('With nothing proving itself the page says why, and joins nothing: not conn
  s.run("joinFailure=''");
  assert.match(s.run('reachNote(state)'),/No se llega a «macbook» ni directamente ni a través de la sala/);
  // Settings opens on Máquinas with its own host row; it does not put an error in the settings form.
- await s.run("$('settings-open').onclick()");
+ s.run('window.sidevoiceActions.openSettings()');
  assert.equal(s.run("$('pane-machines').hidden"),false);
  assert.equal(s.run("$('settings-error').textContent"),'');
  // The machine answering takes the note, and a failed join, away by themselves.

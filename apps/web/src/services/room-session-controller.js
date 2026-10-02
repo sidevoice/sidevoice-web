@@ -376,7 +376,7 @@ function setDevicesOpen(open){
 }
 function setupAudioControls(){
  $('audio-devices').onclick=()=>setDevicesOpen($('audio-device-panel').hidden);
- $('call-settings-open').onclick=()=>{$('call-menu').open=false;$('settings-open').click()};
+ $('call-settings-open').onclick=()=>{$('call-menu').open=false;window.sidevoiceActions?.openSettings?.()};
  $('refresh-devices').onclick=refreshAudioDevices;
 
  globalThis.navigator?.mediaDevices?.addEventListener?.('devicechange',()=>{refreshAudioDevices();followDefaultRoute()});
@@ -598,8 +598,11 @@ function settleBase(found,reach,pairing){
   if(base!=null&&reachFailure&&state.joinFailure===reachFailure){state.joinFailure='';reachFailure=''}
  });
  if(moved&&base!=null){refresh();refreshPeople();refreshHistory()}
- // Settings open on another machine: its integrations and its providers' lists are read afresh (F13).
- if(base!=null&&state.integrationsStatus==='idle'&&$('language-settings')?.open)void loadIntegrations().then(()=>loadStageLists(true));
+ // Settings opened or changed machine while its route was being proved: now read this host's preferences.
+ if(base!=null&&$('language-settings')?.open){
+  loadSelectedSettingsPreferences();
+  if(state.integrationsStatus==='idle')void loadIntegrations().then(()=>loadStageLists(true));
+ }
 }
 /* ----- pairing this device with a machine (`device-pairing.js`) ----- */
 function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
@@ -1712,7 +1715,6 @@ async function receiveBrowserSpeech(d,cloud=false){
 }
 function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 
-$('settings-open').onclick=()=>openSettings();
 function settingsSection(name){
  if(name==='integrations'){
   const fp=pairings.inUse;
@@ -1977,9 +1979,11 @@ function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===inte
 function switchStages(){
  resetIntegrations();
  settingsPreferencesEpoch++;
+ const settingsOpen=!!$('language-settings')?.open,safePreferences=settingsOpen?devicePreferences():null;
+ if(settingsOpen){settingsFormSeed=fillSettingsForm(safePreferences);window.roomI18n?.setLanguage(settingsFormSeed.ui_language)}
  for(const task of TASKS)selection.cancel(task);
  const {stt:_stt,tts:_tts,...rest}=state.voicePreferences||{};
- roomStore.patch({stageDraft:null,voicePreferences:state.voicePreferences&&{...rest,...storedStages(pairings.inUse)},
+ roomStore.patch({stageDraft:null,voicePreferences:safePreferences||state.voicePreferences&&{...rest,...storedStages(pairings.inUse)},
   settingsPreferences:{host:pairings.inUse,request:settingsPreferencesEpoch,status:'idle'}});
 }
 function resetIntegrations(){
@@ -2164,24 +2168,29 @@ async function loadSettingsPreferences(scope,initial){
   if(currentSettingsPreferences(scope))roomStore.patch({settingsPreferences:{host:scope.host,request:scope.request,status:'failed'}});
  }
 }
+function loadSelectedSettingsPreferences(){
+ const preferences=state.settingsPreferences;
+ if(!$('language-settings')?.open||nodeBase==null||!pairings.inUse||preferences.host!==pairings.inUse||preferences.status!=='idle')return;
+ void loadSettingsPreferences({host:pairings.inUse,request:preferences.request},settingsFormSeed||settingsFormValues(devicePreferences()));
+}
 function openSettings(){
  // A new opening is a new settings session: whatever the last one still has on its way is dropped.
  integrationEpoch++;forgetKeyChecks();
- const request=++settingsPreferencesEpoch,host=nodeBase!=null?pairings.inUse:null,scope={request,host};
+ const request=++settingsPreferencesEpoch,host=pairings.inUse,connected=host!=null&&nodeBase!=null,scope={request,host};
  scanPairedAgents(true);
  // Open on this device's known preferences first; the selected machine fills its own defaults in afterward.
- settingsSection(host==null?'machines':'general');
+ settingsSection(connected?'general':'machines');
  const preferences=devicePreferences();settingsFormSeed=fillSettingsForm(preferences);
  window.roomI18n?.setLanguage(settingsFormSeed.ui_language);
  roomStore.patch({voicePreferences:preferences,stageDraft:null,previewNote:'',prepareNote:'',
-  settingsPreferences:{host,request,status:host?'loading':'idle'}});
+  settingsPreferences:{host,request,status:connected?'loading':'idle'}});
  for(const task of TASKS)selection.dismiss(task);
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
- if(host)void loadSettingsPreferences(scope,settingsFormSeed);
+ if(connected)void loadSettingsPreferences(scope,settingsFormSeed);
  // Neither a device measurement nor a host catalogue is part of opening the dialog: each can finish on its own.
  void measureDevice().catch(error=>{if(currentSettingsPreferences(scope))$('settings-error').textContent=error.message});
- if(host)void loadIntegrations().then(()=>{if(currentSettingsPreferences(scope))loadStageLists(true)});
+ if(connected)void loadIntegrations().then(()=>{if(currentSettingsPreferences(scope))loadStageLists(true)});
 }
 async function retrySettingsPreferences(){
  const previous=state.settingsPreferences;
@@ -2391,6 +2400,7 @@ function saveDeviceSettingsWithoutHost(){
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
 $('language-form').onsubmit=async e=>{e.preventDefault();if(nodeBase==null){saveDeviceSettingsWithoutHost();return}try{await saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
 window.sidevoiceActions={
+ openSettings,
  cancelInput:cancelCurrentInput,
  skipReply:async()=>skipReply(),
  replayReply,
