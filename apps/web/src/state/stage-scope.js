@@ -30,14 +30,22 @@ export function normalizeStageScope(rawValue, tasks, legacyDefault = {}) {
  return { default: fallback, hosts };
 }
 
-/** Transfer legacy general choices into the first available host without replacing its own choices. */
-export function adoptStageDefault(scopeValue, fingerprint) {
+/** Transfer general choices to a fixed snapshot of hosts without replacing each host's own choices. */
+export function adoptStageDefaults(scopeValue, fingerprints) {
  const scope = { default: { ...object(scopeValue?.default) }, hosts: { ...object(scopeValue?.hosts) } };
- if (!fingerprint || !Object.keys(scope.default).length) return scope;
- const existing = object(scope.hosts[fingerprint]);
- scope.hosts[fingerprint] = { ...scope.default, ...existing };
+ const targets = [...new Set((Array.isArray(fingerprints) ? fingerprints : [fingerprints]).filter(Boolean))];
+ if (!targets.length || !Object.keys(scope.default).length) return scope;
+ for (const fingerprint of targets) {
+  const existing = object(scope.hosts[fingerprint]);
+  scope.hosts[fingerprint] = { ...scope.default, ...existing };
+ }
  scope.default = {};
  return scope;
+}
+
+/** Transfer a no-machine default into the first available host without replacing its own choices. */
+export function adoptStageDefault(scopeValue, fingerprint) {
+ return adoptStageDefaults(scopeValue, fingerprint);
 }
 
 /** Replace one machine's choices, or the general choices before a machine is paired. */

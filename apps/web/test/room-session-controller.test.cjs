@@ -306,25 +306,31 @@ test('The stages are each machine\'s own: switching machine switches them, draft
  s.run("keepPairings(usingPairing(pairings,'fp-mac'))");
  assert.equal(s.run('voicePreferences.stt.model'),'model-of-a','and back on A, A\'s are there');
 });
-test('Legacy general stages become the first host defaults, preserving its existing choices',()=>{
+test('Legacy general stages fill missing tasks for every host already paired at migration',()=>{
  const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
  const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
- const existing=stage('openai','model-of-a',{language:'es'}),general=stage('elevenlabs','eleven_v3',{voice:{es:'v1'},speed:1});
- s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en',tts:general});
- s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:existing}});
- assert.equal(s.run('storedPreferences().stt.model'),'model-of-a');
+ const generalStt=stage('openai','gpt-4o-transcribe',{language:'es'}),generalTts=stage('elevenlabs','eleven_v3',{voice:{es:'v1'},speed:1});
+ const hostTts=stage('elevenlabs','eleven_flash_v2_5',{voice:{es:'v2'},speed:.9});
+ s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en',stt:generalStt,tts:generalTts});
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{tts:hostTts}});
+ assert.equal(s.run('storedPreferences().stt.model'),'gpt-4o-transcribe');
  const scope=JSON.parse(s.saved['sidevoice.stages']);
  assert.deepEqual(Object.keys(scope).sort(),['default','hosts'],'legacy storage is rewritten in the approved shape');
- assert.deepEqual(scope.default,{},'general settings no longer float between machines');
- assert.deepEqual(scope.hosts[PAIRED.fp],{stt:existing,tts:general},'the first host receives only its missing stage');
- assert.equal(scope.hosts[B.fp],undefined,'another host does not inherit the general choice');
+ assert.deepEqual(scope.default,{},'general settings are consumed by the paired-host snapshot');
+ assert.deepEqual(scope.hosts[PAIRED.fp],{stt:generalStt,tts:hostTts},'host A receives missing defaults but keeps its TTS override');
+ assert.deepEqual(scope.hosts[B.fp],{stt:generalStt,tts:generalTts},'host B receives the general STT and TTS it did not override');
  assert.deepEqual(JSON.parse(s.saved['sidevoice.settings']),{ui_language:'en'},'migration clears only the legacy stage fields');
  assert.equal(s.saved['sidevoice.stages.legacy-defaults-migrated'],'true','the legacy migration is frozen after it is saved');
  s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
- assert.equal(s.run('storedStages(pairings.inUse).stt'),undefined,'the next host starts without the first host\'s transcription choice');
- assert.equal(s.run('storedStages(pairings.inUse).tts'),undefined,'the next host does not re-import the legacy voice choice');
+ assert.equal(s.run('storedStages(pairings.inUse).stt.model'),'gpt-4o-transcribe','B reads its migrated transcription stage');
+ assert.equal(s.run('storedStages(pairings.inUse).tts.model'),'eleven_v3','B reads its migrated voice stage');
+ const C={...PAIRED,fp:'fp-server',host:'server',urls:['https://c.example'],token:'tok-c'};
+ s.context.__laterHost=C;
+ s.run('keepPairings(withPairing(pairings,__laterHost))');
+ assert.equal(Object.keys(s.run('storedStages(pairings.inUse)')).length,0,'a host paired after migration receives no legacy defaults');
  s.run("keepPairings(usingPairing(pairings,'fp-mac'))");
- assert.equal(s.run('storedStages(pairings.inUse).tts.model'),'eleven_v3','the first host keeps the migrated choice');
+ assert.equal(s.run('storedStages(pairings.inUse).stt.model'),'gpt-4o-transcribe','host A keeps the migrated transcription stage');
+ assert.equal(s.run('storedStages(pairings.inUse).tts.model'),'eleven_flash_v2_5','host A keeps its TTS override');
 });
 test('Before a machine is paired, stage choices stay in the device default scope',()=>{
  const s=setup({strictDOM:true,paired:false,stored:null});

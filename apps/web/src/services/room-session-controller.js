@@ -7,7 +7,7 @@ import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
-import {normalizeStageScope,adoptStageDefault,putStageScope} from '../state/stage-scope.js';
+import {normalizeStageScope,adoptStageDefault,adoptStageDefaults,putStageScope} from '../state/stage-scope.js';
 import {offers as resolveOffers} from '../../../../packages/browser-audio/offers';
 import {pageSize,pageCached} from '../../../../packages/browser-audio/page-models.js';
 import {languageFor} from '../../../../packages/browser-audio/model-check.js';
@@ -2059,17 +2059,19 @@ function stageScope(){
  let migrated=false;try{migrated=localStorage.getItem(LEGACY_STAGE_MIGRATION_KEY)==='true'}catch{}
  const legacy=migrated?{}:readStored(SETTINGS_KEY),scope=normalizeStageScope(raw,TASKS,legacy);
  const hosts=pairings.list.filter(pairing=>!pairing.revoked),host=hosts.some(pairing=>pairing.fp===pairings.inUse)?pairings.inUse:hosts[0]?.fp||null;
- const adopted=adoptStageDefault(scope,host);
+ // Snapshot legacy general choices into every paired host once; a later no-machine default stays first-host-only.
+ const adopted=migrated?adoptStageDefault(scope,host):adoptStageDefaults(scope,hosts.map(pairing=>pairing.fp));
  const hasLegacyStages=TASKS.some(task=>Object.hasOwn(legacy,task));
  if(!migrated){
-  try{
-   if(Object.keys(raw).length||hasLegacyStages)localStorage.setItem(STAGES_KEY,JSON.stringify(adopted));
-   localStorage.setItem(LEGACY_STAGE_MIGRATION_KEY,'true');
-   if(hasLegacyStages){
+  let scopeSaved=true;
+  try{if(Object.keys(raw).length||hasLegacyStages)localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{scopeSaved=false}
+  if(scopeSaved){
+   try{localStorage.setItem(LEGACY_STAGE_MIGRATION_KEY,'true')}catch{}
+   if(hasLegacyStages)try{
     const remaining={...legacy};for(const task of TASKS)delete remaining[task];
     if(Object.keys(remaining).length)localStorage.setItem(SETTINGS_KEY,JSON.stringify(remaining));else localStorage.removeItem(SETTINGS_KEY);
-   }
-  }catch{}
+   }catch{}
+  }
  }else if((Object.keys(raw).length||hasLegacyStages)&&JSON.stringify(adopted)!==JSON.stringify(raw))try{localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{}
  return adopted;
 }
