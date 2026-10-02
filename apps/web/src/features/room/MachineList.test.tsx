@@ -15,7 +15,7 @@ const paired = (extra: Partial<PairingSummary> = {}): PairingSummary => ({
   device_id: "d-nuc", paired_at: 1_700_000_000, revoked: false, ...extra,
 });
 const local = paired({ fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local" });
-const running: LocalHostStatus = { state: "running", installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
+const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.1.0", api: 1 }, calls: 0 };
 
 function setBridge(bridge: Partial<LocalHostBridge>) {
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
@@ -154,5 +154,37 @@ test("the local warning only appears while the local host is selected", () => {
   const store = createRoomStore();
   act(() => { store.patch({ pairings: [local, paired()], pairingInUse: "fp-nuc", localHostStatus: { state: "failed" } }); });
   render(<RoomProvider store={store}><LocalHostBanner /></RoomProvider>);
+  expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
+});
+
+test("a lost native pairing keeps a local Status row and recovery action without a selectable proxy", async () => {
+  const restart = vi.fn().mockResolvedValue(undefined);
+  setBridge({ restart, state: vi.fn(async (): Promise<LocalHostStatus> => ({ state: "failed", reachable: false })) });
+  actions();
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [], pairingInUse: "@sidevoice/local-host", localHostAvailable: true, localHostSelected: true,
+    localHostStatus: { state: "failed", reachable: false, failure: { key: "start.failed" } }, machinesReady: true }); });
+  render(<RoomProvider store={store}><MachineList /><LocalHostBanner /></RoomProvider>);
+
+  const row = document.querySelector(".machine-row");
+  expect(row).toHaveAttribute("data-local", "true");
+  expect(row).toHaveAttribute("data-in-use", "true");
+  expect(row?.textContent).toMatch(/This computer/);
+  expect(screen.queryByRole("button", { name: "Use This computer" })).toBeNull();
+  expect(screen.getByText(/This computer is unavailable/)).toBeInTheDocument();
+  await act(async () => { screen.getByRole("button", { name: "Open This computer" }).click(); });
+  expect(screen.getByRole("tab", { name: "Status" })).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
+  await act(async () => { screen.getAllByRole("button", { name: "Retry" })[0].click(); });
+  expect(restart).toHaveBeenCalledOnce();
+});
+
+test("a reachable local core stays Connected when its service state is not running and hides the warning", () => {
+  actions();
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostAvailable: true, localHostSelected: true,
+    localHostStatus: { state: "stopped-by-person", reachable: true }, machinesReady: true }); });
+  render(<RoomProvider store={store}><MachineList /><LocalHostBanner /></RoomProvider>);
+  expect(document.querySelector(".machine-row")?.textContent).toMatch(/Connected/);
   expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
 });

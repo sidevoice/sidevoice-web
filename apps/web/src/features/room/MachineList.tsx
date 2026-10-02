@@ -29,9 +29,9 @@ export function MachineList() {
       {machines.length === 0 && <p className="muted">{t("hosts.none")}</p>}
       <div className="machine-list">
         {machines.map((machine) => {
-          const machineName = machine.host || t("hosts.unnamed");
+          const machineName = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
           const subtitle = machine.local
-            ? machine.localStatus === "running" ? t("hosts.thisComputer") : hostStatusText(status, t)
+            ? machine.selectable && status.reachable === true ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
             : machine.state === "checking" ? t("hosts.checking")
               : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
               ? t("hosts.remoteNoResponse") : t("hosts.connected");
@@ -44,8 +44,8 @@ export function MachineList() {
                   <span className="machine-brief muted">{[machine.inUse ? t("hosts.inUse") : "", subtitle].filter(Boolean).join(" · ")}</span>
                 </span>
                 <span className="machine-actions">
-                  {!machine.inUse && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
-                    onClick={() => window.sidevoiceActions?.chooseMachine(machine.id)}>{t("hosts.use", { machine: machineName })}</Button>}
+                  {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
+                    onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.use", { machine: machineName })}</Button>}
                   {machine.local && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
                     onClick={() => setSelected(machine.id)}>{t("hosts.open", { machine: machineName })}</Button>}
                 </span>

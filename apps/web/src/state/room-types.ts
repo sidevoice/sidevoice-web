@@ -74,8 +74,10 @@ export interface ParticipantView {
 /** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
  *  it stays, saying so, until the person pairs again or forgets it. */
 export interface MachineView {
-  /** The machine's fingerprint: what identifies it to this device. */
+  /** Stable UI row identity. The local row remains stable while its native pairing is unavailable. */
   id: string;
+  /** The pairing fingerprint, when this row currently has a usable pairing. */
+  pairingId?: string;
   host: string;
   /** The one this page talks to: its conversations and its call. */
   inUse: boolean;
@@ -85,6 +87,8 @@ export interface MachineView {
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
+  /** Whether this row has a pairing that may be selected for routing. */
+  selectable?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
   pairedLabel: string;
 }

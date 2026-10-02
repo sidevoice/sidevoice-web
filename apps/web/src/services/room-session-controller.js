@@ -103,20 +103,45 @@ let localPairing=null;
 // projection, so validating against only browser pairings here would silently switch machines on app launch.
 let pairings={inUse:storedPairingState.inUse,list:storedPairingState.list};
 const desktopLocalHost=localHostBridge();
-roomStore.patch({localHostAvailable:!!desktopLocalHost});
-function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,machinesAt:Date.now()})}
+const LOCAL_HOST_SELECTION_KEY='sidevoice.local-host-selected',LOCAL_HOST_SELECTION_ID='@sidevoice/local-host';
+function readLocalHostSelected(){try{return pairingStorage?.getItem(LOCAL_HOST_SELECTION_KEY)==='true'}catch{return false}}
+function saveLocalHostSelected(){try{if(localHostSelected)pairingStorage?.setItem(LOCAL_HOST_SELECTION_KEY,'true');else pairingStorage?.removeItem(LOCAL_HOST_SELECTION_KEY)}catch{}}
+// Older versions stored the native fingerprint as the in-use pointer but intentionally did not store its
+// per-launch credentials. If it matches no browser pairing, retain the local selection while native reconnects.
+let localHostSelected=!!desktopLocalHost&&(readLocalHostSelected()||!!storedPairingState.inUse&&!storedPairingState.list.some(p=>p.fp===storedPairingState.inUse));
+roomStore.patch({localHostAvailable:!!desktopLocalHost,localHostSelected});
+function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
+function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
 function keepPairings(next){
- const projected=projectPairings(next,localPairing),moved=projected.inUse!==pairings.inUse;
+ const keepUnavailableLocal=localHostSelected&&!localPairing&&next.inUse===pairings.inUse;
+ const projected=projectPairings(next,localPairing);
+ if(keepUnavailableLocal)projected.inUse=pairings.inUse;
+ const moved=projected.inUse!==pairings.inUse;
+ localHostSelected=localPairing?projected.inUse===localPairing.fp:localHostSelected&&projected.inUse===pairings.inUse;
  pairings=projected;storedPairingState.inUse=projected.inUse;storedPairingState.list=projected.list.filter(p=>!p.local);
- if(moved)switchStages();if(pairingStorage)writePairings(pairingStorage,pairings);publishPairings()
+ if(moved)switchStages();persistPairingProjection()
 }
 function setLocalPairing(value){
  const next=normalizeLocalHostPairing(value),duplicates=next?storedPairingState.list.filter(p=>p.fp===next.fp):[];
+ const previousLocal=localPairing,previous=pairings,wasSelected=localHostSelected||!!previousLocal&&previous.inUse===previousLocal.fp;
  localPairing=next;
- const previous=pairings,projected=projectPairings(storedPairingState,localPairing),moved=projected.inUse!==previous.inUse;
+ if(next){localHostSelected=wasSelected||storedPairingState.inUse===next.fp;if(localHostSelected)storedPairingState.inUse=next.fp}
+ else if(state.localHostStatus?.state==='absent'){
+  localHostSelected=false;
+  if(wasSelected)storedPairingState.inUse=null;
+ }
+ else if(wasSelected){localHostSelected=true;storedPairingState.inUse=previousLocal?.fp||previous.inUse||LOCAL_HOST_SELECTION_ID}
+ const projected=projectPairings(storedPairingState,localPairing);
+ if(localHostSelected&&!localPairing)projected.inUse=storedPairingState.inUse||previous.inUse||LOCAL_HOST_SELECTION_ID;
+ const moved=projected.inUse!==previous.inUse;
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
- if(moved)switchStages();if(pairingStorage)writePairings(pairingStorage,pairings);publishPairings();
+ storedPairingState.inUse=projected.inUse;
+ if(moved)switchStages();persistPairingProjection();
+ // An unreachable report invalidates the app-owned per-launch proxy immediately. Never keep its URL or
+ // session secret around to be reused after native starts a new core.
+ if(wasSelected&&!next)settleBase(null,'away',null);
+ else if(next&&localHostSelected)void locate({move:true,fresh:true});
  // A stale code pairing for the same fingerprint is removed from storage, then revoked at an address which
  // proves itself as that host. The app-owned local pairing always remains the one in the machine list.
  for(const pairing of duplicates)void revokePairingCopy(pairing);
@@ -129,6 +154,7 @@ function setLocalHostStatus(status){
  if(!status||typeof status!=='object'||typeof status.state!=='string')return;
  roomStore.patch({localHostStatus:status});
 }
+let localHostEpoch=0;
 function setRemoteHostStatus(fp,status){
  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{state:status,checkedAt:Date.now()}}});
 }
@@ -137,13 +163,25 @@ async function refreshLocalHost(){
   pairings=projectPairings(storedPairingState,null);storedPairingState.inUse=pairings.inUse;storedPairingState.list=pairings.list;
   roomStore.patch({machinesReady:true,localHostStatus:{state:'absent'}});publishPairings();return
  }
+ const epoch=++localHostEpoch;
  const status=await Promise.resolve().then(()=>desktopLocalHost.state()).catch(()=>({state:'failed',failure:{key:'start.failed'}}));
+ if(epoch!==localHostEpoch)return;
  setLocalHostStatus(status);
+ if(status.reachable!==true){setLocalPairing(null);roomStore.patch({machinesReady:true});return}
  const pairing=await Promise.resolve().then(()=>desktopLocalHost.pairing()).catch(()=>null);
+ if(epoch!==localHostEpoch)return;
  setLocalPairing(pairing);roomStore.patch({machinesReady:true});
 }
 if(desktopLocalHost){
- try{desktopLocalHost.subscribe(status=>{setLocalHostStatus(status);void Promise.resolve().then(()=>desktopLocalHost.pairing()).then(setLocalPairing).catch(()=>{});})}catch{}
+ try{desktopLocalHost.subscribe(status=>{
+  const epoch=++localHostEpoch;
+  setLocalHostStatus(status);
+  roomStore.patch({machinesReady:true});
+  if(status.reachable!==true){setLocalPairing(null);return}
+  void Promise.resolve().then(()=>desktopLocalHost.pairing()).then(pairing=>{
+   if(epoch===localHostEpoch){setLocalPairing(pairing);roomStore.patch({machinesReady:true})}
+  }).catch(()=>{if(epoch===localHostEpoch){setLocalPairing(null);roomStore.patch({machinesReady:true})}});
+ })}catch{}
 }
 function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
@@ -502,7 +540,7 @@ let locateAsked=0,locateApplied=0,targetAbout=null,reachFailure='',doubted=null;
 async function locate({move=!(state.ws||state.connecting||state.reconnecting),fresh=false,hold=false}={}){
  if(!move)return;
  const pairing=pairingInUse(pairings);
- if(!pairing){settleBase(null,'unpaired',null);return}
+ if(!pairing){settleBase(null,localHostSelected?'away':'unpaired',null);return}
  if(pairing.revoked){settleBase(null,'revoked',pairing);return}
  // Native verified the local identity over the peer-checked socket. Its per-launch proxy is the locator: never
  // send the app's session secret to the core's TCP listener or probe another address with it.
@@ -585,7 +623,8 @@ async function forgetMachine(fp){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing)return;
  const wasInUse=pairings.inUse===fp,known=wasInUse&&state.node===fp?nodeBase:null;
  if(wasInUse&&(state.ws||state.connecting||state.reconnecting))disconnect();
- keepPairings(withoutPairing(pairings,fp));
+ const remaining=withoutPairing(pairings,fp);
+ keepPairings(localHostSelected&&!localPairing&&!wasInUse?{...remaining,inUse:pairings.inUse}:remaining);
  if(wasInUse){const next=pairingInUse(pairings);settleBase(null,next?'':'unpaired',next);if(next)void locate({move:true})}
  if(pairing.revoked)return;
  try{

@@ -28,7 +28,7 @@ export function initialSessionFacts() {
         // The machines this device is paired with (never their tokens), the one in use, and the clock of the
         // moment they were read so a row can say "hace 3 días" without reading one.
         pairings: [], pairingInUse: null, machinesAt: 0, machinesReady: false, remoteHostStatus: {},
-        localHostAvailable: false, localHostStatus: { state: 'absent' },
+        localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
         rendezvous: '', node: null, nodeReach: '',
@@ -315,22 +315,35 @@ export function sinceText(seconds, now) {
  *  person pairs again or forgets it — a row that vanished would leave nothing to read about why. */
 export function machinesView(s) {
     const local = (s.pairings || []).find(p => p.local);
-    const pairings = [...(local ? [local] : []), ...(s.pairings || []).filter(p => !p.local && p.fp !== local?.fp)];
-    return pairings.map(p => {
-        const inUse = p.fp === s.pairingInUse;
-        const localStatus = p.local ? s.localHostStatus?.state || 'absent' : null;
+    const localStatus = s.localHostStatus?.state || 'absent';
+    const showLocal = !!local || (s.localHostAvailable && localStatus !== 'absent');
+    const localRow = showLocal ? {
+        fp: local?.fp || 'local-host', host: local?.host || null, local: true,
+        inUse: !!s.localHostSelected || (!!local && s.pairingInUse === local.fp),
+        selectable: !!local && s.localHostStatus?.reachable === true,
+        localStatus,
+    } : null;
+    const rows = [
+        ...(localRow ? [localRow] : []),
+        ...(s.pairings || []).filter(p => !p.local && p.fp !== local?.fp).map(p => ({ ...p, inUse: !s.localHostSelected && p.fp === s.pairingInUse, localStatus: null, selectable: true })),
+    ];
+    return rows.map(p => {
+        const inUse = !!p.inUse;
+        const status = p.local ? s.localHostStatus : null;
+        const localStatus = p.local ? status?.state || 'absent' : null;
         const knownRemote = s.remoteHostStatus?.[p.fp];
         const remoteReach = inUse && s.node === p.fp ? s.nodeReach === 'ok' ? 'connected'
             : ['away', 'offline'].includes(s.nodeReach) ? 'offline' : 'checking' : knownRemote?.state || 'checking';
-        const reach = p.revoked ? 'revoked' : p.local ? localStatus === 'running' ? 'direct'
+        const reachableLocal = p.local && status?.reachable === true && !!local?.fp;
+        const reach = p.revoked ? 'revoked' : p.local ? reachableLocal ? 'direct'
             : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'offline' : 'checking'
             : remoteReach === 'connected' ? s.node === p.fp && s.rendezvous === 'room' ? 'room'
                 : s.node === p.fp && s.rendezvous === 'node' ? 'direct' : 'idle'
             : remoteReach === 'offline' ? 'offline' : 'checking';
-        const state = p.local ? localStatus === 'running' ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
+        const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
-        return { id: p.fp, host: p.host || '', inUse, revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus,
+        return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', inUse, revoked: !!p.revoked, reach,
+            state, local: !!p.local, localStatus, selectable: p.selectable,
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }

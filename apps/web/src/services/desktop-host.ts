@@ -86,6 +86,6 @@ export function normalizeLocalHostPairing(value: unknown): Pairing | null {
 
 /** Native already proved the local identity over the peer-checked socket; the per-launch proxy is the locator. */
 export function localHostLocator(pairing: Pairing | null, status: LocalHostStatus) {
-  if (!pairing?.local || status.state !== "running" || typeof pairing.urls[0] !== "string" || !pairing.urls[0]) return null;
+  if (!pairing?.local || status.reachable !== true || typeof pairing.urls[0] !== "string" || !pairing.urls[0]) return null;
   return { base: pairing.urls[0], via: "direct" as const };
 }
