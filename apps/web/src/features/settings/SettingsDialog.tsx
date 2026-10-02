@@ -1,28 +1,31 @@
 import { DialogFrame } from "../../components/ui/DialogFrame";
-import { AdvancedIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { MachineList } from "../room/MachineList";
 import { InfoPopover } from "../../components/models/ModelInfo";
-import { IntegrationList } from "./IntegrationList";
 import { StageSettings } from "./StageSettings";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
+import { useRoomStore } from "../../state/room-store";
+import { desktopAppBridge } from "../../services/desktop-host";
+import { SettingsShell } from "./SettingsShell";
+import { AppDiagnostics, ThisApp } from "./ThisApp";
+import { hostTranslator } from "./host-i18n";
 
-function GeneralSettings() {
+export function GeneralSettings() {
   return <section id="pane-general" aria-labelledby="settings-general" hidden>
-    <h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este dispositivo y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya. Las claves de Integraciones son la excepción: son de la máquina, y sirven a todos tus dispositivos.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p>
+    <h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web. La voz y la transcripción se configuran por separado.</p><p className="muted">Toda la configuración se guarda en este dispositivo y se envía a la sala al entrar; la sala no conserva ninguna copia. Cada dispositivo tiene la suya. Las claves de Integraciones son la excepción: son de la máquina, y sirven a todos tus dispositivos.</p><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p>
   </section>;
 }
 
-function VoiceSettings() {
+export function VoiceSettings() {
   return (
-    <section id="pane-voice" aria-labelledby="settings-voice">
+    <section id="pane-voice" aria-labelledby="settings-voice" hidden>
       <h3>Voz</h3>
       <StageSettings task="tts" />
     </section>
   );
 }
 
-function TranscriptionSettings() {
+export function TranscriptionSettings() {
   return (
     <section id="pane-transcription" aria-labelledby="settings-transcription" hidden>
       <h3>Transcripción</h3>
@@ -31,7 +34,7 @@ function TranscriptionSettings() {
   );
 }
 
-function AdvancedSettings() {
+export function AdvancedSettings() {
   return (
     <section id="pane-advanced" aria-labelledby="settings-advanced" hidden>
       <h3>Tiempos de conversación</h3>
@@ -48,13 +51,9 @@ function AdvancedSettings() {
       <h3>Fin de tu intervención</h3>
       <label>Cuánta paciencia quieres <InfoPopover description="Cuánto silencio deja la sala antes de dar por terminada tu intervención, y cuánto espera antes de entregarla por si sólo estabas cogiendo aire. Los números que hay detrás son de la sala, iguales para todos, para que un arreglo llegue a todo el mundo a la vez." label="Información sobre la paciencia" /><NativeSelect id="turn-patience" defaultValue="normal"><option value="fast">Rápido · corta antes</option><option value="normal">Normal</option><option value="calm">Tranquilo · te deja respirar</option></NativeSelect></label>
       <p className="muted">Rápido responde en cuanto callas, y es cómodo para frases sueltas. Tranquilo deja casi un segundo y medio de pausa y, si sigues hablando justo después, une las dos partes en un solo mensaje: es lo que quieres conduciendo. Se aplica al entrar en la sala; si lo cambias durante una llamada, vuelve a entrar. Por defecto: Normal.</p>
+      <AppDiagnostics />
     </section>
   );
-}
-
-/** The machine's own configuration, not this device's: any paired device sets it. */
-function IntegrationSettings() {
-  return <section id="pane-integrations" aria-labelledby="settings-integrations" hidden><IntegrationList /></section>;
 }
 
 function MachineSettings() {
@@ -62,20 +61,20 @@ function MachineSettings() {
 }
 
 export function SettingsDialog() {
+  const t = hostTranslator();
+  const hasMachines = useRoomStore((state) => state.machines.some((machine) => !!machine.pairingId || machine.local && machine.inUse));
+  const app = desktopAppBridge();
+  const appAvailable = !!app?.settings && !!app.update;
   return (
-    <DialogFrame id="language-settings" className="settings-dialog" labelledBy="settings-title" title="Configuración" closeId="settings-close" footer={<div className="settings-footer"><p id="settings-error" role="alert" /><Button type="submit" form="language-form" variant="primary">Guardar cambios</Button></div>}>
+    <DialogFrame id="language-settings" className="settings-dialog" labelledBy="settings-title" title={t("settings.title")} closeId="settings-close" closeLabel={t("settings.back")} closeTitle={t("settings.back")} footer={<div className="settings-footer"><p id="settings-error" role="alert" /><Button type="submit" form="language-form" variant="primary">{t("settings.save")}</Button></div>}>
       <form id="language-form">
-        <div className="settings-layout">
-          <nav className="settings-nav" aria-label="Secciones de configuración">
-            <Button variant="ghost" id="settings-general" aria-controls="pane-general" aria-pressed="false"><GeneralIcon /> General</Button>
-            <Button variant="ghost" id="settings-voice" aria-controls="pane-voice" aria-pressed="true"><VoicesIcon /> Voz</Button>
-            <Button variant="ghost" id="settings-transcription" aria-controls="pane-transcription" aria-pressed="false"><TranscriptionIcon /> Transcripción</Button>
-            <Button variant="ghost" id="settings-integrations" aria-controls="pane-integrations" aria-pressed="false"><IntegrationsIcon /> Integraciones</Button>
-            <Button variant="ghost" id="settings-machines" aria-controls="pane-machines" aria-pressed="false"><MachinesIcon /> Máquinas</Button>
-            <Button variant="ghost" id="settings-advanced" aria-controls="pane-advanced" aria-pressed="false"><AdvancedIcon /> Avanzado</Button>
-          </nav>
-          <div className="settings-content"><GeneralSettings /><VoiceSettings /><TranscriptionSettings /><IntegrationSettings /><MachineSettings /><AdvancedSettings /></div>
-        </div>
+        <SettingsShell hasMachines={hasMachines} appAvailable={appAvailable}>
+          <GeneralSettings />
+          {!hasMachines && <><VoiceSettings /><TranscriptionSettings /></>}
+          {appAvailable && <ThisApp />}
+          <AdvancedSettings />
+          <MachineSettings />
+        </SettingsShell>
       </form>
     </DialogFrame>
   );

@@ -91,6 +91,38 @@ export interface LocalHostBridge {
   version?(): Promise<LocalHostVersion>;
 }
 
+/** Optional R3 app.* operations. The web only renders native controls when these real bridge methods exist. */
+export interface AppSettings {
+  muteShortcut: string;
+  callControlsAlways: boolean;
+}
+
+export interface AppDiagnostics {
+  version: string;
+  os: string;
+  arch: string;
+  accelerators: string[];
+  memory_mb: number | null;
+  headset?: { supported: boolean; muteGesture: boolean };
+  webview?: { microphone: boolean; secureContext: boolean; webCrypto: boolean };
+}
+
+export type AppUpdateResult =
+  | { ok: true; settings?: AppSettings; warning?: string }
+  | { ok: false; error?: { key?: string; detail?: string } };
+
+export interface DesktopAppBridge {
+  settings?(): Promise<AppSettings>;
+  update?(patch: Partial<AppSettings>): Promise<AppUpdateResult>;
+  diagnostics?(): Promise<AppDiagnostics>;
+  headsetTest?(): Promise<void>;
+}
+
+export function desktopAppBridge(): DesktopAppBridge | null {
+  const app = desktopHost()?.app as DesktopAppBridge | undefined;
+  return app ?? null;
+}
+
 export function localHostBridge(): LocalHostBridge | null {
   const host = desktopHost();
   const localHost = host?.localHost as LocalHostBridge | undefined;

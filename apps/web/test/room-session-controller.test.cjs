@@ -8,13 +8,14 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const elements=new Map(),handlers={};
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element())}
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const dispatched=[];
+ const context=vm.createContext({Element,CustomEvent,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn,dispatchEvent:event=>{dispatched.push(event);return true},roomTranscription:{capabilities:async()=>({webgpu:false,wasm:true,models:['onnx-community/whisper-tiny','onnx-community/whisper-base']}),prepare:async({model})=>({model,device:'wasm'}),start(){},stop(){},ingest(){}}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. The resolver is TypeScript (packages/browser-audio/offers.ts), transpiled here.
- const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection'};
+ const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','../state/stage-scope.js':'StageScope','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection','./host-agents.ts':'HostAgents'};
  const audio=sourceRoot+'/../../../packages/browser-audio/';
- const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts'};
+ const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',StageScope:sourceRoot+'/state/stage-scope.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -31,7 +32,7 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
  if(paired)vm.runInContext("nodeBase='';verified.set('',Date.now());roomStore.patch({node:pairings.inUse,nodeReach:'ok'})",context);
  vm.runInContext("roomBinding={thread_id:'a',title:'A'};sessionId='s'",context);
- return {context,handlers,Element,elements,saved,run:code=>vm.runInContext(code,context)};
+ return {context,handlers,Element,elements,saved,dispatched,run:code=>vm.runInContext(code,context)};
 }
 test('The runtime never writes into a node React fills itself',()=>{
  // Two owners for the join line cost a blank room: setting textContent removed React's children, and the
@@ -127,10 +128,10 @@ function openaiPane(s,listing){listed(s,listing);s.run(`roomStore.patch({voicePr
 test('The React component tree initializes without inventing missing DOM elements',()=>{
  const s=setup({strictDOM:true});
  assert.equal(s.run("$('missing-element')"),null);
- assert.equal(s.run("typeof $('settings-integrations').onclick"),'function','Integraciones is a section like the others');
+ assert.equal(s.run("typeof $('settings-machines').onclick"),'function','machine settings have a section in the shell');
  for(const action of ['toggleCall','toggleMic','cancelInput','typeIntegrationKey','checkIntegrationKey','clearIntegrationKey','openIntegration','chooseStagePlace','chooseStageModel','setStageOption','chooseStageBuild','previewVoice','prepareVoice','retryIntegrations'])
   assert.equal(s.run("typeof window.sidevoiceActions."+action),'function','React calls '+action+', it does not reach into the DOM');
- for(const id of ['pane-integrations','settings-integrations','pane-voice','pane-transcription'])
+ for(const id of ['pane-machines','settings-machines','pane-voice','pane-transcription'])
   assert.ok(s.run("$('"+id+"')"),id);
  for(const id of ['stt-provider','tts-provider','stt-device','tts-device','stt-key','elevenlabs-key'])
   assert.equal(s.run("$('"+id+"')"),null,'the panes are the store\'s, and a pane does not authenticate: '+id);
@@ -300,10 +301,51 @@ test('The stages are each machine\'s own: switching machine switches them, draft
  s.run("$('language-settings').close=()=>{}");
  await s.run('saveSettings()');
  const stages=JSON.parse(s.saved['sidevoice.stages']);
- assert.deepEqual(stages[PAIRED.fp].stt,A_STT,'saving on B leaves A\'s stages as they were');
- assert.equal(stages['fp-nuc'].stt.place,'device');
+ assert.deepEqual(stages.hosts[PAIRED.fp].stt,A_STT,'saving on B leaves A\'s stages as they were');
+ assert.equal(stages.hosts['fp-nuc'].stt.place,'device');
  s.run("keepPairings(usingPairing(pairings,'fp-mac'))");
  assert.equal(s.run('voicePreferences.stt.model'),'model-of-a','and back on A, A\'s are there');
+});
+test('Legacy general stages fill missing tasks for every host already paired at migration',()=>{
+ const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
+ const s=setup({strictDOM:true,stored:{in_use:PAIRED.fp,pairings:[PAIRED,B]}});
+ const generalStt=stage('openai','gpt-4o-transcribe',{language:'es'}),generalTts=stage('elevenlabs','eleven_v3',{voice:{es:'v1'},speed:1});
+ const hostTts=stage('elevenlabs','eleven_flash_v2_5',{voice:{es:'v2'},speed:.9});
+ s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en',stt:generalStt,tts:generalTts});
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{tts:hostTts}});
+ assert.equal(s.run('storedPreferences().stt.model'),'gpt-4o-transcribe');
+ const scope=JSON.parse(s.saved['sidevoice.stages']);
+ assert.deepEqual(Object.keys(scope).sort(),['default','hosts'],'legacy storage is rewritten in the approved shape');
+ assert.deepEqual(scope.default,{},'general settings are consumed by the paired-host snapshot');
+ assert.deepEqual(scope.hosts[PAIRED.fp],{stt:generalStt,tts:hostTts},'host A receives missing defaults but keeps its TTS override');
+ assert.deepEqual(scope.hosts[B.fp],{stt:generalStt,tts:generalTts},'host B receives the general STT and TTS it did not override');
+ assert.deepEqual(JSON.parse(s.saved['sidevoice.settings']),{ui_language:'en'},'migration clears only the legacy stage fields');
+ assert.equal(s.saved['sidevoice.stages.legacy-defaults-migrated'],'true','the legacy migration is frozen after it is saved');
+ s.run("keepPairings(usingPairing(pairings,'fp-nuc'))");
+ assert.equal(s.run('storedStages(pairings.inUse).stt.model'),'gpt-4o-transcribe','B reads its migrated transcription stage');
+ assert.equal(s.run('storedStages(pairings.inUse).tts.model'),'eleven_v3','B reads its migrated voice stage');
+ const C={...PAIRED,fp:'fp-server',host:'server',urls:['https://c.example'],token:'tok-c'};
+ s.context.__laterHost=C;
+ s.run('keepPairings(withPairing(pairings,__laterHost))');
+ assert.equal(Object.keys(s.run('storedStages(pairings.inUse)')).length,0,'a host paired after migration receives no legacy defaults');
+ s.run("keepPairings(usingPairing(pairings,'fp-mac'))");
+ assert.equal(s.run('storedStages(pairings.inUse).stt.model'),'gpt-4o-transcribe','host A keeps the migrated transcription stage');
+ assert.equal(s.run('storedStages(pairings.inUse).tts.model'),'eleven_flash_v2_5','host A keeps its TTS override');
+});
+test('Before a machine is paired, stage choices stay in the device default scope',()=>{
+ const s=setup({strictDOM:true,paired:false,stored:null});
+ const general=stage('openai','gpt-4o-transcribe',{language:'en'});
+ s.saved['sidevoice.settings']=JSON.stringify({ui_language:'en',stt:general});
+ assert.equal(s.run('storedPreferences().stt.model'),'gpt-4o-transcribe');
+ const scope=JSON.parse(s.saved['sidevoice.stages']);
+ assert.deepEqual(scope.default,{stt:general});
+ assert.deepEqual(scope.hosts,{});
+ s.context.__pairingProjection={inUse:PAIRED.fp,list:[PAIRED]};
+ s.run('pairings=__pairingProjection');
+ assert.equal(s.run('storedStages(pairings.inUse).stt.model'),'gpt-4o-transcribe','the first host adopts the no-machine default');
+ s.context.__pairingProjection={inUse:'fp-nuc',list:[PAIRED,{...PAIRED,fp:'fp-nuc'}]};
+ s.run('pairings=__pairingProjection');
+ assert.equal(s.run('storedStages(pairings.inUse).stt'),undefined,'a later host starts empty');
 });
 test('A key verified on one machine does not label the next machine\'s row, however late its lists arrive (R04)',async()=>{
  const B={...PAIRED,fp:'fp-nuc',host:'nuc',urls:['https://b.example'],token:'tok-b'};
@@ -428,7 +470,7 @@ test('A provider\'s "Automática" voice is the voice the preview speaks, and it 
  await s.run("previewVoice('en')");
  assert.equal(spoken[0].voice,'voice-1');
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
- const {tts}=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
+ const {tts}=stored.find(([key])=>key==='sidevoice.stages')[1].hosts[PAIRED.fp];
  assert.equal(tts.options.voice.en,'voice-1','the call speaks the voice the preview spoke: the node has no automatic of its own');
 });
 test('A provider\'s voice stage with no voice to choose from is not saved (R02)',async()=>{
@@ -464,13 +506,16 @@ test('Removing a key acts at once, greys the place out, and takes what was typed
  await s.run("window.sidevoiceActions.checkIntegrationKey('openai')");
  assert.equal(calls.length,3,'and a later blur has nothing to send');
 });
-test('"Configurar" opens Integraciones at the provider\'s row',()=>{
+test('"Configurar" opens the in-use machine\'s Integrations tab at the provider row',()=>{
  const s=setup({strictDOM:true});
  s.run(`integrations=${JSON.stringify(LISTING(OPENAI(),ELEVEN()))}`);
  s.run("settingsSection('voice');window.sidevoiceActions.openIntegration('elevenlabs')");
- assert.equal(s.run("$('pane-integrations').hidden"),false);
+ assert.equal(s.run("$('pane-machines').hidden"),false);
  assert.equal(s.run("$('pane-voice').hidden"),true);
- assert.equal(s.run("$('settings-integrations').getAttribute('aria-pressed')"),'true');
+ assert.equal(s.run("$('settings-machines').getAttribute('aria-pressed')"),'true');
+ const route=s.dispatched.filter(event=>event.type==='sidevoice:open-host-settings').at(-1);
+ assert.equal(route.detail.tab,'integrations');
+ assert.equal(route.detail.fp,PAIRED.fp);
  assert.deepEqual(plain(s.run('roomStore.getState().integrations.rows').map(row=>[row.id,row.focused])),[['openai',false],['elevenlabs',true]]);
  s.run("settingsSection('general')");
  assert.equal(s.run('integrationFocus'),null,'leaving the section lets the row go');
@@ -515,7 +560,7 @@ test('A listing the machine could not give keeps the saved provider, locks the c
  assert.equal(stt.editable,false,'what depends on the listing waits for it');
  s.run("$('language-settings').close=()=>{}");
  await s.run('saveSettings()');
- assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.place,'openai','saving something else keeps the saved provider');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages']).hosts[PAIRED.fp].stt.place,'openai','saving something else keeps the saved provider');
  fail=false;
  await s.run('window.sidevoiceActions.retryIntegrations()');
  stt=stageView(s,'stt');
@@ -550,7 +595,7 @@ test('A provider model list that failed to load leaves the saved model, and savi
  const stt=stageView(s,'stt');
  assert.deepEqual([stt.model,stt.modelsError,stt.modelsLoading],['future-model','OpenAI answered 503 when loading the models.',false]);
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
- assert.equal(stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp].stt.model,'future-model','an outage is not a new choice');
+ assert.equal(stored.find(([key])=>key==='sidevoice.stages')[1].hosts[PAIRED.fp].stt.model,'future-model','an outage is not a new choice');
 });
 test('A new provider choice takes the first listed model, and one with an empty list is not saved (R05)',async()=>{
  const s=setup({strictDOM:true});const stored=[];
@@ -1821,7 +1866,7 @@ test('A control the person never saw does not decide anything',async()=>{
  s.run("ws=null;roomStore.patch({integrationsStatus:'ready',voicePreferences:{stt:"+JSON.stringify(stage('openai','gpt-4o-transcribe',{language:'es',context:''}))+",tts:"+JSON.stringify(stage('elevenlabs','eleven_flash_v2_5',{voice:{es:'v1'},speed:1}))+",turn_patience:'calm'}})");
  s.run("$('turn-patience').value=''");
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
- const saved=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
+ const saved=stored.find(([key])=>key==='sidevoice.stages')[1].hosts[PAIRED.fp];
  assert.equal(saved.stt.place,'openai','a provider whose listing is not in is not a switch to this device');
  assert.equal(saved.stt.model,'gpt-4o-transcribe');
  assert.equal(saved.tts.model,'eleven_flash_v2_5');
@@ -1841,7 +1886,7 @@ test('Saving the settings form stores every device setting, the ambient bed amon
  assert.ok(saved,'something was stored at all');
  assert.deepEqual(Object.keys(saved).sort(),['audio_grace_seconds','locked_call','presence_sound','replay_on_return_seconds','turn_patience','ui_language'],
   'old fields are dropped, not translated (F11)');
- const stages=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
+ const stages=stored.find(([key])=>key==='sidevoice.stages')[1].hosts[PAIRED.fp];
  assert.deepEqual(stages.stt,{place:'device',model:'whisper-tiny',options:{language:s.run('speechLanguage')},build:null},'with nothing chosen, this device\'s best offer');
  assert.equal(stages.tts.model,'kokoro-82m-v1.0');
  assert.equal(saved.presence_sound,'on');
@@ -2272,6 +2317,63 @@ test('Every request to the machine carries this device\'s token; the call socket
  assert.deepEqual([...sockets[0].protocols],['sidevoice','sidevoice.token.tok-1']);
 });
 
+test('the Agents API proves the paired host before sending its device token',async()=>{
+ const node=await fakeNode(),pairing=pairingOf(node);
+ node.tokens.add(pairing.token);
+ const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'http://127.0.0.1:8768':node}}),agentRequests=[];
+ s.context.fetch=async(url,init={})=>{
+  if(url.includes('/api/host/agents')){
+   agentRequests.push({url,init});
+   return {ok:true,status:200,json:async()=>({agents:[],scanned_at:1})};
+  }
+  return net.get(url,init);
+ };
+ await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
+
+ const identity=net.asked.find(request=>request.url.startsWith('http://127.0.0.1:8768/api/device/identity?nonce='));
+ assert.ok(identity,'the host identity is checked before the listing request');
+ assert.equal(identity.auth,null,'identity proof does not expose a device token');
+ assert.equal(agentRequests.length,1);
+ assert.equal(agentRequests[0].url,'http://127.0.0.1:8768/api/host/agents?rescan=1');
+ assert.equal(agentRequests[0].init.headers.Authorization,'Bearer tok-1');
+ assert.equal(agentRequests[0].init.redirect,'error');
+ assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
+});
+
+test('forgetting a host during identity proof prevents the pending Agents request from sending its token',async()=>{
+ const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
+ const s=setup({stored:{in_use:null,pairings:[pairing]}}),net=network({at:{'http://127.0.0.1:8768':node}}),agentRequests=[];
+ let releaseProof,signalProof;
+ const proofStarted=new Promise(resolve=>{signalProof=resolve}),proofGate=new Promise(resolve=>{releaseProof=resolve});
+ let delayed=false;
+ s.context.fetch=async(url,init={})=>{
+  const text=String(url);
+  if(text.startsWith('http://127.0.0.1:8768/api/device/identity?nonce=')&&!delayed){delayed=true;signalProof();await proofGate}
+  if(text.includes('/api/host/agents'))agentRequests.push({url:text,init});
+  return net.get(url,init);
+ };
+ const loading=s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)})`);
+ await proofStarted;
+ await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(node.fp)})`);
+ releaseProof();
+ await loading;
+ assert.deepEqual(agentRequests,[],'the host can be forgotten while the unauthenticated proof is pending');
+ assert.deepEqual(stored(s).pairings,[]);
+});
+
+test('the gear handoff stores one host or leaves a multi-host choice in R3 Machines',()=>{
+ const s=setup({strictDOM:true});
+ s.run(`window.sidevoiceActions.openAgentSettings(${JSON.stringify(PAIRED.fp)})`);
+ assert.equal(s.run("$('settings-machines').getAttribute('aria-pressed')"),'true');
+ assert.equal(JSON.stringify(s.run('roomStore.getState().facts.settingsAgentRequest')),
+  JSON.stringify({fp:PAIRED.fp,id:1}),'one pending host is passed to the machine selection route');
+
+ s.run('window.sidevoiceActions.openAgentSettings(null)');
+ assert.equal(s.run("$('settings-machines').getAttribute('aria-pressed')"),'true');
+ assert.equal(JSON.stringify(s.run('roomStore.getState().facts.settingsAgentRequest')),
+  JSON.stringify({fp:null,id:2}),'multiple pending hosts leave selection to the marked Machines list');
+});
+
 test('The machine in use is reached at the first of its addresses that proves it is that machine, and the token goes nowhere else',async()=>{
  const node=await fakeNode(),squatter=await fakeNode('squatter');node.tokens.add('tok-1');
  const s=setup({paired:false,stored:{in_use:node.fp,pairings:[pairingOf(node)]}});
@@ -2308,8 +2410,8 @@ test('The native local pairing is projected before selection validation and uses
  assert.equal(snapshot.facts.nodeReach,'ok');
  assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
  assert.equal(JSON.stringify(snapshot.machines.map(machine=>[machine.id,machine.local])),JSON.stringify([['local-host',true],[PAIRED.fp,false]]));
- assert.equal(asked.some(([url])=>url.includes('/api/device/identity?nonce=')),false,'native already verified the identity over its local socket');
- assert.ok(asked.every(([url])=>url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy');
+ assert.equal(asked.some(([url])=>url.startsWith('http://127.0.0.1:43127/')&&url.includes('/api/device/identity?nonce=')),false,'native already verified the local identity over its peer-checked socket');
+ assert.ok(asked.every(([url,options])=>!options.headers?.Authorization||url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy; other paired hosts may receive unauthenticated identity probes');
  const saved=JSON.parse(s.saved['sidevoice.pairings']);
  assert.equal(saved.in_use,'fp-local');
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
@@ -2530,6 +2632,7 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  const mac=await fakeNode('macbook'),pc=await fakeNode('linux'),squatter=await fakeNode('squatter');
  const s=setup({stored:{in_use:mac.fp,pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
  const net=network({at:{'':mac,'http://10.0.0.9:8768':squatter}});s.context.fetch=net.get;
+ s.run(`roomStore.patch({hostAgents:{[${JSON.stringify(mac.fp)}]:{status:'ready',value:{agents:[{id:'codex',present:true,registration:'not-connected',actionable:true}],scanned_at:1},error:null,busy:{},actionErrors:{}}}})`);
  // The one in use, at the address that proved itself a moment ago.
  await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(mac.fp)})`);
  const revoke=net.asked.find(r=>r.method==='DELETE');
@@ -2538,6 +2641,7 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  assert.deepEqual(stored(s).pairings.map(p=>p.fp),[pc.fp]);
  assert.equal(stored(s).in_use,pc.fp,'the one left is the one in use');
  assert.equal(s.run('roomStore.getState().machines.length'),1);
+ assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(mac.fp)}]`),undefined,'forgetting a host clears its connector state');
  // The other one's only address answers as somebody else: forgotten here, and its token sent nowhere.
  net.asked.length=0;
  await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(pc.fp)})`);
@@ -2811,7 +2915,7 @@ test('Selecting a model checks it apart, puts it in place of the one in use, and
  assert.equal(worker.posted[1].language,'es');
  assert.deepEqual(log,[['candidate',true],['adopt',true,'whisper-base'],['unload','whisper-tiny','sherpa-onnx']],'the previous model goes only after the swap');
  assert.equal(s.run('voicePreferences.stt.model'),'whisper-base');
- assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-base','stored once it passed');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages']).hosts[PAIRED.fp].stt.model,'whisper-base','stored once it passed');
  const check=plain(s.run('stageChecks.stt'));
  assert.equal(check.phase,'done');
  assert.equal(check.result.load_ms,321,'the app\'s own load time');
@@ -2912,7 +3016,7 @@ test('A mid-call change the room accepts is stored, and only then is the previou
  await settle();
  assert.equal(s.run('sessionId'),'new-session');
  assert.equal(s.run('voicePreferences.stt.place'),'openai');
- assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-1');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages']).hosts[PAIRED.fp].stt.model,'whisper-1');
  assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']]);
  assert.equal(plain(s.run('stageChecks.stt')).phase,'done');
 });
@@ -2944,7 +3048,7 @@ async function deferredVoices(outcome){
  await s.run("$('language-form').onsubmit({preventDefault(){}})");await settle();
  return {s,stored,checks:()=>checks};
 }
-const storedTts=stored=>stored.filter(([key])=>key==='sidevoice.stages').map(([,value])=>value[PAIRED.fp]?.tts?.place);
+const storedTts=stored=>stored.filter(([key])=>key==='sidevoice.stages').map(([,value])=>value.hosts[PAIRED.fp]?.tts?.place);
 test('A provider draft completed later is checked when saved, and a check that fails stores nothing (R02)',async()=>{
  const {s,stored,checks}=await deferredVoices({ok:false,step:'key',reason:{key:'provider_key_refused',provider:'elevenlabs',message:'refused'},passes:[]});
  assert.equal(checks(),1,'saving selects it: the check runs');
@@ -2958,7 +3062,7 @@ test('A provider draft completed later and passing its check is stored by the se
  assert.equal(checks(),1);
  assert.equal(s.run('voicePreferences.tts.place'),'elevenlabs');
  assert.equal(storedTts(stored).at(-1),'elevenlabs');
- assert.equal(JSON.parse(JSON.stringify(stored.filter(([key])=>key==='sidevoice.stages').at(-1)[1][PAIRED.fp].tts.options.voice)).es,'v1','stored with the voice it names');
+ assert.equal(JSON.parse(JSON.stringify(stored.filter(([key])=>key==='sidevoice.stages').at(-1)[1].hosts[PAIRED.fp].tts.options.voice)).es,'v1','stored with the voice it names');
 });
 test('Saving an option of the model already in use stores it without a check',async()=>{
  const s=setup({strictDOM:true});let checks=0;
@@ -3114,7 +3218,7 @@ test('A cancel after the room admitted the new session does not half-undo it: th
  assert.equal(s.run('sessionId'),'new-session');
  assert.equal(s.run('voicePreferences.stt.model'),'whisper-1');
  assert.equal(s.run('enginePreferences.stt.model'),'whisper-1');
- assert.equal(JSON.parse(s.saved['sidevoice.stages'])[PAIRED.fp].stt.model,'whisper-1','stored: the active choice and the stored one agree');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages']).hosts[PAIRED.fp].stt.model,'whisper-1','stored: the active choice and the stored one agree');
  assert.deepEqual(unloads,[['whisper-tiny','sherpa-onnx','cpu']],'the model the old session used is let go');
  assert.equal(plain(s.run('stageChecks.stt')).phase,'done');
 });

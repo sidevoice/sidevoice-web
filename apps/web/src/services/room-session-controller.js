@@ -2,11 +2,13 @@ import {createRoomSessionStore,stageContext,working,joinView,conversationView,pa
 import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
+import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
+import {normalizeStageScope,adoptStageDefault,adoptStageDefaults,putStageScope} from '../state/stage-scope.js';
 import {offers as resolveOffers} from '../../../../packages/browser-audio/offers';
 import {pageSize,pageCached} from '../../../../packages/browser-audio/page-models.js';
 import {languageFor} from '../../../../packages/browser-audio/model-check.js';
@@ -114,11 +116,12 @@ function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSu
 function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
 function keepPairings(next){
  const keepUnavailableLocal=localHostSelected&&!localPairing&&next.inUse===pairings.inUse;
- const projected=projectPairings(next,localPairing);
+ const previous=pairings,projected=projectPairings(next,localPairing);
  if(keepUnavailableLocal)projected.inUse=pairings.inUse;
  const moved=projected.inUse!==pairings.inUse;
  localHostSelected=localPairing?projected.inUse===localPairing.fp:localHostSelected&&projected.inUse===pairings.inUse;
  pairings=projected;storedPairingState.inUse=projected.inUse;storedPairingState.list=projected.list.filter(p=>!p.local);
+ discardChangedHostAgents(previous,projected);
  if(moved)switchStages();persistPairingProjection()
 }
 function setLocalPairing(value){
@@ -137,11 +140,12 @@ function setLocalPairing(value){
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
  storedPairingState.inUse=projected.inUse;
+ discardChangedHostAgents(previous,projected);
  if(moved)switchStages();persistPairingProjection();
  // An unreachable report invalidates the app-owned per-launch proxy immediately. Never keep its URL or
  // session secret around to be reused after native starts a new core.
  if(wasSelected&&!next)settleBase(null,'away',null);
- else if(next&&localHostSelected)void locate({move:true,fresh:true});
+ else if(next){hostAgentBases.set(next.fp,next.urls[0]);if(localHostSelected)void locate({move:true,fresh:true})}
  // A stale code pairing for the same fingerprint is removed from storage, then revoked at an address which
  // proves itself as that host. The app-owned local pairing always remains the one in the machine list.
  for(const pairing of duplicates)void revokePairingCopy(pairing);
@@ -535,7 +539,8 @@ function refreshMachines(){roomStore.patch({machinesAt:Date.now()});void locate(
  * proved itself is trusted for a few minutes. A call in progress is never moved by it
  * — changing machine is a hang-up, and the person's to make. A reconnecting call (`hold`) keeps the address it
  * had while that one's proof is recent: the machine may be restarting, and the socket is the better probe. */
-const verified=new Map();
+const verified=new Map(),hostAgentBases=new Map();
+let settingsAgentRequestId=0;
 let locateAsked=0,locateApplied=0,targetAbout=null,reachFailure='',doubted=null;
 async function locate({move=!(state.ws||state.connecting||state.reconnecting),fresh=false,hold=false}={}){
  if(!move)return;
@@ -567,10 +572,21 @@ async function locate({move=!(state.ws||state.connecting||state.reconnecting),fr
  locateApplied=asked;
  // The page follows the build of whoever serves it: a room serving this page says which.
  if(target===''&&targetAbout?.kind==='room')followServedBuild(targetAbout.build);
- if(found){verified.set(found.base,Date.now());setRemoteHostStatus(pairing.fp,'connected');if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
+ if(found){verified.set(found.base,Date.now());hostAgentBases.set(pairing.fp,found.base);setRemoteHostStatus(pairing.fp,'connected');if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
  if(hold&&state.node===pairing.fp&&recent(nodeBase))return;
  setRemoteHostStatus(pairing.fp,'offline');
  settleBase(null,reach,pairing);
+}
+async function checkMachine(fp){
+ const pairing=pairings.list.find(item=>item.fp===fp);
+ if(!pairing)return;
+ if(pairing.revoked){setRemoteHostStatus(fp,'offline');return}
+ setRemoteHostStatus(fp,'checking');
+ try{
+  const about=await askTarget(target,fetch);
+  const found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,{get:fetch});
+  setRemoteHostStatus(fp,found?'connected':'offline');
+ }catch{setRemoteHostStatus(fp,'offline')}
 }
 function settleBase(found,reach,pairing){
  const base=found?.base??null,moved=base!==nodeBase,machine=pairing?.fp??null,other=machine!==state.node;
@@ -611,6 +627,7 @@ async function pairDevice(code,name){
  }
  const inCall=!!(state.ws||state.connecting||state.reconnecting),use=!inCall||pairings.inUse===pairing.fp;
  keepPairings(withPairing(pairings,pairing,{use}));
+ void hostAgentsController.load(pairing.fp);
  verified.set(base.base,Date.now());
  if(use&&!inCall)settleBase(base,'ok',pairing);
  closePairing();
@@ -639,6 +656,64 @@ async function localHostApi(path,options={}){
  const response=await fetch(pairing.urls[0]+path,withToken({...options,redirect:'error'},pairing.token));
  if(!response.ok)throw Error('local-host-request-failed');
  return response;
+}
+const hostAgentPairingGenerations=new Map();
+async function hostApi(fp,path,options={}){
+ const pairingGeneration=hostAgentPairingGenerations.get(fp)||0;
+ const pairing=pairings.list.find(item=>item.fp===fp);
+ if(!pairing||pairing.revoked)throw Object.assign(Error('unreachable'),{key:'unreachable'});
+ let base=pairing.local?pairing.urls[0]:hostAgentBases.get(fp);
+ if(!base||!pairing.local&&Date.now()-(verified.get(base)||0)>=VERIFIED_FOR_MS){
+  if(pairing.local)base=pairing.urls[0];
+  else{
+   let place=null;
+   try{place=await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch})}catch{}
+   if(!place)throw Object.assign(Error('unreachable'),{key:'unreachable'});
+   const currentPairing=pairings.list.find(item=>item.fp===fp);
+   if((hostAgentPairingGenerations.get(fp)||0)!==pairingGeneration||!currentPairing||currentPairing.revoked||currentPairing.token!==pairing.token)
+    throw Object.assign(Error('unreachable'),{key:'unreachable'});
+   base=place.base;verified.set(base,Date.now());hostAgentBases.set(fp,base);setRemoteHostStatus(fp,'connected');
+  }
+ }
+ if(typeof base!=='string'||!base)throw Object.assign(Error('unreachable'),{key:'unreachable'});
+ const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),23000);
+ let response;
+ try{response=await fetch(base+path,withToken({...options,signal:abort.signal,redirect:'error'},pairing.token))}
+ catch(error){throw Object.assign(Error('unreachable'),{key:error?.name==='AbortError'?'timeout':'unreachable'})}
+ finally{clearTimeout(timer)}
+ let data=null;
+ try{data=await response.json()}catch{}
+ if(response.status===401){pairingRefused(fp);throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ if(!response.ok){
+  const failure=data?.error&&typeof data.error==='object'?data.error:data;
+  const key=typeof failure?.key==='string'&&/^[a-z0-9._-]+$/.test(failure.key)?failure.key:response.status===503?'no-connector':'request-failed';
+  const params=failure?.params&&typeof failure.params==='object'?Object.fromEntries(Object.entries(failure.params).filter(([,value])=>typeof value==='string'||typeof value==='number'&&Number.isFinite(value))):undefined;
+  throw Object.assign(Error(key),{key,params});
+ }
+ return data;
+}
+function hostAgentState(fp){return state.hostAgents[fp]}
+function setHostAgentState(fp,next){roomStore.patch({hostAgents:{...state.hostAgents,[fp]:next}})}
+const hostAgentsController=createHostAgentsController({request:hostApi,
+ hasHost:fp=>pairings.list.some(pairing=>pairing.fp===fp&&!pairing.revoked),getState:hostAgentState,setState:setHostAgentState,
+ removeState:fp=>{const next={...state.hostAgents};delete next[fp];roomStore.patch({hostAgents:next})}});
+function discardHostAgents(fp){
+ hostAgentPairingGenerations.set(fp,(hostAgentPairingGenerations.get(fp)||0)+1);
+ hostAgentsController.invalidate(fp);
+ hostAgentBases.delete(fp);
+}
+function discardChangedHostAgents(previous,next){
+ for(const old of previous.list){
+  const current=next.list.find(pairing=>pairing.fp===old.fp);
+  if(!current||current.revoked||current.token!==old.token)discardHostAgents(old.fp);
+ }
+}
+function scanPairedAgents(rescan=false){
+ for(const pairing of pairings.list)if(!pairing.revoked)void hostAgentsController.load(pairing.fp,{rescan});
+}
+function openAgentSettings(fp){
+ settingsSection('machines');
+ roomStore.patch({settingsAgentRequest:{fp,id:++settingsAgentRequestId}});
 }
 async function localHostDevices(){
  const data=await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json();
@@ -1640,8 +1715,9 @@ function receiveServerSpeech(d){return receiveBrowserSpeech(d,true)}
 $('settings-open').onclick=async()=>{try{
  // A new opening is a new settings session: whatever the last one still has on its way is dropped.
  integrationEpoch++;forgetKeyChecks();
+ scanPairedAgents(true);
  // Without an answered machine, use this device's saved app preferences and leave host-owned data alone.
- if(nodeBase==null)settingsSection('machines');
+ if(nodeBase==null)settingsSection('machines');else settingsSection('general');
  const p=nodeBase==null?devicePreferences():await loadPreferences();window.roomI18n?.setLanguage(p.ui_language);
  roomStore.patch({voicePreferences:p,stageDraft:null,previewNote:'',prepareNote:''});
  for(const task of TASKS)selection.dismiss(task);
@@ -1657,14 +1733,31 @@ $('settings-open').onclick=async()=>{try{
  if(nodeBase!=null)work.push(loadIntegrations().then(()=>loadStageLists(true)));
  await Promise.all(work);
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-function settingsSection(name){for(const section of ['general','voice','transcription','integrations','machines','advanced']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}if(name!=='integrations'&&state.integrationFocus)state.integrationFocus=null}
+function settingsSection(name){
+ if(name==='integrations'){
+  const fp=pairings.inUse;
+  name='machines';
+  if(fp)window.dispatchEvent(new CustomEvent('sidevoice:open-host-settings',{detail:{fp,tab:'integrations'}}));
+ }
+ if((name==='voice'||name==='transcription')&&pairings.inUse){
+  const tab=name;name='machines';
+  window.dispatchEvent(new CustomEvent('sidevoice:open-host-settings',{detail:{fp:pairings.inUse,tab}}));
+ }
+ for(const section of ['general','voice','transcription','app','machines','advanced']){
+  const panel=$('pane-'+section),button=$('settings-'+section);
+  if(panel)panel.hidden=section!==name;
+  if(button)button.setAttribute('aria-pressed',String(section===name));
+ }
+ window.dispatchEvent(new CustomEvent('sidevoice:settings-section',{detail:{name}}));
+ if(name!=='machines'&&state.integrationFocus)state.integrationFocus=null;
+}
 $('settings-advanced').onclick=()=>settingsSection('advanced');
 $('settings-general').onclick=()=>settingsSection('general');
 $('settings-machines').onclick=()=>settingsSection('machines');
+if($('settings-app'))$('settings-app').onclick=()=>settingsSection('app');
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
-$('settings-voice').onclick=()=>settingsSection('voice');
-$('settings-transcription').onclick=()=>settingsSection('transcription');
-$('settings-integrations').onclick=()=>settingsSection('integrations');
+if($('settings-voice'))$('settings-voice').onclick=()=>settingsSection('voice');
+if($('settings-transcription'))$('settings-transcription').onclick=()=>settingsSection('transcription');
 /* The stages (sidevoice/sidevoice-core#21): what this device measured about itself, the resolver's offers for it, and the edits the
  * panes make. The panes read all of it from the store (stage-settings.js); nothing here renders. */
 function nativeEngine(){return window.__sidevoiceDesktop?.host?.nativeEngine||null}
@@ -2010,7 +2103,6 @@ async function settleIntegrationKeys(){
  }
 }
 function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
-$('reset-settings').onclick=async()=>{try{localStorage.removeItem(SETTINGS_KEY);localStorage.removeItem(STAGES_KEY);localStorage.removeItem(WEBGPU_FAILED_KEY)}catch{}await measureDevice(true).catch(()=>{});await $('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
 $('settings-close').onclick=()=>{stopPreview();$('language-settings').close()};$('language-settings').addEventListener('close',stopPreview);
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
 // The only thing a device says about turn detection. The seconds behind each word are the room's, in one
@@ -2023,14 +2115,36 @@ const MIC_KEYS=['turn_patience'];
 // anything else a browser kept from before is dropped, not translated (greenfield).
 // The stages are kept per machine, by its pairing's fingerprint: what this device does with one machine — its
 // provider, that account's voices — is not what it does with another. The rest is the device's.
-const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages';
+const SETTINGS_KEY='sidevoice.settings',STAGES_KEY='sidevoice.stages',LEGACY_STAGE_MIGRATION_KEY='sidevoice.stages.legacy-defaults-migrated';
 const DEVICE_KEYS=['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS];
 function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||'null');return stored&&typeof stored==='object'?stored:{}}catch{return {}}}
-function storedStages(fp){const stages=fp?readStored(STAGES_KEY)[fp]:null;return Object.fromEntries(TASKS.filter(task=>stages?.[task]).map(task=>[task,stages[task]]))}
+function stageScope(){
+ const raw=readStored(STAGES_KEY);
+ let migrated=false;try{migrated=localStorage.getItem(LEGACY_STAGE_MIGRATION_KEY)==='true'}catch{}
+ const legacy=migrated?{}:readStored(SETTINGS_KEY),scope=normalizeStageScope(raw,TASKS,legacy);
+ const hosts=pairings.list.filter(pairing=>!pairing.revoked),host=hosts.some(pairing=>pairing.fp===pairings.inUse)?pairings.inUse:hosts[0]?.fp||null;
+ // Snapshot legacy general choices into every paired host once; a later no-machine default stays first-host-only.
+ const adopted=migrated?adoptStageDefault(scope,host):adoptStageDefaults(scope,hosts.map(pairing=>pairing.fp));
+ const hasLegacyStages=TASKS.some(task=>Object.hasOwn(legacy,task));
+ if(!migrated){
+  let scopeSaved=true;
+  try{if(Object.keys(raw).length||hasLegacyStages)localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{scopeSaved=false}
+  if(scopeSaved){
+   try{localStorage.setItem(LEGACY_STAGE_MIGRATION_KEY,'true')}catch{}
+   if(hasLegacyStages)try{
+    const remaining={...legacy};for(const task of TASKS)delete remaining[task];
+    if(Object.keys(remaining).length)localStorage.setItem(SETTINGS_KEY,JSON.stringify(remaining));else localStorage.removeItem(SETTINGS_KEY);
+   }catch{}
+  }
+ }else if((Object.keys(raw).length||hasLegacyStages)&&JSON.stringify(adopted)!==JSON.stringify(raw))try{localStorage.setItem(STAGES_KEY,JSON.stringify(adopted))}catch{}
+ return adopted;
+}
+function storedStages(fp){const scope=stageScope(),stages=fp?scope.hosts[fp]:scope.default;return Object.fromEntries(TASKS.filter(task=>stages?.[task]).map(task=>[task,stages[task]]))}
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return {...Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]])),...storedStages(pairings.inUse)}}
 function storePreferences(p,fp=pairings.inUse){try{
+ const current=stageScope(),scope=putStageScope(current,fp,{...storedStages(fp),...Object.fromEntries(TASKS.filter(task=>p[task]).map(task=>[task,p[task]]))},TASKS);
  localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))));
- if(fp)localStorage.setItem(STAGES_KEY,JSON.stringify({...readStored(STAGES_KEY),[fp]:Object.fromEntries(TASKS.filter(task=>p[task]).map(task=>[task,p[task]]))}));
+ localStorage.setItem(STAGES_KEY,JSON.stringify(scope));
 }catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
 // The room's stage defaults are not this device's: it cannot know what this device runs, so they are left out.
@@ -2230,7 +2344,7 @@ function saveDeviceSettingsWithoutHost(){
  for(const key of ['ui_language','audio_grace_seconds','replay_on_return_seconds','presence_sound','locked_call',...MIC_KEYS]){
   const value=field(key);if(value!==undefined&&value!=='')p[key]=['audio_grace_seconds','replay_on_return_seconds'].includes(key)?Number(value):value;
  }
- storePreferences(p,null);roomStore.patch({voicePreferences:p});window.roomI18n?.setLanguage(p.ui_language);$('language-settings').close();
+ storePreferences(p,pairings.inUse);roomStore.patch({voicePreferences:p});window.roomI18n?.setLanguage(p.ui_language);$('language-settings').close();
 }
 // Whatever goes wrong while reading the form is said where the person is looking, and nothing is half-saved.
 // A form the settings never filled — no machine served its catalogues — is not saved over this device's settings.
@@ -2274,6 +2388,9 @@ window.sidevoiceActions={
  checkIntegrationKey,
  clearIntegrationKey,
  openIntegration,
+ loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
+ hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
+ openAgentSettings,
  // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
  // away, inside the person's own tap. The choice is this device's, kept for next time.
  chooseMachine(id){
@@ -2286,6 +2403,7 @@ window.sidevoiceActions={
  },
  forgetMachine,
  pairDevice,
+ checkMachine,
  localHostDevices,
  revokeLocalHostDevice,
  openPairing:()=>openPairing(),
@@ -2373,6 +2491,7 @@ window.addEventListener('blur',releaseHold);document.addEventListener('visibilit
 window.roomI18n?.setLanguage(devicePreferences().ui_language);
 function startInitialLocate(){
  publishPairings();
+ scanPairedAgents();
  void locate().finally(()=>{loadPreferences().catch(()=>devicePreferences()).then(p=>window.roomI18n?.setLanguage(p.ui_language))});
 }
 // A normal browser has no native projection to wait for, so keep its existing first locate timing. The desktop
