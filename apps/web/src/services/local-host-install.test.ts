@@ -41,6 +41,27 @@ test("install progress belongs to one job, and a second start cannot race it", a
   expect(observed).toContain("succeeded");
 });
 
+test("a bridge commit frame revokes cancellation for that job", async () => {
+  const result = deferred<LocalHostStatus>();
+  let report!: (event: { step: string; done: number | null; total: number | null; cancellable?: boolean }) => void;
+  const cancel = vi.fn(async () => true);
+  const bridge = {
+    install: vi.fn((onProgress) => { report = onProgress!; return operation("job-commit", result.promise); }),
+    cancel,
+  } as unknown as LocalHostBridge;
+  const controller = createLocalHostInstallController(() => bridge);
+  controller.start();
+
+  expect(controller.getSnapshot()).toMatchObject({ phase: "installing", job: "job-commit", cancellable: true });
+  report({ step: "commit", done: null, total: null, cancellable: false });
+  expect(controller.getSnapshot()).toMatchObject({ phase: "installing", step: "commit", cancellable: false });
+  expect(await controller.cancel()).toBe(false);
+  expect(cancel).not.toHaveBeenCalled();
+
+  result.resolve(running);
+  await vi.waitFor(() => expect(controller.getSnapshot()).toMatchObject({ phase: "succeeded" }));
+});
+
 test("failed bridge details retain allowlisted diagnostics and omit untrusted strings and logs", async () => {
   const result = deferred<LocalHostStatus>();
   const bridge = { install: vi.fn(() => operation("job-2", result.promise)) } as unknown as LocalHostBridge;

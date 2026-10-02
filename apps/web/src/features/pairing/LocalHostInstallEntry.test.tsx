@@ -74,6 +74,24 @@ test("NoMachine keeps remote pairing available while local preparation reports b
   act(() => controller.clear());
 });
 
+test("a non-cancellable commit progress frame hides Cancel", async () => {
+  const result = deferred<LocalHostStatus>();
+  let report!: (event: { step: string; done: number | null; total: number | null; cancellable?: boolean }) => void;
+  const controller = fakeController({
+    install: vi.fn((onProgress) => { report = onProgress!; return operation("commit-job", result.promise); }),
+    cancel: vi.fn(async () => true),
+  });
+  render(<LocalHostInstallEntry showCta controller={controller} />);
+
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
+  await act(async () => { report({ step: "commit", done: null, total: null, cancellable: false }); });
+  expect(screen.queryByRole("button", { name: "Cancel setup" })).toBeNull();
+
+  await act(async () => { result.resolve(running); await Promise.resolve(); });
+  act(() => controller.clear());
+});
+
 test("failure shows translated key copy, safe details and a retry action", async () => {
   const failed = deferred<LocalHostStatus>();
   const install = vi.fn()

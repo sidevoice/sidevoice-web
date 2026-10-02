@@ -135,6 +135,48 @@ test("local F6 status shows only supported service actions", async () => {
   expect(serviceInstall).toHaveBeenCalledOnce();
 });
 
+test("service failure display and copied diagnostics omit secret-bearing native fields", async () => {
+  const secretStatus = {
+    state: "service-failed", service: "launchd", installed: true, reachable: false, calls: 0, attempts: 2, limit: 3,
+    core: { pid: 814, version: "0.1.0", api: 1, launch_id: "LAUNCH_SECRET_42" },
+    failure: {
+      key: "start.failed", step: "PAIRING_CODE_SECRET_42", message: "RAW_FAILURE_SECRET_42",
+      at: "2026-10-01T10:12:00.000Z", log_tail: ["token=TOKEN_SECRET_42", "env=ENV_SECRET_42", "code=CODE_SECRET_42"],
+      token: "TOKEN_SECRET_42", code: "CODE_SECRET_42", env: "ENV_SECRET_42",
+    },
+    token: "TOP_LEVEL_TOKEN_SECRET_42", pairing_code: "TOP_LEVEL_CODE_SECRET_42", env: { secret: "TOP_LEVEL_ENV_SECRET_42" },
+  } as unknown as LocalHostStatus;
+  setBridge({ restart: vi.fn(async () => undefined) });
+  actions();
+  const store = createRoomStore();
+  act(() => store.patch({ pairings: [local], pairingInUse: "fp-local", machinesReady: true, localHostAvailable: true, localHostStatus: secretStatus }));
+
+  const writeText = vi.fn(async (_value: string) => {});
+  const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    render(<RoomProvider store={store}><LocalHostBanner /><MachineList /></RoomProvider>);
+    expect(document.querySelector(".local-host-banner")).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open MacBook" })); });
+    expect(screen.getByText("The Sidevoice service is unavailable: the service could not start")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
+    expect(screen.queryByText(/PAIRING_CODE_SECRET_42|RAW_FAILURE_SECRET_42|TOKEN_SECRET_42|ENV_SECRET_42|CODE_SECRET_42|LAUNCH_SECRET_42/)).toBeNull();
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
+    expect(writeText).toHaveBeenCalledOnce();
+    const copied = writeText.mock.calls[0][0];
+    const details = JSON.parse(copied) as Record<string, unknown>;
+    expect(details).toMatchObject({ state: "service-failed", service: "launchd", installed: true, reachable: false,
+      core: { pid: 814, version: "0.1.0", api: 1 }, attempts: 2, limit: 3,
+      failure: { key: "start.failed", at: "2026-10-01T10:12:00.000Z" } });
+    expect(copied).not.toMatch(/PAIRING_CODE_SECRET_42|RAW_FAILURE_SECRET_42|TOKEN_SECRET_42|ENV_SECRET_42|CODE_SECRET_42|LAUNCH_SECRET_42|TOP_LEVEL/);
+    expect(copied).not.toContain("log_tail");
+  } finally {
+    if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
 test("Update appears only for an available version and waits for active calls", async () => {
   const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
   const versionCheck = vi.fn(async () => version);

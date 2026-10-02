@@ -251,6 +251,8 @@ body,
 .setup-command code { min-width:0;overflow-wrap:anywhere;font-size:.82rem }
 .no-machine-actions { display:flex;align-items:flex-start;flex-wrap:wrap;gap:.55rem;margin-top:1rem }
 .local-install-entry { min-width:0 }
+.local-install-entry--room { flex:none;padding:0 .75rem;border-bottom:1px solid var(--sv-border) }
+.local-install-entry--room .local-install-panel { margin:.35rem auto;max-width:42rem;padding:.55rem .7rem }
 .local-install-cta { display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;max-width:22rem }
 .local-install-cta p { margin:0;line-height:1.45 }
 .local-install-panel { flex:1 1 100%;min-width:min(100%,18rem);max-width:42rem;margin-top:.55rem;padding:.8rem .9rem;border:1px solid var(--sv-border);border-radius:.75rem;background:#11171d }

@@ -40,6 +40,7 @@ export interface LocalHostInstallProgress {
   step: string;
   done: number | null;
   total: number | null;
+  cancellable?: boolean;
 }
 
 /** Stable, machine-readable failure data. `message` is deliberately omitted from the web-facing type: UI copy

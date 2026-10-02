@@ -7,7 +7,7 @@ import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator } from "../settings/host-i18n";
-import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, type LocalHostAction } from "../settings/local-host-status";
+import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
@@ -90,6 +90,7 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
   const buttons: { action: LocalHostAction; label: string }[] = [];
@@ -120,23 +121,21 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
     finally { setBusy(null); }
   }
   async function copyDetails() {
-    try { await navigator.clipboard.writeText(JSON.stringify(status, null, 2));setCopied(true);setNote(t("hosts.detailsCopied")); }
+    try { await navigator.clipboard.writeText(JSON.stringify(details, null, 2));setCopied(true);setNote(t("hosts.detailsCopied")); }
     catch { setCopied(false);setNote(t("hosts.actionFailed")); }
   }
   const cause = status.failure ? hostCause(status, t) : "";
-  const failureAt = dateText(status.failure?.at);
+  const failureAt = dateText(details.failure?.at);
   return (
     <div className="host-status-panel" data-state={status.state}>
       <p className="host-status-summary" role="status">{statusMessage}</p>
-      {status.core?.version && <p className="muted">{t("hosts.version", { version: status.core.version })}</p>}
-      {typeof status.calls === "number" && <p className="muted">{t("hosts.calls", { calls: status.calls })}</p>}
+      {details.core?.version && <p className="muted">{t("hosts.version", { version: details.core.version })}</p>}
+      {details.calls !== undefined && <p className="muted">{t("hosts.calls", { calls: details.calls })}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
       {status.failure && (status.state === "failed" || status.state === "service-failed") && (
         <div className="host-failure-details">
-          {status.failure.step && <p>{t("hosts.failureStep", { step: status.failure.step })}</p>}
-          {status.attempts != null && <p>{t("hosts.failureAttempts", { attempts: status.attempts, limit: status.limit ? ` of ${status.limit}` : "" })}</p>}
+          {details.attempts !== undefined && <p>{t("hosts.failureAttempts", { attempts: details.attempts, limit: details.limit ? ` of ${details.limit}` : "" })}</p>}
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
-          {!!status.failure.log_tail?.length && <details><summary>{t("hosts.logTail")}</summary><pre>{status.failure.log_tail.join("\n")}</pre></details>}
         </div>
       )}
       <div className="host-action-list">
@@ -219,10 +218,11 @@ function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
     ? t("hosts.update.incompatibleUnknown") : t("hosts.update.incompatible", { api: report.core_api })}</p>;
   if (report.update !== "available") return null;
 
-  const waitingForCalls = typeof status.calls === "number" && status.calls > 0;
+  const calls = safeLocalHostCount(status.calls);
+  const waitingForCalls = calls !== undefined && calls > 0;
   return (
     <div className="host-update-control" aria-live="polite">
-      {waitingForCalls && <p className="muted">{t("hosts.update.waitCalls", { calls: status.calls! })}</p>}
+      {waitingForCalls && <p className="muted">{t("hosts.update.waitCalls", { calls })}</p>}
       {error && <div className="local-install-error" role="alert">
         <p>{localHostBridgeErrorText(error, t)}</p>
         <div className="local-install-actions">

@@ -13,6 +13,7 @@ import { PairingDialog } from "../features/pairing/PairingDialog";
 import { PreparationDialog } from "../features/call/PreparationDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
+import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
 import { useRoomStore } from "../state/room-store";
 
@@ -22,7 +23,6 @@ function RoomContent() {
   const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
   const pendingLocalSelection = useRef(false);
   const noMachine = ready && machines.length === 0;
-  const keepSetupScreen = install.phase !== "idle" && install.source === "no-machine";
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -43,18 +43,19 @@ function RoomContent() {
     }
   }, [install.phase, machines]);
 
-  const showNoMachineScreen = noMachine || keepSetupScreen;
   return (
     <>
       <RoomHeader />
       <LocalHostBanner />
+      {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
+        <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
       <main>
-        {showNoMachineScreen ? <NoMachineScreen source={install.phase === "idle" ? "no-machine" : install.source} /> : <>
+        {noMachine ? <NoMachineScreen source="no-machine" /> : <>
           <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
           <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
         </>}
       </main>
-      {!showNoMachineScreen && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
+      {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
       <ConnectionStatsDialog />
       <SettingsDialog />
       <PairingDialog />

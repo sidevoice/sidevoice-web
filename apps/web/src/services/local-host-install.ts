@@ -94,6 +94,7 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
     const currentAttempt = ++attempt;
     activeBridge = bridge;
     let lastStep: string | null = null;
+    let progressCancellable: boolean | undefined;
     publish({ phase: "installing", source, job: null, step: null, done: null, total: null, cancellable: false, cancelling: false, cancelState: null });
 
     let operation;
@@ -106,7 +107,9 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
         if (step) lastStep = step;
         const done = typeof event?.done === "number" && Number.isFinite(event.done) && event.done >= 0 ? event.done : null;
         const total = typeof event?.total === "number" && Number.isFinite(event.total) && event.total > 0 ? event.total : null;
-        publish({ ...current, step, done, total });
+        if (typeof event?.cancellable === "boolean") progressCancellable = event.cancellable;
+        const cancellable = typeof bridge.cancel === "function" && (progressCancellable ?? current.cancellable);
+        publish({ ...current, step, done, total, cancellable });
       });
     } catch (error) {
       publish({ phase: "failed", source, step: lastStep, error: normalizeLocalHostBridgeError(error, lastStep) });
@@ -121,7 +124,7 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
     }
     const waiting = readSnapshot();
     if (waiting.phase === "installing") {
-      publish({ ...waiting, job: operation.job, cancellable: typeof bridge.cancel === "function" });
+      publish({ ...waiting, job: operation.job, cancellable: typeof bridge.cancel === "function" && (progressCancellable ?? true) });
     }
     void Promise.resolve(operation).then((_status: LocalHostStatus) => {
       if (attempt !== currentAttempt) return;
