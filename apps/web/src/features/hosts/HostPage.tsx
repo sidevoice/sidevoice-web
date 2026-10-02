@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView, StageTask } from "../../state/room-types";
@@ -27,6 +27,7 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
   const showAgents = !!machine.pairingId && !machine.revoked && !!agentsPanel;
   const agentNotice = !machine.revoked && hostAgents?.status === "ready" && hostAgents.value?.agents.some(actionableAgent) === true;
   const [tab, setTab] = useState<HostTab>(initialTab === "agents" && !showAgents ? "status" : initialTab ?? "status");
+  const visibleTab = tab === "agents" && !showAgents ? "status" : tab;
   const [confirmForget, setConfirmForget] = useState(false);
   const hostLabel = machine.local ? t("hosts.thisComputer") : machine.host || t("hosts.unnamed");
   const tabs: { id: HostTab; label: string }[] = [
@@ -37,6 +38,10 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
     { id: "voice", label: t("settings.voice") },
     { id: "transcription", label: t("settings.transcription") },
   ];
+
+  useEffect(() => {
+    if (tab === "agents" && !showAgents) setTab("status");
+  }, [showAgents, tab]);
 
   function useMachine() {
     if (machine.selectable === false) return;
@@ -55,8 +60,8 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
       </header>
       <div className="host-tabs" role="tablist" aria-label={t("settings.hostSections")}>
         {tabs.map(({ id, label }) => (
-          <button key={id} type="button" role="tab" id={`host-tab-${id}`} aria-controls="host-tabpanel" aria-selected={tab === id}
-            tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)}
+          <button key={id} type="button" role="tab" id={`host-tab-${id}`} aria-controls="host-tabpanel" aria-selected={visibleTab === id}
+            tabIndex={visibleTab === id ? 0 : -1} onClick={() => setTab(id)}
             onKeyDown={(event) => {
               const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
               const target = event.key === "Home" ? tabs[0]?.id : event.key === "End" ? tabs.at(-1)?.id : step ? tabs[(tabs.findIndex((item) => item.id === id) + step + tabs.length) % tabs.length]?.id : undefined;
@@ -69,13 +74,13 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
           </button>
         ))}
       </div>
-      <div className="host-tabpanel" id="host-tabpanel" role="tabpanel" aria-labelledby={`host-tab-${tab}`}>
-        {tab === "status" && (machine.local ? statusPanel : <RemoteStatus machine={machine} status={remote?.state ?? machine.state} />)}
-        {tab === "agents" && agentsPanel}
-        {tab === "integrations" && (machine.inUse ? <IntegrationList /> : <UseMachinePrompt machine={hostLabel} onUse={useMachine} />)}
-        {tab === "devices" && (machine.local ? devicesPanel : <RemoteDevices />)}
-        {tab === "voice" && <MachineStage machine={machine} task="tts" onUse={useMachine} />}
-        {tab === "transcription" && <MachineStage machine={machine} task="stt" onUse={useMachine} />}
+      <div className="host-tabpanel" id="host-tabpanel" role="tabpanel" aria-labelledby={`host-tab-${visibleTab}`}>
+        {visibleTab === "status" && (machine.local ? statusPanel : <RemoteStatus machine={machine} status={remote?.state ?? machine.state} />)}
+        {visibleTab === "agents" && agentsPanel}
+        {visibleTab === "integrations" && (machine.inUse ? <IntegrationList /> : <UseMachinePrompt machine={hostLabel} onUse={useMachine} />)}
+        {visibleTab === "devices" && (machine.local ? devicesPanel : <RemoteDevices />)}
+        {visibleTab === "voice" && <MachineStage machine={machine} task="tts" onUse={useMachine} />}
+        {visibleTab === "transcription" && <MachineStage machine={machine} task="stt" onUse={useMachine} />}
       </div>
       {!machine.local && <div className="host-forget">
         {confirmForget ? <span className="inline-confirm" role="group">

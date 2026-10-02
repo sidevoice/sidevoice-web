@@ -77,6 +77,28 @@ test("a revoked host does not show stale Agents notices, review actions, or an A
   expect(screen.queryByRole("tab", { name: /Agents/ })).toBeNull();
 });
 
+test("revoking a pairing while its Agents tab is open selects populated Status", async () => {
+  actions();
+  const host = paired();
+  const store = room([host], { hostAgents: { [host.fp]: {
+    status: "ready", value: { scanned_at: 1, agents: [] }, error: null, busy: {}, actionErrors: {},
+  } } });
+
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open NUC" })); });
+  fireEvent.click(screen.getByRole("tab", { name: "Agents" }));
+  expect(screen.getByRole("tab", { name: "Agents" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tabpanel")).toHaveTextContent("No agents found on this machine.");
+
+  act(() => { store.patch({ pairings: [paired({ revoked: true })] }); });
+
+  expect(screen.queryByRole("tab", { name: "Agents" })).toBeNull();
+  expect(screen.getByRole("tab", { name: "Status" })).toHaveAttribute("aria-selected", "true");
+  const panel = screen.getByRole("tabpanel");
+  expect(panel).toHaveAttribute("aria-labelledby", "host-tab-status");
+  expect(panel.querySelector(".host-status-panel")).toBeInTheDocument();
+  expect(panel).toHaveTextContent("This machine no longer accepts this device.");
+});
+
 test("the Machines footer offers local setup only when no local host is projected, and keeps remote pairing", async () => {
   const install = vi.fn();
   const done = actions();

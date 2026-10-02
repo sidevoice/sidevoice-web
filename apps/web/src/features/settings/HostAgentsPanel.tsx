@@ -60,7 +60,7 @@ function Instructions({ agent, fp, id, onClose }: { agent: DetectedAgent; fp: st
       {!command && !snippet ? <p className="muted">{t("agents.manual.none")}</p> : <>
         {command && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><CodeBlock code={command} /></>}
         {snippet && <><p className="host-agent-howto-label">{how?.file ? t("agents.manual.file", { file: how.file }) : t("agents.manual.snippet")}</p><CodeBlock code={snippet} /></>}
-        <p className="muted" role="status">{t("agents.manual.waiting")}</p>
+        <p className="muted" role="status">{t(agent.registration === "foreign" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
         <Button variant="ghost" size="compact" onClick={onClose}>{t("agents.close")}</Button>
       </>}
     </div>
@@ -78,6 +78,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const manualOnly = agent.connect === "manual";
   const readOnly = agent.registration === "foreign" || agent.registration === "unknown";
   const isNew = !readOnly && actionableAgent(agent);
+  const hasManualInstructions = !!(agent.instructions?.command?.trim() || agent.instructions?.snippet?.trim());
   const panelId = `host-agent-howto-${fp.slice(0, 7)}-${agent.id}`;
 
   useEffect(() => { if (error) setOpen(true); }, [error]);
@@ -115,7 +116,10 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         <span className="host-agent-actions">
           {busy ? <span className="muted" role="status">{t(`agents.busy.${busy}` as HostMessageKey)}</span>
             : agent.registration === "connected" ? <Button variant="ghost" size="compact" onClick={() => run("disconnect")}>{t("agents.disconnect")}</Button>
-              : readOnly ? null : <>
+              : agent.registration === "foreign" ? hasManualInstructions && <Button variant="ghost" size="compact" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
+                {open ? t("agents.close") : t("agents.foreign.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
+              </Button>
+                : readOnly ? null : <>
                 {isNew && <Button variant="ghost" size="compact" onClick={() => run("dismiss")}>{t("agents.notNow")}</Button>}
                 <Button variant="ghost" size="compact" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
                   {t("agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
@@ -124,7 +128,8 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
               </>}
         </span>
       </div>
-      {open && agent.registration === "not-connected" && <Instructions agent={agent} fp={fp} id={panelId} onClose={() => setOpen(false)} />}
+      {open && (agent.registration === "not-connected" || agent.registration === "foreign") &&
+        <Instructions agent={agent} fp={fp} id={panelId} onClose={() => setOpen(false)} />}
     </li>
   );
 }
