@@ -48,6 +48,21 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: node scripts/assemble-static-web.mjs "$RUNNER_TEMP/site"
+      - name: Install Chromium and WebKit for the rendered Settings flow
+        run: npx playwright install --with-deps chromium webkit
+      - name: Open Settings and navigate to host Agents in rendered browsers
+        env:
+          SIDEVOICE_STATIC_SITE: ${{ runner.temp }}/site
+        run: npm run e2e -w @sidevoice/web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-browser-e2e-results
+          path: |
+            apps/web/test-results/playwright/
+            apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
       - name: The static site as a tarball, and its SHA256SUMS
         if: github.event_name != 'pull_request'
         env:

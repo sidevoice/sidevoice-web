@@ -63,10 +63,22 @@ function MachineSettings() {
 export function SettingsDialog() {
   const t = hostTranslator();
   const hasMachines = useRoomStore((state) => state.machines.some((machine) => !!machine.pairingId || machine.local && machine.inUse));
+  const preferenceLoad = useRoomStore((state) => state.facts.settingsPreferences);
+  const inUse = useRoomStore((state) => state.facts.pairingInUse);
+  const preferenceHost = useRoomStore((state) => state.facts.pairings.find((pairing) => pairing.fp === preferenceLoad.host));
   const app = desktopAppBridge();
   const appAvailable = !!app?.settings && !!app.update;
+  const preferenceHostName = preferenceHost?.local ? t("hosts.thisComputer") : preferenceHost?.host || t("hosts.unnamed");
+  const showPreferenceLoad = !!preferenceLoad.host && preferenceLoad.host === inUse;
   return (
-    <DialogFrame id="language-settings" className="settings-dialog" labelledBy="settings-title" title={t("settings.title")} closeId="settings-close" closeLabel={t("settings.back")} closeTitle={t("settings.back")} footer={<div className="settings-footer"><p id="settings-error" role="alert" /><Button type="submit" form="language-form" variant="primary">{t("settings.save")}</Button></div>}>
+    <DialogFrame id="language-settings" className="settings-dialog" labelledBy="settings-title" title={t("settings.title")} closeId="settings-close" closeLabel={t("settings.back")} closeTitle={t("settings.back")} footer={<div className="settings-footer">
+      {showPreferenceLoad && preferenceLoad.status === "loading" && <p className="settings-preferences-status" role="status">{t("settings.preferences.loading", { machine: preferenceHostName })}</p>}
+      {showPreferenceLoad && preferenceLoad.status === "failed" && <div className="settings-preferences-error" role="alert" data-host={preferenceLoad.host} data-request={preferenceLoad.request}>
+        <span>{t("settings.preferences.failed", { machine: preferenceHostName })}</span>
+        <Button type="button" variant="ghost" size="compact" onClick={() => void window.sidevoiceActions?.retrySettingsPreferences?.()}>{t("settings.preferences.retry")}</Button>
+      </div>}
+      <p id="settings-error" role="alert" /><Button type="submit" form="language-form" variant="primary">{t("settings.save")}</Button>
+    </div>}>
       <form id="language-form">
         <SettingsShell hasMachines={hasMachines} appAvailable={appAvailable}>
           <GeneralSettings />

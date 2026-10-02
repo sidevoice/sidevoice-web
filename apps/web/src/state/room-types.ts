@@ -130,6 +130,13 @@ export interface SettingsAgentRequest {
   id: number;
 }
 
+export interface SettingsPreferencesLoad {
+  /** The fingerprint these machine-owned defaults belong to. It is never shown in the interface. */
+  host: string | null;
+  request: number;
+  status: "idle" | "loading" | "ready" | "failed";
+}
+
 export interface HostDeviceView {
   device_id: string;
   name?: string | null;
@@ -266,6 +273,8 @@ export interface DownloadsView {
 }
 
 export interface SidevoiceActions {
+  /** Open Settings on this device's saved preferences without waiting for the selected host. */
+  openSettings(): void;
   cancelInput(): Promise<void>;
   skipReply(): Promise<void>;
   replayReply(historyId: string | null): Promise<void>;
@@ -296,6 +305,8 @@ export interface SidevoiceActions {
   prepareVoice(): Promise<void>;
   /** Ask the machine for its integrations again, after a failed read. */
   retryIntegrations(): Promise<void>;
+  /** Retry this Settings opening's machine preference read. */
+  retrySettingsPreferences?(): Promise<void>;
   /** Try this page's GPU again after a model failed to load on it. */
   retryGpu(): Promise<void>;
   /** Talk to this paired machine from now on, on this device. In a call it hangs up and joins that machine's. */

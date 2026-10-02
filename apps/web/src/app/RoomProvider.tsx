@@ -23,6 +23,7 @@ export function RoomProvider({ children, store: suppliedStore }: RoomProviderPro
       .catch(() => undefined)
       .then(() => import("../services/room-session-controller.js"));
     void controllerImport.catch((error: unknown) => {
+      if (typeof window === "undefined") return;
       const message = error instanceof Error ? error.message : String(error);
       window.sidevoiceUI?.setBootError(`No se pudo iniciar Sidevoice: ${message}`);
     });

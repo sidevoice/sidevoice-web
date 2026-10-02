@@ -14,7 +14,10 @@ export function RoomHeader() {
   const hasNotice = pendingHosts.length > 0;
   return <header><h1 className="brand"><SidevoiceMark /> Sidevoice</h1><Button id="settings-open" variant="ghost" size="icon"
     aria-label={t(hasNotice ? "agents.gear.pending" : "settings.open")} title={t(hasNotice ? "agents.gear.pending" : "settings.open")}
-    onClick={() => { if (hasNotice) window.sidevoiceActions?.openAgentSettings?.(pendingHosts.length === 1 ? pendingHosts[0] : null); }}>
+    onClick={() => {
+      window.sidevoiceActions?.openSettings?.();
+      if (hasNotice) window.sidevoiceActions?.openAgentSettings?.(pendingHosts.length === 1 ? pendingHosts[0] : null);
+    }}>
     <SettingsIcon />{hasNotice && <span className="settings-notice-dot" aria-hidden="true" />}
   </Button></header>;
 }

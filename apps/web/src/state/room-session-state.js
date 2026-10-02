@@ -30,6 +30,7 @@ export function initialSessionFacts() {
         pairings: [], pairingInUse: null, machinesAt: 0, machinesReady: false, remoteHostStatus: {},
         // Host-owned agent state is keyed by fingerprint, never by the machine currently in use.
         hostAgents: {}, settingsAgentRequest: null,
+        settingsPreferences: { host: null, request: 0, status: 'idle' },
         localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.

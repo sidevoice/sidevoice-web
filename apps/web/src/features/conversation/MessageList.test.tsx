@@ -34,6 +34,7 @@ test("marks an assistant message as visually pending before playback starts", ()
 test("keeps the active transcribed draft cancellable after listening text disappears", () => {
   const cancelInput = vi.fn().mockResolvedValue(undefined);
   window.sidevoiceActions = {
+    openSettings: vi.fn(),
     cancelInput,
     skipReply: vi.fn().mockResolvedValue(undefined),
     replayReply: vi.fn().mockResolvedValue(undefined),
