@@ -296,6 +296,18 @@ export interface SidevoiceActions {
   cancelStage(task: StageTask): void;
   /** Check the model in use again, for its numbers (Diagnóstico). */
   recheckStage(task: StageTask): void;
+  /** Acquire the same constrained microphone used by a call, for an isolated transcription sample. */
+  acquireTrialMicrophone?(): Promise<MediaStream>;
+  /** Capture a request pinned to the selected, verified pairing for one provider transcription sample. */
+  captureTranscriptionTrialRoute?(fp: string): (path: string, options: RequestInit) => Promise<Response>;
+  /** Resolve the exact checked device build the transcription stage will use. */
+  transcriptionTrialBuild?(stage: { place: string; model: string; build?: { engine: string; accelerator: string } | null }):
+    { model: string; engine: string; accelerator: string; native: boolean; fallback?: string } | null;
+  /** Release a native build lease only if no current stage still uses it. */
+  releaseTranscriptionTrialBuild?(build: { model: string; engine: string; accelerator: string; native: boolean }): void;
+  /** Start one standalone mic-to-STT trial; callers finish or cancel the returned capture handle. */
+  transcriptionTrial?(options: import("../services/transcription-trial").TranscriptionTrialOptions):
+    import("../services/transcription-trial").TranscriptionTrialHandle;
   /** Copy a stage's diagnostics as text. Resolves with whether it was copied. */
   copyDiagnostics(task: StageTask): Promise<boolean>;
   /** Stop one download, whoever started it: the page's, or the desktop app's through the bridge. */
