@@ -1,0 +1,15 @@
+{
+  "id": "P18", "title": "", "title_en": "", "walk": "",
+  "title_key": "prototype.scenario.P18.title", "walk_key": "prototype.scenario.P18.walk",
+  "inApp": true, "platform": "macos-aarch64",
+  "bridge": { "localHost": { "states": [{ "state": "running", "after_ms": 0 }] } },
+  "hosts": { "local": { "name": "MacBook de Ana" }, "nuc": { "name": "NUC", "via": "room", "integrations": { "elevenlabs": "stored" } } },
+  "pairings": [{ "host": "nuc", "paired_days_ago": 1 }],
+  "in_use": "local",
+  "stages": { "hosts": { "nuc": {
+    "stt": { "place": "host", "model": "whisper-large-v3-turbo" },
+    "tts": { "place": "elevenlabs", "model": "eleven_flash_v2_5" }
+  } } },
+  "room": true, "open": { "pane": "host", "host": "local", "tab": "voice" },
+  "onboarding": { "choice": "agents", "agents_done": true, "test_passed": true, "completed_at": 1758000000 }
+}

@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../styles/tokens.css";
 import "./shell.css";
+import { translator } from "../i18n";
 import { FLOW_TOGGLE, readParams, SCENARIOS, TOGGLES, writeParams, scenarioById, type Toggles, type View } from "./scenario";
 
 function SidevoiceMark({ size = 16 }: { size?: number }) {
@@ -37,6 +38,7 @@ function Shell() {
   const frame = useRef<HTMLIFrameElement>(null);
   const narrow = useNarrow();
   const current = scenarioById(scenario);
+  const scenarioText = translator(lang || (navigator.language.toLowerCase().startsWith("es") ? "es" : "en"));
   const [at, setAt] = useState<string | null>(initial.at);
   const query = writeParams({ scenario, view, lang, toggles, at });
   // The frame loads once per generation: a live toggle changes the URL, not the running app.
@@ -123,10 +125,10 @@ function Shell() {
             <p className="panel-warning">Solo prototipo: núcleo, puente de escritorio y hosts simulados. Nada sale de esta página.</p>
             <label>Escenario
               <select value={scenario} onChange={(e) => choose(e.currentTarget.value)}>
-                {SCENARIOS.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.title}</option>)}
+                {SCENARIOS.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.title_key ? scenarioText(s.title_key) : s.title}</option>)}
               </select>
             </label>
-            <p className="walk">{current.walk}</p>
+            <p className="walk">{current.walk_key ? scenarioText(current.walk_key) : current.walk}</p>
             <div className="seg" role="group" aria-label="Vista">
               {(["app", "browser", "phone"] as View[]).map((v) => (
                 <button key={v} type="button" aria-pressed={view === v} onClick={() => { setView(v); setGeneration((g) => g + 1); }}>{v === "app" ? "App escritorio" : v === "browser" ? "Navegador" : "Móvil"}</button>

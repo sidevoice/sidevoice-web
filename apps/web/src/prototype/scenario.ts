@@ -19,6 +19,7 @@ export interface HostSeed {
 export interface StageSeed { place: string; model: string; options?: Record<string, unknown> }
 export interface Scenario {
   id: string; title: string; title_en: string; walk: string;
+  title_key?: string; walk_key?: string;
   inApp: boolean; platform?: string; view?: View;
   bridge?: {
     localHost?: { states: TimedState[]; agents?: DetectedAgent[]; refused?: boolean; install?: { duration_ms?: number }; calls?: Record<string, CallAnswer[]> };

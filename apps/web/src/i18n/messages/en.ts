@@ -1,5 +1,9 @@
 /** The English bundle: every key, and the fallback for any language that lacks one. */
 export const en: Record<string, string> = {
+  "prototype.scenario.P17.title": "Computer configured, NUC unconfigured",
+  "prototype.scenario.P17.walk": "Open NUC > Voice or Transcription. Copy this computer's models to NUC with Copy from another machine.",
+  "prototype.scenario.P18.title": "NUC configured, computer unconfigured",
+  "prototype.scenario.P18.walk": "Open This computer > Voice or Transcription and copy from NUC. NUC's own transcription cannot move here; its ElevenLabs voice can be copied after adding a key for this computer.",
   "common.cancel": "Cancel",
   "common.close": "Close",
   "common.retry": "Retry",
