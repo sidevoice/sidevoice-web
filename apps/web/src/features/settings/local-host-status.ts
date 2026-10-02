@@ -1,4 +1,4 @@
-import type { LocalHostBridge, LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostBridge, LocalHostBridgeError, LocalHostStatus } from "../../services/desktop-host";
 import { localHostBridge } from "../../services/desktop-host";
 import type { HostMessageKey } from "./messages/en";
 
@@ -8,6 +8,31 @@ const CAUSES = new Set([
   "import.missing-module", "bind.port-in-use", "identity.unreadable", "identity.unsafe-directory", "start.failed",
   "executable-missing", "permission-denied", "start-limit", "not-loaded",
 ]);
+const INSTALL_CAUSES: Record<string, HostMessageKey> = {
+  "install.network": "localInstall.error.network",
+  "install.proxy": "localInstall.error.proxy",
+  "install.disk": "localInstall.error.disk",
+  "install.checksum": "localInstall.error.checksum",
+  "install.no-bundle": "localInstall.error.noBundle",
+  "install.authenticity": "localInstall.error.authenticity",
+  "install.self-test": "localInstall.error.selfTest",
+  "install.rollback": "localInstall.error.rollback",
+  "install.rollback-failed": "localInstall.error.rollbackFailed",
+  "cli.timeout": "localInstall.error.timeout",
+  "install.executable-missing": "localInstall.error.executableMissing",
+  "unsupported": "localInstall.error.unsupported",
+  "install.unsafe": "localInstall.error.unsafe",
+  "service.failed": "localInstall.error.service",
+  "service.start.failed": "localInstall.error.service",
+  "launch.failed": "localInstall.error.launch",
+};
+
+export function localHostBridgeErrorText(error: LocalHostBridgeError, t: HostTranslate) {
+  const key = INSTALL_CAUSES[error.key] ?? "localInstall.error.unknown";
+  const check = typeof error.params?.check === "string" && error.params.check ? error.params.check : t("localInstall.error.verificationCheck");
+  return t(key, { check });
+}
+
 export function hostCause(status: LocalHostStatus, t: HostTranslate) {
   const key = status.failure?.key || "unknown";
   const messageKey = `hosts.cause.${key}` as HostMessageKey;

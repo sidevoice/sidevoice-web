@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { MachinesIcon } from "../../components/ui/Icons";
-import { localHostBridge, type LocalHostStatus, type LocalPairingCode } from "../../services/desktop-host";
+import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion, type LocalPairingCode } from "../../services/desktop-host";
+import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
+import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator } from "../settings/host-i18n";
-import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, type LocalHostAction } from "../settings/local-host-status";
+import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
@@ -19,6 +21,7 @@ export function MachineList() {
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [selected, setSelected] = useState<string | null>(null);
   const localMachine = machines.find((machine) => machine.local) ?? null;
+  const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
   const selectedMachine = selected ? machines.find((machine) => machine.id === selected && machine.local) ?? null : null;
 
   if (selectedMachine && localMachine) return <HostDetail machine={selectedMachine} onBack={() => setSelected(null)} />;
@@ -56,6 +59,7 @@ export function MachineList() {
       </div>
       <div className="pairing">
         <Button id="pair-device-open" variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.add")}</Button>
+        <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" />
       </div>
     </div>
   );
@@ -148,6 +152,87 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
         {(status.state === "failed" || status.state === "service-failed") && typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
       </div>
       {note && <p className="muted" role="status">{note}</p>}
+      <LocalHostUpdateControl status={status} />
+    </div>
+  );
+}
+
+function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
+  const t = hostTranslator();
+  const [report, setReport] = useState<LocalHostVersion | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<LocalHostBridgeError | null>(null);
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    let current = true;
+    const bridge = localHostBridge();
+    if (typeof bridge?.version !== "function" || typeof bridge.update !== "function") {
+      setReport(null);
+      setChecking(false);
+      return () => { current = false; };
+    }
+    setChecking(true);
+    void bridge.version().then((next) => { if (current) setReport(next); })
+      .catch(() => { if (current) setReport(null); })
+      .finally(() => { if (current) setChecking(false); });
+    return () => { current = false; };
+  }, [status.state, status.core?.version, status.core?.api]);
+
+  const bridge = localHostBridge();
+  if (checking || typeof bridge?.version !== "function" || typeof bridge.update !== "function") return null;
+
+  async function refreshVersion() {
+    const nextBridge = localHostBridge();
+    if (typeof nextBridge?.version !== "function") return;
+    try { setReport(await nextBridge.version()); } catch { setReport(null); }
+  }
+
+  async function update() {
+    const nextBridge = localHostBridge();
+    if (report?.update !== "available" || typeof nextBridge?.version !== "function" || typeof nextBridge.update !== "function" || busy) return;
+    setBusy(true);setError(null);setNote("");
+    try {
+      const current = await nextBridge.version();
+      setReport(current);
+      if (current.update !== "available") return;
+      await nextBridge.update();
+      await refreshVersion();
+    }
+    catch (reason) { setError(normalizeLocalHostBridgeError(reason)); }
+    finally { setBusy(false); }
+  }
+
+  async function copyErrorDetails() {
+    if (!error) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(JSON.stringify(error, null, 2));
+      setNote(t("localInstall.detailsCopied"));
+    } catch { setNote(t("localInstall.detailsCopyFailed")); }
+  }
+
+  if (!report) return null;
+  if (report.update === "newer-installed") return <p className="host-update-guidance" role="status">{t("hosts.update.newerInstalled")}</p>;
+  if (report.update === "incompatible") return <p className="host-update-guidance" role="status">{report.core_api == null
+    ? t("hosts.update.incompatibleUnknown") : t("hosts.update.incompatible", { api: report.core_api })}</p>;
+  if (report.update !== "available") return null;
+
+  const waitingForCalls = typeof status.calls === "number" && status.calls > 0;
+  return (
+    <div className="host-update-control" aria-live="polite">
+      {waitingForCalls && <p className="muted">{t("hosts.update.waitCalls", { calls: status.calls! })}</p>}
+      {error && <div className="local-install-error" role="alert">
+        <p>{localHostBridgeErrorText(error, t)}</p>
+        <div className="local-install-actions">
+          <Button variant="ghost" onClick={() => void copyErrorDetails()}>{t("localInstall.copyDetails")}</Button>
+          {note && <span className="muted" role="status">{note}</span>}
+        </div>
+      </div>}
+      <Button variant="primary" disabled={busy || waitingForCalls} onClick={() => void update()}>
+        {busy ? t("hosts.update.working") : error ? t("hosts.update.retry") : t("hosts.update.button")}
+      </Button>
     </div>
   );
 }

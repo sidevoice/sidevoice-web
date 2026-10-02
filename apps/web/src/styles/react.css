@@ -249,7 +249,21 @@ body,
 .no-machine-setup h2 { margin:.25rem 0 .5rem;font-size:1.05rem }
 .setup-command { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.55rem;padding:.6rem;border:1px solid var(--sv-border);border-radius:.65rem;background:#11171d }
 .setup-command code { min-width:0;overflow-wrap:anywhere;font-size:.82rem }
-.no-machine-actions { display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1rem }
+.no-machine-actions { display:flex;align-items:flex-start;flex-wrap:wrap;gap:.55rem;margin-top:1rem }
+.local-install-entry { min-width:0 }
+.local-install-cta { display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;max-width:22rem }
+.local-install-cta p { margin:0;line-height:1.45 }
+.local-install-panel { flex:1 1 100%;min-width:min(100%,18rem);max-width:42rem;margin-top:.55rem;padding:.8rem .9rem;border:1px solid var(--sv-border);border-radius:.75rem;background:#11171d }
+.local-install-panel h4 { margin:0 0 .4rem;font-size:.95rem }
+.local-install-panel p { margin:.25rem 0;line-height:1.45 }
+.local-install-panel progress { display:block;width:100%;height:.55rem;margin:.5rem 0;accent-color:var(--sv-primary) }
+.local-install-status { color:var(--sv-primary-soft) }
+.local-install-error { color:#f0b7ad;line-height:1.5 }
+.local-install-actions { display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;margin-top:.55rem }
+.host-update-control { display:flex;align-items:center;flex-wrap:wrap;gap:.45rem;margin-top:.45rem }
+.host-update-control>p { flex-basis:100%;margin:.15rem 0;line-height:1.45 }
+.host-update-guidance { margin:.35rem 0 0;line-height:1.5;color:#d8c99d }
+.host-update-control .local-install-error { flex-basis:100% }
 .local-host-banner { display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.5rem;padding:.6rem 1rem;background:#2c2226;border-bottom:1px solid #6b4046;color:#f0c9c4;line-height:1.45;text-align:center }
 .remote-setup-guidance { margin:.5rem 0 1rem;padding:.8rem;border:1px solid var(--sv-border);border-radius:.75rem;background:var(--sv-surface) }
 .remote-setup-guidance h3 { margin:.15rem 0 .4rem;font-size:1rem }

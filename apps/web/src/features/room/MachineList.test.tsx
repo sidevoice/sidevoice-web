@@ -7,7 +7,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostBridge, LocalHostStatus, LocalPairingCode } from "../../services/desktop-host";
+import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -64,6 +64,48 @@ test("the unreachable remote row only says No response and has no machine-specif
   expect(screen.queryByRole("button", { name: /Forget NUC/ })).toBeNull();
 });
 
+test("the Machines footer offers local setup only when no local host is projected, and keeps remote pairing", async () => {
+  const install = vi.fn();
+  const done = actions();
+  setBridge({ install });
+  room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true });
+
+  expect(screen.getByRole("button", { name: "Use agents on this computer" })).toBeInTheDocument();
+  await act(async () => { screen.getByRole("button", { name: "Add a machine" }).click(); });
+  expect(done.openPairing).toHaveBeenCalledOnce();
+  expect(install).not.toHaveBeenCalled();
+});
+
+test("an existing stopped local R1 host keeps its row and does not show the install CTA", () => {
+  actions();
+  setBridge({ install: vi.fn() });
+  room([local], { pairingInUse: "fp-local", localHostStatus: { state: "stopped-by-person", installed: true, reachable: false } });
+
+  expect(screen.getByText("MacBook")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+});
+
+test("an already-running local R1 host is shown without starting another install", () => {
+  const install = vi.fn();
+  setBridge({ install });
+  actions();
+  room([local], { pairingInUse: "fp-local", localHostStatus: running });
+
+  expect(screen.getByText("MacBook")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(install).not.toHaveBeenCalled();
+});
+
+test("a failed local R1 host stays on the existing machine path instead of the no-machine screen", () => {
+  setBridge({ install: vi.fn() });
+  const store = createRoomStore();
+  act(() => store.patch({ pairings: [local], pairingInUse: "fp-local", machinesReady: true, localHostAvailable: true,
+    localHostStatus: { state: "failed", installed: true, failure: { key: "start.failed" } } }));
+  render(<RoomProvider store={store}><NoMachineScreen /></RoomProvider>);
+
+  expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
+});
+
 test("a previously unreachable remote stays No response after another machine becomes selected", () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
@@ -88,8 +130,72 @@ test("local F6 status shows only supported service actions", async () => {
   expect(screen.getAllByRole("button", { name: "Start at login" })).toHaveLength(1);
   expect(screen.queryByRole("button", { name: /agent/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /copy from another machine/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
   await act(async () => { screen.getByRole("button", { name: "Start at login" }).click(); });
   expect(serviceInstall).toHaveBeenCalledOnce();
+});
+
+test("Update appears only for an available version and waits for active calls", async () => {
+  const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
+  const versionCheck = vi.fn(async () => version);
+  const update = vi.fn().mockResolvedValue(running);
+  setBridge({ version: versionCheck, update });
+  actions();
+  room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 2 } });
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+
+  expect(await screen.findByText("Wait for 2 active calls to finish before updating.")).toBeInTheDocument();
+  const updateButton = screen.getByRole("button", { name: "Update this machine" });
+  expect(updateButton).toBeDisabled();
+  expect(versionCheck).toHaveBeenCalledOnce();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test("an available Update click delegates to the optional desktop transaction", async () => {
+  const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
+  const current: LocalHostVersion = { ...available, update: "current" };
+  const version = vi.fn().mockResolvedValueOnce(available).mockResolvedValueOnce(available).mockResolvedValueOnce(current);
+  const update = vi.fn().mockResolvedValue(running);
+  setBridge({ version, update });
+  actions();
+  room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+
+  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
+  expect(update).toHaveBeenCalledOnce();
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull());
+  expect(version).toHaveBeenCalledTimes(3);
+});
+
+test("a newer installed build found at click time is never downgraded", async () => {
+  const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
+  const newer: LocalHostVersion = { ...available, update: "newer-installed" };
+  const version = vi.fn().mockResolvedValueOnce(available).mockResolvedValueOnce(newer);
+  const update = vi.fn().mockResolvedValue(running);
+  setBridge({ version, update });
+  actions();
+  room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+
+  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
+  expect(await screen.findByText("A newer Sidevoice core is already installed. Update the desktop app to use it.")).toBeInTheDocument();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["newer-installed", "A newer Sidevoice core is already installed. Update the desktop app to use it."],
+  ["incompatible", "This machine reports core API 9, which this app cannot use."],
+] as const)("Update is not offered when version reports %s", async (state, copy) => {
+  const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 9, update: state };
+  const update = vi.fn().mockResolvedValue(running);
+  setBridge({ version: vi.fn(async () => version), update });
+  actions();
+  room([local], { pairingInUse: "fp-local" });
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+
+  expect(await screen.findByText(copy)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
+  expect(update).not.toHaveBeenCalled();
 });
 
 test("stopping the local host requires confirmation and Cancel leaves it running", async () => {
