@@ -29,23 +29,28 @@ export function LocalHostInstallEntry({
   showCta,
   controller = localHostInstallController,
   className = "",
+  holdSuccess = false,
+  source = "machines",
 }: {
   showCta: boolean;
   controller?: LocalHostInstallController;
   className?: string;
+  holdSuccess?: boolean;
+  source?: "no-machine" | "machines";
 }) {
   const t = hostTranslator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const bridge = localHostBridge();
   const supportsInstall = typeof bridge?.install === "function";
-  const showingAttempt = isVisibleLocalHostInstall(snapshot);
+  const showingAttempt = isVisibleLocalHostInstall(snapshot, source);
+  const attemptActive = isVisibleLocalHostInstall(snapshot);
   const [note, setNote] = useState("");
 
-  if ((!supportsInstall && !showingAttempt) || (!showCta && !showingAttempt) || snapshot.phase === "succeeded") return null;
+  if ((!supportsInstall && !showingAttempt) || (!showCta && !showingAttempt) || (snapshot.phase === "succeeded" && !holdSuccess)) return null;
 
   function start() {
     setNote("");
-    controller.start();
+    controller.start(source);
   }
 
   async function connectAnotherMachine() {
@@ -77,7 +82,7 @@ export function LocalHostInstallEntry({
 
   return (
     <div className={`local-install-entry ${className}`.trim()}>
-      {showCta && !showingAttempt && (
+      {showCta && !attemptActive && (
         <div className="local-install-cta">
           <Button variant="primary" onClick={start}>{t("localInstall.cta")}</Button>
           <p className="muted">{t("localInstall.description")}</p>
@@ -104,6 +109,7 @@ export function LocalHostInstallEntry({
             {mappedStep && <p className="muted">{t("hosts.failureStep", { step: t(mappedStep) })}</p>}
           </div>}
           {snapshot.phase === "cancelled" && <p className="local-install-status" role="status">{t("localInstall.cancelled")}</p>}
+          {snapshot.phase === "succeeded" && <p className="local-install-status" role="status">{t("localInstall.selecting")}</p>}
           <div className="local-install-actions">
             {snapshot.phase === "installing" && snapshot.cancellable && <Button variant="ghost" disabled={snapshot.cancelling}
               onClick={() => void controller.cancel()}>{t("localInstall.cancel")}</Button>}

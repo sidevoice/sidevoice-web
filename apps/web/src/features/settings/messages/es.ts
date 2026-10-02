@@ -134,6 +134,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "localInstall.cancelTooLate": "La configuración está terminando y ya no se puede cancelar.",
   "localInstall.cancelFailed": "Sidevoice no pudo confirmar la cancelación. Puede que la configuración siga terminando.",
   "localInstall.cancelled": "Se canceló la configuración. No se registró ningún agente.",
+  "localInstall.selecting": "Conectando con este ordenador…",
   "localInstall.retry": "Reintentar configuración",
   "localInstall.copyDetails": "Copiar detalles",
   "localInstall.detailsCopied": "Detalles copiados.",

@@ -86,7 +86,9 @@ test("failure shows translated key copy, safe details and a retry action", async
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   await act(async () => { failed.reject({ key: "install.network", step: "download", message: "never show native prose",
-    params: { token: "raw-token", attempt: 2 }, log_tail: ["HOME=/private/account", "release request timed out", "SV1.private-pairing-code"] });
+    params: { token: "raw-token", attempt: 2, url: "http://demo-user:demo-password@proxy.example:8080",
+      detail: "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}" },
+    log_tail: ["HOME=/private/account", "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}", "SV1.private-pairing-code"] });
     await Promise.resolve(); });
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("The download could not reach the release"));
   expect(screen.queryByText("never show native prose")).toBeNull();
@@ -99,6 +101,10 @@ test("failure shows translated key copy, safe details and a retry action", async
   expect(copied).not.toContain("private-pairing-code");
   expect(copied).not.toContain("HOME=");
   expect(copied).not.toContain("never show native prose");
+  expect(copied).not.toContain("demo-user");
+  expect(copied).not.toContain("demo-password");
+  expect(copied).not.toContain("demo-secret");
+  expect(copied).not.toContain("demo-credential");
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry setup" })); });
   expect(install).toHaveBeenCalledTimes(2);

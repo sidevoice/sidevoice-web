@@ -10,6 +10,7 @@ export type LocalHostInstallSnapshot =
   | { phase: "idle" }
   | {
     phase: "installing";
+    source: LocalHostInstallSource;
     job: string | null;
     step: string | null;
     done: number | null;
@@ -18,19 +19,24 @@ export type LocalHostInstallSnapshot =
     cancelling: boolean;
     cancelState: "too-late" | "failed" | null;
   }
-  | { phase: "failed"; step: string | null; error: LocalHostBridgeError }
-  | { phase: "cancelled"; step: string | null }
-  | { phase: "succeeded" };
+  | { phase: "failed"; source: LocalHostInstallSource; step: string | null; error: LocalHostBridgeError }
+  | { phase: "cancelled"; source: LocalHostInstallSource; step: string | null }
+  | { phase: "succeeded"; source: LocalHostInstallSource };
+
+export type LocalHostInstallSource = "no-machine" | "machines";
 
 const IDLE: LocalHostInstallSnapshot = Object.freeze({ phase: "idle" });
-const sensitiveName = /(token|secret|password|pairing|authorization|environment|env|home|path|api[_ -]?key)/i;
-
-function boundedText(value: string, max = 300) {
-  return value.trim().slice(0, max)
-    .replace(/\bSV1\.[A-Za-z0-9._~-]+\b/g, "[redacted]")
-    .replace(/(bearer\s+)[A-Za-z0-9._~-]+/gi, "$1[redacted]")
-    .replace(/\b([\w.-]*(?:token|secret|password|api[_ -]?key|private[_ -]?key)[\w.-]*)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]");
-}
+const SAFE_VERIFICATION_CHECKS = new Map<string, string>([
+  ["sha256", "SHA-256 digest"], ["manifest.sha256", "manifest SHA-256 digest"],
+  ["bundle.sha256", "bundle SHA-256 digest"], ["wheel.sha256", "wheel SHA-256 digest"],
+  ["sigstore", "Sigstore bundle"], ["sigstore.bundle", "Sigstore bundle"],
+  ["certificate.issuer", "certificate issuer"], ["certificate.signer", "certificate signer"],
+  ["certificate.repository", "source repository"], ["certificate.repository-id", "source repository ID"],
+  ["certificate.runner", "runner type"], ["certificate.build-config", "build configuration"],
+  ["attestation.predicate", "attestation predicate"], ["attestation.subject", "attestation subject"],
+  ["archive.path", "archive paths"], ["signed bundle", "signed bundle"],
+]);
+const SAFE_NUMERIC_PARAMS = new Set(["attempt", "attempts", "limit", "bytes", "duration_ms"]);
 
 function safeStep(value: unknown) {
   return typeof value === "string" && /^[\w.-]{1,100}$/.test(value) ? value : null;
@@ -40,20 +46,14 @@ function safeParams(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const result: Record<string, string | number> = {};
   for (const [key, entry] of Object.entries(value).slice(0, 20)) {
-    if (sensitiveName.test(key)) continue;
-    if (typeof entry === "string") result[key] = boundedText(entry, 200);
-    else if (typeof entry === "number" && Number.isFinite(entry)) result[key] = entry;
+    if (key === "check" && typeof entry === "string") {
+      const safeCheck = SAFE_VERIFICATION_CHECKS.get(entry.trim().toLowerCase());
+      if (safeCheck) result.check = safeCheck;
+    } else if (SAFE_NUMERIC_PARAMS.has(key) && typeof entry === "number" && Number.isFinite(entry)) {
+      result[key] = entry;
+    }
   }
   return Object.keys(result).length ? result : undefined;
-}
-
-function safeLogTail(value: unknown) {
-  if (!Array.isArray(value)) return undefined;
-  const lines = value.filter((line): line is string => typeof line === "string")
-    .filter((line) => !/^\s*(environment|env(?:ironment)?\s+variables?|printenv(?:\s|$)|home=|path=|user=)/i.test(line))
-    .filter((line) => (line.match(/\b[A-Z_][A-Z0-9_]*=/g) || []).length < 3)
-    .slice(-20).map((line) => boundedText(line));
-  return lines.length ? lines : undefined;
 }
 
 export function normalizeLocalHostBridgeError(value: unknown, fallbackStep: string | null = null): LocalHostBridgeError {
@@ -61,19 +61,17 @@ export function normalizeLocalHostBridgeError(value: unknown, fallbackStep: stri
   const source = outer.failure && typeof outer.failure === "object" ? outer.failure as Record<string, unknown> : outer;
   const key = typeof source.key === "string" && /^[\w.-]{1,100}$/.test(source.key) ? source.key : "install.unknown";
   const params = safeParams(source.params);
-  const logTail = safeLogTail(source.log_tail);
   return {
     key,
     ...(safeStep(source.step) || fallbackStep ? { step: safeStep(source.step) || fallbackStep || undefined } : {}),
     ...(params ? { params } : {}),
-    ...(logTail ? { log_tail: logTail } : {}),
   };
 }
 
 export interface LocalHostInstallController {
   getSnapshot(): LocalHostInstallSnapshot;
   subscribe(listener: () => void): () => void;
-  start(): boolean;
+  start(source?: LocalHostInstallSource): boolean;
   cancel(): Promise<boolean>;
   clear(): void;
 }
@@ -93,7 +91,7 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
 
   function readSnapshot(): LocalHostInstallSnapshot { return snapshot; }
 
-  function start() {
+  function start(source: LocalHostInstallSource = "machines") {
     if (snapshot.phase === "installing") return false;
     const bridge = bridgeProvider();
     if (!bridge || typeof bridge.install !== "function") return false;
@@ -101,7 +99,7 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
     const currentAttempt = ++attempt;
     activeBridge = bridge;
     let lastStep: string | null = null;
-    publish({ phase: "installing", job: null, step: null, done: null, total: null, cancellable: false, cancelling: false, cancelState: null });
+    publish({ phase: "installing", source, job: null, step: null, done: null, total: null, cancellable: false, cancelling: false, cancelState: null });
 
     let operation;
     try {
@@ -116,13 +114,13 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
         publish({ ...current, step, done, total });
       });
     } catch (error) {
-      publish({ phase: "failed", step: lastStep, error: normalizeLocalHostBridgeError(error, lastStep) });
+      publish({ phase: "failed", source, step: lastStep, error: normalizeLocalHostBridgeError(error, lastStep) });
       activeBridge = null;
       return true;
     }
 
     if (!operation || typeof operation.job !== "string" || !operation.job) {
-      publish({ phase: "failed", step: lastStep, error: normalizeLocalHostBridgeError({ key: "bridge.invalid-response" }, lastStep) });
+      publish({ phase: "failed", source, step: lastStep, error: normalizeLocalHostBridgeError({ key: "bridge.invalid-response" }, lastStep) });
       activeBridge = null;
       return true;
     }
@@ -132,13 +130,13 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
     }
     void Promise.resolve(operation).then((_status: LocalHostStatus) => {
       if (attempt !== currentAttempt) return;
-      publish({ phase: "succeeded" });
+      publish({ phase: "succeeded", source });
       activeBridge = null;
     }).catch((error: unknown) => {
       if (attempt !== currentAttempt) return;
       const normalized = normalizeLocalHostBridgeError(error, lastStep);
-      if (normalized.key === "install.cancelled") publish({ phase: "cancelled", step: normalized.step || lastStep });
-      else publish({ phase: "failed", step: normalized.step || lastStep, error: normalized });
+      if (normalized.key === "install.cancelled") publish({ phase: "cancelled", source, step: normalized.step || lastStep });
+      else publish({ phase: "failed", source, step: normalized.step || lastStep, error: normalized });
       activeBridge = null;
     });
     return true;
@@ -184,6 +182,6 @@ export function createLocalHostInstallController(bridgeProvider: () => LocalHost
 
 export const localHostInstallController = createLocalHostInstallController();
 
-export function isVisibleLocalHostInstall(snapshot: LocalHostInstallSnapshot) {
-  return snapshot.phase === "installing" || snapshot.phase === "failed" || snapshot.phase === "cancelled";
+export function isVisibleLocalHostInstall(snapshot: LocalHostInstallSnapshot, source?: LocalHostInstallSource) {
+  return snapshot.phase !== "idle" && (!source || snapshot.source === source);
 }

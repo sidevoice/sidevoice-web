@@ -59,7 +59,7 @@ export function MachineList() {
       </div>
       <div className="pairing">
         <Button id="pair-device-open" variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.add")}</Button>
-        <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" />
+        <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />
       </div>
     </div>
   );

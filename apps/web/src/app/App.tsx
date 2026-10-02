@@ -1,4 +1,7 @@
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { RoomProvider } from "./RoomProvider";
+import type { RoomStore } from "../state/room-store";
+import { localHostInstallController } from "../services/local-host-install";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { RoomHeader } from "../features/room/RoomHeader";
 import { ParticipantSidebar } from "../features/room/ParticipantSidebar";
@@ -16,18 +19,42 @@ import { useRoomStore } from "../state/room-store";
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
+  const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
+  const pendingLocalSelection = useRef(false);
   const noMachine = ready && machines.length === 0;
+  const keepSetupScreen = install.phase !== "idle" && install.source === "no-machine";
+
+  useEffect(() => {
+    if (install.phase === "installing") {
+      pendingLocalSelection.current = true;
+      return;
+    }
+    if (install.phase === "idle" || install.phase === "failed" || install.phase === "cancelled") {
+      pendingLocalSelection.current = false;
+      return;
+    }
+    if (install.phase === "succeeded" && pendingLocalSelection.current) {
+      const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
+      const chooseMachine = window.sidevoiceActions?.chooseMachine;
+      if (!localMachine?.pairingId || typeof chooseMachine !== "function") return;
+      chooseMachine(localMachine.pairingId);
+      pendingLocalSelection.current = false;
+      localHostInstallController.clear();
+    }
+  }, [install.phase, machines]);
+
+  const showNoMachineScreen = noMachine || keepSetupScreen;
   return (
     <>
       <RoomHeader />
       <LocalHostBanner />
       <main>
-        {noMachine ? <NoMachineScreen /> : <>
+        {showNoMachineScreen ? <NoMachineScreen source={install.phase === "idle" ? "no-machine" : install.source} /> : <>
           <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
           <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
         </>}
       </main>
-      {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
+      {!showNoMachineScreen && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
       <ConnectionStatsDialog />
       <SettingsDialog />
       <PairingDialog />
@@ -37,9 +64,9 @@ function RoomContent() {
   );
 }
 
-export function App() {
+export function App({ store }: { store?: RoomStore } = {}) {
   return (
-    <RoomProvider>
+    <RoomProvider store={store}>
       <TooltipProvider>
         <RoomContent />
       </TooltipProvider>

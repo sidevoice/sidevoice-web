@@ -132,6 +132,7 @@ export const en = {
   "localInstall.cancelTooLate": "Setup is finishing and can no longer be canceled.",
   "localInstall.cancelFailed": "Sidevoice could not confirm cancellation. Setup may still be finishing.",
   "localInstall.cancelled": "Setup was canceled. No agents were registered.",
+  "localInstall.selecting": "Connecting to this computer…",
   "localInstall.retry": "Retry setup",
   "localInstall.copyDetails": "Copy details",
   "localInstall.detailsCopied": "Details copied.",
