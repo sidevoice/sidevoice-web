@@ -26,10 +26,33 @@ const INSTALL_CAUSES: Record<string, HostMessageKey> = {
   "service.start.failed": "localInstall.error.service",
   "launch.failed": "localInstall.error.launch",
 };
+const INSTALL_CHECKS: Record<string, HostMessageKey> = {
+  sha256: "localInstall.check.sha256",
+  sigstore: "localInstall.check.sigstore",
+  "sigstore-bundle": "localInstall.check.sigstoreBundle",
+  issuer: "localInstall.check.issuer",
+  workflow: "localInstall.check.workflow",
+  source: "localInstall.check.source",
+  "repository-id": "localInstall.check.repositoryId",
+  runner: "localInstall.check.runner",
+  "build-config": "localInstall.check.buildConfig",
+  predicate: "localInstall.check.predicate",
+  subject: "localInstall.check.subject",
+  manifest: "localInstall.check.manifest",
+  "developer-override": "localInstall.check.developerOverride",
+  platform: "localInstall.check.platform",
+  download: "localInstall.check.download",
+  "download-size": "localInstall.check.downloadSize",
+  "archive-path": "localInstall.check.archivePath",
+  "archive-link": "localInstall.check.archiveLink",
+  "archive-size": "localInstall.check.archiveSize",
+  "archive-type": "localInstall.check.archiveType",
+};
 
 export function localHostBridgeErrorText(error: LocalHostBridgeError, t: HostTranslate) {
   const key = INSTALL_CAUSES[error.key] ?? "localInstall.error.unknown";
-  const check = typeof error.params?.check === "string" && error.params.check ? error.params.check : t("localInstall.error.verificationCheck");
+  const checkKey = typeof error.params?.check === "string" ? INSTALL_CHECKS[error.params.check] : undefined;
+  const check = checkKey ? t(checkKey) : t("localInstall.error.verificationCheck");
   return t(key, { check });
 }
 

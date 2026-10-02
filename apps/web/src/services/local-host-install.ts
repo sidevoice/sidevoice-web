@@ -26,15 +26,10 @@ export type LocalHostInstallSnapshot =
 export type LocalHostInstallSource = "no-machine" | "machines";
 
 const IDLE: LocalHostInstallSnapshot = Object.freeze({ phase: "idle" });
-const SAFE_VERIFICATION_CHECKS = new Map<string, string>([
-  ["sha256", "SHA-256 digest"], ["manifest.sha256", "manifest SHA-256 digest"],
-  ["bundle.sha256", "bundle SHA-256 digest"], ["wheel.sha256", "wheel SHA-256 digest"],
-  ["sigstore", "Sigstore bundle"], ["sigstore.bundle", "Sigstore bundle"],
-  ["certificate.issuer", "certificate issuer"], ["certificate.signer", "certificate signer"],
-  ["certificate.repository", "source repository"], ["certificate.repository-id", "source repository ID"],
-  ["certificate.runner", "runner type"], ["certificate.build-config", "build configuration"],
-  ["attestation.predicate", "attestation predicate"], ["attestation.subject", "attestation subject"],
-  ["archive.path", "archive paths"], ["signed bundle", "signed bundle"],
+const SAFE_VERIFICATION_CHECKS = new Set([
+  "sha256", "sigstore", "sigstore-bundle", "issuer", "workflow", "source", "repository-id", "runner",
+  "build-config", "predicate", "subject", "manifest", "developer-override", "platform", "download",
+  "download-size", "archive-path", "archive-link", "archive-size", "archive-type",
 ]);
 const SAFE_NUMERIC_PARAMS = new Set(["attempt", "attempts", "limit", "bytes", "duration_ms"]);
 
@@ -47,8 +42,8 @@ function safeParams(value: unknown) {
   const result: Record<string, string | number> = {};
   for (const [key, entry] of Object.entries(value).slice(0, 20)) {
     if (key === "check" && typeof entry === "string") {
-      const safeCheck = SAFE_VERIFICATION_CHECKS.get(entry.trim().toLowerCase());
-      if (safeCheck) result.check = safeCheck;
+      const check = entry.trim().toLowerCase();
+      if (SAFE_VERIFICATION_CHECKS.has(check)) result.check = check;
     } else if (SAFE_NUMERIC_PARAMS.has(key) && typeof entry === "number" && Number.isFinite(entry)) {
       result[key] = entry;
     }

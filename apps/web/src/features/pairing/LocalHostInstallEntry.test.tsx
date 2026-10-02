@@ -111,6 +111,18 @@ test("failure shows translated key copy, safe details and a retry action", async
   await waitFor(() => expect(screen.queryByRole("heading", { name: "Preparing this computer" })).toBeNull());
 });
 
+test("authenticity failures translate allowlisted connector check IDs", async () => {
+  const failed = deferred<LocalHostStatus>();
+  const controller = fakeController({ install: vi.fn(() => operation("check-job", failed.promise)) });
+  render(<LocalHostInstallEntry showCta controller={controller} />);
+
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  await act(async () => { failed.reject({ key: "install.authenticity", params: { check: "sigstore-bundle" } });await Promise.resolve(); });
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Release authenticity check failed: the Sigstore bundle.");
+  expect(alert).not.toHaveTextContent("sigstore-bundle");
+});
+
 test("connecting to another machine dismisses a settled failure without changing remote pairing", async () => {
   const failed = deferred<LocalHostStatus>();
   const controller = fakeController({ install: vi.fn(() => operation("failed-job", failed.promise)) });

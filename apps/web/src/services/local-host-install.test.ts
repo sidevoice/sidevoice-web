@@ -47,13 +47,13 @@ test("failed bridge details retain allowlisted diagnostics and omit untrusted st
   const controller = createLocalHostInstallController(() => bridge);
   controller.start();
   result.reject({ key: "install.authenticity", step: "verification", message: "do not render raw prose",
-    params: { check: "signed bundle", token: "secret-token", attempts: 2,
+    params: { check: "sigstore-bundle", token: "secret-token", attempts: 2,
       url: "http://demo-user:demo-password@proxy.example:8080", arbitrary: "{\"token\":\"demo-secret\"}" },
     log_tail: ["environment: token=secret-token", "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}", "SV1.private-pairing-code"] });
 
   await vi.waitFor(() => expect(controller.getSnapshot().phase).toBe("failed"));
   expect(controller.getSnapshot()).toEqual({ phase: "failed", source: "machines", step: "verification", error: {
-    key: "install.authenticity", step: "verification", params: { check: "signed bundle", attempts: 2 },
+    key: "install.authenticity", step: "verification", params: { check: "sigstore-bundle", attempts: 2 },
   } });
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("secret-token");
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("private-pairing-code");
@@ -62,6 +62,18 @@ test("failed bridge details retain allowlisted diagnostics and omit untrusted st
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-password");
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-secret");
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-credential");
+});
+
+test("connector check identifiers are kept while arbitrary check strings are omitted", async () => {
+  const result = deferred<LocalHostStatus>();
+  const bridge = { install: vi.fn(() => operation("job-check", result.promise)) } as unknown as LocalHostBridge;
+  const controller = createLocalHostInstallController(() => bridge);
+  controller.start();
+  result.reject({ key: "install.authenticity", params: { check: "archive-link", arbitrary: "https://user:pass@example.test" } });
+
+  await vi.waitFor(() => expect(controller.getSnapshot().phase).toBe("failed"));
+  expect(controller.getSnapshot()).toMatchObject({ phase: "failed", error: { params: { check: "archive-link" } } });
+  expect(JSON.stringify(controller.getSnapshot())).not.toContain("user:pass");
 });
 
 test("a refused cancellation disables retrying cancel and leaves the job active", async () => {
