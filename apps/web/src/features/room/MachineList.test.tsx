@@ -5,8 +5,9 @@ import { NoMachineScreen } from "../pairing/NoMachineScreen";
 import { LocalHostBanner } from "../settings/LocalHostBanner";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
+import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
-import type { LocalHostBridge, LocalHostStatus } from "../../services/desktop-host";
+import type { LocalHostBridge, LocalHostStatus, LocalPairingCode } from "../../services/desktop-host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -129,6 +130,148 @@ test("Devices shows the local code and pairs a local-only host with a room", asy
   fireEvent.change(screen.getByRole("textbox", { name: "Room pairing code" }), { target: { value: "ROOM-123" } });
   await act(async () => { fireEvent.submit(screen.getByRole("textbox", { name: "Room pairing code" }).closest("form")!); });
   expect(pairRoom).toHaveBeenCalledWith("https://room.example", "ROOM-123");
+});
+
+test.each(["not-installed", "service-failed", "stopped-by-person"] as const)(
+  "Devices operations remain available for a reachable local core in %s state",
+  async (state) => {
+    const status: LocalHostStatus = { state, reachable: true, installed: true, service: "launchd" };
+    const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.local", expires_in: 600, reach: "local-only" as const });
+    setBridge({ state: vi.fn(async () => status), pairingCode });
+    const done = actions();
+    room([local], { pairingInUse: "fp-local", localHostStatus: status });
+    await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+    await act(async () => { screen.getByRole("tab", { name: "Devices" }).click(); });
+    await waitFor(() => expect(done.localHostDevices).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Create pairing code" })).toBeEnabled();
+
+    await act(async () => { screen.getByRole("button", { name: "Retry" }).click(); });
+    expect(done.localHostDevices).toHaveBeenCalledTimes(2);
+    await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
+    expect(pairingCode).toHaveBeenCalledOnce();
+    expect(screen.getByText("SV1.local")).toBeInTheDocument();
+  },
+);
+
+test("Devices waits for the verified local pairing if reachability arrives first", async () => {
+  const status: LocalHostStatus = { state: "stopped-by-person", reachable: true, installed: true, service: "launchd" };
+  const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.local", expires_in: 600, reach: "local-only" as const });
+  setBridge({ state: vi.fn(async () => status), pairingCode, pairRoom: vi.fn().mockResolvedValue({ ok: true }) });
+  const done = actions();
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
+    localHostStatus: status, machinesReady: true }); });
+  render(<RoomProvider store={store}><MachineList /></RoomProvider>);
+  await act(async () => { screen.getByRole("button", { name: "Open This computer" }).click(); });
+  await act(async () => { screen.getByRole("tab", { name: "Devices" }).click(); });
+
+  expect(done.localHostDevices).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Create pairing code" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local" }); });
+  await waitFor(() => expect(done.localHostDevices).toHaveBeenCalledOnce());
+  expect(screen.getByRole("button", { name: "Create pairing code" })).toBeEnabled();
+  await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
+  expect(pairingCode).toHaveBeenCalledOnce();
+});
+
+test("Devices discards the old host's rows and code when the local pairing identity changes", async () => {
+  const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.old-host", expires_in: 600, reach: "local-only" as const });
+  setBridge({ pairingCode });
+  const done = actions();
+  done.localHostDevices.mockImplementationOnce(async () => [{ device_id: "d-old", name: "Old phone", kind: "code" }])
+    .mockResolvedValue([{ device_id: "d-new", name: "New phone", kind: "code" }]);
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
+    localHostStatus: running, machinesReady: true }); });
+  render(<RoomProvider store={store}><MachineList /></RoomProvider>);
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { screen.getByRole("tab", { name: "Devices" }).click(); });
+  await waitFor(() => expect(screen.getByText("Old phone")).toBeInTheDocument());
+  await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
+  expect(screen.getByText("SV1.old-host")).toBeInTheDocument();
+
+  const replacement = paired({ fp: "fp-local-new", host: "Mac mini", local: true, urls: ["http://127.0.0.1:47212"], rv: null, device_id: "d-local-new" });
+  act(() => { store.patch({ pairings: [replacement], pairingInUse: replacement.fp }); });
+  await waitFor(() => expect(screen.getByText("New phone")).toBeInTheDocument());
+  expect(screen.queryByText("Old phone")).toBeNull();
+  expect(screen.queryByText("SV1.old-host")).toBeNull();
+  expect(done.localHostDevices).toHaveBeenCalledTimes(2);
+});
+
+test("Devices clears cached contents on loss and refreshes them when native reachability returns", async () => {
+  const status: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd" };
+  const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.initial", expires_in: 600, reach: "local-only" as const });
+  setBridge({ state: vi.fn(async () => status), pairingCode, pairRoom: vi.fn().mockResolvedValue({ ok: true }) });
+  const done = actions();
+  let loads = 0;
+  done.localHostDevices.mockImplementation(async () => ++loads === 1
+    ? [{ device_id: "d-before", name: "Phone", kind: "code" }]
+    : [{ device_id: "d-after", name: "Tablet", kind: "code" }]);
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
+    localHostStatus: status, machinesReady: true }); });
+  render(<RoomProvider store={store}><MachineList /></RoomProvider>);
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { screen.getByRole("tab", { name: "Devices" }).click(); });
+  await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
+  await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
+  expect(screen.getByText("SV1.initial")).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Room address" })).toBeInTheDocument();
+  await act(async () => { screen.getByRole("button", { name: "Revoke Phone" }).click(); });
+  expect(screen.getByRole("group", { name: "Revoke Phone" })).toBeInTheDocument();
+
+  act(() => { store.patch({ pairings: [], pairingInUse: "fp-local", localHostStatus: { ...status, reachable: false } }); });
+  await waitFor(() => expect(screen.queryByText("Phone")).toBeNull());
+  expect(screen.queryByText("SV1.initial")).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Room address" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Revoke Phone" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Create pairing code" })).toBeDisabled();
+
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostStatus: { ...status, reachable: true, state: "service-failed" } }); });
+  await waitFor(() => expect(screen.getByText("Tablet")).toBeInTheDocument());
+  expect(screen.queryByText("SV1.initial")).toBeNull();
+  expect(done.localHostDevices).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole("button", { name: "Create pairing code" })).toBeEnabled();
+});
+
+test("in-flight device and code results cannot repopulate Devices after reachability is lost", async () => {
+  const status: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd" };
+  let resolveDevices!: (value: HostDeviceView[]) => void;
+  let resolveCode!: (value: LocalPairingCode) => void;
+  const pairingCode = vi.fn()
+    .mockImplementationOnce(() => new Promise<LocalPairingCode>((resolve) => { resolveCode = resolve; }))
+    .mockResolvedValue({ code: "SV1.fresh", expires_in: 600, reach: "direct" as const });
+  setBridge({ state: vi.fn(async () => status), pairingCode, pairRoom: vi.fn().mockResolvedValue({ ok: true }) });
+  const done = actions();
+  done.localHostDevices.mockImplementationOnce(() => new Promise<HostDeviceView[]>((resolve) => { resolveDevices = resolve; }));
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
+    localHostStatus: status, machinesReady: true }); });
+  render(<RoomProvider store={store}><MachineList /></RoomProvider>);
+  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { screen.getByRole("tab", { name: "Devices" }).click(); });
+  await waitFor(() => expect(done.localHostDevices).toHaveBeenCalledOnce());
+  await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
+
+  act(() => { store.patch({ pairings: [], pairingInUse: "fp-local", localHostStatus: { ...status, reachable: false } }); });
+  await act(async () => {
+    resolveDevices([{ device_id: "d-stale", name: "Stale phone", kind: "code" }]);
+    resolveCode({ code: "SV1.stale", expires_in: 600, reach: "local-only" });
+    await Promise.resolve();
+  });
+  expect(screen.queryByText("Stale phone")).toBeNull();
+  expect(screen.queryByText("SV1.stale")).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Room address" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Create pairing code" })).toBeDisabled();
+
+  act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostStatus: status }); });
+  await waitFor(() => expect(screen.getByText("No devices are paired with this machine.")).toBeInTheDocument());
+  await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
+  expect(screen.getByText("SV1.fresh")).toBeInTheDocument();
 });
 
 test("Add machine opens the explicit remote setup and pairing flow", async () => {

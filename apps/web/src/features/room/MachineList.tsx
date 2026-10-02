@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { MachinesIcon } from "../../components/ui/Icons";
 import { localHostBridge, type LocalHostStatus, type LocalPairingCode } from "../../services/desktop-host";
@@ -75,7 +75,7 @@ function HostDetail({ machine, onBack }: { machine: MachineView; onBack: () => v
         <Button variant="ghost" role="tab" aria-selected={tab === "status"} onClick={() => setTab("status")}>{t("hosts.tab.status")}</Button>
         <Button variant="ghost" role="tab" aria-selected={tab === "devices"} onClick={() => setTab("devices")}>{t("hosts.tab.devices")}</Button>
       </div>
-      {tab === "status" ? <LocalHostStatusPanel status={status} /> : <LocalHostDevicesPanel />}
+      {tab === "status" ? <LocalHostStatusPanel status={status} /> : <LocalHostDevicesPanel machine={machine} />}
     </section>
   );
 }
@@ -152,14 +152,16 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   );
 }
 
-function LocalHostDevicesPanel() {
+function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [devices, setDevices] = useState<HostDeviceView[]>([]);
+  const [devicesFor, setDevicesFor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pairing, setPairing] = useState<LocalPairingCode | null>(null);
+  const [pairingFor, setPairingFor] = useState<string | null>(null);
   const [pairingError, setPairingError] = useState(false);
   const [pairingCopied, setPairingCopied] = useState(false);
   const [deviceNote, setDeviceNote] = useState("");
@@ -168,58 +170,90 @@ function LocalHostDevicesPanel() {
   const [roomBusy, setRoomBusy] = useState(false);
   const [roomPaired, setRoomPaired] = useState(false);
   const [roomError, setRoomError] = useState(false);
+  const deviceEpoch = useRef(0);
+  const pairingEpoch = useRef(0);
+  const roomEpoch = useRef(0);
   const bridge = localHostBridge();
   const canPairDevices = typeof bridge?.pairingCode === "function";
   const canPairRoom = typeof bridge?.pairRoom === "function";
+  const usable = status.reachable === true && machine.selectable === true;
+  const pairingKey = machine.pairingId || "";
+  const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
+  const visiblePairing = usable && pairingFor === pairingKey ? pairing : null;
 
   async function refresh() {
-    if (status.state !== "running") { setError(true);setDevices([]);return; }
+    const epoch = ++deviceEpoch.current;
+    if (!usable) { setError(true);setDevices([]);return; }
     const action = window.sidevoiceActions?.localHostDevices;
     if (!action) { setError(true);return; }
     setLoading(true);setError(false);
-    try { setDevices(await action()); } catch { setError(true); }
-    finally { setLoading(false); }
+    try { const next = await action();if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)} }
+    catch { if (deviceEpoch.current === epoch && usable) setError(true); }
+    finally { if (deviceEpoch.current === epoch) setLoading(false); }
   }
-  useEffect(() => { void refresh(); }, [status.state]);
+  useEffect(() => {
+    deviceEpoch.current++;
+    pairingEpoch.current++;
+    roomEpoch.current++;
+    setLoading(false);
+    setConfirmId(null);
+    setDevices([]);setDevicesFor(null);setPairing(null);setPairingFor(null);setPairingError(false);setPairingCopied(false);
+    setDeviceNote("");setRoomUrl("");setRoomCode("");setRoomBusy(false);setRoomPaired(false);setRoomError(false);
+    if (!usable) {
+      setError(true);
+      return;
+    }
+    setError(false);
+    void refresh();
+  }, [usable, machine.pairingId]);
   async function revoke(id: string) {
     const action = window.sidevoiceActions?.revokeLocalHostDevice;
-    if (!action) return;
+    if (!usable || !action) return;
+    const epoch = ++deviceEpoch.current;
     setLoading(true);setError(false);
-    try { await action(id);setConfirmId(null);setDeviceNote(t("hosts.devices.revoked"));setDevices(await window.sidevoiceActions?.localHostDevices?.() ?? []); }
-    catch { setError(true); }
-    finally { setLoading(false); }
+    try {
+      await action(id);
+      if (deviceEpoch.current !== epoch || !usable) return;
+      setConfirmId(null);setDeviceNote(t("hosts.devices.revoked"));
+      const next = await window.sidevoiceActions?.localHostDevices?.() ?? [];
+      if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)}
+    }
+    catch { if (deviceEpoch.current === epoch && usable) setError(true); }
+    finally { if (deviceEpoch.current === epoch) setLoading(false); }
   }
   async function createCode() {
-    if (!bridge?.pairingCode) return;
-    setPairingError(false);setPairingCopied(false);setPairing(null);
-    try { setPairing(await bridge.pairingCode()); }
-    catch { setPairingError(true); }
+    if (!usable || !bridge?.pairingCode) return;
+    const epoch = ++pairingEpoch.current;
+    setPairingError(false);setPairingCopied(false);setPairing(null);setPairingFor(null);
+    try { const next = await bridge.pairingCode();if (pairingEpoch.current === epoch && usable) {setPairing(next);setPairingFor(pairingKey)} }
+    catch { if (pairingEpoch.current === epoch && usable) setPairingError(true); }
   }
   async function copyPairingCode() {
-    if (!pairing) return;
-    try { await navigator.clipboard.writeText(pairing.code);setPairingCopied(true);setDeviceNote(t("hosts.devices.codeCopied")); }
+    if (!usable || !visiblePairing) return;
+    try { await navigator.clipboard.writeText(visiblePairing.code);setPairingCopied(true);setDeviceNote(t("hosts.devices.codeCopied")); }
     catch { setPairingCopied(false);setError(true); }
   }
   async function connectRoom(event: FormEvent) {
     event.preventDefault();
-    if (!bridge?.pairRoom || !roomUrl.trim() || !roomCode.trim()) return;
+    if (!usable || !bridge?.pairRoom || !roomUrl.trim() || !roomCode.trim()) return;
+    const epoch = ++roomEpoch.current;
     setRoomBusy(true);setRoomError(false);setRoomPaired(false);
-    try { await bridge.pairRoom(roomUrl.trim(), roomCode.trim());setRoomPaired(true);setRoomCode("");setPairing(null); }
-    catch { setRoomError(true); }
-    finally { setRoomBusy(false); }
+    try { await bridge.pairRoom(roomUrl.trim(), roomCode.trim());if (roomEpoch.current === epoch && usable){setRoomPaired(true);setRoomCode("");setPairing(null)} }
+    catch { if (roomEpoch.current === epoch && usable) setRoomError(true); }
+    finally { if (roomEpoch.current === epoch) setRoomBusy(false); }
   }
   return (
     <div className="host-devices-panel">
       <div className="host-devices-head">
         <h4>{t("hosts.tab.devices")}</h4>
-        {status.state === "running" && <Button variant="ghost" size="compact" disabled={loading} onClick={() => void refresh()}>{t("hosts.retry")}</Button>}
+        {usable && <Button variant="ghost" size="compact" disabled={loading} onClick={() => void refresh()}>{t("hosts.retry")}</Button>}
       </div>
-      {loading && <p className="muted" role="status">{t("hosts.working")}</p>}
-      {error && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
-      {deviceNote && <p className="muted" role="status">{deviceNote}</p>}
-      {!loading && !error && devices.length === 0 && <p className="muted">{t("hosts.devices.empty")}</p>}
+      {usable && loading && <p className="muted" role="status">{t("hosts.working")}</p>}
+      {(!usable || error) && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
+      {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
+      {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t("hosts.devices.empty")}</p>}
       <ul className="host-device-list">
-        {devices.map((device) => (
+        {visibleDevices.map((device) => (
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
               <strong>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
@@ -227,7 +261,7 @@ function LocalHostDevicesPanel() {
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
-            {device.kind !== "local" && (confirmId === device.device_id ? (
+            {usable && device.kind !== "local" && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>
                 <Button variant="danger" size="compact" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke")}</Button>
@@ -239,21 +273,21 @@ function LocalHostDevicesPanel() {
       </ul>
       {canPairDevices && <section className="pair-another-device">
         <h4>{t("hosts.devices.pairAnother")}</h4>
-        <Button variant="primary" disabled={status.state !== "running"} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>
-        {pairingError && <p role="alert">{t("hosts.devices.codeFailed")}</p>}
-        {pairing && <div className="local-pairing-code" role="status">
-          <p>{t(`hosts.devices.reach.${pairing.reach}` as never)}</p>
-          <output>{pairing.code}</output>
-          {typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" size="compact" onClick={() => void copyPairingCode()}>{pairingCopied ? t("hosts.devices.codeCopied") : t("hosts.devices.copyCode")}</Button>}
-          <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(pairing.expires_in / 60) })}</p>
+        <Button variant="primary" disabled={!usable} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>
+        {usable && pairingError && <p role="alert">{t("hosts.devices.codeFailed")}</p>}
+        {visiblePairing && <div className="local-pairing-code" role="status">
+          <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
+          <output>{visiblePairing.code}</output>
+          {typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" size="compact" disabled={!usable} onClick={() => void copyPairingCode()}>{pairingCopied ? t("hosts.devices.codeCopied") : t("hosts.devices.copyCode")}</Button>}
+          <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(visiblePairing.expires_in / 60) })}</p>
         </div>}
-        {pairing?.reach === "local-only" && <>
+        {visiblePairing?.reach === "local-only" && <>
           {canPairRoom && <form className="room-pair-form" onSubmit={connectRoom}>
             <h5>{t("hosts.devices.roomTitle")}</h5>
             <p>{t("hosts.devices.roomInstructions")}</p>
             <label>{t("hosts.devices.roomUrl")}<input value={roomUrl} autoComplete="url" onChange={(event) => setRoomUrl(event.currentTarget.value)} /></label>
             <label>{t("hosts.devices.roomCode")}<input value={roomCode} autoComplete="off" onChange={(event) => setRoomCode(event.currentTarget.value)} /></label>
-            <Button type="submit" variant="primary" disabled={roomBusy || !roomUrl.trim() || !roomCode.trim()}>{t("hosts.devices.pairRoom")}</Button>
+            <Button type="submit" variant="primary" disabled={!usable || roomBusy || !roomUrl.trim() || !roomCode.trim()}>{t("hosts.devices.pairRoom")}</Button>
             {roomPaired && <p role="status">{t("hosts.devices.roomPaired")}</p>}
             {roomError && <p role="alert">{t("hosts.devices.roomFailed")}</p>}
           </form>}
