@@ -89,7 +89,7 @@ async function installHarness(page, { languageMode = "pending", completed = true
     return route.continue();
   });
 
-  await page.addInitScript(({ hostPairing, completedSetup, choice, hasFinishedAgents }) => {
+  await page.addInitScript(({ hostPairing, completedSetup, choice, hasFinishedAgents, remoteOnly }) => {
     localStorage.setItem("sidevoice.pairings", JSON.stringify({ in_use: hostPairing.fp, pairings: [hostPairing] }));
     window.__SIDEVOICE_TARGET__ = window.location.origin;
     const seed = completedSetup
