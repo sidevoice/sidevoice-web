@@ -345,13 +345,16 @@ export function withVoicesChosen(ctx, stage) {
 export function stageProblem(ctx, task, stage) {
     if (!stage)
         return task === 'stt' ? 'Elige dónde transcribir: este dispositivo no puede ejecutar ningún modelo.' : 'Elige dónde generar la voz: este dispositivo no puede ejecutar ningún modelo.';
-    if (stage.place === DEVICE)
+    const current = effectiveStage(ctx, task, stage);
+    if (!current)
+        return task === 'stt' ? 'Elige dónde transcribir: este dispositivo no puede ejecutar ningún modelo.' : 'Elige dónde generar la voz: este dispositivo no puede ejecutar ningún modelo.';
+    if (current.place === DEVICE)
         return '';
-    const label = providerOf(ctx.catalog, stage.place, task)?.label || stage.place;
-    if (!stage.model)
+    const label = providerOf(ctx.catalog, current.place, task)?.label || current.place;
+    if (!current.model)
         return 'Elige un modelo de ' + label + '.';
-    const voice = optionSchema(ctx.catalog, stage, task).find((o) => o.kind === 'voice');
-    const chosen = voice && stage.options[voice.id];
+    const voice = optionSchema(ctx.catalog, current, task).find((o) => o.kind === 'voice');
+    const chosen = voice && current.options[voice.id];
     if (voice && !(chosen && (typeof chosen === 'string' || Object.keys(chosen).length)))
         return 'Elige una voz de ' + label + '.';
     return '';

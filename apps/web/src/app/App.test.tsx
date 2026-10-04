@@ -74,6 +74,8 @@ test("remote pairing goes through real agents before transcription setup", async
     pairings: [{ fp: "fp-remote", device_id: "device-remote", urls: ["https://remote.example"], rv: null,
       host: "Remote computer", paired_at: 1_700_000_000, revoked: false }],
     pairingInUse: "fp-remote",
+    node: "fp-remote",
+    nodeReach: "ok",
   }));
   expect(await screen.findByRole("heading", { name: "Connect Sidevoice to your agents" })).toBeInTheDocument();
 
