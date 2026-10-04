@@ -10,14 +10,14 @@ import {
   type OnboardingStep,
   type OnboardingStorageError,
 } from "../../services/onboarding-state";
-import { effectiveStage } from "../../state/stage-settings.js";
+import { effectiveStage, stageProblem, withVoicesChosen } from "../../state/stage-settings.js";
 import { stageContext } from "../../state/room-session-state.js";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore, type RoomViewState } from "../../state/room-store";
 
 interface OnboardingContextValue {
   ready: boolean;
   record: OnboardingRecord;
-  error: OnboardingStorageError["key"] | null;
+  error: OnboardingStorageError["key"] | "onboarding.prerequisites" | null;
   open: boolean;
   step: OnboardingStep;
   path: "agents" | "remote" | null;
@@ -25,13 +25,13 @@ interface OnboardingContextValue {
   localAgents: { id: string; label: string; version?: string | null }[];
   localAgentsLoading: boolean;
   localAgentsError: boolean;
-  stageKey(task: "stt" | "tts"): string | null;
+  stageKey(task: "stt" | "tts", language?: string): string | null;
   trialled(task: "stt" | "tts", key?: string | null): boolean;
   openWizard(step?: OnboardingStep): void;
   goTo(step: OnboardingStep): void;
   setPath(path: "agents" | "remote"): Promise<boolean>;
   markAgentsDone(): Promise<boolean>;
-  markTrial(task: "stt" | "tts", key: string): Promise<boolean>;
+  markTrial(task: "stt" | "tts", key: string | null): Promise<boolean>;
   defer(): Promise<void>;
   complete(): Promise<boolean>;
   rescanLocalAgents(): Promise<void>;
@@ -45,8 +45,53 @@ export function useOnboarding() {
   return value;
 }
 
+export function useOptionalOnboarding() {
+  return useContext(Context);
+}
+
+function liveHost(room: RoomViewState) {
+  const fp = room.facts.pairingInUse;
+  const machine = room.machines.find((candidate) => candidate.pairingId === fp);
+  return fp && machine && machine.selectable && !machine.revoked && room.facts.node === fp && room.facts.nodeReach === "ok"
+    ? { fp, machine } : null;
+}
+
+function stageKeyFor(room: RoomViewState, record: OnboardingRecord, task: "stt" | "tts", language?: string) {
+  const selected = liveHost(room);
+  const { facts } = room;
+  if (!selected || facts.stagePreparation.host !== selected.fp || facts.stagePreparation.status !== "ready") return null;
+  const view = room.stages?.[task];
+  const raw = facts.stageDraft?.[task] ?? facts.voicePreferences?.[task];
+  const ctx = stageContext(facts);
+  const stage = effectiveStage(ctx, task, raw);
+  if (!view || !stage?.model || !view.editable || view.modelsLoading || view.modelsError ||
+      !view.models.some((model) => model.id === stage.model) || stageProblem(ctx, task, withVoicesChosen(ctx, stage))) return null;
+  if (stage.place !== "device") {
+    const provider = facts.integrations?.providers.find((row) => row.id === stage.place);
+    const catalog = facts.remoteModels[`${stage.place}:${task}`];
+    if (facts.integrationsStatus !== "ready" || !provider?.configured || !catalog?.models?.some((model) => model.id === stage.model)) return null;
+  }
+
+  let actualLanguage = language;
+  if (task === "stt" && !actualLanguage) {
+    const configured = (stage.options as Record<string, unknown> | undefined)?.language;
+    actualLanguage = typeof configured === "string" && configured !== "auto" ? configured : facts.speechLanguage;
+  }
+  if (task === "tts" && !actualLanguage) {
+    const voice = view.options.find((option) => option.kind === "voice" && option.perLanguage);
+    const supported = voice?.kind === "voice" && voice.perLanguage ? voice.rows.map((row) => row.language) : [];
+    const matchingPrevious = supported.find((candidate) =>
+      record.trials[selected.fp]?.tts === stageTrialKey(selected.fp, { stage, language: candidate }));
+    actualLanguage = matchingPrevious || (supported.includes(facts.speechLanguage) ? facts.speechLanguage : supported[0]);
+  }
+  if (!actualLanguage) return null;
+  return stageTrialKey(selected.fp, { stage, language: actualLanguage });
+}
+
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const room = useRoomStore((state) => state);
+  const roomStore = useContext(RoomStoreContext);
+  if (!roomStore) throw new Error("useRoomStore must be used inside RoomProvider");
   const facts = room.facts;
   const machines = room.machines;
   const app = desktopAppBridge();
@@ -58,7 +103,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }), [app]);
   const [ready, setReady] = useState(false);
   const [record, setRecord] = useState<OnboardingRecord>(emptyOnboardingRecord);
-  const [error, setError] = useState<OnboardingStorageError["key"] | null>(null);
+  const [error, setError] = useState<OnboardingStorageError["key"] | "onboarding.prerequisites" | null>(null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<OnboardingStep>("W1");
   const [localAgents, setLocalAgents] = useState<OnboardingContextValue["localAgents"]>([]);
@@ -70,20 +115,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const writes = useRef(Promise.resolve());
 
   const fp = facts.pairingInUse;
-  const context = stageContext(facts);
-  const stt = effectiveStage(context, "stt", facts.stageDraft?.stt ?? facts.voicePreferences?.stt);
-  const tts = effectiveStage(context, "tts", facts.stageDraft?.tts ?? facts.voicePreferences?.tts);
-  const stageKey = useCallback((task: "stt" | "tts") => {
-    const stage = task === "stt" ? stt : tts;
-    if (!fp || !stage?.model) return null;
-    const stageLanguage = (stage.options as Record<string, unknown>)?.language;
-    const language = task === "stt" && typeof stageLanguage === "string" && stageLanguage !== "auto"
-      ? stageLanguage : facts.speechLanguage;
-    return stageTrialKey(fp, { stage, language });
-  }, [facts.speechLanguage, fp, stt, tts]);
+  const stageKey = useCallback((task: "stt" | "tts", language?: string) => stageKeyFor(room, record, task, language), [room, record]);
   const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
-  const localReady = !!localMachine && facts.localHostStatus.state === "running";
-  const remoteReady = machines.some((machine) => !machine.local && machine.selectable && !!machine.pairingId);
+  const currentMachine = machines.find((machine) => machine.pairingId === fp && machine.selectable && !machine.revoked);
+  const selectedRouteReady = !!currentMachine && facts.node === fp && facts.nodeReach === "ok";
+  const localReady = !!currentMachine?.local && selectedRouteReady && facts.localHostStatus.state === "running";
+  const remoteReady = !!currentMachine && !currentMachine.local && selectedRouteReady;
   const hostFp = fp;
   const sttKey = stageKey("stt");
   const ttsKey = stageKey("tts");
@@ -111,7 +148,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (!facts.machinesReady) return;
     firstDecision.current = true;
     const hasMachine = machines.some((machine) => machine.selectable && !!machine.pairingId);
-    if (!hasMachine || localReady) {
+    if (!record.deferred_at || !hasMachine || localReady) {
       setStep(setupStep);
       setOpen(true);
     }
@@ -187,6 +224,33 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (await persist({ deferred_at: Math.floor(Date.now() / 1000) })) setOpen(false);
     },
     async complete() {
+      const selected = liveHost(roomStore.getState());
+      if (!selected || !await window.sidevoiceActions?.prepareOnboardingStages?.(selected.fp)) {
+        const latest = roomStore.getState();
+        const latestFp = latest.facts.pairingInUse;
+        const latestMachine = latest.machines.find((machine) => machine.pairingId === latestFp && machine.selectable && !machine.revoked);
+        const routeReady = !!latestMachine && latest.facts.node === latestFp && latest.facts.nodeReach === "ok";
+        const step = resumeOnboarding({ record: recordRef.current, canHostAgents, localReady: !!latestMachine?.local && routeReady && latest.facts.localHostStatus.state === "running",
+          localInstallStarted: false, remoteReady: !!latestMachine && !latestMachine.local && routeReady, hostFp: latestFp,
+          sttStageKey: stageKeyFor(latest, recordRef.current, "stt"), ttsStageKey: stageKeyFor(latest, recordRef.current, "tts") });
+        setStep(step);
+        setOpen(true);
+        setError("onboarding.prerequisites");
+        return false;
+      }
+      const latest = roomStore.getState();
+      const latestFp = latest.facts.pairingInUse;
+      const latestMachine = latest.machines.find((machine) => machine.pairingId === latestFp && machine.selectable && !machine.revoked);
+      const routeReady = !!latestMachine && latest.facts.node === latestFp && latest.facts.nodeReach === "ok";
+      const step = resumeOnboarding({ record: recordRef.current, canHostAgents, localReady: !!latestMachine?.local && routeReady && latest.facts.localHostStatus.state === "running",
+        localInstallStarted: false, remoteReady: !!latestMachine && !latestMachine.local && routeReady, hostFp: latestFp,
+        sttStageKey: stageKeyFor(latest, recordRef.current, "stt"), ttsStageKey: stageKeyFor(latest, recordRef.current, "tts") });
+      if (step !== "W6") {
+        setStep(step);
+        setOpen(true);
+        setError("onboarding.prerequisites");
+        return false;
+      }
       const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null });
       if (saved) setOpen(false);
       return saved;

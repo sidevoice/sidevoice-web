@@ -54,23 +54,23 @@ function RoomContent() {
 
   return (
     <>
-      <RoomHeader />
-      {!setupPending && <LocalHostBanner />}
-      {!setupPending && !noMachine && install.phase !== "idle" && install.source === "no-machine" &&
-        <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
-      {setupPending ? !onboarding.ready || onboarding.open ? <main className="setup-surface" aria-hidden="true" /> : <main className="no-machine-main"><SetupPending /></main>
-        : <>
-          <main>
-            {noMachine ? <NoMachineScreen source="no-machine" /> : <>
-              <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
-              <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
-            </>}
-          </main>
-          {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
-          <ConnectionStatsDialog />
-          <SettingsDialog />
-          <PreparationDialog />
-        </>}
+      <div className="room-controller-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
+        <RoomHeader />
+        <LocalHostBanner />
+        {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
+          <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
+        <main>
+          {noMachine ? <NoMachineScreen source="no-machine" /> : <>
+            <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
+            <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
+          </>}
+        </main>
+        {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
+        <ConnectionStatsDialog />
+        <SettingsDialog />
+        <PreparationDialog />
+      </div>
+      {setupPending ? !onboarding.ready || onboarding.open ? <main className="setup-surface" aria-hidden="true" /> : <main className="no-machine-main"><SetupPending /></main> : null}
       {onboarding.ready && <Wizard />}
       <PairingDialog />
       <audio id="preview-audio" />

@@ -137,6 +137,13 @@ export interface SettingsPreferencesLoad {
   status: "idle" | "loading" | "ready" | "failed";
 }
 
+export interface StagePreparationLoad {
+  /** The selected machine whose stage facts are being loaded. */
+  host: string | null;
+  request: number;
+  status: "idle" | "loading" | "ready" | "failed";
+}
+
 export interface HostDeviceView {
   device_id: string;
   name?: string | null;
@@ -315,6 +322,16 @@ export interface SidevoiceActions {
   previewVoice(language: string, text?: string): Promise<boolean>;
   /** Load this device's chosen voice model ahead of the first reply. */
   prepareVoice(): Promise<void>;
+  /** Load the selected machine's saved stages, integration listing, device offers, and provider catalogues for setup. */
+  prepareOnboardingStages?(fp: string): Promise<boolean>;
+  /** Check the selected draft through the existing stage-selection flow and durably save its effective options. */
+  prepareOnboardingStage?(task: StageTask, fp: string): Promise<boolean>;
+  /** Setup-only draft selection; checking starts only at the explicit Prepare action. */
+  draftStagePlace?(task: StageTask, place: string): void;
+  draftStageModel?(task: StageTask, model: string): void;
+  draftStageBuild?(task: StageTask, value: string): void;
+  /** Cancel only preview playback owned by the stage editor. */
+  stopVoicePreview?(): void;
   /** Ask the machine for its integrations again, after a failed read. */
   retryIntegrations(): Promise<void>;
   /** Retry this Settings opening's machine preference read. */
@@ -322,7 +339,7 @@ export interface SidevoiceActions {
   /** Try this page's GPU again after a model failed to load on it. */
   retryGpu(): Promise<void>;
   /** Talk to this paired machine from now on, on this device. In a call it hangs up and joins that machine's. */
-  chooseMachine(id: string): void;
+  chooseMachine(id: string): Promise<boolean> | void;
   /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */
   forgetMachine(id: string): Promise<void>;
   /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */

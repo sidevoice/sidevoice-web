@@ -7,7 +7,7 @@ export type StageCheck =
   | { phase: 'failed'; stage: Stage; step: CheckStep; reason?: Refusal; result?: CheckResult; recheck?: boolean }
   | { phase: 'done'; stage: Stage; result: CheckResult; recheck?: boolean };
 export interface StageSelection {
-  select(task: 'stt' | 'tts', stage: Stage, options?: { recheck?: boolean }): Promise<void>;
+  select(task: 'stt' | 'tts', stage: Stage, options?: { recheck?: boolean }): Promise<boolean>;
   decide(task: 'stt' | 'tts', yes: boolean): void;
   cancel(task: 'stt' | 'tts'): void;
   dismiss(task: 'stt' | 'tts'): void;

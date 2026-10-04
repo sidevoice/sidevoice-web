@@ -68,9 +68,8 @@ function voiceChoices(ctx, stage, option) {
         const byLanguage = {};
         for (const language of languages) {
             if (!supported?.has(primary(language.id))) continue;
-            const own = voices.filter((v) => (v.languages || []).map(primary).includes(primary(language.id)));
-            const rest = voices.filter((v) => !own.includes(v));
-            byLanguage[language.id] = [...own, ...rest].map((v) => ({ value: v.id, label: v.label || v.id, other: rest.includes(v) }));
+            byLanguage[language.id] = voices.filter((voice) => (voice.languages || []).map(primary).includes(primary(language.id)))
+                .map((voice) => ({ value: voice.id, label: voice.label || voice.id }));
         }
         return byLanguage;
     }
@@ -85,7 +84,6 @@ function validOption(option, value, ctx, stage) {
         case 'voice':
             if (!option.per_language) return typeof value === 'string' && !!value;
             if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-            if (option.from !== 'model.voices') return Object.values(value).every((v) => typeof v === 'string' && v);
             {
                 const choices = voiceChoices(ctx, stage, option);
                 return Object.entries(value).every(([language, voice]) => (choices[language] || []).some((c) => c.value === voice));

@@ -73,6 +73,7 @@ export interface TranscriptionTrialDependencies {
   setTimer(callback: () => void, delay: number): ReturnType<typeof setTimeout>;
   clearTimer(timer: ReturnType<typeof setTimeout>): void;
   workerTimeoutMs: number;
+  providerTimeoutMs: number;
 }
 
 export class TranscriptionTrialError extends Error {
@@ -124,7 +125,7 @@ function keyedError(key: string): TranscriptionTrialError {
 function usefulTranscript(value: unknown): value is string {
   const text = String(value || "").trim();
   const compact = text.replace(/\s/g, "");
-  if (!text || (!/[\p{L}\p{N}]/u.test(text) && compact.length >= 8)) return false;
+  if (!text || !/[\p{L}\p{N}]/u.test(text)) return false;
   if (compact.length >= 24 && new Set(compact).size <= 3) return false;
   const tokens = text.split(/\s+/);
   if (tokens.length >= 10 && new Set(tokens).size / tokens.length < 0.15) return false;
@@ -199,6 +200,7 @@ function defaultDependencies(): TranscriptionTrialDependencies {
     setTimer: (callback, delay) => setTimeout(callback, delay),
     clearTimer: (timer) => clearTimeout(timer),
     workerTimeoutMs: 30_000,
+    providerTimeoutMs: 30_000,
   };
 }
 
@@ -309,35 +311,49 @@ async function runLocal(stage: TranscriptionTrialStage, build: TrialBuild, pcm: 
 }
 
 async function runProvider(stage: TranscriptionTrialStage, pcm: Int16Array, request: TrialProviderRequest,
-  signal: AbortSignal): Promise<string> {
+  signal: AbortSignal, deps: TranscriptionTrialDependencies): Promise<string> {
   const language = typeof stage.options?.language === "string" ? stage.options.language : "auto";
   const context = typeof stage.options?.context === "string" ? stage.options.context.trim() : "";
   if (context.length > 400) throw keyedError("trial.invalid_stage");
   const options: Record<string, string> = { language: language || "auto" };
   if (context) options.context = context;
-  const response = await awaitAbortable(request(TRANSCRIPTION_TRIAL_PATH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    redirect: "error",
-    signal,
-    body: JSON.stringify({ place: "openai", model: stage.model, options,
-      audio: { encoding: "pcm_s16le", sample_rate: TRIAL_SAMPLE_RATE, data_base64: pcmBase64(pcm) } }),
-  }), signal);
-  pcm.fill(0);
-  let body: any = null;
-  try { body = await awaitAbortable(response.json(), signal); }
-  catch (error) {
-    if (signal.aborted || (error as Error)?.name === "AbortError") throw abortError();
-    /* A refusal without JSON keeps its keyed fallback. */
+  if (signal.aborted) throw abortError();
+  const bounded = new AbortController();
+  let timedOut = false;
+  const relayAbort = () => bounded.abort();
+  signal.addEventListener("abort", relayAbort, { once: true });
+  const timer = deps.setTimer(() => { timedOut = true; bounded.abort(); }, deps.providerTimeoutMs);
+  try {
+    const response = await awaitAbortable(request(TRANSCRIPTION_TRIAL_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      redirect: "error",
+      signal: bounded.signal,
+      body: JSON.stringify({ place: "openai", model: stage.model, options,
+        audio: { encoding: "pcm_s16le", sample_rate: TRIAL_SAMPLE_RATE, data_base64: pcmBase64(pcm) } }),
+    }), bounded.signal);
+    let body: any = null;
+    try { body = await awaitAbortable(response.json(), bounded.signal); }
+    catch (error) {
+      if (bounded.signal.aborted || (error as Error)?.name === "AbortError") throw abortError();
+      /* A refusal without JSON keeps its keyed fallback. */
+    }
+    if (!response.ok || !body || typeof body !== "object") {
+      if (response.status === 401) throw keyedError("trial.pairing_refused");
+      if (response.status === 403) throw keyedError("trial.origin_refused");
+      const key = errorKey(body?.detail);
+      throw keyedError(key || "trial.stt_failed");
+    }
+    if (!usefulTranscript(body.text)) throw keyedError("trial.unusable");
+    return String(body.text).trim();
+  } catch (error) {
+    if (timedOut) throw keyedError("trial.stt_failed");
+    throw error;
+  } finally {
+    deps.clearTimer(timer);
+    signal.removeEventListener("abort", relayAbort);
+    pcm.fill(0);
   }
-  if (!response.ok || !body || typeof body !== "object") {
-    if (response.status === 401) throw keyedError("trial.pairing_refused");
-    if (response.status === 403) throw keyedError("trial.origin_refused");
-    const key = errorKey(body?.detail);
-    throw keyedError(key || "trial.stt_failed");
-  }
-  if (!usefulTranscript(body.text)) throw keyedError("trial.unusable");
-  return String(body.text).trim();
 }
 
 /** Start capture synchronously from Speak, then use finish() for the explicit Finish speaking action.
@@ -479,7 +495,7 @@ export function transcriptionTrial(options: TranscriptionTrialOptions,
         try { options.onState?.("transcribing"); } catch { /* State display is best effort. */ }
         const text = stage.place === "device"
           ? await runLocal(stage, build!, pcm, signal, deps)
-          : await runProvider(stage, pcm, providerRequest!, signal);
+          : await runProvider(stage, pcm, providerRequest!, signal, deps);
         if (signal.aborted) throw abortError();
         if (!usefulTranscript(text)) throw keyedError("trial.unusable");
         return { text };

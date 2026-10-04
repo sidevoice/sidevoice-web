@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stageView, voiceFor, withVoicesChosen } from "./stage-settings.js";
+import { stageProblem, stageView, voiceFor, withVoicesChosen } from "./stage-settings.js";
 
 function context(languages?: string[]) {
   const model = { id: "voice-model", label: "Voice model", ...(languages ? { languages } : {}) };
@@ -26,7 +26,8 @@ describe("provider voice language support", () => {
     expect(voice.rows.map((row: any) => row.language)).toEqual(["en", "fr"]);
     const english = voice.rows.find((row: any) => row.language === "en");
     expect(english.choices[1]).toMatchObject({ value: "voice-en" });
-    expect(english.choices.find((choice: any) => choice.value === "voice-es")).toMatchObject({ other: true });
+    expect(english.choices.some((choice: any) => choice.value === "voice-es")).toBe(false);
+    expect(voice.rows.find((row: any) => row.language === "fr").choices.some((choice: any) => choice.value === "voice-es")).toBe(false);
     expect(withVoicesChosen(ctx, stage).options.voice).toEqual({ en: "voice-en", fr: "voice-fr" });
   });
 
@@ -37,5 +38,14 @@ describe("provider voice language support", () => {
     const voice = view.options.find((option: any) => option.id === "voice");
     expect(voice.rows).toEqual([]);
     expect(voiceFor(ctx, stage, "es")).toBe("");
+  });
+
+  it("drops a stored voice whose declared language the selected model does not support", () => {
+    const ctx = context(["en", "fr"]);
+    const stage = { place: "elevenlabs", model: "voice-model", options: { voice: { en: "voice-es" } }, build: null };
+    const view = stageView(ctx, "tts", stage);
+    const voice = view.options.find((option: any) => option.id === "voice");
+    expect(voice.rows.find((row: any) => row.language === "en").value).toBe("");
+    expect(stageProblem(ctx, "tts", stage)).toContain("Elige una voz");
   });
 });

@@ -35,10 +35,10 @@ async function respond(route, value, status = 200) {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(value) });
 }
 
-async function installHarness(page, { languageMode = "pending" } = {}) {
+async function installHarness(page, { languageMode = "pending", completed = true, initialChoice = null, agentsDone = false, remoteOnly = false } = {}) {
   let releaseDeferredLanguage;
   const deferredLanguage = new Promise((resolve) => { releaseDeferredLanguage = resolve; });
-  const fake = { languageMode, scans: 0, hostMode: "normal", connectMode: "success", disconnectMode: "success", authorization: [],
+  const fake = { languageMode, remoteOnly, scans: 0, hostMode: "normal", connectMode: "success", disconnectMode: "success", authorization: [],
     releaseDeferredLanguage: () => releaseDeferredLanguage() };
   await page.route("**/api/**", async (route) => {
     const request = route.request();
@@ -62,9 +62,12 @@ async function installHarness(page, { languageMode = "pending" } = {}) {
     if (pathname === "/api/presentation") return respond(route, { binding: null, call: null, room: { web_build: null } });
     if (pathname === "/api/presentation/participants") return respond(route, { participants: [] });
     if (pathname === "/api/presentation/history") return respond(route, { messages: [] });
-    if (pathname === "/api/presentation/integrations") return respond(route, { providers: [] });
-    if (pathname === "/api/presentation/transcription/models") return respond(route, { models: [] });
+    if (pathname === "/api/presentation/integrations") return respond(route, { providers: fake.remoteOnly
+      ? [{ id: "openai", label: "OpenAI", capabilities: ["transcription"], configured: true }] : [] });
+    if (pathname === "/api/presentation/transcription/models") return respond(route, { models: fake.remoteOnly
+      ? [{ id: "gpt-4o-transcribe", label: "GPT-4o Transcribe" }] : [] });
     if (pathname === "/api/presentation/voice-catalog") return respond(route, { providers: {} });
+    if (pathname === "/api/models/check") return respond(route, { ok: true, step: "done", slow: false, passes: [] });
     if (pathname === "/api/host/agents") {
       fake.authorization.push(request.headers().authorization || "");
       if (fake.hostMode === "revoked") return respond(route, { detail: "pairing revoked" }, 401);
@@ -86,26 +89,99 @@ async function installHarness(page, { languageMode = "pending" } = {}) {
     return route.continue();
   });
 
-  await page.addInitScript((hostPairing) => {
+  await page.addInitScript(({ hostPairing, completedSetup, choice, hasFinishedAgents }) => {
     localStorage.setItem("sidevoice.pairings", JSON.stringify({ in_use: hostPairing.fp, pairings: [hostPairing] }));
     window.__SIDEVOICE_TARGET__ = window.location.origin;
+    const seed = completedSetup
+      ? { version: 1, choice: "remote", agents_done: true, deferred_at: null, completed_at: 1_790_000_000, trials: {} }
+      : { version: 1, choice, agents_done: hasFinishedAgents, deferred_at: null, completed_at: null, trials: {} };
+    let setupRecord = JSON.parse(localStorage.getItem("sidevoice.e2e-setup") || "null") || seed;
     window.__sidevoiceDesktop = {
       host: {
         nativeEngine: {
-          capabilities: async () => ({ runs: "native", os: "macos", arch: "aarch64", has: ["cpu"], memory_mb: 8192 }),
+          capabilities: async () => ({ runs: "native", os: "macos", arch: "aarch64", has: remoteOnly ? [] : ["cpu"], memory_mb: 8192 }),
           installed: async () => [],
         },
-        app: { settings: async () => ({ muteShortcut: "", callControlsAlways: false }), update: async () => ({ ok: true }) },
+        app: {
+          settings: async () => ({ muteShortcut: "", callControlsAlways: false }),
+          update: async () => ({ ok: true }),
+          onboarding: {
+            read: async () => setupRecord,
+            patch: async (update) => {
+              setupRecord = { ...setupRecord, ...update,
+                trials: { ...setupRecord.trials, ...update.trials } };
+              localStorage.setItem("sidevoice.e2e-setup", JSON.stringify(setupRecord));
+              return setupRecord;
+            },
+          },
+        },
         localHost: { state: async () => ({ state: "absent" }), subscribe: () => () => {}, pairing: async () => null },
       },
     };
-  }, pairing);
+  }, { hostPairing: pairing, completedSetup: completed, choice: initialChoice, hasFinishedAgents: agentsDone, remoteOnly });
   return fake;
 }
 
 function languageRequest(page) {
   return page.waitForRequest((request) => new URL(request.url()).pathname === "/api/presentation/languages");
 }
+
+test("first-run setup boots the real controller behind the W1 page", async ({ page }) => {
+  await installHarness(page, { completed: false });
+  await page.goto("/voice/");
+  await expect(page.getByRole("dialog", { name: "Where do your agents run?" })).toBeVisible();
+  expect(await page.evaluate(() => typeof window.sidevoiceActions?.chooseMachine)).toBe("function");
+  expect(await page.evaluate(() => document.querySelector(".room-controller-shell")?.hidden)).toBe(true);
+  await expect(page.locator("#loading-cancel")).toHaveCount(1);
+});
+
+test("deferred first-run setup stays paused across reload and resumes at its saved step", async ({ page }) => {
+  await installHarness(page, { completed: false });
+  await page.goto("/voice/");
+  const wizard = page.getByRole("dialog", { name: "Where do your agents run?" });
+  await expect(wizard).toBeVisible();
+  await wizard.getByRole("button", { name: "Do this later" }).click();
+  await expect(wizard).toBeHidden();
+  await expect(page.getByRole("button", { name: "Continue setup" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Continue setup" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Where do your agents run?" })).toBeHidden();
+  await page.getByRole("button", { name: "Continue setup" }).click();
+  await expect(page.getByRole("dialog", { name: "Where do your agents run?" })).toBeVisible();
+});
+
+test("remote first-run stage saves its chosen provider options and keeps Speak reachable on phones", async ({ page }) => {
+  await installHarness(page, { languageMode: "success", completed: false, initialChoice: "remote", remoteOnly: true });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/voice/");
+  await expect(page.getByRole("heading", { name: "Connect Sidevoice to your agents" })).toBeVisible();
+  await page.getByRole("button", { name: "Not now" }).click();
+
+  const stage = page.locator('.stage-editor[data-task="stt"]');
+  await expect(stage).toBeVisible();
+  await expect(stage.getByRole("button", { name: "OpenAI" })).toBeVisible();
+  await page.locator("#stt-place-openai").click();
+  await expect(page.locator("#stt-model")).toHaveValue("gpt-4o-transcribe");
+  await page.locator("#stt-option-language").selectOption("fr");
+  await page.locator("#stt-option-context").fill("Names for the French voice test");
+
+  const speak = page.getByRole("button", { name: "Speak" });
+  await expect(speak).toBeVisible();
+  await expect(speak).toBeDisabled();
+  await expectInsideViewport(speak, 320, 568);
+  await page.setViewportSize({ width: 375, height: 667 });
+  await expectInsideViewport(speak, 375, 667);
+
+  await stage.getByRole("button", { name: "Prepare stage" }).click();
+  await expect(speak).toBeEnabled();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Set up transcription" })).toBeVisible();
+  await expect(page.locator("#stt-place-openai")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#stt-model")).toHaveValue("gpt-4o-transcribe");
+  await expect(page.locator("#stt-option-language")).toHaveValue("fr");
+  await expect(page.locator("#stt-option-context")).toHaveValue("Names for the French voice test");
+});
 
 async function navigateToMachines(page, width, height) {
   await page.setViewportSize({ width, height });

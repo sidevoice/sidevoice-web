@@ -7,6 +7,7 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {createMicLink,webrtcAllowed} from './webrtc-mic.js';
 import {pinTrialProviderRequest,transcriptionTrial} from './transcription-trial.ts';
+import {stageTrialKey} from './onboarding-state.ts';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {TASKS,DEVICE,effectiveStage,defaultStage,deviceBuild,taskOffers,withPlace,withModel,withOption,withBuild,voiceFor,withVoicesChosen,stageProblem,stageLabel,diagnosticsText} from '../state/stage-settings.js';
 import {normalizeStageScope,adoptStageDefault,adoptStageDefaults,putStageScope} from '../state/stage-scope.js';
@@ -1702,7 +1703,7 @@ async function previewVoice(language,textOverride){
  const job={controller:new AbortController(),language,browser:true};state.previewJob=job;state.previewNote='Preparando muestra…';
  try{
   await window.roomVoice.unlock();if(state.previewJob!==job)return false;
-  if(stage.place!==DEVICE){const audio=await post('/api/presentation/synthesis/preview',{model:stage.model,voice,speed,text:sample});if(state.previewJob!==job)return false;await window.roomVoice.playEncoded(audio,text=>{state.previewNote=text})}
+  if(stage.place!==DEVICE){const audio=await api('/api/presentation/synthesis/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:stage.model,voice,speed,text:sample}),signal:job.controller.signal});if(state.previewJob!==job)return false;await window.roomVoice.playEncoded(audio,text=>{state.previewNote=text})}
   else{await measureDevice();if(state.previewJob!==job)return false;await window.roomVoice.speak({...ttsRequest(stage),voice,speed,text:sample},text=>{state.previewNote=text})}
   if(state.previewJob===job){stopPreview();state.previewNote='Prueba terminada';return true}
   return false;
@@ -1850,6 +1851,14 @@ function buildRequest(build){
 }
 function ttsRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage)||deviceBuild(state.deviceOffers,defaultStage(stageContext(state),'tts')))}
 function editStage(task,next){roomStore.patch({stageDraft:{...(state.stageDraft||{stt:state.voicePreferences?.stt,tts:state.voicePreferences?.tts}),[task]:next}})}
+function draftStagePlace(task,place){
+ if(task==='stt')cancelTranscriptionTrials();
+ const next=withPlace(stageContext(state),task,paneStage(task),place,state.voicePreferences?.[task]);
+ editStage(task,next);
+ if(place!==DEVICE)void loadRemote(place,task);
+}
+function draftStageModel(task,model){if(task==='stt')cancelTranscriptionTrials();editStage(task,withModel(stageContext(state),task,paneStage(task),model))}
+function draftStageBuild(task,value){if(task==='stt')cancelTranscriptionTrials();editStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
 /* A place, a model or a build chosen in a pane is a selection: checked before it takes effect (below). A provider's
  * place waits for that account's lists, so there is a model to check; one that still lacks a model or a voice stays
  * a draft, which "Guardar cambios" refuses until it is complete. Options are not checked: they are the draft it saves. */
@@ -1870,6 +1879,71 @@ function chooseStageBuild(task,value){if(task==='stt')cancelTranscriptionTrials(
  * stage-selection.js is the state machine; what each of its steps does on this page is here. */
 function activeStage(task){return effectiveStage(stageContext(state),task,state.voicePreferences?.[task])}
 function sameChoice(a,b){return !!a&&!!b&&a.place===b.place&&a.model===b.model&&JSON.stringify(a.build||null)===JSON.stringify(b.build||null)}
+function validatedStage(task,raw){
+ const ctx=stageContext(state),stage=withVoicesChosen(ctx,effectiveStage(ctx,task,raw));
+ return {stage,problem:stageProblem(ctx,task,stage)};
+}
+function persistSetupStage(task,raw,fp){
+ if(!fp||pairings.inUse!==fp||!nodeBase||state.node!==fp||state.nodeReach!=='ok')return false;
+ const {stage,problem}=validatedStage(task,raw);
+ if(problem)return false;
+ const previous=state.voicePreferences||devicePreferences(),next={...previous,[task]:stage};
+ if(!storePreferences(next,fp))return false;
+ const saved=storedStages(fp)[task];
+ if(!saved||stageTrialKey(fp,{stage:saved})!==stageTrialKey(fp,{stage}))return false;
+ const stageDraft={...(state.stageDraft||{stt:previous?.stt,tts:previous?.tts}),[task]:saved};
+ roomStore.patch({voicePreferences:{...previous,[task]:saved},stageDraft});
+ return true;
+}
+function setupHostCurrent(fp,scope,request){
+ return request===stagePreparationEpoch&&scope.host===fp&&sameScope(scope)&&!!nodeBase&&state.node===fp&&state.nodeReach==='ok';
+}
+async function prepareOnboardingStages(fp){
+ const request=++stagePreparationEpoch,scope=integrationScope();
+ roomStore.patch({stagePreparation:{host:fp,request,status:'loading'}});
+ const current=()=>setupHostCurrent(fp,scope,request);
+ if(!current()){
+  roomStore.patch({stagePreparation:{host:fp,request,status:'failed'}});
+  return false;
+ }
+ try{
+  const [preferences]=await Promise.all([loadPreferences(),measureDevice()]);
+  if(!current())return false;
+  roomStore.patch({voicePreferences:preferences,stageDraft:null,remoteModels:{}});
+  if(!await loadIntegrations()||!current())throw Error('stage-preparation-failed');
+  const lists=await loadStageLists(true);
+  if(!current())return false;
+  for(const task of TASKS){
+   const stage=paneStage(task);
+   if(!stage||stage.place===DEVICE||keyedProvider(state,stage.place)!=='ready')continue;
+   const entry=state.remoteModels[stage.place+':'+task];
+   if(lists[TASKS.indexOf(task)]===false||entry?.error)throw Error('stage-preparation-failed');
+  }
+  roomStore.patch({stagePreparation:{host:fp,request,status:'ready'}});
+  return true;
+ }catch{
+  if(current())roomStore.patch({stagePreparation:{host:fp,request,status:'failed'}});
+  return false;
+ }
+}
+async function prepareOnboardingStage(task,fp){
+ const scope=integrationScope(),request=state.stagePreparation.request;
+ const current=()=>state.stagePreparation.host===fp&&state.stagePreparation.status==='ready'&&setupHostCurrent(fp,scope,request);
+ if(!current())return false;
+ let raw=state.stageDraft?.[task]||state.voicePreferences?.[task];
+ let candidate=validatedStage(task,raw);
+ if(candidate.stage?.place!==DEVICE&&keyedProvider(state,candidate.stage.place)==='ready'){
+  if(!await loadRemote(candidate.stage.place,task,true)||!current())return false;
+  raw=state.stageDraft?.[task]||state.voicePreferences?.[task];
+  candidate=validatedStage(task,raw);
+ }
+ if(candidate.problem||!candidate.stage?.model)return false;
+ if(candidate.stage.place!==DEVICE&&keyedProvider(state,candidate.stage.place)!=='ready')return false;
+ const recheck=sameChoice(candidate.stage,activeStage(task));
+ const checked=await selection.select(task,candidate.stage,{recheck});
+ if(!checked||!current())return false;
+ return persistSetupStage(task,candidate.stage,fp);
+}
 function selectStage(task,next){
  if(!next)return;
  if(task==='stt')cancelTranscriptionTrials();
@@ -2009,18 +2083,19 @@ async function copyDiagnostics(task){
 function patchRemote(key,entry){roomStore.patch({remoteModels:{...state.remoteModels,[key]:entry}})}
 async function loadRemote(place,task,refresh=false){
  const key=place+':'+task,scope=integrationScope();
- if(!refresh&&state.remoteModels[key]?.models)return;
- if(keyedProvider(state,place)!=='ready')return;
+ if(!refresh&&state.remoteModels[key]?.models)return true;
+ if(keyedProvider(state,place)!=='ready')return false;
  patchRemote(key,{});
  try{
   let entry;
   // A read that failed is not an empty account: it leaves the lists unknown, so nothing chosen is replaced (R05).
   if(task==='stt'){const data=await api('/api/presentation/transcription/models?provider='+encodeURIComponent(place));entry=data.error?{error:data.error}:{models:Array.isArray(data.models)?data.models:[],error:''}}
   else{const data=await api('/api/presentation/voice-catalog'),own=data.providers?.[place]||{};entry=own.error?{error:own.error}:{models:own.models||[],voices:own.voices||[],error:''}}
-  if(sameScope(scope))patchRemote(key,entry);
- }catch(error){if(sameScope(scope))patchRemote(key,{error:error.message||'No se pudo cargar el catálogo.'})}
+  if(sameScope(scope)){patchRemote(key,entry);return !entry.error}
+  return false;
+ }catch(error){if(sameScope(scope))patchRemote(key,{error:error.message||'No se pudo cargar el catálogo.'});return false}
 }
-function loadStageLists(refresh=false){for(const task of TASKS){const stage=paneStage(task);if(stage&&stage.place!==DEVICE)void loadRemote(stage.place,task,refresh)}}
+function loadStageLists(refresh=false){return Promise.all(TASKS.map(task=>{const stage=paneStage(task);return stage&&stage.place!==DEVICE?loadRemote(stage.place,task,refresh):Promise.resolve(true)}))}
 /* Integrations: the machine's key for each provider, one per provider whatever it is used for, written from
  * any paired device — each has the machine's full authority — and never read back. The machine lists them with what can be said about a key —
  * whether there is one, where from, its last four — and that listing is the one fact the panes derive from:
@@ -2038,19 +2113,22 @@ function loadStageLists(refresh=false){for(const task of TASKS){const stage=pane
 const KEY_CHECK_PAUSE=1500;
 let keyChecks={};   // provider -> the plumbing of its check in this scope; what its row says is the store's
 let integrationEpoch=0;
+let stagePreparationEpoch=0;
 function integrationScope(){return {host:pairings.inUse,epoch:integrationEpoch}}
 function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===integrationEpoch}
 /* Another machine, or none: its listing, its keys being typed and every answer still on its way are forgotten,
  * and the stages are that machine's own (a composition per client × host), switched in the same step. */
 function switchStages(){
  resetIntegrations();
+ const stageRequest=++stagePreparationEpoch;
  settingsPreferencesEpoch++;
  const settingsOpen=!!$('language-settings')?.open,safePreferences=settingsOpen?devicePreferences():null;
  if(settingsOpen){settingsFormSeed=fillSettingsForm(safePreferences);window.roomI18n?.setLanguage(settingsFormSeed.ui_language)}
  for(const task of TASKS)selection.cancel(task);
  const {stt:_stt,tts:_tts,...rest}=state.voicePreferences||{};
  roomStore.patch({stageDraft:null,voicePreferences:safePreferences||state.voicePreferences&&{...rest,...storedStages(pairings.inUse)},
-  settingsPreferences:{host:pairings.inUse,request:settingsPreferencesEpoch,status:'idle'}});
+  settingsPreferences:{host:pairings.inUse,request:settingsPreferencesEpoch,status:'idle'},
+  stagePreparation:{host:pairings.inUse,request:stageRequest,status:'idle'}});
 }
 function resetIntegrations(){
  integrationEpoch++;
@@ -2073,10 +2151,10 @@ function forgetKeyChecks(){roomStore.batch(()=>{for(const id of Object.keys(keyC
 async function loadIntegrations(){
  const scope=integrationScope();
  roomStore.patch({integrationsStatus:'loading',integrationsError:''});
- try{const listing=await api('/api/presentation/integrations');if(sameScope(scope))roomStore.patch({integrations:listing,integrationsStatus:'ready'})}
- catch(error){if(sameScope(scope))roomStore.patch({integrationsStatus:'failed',integrationsError:'No se pudieron leer las integraciones de esta máquina: '+error.message})}
+ try{const listing=await api('/api/presentation/integrations');if(sameScope(scope)){roomStore.patch({integrations:listing,integrationsStatus:'ready'});return true}return false}
+ catch(error){if(sameScope(scope))roomStore.patch({integrationsStatus:'failed',integrationsError:'No se pudieron leer las integraciones de esta máquina: '+error.message});return false}
 }
-async function retryIntegrations(){await loadIntegrations();if(state.integrationsStatus==='ready')loadStageLists(true)}
+async function retryIntegrations(){if(await loadIntegrations())await loadStageLists(true)}
 /* One provider's key work, in order: a check, a removal, the next check. */
 function queueKey(id,work){const check=keyCheck(id),run=check.chain.then(work,work);check.chain=run.catch(()=>{});return run}
 function typeIntegrationKey(id,value){
@@ -2197,9 +2275,11 @@ function storedStages(fp){const scope=stageScope(),stages=fp?scope.hosts[fp]:sco
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return {...Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]])),...storedStages(pairings.inUse)}}
 function storePreferences(p,fp=pairings.inUse){try{
  const current=stageScope(),scope=putStageScope(current,fp,{...storedStages(fp),...Object.fromEntries(TASKS.filter(task=>p[task]).map(task=>[task,p[task]]))},TASKS);
- localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))));
- localStorage.setItem(STAGES_KEY,JSON.stringify(scope));
-}catch{}}
+ const settings=JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))),stages=JSON.stringify(scope);
+ localStorage.setItem(SETTINGS_KEY,settings);
+ localStorage.setItem(STAGES_KEY,stages);
+ return localStorage.getItem(SETTINGS_KEY)===settings&&localStorage.getItem(STAGES_KEY)===stages;
+}catch{return false}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
 // The room's stage defaults are not this device's: it cannot know what this device runs, so they are left out.
 async function loadPreferences(){const {stt:_stt,tts:_tts,...defaults}=await api('/api/presentation/languages');return {...defaults,...devicePreferences()}}
@@ -2425,7 +2505,7 @@ async function saveSettings(){
  const previous=state.voicePreferences,ctx=stageContext(state),draft=state.stageDraft||previous||{},p={...previous};
  // The stages as the panes show them: a choice that waits for the machine's listing is saved as it was (F18), a
  // provider's "Automática" voice as the voice it names (R02), and one that cannot run is not saved at all.
- for(const task of TASKS)p[task]=withVoicesChosen(ctx,effectiveStage(ctx,task,draft[task]));
+ for(const task of TASKS)p[task]=validatedStage(task,draft[task]).stage;
  // Before this device has measured itself it cannot say what it runs: the saved stages stay as they were.
  if(state.deviceOffers===null)for(const task of TASKS)if(!p[task])p[task]=previous?.[task];
  const problem=TASKS.map(task=>stageProblem(ctx,task,p[task])).find(Boolean);
@@ -2441,7 +2521,7 @@ async function saveSettings(){
  for(const key of ['ui_language','audio_grace_seconds','presence_sound','locked_call','replay_on_return_seconds',...MIC_KEYS]){const value=field(key);p[key]=['audio_grace_seconds','replay_on_return_seconds'].includes(key)?Number(value):value}
  let hotSwap=false;
  try{
-  storePreferences(p,scope.host);
+  if(!storePreferences(p,scope.host))throw Error(hostTranslator()('wizard.stageSaveFailed'));
   if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,settings:p}}));
   hotSwap=localModelSwap(previous,p);
   roomStore.patch({voicePreferences:p,stageDraft:selecting.length?{stt:p.stt,tts:p.tts,...Object.fromEntries(selecting.map(({task,stage})=>[task,stage]))}:null});
@@ -2490,6 +2570,9 @@ window.sidevoiceActions={
  },
  chooseStagePlace,
  chooseStageModel,
+ draftStagePlace,
+ draftStageModel,
+ draftStageBuild,
  setStageOption,
  chooseStageBuild,
  decideStage:(task,yes)=>selection.decide(task,yes),
@@ -2503,7 +2586,10 @@ window.sidevoiceActions={
  copyDiagnostics,
  cancelDownload:id=>{downloads.cancel(id)},
  previewVoice,
+ stopVoicePreview:stopPreview,
  prepareVoice,
+ prepareOnboardingStages,
+ prepareOnboardingStage,
  retryIntegrations,
  retrySettingsPreferences,
  retryGpu,
@@ -2516,13 +2602,15 @@ window.sidevoiceActions={
  openAgentSettings,
  // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
  // away, inside the person's own tap. The choice is this device's, kept for next time.
- chooseMachine(id){
-  if(!pairings.list.some(p=>p.fp===id)||id===pairings.inUse)return;
+  async chooseMachine(id){
+  if(!pairings.list.some(p=>p.fp===id))return false;
+  if(id===pairings.inUse){if(state.nodeReach!=='ok'||state.node!==id)await locate({move:true,fresh:true});return state.nodeReach==='ok'&&state.node===id}
   const rejoin=!!(state.ws||state.connecting||state.reconnecting);
   if(rejoin)disconnect();
   keepPairings(usingPairing(pairings,id));
   settleBase(null,'',pairingInUse(pairings));
-  if(rejoin)void toggleCall();else void locate({move:true});
+  if(rejoin)await toggleCall();else await locate({move:true});
+  return state.nodeReach==='ok'&&state.node===id;
  },
  forgetMachine,
  pairDevice,

@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { SidevoiceMark } from "../../components/ui/Icons";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
-import { StageEditor } from "../settings/StageEditor";
+import { StageEditor, type StageTrialFooterState } from "../settings/StageEditor";
 import { HostIntegrationsPanel } from "../hosts/HostIntegrationsPanel";
 import { hostTranslator } from "../settings/host-i18n";
 import { useOnboarding } from "./onboarding-context";
@@ -44,10 +44,16 @@ export function Wizard() {
   const [copyStatus, setCopyStatus] = useState("");
   const [integrationProvider, setIntegrationProvider] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [trialFooter, setTrialFooter] = useState<StageTrialFooterState | null>(null);
+  const trialActionRef = useRef<(() => void) | null>(null);
   const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
-  const localReady = !!localMachine && facts.localHostStatus.state === "running";
-  const remoteReady = machines.some((machine) => !machine.local && machine.selectable && !!machine.pairingId);
   const fp = facts.pairingInUse;
+  const selectedMachine = machines.find((machine) => machine.pairingId === fp && machine.selectable && !machine.revoked);
+  const selectedRouteReady = !!selectedMachine && facts.node === fp && facts.nodeReach === "ok";
+  const localReady = !!selectedMachine?.local && selectedRouteReady && facts.localHostStatus.state === "running";
+  const remoteMachines = machines.filter((machine) => !machine.local && machine.selectable && !machine.revoked && !!machine.pairingId);
+  const remoteReady = !!selectedMachine && !selectedMachine.local && selectedRouteReady;
+  const remoteMachine = remoteReady ? selectedMachine : remoteMachines.find((machine) => machine.state === "connected") ?? remoteMachines[0];
 
   useEffect(() => {
     if (onboarding.record.choice) setChoice(onboarding.record.choice);
@@ -78,21 +84,42 @@ export function Wizard() {
 
   useEffect(() => {
     if (!onboarding.open) return;
-    if (onboarding.step === "W2" && localReady) onboarding.goTo("W3");
-    if (onboarding.step === "W2r" && remoteReady) onboarding.goTo("W3");
-  }, [onboarding.open, onboarding.step, localReady, remoteReady]);
+    if (onboarding.step === "W2" && localReady) onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3");
+    if (onboarding.step === "W2r" && remoteReady) onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3");
+  }, [onboarding.open, onboarding.step, onboarding.record.agents_done, localReady, remoteReady]);
 
   useEffect(() => {
     if (!onboarding.open || onboarding.step !== "W3" || !localMachine?.pairingId || facts.pairingInUse === localMachine.pairingId) return;
+    if (onboarding.path !== "agents") return;
     window.sidevoiceActions?.chooseMachine(localMachine.pairingId);
-  }, [onboarding.open, onboarding.step, localMachine?.pairingId, facts.pairingInUse]);
+  }, [onboarding.open, onboarding.step, onboarding.path, localMachine?.pairingId, facts.pairingInUse]);
+
+  useEffect(() => {
+    setTrialFooter(null);
+    trialActionRef.current = null;
+  }, [onboarding.step, fp]);
+
+  useEffect(() => {
+    if (!onboarding.open || (onboarding.step !== "W4" && onboarding.step !== "W4v") || !fp) return;
+    void window.sidevoiceActions?.prepareOnboardingStages?.(fp);
+  }, [onboarding.open, onboarding.step, fp]);
 
   async function choosePath(next: "agents" | "remote") {
     touchedChoice.current = true;
     setChoice(next);
     if (!await onboarding.setPath(next)) return;
-    if (next === "agents") onboarding.goTo(localReady ? "W3" : "W2");
-    else onboarding.goTo(remoteReady ? "W3" : "W2r");
+    if (next === "agents") {
+      if (localMachine?.pairingId && facts.pairingInUse !== localMachine.pairingId) {
+        const usable = await window.sidevoiceActions?.chooseMachine(localMachine.pairingId);
+        onboarding.goTo(usable ? "W3" : "W2");
+      } else onboarding.goTo(localReady ? "W3" : "W2");
+      return;
+    }
+    if (remoteMachine?.pairingId) {
+      const usable = facts.pairingInUse === remoteMachine.pairingId && remoteReady
+        ? true : await window.sidevoiceActions?.chooseMachine(remoteMachine.pairingId);
+      onboarding.goTo(usable ? "W3" : "W2r");
+    } else onboarding.goTo("W2r");
   }
 
   async function finishAgents() {
@@ -177,10 +204,10 @@ export function Wizard() {
             <p className="muted">{t("wizard.noAgentsConnected")}</p>}
         </section>}
 
-        {onboarding.step === "W4" && <StageEditor key={`setup-stt-${fp ?? "none"}`} task="stt" setup
-          onConfigureProvider={setIntegrationProvider} />}
-        {onboarding.step === "W4v" && <StageEditor key={`setup-tts-${fp ?? "none"}`} task="tts" setup
-          onConfigureProvider={setIntegrationProvider} />}
+        {onboarding.open && onboarding.step === "W4" && <StageEditor key={`setup-stt-${fp ?? "none"}`} task="stt" setup
+          onConfigureProvider={setIntegrationProvider} trialActionRef={trialActionRef} onTrialFooterState={setTrialFooter} />}
+        {onboarding.open && onboarding.step === "W4v" && <StageEditor key={`setup-tts-${fp ?? "none"}`} task="tts" setup
+          onConfigureProvider={setIntegrationProvider} trialActionRef={trialActionRef} onTrialFooterState={setTrialFooter} />}
         {integrationProvider && fp && stageTask && <section className="wizard-provider-keys">
           <div className="wizard-provider-keys-heading">
             <h3>{t("settings.integrations")}</h3>
@@ -197,13 +224,19 @@ export function Wizard() {
       <div className="wizard-actions">
         {back && <Button type="button" variant="default" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
         {onboarding.step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
-        {onboarding.step === "W2" && localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
-        {onboarding.step === "W2r" && remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
+        {onboarding.step === "W2" && localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3")}>{t("wizard.continue")}</Button>}
+        {onboarding.step === "W2r" && remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3")}>{t("wizard.continue")}</Button>}
         {onboarding.step === "W3" && <>
           <Button type="button" variant="ghost" onClick={() => void finishAgents()}>{t("wizard.agentsSkip")}</Button>
           <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.agentsDone")}</Button>
         </>}
-        {stageTask && <Button type="button" variant="primary" disabled={!stageValid} onClick={() => onboarding.goTo(stageTask === "stt" ? "W4v" : "W6")}>{t("wizard.continue")}</Button>}
+        {stageTask && <Button type="button" variant="primary"
+          disabled={stageValid ? false : !trialFooter?.ready}
+          onClick={() => stageValid ? onboarding.goTo(stageTask === "stt" ? "W4v" : "W6") : trialActionRef.current?.()}>
+          {stageValid ? t("wizard.continue") : trialFooter?.phase === "playing" || trialFooter?.phase === "transcribing" ? t("wizard.cancelTrial")
+            : trialFooter?.phase === "listening" ? t("wizard.finishSpeaking")
+            : stageTask === "stt" ? t("wizard.speak") : t("wizard.listen")}
+        </Button>}
         {onboarding.step === "W6" && <Button type="button" variant="primary" disabled={completing} onClick={() => void complete()}>
           {completing ? t("localInstall.preparing") : error ? t("wizard.retryCompletion") : t("wizard.enter")}
         </Button>}

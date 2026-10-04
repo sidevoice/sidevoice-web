@@ -38,11 +38,11 @@ export function createStageSelection({ publish, consent, verify, activate, disca
         let result = null;
         try {
             const needed = recheck ? null : await consent(task, stage);
-            if (!live()) return;
+            if (!live()) return false;
             if (needed) {
                 publish(task, { phase: 'consent', stage, size: needed.size || 0 });
-                if (!await decision()) { if (live()) publish(task, null); return; }
-                if (!live()) return;
+                if (!await decision()) { if (live()) publish(task, null); return false; }
+                if (!live()) return false;
             }
             publish(task, { phase: 'running', stage, progress: { step: needed ? 'download' : 'load' }, recheck });
             result = await verify(task, stage, { signal: run.controller.signal,
@@ -51,30 +51,32 @@ export function createStageSelection({ publish, consent, verify, activate, disca
                 discard(task, stage, result);
                 // Cancelled from elsewhere (the desktop app's own cancel): over, and not a failure (N03).
                 if (live()) { delete runs[task]; publish(task, null); }
-                return;
+                return false;
             }
             if (!result.ok) {
                 discard(task, stage, result);
                 publish(task, { phase: 'failed', stage, step: result.step, reason: result.reason, result, recheck });
-                return;
+                return false;
             }
             if (recheck) {
                 discard(task, stage, result);
                 publish(task, { phase: 'done', stage, result, recheck });
-                return;
+                return true;
             }
             if (result.slow) {
                 publish(task, { phase: 'slow', stage, result });
-                if (!await decision() || !live()) { discard(task, stage, result); if (live()) { delete runs[task]; publish(task, null); } return; }
+                if (!await decision() || !live()) { discard(task, stage, result); if (live()) { delete runs[task]; publish(task, null); } return false; }
             }
             // Taking effect is part of the selection: a call that refuses the change leaves everything as it was, and
             // only an activation that went through is done.
             publish(task, { phase: 'running', stage, progress: { step: 'apply' } });
             await activate(task, stage, result, { signal: run.controller.signal, commit: () => { run.committed = true; } });
             if (live()) publish(task, { phase: 'done', stage, result });
+            return live();
         } catch (error) {
             if (result?.ok) discard(task, stage, result);
             if (live()) publish(task, { phase: 'failed', stage, step: 'apply', reason: error?.reason || { key: 'apply_failed', message: String(error?.message || error) }, result, recheck });
+            return false;
         } finally {
             if (runs[task] === run) delete runs[task];
         }

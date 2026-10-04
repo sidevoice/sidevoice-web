@@ -16,14 +16,16 @@ const WHERE_NOTES = {
 
 /** One stage — transcription or voice — as sidevoice/sidevoice-core#21 draws it: where, which model, its options, and under
  *  Avanzado the build it runs on. Everything shown is the store's; every change is an action. */
-export function StageSettings({ task, onConfigureProvider }: { task: StageTask; onConfigureProvider?: (provider: string) => void }) {
+export function StageSettings({ task, onConfigureProvider, deferSelection = false, disabled = false }: {
+  task: StageTask; onConfigureProvider?: (provider: string) => void; deferSelection?: boolean; disabled?: boolean;
+}) {
   const t = hostTranslator();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
   const noMachine = useRoomStore((state) => state.facts.machinesReady && state.facts.nodeReach !== "ok");
   const actions = () => window.sidevoiceActions;
   if (!view) return <p className="muted" role="status">Cargando…</p>;
-  const locked = !view.editable;
+  const locked = !view.editable || disabled;
   return (
     <div className="stage-settings" data-task={task}>
       {noMachine && <aside className="no-machine-stage-note">
@@ -46,7 +48,7 @@ export function StageSettings({ task, onConfigureProvider }: { task: StageTask; 
               disabled={locked && view.place !== place.id}
               onClick={() => place.state === "missing"
                 ? onConfigureProvider ? onConfigureProvider(place.id) : actions()?.openIntegration(place.id)
-                : actions()?.chooseStagePlace(task, place.id)}>
+                : deferSelection ? actions()?.draftStagePlace?.(task, place.id) : actions()?.chooseStagePlace(task, place.id)}>
               {place.label}{place.state === "missing" ? " · Configurar" : ""}
             </Button>
           ))}
@@ -54,7 +56,7 @@ export function StageSettings({ task, onConfigureProvider }: { task: StageTask; 
       </div>
       <ModelPicker label="Modelo" id={`${task}-model`} value={view.model} disabled={locked || view.modelsLoading || !view.models.length}
         description={view.models.find((model) => model.id === view.model)?.description}
-        onChange={(event) => actions()?.chooseStageModel(task, event.target.value)}>
+        onChange={(event) => deferSelection ? actions()?.draftStageModel?.(task, event.target.value) : actions()?.chooseStageModel(task, event.target.value)}>
         {view.modelsLoading && !view.models.length && <option value="">Cargando modelos…</option>}
         {view.models.map((model) => <option key={model.id} value={model.id}>{model.label}{model.detail ? ` · ${model.detail}` : ""}</option>)}
       </ModelPicker>
@@ -72,7 +74,7 @@ export function StageSettings({ task, onConfigureProvider }: { task: StageTask; 
           {view.advanced && (
             <>
               <label className="ui-field">Motor
-                <NativeSelect id={`${task}-build`} value={view.advanced.value} disabled={locked} onChange={(event) => actions()?.chooseStageBuild(task, event.target.value)}>
+                <NativeSelect id={`${task}-build`} value={view.advanced.value} disabled={locked} onChange={(event) => deferSelection ? actions()?.draftStageBuild?.(task, event.target.value) : actions()?.chooseStageBuild(task, event.target.value)}>
                   {view.advanced.choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
                 </NativeSelect>
               </label>

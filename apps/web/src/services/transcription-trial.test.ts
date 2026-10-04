@@ -60,6 +60,7 @@ function createHarness(overrides: Partial<TranscriptionTrialDependencies> = {}) 
     },
     clearTimer: timer => { timers.delete(timer as unknown as number); },
     workerTimeoutMs: 30_000,
+    providerTimeoutMs: 30_000,
     ...overrides,
   };
   return {
@@ -328,6 +329,13 @@ describe("standalone transcription trial", () => {
   });
 
   it("does not accept unusable local text or unavailable places", async() => {
+    const punctuation = createHarness();
+    punctuation.worker.responseText = "...";
+    const punctuationTrial = transcriptionTrial(localOptions(), punctuation.deps);
+    await captureSpeech(punctuationTrial, punctuation);
+    punctuationTrial.finish();
+    await expect(punctuationTrial.result).rejects.toMatchObject({ key: "trial.unusable" });
+
     const repeated = createHarness();
     repeated.worker.responseText = "aaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const trial = transcriptionTrial(localOptions(), repeated.deps);
@@ -374,6 +382,35 @@ describe("standalone transcription trial", () => {
     expect(json).not.toHaveBeenCalled();
     expect(harness.track.stopped).toBe(true);
     expect(harness.audioContextClosed).toBe(true);
+  });
+
+  it("bounds provider inference even when the host never settles", async() => {
+    let timeout: (() => void) | null = null;
+    let requestSignal: AbortSignal | null = null;
+    const harness = createHarness({
+      setTimer: (callback, delay) => {
+        if (delay === 30_000) timeout = callback;
+        return delay as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: () => undefined,
+    });
+    const request = vi.fn((_path: string, init: RequestInit) => {
+      requestSignal = init.signal as AbortSignal;
+      return new Promise<Response>(() => undefined);
+    });
+    const trial = transcriptionTrial({ hostFp: "host-a", stage: { place: "openai", model: "gpt-4o-transcribe" } }, {
+      ...harness.deps,
+      captureProviderRequest: () => request,
+    });
+    await trial.ready;
+    for (let index = 0; index < 13; index++) harness.worklet!.emit(speechFrame());
+    trial.finish();
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(timeout).toBeTypeOf("function");
+    timeout!();
+    await expect(trial.result).rejects.toMatchObject({ key: "trial.stt_failed" });
+    expect(requestSignal?.aborted).toBe(true);
+    expect(harness.track.stopped).toBe(true);
   });
 
   it("cancels while a provider response body is still being read", async() => {
