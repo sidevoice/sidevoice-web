@@ -46,6 +46,18 @@ test("a new browser starts at remote pairing and resumes there after deferral", 
   expect(await screen.findByRole("heading", { name: "Connect to your machine" })).toBeInTheDocument();
 });
 
+test("an unpaired browser stays deferred when it reloads", async () => {
+  localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: null, agents_done: false,
+    deferred_at: 1_700_000_000, completed_at: null, trials: {} }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true }));
+  render(<App store={store} />);
+
+  expect(await screen.findByRole("heading", { name: "Setup is not finished" })).toBeInTheDocument();
+  expect((document.getElementById("wizard") as HTMLDialogElement).open).toBe(false);
+  expect(screen.queryByRole("heading", { name: "Connect to your machine" })).toBeNull();
+});
+
 test("a Desktop host without host.app fails closed instead of writing onboarding to browser storage", async () => {
   localStorage.removeItem("sidevoice.onboarding");
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: {} } });
@@ -102,6 +114,29 @@ function localBridge(agents: () => Promise<unknown> = async () => ({ agents: [] 
   return { state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}),
     pairing: vi.fn(async () => null), agents: vi.fn(agents) };
 }
+
+test("a deferred ready local host stays closed until Continue setup durably adopts the local path", async () => {
+  const initial = { ...emptyOnboardingRecord(), deferred_at: 1_700_000_000 };
+  const { port, getRecord } = nativeOnboardingPort({ initial });
+  const bridge = localBridge();
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { app: { onboarding: port }, localHost: bridge } } });
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "running", reachable: true, installed: true },
+    pairings: [{ fp: "fp-local", device_id: "device-local", urls: ["http://127.0.0.1:45781"], rv: null,
+      host: "This computer", local: true, paired_at: 1_700_000_000, revoked: false }],
+    pairingInUse: "fp-local", node: "fp-local", nodeReach: "ok" }));
+  render(<App store={store} />);
+
+  expect(await screen.findByRole("heading", { name: "Setup is not finished" })).toBeInTheDocument();
+  const dialog = document.getElementById("wizard") as HTMLDialogElement;
+  expect(dialog.open).toBe(false);
+  expect(port.patch).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+  expect(await screen.findByRole("heading", { name: "Connect Sidevoice to your agents" })).toBeInTheDocument();
+  expect(port.patch).toHaveBeenCalledWith({ choice: "agents", deferred_at: null });
+  expect(getRecord()).toMatchObject({ choice: "agents", deferred_at: null, completed_at: null });
+});
 
 test("a ready local host durably adopts the local path before opening W3", async () => {
   localStorage.removeItem("sidevoice.onboarding");

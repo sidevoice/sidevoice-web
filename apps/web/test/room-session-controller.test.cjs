@@ -3210,6 +3210,33 @@ test('Saving an option of the model already in use stores it without a check',as
  assert.equal(s.run('voicePreferences.stt.options.language'),'fr');
 });
 
+test('Closing machine Settings discards its stage draft and permits an unrelated General save after reopening',async()=>{
+ const s=setup({strictDOM:true});
+ await measured(s);
+ s.saved['sidevoice.stages']=JSON.stringify({[PAIRED.fp]:{stt:STT('whisper-tiny'),tts:TTS()}});
+ s.run('window.sidevoiceActions.openSettings()');
+ s.run("window.sidevoiceActions.draftStageOption('stt','language','fr')");
+ assert.equal(s.run('stageDraft.stt.options.language'),'fr','the edited option is visible as a draft');
+
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+ assert.match(s.run("$('settings-error').textContent"),/prepar/i,'a visible changed stage still requires Prepare');
+ assert.equal(!!s.run("$('language-settings').open"),true,'the refused form remains open');
+ assert.equal(JSON.parse(s.saved['sidevoice.stages']).hosts[PAIRED.fp].stt.options.language,'es','the unprepared stage was not stored');
+
+ s.run("$('settings-close').click()");
+ assert.equal(s.run('stageDraft'),null,'closing discards the visible stage draft');
+ assert.equal(s.run("explicitStageDrafts.has('fp-mac:stt')"),false,'closing discards the matching Prepare guard');
+ s.run('window.sidevoiceActions.openSettings()');
+ assert.equal(s.run('stageDraft'),null,'reopening starts from the saved stage');
+ s.run("$('audio-grace-seconds').value='4'");
+ await s.run("$('language-form').onsubmit({preventDefault(){}})");
+
+ assert.equal(s.run("$('settings-error').textContent"),'','the unrelated General save is no longer blocked');
+ assert.equal(!!s.run("$('language-settings').open"),false,'the General save closes Settings');
+ assert.equal(JSON.parse(s.saved['sidevoice.settings']).audio_grace_seconds,4);
+ assert.equal(JSON.parse(s.saved['sidevoice.stages']).hosts[PAIRED.fp].stt.options.language,'es','the discarded edit remains discarded');
+});
+
 /* The app keeps one instance per accelerator, so the page lets go of exactly the one it no longer needs. */
 async function acceleratorSwap(heard){
  const {s,log,worker}=selecting({heard});

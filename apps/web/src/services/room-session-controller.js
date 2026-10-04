@@ -1917,6 +1917,7 @@ async function prepareOnboardingStages(fp){
  try{
   const [preferences]=await Promise.all([loadPreferences(),measureDevice()]);
   if(!current())return false;
+  discardExplicitStageDrafts(fp);
   roomStore.patch({voicePreferences:preferences,stageDraft:null,remoteModels:{}});
   if(!await loadIntegrations()||!current())throw Error('stage-preparation-failed');
   const lists=await loadStageLists(true);
@@ -2125,6 +2126,7 @@ let keyChecks={};   // provider -> the plumbing of its check in this scope; what
 let integrationEpoch=0;
 let stagePreparationEpoch=0;
 const explicitStageDrafts=new Set();
+function discardExplicitStageDrafts(fp){if(fp)for(const task of TASKS)explicitStageDrafts.delete(fp+':'+task)}
 function integrationScope(){return {host:pairings.inUse,epoch:integrationEpoch}}
 function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===integrationEpoch}
 /* Another machine, or none: its listing, its keys being typed and every answer still on its way are forgotten,
@@ -2245,7 +2247,7 @@ async function settleIntegrationKeys(){
  }
 }
 function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
-function cancelSettingsPreferences(){settingsFormSeed=null;roomStore.patch({settingsPreferences:{host:null,request:++settingsPreferencesEpoch,status:'idle'}})}
+function cancelSettingsPreferences(){settingsFormSeed=null;discardExplicitStageDrafts(pairings.inUse);roomStore.patch({stageDraft:null,settingsPreferences:{host:null,request:++settingsPreferencesEpoch,status:'idle'}})}
  $('settings-close').onclick=()=>{stopPreview();cancelSettingsPreferences();cancelTranscriptionTrials();$('language-settings').close()};
 $('language-settings').addEventListener('close',()=>{stopPreview();cancelSettingsPreferences();cancelTranscriptionTrials()});
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
@@ -2335,6 +2337,7 @@ function openSettings(){
  // A new opening is a new settings session: whatever the last one still has on its way is dropped.
  integrationEpoch++;forgetKeyChecks();
  const request=++settingsPreferencesEpoch,host=pairings.inUse,connected=host!=null&&nodeBase!=null,scope={request,host};
+ discardExplicitStageDrafts(host);
  scanPairedAgents(true);
  // Open on this device's known preferences first; the selected machine fills its own defaults in afterward.
  settingsSection(connected?'general':'machines');

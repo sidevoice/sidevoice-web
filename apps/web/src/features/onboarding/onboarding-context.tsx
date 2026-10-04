@@ -176,7 +176,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready || firstDecision.current || record.completed_at || !facts.machinesReady) return;
-    if (record.deferred_at && machines.some((machine) => machine.selectable && !!machine.pairingId) && !localReady) return;
+    if (record.deferred_at) return;
     firstDecision.current = true;
     if (localReady && !record.choice) {
       void adoptLocalPath();
