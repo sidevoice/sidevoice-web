@@ -1968,8 +1968,8 @@ test('A browser that cannot transcribe refuses at once instead of being waited f
 test('A control the person never saw does not decide anything',async()=>{
  // A field that is hidden, or not filled yet, reads back empty. Reading that as a choice turned a saved OpenAI
  // transcription into the browser's, silently (2026-09-20). The stages are the store's, and are saved as shown.
- const s=setup();const stored=[];
- s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ const s=setup();const stored=[],storageData=new Map();
+ s.context.localStorage={getItem:key=>storageData.get(key)??null,setItem:(key,value)=>{storageData.set(key,value);stored.push([key,JSON.parse(value)])},removeItem:key=>storageData.delete(key)};
  s.run("ws=null;roomStore.patch({integrationsStatus:'ready',voicePreferences:{stt:"+JSON.stringify(stage('openai','gpt-4o-transcribe',{language:'es',context:''}))+",tts:"+JSON.stringify(stage('elevenlabs','eleven_flash_v2_5',{voice:{es:'v1'},speed:1}))+",turn_patience:'calm'}})");
  s.run("$('turn-patience').value=''");
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
@@ -1980,8 +1980,8 @@ test('A control the person never saw does not decide anything',async()=>{
  assert.equal(stored.find(([key])=>key==='sidevoice.settings')[1].turn_patience,'calm');
 });
 test('Saving the settings form stores every device setting, the ambient bed among them, and only today\'s shape',async()=>{
- const s=setup();const stored=[];
- s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ const s=setup();const stored=[],storageData=new Map();
+ s.context.localStorage={getItem:key=>storageData.get(key)??null,setItem:(key,value)=>{storageData.set(key,value);stored.push([key,JSON.parse(value)])},removeItem:key=>storageData.delete(key)};
  await measured(s,{webgpu:false,wasm:true});
  s.run("ws=null;roomStore.patch({voicePreferences:{stt_provider:'openai',tts_execution:'browser',spanish_voice:'em_alex'}})");
  for(const [id,value] of [['ui-language','es'],['audio-grace-seconds','2'],['presence-sound','on'],['locked-call','on'],['replay-on-return-seconds','300'],['turn-patience','fast']])
@@ -3170,7 +3170,8 @@ test('Cancelling a change while the room is still answering leaves the call, the
  * is pressed, the choice is still selected — checked — and stored only if the check passes. */
 async function deferredVoices(outcome){
  const s=setup({strictDOM:true});const stored=[];let checks=0;
- s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
+ const storageData=new Map();
+ s.context.localStorage={getItem:key=>storageData.get(key)??null,setItem:(key,value)=>{storageData.set(key,value);stored.push([key,JSON.parse(value)])},removeItem:key=>storageData.delete(key)};
  await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
  s.context.__outcome=outcome;s.context.__checked=()=>checks++;
  s.run("consentFor=async()=>null;verifyStage=async()=>{__checked();return __outcome}");

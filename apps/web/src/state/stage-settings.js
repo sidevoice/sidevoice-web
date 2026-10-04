@@ -85,6 +85,13 @@ function validOption(option, value, ctx, stage) {
             if (!option.per_language) return typeof value === 'string' && !!value;
             if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
             {
+                if (option.from === 'remote.voices') {
+                    const model = remoteOf(ctx, stage.place, 'tts')?.models?.find((entry) => entry.id === stage.model);
+                    // Until Core #52 supplies a model's languages, keep an already-saved provider voice usable.
+                    // The editor still has no choices to offer, and onboarding cannot verify this voice.
+                    if (!Array.isArray(model?.languages))
+                        return Object.entries(value).every(([, voice]) => typeof voice === 'string' && !!voice);
+                }
                 const choices = voiceChoices(ctx, stage, option);
                 return Object.entries(value).every(([language, voice]) => (choices[language] || []).some((c) => c.value === voice));
             }
