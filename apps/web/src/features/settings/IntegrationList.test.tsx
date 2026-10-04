@@ -4,6 +4,7 @@ import { act } from "react";
 import { IntegrationList } from "./IntegrationList";
 import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
+import { OnboardingProvider } from "../onboarding/onboarding-context";
 import { createRoomStore } from "../../state/room-store";
 import type { IntegrationListing } from "../../state/room-types";
 
@@ -16,7 +17,7 @@ const listing: IntegrationListing = { providers: [
 
 function room(ui: React.ReactNode, facts: Record<string, unknown>) {
   const store = createRoomStore();
-  render(<RoomProvider store={store}>{ui}</RoomProvider>);
+  render(<RoomProvider store={store}><OnboardingProvider>{ui}</OnboardingProvider></RoomProvider>);
   act(() => { store.patch(facts); });
   return store;
 }

@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { StageSettings } from "./StageSettings";
+import { OnboardingProvider } from "../onboarding/onboarding-context";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { stageContext } from "../../state/room-session-state.js";
@@ -107,7 +108,7 @@ test("in the app the whole settings dialog, every pane, says nothing of a browse
   const { ConnectionStatsDialog } = await import("../diagnostics/ConnectionStatsDialog");
   const { PreparationDialog } = await import("../call/PreparationDialog");
   const store = createRoomStore();
-  render(<RoomProvider store={store}><SettingsDialog /><ConnectionStatsDialog /><PreparationDialog /></RoomProvider>);
+  render(<RoomProvider store={store}><OnboardingProvider><SettingsDialog /><ConnectionStatsDialog /><PreparationDialog /></OnboardingProvider></RoomProvider>);
   act(() => {
     store.patch({ modelCatalog: catalog as never, voiceLanguages: voices.languages as never, speechLanguage: "es", inApp: true,
       deviceCapabilities: MAC, deviceOffers: offers(catalog as Catalog, MAC, "device") as never, integrations: LISTING, integrationsStatus: "ready" });

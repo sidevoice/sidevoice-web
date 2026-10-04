@@ -14,10 +14,11 @@ beforeEach(() => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "en" }));
 });
 
-test("completed first-run setup renders the room as accessible React components", () => {
+test("completed first-run setup renders the room as accessible React components", async () => {
   localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: true,
     deferred_at: null, completed_at: 1_700_000_000, trials: {} }));
   render(<App />);
+  await waitFor(() => expect(document.body).toHaveAttribute("data-setup", "done"));
   expect(screen.getByRole("heading", { name: "Sidevoice" })).toBeInTheDocument();
   expect(screen.getByRole("log")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Entrar en la sala" })).toBeInTheDocument();
@@ -31,8 +32,8 @@ test("a new browser can defer remote pairing and resume at the same setup step",
   act(() => store.patch({ machinesReady: true }));
   render(<App store={store} />);
 
-  const dialog = await screen.findByRole("dialog") as HTMLDialogElement;
-  expect(screen.getByRole("heading", { name: "Where do your agents run?" })).toBeInTheDocument();
+  const dialog = document.getElementById("wizard") as HTMLDialogElement;
+  expect(await screen.findByRole("heading", { name: "Where do your agents run?" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("radio", { name: "This computer connects to another machine" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("heading", { name: "Connect to your machine" })).toBeInTheDocument();
@@ -84,6 +85,7 @@ test("keeps local setup visible through native projection and selects the projec
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
+  await waitFor(() => expect(document.body).toHaveAttribute("data-setup", "done"));
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   expect(await screen.findByText("Sidevoice is preparing this computer…")).toBeInTheDocument();
@@ -127,6 +129,7 @@ test("remote room controls stay available when remote pairing succeeds during lo
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
+  await waitFor(() => expect(document.body).toHaveAttribute("data-setup", "done"));
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
@@ -159,6 +162,7 @@ test("a failed local host projected during setup returns to the normal room and 
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
+  await waitFor(() => expect(document.body).toHaveAttribute("data-setup", "done"));
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   act(() => store.patch({

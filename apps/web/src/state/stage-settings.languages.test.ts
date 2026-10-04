@@ -24,7 +24,9 @@ describe("provider voice language support", () => {
     const view = stageView(ctx, "tts", stage);
     const voice = view.options.find((option: any) => option.id === "voice");
     expect(voice.rows.map((row: any) => row.language)).toEqual(["en", "fr"]);
-    expect(voice.rows.flatMap((row: any) => row.choices.map((choice: any) => choice.value))).not.toContain("voice-es");
+    const english = voice.rows.find((row: any) => row.language === "en");
+    expect(english.choices[1]).toMatchObject({ value: "voice-en" });
+    expect(english.choices.find((choice: any) => choice.value === "voice-es")).toMatchObject({ other: true });
     expect(withVoicesChosen(ctx, stage).options.voice).toEqual({ en: "voice-en", fr: "voice-fr" });
   });
 
