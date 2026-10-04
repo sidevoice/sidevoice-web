@@ -109,10 +109,9 @@ export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   const { record } = facts;
   if (!record.choice) return "W1";
   const path = !facts.canHostAgents ? "remote" : record.choice;
-  if (path === "agents") {
-    if (!facts.localReady) return "W2";
-    if (!record.agents_done) return "W3";
-  } else if (!facts.remoteReady) return "W2r";
+  if (path === "agents" && !facts.localReady) return "W2";
+  if (path === "remote" && !facts.remoteReady) return "W2r";
+  if (!record.agents_done) return "W3";
   if (!hasMatchingTrial(record, facts.hostFp, "stt", facts.sttStageKey)) return "W4";
   if (!hasMatchingTrial(record, facts.hostFp, "tts", facts.ttsStageKey)) return "W4v";
   return "W6";

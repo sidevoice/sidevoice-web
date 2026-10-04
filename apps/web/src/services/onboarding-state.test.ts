@@ -30,6 +30,9 @@ describe("onboarding record and resume", () => {
       remoteReady: false, hostFp: "host-a", sttStageKey: "stt-1", ttsStageKey: "tts-1",
     };
     expect(resumeOnboarding(facts)).toBe("W1");
+    facts.localReady = true;
+    expect(resumeOnboarding(facts)).toBe("W1");
+    facts.localReady = false;
     facts.record = mergeOnboardingRecord(facts.record, { choice: "agents" });
     expect(resumeOnboarding(facts)).toBe("W2");
     facts.localReady = true;
@@ -48,9 +51,12 @@ describe("onboarding record and resume", () => {
     const facts: ResumeFacts = { record: emptyOnboardingRecord(), canHostAgents: false, localReady: false, localInstallStarted: false, remoteReady: false,
       hostFp: null, sttStageKey: null, ttsStageKey: null };
     expect(resumeOnboarding(facts)).toBe("W1");
-    facts.record = normalizeOnboardingRecord({ choice: "agents", agents_done: true, test_passed: true });
+    facts.record = normalizeOnboardingRecord({ choice: "remote", agents_done: false, test_passed: true });
     expect(resumeOnboarding(facts)).toBe("W2r");
     facts.remoteReady = true;
+    expect(resumeOnboarding(facts)).toBe("W3");
+    facts.record = mergeOnboardingRecord(facts.record, { agents_done: true });
+    expect(resumeOnboarding(facts)).toBe("W4");
     facts.hostFp = "remote-a";
     facts.sttStageKey = "stt-a";
     facts.ttsStageKey = "tts-a";

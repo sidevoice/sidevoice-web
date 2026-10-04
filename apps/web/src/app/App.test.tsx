@@ -62,6 +62,25 @@ test("packaged setup stays at W1 when the native durable onboarding bridge is mi
   expect(JSON.parse(localStorage.getItem("sidevoice.onboarding") || "null")).toBeNull();
 });
 
+test("remote pairing goes through real agents before transcription setup", async () => {
+  localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: false,
+    deferred_at: null, completed_at: null, trials: {} }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true }));
+  render(<App store={store} />);
+
+  expect(await screen.findByRole("heading", { name: "Connect to your machine" })).toBeInTheDocument();
+  act(() => store.patch({
+    pairings: [{ fp: "fp-remote", device_id: "device-remote", urls: ["https://remote.example"], rv: null,
+      host: "Remote computer", paired_at: 1_700_000_000, revoked: false }],
+    pairingInUse: "fp-remote",
+  }));
+  expect(await screen.findByRole("heading", { name: "Connect Sidevoice to your agents" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(await screen.findByRole("heading", { name: "Set up transcription" })).toBeInTheDocument();
+});
+
 test("keeps local setup visible through native projection and selects the projected host after success", async () => {
   localHostInstallController.clear();
   let rejectFirst!: (error: unknown) => void;

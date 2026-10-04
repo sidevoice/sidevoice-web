@@ -18,12 +18,12 @@ const groups: { key: string; steps: OnboardingStep[] }[] = [
   { key: "wizard.group.ready", steps: ["W6"] },
 ];
 
-function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean): OnboardingStep | null {
-  if (step === "W3") return canHostAgents ? "W1" : null;
-  if (step === "W4") return path === "agents" ? "W3" : canHostAgents ? "W2r" : null;
+function previous(step: OnboardingStep): OnboardingStep | null {
+  if (step === "W3") return "W1";
+  if (step === "W4") return "W3";
   if (step === "W4v") return "W4";
   if (step === "W6") return "W4v";
-  if (step === "W2" || step === "W2r") return canHostAgents ? "W1" : null;
+  if (step === "W2" || step === "W2r") return "W1";
   return null;
 }
 
@@ -79,7 +79,7 @@ export function Wizard() {
   useEffect(() => {
     if (!onboarding.open) return;
     if (onboarding.step === "W2" && localReady) onboarding.goTo("W3");
-    if (onboarding.step === "W2r" && remoteReady) onboarding.goTo("W4");
+    if (onboarding.step === "W2r" && remoteReady) onboarding.goTo("W3");
   }, [onboarding.open, onboarding.step, localReady, remoteReady]);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export function Wizard() {
     setChoice(next);
     if (!await onboarding.setPath(next)) return;
     if (next === "agents") onboarding.goTo(localReady ? "W3" : "W2");
-    else onboarding.goTo(remoteReady ? "W4" : "W2r");
+    else onboarding.goTo(remoteReady ? "W3" : "W2r");
   }
 
   async function finishAgents() {
@@ -113,11 +113,10 @@ export function Wizard() {
     } catch { setCopyStatus(t("noMachine.commandCopyFailed")); }
   }
 
-  const path = onboarding.path ?? choice;
   const stageTask = onboarding.step === "W4" ? "stt" : onboarding.step === "W4v" ? "tts" : null;
   const stageValid = stageTask ? onboarding.trialled(stageTask) : false;
   const currentGroup = groups.findIndex((group) => group.steps.includes(onboarding.step));
-  const back = previous(onboarding.step, path, onboarding.canHostAgents);
+  const back = previous(onboarding.step);
   const error = onboarding.error ? t(messageKey(onboarding.error)) : "";
   const label = (step: OnboardingStep) => t(`wizard.title.${({ W1: "where", W2: "install", W2r: "pair", W3: "agents", W4: "stt", W4v: "tts", W6: "ready" } as const)[step]}` as Parameters<ReturnType<typeof hostTranslator>>[0]);
 
@@ -199,7 +198,7 @@ export function Wizard() {
         {back && <Button type="button" variant="default" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
         {onboarding.step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
         {onboarding.step === "W2" && localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
-        {onboarding.step === "W2r" && remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
+        {onboarding.step === "W2r" && remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
         {onboarding.step === "W3" && <>
           <Button type="button" variant="ghost" onClick={() => void finishAgents()}>{t("wizard.agentsSkip")}</Button>
           <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.agentsDone")}</Button>
