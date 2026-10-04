@@ -158,6 +158,13 @@ test("remote first-run stage saves its chosen provider options and keeps Speak r
   const wizard = page.getByRole("dialog", { name: "Connect Sidevoice to your agents" });
   await expect(wizard).toBeVisible();
   await wizard.locator(".wizard-actions").getByRole("button", { name: "Not now" }).click();
+  const setupFacts = await page.evaluate(() => {
+    const facts = window.sidevoiceUI.store.getState().facts;
+    return { node: facts.node, nodeReach: facts.nodeReach, pairingInUse: facts.pairingInUse,
+      stagePreparation: facts.stagePreparation, deviceCapabilities: facts.deviceCapabilities,
+      deviceOffers: facts.deviceOffers?.length, integrationsStatus: facts.integrationsStatus };
+  });
+  console.log("Remote setup facts", JSON.stringify(setupFacts));
 
   const stage = page.locator('.stage-editor[data-task="stt"]');
   await expect(stage).toBeVisible();
