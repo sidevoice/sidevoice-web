@@ -446,7 +446,7 @@ test('A verified ElevenLabs key lights up its place in Voz and brings its models
  s.context.fetch=async(path,options)=>{
   calls.push([options?.method||'GET',path]);
   if(path.includes('/integrations/elevenlabs'))return {ok:true,json:async()=>LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'}))};
-  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({providers:{elevenlabs:{models:[{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5'},{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'v1',label:'Nube',languages:['es']}]}}})};
+  if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({providers:{elevenlabs:{models:[{id:'eleven_flash_v2_5',label:'Eleven Flash v2.5',languages:['es']},{id:'eleven_v3',label:'Eleven v3',languages:['es']}],voices:[{id:'v1',label:'Nube',languages:['es']}]}}})};
   throw Error('unexpected request: '+path);
  };
  await measured(s);listed(s,LISTING(ELEVEN()));
@@ -473,7 +473,7 @@ test('A provider\'s "Automática" voice is the voice the preview speaks, and it 
  s.context.fetch=async()=>({ok:true,json:async()=>({audio_base64:'SUQz'})});
  s.context.window.roomVoice={unlock:async()=>{},cancel(){},playEncoded:async()=>{}};
  await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
- s.run("$('preview-audio').pause=()=>{};ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'voice-1',label:'Nube',languages:['en']}]})");
+ s.run("$('preview-audio').pause=()=>{};ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3',languages:['en']}],voices:[{id:'voice-1',label:'Nube',languages:['en']}]})");
  passing(s);
  s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");await settle();
  const row=stageView(s,'tts').options[0].rows.find(r=>r.language==='en');
@@ -489,7 +489,7 @@ test('A provider\'s voice stage with no voice to choose from is not saved (R02)'
  const s=setup({strictDOM:true});const stored=[];
  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
  await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
- s.run("ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[]})");
+ s.run("ws=null;roomStore.patch({voicePreferences:{}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3',languages:['es']}],voices:[]})");
  s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
  assert.equal(s.run("$('settings-error').textContent"),'Elige una voz de ElevenLabs.');
@@ -3174,11 +3174,11 @@ async function deferredVoices(outcome){
  await measured(s);listed(s,LISTING(ELEVEN({configured:true,source:'stored',hint:'…11ab'})));
  s.context.__outcome=outcome;s.context.__checked=()=>checks++;
  s.run("consentFor=async()=>null;verifyStage=async()=>{__checked();return __outcome}");
- s.run("ws=null;roomStore.patch({voicePreferences:{tts:"+JSON.stringify(TTS())+"}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[]})");
+ s.run("ws=null;roomStore.patch({voicePreferences:{tts:"+JSON.stringify(TTS())+"}});patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3',languages:['es']}],voices:[]})");
  await s.run("window.sidevoiceActions.chooseStagePlace('tts','elevenlabs')");await settle();
  assert.equal(checks,0,'no voice yet: only a draft');
  assert.equal(s.run('stageDraft.tts.place'),'elevenlabs');
- s.run("patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3'}],voices:[{id:'v1',label:'Nube',languages:['es']}]})");
+ s.run("patchRemote('elevenlabs:tts',{models:[{id:'eleven_v3',label:'Eleven v3',languages:['es']}],voices:[{id:'v1',label:'Nube',languages:['es']}]})");
  await s.run("$('language-form').onsubmit({preventDefault(){}})");await settle();
  return {s,stored,checks:()=>checks};
 }
