@@ -386,7 +386,7 @@ describe("standalone transcription trial", () => {
 
   it("bounds provider inference even when the host never settles", async() => {
     let timeout: (() => void) | null = null;
-    let requestSignal: AbortSignal | null = null;
+    const requestSignal: { value: AbortSignal | null } = { value: null };
     const harness = createHarness({
       setTimer: (callback, delay) => {
         if (delay === 30_000) timeout = callback;
@@ -395,7 +395,7 @@ describe("standalone transcription trial", () => {
       clearTimer: () => undefined,
     });
     const request = vi.fn((_path: string, init: RequestInit) => {
-      requestSignal = init.signal as AbortSignal;
+      requestSignal.value = init.signal as AbortSignal;
       return new Promise<Response>(() => undefined);
     });
     const trial = transcriptionTrial({ hostFp: "host-a", stage: { place: "openai", model: "gpt-4o-transcribe" } }, {
@@ -409,7 +409,7 @@ describe("standalone transcription trial", () => {
     expect(timeout).toBeTypeOf("function");
     timeout!();
     await expect(trial.result).rejects.toMatchObject({ key: "trial.stt_failed" });
-    expect(requestSignal?.aborted).toBe(true);
+    expect(requestSignal.value?.aborted).toBe(true);
     expect(harness.track.stopped).toBe(true);
   });
 
