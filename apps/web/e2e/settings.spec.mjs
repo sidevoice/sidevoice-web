@@ -157,7 +157,7 @@ test("remote first-run stage saves its chosen provider options and keeps Speak r
   await page.goto("/voice/");
   const wizard = page.getByRole("dialog", { name: "Connect Sidevoice to your agents" });
   await expect(wizard).toBeVisible();
-  await wizard.getByRole("button", { name: "Not now" }).click();
+  await wizard.locator(".wizard-actions").getByRole("button", { name: "Not now" }).click();
 
   const stage = page.locator('.stage-editor[data-task="stt"]');
   await expect(stage).toBeVisible();
