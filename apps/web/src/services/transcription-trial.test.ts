@@ -212,6 +212,14 @@ describe("standalone transcription trial", () => {
       .toThrowError(TranscriptionTrialError);
   });
 
+  it("keeps a verified same-origin route with an empty base", async() => {
+    const fetcher = vi.fn(async() => ({ ok: true, status: 200, json: async() => ({ text: "ok" }) } as Response));
+    const request = pinTrialProviderRequest({ requestedFp: "host-a", selectedFp: "host-a", pairingFp: "host-a",
+      base: "", token: "token-a", verified: true, isCurrent: () => true, fetcher });
+    await request(TRANSCRIPTION_TRIAL_PATH, { method: "POST" });
+    expect(fetcher).toHaveBeenCalledWith(TRANSCRIPTION_TRIAL_PATH, expect.objectContaining({ redirect: "error" }));
+  });
+
   it("keeps Finish speaking distinct from Cancel and does not submit a short sample", async() => {
     const harness = createHarness();
     const provider = vi.fn(async() => ({ ok: true, status: 200, json: async() => ({ text: "should not be sent" }) } as Response));

@@ -89,7 +89,7 @@ export class TranscriptionTrialError extends Error {
 /** Capture one already verified pairing route. This never consults a changing global node base. */
 export function pinTrialProviderRequest(snapshot: PinnedTrialRouteSnapshot): TrialProviderRequest {
   if (!snapshot.requestedFp || snapshot.selectedFp !== snapshot.requestedFp || snapshot.pairingFp !== snapshot.requestedFp ||
-      !snapshot.base || !snapshot.token || !snapshot.verified || snapshot.revoked) {
+      snapshot.base == null || !snapshot.token || !snapshot.verified || snapshot.revoked) {
     throw keyedError("trial.host_unavailable");
   }
   const { base, token } = snapshot;

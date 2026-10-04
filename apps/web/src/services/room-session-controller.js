@@ -719,7 +719,7 @@ async function hostApi(fp,path,options={}){
  * first instead of inheriting `nodeBase` from whichever machine happened to be in use. */
 function captureTranscriptionTrialRoute(fp){
  const pairing=pairingInUse(pairings),base=nodeBase;
- if(!fp||!pairing||pairing.fp!==fp||pairing.revoked||!base||state.node!==fp||state.nodeReach!=='ok')
+ if(!fp||!pairing||pairing.fp!==fp||pairing.revoked||base==null||state.node!==fp||state.nodeReach!=='ok')
   throw Object.assign(Error('trial.host_unavailable'),{key:'trial.host_unavailable'});
  const fresh=!!pairing.local||Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
  const token=pairing.token;
@@ -1884,7 +1884,7 @@ function validatedStage(task,raw){
  return {stage,problem:stageProblem(ctx,task,stage)};
 }
 function persistSetupStage(task,raw,fp){
- if(!fp||pairings.inUse!==fp||!nodeBase||state.node!==fp||state.nodeReach!=='ok')return false;
+ if(!fp||pairings.inUse!==fp||nodeBase==null||state.node!==fp||state.nodeReach!=='ok')return false;
  const {stage,problem}=validatedStage(task,raw);
  if(problem)return false;
  const previous=state.voicePreferences||devicePreferences(),next={...previous,[task]:stage};
@@ -1896,7 +1896,7 @@ function persistSetupStage(task,raw,fp){
  return true;
 }
 function setupHostCurrent(fp,scope,request){
- return request===stagePreparationEpoch&&scope.host===fp&&sameScope(scope)&&!!nodeBase&&state.node===fp&&state.nodeReach==='ok';
+ return request===stagePreparationEpoch&&scope.host===fp&&sameScope(scope)&&nodeBase!=null&&state.node===fp&&state.nodeReach==='ok';
 }
 async function prepareOnboardingStages(fp){
  const request=++stagePreparationEpoch,scope=integrationScope();
