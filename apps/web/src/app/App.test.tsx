@@ -1,4 +1,4 @@
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App } from "./App";
 import { createRoomStore } from "../state/room-store";
@@ -7,12 +7,58 @@ import type { LocalHostStatus } from "../services/desktop-host";
 
 vi.mock("../services/room-session-controller.js", () => ({}));
 
-test("renders the room as accessible React components", () => {
+beforeEach(() => {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: undefined });
+  localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: true,
+    deferred_at: null, completed_at: 1_700_000_000, trials: {} }));
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "en" }));
+});
+
+test("completed first-run setup renders the room as accessible React components", () => {
+  localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: true,
+    deferred_at: null, completed_at: 1_700_000_000, trials: {} }));
   render(<App />);
   expect(screen.getByRole("heading", { name: "Sidevoice" })).toBeInTheDocument();
   expect(screen.getByRole("log")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Entrar en la sala" })).toBeInTheDocument();
   expect(document.getElementById("language-settings")).toBeInTheDocument();
+});
+
+test("a new browser can defer remote pairing and resume at the same setup step", async () => {
+  localStorage.removeItem("sidevoice.onboarding");
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "en" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true }));
+  render(<App store={store} />);
+
+  const dialog = await screen.findByRole("dialog");
+  expect(screen.getByRole("heading", { name: "Where do your agents run?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: "This computer connects to another machine" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(await screen.findByRole("heading", { name: "Connect to your machine" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Do this later" }));
+  await waitFor(() => expect(dialog.open).toBe(false));
+  expect(screen.getByRole("heading", { name: "Setup is not finished" })).toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("sidevoice.onboarding") || "null")).toMatchObject({ choice: "remote", deferred_at: expect.any(Number), completed_at: null });
+
+  fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+  expect(await screen.findByRole("heading", { name: "Connect to your machine" })).toBeInTheDocument();
+});
+
+test("packaged setup stays at W1 when the native durable onboarding bridge is missing", async () => {
+  localStorage.removeItem("sidevoice.onboarding");
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { app: {} } } });
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true }));
+  render(<App store={store} />);
+
+  expect(await screen.findByRole("heading", { name: "Where do your agents run?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: "This computer connects to another machine" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("This app needs its native setup storage");
+  expect(screen.getByRole("heading", { name: "Where do your agents run?" })).toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("sidevoice.onboarding") || "null")).toBeNull();
 });
 
 test("keeps local setup visible through native projection and selects the projected host after success", async () => {

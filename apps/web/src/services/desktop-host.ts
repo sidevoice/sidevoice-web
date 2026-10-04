@@ -1,4 +1,5 @@
 import type { Pairing } from "./device-pairing.js";
+import type { OnboardingPort } from "./onboarding-state";
 
 export type LocalHostStatusName = "absent" | "installing" | "not-installed" | "stopped-by-person" | "starting" |
   "backoff" | "running" | "failed" | "service-failed" | "refused" | "incompatible";
@@ -116,6 +117,8 @@ export interface DesktopAppBridge {
   update?(patch: Partial<AppSettings>): Promise<AppUpdateResult>;
   diagnostics?(): Promise<AppDiagnostics>;
   headsetTest?(): Promise<void>;
+  /** R5 native durability seam. Desktop must implement atomic patch + read-back in its app config directory. */
+  onboarding?: OnboardingPort;
 }
 
 export function desktopAppBridge(): DesktopAppBridge | null {

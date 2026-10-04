@@ -43,18 +43,32 @@ export function optionSchema(catalog, stage, task) {
 
 /** Voices a per-language voice option can take, by speech language. */
 function voiceChoices(ctx, stage, option) {
-    if (option.from === 'model.voices') {
+    const languages = (ctx.languages || []);
+    let supported = null;
+    if (option.from === 'model.voices' && stage.place === DEVICE) {
         const model = familyOf(ctx.catalog, stage.model)?.model;
+        supported = new Set((model?.voices || []).map((voice) => primary(voice.language)).filter(Boolean));
+    } else if (stage.place !== DEVICE) {
+        const model = remoteOf(ctx, stage.place, 'tts')?.models?.find((entry) => entry.id === stage.model);
+        // An absent list is unknown support, not support for every language. Core #52 supplies this per model.
+        if (!Array.isArray(model?.languages)) return {};
+        supported = new Set(model.languages.map(primary).filter(Boolean));
+    }
+    if (option.from === 'model.voices') {
         const labels = new Map((ctx.languages || []).flatMap((l) => l.voices || []));
         const byLanguage = {};
-        for (const voice of model?.voices || []) (byLanguage[primary(voice.language)] ||= []).push({ value: voice.id, label: labels.get(voice.id) || voice.id });
+        for (const voice of familyOf(ctx.catalog, stage.model)?.model?.voices || []) {
+            const language = primary(voice.language);
+            if (supported?.has(language)) (byLanguage[language] ||= []).push({ value: voice.id, label: labels.get(voice.id) || voice.id });
+        }
         return byLanguage;
     }
     if (option.from === 'remote.voices') {
         const voices = remoteOf(ctx, stage.place, 'tts')?.voices || [];
         const byLanguage = {};
-        for (const language of ctx.languages || []) {
-            const own = voices.filter((v) => (v.languages || []).map(primary).includes(language.id));
+        for (const language of languages) {
+            if (!supported?.has(primary(language.id))) continue;
+            const own = voices.filter((v) => (v.languages || []).map(primary).includes(primary(language.id)));
             const rest = voices.filter((v) => !own.includes(v));
             byLanguage[language.id] = [...own, ...rest].map((v) => ({ value: v.id, label: v.label || v.id, other: rest.includes(v) }));
         }
@@ -207,7 +221,7 @@ function optionView(ctx, stage, task, option, value) {
     if (option.kind === 'voice') {
         const choices = voiceChoices(ctx, stage, option);
         const loading = option.from === 'remote.voices' && !remoteOf(ctx, stage.place, task)?.voices;
-        const languages = (ctx.languages || []).filter((l) => (choices[l.id] || []).length || loading);
+        const languages = (ctx.languages || []).filter((l) => Object.prototype.hasOwnProperty.call(choices, l.id) && ((choices[l.id] || []).length || loading));
         if (!option.per_language) return { ...base, value, perLanguage: false, choices: Object.values(choices)[0] || [] };
         return { ...base, perLanguage: true, loading, rows: languages.map((l) => ({
             language: l.id, label: l.label, value: value?.[l.id] || '',

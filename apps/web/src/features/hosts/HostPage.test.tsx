@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -23,15 +23,37 @@ function renderHost(props: Partial<ComponentProps<typeof HostPage>> = {}) {
   return { checkMachine, store };
 }
 
-test("a host page reuses the machine's real settings tabs and remote device instructions", () => {
-  renderHost();
+test("each host page reads and edits its own provider keys and paired devices", async () => {
+  const listing = { providers: [{ id: "openai", label: "OpenAI", capabilities: ["transcription" as const], configured: false }] };
+  const actions = {
+    checkMachine: vi.fn(),
+    loadHostIntegrations: vi.fn().mockResolvedValue(listing),
+    setHostIntegrationKey: vi.fn().mockResolvedValue({ providers: [{ ...listing.providers[0], configured: true, hint: "••9f2a" }] }),
+    clearHostIntegrationKey: vi.fn().mockResolvedValue(listing),
+    loadHostDevices: vi.fn().mockResolvedValue([{ device_id: "device-2", name: "Laptop", kind: "code" }]),
+    revokeHostDevice: vi.fn().mockResolvedValue(undefined),
+  };
+  const store = createRoomStore();
+  window.sidevoiceActions = actions as unknown as typeof window.sidevoiceActions;
+  render(<RoomProvider store={store}><HostPage machine={{ ...machine, inUse: false }} onBack={() => {}}
+    statusPanel={null} devicesPanel={null} /></RoomProvider>);
   expect(screen.getByRole("tab", { name: "Integrations" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Voice" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Transcription" })).toBeInTheDocument();
   expect(screen.queryByRole("tab", { name: "Agents" })).toBeNull();
 
+  fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));
+  const key = await screen.findByLabelText("API key for OpenAI");
+  fireEvent.change(key, { target: { value: "test-key" } });
+  fireEvent.blur(key);
+  await waitFor(() => expect(actions.setHostIntegrationKey).toHaveBeenCalledWith("fp-nuc", "openai", "test-key"));
+
   fireEvent.click(screen.getByRole("tab", { name: "Devices" }));
-  expect(screen.getByText("sidevoice pair-device")).toBeInTheDocument();
+  expect(await screen.findByText("Laptop")).toBeInTheDocument();
+  expect(actions.loadHostDevices).toHaveBeenCalledWith("fp-nuc");
+  fireEvent.click(screen.getByRole("button", { name: "Revoke Laptop" }));
+  fireEvent.click(screen.getByRole("button", { name: "Revoke device" }));
+  await waitFor(() => expect(actions.revokeHostDevice).toHaveBeenCalledWith("fp-nuc", "device-2"));
 });
 
 test("every paired host can open Agents before a listing capability or successful response exists", () => {

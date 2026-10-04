@@ -16,13 +16,22 @@ import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
 import { useRoomStore } from "../state/room-store";
+import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
+import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 
 function RoomContent() {
+  const onboarding = useOnboarding();
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
   const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
   const pendingLocalSelection = useRef(false);
   const noMachine = ready && machines.length === 0;
+  const setupPending = !onboarding.ready || !onboarding.record.completed_at;
+
+  useEffect(() => {
+    document.body.dataset.setup = onboarding.ready ? setupPending ? "pending" : "done" : "loading";
+    return () => { delete document.body.dataset.setup; };
+  }, [onboarding.ready, setupPending]);
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -46,20 +55,24 @@ function RoomContent() {
   return (
     <>
       <RoomHeader />
-      <LocalHostBanner />
-      {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
+      {!setupPending && <LocalHostBanner />}
+      {!setupPending && !noMachine && install.phase !== "idle" && install.source === "no-machine" &&
         <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
-      <main>
-        {noMachine ? <NoMachineScreen source="no-machine" /> : <>
-          <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
-          <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
+      {setupPending ? !onboarding.ready || onboarding.open ? <main className="setup-surface" aria-hidden="true" /> : <main className="no-machine-main"><SetupPending /></main>
+        : <>
+          <main>
+            {noMachine ? <NoMachineScreen source="no-machine" /> : <>
+              <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
+              <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
+            </>}
+          </main>
+          {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
+          <ConnectionStatsDialog />
+          <SettingsDialog />
+          <PreparationDialog />
         </>}
-      </main>
-      {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
-      <ConnectionStatsDialog />
-      <SettingsDialog />
+      {onboarding.ready && <Wizard />}
       <PairingDialog />
-      <PreparationDialog />
       <audio id="preview-audio" />
     </>
   );
@@ -68,9 +81,11 @@ function RoomContent() {
 export function App({ store }: { store?: RoomStore } = {}) {
   return (
     <RoomProvider store={store}>
-      <TooltipProvider>
-        <RoomContent />
-      </TooltipProvider>
+      <OnboardingProvider>
+        <TooltipProvider>
+          <RoomContent />
+        </TooltipProvider>
+      </OnboardingProvider>
     </RoomProvider>
   );
 }

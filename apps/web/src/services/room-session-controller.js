@@ -759,6 +759,36 @@ async function localHostDevices(){
 async function revokeLocalHostDevice(id){
  await localHostApi('/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}});
 }
+function hostDeviceRows(data){
+ const rows=Array.isArray(data)?data:Array.isArray(data?.devices)?data.devices:[];
+ return rows.filter(row=>row&&(typeof row.device_id==='string'||typeof row.id==='string')).map(row=>({device_id:row.device_id||row.id,name:row.name||null,kind:row.kind||'code',current:!!row.current,
+  created_at:row.created_at??row.created??null,last_seen_at:row.last_seen_at??row.last_seen??null}));
+}
+async function loadHostDevices(fp){return hostDeviceRows(await hostApi(fp,'/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'}))}
+async function revokeHostDevice(fp,id){
+ await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}});
+}
+async function loadHostIntegrations(fp){
+ const scope=integrationScope();
+ const data=await hostApi(fp,'/api/presentation/integrations',{headers:{accept:'application/json'},cache:'no-store'});
+ const listing=data&&Array.isArray(data.providers)?data:{providers:[]};
+ if(fp===scope.host&&sameScope(scope))roomStore.patch({integrations:listing,integrationsStatus:'ready',integrationsError:''});
+ return listing;
+}
+async function setHostIntegrationKey(fp,id,key){
+ const scope=integrationScope();
+ const listing=await hostApi(fp,'/api/presentation/integrations/'+encodeURIComponent(id),{method:'PUT',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify({key})});
+ const result=listing&&Array.isArray(listing.providers)?listing:{providers:[]};
+ if(fp===scope.host&&sameScope(scope)){roomStore.patch({integrations:result,integrationsStatus:'ready',integrationsError:''});await followIntegration(id,scope)}
+ return result;
+}
+async function clearHostIntegrationKey(fp,id){
+ const scope=integrationScope();
+ const listing=await hostApi(fp,'/api/presentation/integrations/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}});
+ const result=listing&&Array.isArray(listing.providers)?listing:{providers:[]};
+ if(fp===scope.host&&sameScope(scope)){roomStore.patch({integrations:result,integrationsStatus:'ready',integrationsError:''});await followIntegration(id,scope)}
+ return result;
+}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
 function callProtocols(){const token=pairingInUse(pairings)?.token;if(!token)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+token]}
 async function reselectRemembered(){
@@ -1662,19 +1692,21 @@ function sendGapAudio(socket){
 function stopPreview(){return roomStore.batch(()=>stopPreviewJob())}
 function stopPreviewJob(){const job=state.previewJob;state.previewJob=null;if(!job)return;job.controller.abort();if(job.browser)window.roomVoice?.cancel();$('preview-audio')?.pause();$('preview-audio')?.removeAttribute('src');if(job.url)URL.revokeObjectURL(job.url)}
 function paneStage(task){return effectiveStage(stageContext(state),task,(state.stageDraft||state.voicePreferences||{})[task])}
-async function previewVoice(language){
- if(state.previewJob){stopPreview();state.previewNote='Prueba detenida';return}
- if(state.botLive){state.previewNote='Espera a que termine la locución antes de probar una voz.';return}
- const stage=paneStage('tts');if(!stage)return;
+async function previewVoice(language,textOverride){
+ if(state.previewJob){stopPreview();state.previewNote='Prueba detenida';return false}
+ if(state.botLive){state.previewNote='Espera a que termine la locución antes de probar una voz.';return false}
+ const stage=paneStage('tts');if(!stage)return false;
  const ctx=stageContext(state),voice=voiceFor(ctx,stage,language),speed=stage.options.speed??1;
- const sample=state.voiceLanguages.find(item=>item.id===language)?.sample||'';
+ const sample=String(textOverride??(state.voiceLanguages.find(item=>item.id===language)?.sample||'')).trim().slice(0,200);
+ if(!sample||!voice)return false;
  const job={controller:new AbortController(),language,browser:true};state.previewJob=job;state.previewNote='Preparando muestra…';
  try{
-  await window.roomVoice.unlock();if(state.previewJob!==job)return;
-  if(stage.place!==DEVICE){const audio=await post('/api/presentation/synthesis/preview',{model:stage.model,voice,speed,text:sample});if(state.previewJob!==job)return;await window.roomVoice.playEncoded(audio,text=>{state.previewNote=text})}
-  else{await measureDevice();if(state.previewJob!==job)return;await window.roomVoice.speak({...ttsRequest(stage),voice,speed,text:sample},text=>{state.previewNote=text})}
-  if(state.previewJob===job){stopPreview();state.previewNote='Prueba terminada'}
- }catch(e){if(state.previewJob!==job)return;stopPreview();state.previewNote=e.name==='AbortError'?'Prueba detenida':e.message}
+  await window.roomVoice.unlock();if(state.previewJob!==job)return false;
+  if(stage.place!==DEVICE){const audio=await post('/api/presentation/synthesis/preview',{model:stage.model,voice,speed,text:sample});if(state.previewJob!==job)return false;await window.roomVoice.playEncoded(audio,text=>{state.previewNote=text})}
+  else{await measureDevice();if(state.previewJob!==job)return false;await window.roomVoice.speak({...ttsRequest(stage),voice,speed,text:sample},text=>{state.previewNote=text})}
+  if(state.previewJob===job){stopPreview();state.previewNote='Prueba terminada';return true}
+  return false;
+ }catch(e){if(state.previewJob!==job)return false;stopPreview();state.previewNote=e.name==='AbortError'?'Prueba detenida':e.message;return false}
 }
 async function prepareVoice(){
  if(state.activeSpeech||state.previewJob){state.prepareNote='Espera a que termine la voz.';return}
@@ -2497,6 +2529,11 @@ window.sidevoiceActions={
  checkMachine,
  localHostDevices,
  revokeLocalHostDevice,
+ loadHostDevices,
+ revokeHostDevice,
+ loadHostIntegrations,
+ setHostIntegrationKey,
+ clearHostIntegrationKey,
  openPairing:()=>openPairing(),
  closePairing,
 };

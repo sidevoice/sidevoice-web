@@ -312,7 +312,7 @@ export interface SidevoiceActions {
   copyDiagnostics(task: StageTask): Promise<boolean>;
   /** Stop one download, whoever started it: the page's, or the desktop app's through the bridge. */
   cancelDownload(id: string): void;
-  previewVoice(language: string): Promise<void>;
+  previewVoice(language: string, text?: string): Promise<boolean>;
   /** Load this device's chosen voice model ahead of the first reply. */
   prepareVoice(): Promise<void>;
   /** Ask the machine for its integrations again, after a failed read. */
@@ -346,6 +346,16 @@ export interface SidevoiceActions {
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;
+  /** Read the selected machine's devices, using only that pairing's authenticated host route. */
+  loadHostDevices?(fp: string): Promise<HostDeviceView[]>;
+  /** Revoke a device at the identified machine. */
+  revokeHostDevice?(fp: string, id: string): Promise<void>;
+  /** Read a machine's provider metadata without exposing stored keys. */
+  loadHostIntegrations?(fp: string): Promise<IntegrationListing>;
+  /** Verify and store a provider key at the identified machine. The returned listing contains no key. */
+  setHostIntegrationKey?(fp: string, id: string, key: string): Promise<IntegrationListing>;
+  /** Remove a stored provider key at the identified machine. */
+  clearHostIntegrationKey?(fp: string, id: string): Promise<IntegrationListing>;
   /** Recheck one known remote host without changing which machine is in use. */
   checkMachine?(id: string): Promise<void>;
 }

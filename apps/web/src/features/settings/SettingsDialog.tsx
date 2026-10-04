@@ -1,7 +1,7 @@
 import { DialogFrame } from "../../components/ui/DialogFrame";
 import { MachineList } from "../room/MachineList";
 import { InfoPopover } from "../../components/models/ModelInfo";
-import { StageSettings } from "./StageSettings";
+import { StageEditor } from "./StageEditor";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { useRoomStore } from "../../state/room-store";
@@ -20,7 +20,7 @@ export function VoiceSettings() {
   return (
     <section id="pane-voice" aria-labelledby="settings-voice" hidden>
       <h3>Voz</h3>
-      <StageSettings task="tts" />
+      <StageEditor task="tts" />
     </section>
   );
 }
@@ -29,7 +29,7 @@ export function TranscriptionSettings() {
   return (
     <section id="pane-transcription" aria-labelledby="settings-transcription" hidden>
       <h3>Transcripción</h3>
-      <StageSettings task="stt" />
+      <StageEditor task="stt" />
     </section>
   );
 }

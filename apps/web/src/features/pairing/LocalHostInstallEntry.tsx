@@ -31,18 +31,21 @@ export function LocalHostInstallEntry({
   className = "",
   holdSuccess = false,
   source = "machines",
+  followActive = false,
 }: {
   showCta: boolean;
   controller?: LocalHostInstallController;
   className?: string;
   holdSuccess?: boolean;
   source?: "no-machine" | "machines";
+  /** Render the one shared install operation even when another entry point started it. */
+  followActive?: boolean;
 }) {
   const t = hostTranslator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const bridge = localHostBridge();
   const supportsInstall = typeof bridge?.install === "function";
-  const showingAttempt = isVisibleLocalHostInstall(snapshot, source);
+  const showingAttempt = followActive ? isVisibleLocalHostInstall(snapshot) : isVisibleLocalHostInstall(snapshot, source);
   const attemptActive = isVisibleLocalHostInstall(snapshot);
   const [note, setNote] = useState("");
 

@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView, StageTask } from "../../state/room-types";
-import { IntegrationList } from "../settings/IntegrationList";
-import { StageSettings } from "../settings/StageSettings";
+import { StageEditor } from "../settings/StageEditor";
 import { hostTranslator } from "../settings/host-i18n";
 import { actionableAgent } from "../../services/host-agents";
+import { HostDevicesPanel } from "./HostDevicesPanel";
+import { HostIntegrationsPanel } from "./HostIntegrationsPanel";
 
 type HostTab = "status" | "agents" | "integrations" | "devices" | "voice" | "transcription";
 
@@ -44,7 +45,7 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
   }, [showAgents, tab]);
 
   function useMachine() {
-    if (machine.selectable === false) return;
+    if (machine.selectable === false || machine.revoked) return;
     window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id);
   }
 
@@ -56,7 +57,7 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
           <h3 id="host-detail-title">{hostLabel}{machine.inUse && <span className="badge">{t("hosts.inUse")}</span>}</h3>
           {machine.local && <p className="muted">{t("hosts.thisComputer")}</p>}
         </div>
-        {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="compact" onClick={useMachine}>{t("hosts.use", { machine: hostLabel })}</Button>}
+        {!machine.inUse && machine.selectable !== false && !machine.revoked && <Button variant="ghost" size="compact" onClick={useMachine}>{t("hosts.use", { machine: hostLabel })}</Button>}
       </header>
       <div className="host-tabs" role="tablist" aria-label={t("settings.hostSections")}>
         {tabs.map(({ id, label }) => (
@@ -77,8 +78,12 @@ export function HostPage({ machine, onBack, statusPanel, devicesPanel, agentsPan
       <div className="host-tabpanel" id="host-tabpanel" role="tabpanel" aria-labelledby={`host-tab-${visibleTab}`}>
         {visibleTab === "status" && (machine.local ? statusPanel : <RemoteStatus machine={machine} status={remote?.state ?? machine.state} />)}
         {visibleTab === "agents" && agentsPanel}
-        {visibleTab === "integrations" && (machine.inUse ? <IntegrationList /> : <UseMachinePrompt machine={hostLabel} onUse={useMachine} />)}
-        {visibleTab === "devices" && (machine.local ? devicesPanel : <RemoteDevices />)}
+        {visibleTab === "integrations" && (machine.pairingId && !machine.revoked
+          ? <HostIntegrationsPanel key={machine.pairingId} fp={machine.pairingId} />
+          : machine.revoked ? <p className="muted">{t("hosts.revokedDetail")}</p> : <UseMachinePrompt machine={hostLabel} onUse={useMachine} />)}
+        {visibleTab === "devices" && (machine.local ? devicesPanel : machine.pairingId && !machine.revoked
+          ? <HostDevicesPanel key={machine.pairingId} fp={machine.pairingId} />
+          : machine.revoked ? <p className="muted">{t("hosts.revokedDetail")}</p> : <UseMachinePrompt machine={hostLabel} onUse={useMachine} />)}
         {visibleTab === "voice" && <MachineStage machine={machine} task="tts" onUse={useMachine} />}
         {visibleTab === "transcription" && <MachineStage machine={machine} task="stt" onUse={useMachine} />}
       </div>
@@ -109,11 +114,6 @@ function RemoteStatus({ machine, status }: { machine: MachineView; status: strin
   );
 }
 
-function RemoteDevices() {
-  const t = hostTranslator();
-  return <div className="host-devices-panel"><h4>{t("hosts.tab.devices")}</h4><p className="muted">{t("hosts.devices.remoteHint")}</p><code>{t("hosts.devices.remoteCommand")}</code></div>;
-}
-
 function UseMachinePrompt({ machine, onUse }: { machine: string; onUse(): void }) {
   const t = hostTranslator();
   return <div className="host-tab-prompt"><p className="muted">{t("settings.useMachineFirst", { machine })}</p><Button type="button" size="compact" onClick={onUse}>{t("hosts.use", { machine })}</Button></div>;
@@ -121,5 +121,5 @@ function UseMachinePrompt({ machine, onUse }: { machine: string; onUse(): void }
 
 function MachineStage({ machine, task, onUse }: { machine: MachineView; task: StageTask; onUse(): void }) {
   const t = hostTranslator();
-  return machine.inUse ? <StageSettings task={task} /> : <UseMachinePrompt machine={machine.host || t("hosts.unnamed")} onUse={onUse} />;
+  return machine.inUse ? <StageEditor task={task} /> : <UseMachinePrompt machine={machine.host || t("hosts.unnamed")} onUse={onUse} />;
 }

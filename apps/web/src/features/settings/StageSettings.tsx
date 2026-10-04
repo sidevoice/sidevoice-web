@@ -16,7 +16,7 @@ const WHERE_NOTES = {
 
 /** One stage — transcription or voice — as sidevoice/sidevoice-core#21 draws it: where, which model, its options, and under
  *  Avanzado the build it runs on. Everything shown is the store's; every change is an action. */
-export function StageSettings({ task }: { task: StageTask }) {
+export function StageSettings({ task, onConfigureProvider }: { task: StageTask; onConfigureProvider?: (provider: string) => void }) {
   const t = hostTranslator();
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const tools = useRoomStore((state) => state.voiceTools);
@@ -44,7 +44,9 @@ export function StageSettings({ task }: { task: StageTask }) {
             <Button key={place.id} id={`${task}-place-${place.id}`} variant="ghost" size="compact" className="segment"
               aria-pressed={view.place === place.id} data-state={place.state}
               disabled={locked && view.place !== place.id}
-              onClick={() => place.state === "missing" ? actions()?.openIntegration(place.id) : actions()?.chooseStagePlace(task, place.id)}>
+              onClick={() => place.state === "missing"
+                ? onConfigureProvider ? onConfigureProvider(place.id) : actions()?.openIntegration(place.id)
+                : actions()?.chooseStagePlace(task, place.id)}>
               {place.label}{place.state === "missing" ? " · Configurar" : ""}
             </Button>
           ))}
