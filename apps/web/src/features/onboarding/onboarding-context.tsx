@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { desktopAppBridge, localHostBridge } from "../../services/desktop-host";
+import { desktopAppBridge, hasDesktopHost, localHostBridge } from "../../services/desktop-host";
 import {
   createOnboardingRepository,
   emptyOnboardingRecord,
@@ -25,6 +25,7 @@ interface OnboardingContextValue {
   localAgents: { id: string; label: string; version?: string | null }[];
   localAgentsLoading: boolean;
   localAgentsError: boolean;
+  localAgentsScanned: boolean;
   stageKey(task: "stt" | "tts", language?: string): string | null;
   trialled(task: "stt" | "tts", key?: string | null): boolean;
   openWizard(step?: OnboardingStep): void;
@@ -99,7 +100,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const canHostAgents = !!bridge;
   const repository = useMemo(() => createOnboardingRepository({
     nativePort: app?.onboarding ?? null,
-    nativeExpected: !!app,
+    nativeExpected: hasDesktopHost(),
   }), [app]);
   const [ready, setReady] = useState(false);
   const [record, setRecord] = useState<OnboardingRecord>(emptyOnboardingRecord);
@@ -143,17 +144,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     return () => { current = false; };
   }, [repository]);
 
-  useEffect(() => {
-    if (!ready || firstDecision.current || record.completed_at || record.deferred_at) return;
-    if (!facts.machinesReady) return;
-    firstDecision.current = true;
-    const hasMachine = machines.some((machine) => machine.selectable && !!machine.pairingId);
-    if (!record.deferred_at || !hasMachine || localReady) {
-      setStep(setupStep);
-      setOpen(true);
-    }
-  }, [ready, record.completed_at, record.deferred_at, facts.machinesReady, machines, localReady, setupStep]);
-
   const persist = useCallback(async (update: OnboardingPatch) => {
     const operation = writes.current.then(async () => {
       try {
@@ -173,11 +163,38 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     return operation;
   }, [repository]);
 
+  const adoptLocalPath = useCallback(async () => {
+    if (await persist({ choice: "agents", deferred_at: null })) {
+      setStep("W3");
+      setOpen(true);
+      return true;
+    }
+    setStep("W1");
+    setOpen(true);
+    return false;
+  }, [persist]);
+
+  useEffect(() => {
+    if (!ready || firstDecision.current || record.completed_at || !facts.machinesReady) return;
+    if (record.deferred_at && machines.some((machine) => machine.selectable && !!machine.pairingId) && !localReady) return;
+    firstDecision.current = true;
+    if (localReady && !record.choice) {
+      void adoptLocalPath();
+      return;
+    }
+    setStep(setupStep);
+    setOpen(true);
+  }, [ready, record.completed_at, record.deferred_at, record.choice, facts.machinesReady, machines, localReady, setupStep, adoptLocalPath]);
+
   const openWizard = useCallback((requested?: OnboardingStep) => {
+    if (localReady && !record.choice && !record.completed_at) {
+      void adoptLocalPath();
+      return;
+    }
     setStep(requested ?? resumeOnboarding({ record, canHostAgents, localReady, localInstallStarted: false,
       remoteReady, hostFp, sttStageKey: sttKey, ttsStageKey: ttsKey }));
     setOpen(true);
-  }, [record, canHostAgents, localReady, remoteReady, hostFp, sttKey, ttsKey]);
+  }, [record, canHostAgents, localReady, remoteReady, hostFp, sttKey, ttsKey, adoptLocalPath]);
 
   const rescanLocalAgents = useCallback(async () => {
     const current = localHostBridge();
@@ -206,7 +223,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const value: OnboardingContextValue = {
     ready, record, error, open, step, path: !canHostAgents ? "remote" : record.choice,
-    canHostAgents, localAgents, localAgentsLoading, localAgentsError,
+    canHostAgents, localAgents, localAgentsLoading, localAgentsError, localAgentsScanned,
     stageKey,
     trialled: (task, key) => {
       const expected = key === undefined ? stageKey(task) : key;

@@ -331,6 +331,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "wizard.stagePreparationFailed": "No se pudo cargar la configuración de la máquina seleccionada.",
   "wizard.retryStagePreparation": "Reintentar la configuración",
   "wizard.prepareStage": "Preparar etapa",
+  "wizard.prepareBeforeSaving": "Prepara la etapa modificada antes de guardar la configuración.",
   "wizard.stageChecking": "Comprobando la etapa…",
   "wizard.stagePrepareFailed": "No se pudo comprobar y guardar la etapa seleccionada. Revísala y vuelve a intentarlo.",
   "wizard.stageSaveFailed": "No se pudo guardar la etapa seleccionada. Vuelve a intentarlo.",

@@ -31,7 +31,7 @@ describe("onboarding record and resume", () => {
     };
     expect(resumeOnboarding(facts)).toBe("W1");
     facts.localReady = true;
-    expect(resumeOnboarding(facts)).toBe("W1");
+    expect(resumeOnboarding(facts)).toBe("W3");
     facts.localReady = false;
     facts.record = mergeOnboardingRecord(facts.record, { choice: "agents" });
     expect(resumeOnboarding(facts)).toBe("W2");
@@ -47,15 +47,13 @@ describe("onboarding record and resume", () => {
     expect(resumeOnboarding(facts)).toBe("W4v");
   });
 
-  it("keeps remote-only clients on the first-run choice and resumes after a real pairing", () => {
+  it("routes remote-only clients through pairing and directly to stages after pairing", () => {
     const facts: ResumeFacts = { record: emptyOnboardingRecord(), canHostAgents: false, localReady: false, localInstallStarted: false, remoteReady: false,
       hostFp: null, sttStageKey: null, ttsStageKey: null };
-    expect(resumeOnboarding(facts)).toBe("W1");
-    facts.record = normalizeOnboardingRecord({ choice: "remote", agents_done: false, test_passed: true });
     expect(resumeOnboarding(facts)).toBe("W2r");
     facts.remoteReady = true;
-    expect(resumeOnboarding(facts)).toBe("W3");
-    facts.record = mergeOnboardingRecord(facts.record, { agents_done: true });
+    expect(resumeOnboarding(facts)).toBe("W4");
+    facts.record = normalizeOnboardingRecord({ choice: "remote", agents_done: false, test_passed: true });
     expect(resumeOnboarding(facts)).toBe("W4");
     facts.hostFp = "remote-a";
     facts.sttStageKey = "stt-a";

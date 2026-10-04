@@ -126,6 +126,11 @@ export function desktopAppBridge(): DesktopAppBridge | null {
   return app ?? null;
 }
 
+/** True when this page is hosted by Desktop, even if its native app bridge is incomplete. */
+export function hasDesktopHost(): boolean {
+  return !!desktopHost();
+}
+
 export function localHostBridge(): LocalHostBridge | null {
   const host = desktopHost();
   const localHost = host?.localHost as LocalHostBridge | undefined;

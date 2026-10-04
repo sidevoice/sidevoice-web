@@ -348,6 +348,7 @@ export const en = {
   "wizard.stagePreparationFailed": "Could not load the selected machine’s stage settings.",
   "wizard.retryStagePreparation": "Retry setup settings",
   "wizard.prepareStage": "Prepare stage",
+  "wizard.prepareBeforeSaving": "Prepare the changed stage before saving Settings.",
   "wizard.stageChecking": "Checking stage…",
   "wizard.stagePrepareFailed": "The selected stage could not be checked and saved. Review it and retry.",
   "wizard.stageSaveFailed": "The selected stage could not be saved. Try again.",

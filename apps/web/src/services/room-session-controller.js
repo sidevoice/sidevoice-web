@@ -1851,17 +1851,25 @@ function buildRequest(build){
 }
 function ttsRequest(stage){return buildRequest(deviceBuild(state.deviceOffers,stage)||deviceBuild(state.deviceOffers,defaultStage(stageContext(state),'tts')))}
 function editStage(task,next){roomStore.patch({stageDraft:{...(state.stageDraft||{stt:state.voicePreferences?.stt,tts:state.voicePreferences?.tts}),[task]:next}})}
+function draftStage(task,next){
+ editStage(task,next);
+ const fp=pairings.inUse,key=fp&&fp+':'+task;
+ if(!key)return;
+ const candidate=validatedStage(task,next).stage;
+ if(candidate&&stageTrialKey(fp,{stage:candidate})===stageTrialKey(fp,{stage:activeStage(task)}))explicitStageDrafts.delete(key);
+ else explicitStageDrafts.add(key);
+}
 function draftStagePlace(task,place){
  if(task==='stt')cancelTranscriptionTrials();
  const next=withPlace(stageContext(state),task,paneStage(task),place,state.voicePreferences?.[task]);
- editStage(task,next);
+ draftStage(task,next);
  if(place!==DEVICE)void loadRemote(place,task);
 }
-function draftStageModel(task,model){if(task==='stt')cancelTranscriptionTrials();editStage(task,withModel(stageContext(state),task,paneStage(task),model))}
-function draftStageBuild(task,value){if(task==='stt')cancelTranscriptionTrials();editStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
-/* A place, a model or a build chosen in a pane is a selection: checked before it takes effect (below). A provider's
- * place waits for that account's lists, so there is a model to check; one that still lacks a model or a voice stays
- * a draft, which "Guardar cambios" refuses until it is complete. Options are not checked: they are the draft it saves. */
+function draftStageModel(task,model){if(task==='stt')cancelTranscriptionTrials();draftStage(task,withModel(stageContext(state),task,paneStage(task),model))}
+function draftStageBuild(task,value){if(task==='stt')cancelTranscriptionTrials();draftStage(task,withBuild(stageContext(state),task,paneStage(task),value))}
+function draftStageOption(task,id,value,language){if(task==='stt')cancelTranscriptionTrials();draftStage(task,withOption(stageContext(state),task,paneStage(task),id,value,language))}
+/* The shared editor keeps stage choices as drafts until Prepare runs the check and activation transaction. A
+ * provider place waits for that account's lists, so a missing model or voice remains a draft until it is valid. */
 async function chooseStagePlace(task,place){
  if(task==='stt')cancelTranscriptionTrials();
  if(place!==DEVICE)await loadRemote(place,task);
@@ -1939,10 +1947,12 @@ async function prepareOnboardingStage(task,fp){
  }
  if(candidate.problem||!candidate.stage?.model)return false;
  if(candidate.stage.place!==DEVICE&&keyedProvider(state,candidate.stage.place)!=='ready')return false;
- const recheck=sameChoice(candidate.stage,activeStage(task));
+ const recheck=stageTrialKey(fp,{stage:candidate.stage})===stageTrialKey(fp,{stage:activeStage(task)});
  const checked=await selection.select(task,candidate.stage,{recheck});
  if(!checked||!current())return false;
- return persistSetupStage(task,candidate.stage,fp);
+ if(!persistSetupStage(task,candidate.stage,fp))return false;
+ explicitStageDrafts.delete(fp+':'+task);
+ return true;
 }
 function selectStage(task,next){
  if(!next)return;
@@ -2114,12 +2124,14 @@ const KEY_CHECK_PAUSE=1500;
 let keyChecks={};   // provider -> the plumbing of its check in this scope; what its row says is the store's
 let integrationEpoch=0;
 let stagePreparationEpoch=0;
+const explicitStageDrafts=new Set();
 function integrationScope(){return {host:pairings.inUse,epoch:integrationEpoch}}
 function sameScope(scope){return scope.host===pairings.inUse&&scope.epoch===integrationEpoch}
 /* Another machine, or none: its listing, its keys being typed and every answer still on its way are forgotten,
  * and the stages are that machine's own (a composition per client × host), switched in the same step. */
 function switchStages(){
  resetIntegrations();
+ explicitStageDrafts.clear();
  const stageRequest=++stagePreparationEpoch;
  settingsPreferencesEpoch++;
  const settingsOpen=!!$('language-settings')?.open,safePreferences=settingsOpen?devicePreferences():null;
@@ -2234,8 +2246,8 @@ async function settleIntegrationKeys(){
 }
 function openIntegration(id){settingsSection('integrations');state.integrationFocus=id}
 function cancelSettingsPreferences(){settingsFormSeed=null;roomStore.patch({settingsPreferences:{host:null,request:++settingsPreferencesEpoch,status:'idle'}})}
-$('settings-close').onclick=()=>{stopPreview();cancelSettingsPreferences();$('language-settings').close()};
-$('language-settings').addEventListener('close',()=>{stopPreview();cancelSettingsPreferences()});
+ $('settings-close').onclick=()=>{stopPreview();cancelSettingsPreferences();cancelTranscriptionTrials();$('language-settings').close()};
+$('language-settings').addEventListener('close',()=>{stopPreview();cancelSettingsPreferences();cancelTranscriptionTrials()});
 // What this device may set. The detector's tuning is the room's: one place to fix it for everyone.
 // The only thing a device says about turn detection. The seconds behind each word are the room's, in one
 // place for everyone: a device that had saved the old numbers kept them after the room changed its mind,
@@ -2499,6 +2511,8 @@ async function applyTranscriptionSettings(previous,next,{onCommit}={}){
 }
 async function saveSettings(){
  const scope=integrationScope();
+ const pendingStage=TASKS.find(task=>scope.host&&explicitStageDrafts.has(scope.host+':'+task));
+ if(pendingStage){$('settings-error').textContent=hostTranslator()('wizard.prepareBeforeSaving');return}
  try{await settleIntegrationKeys()}catch(error){$('settings-error').textContent=error.message;return}
  // The machine changed while a key was being settled: what the panes show is now the other machine's.
  if(!sameScope(scope)){$('settings-error').textContent='Cambiaste de máquina: revisa la configuración y vuelve a guardar.';return}
@@ -2573,6 +2587,7 @@ window.sidevoiceActions={
  draftStagePlace,
  draftStageModel,
  draftStageBuild,
+ draftStageOption,
  setStageOption,
  chooseStageBuild,
  decideStage:(task,yes)=>selection.decide(task,yes),

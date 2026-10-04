@@ -25,9 +25,10 @@ function errorMessage(reason: unknown, t: ReturnType<typeof hostTranslator>) {
   return key.startsWith("trial.") ? t(key as Parameters<typeof t>[0]) : t("trial.stt_failed");
 }
 
-export function StageEditor({ task, setup = false, onConfigureProvider, trialActionRef, onTrialFooterState }: {
+export function StageEditor({ task, setup = false, machineSettings = false, onConfigureProvider, trialActionRef, onTrialFooterState }: {
   task: "stt" | "tts";
   setup?: boolean;
+  machineSettings?: boolean;
   onConfigureProvider?: (provider: string) => void;
   trialActionRef?: MutableRefObject<(() => void) | null>;
   onTrialFooterState?: (state: StageTrialFooterState) => void;
@@ -36,6 +37,7 @@ export function StageEditor({ task, setup = false, onConfigureProvider, trialAct
   const view = useRoomStore((state) => state.stages?.[task] ?? null);
   const facts = useRoomStore((state) => state.facts);
   const onboarding = useOptionalOnboarding();
+  const requiresPrepare = setup || machineSettings;
   const hostFp = facts.pairingInUse;
   const stage = useMemo(() => effectiveStage(stageContext(facts), task,
     facts.stageDraft?.[task] ?? facts.voicePreferences?.[task]), [facts, task]);
@@ -64,12 +66,15 @@ export function StageEditor({ task, setup = false, onConfigureProvider, trialAct
   const preparedStage = stage ? withVoicesChosen(stageContext(facts), stage) : null;
   const savedStage = effectiveStage(stageContext(facts), task, facts.voicePreferences?.[task]);
   const configurationKey = hostFp && preparedStage ? stageTrialKey(hostFp, { stage: preparedStage }) : null;
-  const prepared = !setup || !!hostFp && facts.stagePreparation.host === hostFp && facts.stagePreparation.status === "ready" &&
-    !!preparedStage && !!savedStage && checkedSignature === configurationKey &&
-    stageTrialKey(hostFp, { stage: preparedStage }) === stageTrialKey(hostFp, { stage: savedStage });
+  const savedConfigurationKey = hostFp && savedStage
+    ? stageTrialKey(hostFp, { stage: withVoicesChosen(stageContext(facts), savedStage) }) : null;
+  const stagePreparationReady = !!hostFp && facts.stagePreparation.host === hostFp && facts.stagePreparation.status === "ready";
+  const matchesSaved = !!configurationKey && configurationKey === savedConfigurationKey;
+  const prepared = !requiresPrepare || stagePreparationReady && !!preparedStage &&
+    (setup ? matchesSaved && checkedSignature === configurationKey : matchesSaved || checkedSignature === configurationKey);
   const sample = facts.voiceLanguages.find((language) => language.id === voiceLanguage)?.sample ?? t("wizard.samplePlaceholder");
   const successful = setup ? !trialInvalidated && !!onboarding?.trialled(task, trialSignature) : phase === "done" && signature !== null;
-  const preparationReady = !setup || !!hostFp && facts.stagePreparation.host === hostFp && facts.stagePreparation.status === "ready";
+  const preparationReady = !requiresPrepare || stagePreparationReady;
   const ready = !!view && !!stage?.model && view.editable && !view.modelsLoading && !view.modelsError &&
     view.models.some((model) => model.id === stage.model) && preparationReady;
 
@@ -94,6 +99,30 @@ export function StageEditor({ task, setup = false, onConfigureProvider, trialAct
     window.sidevoiceActions?.stopVoicePreview?.();
     if (trialActionRef) trialActionRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (!machineSettings || !hostFp || (facts.stagePreparation.host === hostFp && facts.stagePreparation.status !== "idle")) return;
+    void window.sidevoiceActions?.prepareOnboardingStages?.(hostFp);
+  }, [machineSettings, hostFp, facts.stagePreparation.host, facts.stagePreparation.status]);
+
+  useEffect(() => {
+    if (!machineSettings) return;
+    const dialog = document.getElementById("language-settings");
+    if (!dialog) return;
+    const resetTrial = () => {
+      generation.current++;
+      trialRef.current?.cancel();
+      trialRef.current = null;
+      window.sidevoiceActions?.stopVoicePreview?.();
+      setPhase("idle");
+      setFailure("");
+      setTranscript("");
+      setLevel(0);
+      setTrialInvalidated(false);
+    };
+    dialog.addEventListener("close", resetTrial);
+    return () => dialog.removeEventListener("close", resetTrial);
+  }, [machineSettings]);
 
   useEffect(() => {
     if (!setup || task !== "tts" || !hostFp || !stage || voiceLanguagePicked.current) return;
@@ -203,7 +232,7 @@ export function StageEditor({ task, setup = false, onConfigureProvider, trialAct
   };
 
   async function prepareStage() {
-    if (!hostFp || !ready || !setup) return;
+    if (!hostFp || !ready || !requiresPrepare) return;
     setPreparing(true);
     setPrepareFailure(false);
     try {
@@ -214,8 +243,8 @@ export function StageEditor({ task, setup = false, onConfigureProvider, trialAct
   }
 
   const stagePreparation = facts.stagePreparation;
-  const stagePreparationFailed = setup && !!hostFp && stagePreparation.host === hostFp && stagePreparation.status === "failed";
-  const stagePreparationLoading = setup && !!hostFp && stagePreparation.host === hostFp && stagePreparation.status === "loading";
+  const stagePreparationFailed = requiresPrepare && !!hostFp && stagePreparation.host === hostFp && stagePreparation.status === "failed";
+  const stagePreparationLoading = requiresPrepare && !!hostFp && stagePreparation.host === hostFp && stagePreparation.status === "loading";
 
   if (!view) return <p className="muted" role="status">{t("wizard.stageLoading")}</p>;
 
@@ -225,8 +254,8 @@ export function StageEditor({ task, setup = false, onConfigureProvider, trialAct
       {stagePreparationFailed && <p className="stage-try-error" role="alert">{t("wizard.stagePreparationFailed")}
         <Button type="button" variant="ghost" size="compact" onClick={() => void window.sidevoiceActions?.prepareOnboardingStages?.(hostFp!)}>{t("wizard.retryStagePreparation")}</Button>
       </p>}
-      <StageSettings task={task} onConfigureProvider={onConfigureProvider} deferSelection={setup} disabled={setup && (!preparationReady || preparing)} />
-      {setup && <div className="stage-prepare-action">
+      <StageSettings task={task} onConfigureProvider={onConfigureProvider} deferSelection={requiresPrepare} disabled={requiresPrepare && (!preparationReady || preparing)} />
+      {requiresPrepare && <div className="stage-prepare-action">
         <Button type="button" variant="default" disabled={!ready || preparing || stagePreparationLoading || stagePreparationFailed}
           onClick={() => void prepareStage()}>{preparing ? t("wizard.stageChecking") : t("wizard.prepareStage")}</Button>
         {prepareFailure && <p className="stage-try-error" role="alert">{t("wizard.stagePrepareFailed")}</p>}

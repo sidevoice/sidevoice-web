@@ -64,7 +64,9 @@ export function StageSettings({ task, onConfigureProvider, deferSelection = fals
       {view.modelsError && <p className="muted" role="status">{view.modelsError}</p>}
       {WHERE_NOTES[view.where] && <p className="muted">{WHERE_NOTES[view.where]}</p>}
       <OptionsForm task={task} options={view.options} disabled={locked}
-        onChange={(id, value, language) => actions()?.setStageOption(task, id, value, language)}
+        onChange={(id, value, language) => deferSelection
+          ? actions()?.draftStageOption?.(task, id, value, language)
+          : actions()?.setStageOption(task, id, value, language)}
         onPreview={task === "tts" ? (language) => void actions()?.previewVoice(language) : undefined}
         previewing={task === "tts" ? tools.previewing : null} />
       {task === "tts" && <p className="muted" role="status">{tools.previewNote}</p>}

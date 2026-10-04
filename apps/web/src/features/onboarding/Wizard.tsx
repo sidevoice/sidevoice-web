@@ -18,12 +18,13 @@ const groups: { key: string; steps: OnboardingStep[] }[] = [
   { key: "wizard.group.ready", steps: ["W6"] },
 ];
 
-function previous(step: OnboardingStep): OnboardingStep | null {
+function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean): OnboardingStep | null {
   if (step === "W3") return "W1";
-  if (step === "W4") return "W3";
+  if (step === "W4") return path === "remote" ? "W2r" : "W3";
   if (step === "W4v") return "W4";
   if (step === "W6") return "W4v";
-  if (step === "W2" || step === "W2r") return "W1";
+  if (step === "W2") return "W1";
+  if (step === "W2r") return canHostAgents ? "W1" : null;
   return null;
 }
 
@@ -60,9 +61,9 @@ export function Wizard() {
   }, [onboarding.record.choice]);
 
   useEffect(() => {
-    if (touchedChoice.current || onboarding.record.choice || !onboarding.canHostAgents) return;
+    if (touchedChoice.current || onboarding.record.choice || !onboarding.canHostAgents || !onboarding.localAgentsScanned) return;
     setChoice(onboarding.localAgents.length ? "agents" : "remote");
-  }, [onboarding.canHostAgents, onboarding.localAgents.length, onboarding.record.choice]);
+  }, [onboarding.canHostAgents, onboarding.localAgentsScanned, onboarding.localAgents.length, onboarding.record.choice]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -85,7 +86,7 @@ export function Wizard() {
   useEffect(() => {
     if (!onboarding.open) return;
     if (onboarding.step === "W2" && localReady) onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3");
-    if (onboarding.step === "W2r" && remoteReady) onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3");
+    if (onboarding.step === "W2r" && remoteReady) onboarding.goTo("W4");
   }, [onboarding.open, onboarding.step, onboarding.record.agents_done, localReady, remoteReady]);
 
   useEffect(() => {
@@ -118,7 +119,7 @@ export function Wizard() {
     if (remoteMachine?.pairingId) {
       const usable = facts.pairingInUse === remoteMachine.pairingId && remoteReady
         ? true : await window.sidevoiceActions?.chooseMachine(remoteMachine.pairingId);
-      onboarding.goTo(usable ? "W3" : "W2r");
+      onboarding.goTo(usable ? "W4" : "W2r");
     } else onboarding.goTo("W2r");
   }
 
@@ -143,7 +144,7 @@ export function Wizard() {
   const stageTask = onboarding.step === "W4" ? "stt" : onboarding.step === "W4v" ? "tts" : null;
   const stageValid = stageTask ? onboarding.trialled(stageTask) : false;
   const currentGroup = groups.findIndex((group) => group.steps.includes(onboarding.step));
-  const back = previous(onboarding.step);
+  const back = previous(onboarding.step, onboarding.path, onboarding.canHostAgents);
   const error = onboarding.error ? t(messageKey(onboarding.error)) : "";
   const label = (step: OnboardingStep) => t(`wizard.title.${({ W1: "where", W2: "install", W2r: "pair", W3: "agents", W4: "stt", W4v: "tts", W6: "ready" } as const)[step]}` as Parameters<ReturnType<typeof hostTranslator>>[0]);
 
@@ -225,7 +226,7 @@ export function Wizard() {
         {back && <Button type="button" variant="default" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
         {onboarding.step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
         {onboarding.step === "W2" && localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3")}>{t("wizard.continue")}</Button>}
-        {onboarding.step === "W2r" && remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3")}>{t("wizard.continue")}</Button>}
+        {onboarding.step === "W2r" && remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
         {onboarding.step === "W3" && <>
           <Button type="button" variant="ghost" onClick={() => void finishAgents()}>{t("wizard.agentsSkip")}</Button>
           <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.agentsDone")}</Button>

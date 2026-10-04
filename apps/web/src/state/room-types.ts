@@ -330,6 +330,7 @@ export interface SidevoiceActions {
   draftStagePlace?(task: StageTask, place: string): void;
   draftStageModel?(task: StageTask, model: string): void;
   draftStageBuild?(task: StageTask, value: string): void;
+  draftStageOption?(task: StageTask, id: string, value: unknown, language?: string): void;
   /** Cancel only preview playback owned by the stage editor. */
   stopVoicePreview?(): void;
   /** Ask the machine for its integrations again, after a failed read. */

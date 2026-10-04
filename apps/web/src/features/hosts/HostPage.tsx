@@ -121,5 +121,5 @@ function UseMachinePrompt({ machine, onUse }: { machine: string; onUse(): void }
 
 function MachineStage({ machine, task, onUse }: { machine: MachineView; task: StageTask; onUse(): void }) {
   const t = hostTranslator();
-  return machine.inUse ? <StageEditor task={task} /> : <UseMachinePrompt machine={machine.host || t("hosts.unnamed")} onUse={onUse} />;
+  return machine.inUse ? <StageEditor task={task} machineSettings /> : <UseMachinePrompt machine={machine.host || t("hosts.unnamed")} onUse={onUse} />;
 }
