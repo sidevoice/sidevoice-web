@@ -155,9 +155,9 @@ test("remote first-run stage saves its chosen provider options and keeps Speak r
   await installHarness(page, { languageMode: "success", completed: false, initialChoice: "remote", remoteOnly: true });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/voice/");
-  const wizard = page.getByRole("dialog", { name: "Connect Sidevoice to your agents" });
+  const wizard = page.getByRole("dialog", { name: "Set up transcription" });
   await expect(wizard).toBeVisible();
-  await wizard.locator(".wizard-actions").getByRole("button", { name: "Not now" }).click();
+  await expect(page.getByRole("dialog", { name: "Connect Sidevoice to your agents" })).toHaveCount(0);
   const stage = page.locator('.stage-editor[data-task="stt"]');
   await expect(stage).toBeVisible();
   await expect(stage.getByRole("button", { name: "OpenAI" })).toBeVisible();
