@@ -76,8 +76,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const stageKey = useCallback((task: "stt" | "tts") => {
     const stage = task === "stt" ? stt : tts;
     if (!fp || !stage?.model) return null;
-    const language = task === "stt" && stage.options?.language && stage.options.language !== "auto"
-      ? stage.options.language : facts.speechLanguage;
+    const stageLanguage = (stage.options as Record<string, unknown>)?.language;
+    const language = task === "stt" && typeof stageLanguage === "string" && stageLanguage !== "auto"
+      ? stageLanguage : facts.speechLanguage;
     return stageTrialKey(fp, { stage, language });
   }, [facts.speechLanguage, fp, stt, tts]);
   const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);

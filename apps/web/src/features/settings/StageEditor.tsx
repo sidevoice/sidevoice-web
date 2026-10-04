@@ -8,7 +8,7 @@ import { effectiveStage } from "../../state/stage-settings.js";
 import { stageContext } from "../../state/room-session-state.js";
 import { stageTrialKey } from "../../services/onboarding-state";
 import { useRoomStore } from "../../state/room-store";
-import type { TranscriptionTrialHandle } from "../../services/transcription-trial";
+import type { TranscriptionTrialHandle, TranscriptionTrialStage } from "../../services/transcription-trial";
 
 const TEXT_MAX = 200;
 
@@ -44,8 +44,9 @@ export function StageEditor({ task, setup = false, onConfigureProvider }: {
   const voiceLanguages = voiceRows?.kind === "voice" && voiceRows.perLanguage ? voiceRows.rows : [];
   const needsVoiceLanguage = view?.options.some((option) => option.kind === "voice" && option.perLanguage) ?? false;
   const voiceLanguageAvailable = !needsVoiceLanguage || voiceLanguages.some((row) => row.language === voiceLanguage);
+  const stageLanguage = (stage?.options as Record<string, unknown> | undefined)?.language;
   const trialLanguage = task === "tts" ? voiceLanguage
-    : stage?.options?.language && stage.options.language !== "auto" ? String(stage.options.language) : facts.speechLanguage;
+    : typeof stageLanguage === "string" && stageLanguage !== "auto" ? stageLanguage : facts.speechLanguage;
   const trialSignature = hostFp && stage?.model ? stageTrialKey(hostFp, { stage, language: trialLanguage }) : null;
   const sample = facts.voiceLanguages.find((language) => language.id === voiceLanguage)?.sample ?? t("wizard.samplePlaceholder");
   const successful = setup ? onboarding.trialled(task, trialSignature) : phase === "done" && signature !== null;
@@ -88,7 +89,7 @@ export function StageEditor({ task, setup = false, onConfigureProvider }: {
     try {
       const handle = window.sidevoiceActions?.transcriptionTrial?.({
         hostFp,
-        stage,
+        stage: stage as TranscriptionTrialStage,
         onLevel: setLevel,
         onState: (next) => { if (generation.current === run) setPhase(next); },
       });

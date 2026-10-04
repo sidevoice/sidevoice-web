@@ -8,6 +8,7 @@ import {
   resumeOnboarding,
   stageTrialKey,
   type OnboardingPort,
+  type ResumeFacts,
 } from "./onboarding-state";
 
 function memoryStorage(seed: Record<string, string> = {}, fail = false): Storage {
@@ -45,7 +46,7 @@ describe("onboarding record and resume", () => {
 
   it("takes remote only clients straight to pairing and resumes after a real pairing", () => {
     const record = normalizeOnboardingRecord({ choice: "agents", agents_done: true, test_passed: true });
-    const facts = { record, canHostAgents: false, localReady: false, localInstallStarted: false, remoteReady: false,
+    const facts: ResumeFacts = { record, canHostAgents: false, localReady: false, localInstallStarted: false, remoteReady: false,
       hostFp: null, sttStageKey: null, ttsStageKey: null };
     expect(resumeOnboarding(facts)).toBe("W2r");
     facts.remoteReady = true;

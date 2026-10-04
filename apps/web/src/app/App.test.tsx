@@ -31,7 +31,7 @@ test("a new browser can defer remote pairing and resume at the same setup step",
   act(() => store.patch({ machinesReady: true }));
   render(<App store={store} />);
 
-  const dialog = await screen.findByRole("dialog");
+  const dialog = await screen.findByRole("dialog") as HTMLDialogElement;
   expect(screen.getByRole("heading", { name: "Where do your agents run?" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("radio", { name: "This computer connects to another machine" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));

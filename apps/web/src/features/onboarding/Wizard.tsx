@@ -130,7 +130,7 @@ export function Wizard() {
       </div>
       <ol className="wizard-steps" aria-label={t("wizard.progress")}>
         {groups.map((group, index) => <li key={group.key} data-state={index < currentGroup ? "done" : index === currentGroup ? "current" : "next"}
-          aria-current={index === currentGroup ? "step" : undefined}>{t(group.key)}</li>)}
+          aria-current={index === currentGroup ? "step" : undefined}>{t(group.key as Parameters<ReturnType<typeof hostTranslator>>[0])}</li>)}
       </ol>
       <h2 id="wizard-title" ref={title} tabIndex={-1}>{label(onboarding.step)}</h2>
       <div className="wizard-body">
