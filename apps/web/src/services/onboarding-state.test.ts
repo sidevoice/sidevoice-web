@@ -44,10 +44,11 @@ describe("onboarding record and resume", () => {
     expect(resumeOnboarding(facts)).toBe("W4v");
   });
 
-  it("takes remote only clients straight to pairing and resumes after a real pairing", () => {
-    const record = normalizeOnboardingRecord({ choice: "agents", agents_done: true, test_passed: true });
-    const facts: ResumeFacts = { record, canHostAgents: false, localReady: false, localInstallStarted: false, remoteReady: false,
+  it("keeps remote-only clients on the first-run choice and resumes after a real pairing", () => {
+    const facts: ResumeFacts = { record: emptyOnboardingRecord(), canHostAgents: false, localReady: false, localInstallStarted: false, remoteReady: false,
       hostFp: null, sttStageKey: null, ttsStageKey: null };
+    expect(resumeOnboarding(facts)).toBe("W1");
+    facts.record = normalizeOnboardingRecord({ choice: "agents", agents_done: true, test_passed: true });
     expect(resumeOnboarding(facts)).toBe("W2r");
     facts.remoteReady = true;
     facts.hostFp = "remote-a";

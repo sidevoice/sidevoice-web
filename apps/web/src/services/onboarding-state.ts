@@ -107,8 +107,8 @@ export interface ResumeFacts {
 
 export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   const { record } = facts;
+  if (!record.choice) return "W1";
   const path = !facts.canHostAgents ? "remote" : record.choice;
-  if (!path) return facts.localReady ? "W3" : "W1";
   if (path === "agents") {
     if (!facts.localReady) return "W2";
     if (!record.agents_done) return "W3";
