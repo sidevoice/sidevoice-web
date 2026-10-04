@@ -23,7 +23,7 @@ function room(ui: React.ReactNode, facts: Record<string, unknown>) {
 }
 function actions() {
   const done = { typeIntegrationKey: vi.fn(), checkIntegrationKey: vi.fn().mockResolvedValue(undefined),
-    clearIntegrationKey: vi.fn().mockResolvedValue(undefined), openIntegration: vi.fn() };
+    clearIntegrationKey: vi.fn().mockResolvedValue(undefined), openIntegration: vi.fn(), previewVoice: vi.fn().mockResolvedValue(false) };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   return done;
 }

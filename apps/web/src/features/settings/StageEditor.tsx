@@ -60,7 +60,7 @@ export function StageEditor({ task, setup = false, onConfigureProvider }: {
     setFailure("");
     setTranscript("");
     setLevel(0);
-    if (task === "tts") void window.sidevoiceActions?.previewVoice(voiceLanguage, "");
+    if (task === "tts") void window.sidevoiceActions?.previewVoice?.(voiceLanguage, "");
     // The selected host or its effective stage changed; a previous result no longer applies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
