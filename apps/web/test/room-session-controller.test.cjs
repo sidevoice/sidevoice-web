@@ -936,7 +936,9 @@ test('A turn is said by its name, and its end waits for the room\'s answer to it
  assert.equal(sentOf(c,first,'voice-user-turn').length,1);
  const answer={session_id:'s1',phase:'started',turn_id:'u1',revision:7,thread_id:'a'};
  c.push(first,{type:'voice-user-turn',data:answer});
- assert.deepEqual(plain(voice.calls.find(([name])=>name==='turnStarted')),['turnStarted',answer],'the voice takes the turn\'s boundary');
+ // Every answer reaches the voice, which keeps those of its own turns: the other turn's, then this one's.
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted').map(([,started])=>started.turn_id)),['elsewhere','u1']);
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted').at(-1)),['turnStarted',answer],'the voice takes the turn\'s boundary');
  const ended=sentOf(c,first,'voice-user-turn').at(-1);
  assert.deepEqual([ended.phase,ended.turn_id,ended.revision,ended.client_msg_id,ended.text],['finished','u1',undefined,'c-2','Hola']);
  assert.equal(s.run('history.at(-1).segment'),'s1:user-turn:u1');
