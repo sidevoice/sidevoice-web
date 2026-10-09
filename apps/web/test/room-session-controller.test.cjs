@@ -1072,11 +1072,21 @@ test('A refusal after its acknowledgement still finds the start it refuses, and 
  assert.equal(sentOf(c,c.first,'voice-playback').length,1);
  s.run('disconnect()');
 });
-test('A start sent twice is waited for once: the next start gets the next answer',()=>{
- const s=setup();
- s.run("var __s={readyState:1,session:'s',send(){}};ws=__s;voiceTurn({client_msg_id:'start-a',turn_id:'a',phase:'started'});ws={readyState:1,session:'s',send(){}};flushOutbox();relay.answered(1);outbox.remove('start-a');voiceTurn({client_msg_id:'start-b',turn_id:'b',phase:'started'});relay.answered(2)");
- assert.equal(s.run("relay.revision('a')"),1);
- assert.equal(s.run("relay.revision('b')"),2);
+test('A start sent twice is waited for once, and each start is answered by its own turn_id',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',{client_msg_id:'start-a',turn_id:'a',phase:'started'});
+ // The same start again on the same session (after a resume, say): the room only acknowledges a repeat.
+ s.run("outbox.get('start-a').sentOn=null;flushOutbox()");
+ assert.equal(sentOf(c,c.first,'voice-user-turn').filter(d=>d.client_msg_id==='start-a').length,2);
+ voice.emit('turn',{client_msg_id:'start-b',turn_id:'b',phase:'started'});
+ voice.emit('turn',{client_msg_id:'end-a',turn_id:'a',phase:'finished',text:'first'});
+ // The room answers by name, here b before a: a's end waits for a's answer only.
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'b',revision:2,thread_id:'a'}});
+ assert.equal(sentOf(c,c.first,'voice-user-turn').some(d=>d.client_msg_id==='end-a'),false);
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'a',revision:1,thread_id:'a'}});
+ const end=sentOf(c,c.first,'voice-user-turn').find(d=>d.client_msg_id==='end-a');
+ assert.deepEqual([end.turn_id,end.offline],['a',undefined],'its end goes as it is, named');
+ s.run('disconnect()');
 });
 test('A hang-up while the settings are taken never starts the microphone, and one while starting stops it',async()=>{
  const s=setup();let release;
@@ -1097,7 +1107,7 @@ test('A hang-up while the settings are taken never starts the microphone, and on
 test('The voice\'s turns and playback reports go as the room reads them, and a voice failure is said and logged',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  voice.emit('turn',{client_msg_id:'t-start',turn_id:'t',phase:'started'});
- c.push(c.first,{type:'voice-user-turn',data:{phase:'started',revision:1,session_id:'s1',thread_id:'a'}});
+ c.push(c.first,{type:'voice-user-turn',data:{phase:'started',turn_id:'t',revision:1,session_id:'s1',thread_id:'a'}});
  // @sidevoice/voice writes the timings under the room's name, and the page passes them on as they are.
  voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings_ms:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
  assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').at(-1).timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});
@@ -1135,8 +1145,8 @@ test('Words said while away take the room\'s row id, so history shows them once 
  const c=await callOnRoom();const {s,voice}=c;
  voice.emit('turn',{client_msg_id:'off-start',turn_id:'off',phase:'started',offline:true});
  voice.emit('turn',{client_msg_id:'off-end',turn_id:'off',phase:'finished',text:'offline words',offline:true});
- assert.equal(s.run("state.history.find(r=>r.text==='offline words').segment"),'s1:user-offline:off-end');
- s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'s1:user-offline:off-end',session:'s1',revision:0,thread:'a',role:'user',text:'offline words',status:'delivered'}]})});
+ assert.equal(s.run("state.history.find(r=>r.text==='offline words').segment"),'s1:user-turn:off','the room names the row by the turn');
+ s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'s1:user-turn:off',session:'s1',revision:0,thread:'a',role:'user',text:'offline words',status:'delivered'}]})});
  await s.run('refreshHistory()');
  assert.equal(s.run("state.history.filter(r=>r.text==='offline words').length"),1);
  assert.equal(s.run("state.history.find(r=>r.text==='offline words').delivery"),'delivered');
