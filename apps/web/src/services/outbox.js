@@ -1,4 +1,4 @@
-/* What this page has told its machine and not yet heard acknowledged: a transcript, a catch-up, a playback receipt.
+/* What this page has told its machine and not yet heard acknowledged: a turn of the person's, or what became of a reply.
  * Each entry is one idempotent message, named by its id (the `client_msg_id` the machine acknowledges), so sending it
  * again costs nothing; it is let go only once the machine has taken it. The copy in memory is the one read and kept in
  * order; IndexedDB keeps it across a reload, and where there is none (a private window, a test) memory alone does.

@@ -1,6 +1,6 @@
 export const OUTBOX_LIMIT: number;
 export interface OutboxEntry {
-  id: string; kind: 'transcript' | 'catchup' | 'receipt'; session_id: string | null; node: string | null;
+  id: string; kind: 'user-turn' | 'playback'; session_id: string | null; node: string | null;
   payload: unknown; created: number; order: number;
 }
 export interface Outbox {

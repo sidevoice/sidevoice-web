@@ -35,35 +35,16 @@ test("keeps the active transcribed draft cancellable after listening text disapp
   const cancelInput = vi.fn().mockResolvedValue(undefined);
   window.sidevoiceActions = {
     cancelInput,
-    skipReply: vi.fn().mockResolvedValue(undefined),
     replayReply: vi.fn().mockResolvedValue(undefined),
     toggleMic: vi.fn(),
-    selectAudioDevice: vi.fn().mockResolvedValue(undefined),
     toggleCall: vi.fn().mockResolvedValue(undefined),
     selectParticipant: vi.fn(),
     closeParticipant: vi.fn(),
-    chooseStagePlace: vi.fn(),
-    chooseStageModel: vi.fn(),
-    setStageOption: vi.fn(),
-    chooseStageBuild: vi.fn(),
-    decideStage: vi.fn(),
-    cancelStage: vi.fn(),
-    recheckStage: vi.fn(),
-    copyDiagnostics: vi.fn(),
-    cancelDownload: vi.fn(),
-    previewVoice: vi.fn(),
-    prepareVoice: vi.fn(),
-    retryIntegrations: vi.fn(),
-    retryGpu: vi.fn(),
     chooseMachine: vi.fn(),
     forgetMachine: vi.fn(),
     pairDevice: vi.fn(),
     openPairing: vi.fn(),
     closePairing: vi.fn(),
-    typeIntegrationKey: vi.fn(),
-    checkIntegrationKey: vi.fn(),
-    clearIntegrationKey: vi.fn(),
-    openIntegration: vi.fn(),
   };
   render(<MessageList conversation={view([message({ segment: "call:user-turn:4", role: "user", name: "Tú", text: "Una frase todavía abierta", draft: true, cancellable: true })])} />);
   fireEvent.click(screen.getByRole("button", { name: "Cancelar envío" }));
@@ -91,24 +72,6 @@ test("once the transcript arrives the bubble becomes the text and the waveform g
   expect(container.querySelector(".voice-wave")).toBeNull();
   expect(container.querySelector(".chat-bubble[data-live]")).toBeNull();
   expect(screen.getByText("Estoy diciendo esto")).toBeInTheDocument();
-});
-
-test("says under a bubble only what the gap cost: what was cut is said, what arrived whole says nothing", () => {
-  render(<MessageList conversation={view([
-    message({ segment: "call:user-catchup:1", role: "user", name: "Tú", text: "Lo dije mientras se caía la sala", offline: "buffered", offlineNote: "" }),
-    message({ segment: "call:user-catchup:2", role: "user", name: "Tú", text: "Y esto se cortó", time: base + 1_000, offline: "truncated", offlineNote: "Solo se guardaron los últimos 30 s" }),
-  ])} />);
-  expect(screen.queryByText(/Capturado/)).toBeNull();
-  expect(screen.getByText("Solo se guardaron los últimos 30 s")).toBeInTheDocument();
-});
-
-test("says under the bubble that a reply is being repeated because this browser never heard it", () => {
-  render(<MessageList conversation={view([
-    message({ segment: "call:voice:u1", role: "assistant", name: "Conversación", text: "Lo último que te dije", replayNote: "Repitiendo lo que no oíste" }),
-    message({ segment: "call:voice:u2", role: "assistant", name: "Conversación", text: "Y esto no se pudo", time: base + 1_000, replayNote: "No se pudo repetir · la sala ya no tiene ese audio" }),
-  ])} />);
-  expect(screen.getByText("Repitiendo lo que no oíste")).toBeInTheDocument();
-  expect(screen.getByText("No se pudo repetir · la sala ya no tiene ese audio")).toBeInTheDocument();
 });
 
 test("offers listening again only for a reply whose audio the room still holds", () => {

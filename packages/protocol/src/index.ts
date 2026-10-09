@@ -21,33 +21,68 @@ export interface Participant {
 
 export interface VoiceSession {
   session_id: Identifier;
-  sample_rate: number;
-  transcription?: Record<string, unknown>;
+  resume?: { token: string; seconds: number };
+  resumed?: boolean;
 }
 
-export interface SpeechEvent {
-  session_id: Identifier;
-  thread_id: Identifier;
-  revision: number;
-  utterance_id: Identifier;
-  text: string;
-  language?: string | null;
+/* The call speaks text with the room (sidevoice/sidevoice-core#89): the page's voice hears and says, and the room
+ * carries words. Every message the page sends names itself with `client_msg_id`, which the room acknowledges with
+ * `voice-ack` or refuses with an `error` naming it. */
+
+/** The person's turn: `started` is answered by the room with the turn's `revision`; its end carries that revision,
+ *  or `offline: true` for words said while the call had no room. */
+export interface VoiceUserTurn {
+  client_msg_id: Identifier;
+  turn_id: Identifier;
+  phase: "started" | "finished" | "cancelled";
+  revision?: number;
+  text?: string;
+  offline?: boolean;
+  merged?: boolean;
   [key: string]: unknown;
 }
 
+/** How a reply sounded on this device. */
+export interface VoicePlayback {
+  client_msg_id: Identifier;
+  utterance_id: Identifier;
+  status: "playing" | "heard" | "interrupted" | "unplayed" | "failed";
+  heard_chars: number;
+  [key: string]: unknown;
+}
+
+/** A reply to say. */
+export interface VoiceReply {
+  session_id: Identifier;
+  utterance_id: Identifier;
+  revision: number;
+  reply_revision: number;
+  thread_id: Identifier;
+  history_id: Identifier;
+  text: string;
+  language?: string | null;
+  replay?: boolean;
+  requested?: boolean;
+}
+
+export type RoomClientEvent =
+  | { type: "voice-user-turn"; data: VoiceUserTurn & { session_id: Identifier } }
+  | { type: "voice-playback"; data: VoicePlayback & { session_id: Identifier } }
+  | { type: "voice-settings"; data: { session_id: Identifier; ui_language: string } }
+  | { type: "voice-pong"; data: { session_id: Identifier } };
+
 export type RoomServerEvent =
   | { type: "voice-session"; data: VoiceSession }
-  | { type: "voice-speech" | "voice-speech-audio"; data: SpeechEvent }
-  | { type: "voice-cancel"; data: { session_id: Identifier; revision: number } }
-  | { type: "voice-user-turn"; data: Record<string, unknown> }
+  | { type: "voice-reply"; data: VoiceReply }
+  | { type: "voice-ack"; data: { client_msg_id: Identifier } }
+  | { type: "voice-user-turn"; data: { session_id: Identifier; phase: "started"; revision: number; thread_id: Identifier } }
   | { type: "voice-input-receipt"; data: Record<string, unknown> }
-  | { type: "voice-preparation"; data: Record<string, unknown> }
   /* Is anybody still there? The browser answers `{type:"voice-pong",data:{session_id}}`, and a
    * browser that stops answering loses its seat: behind a tunnel a closed tab leaves its socket up. */
   | { type: "voice-ping"; data: { session_id: Identifier } }
   /* `reason` names what the sentence says, so a page refused can say it in its own language even
-   * when nothing else about the refusal survived the trip. */
-  | { type: "error"; data: { message?: string; error?: string; reason?: string } }
+   * when nothing else about the refusal survived the trip. With `client_msg_id`, it refuses that message. */
+  | { type: "error"; data: { message?: string; error?: string; reason?: string; key?: string; client_msg_id?: Identifier } }
   | { type: string; data?: Record<string, unknown> };
 
 export const PRESENTATION_API = "/api/presentation" as const;

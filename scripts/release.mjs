@@ -23,8 +23,8 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-// What a site must hold to be served: the page, and the speech worker beside it.
-const REQUIRED = ['index.html', 'voice/index.html', 'voice/target.js', 'voice-browser/worker.js'];
+// What a site must hold to be served: the page, and where it is pointed.
+const REQUIRED = ['index.html', 'voice/index.html', 'voice/target.js'];
 const SUMS = 'SHA256SUMS';
 const ATTESTATION = 'attestation.sigstore.json';
 
@@ -55,7 +55,7 @@ function dist(args) {
   // timestamp of its own.
   const when = run('git', ['log', '-1', '--format=%ct', head]).trim();
   const tar = execFileSync('tar', ['-C', site, '--sort=name', '--owner=0', '--group=0', '--numeric-owner',
-    `--mtime=@${when}`, '-cf', '-', 'index.html', 'voice', 'voice-browser'], { maxBuffer: 1 << 30 });
+    `--mtime=@${when}`, '-cf', '-', 'index.html', 'voice'], { maxBuffer: 1 << 30 });
   const out = path.join(root, 'dist/release');
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });

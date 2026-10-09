@@ -28,21 +28,21 @@ function fakeIndexedDB(disk = new Map<string, unknown>()) {
   };
   return { factory: factory as unknown as IDBFactory, disk };
 }
-const entry = (id: string, kind: "transcript" | "catchup" | "receipt" = "transcript") => ({ id, kind, session_id: "s", node: "mac", payload: { id } });
+const entry = (id: string, kind: "user-turn" | "playback" = "user-turn") => ({ id, kind, session_id: "s", node: "mac", payload: { id } });
 
 test("without IndexedDB it keeps entries in memory, oldest first, until each is removed", async () => {
   let now = 1000;
   const box = createOutbox({ indexedDB: null, now: () => now });
   await box.ready;
   box.add(entry("a"));
-  box.add(entry("b", "receipt"));
+  box.add(entry("b", "playback"));
   now = 1000;   // the same millisecond: the order they were added in still holds
-  box.add(entry("c", "catchup"));
+  box.add(entry("c", "playback"));
   expect(box.list().map((e) => e.id)).toEqual(["a", "b", "c"]);
   expect(box.remove("b")).toBe(true);
   expect(box.remove("b")).toBe(false);
-  expect(box.list().map((e) => [e.id, e.kind, e.session_id, e.node])).toEqual([["a", "transcript", "s", "mac"], ["c", "catchup", "s", "mac"]]);
-  box.clear((e) => e.kind !== "receipt");
+  expect(box.list().map((e) => [e.id, e.kind, e.session_id, e.node])).toEqual([["a", "user-turn", "s", "mac"], ["c", "playback", "s", "mac"]]);
+  box.clear();
   expect(box.size).toBe(0);
 });
 
@@ -61,8 +61,8 @@ test("a reload of the same tab finds what was not acknowledged, and nothing of a
   let now = 1000;
   const before = createOutbox({ scope: "tab-1", indexedDB: factory, now: () => now });
   await before.ready;
-  before.add({ ...entry("t1"), payload: { pcm: new Int16Array([1, -2, 3]).buffer } });
-  before.add(entry("t2", "receipt"));
+  before.add({ ...entry("t1"), payload: { type: "voice-user-turn", data: { text: "hola" } } });
+  before.add(entry("t2", "playback"));
   before.remove("t2");
   const other = createOutbox({ scope: "tab-2", indexedDB: factory, now: () => now });
   await other.ready;
@@ -70,7 +70,7 @@ test("a reload of the same tab finds what was not acknowledged, and nothing of a
   const after = createOutbox({ scope: "tab-1", indexedDB: factory, now: () => now });
   await after.ready;
   expect(after.list().map((e) => e.id)).toEqual(["t1"]);
-  expect([...new Int16Array((after.get("t1")!.payload as { pcm: ArrayBuffer }).pcm)]).toEqual([1, -2, 3]);
+  expect(after.get("t1")!.payload).toEqual({ type: "voice-user-turn", data: { text: "hola" } });
   // However long it waits, what tab-2 left is still there for it.
   now += 365 * 24 * 3600 * 1000;
   const back = createOutbox({ scope: "tab-2", indexedDB: factory, now: () => now });
