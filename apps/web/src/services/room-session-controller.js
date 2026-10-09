@@ -836,8 +836,9 @@ function recordMessage(raw, socket) {
     // goes to is the one the room captured, and the voice takes the turn's revision as its boundary for stale replies.
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
+        // Every answer goes to the voice, an offline turn's too: it keeps those of its own turns and ignores the rest.
+        voice?.turnStarted?.(d);
         if (relay.answered(d.turn_id)) {
-            voice?.turnStarted?.(d);
             if (state.userTurn?.id === d.turn_id)
                 state.userTurn = { ...state.userTurn, thread: d.thread_id };
         }

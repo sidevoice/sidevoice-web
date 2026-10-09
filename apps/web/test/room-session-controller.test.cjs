@@ -949,6 +949,10 @@ test('Words said while the room was away go as their own offline message; a star
  voice.emit('turn',{client_msg_id:'o-2',turn_id:'u2',phase:'finished',text:'Sin sala',offline:true});
  assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.offline,d.turn_id]),[['finished',true,'u2']]);
  assert.deepEqual([c.s.run('history.at(-1).text'),c.s.run('history.at(-1).segment')],['Sin sala','s1:user-turn:u2']);
+ // The room takes it and answers with its revision: the voice gets that boundary too, though no start was sent.
+ const taken={session_id:'s1',phase:'started',turn_id:'u2',revision:9,thread_id:'a'};
+ c.push(first,{type:'voice-user-turn',data:taken});
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted')),[['turnStarted',taken]]);
  voice.emit('turn',{client_msg_id:'r-1',turn_id:'u3',phase:'started',offline:false});
  c.push(first,{type:'error',data:{key:'room.no_conversation',client_msg_id:'r-1'}});
  voice.emit('turn',{client_msg_id:'r-2',turn_id:'u3',phase:'finished',text:'Rechazado',offline:false});
