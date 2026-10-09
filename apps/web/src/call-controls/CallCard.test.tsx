@@ -83,6 +83,16 @@ test("reconnecting overrides both and is written", () => {
   expect(document.querySelector(".agent-mark")).toHaveAttribute("data-state", "reconnecting");
 });
 
+test("reconnecting is only said: muting and hanging up stay at hand", () => {
+  const host = fakeHost({ alwaysExpanded: true, call: snapshot({ busy: true }) });
+  render(<CallCard host={host} t={t} />);
+  act(() => { vi.advanceTimersByTime(CLICK_GUARD_MS + 10); });
+  expect(screen.getByRole("button", { name: "Mute" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Hang up" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Mute" }));
+  expect(host.run).toHaveBeenCalledWith({ command: "toggle-mute" });
+});
+
 test("the wave samples the level over time: silence drains it, muting flattens it", () => {
   const host = fakeHost();
   render(<CallCard host={host} t={t} />);

@@ -10,7 +10,7 @@ export interface AudioDevices {
 export type NodeReach = '' | 'ok' | 'unpaired' | 'revoked' | 'offline' | 'away';
 export interface SessionFacts {
  ws: unknown; stream: unknown; sessionId: string | null; roomRevision: number; roomInfo: Record<string, unknown> | null;
- connecting: boolean; reconnecting: boolean; switching: boolean; switchingSession: boolean; switchingTranscription: boolean;
+ connecting: boolean; reconnecting: boolean; reconnectShown: boolean; switching: boolean; switchingSession: boolean; switchingTranscription: boolean;
  roomBinding: {thread_id: string; title?: string; binding_id?: string} | null; viewedThread: string | null;
  people: unknown[]; history: ChatMessage[]; roomSeen: Record<string, number>; replayMarks: Record<string, string>; inputReceipts: Record<string, string>;
  userLive: boolean; botLive: boolean; activeSpeech: Record<string, unknown> | null; previewJob: unknown;
@@ -83,6 +83,7 @@ export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionSto
 export function receiptView(status: string): {symbol: string; label: string};
 export function shortModel(name: string | null | undefined): string;
 export const NO_MACHINE: string;
+export const RECONNECT_GRACE_MS: number;
 export const UNPAIRED: string;
 export function machinesView(s: SessionFacts): MachineView[];
 export function keyedProvider(s: SessionFacts, id: string): 'ready' | 'missing' | 'absent';

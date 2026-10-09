@@ -68,6 +68,33 @@ test('stopping the provider drops an in-flight answer and rejects pending work',
  assert.equal(client.enabled,false);
 });
 
+test('an answer finished while the socket is down goes to whoever started the client, never nowhere',async()=>{
+ const {client,sent}=setup();const handed=[];
+ client.start({socket:{readyState:3,send(){assert.fail('a closed socket is not written to')}},language:'auto',send:message=>handed.push(message)});
+ client._request=async()=>({text:'Dicho sin red',elapsed_ms:5,accelerator:'webgpu',model:'model'});
+ await client.transcribe({request_id:'req-7',audio_base64:wavBase64(new Array(1600).fill(0))});
+ assert.deepEqual(sent,[]);
+ assert.deepEqual(handed.map(m=>[m.type,m.data.request_id,m.data.session_id,m.data.text]),[['voice-transcript','req-7','session-1','Dicho sin red']]);
+});
+
+test('the same session on another socket keeps what is in flight; a new start drops it',async()=>{
+ const {client}=setup();const handed=[];let finish;
+ client.start({socket:{readyState:1,send(){}},language:'auto',send:message=>handed.push(message)});
+ client._request=()=>new Promise(resolve=>{finish=resolve});
+ const pending=client.transcribe({request_id:'req-8',audio_base64:wavBase64(new Array(1600).fill(0))});
+ const resumed={readyState:1,send(){}};
+ client.attach(resumed);
+ assert.equal(client.socket,resumed);
+ finish({text:'Sigue en curso',elapsed_ms:5,accelerator:'webgpu',model:'model'});await pending;
+ assert.deepEqual(handed.map(m=>m.data.text),['Sigue en curso'],'a swapped socket is not a new generation');
+ const late=client.transcribe({request_id:'req-9',audio_base64:wavBase64(new Array(1600).fill(0))});
+ client.start({socket:{readyState:1,send(){}},language:'auto',send:message=>handed.push(message)});
+ finish({text:'De otra sesión',elapsed_ms:5,accelerator:'webgpu',model:'model'});await late;
+ assert.equal(handed.length,1,'a new session does not get the old one\'s answer');
+ client.stop();client.attach({readyState:1});
+ assert.equal(client.socket,null,'a stopped client is not reattached');
+});
+
 test('switching between the page\'s engine and the native one fails what was waiting instead of leaving it hanging',async()=>{
  const {client,context}=setup();
  const posted=[];

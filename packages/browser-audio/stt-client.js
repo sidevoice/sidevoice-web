@@ -29,7 +29,7 @@ function decodeWav(base64){
 class BrowserTranscription{
  constructor(){
   this.worker=null;this.held=null;this.retired=new Set();this.pending=new Map();this.nextId=0;this.runtime=null;this.socket=null;
-  this.language='auto';this.enabled=false;this.generation=0;
+  this.language='auto';this.enabled=false;this.generation=0;this.deliver=null;
  }
  /* A native build: the desktop app's own engine (native-worker.js), same protocol; a page one: Whisper in a Worker. */
  _ensureWorker(native=!!this.native){
@@ -124,17 +124,21 @@ class BrowserTranscription{
   for(const request of this.pending.values())request.reject(new DOMException('Transcripción cancelada','AbortError'));this.pending.clear();
   worker?.terminate();
  }
- start({socket,language='auto'}){
+ /* `send` carries every answer to the room: whoever starts this client decides how one survives a socket that is down. */
+ start({socket,language='auto',send=null}){
   this.socket=socket;this.language=language;this.enabled=true;this.generation++;
+  this.deliver=send||(message=>{if(this.socket?.readyState===WebSocket.OPEN)this.socket.send(JSON.stringify(message))});
  }
+ /* The same session on another socket (a call the room took back): what is being transcribed carries on and answers there. */
+ attach(socket){if(this.enabled)this.socket=socket}
  stop(){
-  this.enabled=false;this.socket=null;this.generation++;
+  this.enabled=false;this.socket=null;this.deliver=null;this.generation++;
   const error=new DOMException('Transcripción cancelada','AbortError');
   for(const request of this.pending.values())request.reject(error);this.pending.clear();
   for(const worker of [...this.retired])this._retire(worker);
   this.worker?.postMessage({type:'cancel'});
  }
- _send(type,data){if(this.socket?.readyState===WebSocket.OPEN)this.socket.send(JSON.stringify({type,data}))}
+ _send(type,data){this.deliver?.({type,data})}
  /* One finished turn from the room: decode it, run Whisper, answer with the text or the reason. */
  async transcribe(request){
   const generation=this.generation,session_id=window.sidevoiceSessionId?.(),request_id=request?.request_id;

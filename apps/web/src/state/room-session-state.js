@@ -4,6 +4,9 @@ import { downloadsView } from './downloads-view.js';
 export const PRESENCE_LEVEL = .1;
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 export const GAP_BUFFER_SECONDS = 30;
+// A dropped socket is the network's business for this long: the call goes on as if nothing happened (no tone, no
+// line, no control held), and only a drop that outlasts it says the call is reconnecting.
+export const RECONNECT_GRACE_MS = 30000;
 // A turn closing is not the same as a person having finished: between one turn and the next there is a
 // breath, and the bed used to start in it, over someone who was still talking (2026-09-20).
 export const BED_AFTER_USER_MS = 2000;
@@ -16,6 +19,8 @@ const OUTPUT_TITLES = { ok: 'Salida de audio en orden', recovering: 'La salida d
 export function initialSessionFacts() {
     return {
         ws: null, stream: null, sessionId: null, roomRevision: 0, roomInfo: null, connecting: false, reconnecting: false,
+        // A reconnection that outlasted RECONNECT_GRACE_MS: only then is it shown.
+        reconnectShown: false,
         switching: false, switchingSession: false, switchingTranscription: false, roomBinding: null, viewedThread: null,
         people: [], history: [], roomSeen: {}, replayMarks: {}, inputReceipts: {},
         userLive: false, botLive: false, activeSpeech: null, previewJob: null,
@@ -62,10 +67,12 @@ export function initialSessionFacts() {
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
+// A call whose socket is being reopened is still a call: the person is not told otherwise until the grace is over.
+function inCall(s) { return !!(s.ws || s.reconnecting); }
 export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
 export function speechSegment(speech) { return speech.history_id || speech.session_id + ':voice:' + speech.utterance_id; }
 export function working(s, thread = selectedThread(s)) {
-    if (!s.ws || !thread)
+    if (!inCall(s) || !thread)
         return false;
     // false is an authoritative report too. Receipts and replies can never override it.
     if (typeof s.harness[thread] === 'boolean')
@@ -81,8 +88,8 @@ export function userSettled(s) {
 export function sessionStatus(s) {
     const speaker = s.userLive ? 'user' : s.botLive || s.activeSpeech?.started ? 'room' : 'nobody';
     const busy = working(s);
-    const tab = s.reconnecting ? 'reconnecting' : s.switching || s.switchingSession || s.switchingTranscription ? 'switching' :
-        !s.ws ? 'out' : s.pendingPhase === 'transcribing' ? 'transcribing' : 'listening';
+    const tab = s.reconnectShown ? 'reconnecting' : s.switching || s.switchingSession || s.switchingTranscription ? 'switching' :
+        !inCall(s) ? 'out' : s.pendingPhase === 'transcribing' ? 'transcribing' : 'listening';
     return { speaker, conversation: busy ? 'working' : speaker === 'room' ? 'speaking' : 'idle', tab,
         selected: selectedThread(s), viewed: viewedThread(s), harness: s.harness[selectedThread(s)] ?? null,
         working: busy, bed: busy && speaker === 'nobody' && userSettled(s) && !s.activeSpeech && !s.previewJob &&
@@ -144,8 +151,8 @@ export function micView(s) {
 }
 /** The call button: joining and leaving are the same button, and it says which one it is now. */
 export function callView(s) {
-    const joined = !!(s.ws || s.connecting);
-    return { joined, busy: !!(s.reconnecting || s.switchingSession),
+    const joined = !!(inCall(s) || s.connecting);
+    return { joined, busy: !!(s.reconnectShown || s.switchingSession),
         label: joined ? 'Salir de la sala' : 'Entrar en la sala' };
 }
 /** The name over the transcript: the conversation being looked at, whoever it is. */
@@ -256,7 +263,7 @@ export function conversationView(s) {
         sounding += Number(r.role === 'assistant' && ['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause', 'playing'].includes(r.audio));
     }
     return { messages: records.map(r => ({ ...r, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
-            audioNote: audioNote(r, ahead.get(r), { seconds: Number(s.voicePreferences?.replay_on_return_seconds ?? 120), now: s.now || Date.now() }), offlineNote: offlineNote(r), deliveryNote: deliveryNote(r), replayNote: r.role === 'assistant' ? REPLAY_NOTES[s.replayMarks[r.segment]] || '' : '',
+            audioNote: audioNote(r, ahead.get(r)), offlineNote: offlineNote(r), deliveryNote: deliveryNote(r), replayNote: r.role === 'assistant' ? REPLAY_NOTES[s.replayMarks[r.segment]] || '' : '',
             playback: playbackState(r, s), karaoke: s.karaokeState?.segment === r.segment ? s.karaokeState : null })),
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
@@ -406,7 +413,7 @@ export function liveText(s) {
         return 'Reconectando con la sala…';
     if (v.tab === 'switching')
         return 'Cambiando de conversación…';
-    if (s.ws && s.stream && s.micEnabled === false)
+    if (inCall(s) && s.stream && s.micEnabled === false)
         return 'Micrófono silenciado';
     if (v.speaker === 'user')
         return 'Te estamos escuchando…';
@@ -414,7 +421,7 @@ export function liveText(s) {
         return 'La conversación está hablando · Puedes interrumpir';
     if (v.tab === 'transcribing')
         return 'Procesando tu intervención…';
-    return s.ws ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la sala · Esperando a una conversación') : 'Entra en la sala para hablar.';
+    return inCall(s) ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la sala · Esperando a una conversación') : 'Entra en la sala para hablar.';
 }
 // A receipt/reply records evidence about its own turn, never an instruction to extinguish a light.
 export function recordReceipt(s, id, status, at) {
@@ -480,13 +487,10 @@ export function offlineNote(r) {
         ? 'Solo se guardaron los últimos ' + GAP_BUFFER_SECONDS + ' s'
         : '';
 }
-export function audioNote(r, ahead = 0, replay = null) {
-    // Three of these mean nobody was listening when the reply arrived; the room keeps it and repeats it when
-    // someone returns to the conversation within this device's window, and the note promises it only while
-    // that is still true — past the window it says what happened and nothing more.
-    const repeats = !replay || (replay.seconds > 0 && (!r.time || replay.now - r.time < replay.seconds * 1000));
-    const away = where => where + (repeats ? ' · Se repite al volver' : '');
-    const reasons = { newer_turn: 'Empezaste otra intervención', user_speaking: 'Estabas hablando', focus_changed: away('No estabas en esta conversación'), call_ended: away('No estabas en la llamada'), session_changed: away('No estabas en la llamada'), expired_audio_turn: 'El turno de audio había caducado', queue_full: 'Cola de audio llena', user_interrupted: 'Interrumpiste el audio', user_skipped: 'Lo saltaste', playback_failed: 'Falló la reproducción', service_restarted: 'Se reinició el servicio', channel_closed: 'Canal de voz cerrado' };
+export function audioNote(r, ahead = 0) {
+    // Nothing a person did not hear is repeated by itself: a reply nobody was there for says so, and replaying it
+    // is the person's choice.
+    const reasons = { newer_turn: 'Empezaste otra intervención', user_speaking: 'Estabas hablando', focus_changed: 'No estabas en esta conversación', call_ended: 'No estabas en la llamada', session_changed: 'No estabas en la llamada', expired_audio_turn: 'El turno de audio había caducado', queue_full: 'Cola de audio llena', user_interrupted: 'Interrumpiste el audio', user_skipped: 'Lo saltaste', playback_failed: 'Falló la reproducción', service_restarted: 'Se reinició el servicio', channel_closed: 'Canal de voz cerrado' };
     const reason = reasons[r.audio_reason];
     if (r.audio === 'waiting_for_pause')
         return 'Audio pendiente · Breve pausa antes de hablar';
@@ -497,6 +501,9 @@ export function audioNote(r, ahead = 0, replay = null) {
         return 'Audio pendiente · ' + (ahead > 1 ? 'Hay ' + ahead + ' respuestas antes' : 'Esperando a que termine la respuesta anterior');
     if (r.audio === 'text_only')
         return 'Sin audio' + (reason ? ' · ' + reason : ' · Motivo no registrado');
+    // Published while this device was away: none of it sounded, which is not the same as being cut off.
+    if (r.audio_reason === 'unheard')
+        return 'Audio no reproducido';
     if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)
         return 'Audio interrumpido' + (reason ? ' · ' + reason : '') + ' · El texto puede incluir partes que no sonaron';
     if (r.audio === 'failed' && r.audio_reason === 'unconfirmed')
