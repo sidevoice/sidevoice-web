@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { Button } from "../../components/ui/Button";
-import { voiceChoices, SPEED, PROVIDER_NAMES, type VoiceSettings as Settings } from "../../services/voice-settings.js";
+import { voiceChoices, SPEED, PROVIDER_NAMES, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 
 /* The call's voice as the person chooses it: what transcribes, what speaks and with which voice, and when a turn ends.
@@ -85,12 +85,12 @@ function VoiceChoices({ draft }: { draft: Settings }) {
       <fieldset className="voice-stage">
         <legend>Turnos</legend>
         <label>Paciencia
-          <NativeSelect id="voice-patience" value={draft.patience} onChange={(event) => edit({ patience: event.target.value })}>
+          <NativeSelect id="voice-patience" value={draft.patience} onChange={(event) => edit({ patience: event.target.value as Settings["patience"] })}>
             {PATIENCE.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </NativeSelect>
         </label>
         <label>Fin del turno
-          <NativeSelect id="voice-end-of-turn" value={draft.end_of_turn} onChange={(event) => edit({ end_of_turn: event.target.value })}>
+          <NativeSelect id="voice-end-of-turn" value={draft.end_of_turn} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
             <option value="silence">Silencio</option>
             <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn && draft.end_of_turn !== "smart-turn"}>Inteligente (Smart Turn)</option>
           </NativeSelect>
@@ -113,7 +113,7 @@ export function VoiceSettings() {
         <p role="alert" className="voice-catalogue-error">{catalogue.error} <Button id="voice-catalogue-retry" variant="ghost" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>Reintentar</Button></p>
       ) : null}
       {catalogue.state === "ready" && draft ? <VoiceChoices draft={draft} /> : null}
-      <p className="muted">Durante una llamada, cambiar un modelo, su compilación, el idioma, la voz o la velocidad reinicia la voz un momento: lo que estés diciendo se descarta y la respuesta que suena se corta. La paciencia y el fin del turno se aplican sin cortar.</p>
+      <p className="muted">Durante una llamada, cambiar un modelo, su compilación o el fin del turno reinicia la voz un momento: lo que estés diciendo se descarta y la respuesta que suena se corta. El idioma, la voz, la velocidad y la paciencia se aplican sin cortar.</p>
     </section>
   );
 }

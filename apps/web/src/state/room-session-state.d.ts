@@ -31,7 +31,7 @@ export interface SessionFacts {
  speechLanguage: string; inApp: boolean;
  /** The voice settings this device keeps, the ones the settings pane is editing, the voice's catalogue, and whether a
   *  key is kept for each remote provider. */
- voiceSettings: import('../services/voice-settings.js').VoiceSettings | null; voiceDraft: import('../services/voice-settings.js').VoiceSettings | null;
+ voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
  voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; models: import('../services/voice-settings.js').VoiceModel[]; error: string};
  providerKeys: Record<string, boolean | null>;
 }

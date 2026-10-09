@@ -9,10 +9,11 @@ import type { SidevoiceActions } from "../../state/room-types";
 afterEach(cleanup);
 
 const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
+const entry = { family: "test", parametersM: 1, license: "MIT" };
 const models = [
-  { id: "whisper-base", capabilities: ["stt"], languages: ["es"], voices: [], installed: true, builds: [build("whisper-base/int8")] },
-  { id: "kokoro-82m-v1.0", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], installed: true, builds: [build("kokoro/int8")] },
-  { id: "gpt-4o-transcribe", capabilities: ["stt"], languages: [], voices: [], installed: false, builds: [build("gpt-4o-transcribe/openai", { backend: "openai", accelerator: "remote" })] },
+  { ...entry, id: "whisper-base", capabilities: ["stt"], languages: ["es"], voices: [], installed: true, builds: [build("whisper-base/int8")] },
+  { ...entry, id: "kokoro-82m-v1.0", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], installed: true, builds: [build("kokoro/int8")] },
+  { ...entry, id: "gpt-4o-transcribe", capabilities: ["stt"], languages: [], voices: [], installed: false, builds: [build("gpt-4o-transcribe/openai", { backend: "openai", accelerator: "remote" })] },
 ];
 
 function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {}) {

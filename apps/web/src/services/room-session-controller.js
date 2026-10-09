@@ -186,7 +186,7 @@ let holding=false,spaceDown=false;
 // How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
 let screenWakeLock=null,wakeRequest=null,wakeEpoch=0,wakeRetries=0;
-/* ----- the call's voice (`voice-host.js`): it hears the person and says the replies; the page only carries what it
+/* ----- the call's voice (`voice-module.js`): it hears the person and says the replies; the page only carries what it
  * reports to the room, and hands it what the room sends ----- */
 let voice=null;
 const relay=createTurnRelay();

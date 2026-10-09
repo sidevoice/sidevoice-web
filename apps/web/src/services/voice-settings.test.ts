@@ -4,13 +4,14 @@ import { defaultVoiceSettings, editVoiceSettings, providerOf, readVoiceSettings,
 /* The voice settings this device keeps, and the choices the pane offers from the voice's catalogue. */
 
 const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 80e6, memoryMb: 200, available: true, reasons: [], installed: false, ...extra });
+const entry = { family: "test", parametersM: 1, license: "MIT" };
 const catalogue: VoiceModel[] = [
-  { id: "whisper-base", capabilities: ["stt"], languages: ["es", "en"], voices: [], installed: true, recommendedBuild: "whisper-base/int8",
+  { ...entry, id: "whisper-base", capabilities: ["stt"], languages: ["es", "en"], voices: [], installed: true, recommendedBuild: "whisper-base/int8",
     builds: [build("whisper-base/int8", { accelerator: "cpu", installed: true }), build("whisper-base/fp16", { available: false, reasons: [{ code: "wasm-memory", params: {} }] })] },
-  { id: "whisper-large", capabilities: ["stt"], languages: ["en"], voices: [], installed: false, builds: [build("whisper-large/int8", { available: false, reasons: [{ code: "memory", params: {} }] })] },
-  { id: "kokoro-82m-v1.0", capabilities: ["tts"], languages: ["es", "en"], voices: [{ id: "ef_dora", languages: ["es"], gender: "female" }], installed: true, builds: [build("kokoro/int8")] },
-  { id: "gpt-4o-transcribe", capabilities: ["stt"], languages: [], voices: [], installed: false, builds: [build("gpt-4o-transcribe/openai", { backend: "openai", accelerator: "remote", precision: "remote" })] },
-  { id: "eleven-v3", capabilities: ["tts"], languages: [], voices: [], installed: true, builds: [build("eleven-v3/elevenlabs", { backend: "elevenlabs", accelerator: "remote", precision: "remote" })] },
+  { ...entry, id: "whisper-large", capabilities: ["stt"], languages: ["en"], voices: [], installed: false, builds: [build("whisper-large/int8", { available: false, reasons: [{ code: "memory", params: {} }] })] },
+  { ...entry, id: "kokoro-82m-v1.0", capabilities: ["tts"], languages: ["es", "en"], voices: [{ id: "ef_dora", languages: ["es"], gender: "female" }], installed: true, builds: [build("kokoro/int8")] },
+  { ...entry, id: "gpt-4o-transcribe", capabilities: ["stt"], languages: [], voices: [], installed: false, builds: [build("gpt-4o-transcribe/openai", { backend: "openai", accelerator: "remote", precision: "remote" })] },
+  { ...entry, id: "eleven-v3", capabilities: ["tts"], languages: [], voices: [], installed: true, builds: [build("eleven-v3/elevenlabs", { backend: "elevenlabs", accelerator: "remote", precision: "remote" })] },
 ];
 function memory(entries: Record<string, string> = {}) {
   const stored = new Map(Object.entries(entries));
@@ -70,7 +71,7 @@ test("a remote model has no builds to choose, takes the offered languages, and t
 });
 
 test("a kept model the catalogue lacks stays chosen and says so; smart-turn is offered once a model can end a turn", () => {
-  const choices = voiceChoices([...catalogue, { id: "smart-turn-v3", capabilities: ["end-of-turn"], languages: [], voices: [], installed: false, builds: [] }],
+  const choices = voiceChoices([...catalogue, { ...entry, id: "smart-turn-v3", capabilities: ["end-of-turn"], languages: [], voices: [], installed: false, builds: [] }],
     { ...defaultVoiceSettings("es"), stt: { model: "parakeet", build: null, language: null } });
   expect(choices.stt.options[0]).toEqual({ id: "parakeet", provider: null, disabled: false, note: "no está en el catálogo de esta voz" });
   expect(choices.endOfTurn).toEqual({ smartTurn: true, note: "" });

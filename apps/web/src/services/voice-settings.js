@@ -3,15 +3,14 @@
  * (`models()`, the engine's models with their builds ranked for this device). */
 
 /**
- * @typedef {{model: string, build: string | null, language: string | null}} SttSettings
- * @typedef {{model: string, build: string | null, voice: string | null, speed: number}} TtsSettings
- * @typedef {{stt: SttSettings, tts: TtsSettings, patience: string, end_of_turn: string}} VoiceSettings
- * @typedef {{code: string, params?: Record<string, number>}} BuildReason
- * @typedef {{id: string, backend: string, accelerator?: string, precision: string, downloadBytes: number, memoryMb: number,
- *   available: boolean, reasons: BuildReason[], installed: boolean}} VoiceBuild
- * @typedef {{id: string, family?: string, capabilities: string[], languages: string[],
- *   voices: {id: string, languages?: string[], gender?: string}[], installed: boolean, builds: VoiceBuild[],
- *   recommendedBuild?: string}} VoiceModel
+ * @typedef {import('@sidevoice/voice').VoiceSettings} VoiceSettings
+ * @typedef {import('@sidevoice/voice').VoiceModel} VoiceModel
+ * @typedef {{
+ *   stt: {model: string, build: string | null, language: string | null},
+ *   tts: {model: string, build: string | null, voice: string | null, speed: number},
+ *   patience: NonNullable<VoiceSettings['patience']>,
+ *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
+ * }} DeviceVoiceSettings The settings this device keeps: every field filled, so they are the voice's `VoiceSettings` as they are.
  */
 
 export const VOICE_SETTINGS_KEY = 'sidevoice.voice-settings';
@@ -21,7 +20,11 @@ export const END_OF_TURN = ['silence', 'smart-turn'];
 export const PROVIDERS = ['openai', 'elevenlabs'];
 export const SPEED = { min: 0.5, max: 2, step: 0.05 };
 
-/** What a call starts with when the person chose nothing, in `language`. */
+/**
+ * What a call starts with when the person chose nothing, in `language`.
+ * @param {string | null | undefined} language
+ * @returns {DeviceVoiceSettings}
+ */
 export function defaultVoiceSettings(language) {
   return {
     stt: { model: 'whisper-base', build: null, language: language || null },
@@ -33,7 +36,12 @@ export function defaultVoiceSettings(language) {
 
 const text = (value) => (typeof value === 'string' && value ? value : null);
 
-/** `value` as settings, field by field: what is missing or malformed takes `defaults`' value. */
+/**
+ * `value` as settings, field by field: what is missing or malformed takes `defaults`' value.
+ * @param {any} value
+ * @param {DeviceVoiceSettings} defaults
+ * @returns {DeviceVoiceSettings}
+ */
 export function normaliseVoiceSettings(value, defaults) {
   const stt = value?.stt ?? {}, tts = value?.tts ?? {};
   const speed = Number(tts.speed);
@@ -54,7 +62,12 @@ export function normaliseVoiceSettings(value, defaults) {
   };
 }
 
-/** The settings this device keeps, or the defaults for `language`. */
+/**
+ * The settings this device keeps, or the defaults for `language`.
+ * @param {Storage | null | undefined} storage
+ * @param {string | null | undefined} language
+ * @returns {DeviceVoiceSettings}
+ */
 export function readVoiceSettings(storage, language) {
   const defaults = defaultVoiceSettings(language);
   try {
@@ -69,7 +82,13 @@ export function writeVoiceSettings(storage, settings) {
   try { storage?.setItem(VOICE_SETTINGS_KEY, JSON.stringify(settings)); } catch { /* a full or blocked storage keeps nothing */ }
 }
 
-/** `settings` with `patch` applied: a new model drops the build, and the voice or a language it does not have. */
+/**
+ * `settings` with `patch` applied: a new model drops the build, and the voice or a language it does not have.
+ * @param {DeviceVoiceSettings} settings
+ * @param {{stt?: Partial<DeviceVoiceSettings["stt"]>, tts?: Partial<DeviceVoiceSettings["tts"]>, patience?: DeviceVoiceSettings["patience"], end_of_turn?: DeviceVoiceSettings["end_of_turn"]}} patch
+ * @param {VoiceModel[]} [models]
+ * @returns {DeviceVoiceSettings}
+ */
 export function editVoiceSettings(settings, patch, models = []) {
   const stt = { ...settings.stt, ...patch.stt }, tts = { ...settings.tts, ...patch.tts };
   if (patch.stt?.model && patch.stt.model !== settings.stt.model) {
@@ -146,7 +165,7 @@ function stageChoices(models, capability, stage, keys) {
  * What the pane offers, for `settings`, from `models` (the voice's catalogue) and `keys` (`{provider: boolean}`, whether
  * this device keeps a key for it). `languages` are the tags offered for a model that lists none (a remote one).
  * @param {VoiceModel[]} models
- * @param {VoiceSettings} settings
+ * @param {DeviceVoiceSettings} settings
  * @param {Record<string, boolean | null>} [keys]
  * @param {string[]} [languages]
  */
