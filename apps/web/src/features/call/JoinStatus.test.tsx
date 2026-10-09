@@ -22,8 +22,8 @@ test("no join, no line", () => {
 });
 
 test("a step is one quiet line, and a failure takes its place as an alert", () => {
-  renderJoin({ step: "voice", text: "Cargando el modelo de voz (42 %)", progress: 42, failed: false });
-  expect(screen.getByRole("status")).toHaveTextContent("Cargando el modelo de voz (42 %)");
+  renderJoin({ step: "voice", text: "Preparando la voz (42 %)", progress: 42, failed: false });
+  expect(screen.getByRole("status")).toHaveTextContent("Preparando la voz (42 %)");
   expect(document.getElementById("join-status")?.dataset.state).toBe("busy");
 
   act(() => {

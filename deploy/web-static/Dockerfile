@@ -9,7 +9,7 @@
 FROM node:22-bookworm AS build
 WORKDIR /src
 COPY . .
-RUN npm ci && npm run build -w @sidevoice/protocol && npm run build -w @sidevoice/browser-audio \
+RUN npm ci && npm run build -w @sidevoice/protocol \
     && npm run build -w @sidevoice/web && node scripts/assemble-static-web.mjs /site
 
 FROM nginx:1.29-alpine

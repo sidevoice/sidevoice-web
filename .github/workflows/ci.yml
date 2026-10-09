@@ -58,12 +58,10 @@ jobs:
           # The nightly carries the version of the last release, so it says it is not that version.
           NAME="sidevoice-web-${VERSION}$([ "$KIND" = nightly ] && echo -nightly || true).tar.gz"
           mkdir dist-release
-          # The layout scripts/assemble-static-web.mjs makes, at the root of the archive: index.html, voice/,
-          # voice-browser/.
+          # The layout scripts/assemble-static-web.mjs makes, at the root of the archive: index.html and voice/.
           tar -C "$RUNNER_TEMP/site" --sort=name --owner=0 --group=0 --numeric-owner \
-            -czf "dist-release/$NAME" index.html voice voice-browser
+            -czf "dist-release/$NAME" index.html voice
           tar -tzf "dist-release/$NAME" | grep -x 'voice/index.html' >/dev/null
-          tar -tzf "dist-release/$NAME" | grep -x 'voice-browser/worker.js' >/dev/null
           (cd dist-release && sha256sum -- * > SHA256SUMS)
           ls -la dist-release; cat dist-release/SHA256SUMS
       - uses: actions/upload-artifact@v4

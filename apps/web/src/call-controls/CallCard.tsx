@@ -9,9 +9,8 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronIcon, HangupIcon, HARNESS_NAMES, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon, SpeakerIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
-import type { AudioDeviceOption } from "../state/room-session-state";
 import type { ParticipantView } from "../state/room-types";
-import type { CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
+import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import type { Translate } from "./i18n";
 
 /** Space around the card inside its window, for its shadow. */

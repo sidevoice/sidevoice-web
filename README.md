@@ -19,15 +19,16 @@ already have with your agent into a voice call. The agent keeps its context and 
 speaks its replies, and you answer by voice and can interrupt it — from the sofa or on a walk, not only at your desk.
 
 **sidevoice-web** is the call interface: the screen you talk from. It pairs a device with your machine, shows the
-conversation, captures the microphone, plays the agent's replies and lets you interrupt them. It can transcribe
-and speak in the browser itself (Whisper and Kokoro, on WebGPU or WebAssembly), so no audio has to leave the device.
+conversation, and holds the call's voice: it hears you, says the agent's replies and lets you interrupt them, on the
+device itself, and speaks only text with the room. The voice is [sidevoice-voice](https://github.com/sidevoice/sidevoice-voice)'s
+module: on the web `@sidevoice/voice` on `@sidevoice/engine`, in the desktop app its native build.
 
 ## How it fits
 
 | Piece | Role |
 |---|---|
 | [sidevoice-connector](https://github.com/sidevoice/sidevoice-connector) | What you install on the machine where your agents run: their voice tools, and the supervisor of that machine's core. |
-| [sidevoice-core](https://github.com/sidevoice/sidevoice-core) | The conversations and the voice pipeline, next to the agents. This interface talks to it. |
+| [sidevoice-core](https://github.com/sidevoice/sidevoice-core) | The conversations and the room, next to the agents. This interface talks to it, in text. |
 | [sidevoice-desktop](https://github.com/sidevoice/sidevoice-desktop) | The app you call from. It bundles this interface and runs speech models natively. |
 | **sidevoice-web** (this repository) | The call interface, released as a versioned static site. |
 
@@ -79,13 +80,10 @@ For the dev server, run a core from [sidevoice-core](https://github.com/sidevoic
 
 ```
 apps/web/                 the React interface (Vite)
-packages/browser-audio/   in-browser transcription and speech: workers, models, the microphone
 packages/protocol/        the event schema shared with the core
 deploy/web-static/        the static-site container
 scripts/                  assembles the static site the releases and the desktop app use
 ```
-
-The model catalogues in `packages/browser-audio` are byte copies of sidevoice-core's, never edited here.
 
 ## Contributing
 

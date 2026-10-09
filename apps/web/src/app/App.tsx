@@ -10,7 +10,6 @@ import { CallToolbar } from "../features/call/CallToolbar";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
 import { PairingDialog } from "../features/pairing/PairingDialog";
-import { PreparationDialog } from "../features/call/PreparationDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
@@ -59,8 +58,6 @@ function RoomContent() {
       <ConnectionStatsDialog />
       <SettingsDialog />
       <PairingDialog />
-      <PreparationDialog />
-      <audio id="preview-audio" />
     </>
   );
 }

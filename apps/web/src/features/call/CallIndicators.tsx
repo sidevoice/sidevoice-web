@@ -1,7 +1,6 @@
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import { CallIcon, HangupIcon, MicrophoneIcon, SkipIcon, SpeakerIcon } from "../../components/ui/Icons";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { CallIcon, HangupIcon, MicrophoneIcon } from "../../components/ui/Icons";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
@@ -15,29 +14,6 @@ export function ScreenLock() {
       <i className="screen-lock-dot" aria-hidden="true" />
       <span id="screen-lock-text" className="sr-only">{lock.state ? lock.note : ""}</span>
     </span>
-  );
-}
-
-export function EchoCover() {
-  const echo = useRoomStore((state) => state.echo);
-  return (
-    <span id="echo-cover" className="screen-lock echo-cover" role="status" data-state={echo.state || undefined} title={echo.note || undefined} hidden={!echo.state}>
-      <i className="screen-lock-dot" aria-hidden="true" />
-      <span id="echo-cover-text" className="sr-only">{echo.state ? "Eco: " + echo.note : ""}</span>
-    </span>
-  );
-}
-
-
-/* Skip what is playing without saying anything: speaking over a reply to stop it also sends a message,
- * and cancelling that was the only way out. Only this browser skips; the reply stays written. */
-export function SkipButton() {
-  const playing = useRoomStore((state) => !!state.facts.activeSpeech);
-  return (
-    <Button id="skip-reply" variant="ghost" disabled={!playing} aria-label="Saltar lo que está sonando" title="Saltar lo que está sonando"
-      onClick={() => void window.sidevoiceActions?.skipReply()}>
-      <SkipIcon size={24} />
-    </Button>
   );
 }
 
@@ -65,28 +41,4 @@ export function CallButton() {
 export function MicControl({ children }: { children: React.ReactNode }) {
   const mic = useRoomStore((state) => state.mic);
   return <div id="mic-control" className="mic-control" data-muted={String(!mic.enabled)}>{children}</div>;
-}
-
-export function AudioDeviceSelects() {
-  const devices = useRoomStore((state) => state.audioDevices);
-  const choose = (kind: "input" | "output") => (event: React.ChangeEvent<HTMLSelectElement>) =>
-    void window.sidevoiceActions?.selectAudioDevice(kind, event.target.value);
-  // A long device name is cut in the select; its full name is on hover.
-  const named = (list: { id: string; label: string }[], id: string) => list.find((device) => device.id === id)?.label || "Predeterminado del sistema";
-  return (
-    <>
-      <label className="audio-device-choice"><MicrophoneIcon /><span className="sr-only">Micrófono</span>
-        <NativeSelect id="input-device" aria-label="Micrófono" title={named(devices.inputs, devices.inputId)} value={devices.inputId} onChange={choose("input")} disabled={!devices.available || devices.busy}>
-          {devices.inputs.length ? devices.inputs.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)
-            : <option value="default">Predeterminado del sistema</option>}
-        </NativeSelect>
-      </label>
-      <label className="audio-device-choice"><SpeakerIcon /><span className="sr-only">Altavoces</span>
-        <NativeSelect id="output-device" aria-label="Altavoces" title={named(devices.outputs, devices.outputId)} value={devices.outputId} onChange={choose("output")} disabled={!devices.available || !devices.outputAvailable || devices.busy}>
-          {devices.outputs.length ? devices.outputs.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)
-            : <option value="default">Predeterminado del sistema</option>}
-        </NativeSelect>
-      </label>
-    </>
-  );
 }

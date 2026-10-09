@@ -1,7 +1,7 @@
 # Releasing
 
-One version for the whole web, tagged `vX.Y.Z`. It lives in the root `package.json`, the three workspaces'
-`package.json` (`apps/web`, `packages/browser-audio`, `packages/protocol`), the web's pin of
+One version for the whole web, tagged `vX.Y.Z`. It lives in the root `package.json`, the two workspaces'
+`package.json` (`apps/web`, `packages/protocol`), the web's pin of
 `@sidevoice/protocol`, and `package-lock.json`; release-please moves them together (`release-please-config.json`).
 Never edit them by hand.
 
@@ -17,7 +17,7 @@ Assets of a release:
 
 - `sidevoice-web-X.Y.Z.tar.gz`: the static site, in the layout `scripts/assemble-static-web.mjs` makes, at the root
   of the archive: `index.html` (redirects to `/voice/`), `voice/` (the page, with an empty `target.js` for whoever
-  serves it to fill), `voice-browser/` (the workers and their WebAssembly). The same layout the desktop app vendors
+  serves it to fill). The same layout the desktop app vendors
   and `deploy/web-static/` serves.
 - `SHA256SUMS`.
 
