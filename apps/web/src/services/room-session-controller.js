@@ -222,7 +222,6 @@ function releaseScreenWakeLock(){
  if(lock)lock.release().catch(()=>{});
  showScreenLock('','');
 }
-let pendingBotText=[];
 let textAttempt=null;
 try{state.roomSeen=JSON.parse(sessionStorage.getItem('voice-room-seen')||'{}')}catch{}
 try{state.history=JSON.parse(sessionStorage.getItem('voice-room-transcript')||'[]');if(!Array.isArray(state.history))state.history=[]}catch{}
@@ -251,21 +250,38 @@ function keepMessage(kind,type,data){return outbox.add({id:data.client_msg_id,ki
  * answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
  * is let go. */
 function flushOutbox(socket=state.ws){
- if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId)return;
+ // A socket carries nothing until the room has answered its hello with the session it speaks for.
+ if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId||socket.session!==state.sessionId)return;
  for(const entry of outbox.list()){
   if(entry.sentOn===socket)continue;
   if(entry.node!==state.node){outbox.remove(entry.id);continue}
   let data=entry.payload.data;
   if(entry.kind==='user-turn'){
+   // A start made for a session the room has replaced is never answered there: the room takes each message once
+   // per device, so sent again it is only acknowledged. Its turn's end goes as words said while away.
+   if(data.phase==='started'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
    const route=relay.route(data);
    if(route.wait)return;
    if(route.drop){outbox.remove(entry.id);continue}
-   data=route.send;
+   data=roomTurn(route.send);
+   if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-offline:'+entry.id);
   }
+  if(entry.kind==='playback')data=roomPlayback(data);
   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
-  if(entry.kind==='user-turn'&&data.phase==='started')relay.sent(data.turn_id);
+  if(entry.kind==='user-turn'&&data.phase==='started')relay.sent(data.turn_id,entry.id);
   entry.sentOn=socket;
  }
+}
+// The voice's turn as the room reads it: its measured stages under the room's name for them.
+function roomTurn(data){const {timings,...turn}=data;return timings?{...turn,timings_ms:timings}:turn}
+/* The voice's playback report as the room takes it: a reason only from the room's list. The voice names a failure by
+ * its own code (`credential-missing`, say), which the room would refuse; the room says `playback_failed` itself. */
+const ROOM_PLAYBACK_REASONS=new Set(['user_interrupted','newer_turn','user_skipped','focus_changed','call_ended','unheard']);
+function roomPlayback(data){const {reason,...report}=data;return ROOM_PLAYBACK_REASONS.has(reason)?data:report}
+// Words said while away become the room's own row: the bubble takes that row's id, so history and receipts find it.
+function nameOfflineRow(turnId,id){
+ const draft='turn:'+turnId;if(!state.history.some(r=>r.segment===draft))return;
+ state.history=state.history.map(r=>r.segment===draft?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
 }
 
 // Where the reader of a reply is, on the bubble of that reply: its row, by the reply this page was handed.
@@ -326,10 +342,11 @@ async function refresh(){if(nodeBase==null)return;const asked=++refreshAsked,ses
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(d.binding.thread_id);
  if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on.
-  pendingBotText=[];state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
+  state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(call.error);});
  applyMicState();
+ if(previousThread&&targetId()!==previousThread)void silenceLeftConversation();
  // The page follows the build of whoever serves it: this answer's only when the node itself served the page.
  if(target===''&&nodeBase==='')followServedBuild(d.room?.web_build);
 }catch{state.liveNote='Servidor no disponible'}}
@@ -861,7 +878,8 @@ function recordMessage(raw, socket) {
         // A refusal of one of this page's own messages is about that message: a turn's start the room would not
         // take never gets a revision, and the rest is the room keeping its own books.
         if (d.client_msg_id) {
-            relay.refused(outbox.get(d.client_msg_id)?.payload?.data?.turn_id);
+            relay.refusedMessage(d.client_msg_id);
+            flushOutbox();
             return;
         }
         setRoomError(sayRefusal(d, d.error || 'Error de conexión'));
@@ -894,6 +912,8 @@ function voiceTurn(turn){
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 function voicePlayback(report){
  if(report.status!=='playing')repliesSpoken.delete(report.utterance_id);
+ // Why a reply could not be said stays here, where it can be acted on, and in the machine's log.
+ if(report.status==='failed'&&report.reason){setRoomError(voiceErrorText({code:report.reason}));reportClientError({kind:'playback',message:report.utterance_id+': '+report.reason})}
  keepMessage('playback','voice-playback',report);flushOutbox();
 }
 function voiceStateChanged(next){
@@ -919,11 +939,22 @@ function voiceLevel(level){
 window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
 function receiveReply(d){
  if(d.session_id!==state.sessionId)return;
- repliesSpoken.set(d.utterance_id,d);
  state.roomRevision=Math.max(state.roomRevision,d.revision);
  if(!d.replay)state.turns=recordReply(state,d);
  add('assistant',d.text,'voice:'+d.utterance_id,d.thread_id,{history_id:d.history_id,session:d.session_id,revision:d.revision});
+ // A reply of a conversation this call has left is not said: the room hears so, unless the person asked for it.
+ if(d.thread_id!==targetId()&&!d.requested){
+  keepMessage('playback','voice-playback',{client_msg_id:crypto.randomUUID(),utterance_id:d.utterance_id,status:'unplayed',heard_chars:0,reason:'focus_changed',at:Date.now()});
+  flushOutbox();return;
+ }
+ repliesSpoken.set(d.utterance_id,d);
  voice?.speak(d);
+}
+// A move to another conversation ends what the last one was saying here: the voice stops (the reply playing cut, the
+// queue dropped, each reported) and listens again on the same models.
+async function silenceLeftConversation(){
+ const current=voice;if(!current)return;
+ try{await current.stop();if(voice===current)await current.start()}catch(error){if(voice===current)setRoomError(voiceErrorText(error))}
 }
 function roomSocketUrl(){if(nodeBase==null)throw Error(reachNote(state)||NO_MACHINE);return callSocketUrl(nodeBase,location)}
 const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.';
@@ -1021,7 +1052,11 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
   await next.setSettings(state.voiceSettings);
-  await next.start();if(epoch!==connectEpoch)return;
+  // A hang-up while the settings were taken leaves this join: nothing of it may start the microphone after it.
+  if(epoch!==connectEpoch)return;
+  await next.start();
+  // One that came while starting stops what this join started, unless a newer call has taken the same voice.
+  if(epoch!==connectEpoch){if(voice!==next)next.stop().catch(()=>{});return}
   applyMicState();applyLockScreen(true);
   joinStatus('room');
   const session=await joinRoom(epoch,{resume:storedTicket()});if(epoch!==connectEpoch||!session)return;
@@ -1068,6 +1103,8 @@ async function joinRoom(epoch,context){
   state.sessionId=session.session_id;relay.reset();
  }
  keepTicket(true);
+ // From here this socket speaks for the session: the outbox may use it.
+ socket.session=state.sessionId;
  window.sidevoiceTelemetry?.noteSession?.(state.sessionId);
  return session;
 }
@@ -1122,6 +1159,8 @@ async function lostConnection(event,epoch){
     hold=outboxHold={};
    }
    voice?.setOnline(true);
+   // The same session again: what waited in the outbox goes now, not at the next thing the voice says.
+   if(!hold)flushOutbox();
    void settleRejoin(epoch,hold);
    // Time spent in a tunnel is not time spent away: the idle clock starts again with the call.
    personSignal();
