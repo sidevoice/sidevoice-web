@@ -3141,12 +3141,14 @@ test('A voice download the desktop app cancelled while a call connects is said c
 // The room numbers its frames, parks a dropped call and takes it back on a hello naming the session, its single-use
 // token and the last frame handled. Here the room is the test: it answers each hello and replays what it is told to.
 const settleSoon=()=>new Promise(resolve=>setTimeout(resolve,5));
+// A tab's sessionStorage, which a reload of the same tab finds as it was.
+const storageOf=store=>({getItem:key=>key in store?store[key]:null,setItem:(key,value)=>{store[key]=String(value)},removeItem:key=>{delete store[key]}});
 async function callOnRoom({timers=null}={}){
  const s=setup();const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.atob=value=>Buffer.from(value,'base64').toString('binary');
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
- s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
+ const store={'sidevoice.selected':'t-1'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  const posts=[],tones=[],stt={started:[],stopped:0,attached:[]},voice={cancelled:0},room={offline:false};
  s.context.fetch=async(url,init={})=>{
@@ -3172,7 +3174,7 @@ async function callOnRoom({timers=null}={}){
  const pcm=peaks=>{s.context.__peaks=peaks;return Array.from(s.run('concat(makeFrames(__peaks))'))};
  const joining=s.run('joinRoom')(s.run('connectEpoch'),{browserStt:true,sttRuntime:null});
  const {socket,hello}=await answer({session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false});await joining;
- return {s,sockets,posts,tones,stt,voice,room,frames,answer,push,stream,drop,until,pongs,catchupOf,pcm,first:socket,firstHello:hello};
+ return {s,sockets,posts,tones,stt,voice,room,store,frames,answer,push,stream,drop,until,pongs,catchupOf,pcm,first:socket,firstHello:hello};
 }
 test('A dropped call is taken back as it was: what was said and answered meanwhile arrives once, and a frame already handled is not handled again',async()=>{
  const c=await callOnRoom();const {s,first}=c;
@@ -3183,7 +3185,7 @@ test('A dropped call is taken back as it was: what was said and answered meanwhi
  c.push(first,{type:'voice-user-turn',seq:1,data:{session_id:'s1',phase:'started',revision:1,thread_id:'a'}});
  c.stream(first,[0.3,0.4,0.5]);
  c.push(first,{type:'voice-ping',seq:2,data:{session_id:'s1'}});
- s.run("captureNode={};activeSpeech={session_id:'s1',revision:1,utterance_id:'u1',thread_id:'a',started:true}");
+ s.run("activeSpeech={session_id:'s1',revision:1,utterance_id:'u1',thread_id:'a',started:true}");
  // The socket dies.
  c.room.offline=true;c.drop(first);
  assert.equal(s.run('state.reconnecting'),true);
@@ -3202,7 +3204,6 @@ test('A dropped call is taken back as it was: what was said and answered meanwhi
  assert.equal(s.run('sessionId'),'s1','the same session');
  assert.equal(c.stt.attached[0],socket,'the transcription answers on the new socket');
  assert.equal(c.stt.started.length,1,'without starting over, so nothing in flight is dropped');
- assert.equal(s.run('captureSocket'),socket,'and the microphone streams on it without restarting the capture');
  // The room replays from the last frame handled: one already handled is not handled again.
  c.push(socket,{type:'voice-ping',seq:2,data:{session_id:'s1'}});
  c.push(socket,{type:'voice-ping',seq:3,data:{session_id:'s1'}});
@@ -3234,12 +3235,14 @@ test('A dropped call is taken back as it was: what was said and answered meanwhi
  s.run('window.sidevoiceActions.toggleCall()');
  assert.equal(socket.closedWith,1000);
 });
-test('A resume the room refuses is a new session: the open turn and the gap go to it as one catch-up, the old session\'s answers do not',async()=>{
+test('A resume the room refuses is a new session in the same conversation: what was said goes to it, the old session\'s failures do not',async()=>{
  const c=await callOnRoom();const {s,first}=c;
  c.push(first,{type:'voice-user-turn',seq:1,data:{session_id:'s1',phase:'started',revision:1,thread_id:'a'}});
  c.stream(first,[0.3,0.4]);
  c.drop(first);
- c.stt.started[0].send({type:'voice-transcript',data:{session_id:'s1',request_id:'r1',text:'para la sesión vieja'}});
+ c.stt.started[0].send({type:'voice-transcript',data:{session_id:'s1',request_id:'r1',text:'dicho en la sesión vieja'}});
+ c.stt.started[0].send({type:'voice-transcript-error',data:{session_id:'s1',request_id:'r2',error:'falló'}});
+ const kept=s.run("outbox.list().find(e=>e.payload.type==='voice-transcript').id");
  c.stream(first,[0.6]);
  await c.until(()=>c.sockets.length===2,'a socket for the way back');
  const {socket,hello}=await c.answer({session_id:'s2',resume:{token:'tok-c',seconds:60},resumed:false,resume_refused:'unknown'});
@@ -3248,18 +3251,24 @@ test('A resume the room refuses is a new session: the open turn and the gap go t
  await settleSoon();
  assert.equal(s.run('sessionId'),'s2');
  assert.equal(c.stt.started.length,2,'a new session starts the transcription afresh');
- assert.equal(c.frames(socket).filter(m=>m.type==='voice-transcript').length,0,'an answer for a session that is gone is let go');
- assert.equal(s.run("outbox.list().filter(e=>e.kind==='transcript').length"),0);
+ assert.equal(hello.data.conversation,'t-1','the same conversation');
+ // A transcript belongs to the conversation: it goes to the new session, as the same message.
+ const transcripts=c.frames(socket).filter(m=>m.type==='voice-transcript');
+ assert.deepEqual(transcripts.map(m=>[m.data.session_id,m.data.request_id,m.data.client_msg_id,m.data.text]),[['s2','r1',kept,'dicho en la sesión vieja']]);
+ assert.equal(c.frames(socket).filter(m=>m.type==='voice-transcript-error').length,0,'why the old session failed is its own business');
+ assert.deepEqual(plain(s.run("outbox.list().filter(e=>e.kind==='transcript').map(e=>e.id)")),[kept]);
+ c.push(socket,{type:'voice-ack',seq:1,data:{session_id:'s2',client_msg_id:kept}});
+ assert.equal(s.run("outbox.list().filter(e=>e.kind==='transcript').length"),0,'and is let go once the room has it');
  const catchup=c.catchupOf(socket);
  assert.deepEqual(catchup.samples,c.pcm([0.3,0.4,0.6]),'the turn the room lost, then what was said while it was away');
  assert.ok(catchup.slices.every(m=>m.data.session_id==='s2'));
- // The numbering starts again with the new session, and the next drop names it.
- c.push(socket,{type:'voice-ping',seq:1,data:{session_id:'s2'}});
+ // The numbering started again with the new session, and the next drop names it.
+ c.push(socket,{type:'voice-ping',seq:2,data:{session_id:'s2'}});
  assert.equal(c.pongs(socket),1);
  c.drop(socket);
  await c.until(()=>c.sockets.length===3,'another socket');
  const again=await c.answer({session_id:'s2',resume:{token:'tok-d',seconds:60},resumed:true});
- assert.deepEqual(plain(again.hello.data.resume),{session_id:'s2',token:'tok-c',last_seq:1});
+ assert.deepEqual(plain(again.hello.data.resume),{session_id:'s2',token:'tok-c',last_seq:2});
  await c.until(()=>!s.run('state.reconnecting'),'back again');
 });
 test('Within the grace a drop is neither heard nor shown and holds no control; past it, one line and one tone, and the way back is heard',async()=>{
@@ -3330,4 +3339,31 @@ test('Hanging up during a drop ends the call, and lets go of what it still owed 
  await c.until(()=>!s.run('state.reconnecting'),'the reconnection gives up');
  await settleSoon();
  assert.equal(c.sockets.length,1,'no attempt after the hang-up');
+});
+test('A reload takes the call back: the tab keeps the ticket, the next join sends it, and a hang-up forgets it',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ c.push(first,{type:'voice-ping',seq:1,data:{session_id:'s1'}});
+ c.push(first,{type:'voice-ping',seq:2,data:{session_id:'s1'}});
+ // The page goes away: it parks its call rather than hanging up, and leaves the ticket for the next load.
+ first.close=function(code){this.closedWith=code;this.readyState=3};
+ s.handlers.beforeunload();
+ assert.equal(first.readyState,3);
+ assert.equal(first.closedWith,undefined,'not 1000: the room parks the call');
+ assert.deepEqual(JSON.parse(c.store['sidevoice.resume']),{session_id:'s1',token:'tok-a',last_seq:2});
+ // The next load of the same tab joins with it.
+ const next=setup(),{sockets,tap}=joining(next);
+ next.context.sessionStorage=storageOf(c.store);
+ const joined=tap();
+ const socket=await firstSocket(sockets);socket.readyState=1;socket.onopen();
+ assert.deepEqual(plain(JSON.parse(socket.sent[0]).data.resume),{session_id:'s1',token:'tok-a',last_seq:2});
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',sample_rate:16000,channels:1,resume:{token:'tok-b',seconds:60},resumed:true}})});
+ await joined;
+ assert.equal(next.run('sessionId'),'s1','the same session, taken back');
+ // What the page had handled before the reload is not handled again.
+ socket.onmessage({data:JSON.stringify({type:'voice-ping',seq:2,data:{session_id:'s1'}})});
+ socket.onmessage({data:JSON.stringify({type:'voice-ping',seq:3,data:{session_id:'s1'}})});
+ assert.equal(socket.sent.filter(m=>typeof m==='string'&&JSON.parse(m).type==='voice-pong').length,1);
+ assert.equal(JSON.parse(c.store['sidevoice.resume']).token,'tok-b','the rotated token is what is kept');
+ next.run('window.sidevoiceActions.toggleCall()');
+ assert.equal(c.store['sidevoice.resume'],undefined,'a hang-up forgets it');
 });

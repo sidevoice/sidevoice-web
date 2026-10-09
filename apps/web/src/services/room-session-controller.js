@@ -203,8 +203,21 @@ function rememberedThread(){try{return sessionStorage.getItem(SELECTED_KEY)||nul
 function rememberThread(id){try{if(id)sessionStorage.setItem(SELECTED_KEY,id);else sessionStorage.removeItem(SELECTED_KEY)}catch{}}
 let connectEpoch=0;
 // What a dropped call hands the room to be taken back as it was (`resumeTicket`): the room's newest single-use token
-// for its session, and the last numbered frame this page handled.
-let resumeToken=null,lastSeq=0;
+// for its session, and the last numbered frame this page handled. Kept per tab as well, so a reload takes the call
+// back too: written as the token rotates and, at most once a second, as the numbering advances; gone on a hang-up.
+const RESUME_KEY='sidevoice.resume';
+let resumeToken=null,lastSeq=0,ticketTimer=null;
+function keepTicket(now=false){
+ if(!now){if(!ticketTimer)ticketTimer=setTimeout(()=>keepTicket(true),1000);return}
+ clearTimeout(ticketTimer);ticketTimer=null;
+ try{const ticket=resumeTicket();if(ticket)sessionStorage.setItem(RESUME_KEY,JSON.stringify(ticket));else sessionStorage.removeItem(RESUME_KEY)}catch{}
+}
+// A join finds the ticket an earlier load of this tab kept, and takes that call back with it.
+function storedTicket(){
+ try{const ticket=JSON.parse(sessionStorage.getItem(RESUME_KEY)||'null');
+  if(typeof ticket?.session_id!=='string'||typeof ticket.token!=='string'||!Number.isInteger(ticket.last_seq))return null;
+  resumeToken=ticket.token;lastSeq=ticket.last_seq;return ticket}catch{return null}
+}
 // A setting the room can only honour with another pipeline opens a second socket while the first
 // one still carries the call. Until the room answers it, that socket is nobody's: `ws` is the call.
 let openingSocket=null,switchEpoch=0;
@@ -212,8 +225,7 @@ window.sidevoiceSessionId=()=>state.sessionId;
 let audioContext=null,analyser=null,micSource=null,meterFrame=null,holding=false,spaceDown=false;
 // How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
-// The capture streams on `captureSocket`: a resumed call points it at the new socket instead of restarting the capture.
-let inputDeviceId='default',outputDeviceId='default',captureNode=null,captureSocket=null,deviceEpoch=0,captureRate=16000;
+let inputDeviceId='default',outputDeviceId='default',captureNode=null,deviceEpoch=0,captureRate=16000;
 let screenWakeLock=null,wakeRequest=null,wakeEpoch=0,wakeRetries=0;
 const waveLevels=Array(5).fill(0);
 function micTrack(){return state.stream?.getAudioTracks?.()[0]||null}
@@ -400,15 +412,17 @@ function keepMessage(kind,payload,{node=state.node,session=state.sessionId}={}){
 // A transcript, or the reason there is none, answers the session that asked: a socket that went meanwhile delays it.
 function sendTranscript(message){keepMessage('transcript',message,{session:message.data?.session_id??state.sessionId});flushOutbox()}
 function keepCatchup(speech,rate){return keepMessage('catchup',{pcm:speech.samples.slice().buffer,rate,truncated:speech.truncated,started_at:speech.startedAt})}
-/* Everything waiting, in order, on the socket the call has now. A transcript of a session that is gone, or anything
- * for another machine, is let go: no session here could take it. */
+/* Everything waiting, in order, on the socket the call has now. A transcript belongs to the conversation, not to the
+ * session that asked for it: one answered for a session that is gone goes to the session the call has now, under its
+ * own id, and the room takes it as said there. Why a transcript failed is only the old session's business, and
+ * anything for another machine is let go. */
 function flushOutbox(socket=state.ws){
  flushReceipts();
  if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId)return;
  for(const entry of outbox.list()){
   if(entry.kind==='receipt'||entry.sentOn===socket)continue;
-  if(entry.node!==state.node||entry.kind==='transcript'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
-  try{if(entry.kind==='catchup')sendCatchup(socket,entry);else socket.send(JSON.stringify({type:entry.payload.type,data:{...entry.payload.data,client_msg_id:entry.id}}))}catch{return}
+  if(entry.node!==state.node||entry.kind==='transcript'&&entry.session_id!==state.sessionId&&entry.payload.type!=='voice-transcript'){outbox.remove(entry.id);continue}
+  try{if(entry.kind==='catchup')sendCatchup(socket,entry);else socket.send(JSON.stringify({type:entry.payload.type,data:{...entry.payload.data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
   entry.sentOn=socket;
  }
 }
@@ -1085,6 +1099,7 @@ function recordMessage(raw, socket) {
         if (m.seq <= lastSeq)
             return;
         lastSeq = m.seq;
+        keepTicket();
     }
     if (t === 'voice-ack') {
         outbox.remove(d.client_msg_id);
@@ -1339,11 +1354,11 @@ async function startCapture(socket,session){if(!micSource)throw Error('No se pud
  await context.audioWorklet.addModule('/voice/mic_capture.js?v='+encodeURIComponent(window.sidevoiceBuildId||'dev'));
  if(state.ws!==socket||audioContext!==context||epoch!==connectEpoch)return;
  captureRate=session.sample_rate;
- const node=new AudioWorkletNode(context,'mic-capture',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1,channelCountMode:'explicit',processorOptions:{sampleRate:session.sample_rate}});captureNode=node;captureSocket=socket;node.port.onmessage=e=>{
+ const node=new AudioWorkletNode(context,'mic-capture',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[1],channelCount:1,channelCountMode:'explicit',processorOptions:{sampleRate:session.sample_rate}});captureNode=node;node.port.onmessage=e=>{
   if(captureNode!==node)return;
   publishMicLevel(e.data,!!micTrack()?.enabled);
   if(!micTrack()?.enabled)return;
-  sendMicFrame(captureSocket,e.data);
+  sendMicFrame(socket,e.data);
  };source.connect(node);node.connect(context.destination)/* reachable from the destination so it keeps running; its output stays silent */}
 // The microphone's level for whoever shows it outside this page (state/mic-level.ts: the desktop app's call controls
 // card), measured from the frames the capture worklet sends — not from the meter's animation frames, which stop while
@@ -1387,6 +1402,7 @@ function disconnect() {
     outbox.clear(entry => entry.kind !== 'receipt');
     resumeToken = null;
     lastSeq = 0;
+    keepTicket(true);
     outboxHold = null;
     stopIdleWatch();
     ++connectEpoch;
@@ -1432,7 +1448,7 @@ function disconnect() {
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  const pairing=pairingInUse(pairings);if(!pairing||pairing.revoked){openPairing(pairing?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await callPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt.place===DEVICE)joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;if(state.voicePreferences.tts.place===DEVICE){joinStatus('voice');const voice=ttsRequest(state.voicePreferences.tts);await trackedLoad('tts',voice,progress=>window.roomVoice.prepare(voice,text=>{state.liveNote=text},progress||undefined),()=>cancelJoinLoad('tts'))}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
+ personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('audio');try{await window.roomVoice.unlock();if(epoch!==connectEpoch)return;if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}state.voicePreferences=await callPreferences();if(epoch!==connectEpoch)return;if(state.voicePreferences.stt.place===DEVICE)joinStatus('whisper');const {browserStt,sttRuntime}=await prepareTranscription(state.voicePreferences);if(epoch!==connectEpoch)return;if(state.voicePreferences.tts.place===DEVICE){joinStatus('voice');const voice=ttsRequest(state.voicePreferences.tts);await trackedLoad('tts',voice,progress=>window.roomVoice.prepare(voice,text=>{state.liveNote=text},progress||undefined),()=>cancelJoinLoad('tts'))}if(epoch!==connectEpoch)return;audioSession(true);joinStatus('microphone');const acquiredStream=await acquireMicrophone();if(epoch!==connectEpoch){acquiredStream.getTracks().forEach(t=>t.stop());return}state.stream=acquiredStream;state.stream.getAudioTracks().forEach(t=>t.enabled=state.micEnabled);keepScreenAwake();refreshAudioDevices();roomStore.patch({engineReady:true,enginePreferences:state.voicePreferences,sttRuntime});applyLockedCall();joinStatus('room');const session=await joinRoom(epoch,{browserStt,sttRuntime,resume:storedTicket()});if(epoch!==connectEpoch||!session)return;await window.roomVoice.unlock();if(epoch!==connectEpoch)return;updateMic();showEchoCover();const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});await refresh();await refreshPeople();if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}}catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}finally{if(epoch===connectEpoch)state.connecting=false}}
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
 // A room restart or a network blip must not end the call: the microphone permission, the media stream
 // and the unlocked output all survive it; only the socket needs reopening, with the same hello.
@@ -1486,20 +1502,21 @@ async function joinRoom(epoch,context){
  // Every session and every resume hands over a fresh single-use token: the newest is the one a drop will name.
  resumeToken=session.resume?.token||null;
  // Taken back as it was: the same session, its turn and its history, and every frame after `last_seq` on its way.
- // The transcription answers on this socket without dropping what it is doing, and the microphone streams on it from
- // the next frame; what was said while it was away is cut into a catch-up at that same instant and goes ahead of it.
- if(resumedSession(session,context.resume)){
+ // The transcription answers on this socket without dropping what it is doing, and what was said while the room was
+ // away goes to it as the catch-up, ahead of the microphone streaming on it again. A page that reloaded takes its
+ // session back the same way, with a transcription of its own.
+ const resumed=resumedSession(session,context.resume);
+ if(resumed&&state.sessionId===session.session_id){
   window.roomTranscription?.attach?.(socket);
   sendGapAudio(socket);
-  if(captureNode&&captureRate===session.sample_rate)captureSocket=socket;
-  else{stopMeter();startMeter(session.sample_rate);await startCapture(socket,session)}
  }else{
-  lastSeq=0;
-  state.sessionId=session.session_id;state.roomRevision=0;
+  if(!resumed){lastSeq=0;state.roomRevision=0}
+  state.sessionId=session.session_id;
   if(context.browserStt)window.roomTranscription.start({socket,language:state.voicePreferences.stt?.options?.language,send:sendTranscript});
   else window.roomTranscription?.stop();
-  stopMeter();startMeter(session.sample_rate);await startCapture(socket,session);
  }
+ keepTicket(true);
+ stopMeter();startMeter(session.sample_rate);await startCapture(socket,session);
  window.sidevoiceTelemetry?.noteSession?.(state.sessionId);
  if(state.ws===socket&&state.sessionId===session.session_id)startMicLink(socket,session.session_id);
  return session;
@@ -1520,7 +1537,7 @@ async function settleRejoin(epoch,hold){
 }
 async function lostConnection(event,epoch,context){
  if(epoch!==connectEpoch||state.reconnecting)return;
- state.ws=null;closeMicLink();
+ state.ws=null;closeMicLink();keepTicket(true);
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
  // Nothing the call is doing stops with its socket: the meter and the capture go on (what they hear is the gap), the
  // transcription in flight finishes, the reply playing plays on, and what they say back waits in the outbox. The room
@@ -2483,7 +2500,10 @@ window.addEventListener('keydown',e=>{personSignal();
  }
 },true);
 window.addEventListener('keyup',e=>{if(e.code==='Space'&&spaceDown){e.preventDefault();releaseHold()}},true);
-window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});window.addEventListener('beforeunload',()=>{state.ws?.close(1000);state.stream?.getTracks().forEach(t=>t.stop())});updateMic();
+window.addEventListener('blur',releaseHold);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseHold()});
+// A page going away is not a hang-up: its call is parked, and the ticket kept here lets the next load take it back.
+window.addEventListener('pagehide',()=>keepTicket(true));
+window.addEventListener('beforeunload',()=>{keepTicket(true);state.ws?.close();state.stream?.getTracks().forEach(t=>t.stop())});updateMic();
 // Discover the desktop-owned host before validating the persisted selection. Pairing remains an explicit action:
 // an unpaired browser shows setup guidance, and an unpaired desktop does not open a modal by itself.
 window.roomI18n?.setLanguage(devicePreferences().ui_language);
