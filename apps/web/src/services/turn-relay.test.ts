@@ -43,3 +43,18 @@ test("another session forgets every revision", () => {
   expect(relay.revision("a")).toBeNull();
   expect(relay.route(turn("a", "cancelled"))).toEqual({ drop: true });
 });
+
+test("a start sent again is waited for once, and a refusal finds its start by the message it refuses", () => {
+  const relay = createTurnRelay();
+  relay.sent("a", "m-a");
+  relay.sent("a", "m-a");
+  relay.sent("b", "m-b");
+  expect(relay.answered(1)).toBe("a");
+  relay.sent("a", "m-a");
+  expect(relay.answered(2)).toBe("b");
+  relay.sent("c", "m-c");
+  relay.refusedMessage("m-c");
+  expect(relay.route(turn("c", "finished", { text: "hola" }))).toEqual({ send: turn("c", "finished", { text: "hola", offline: true }) });
+  relay.refusedMessage("unknown");
+  expect(relay.revision("b")).toBe(2);
+});

@@ -863,11 +863,11 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
 });
 
 // ----- the call's voice: the VoiceHost the page drives, here a fake that records what it was asked -----
-function fakeVoice({start=async()=>{}}={}){
+function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
  const on={},calls=[];
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
-  setSettings:async settings=>{calls.push(['setSettings',settings])},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
+  setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
   speak:reply=>calls.push(['speak',reply]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
   onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
   models:async()=>[],setProviderKey:async()=>{},hasProviderKey:async()=>false};
@@ -971,4 +971,117 @@ test('Settings send only the interface language to the room',()=>{
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
  s.run("$('ui-language').value='en';saveSettings()");
  assert.deepEqual(sent.filter(m=>m.type==='voice-settings').map(m=>Object.keys(m.data).sort()),[['session_id','ui_language']]);
+});
+
+// ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
+test('A resumed session sends at once what waited while the room was away',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ c.drop(c.first);
+ voice.emit('turn',{client_msg_id:'offline-end',turn_id:'off',phase:'finished',text:'offline words',offline:true});
+ voice.emit('playback',{client_msg_id:'heard-offline',utterance_id:'reply',status:'heard',heard_chars:12});
+ await c.until(()=>c.sockets.length===2,'reconnect socket');
+ const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
+ assert.deepEqual(c.frames(socket).filter(f=>['voice-user-turn','voice-playback'].includes(f.type)).map(f=>f.data.client_msg_id),['offline-end','heard-offline'],'no later voice event needed');
+ c.push(socket,{type:'voice-ack',data:{client_msg_id:'offline-end'}});c.push(socket,{type:'voice-ack',data:{client_msg_id:'heard-offline'}});
+ assert.equal(s.run('outbox.size'),0);
+ s.run('disconnect()');
+});
+test('A refusal after its acknowledgement still finds the start it refuses, and nothing behind it waits',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',{client_msg_id:'start',turn_id:'turn',phase:'started'});
+ // The room acknowledges a message before it answers or refuses it.
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:'start'}});
+ c.push(c.first,{type:'error',data:{client_msg_id:'start',key:'room.browser_absent'}});
+ voice.emit('turn',{client_msg_id:'end',turn_id:'turn',phase:'finished',text:'words'});
+ voice.emit('playback',{client_msg_id:'report',utterance_id:'reply',status:'heard',heard_chars:4});
+ const turns=sentOf(c,c.first,'voice-user-turn');
+ assert.deepEqual(turns.map(d=>[d.client_msg_id,d.phase,d.offline]),[['start','started',undefined],['end','finished',true]],'its words go as said while away');
+ assert.equal(sentOf(c,c.first,'voice-playback').length,1);
+ s.run('disconnect()');
+});
+test('A start sent twice is waited for once: the next start gets the next answer',()=>{
+ const s=setup();
+ s.run("var __s={readyState:1,session:'s',send(){}};ws=__s;voiceTurn({client_msg_id:'start-a',turn_id:'a',phase:'started'});ws={readyState:1,session:'s',send(){}};flushOutbox();relay.answered(1);outbox.remove('start-a');voiceTurn({client_msg_id:'start-b',turn_id:'b',phase:'started'});relay.answered(2)");
+ assert.equal(s.run("relay.revision('a')"),1);
+ assert.equal(s.run("relay.revision('b')"),2);
+});
+test('A hang-up while the settings are taken never starts the microphone, and one while starting stops it',async()=>{
+ const s=setup();let release;
+ const pending=new Promise(resolve=>{release=resolve});
+ const voice=fakeVoice({setSettings:()=>pending});const c=joining(s,{voice});
+ const joined=c.tap();await settleSoon();
+ s.run('disconnect()');release();await joined;
+ assert.deepEqual(voice.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['stop']);
+ assert.equal(c.sockets.length,0);
+ const late=setup();let started;
+ const starting=new Promise(resolve=>{started=resolve});
+ const slow=fakeVoice({start:()=>starting});const d=joining(late,{voice:slow});
+ const joining2=d.tap();await settleSoon();
+ late.run('disconnect()');started();await joining2;
+ assert.deepEqual(slow.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['start','stop','stop'],'the hang-up, then what the join started');
+ assert.equal(d.sockets.length,0);
+});
+test('The room gets the turn\'s timings under its own name, and a failed reply without a reason it would refuse',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',{client_msg_id:'t-start',turn_id:'t',phase:'started'});
+ c.push(c.first,{type:'voice-user-turn',data:{phase:'started',revision:1,session_id:'s1',thread_id:'a'}});
+ voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
+ const sent=sentOf(c,c.first,'voice-user-turn').at(-1);
+ assert.deepEqual(plain(sent.timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});assert.equal(sent.timings,undefined);
+ voice.emit('playback',{client_msg_id:'failed',utterance_id:'reply',status:'failed',heard_chars:0,reason:'credential-missing'});
+ const failed=sentOf(c,c.first,'voice-playback').at(-1);
+ assert.equal(failed.status,'failed');assert.equal('reason' in failed,false);
+ voice.emit('playback',{client_msg_id:'cut',utterance_id:'other',status:'interrupted',heard_chars:3,reason:'user_interrupted'});
+ assert.equal(sentOf(c,c.first,'voice-playback').at(-1).reason,'user_interrupted','a reason of the room\'s own list goes');
+ s.run('disconnect()');
+});
+test('A move to another conversation silences the last one\'s voice, and a late reply of it is not said',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'old-reply',revision:1,reply_revision:1,thread_id:'a',history_id:'row',text:'old conversation'}});
+ const before=voice.calls.length;
+ s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
+ await s.run("select('b')");await settleSoon();
+ assert.equal(s.run('targetId()'),'b');
+ assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['stop','start']);
+ const spoken=voice.calls.filter(([name])=>name==='speak').length;
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:1,reply_revision:2,thread_id:'a',history_id:'row-2',text:'late'}});
+ assert.equal(voice.calls.filter(([name])=>name==='speak').length,spoken,'not said');
+ const report=sentOf(c,c.first,'voice-playback').at(-1);
+ assert.deepEqual([report.utterance_id,report.status,report.reason],['late','unplayed','focus_changed']);
+ // A rebind of the same conversation is not a move.
+ const kept=voice.calls.length;
+ s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'again'},room:{revision:0}})});
+ await s.run('refresh()');await settleSoon();
+ assert.equal(voice.calls.slice(kept).some(([name])=>name==='stop'),false);
+ s.run('disconnect()');
+});
+test('Words said while away take the room\'s row id, so history shows them once with their receipt',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',{client_msg_id:'off-start',turn_id:'off',phase:'started',offline:true});
+ voice.emit('turn',{client_msg_id:'off-end',turn_id:'off',phase:'finished',text:'offline words',offline:true});
+ assert.equal(s.run("state.history.find(r=>r.text==='offline words').segment"),'s1:user-offline:off-end');
+ s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'s1:user-offline:off-end',session:'s1',revision:0,thread:'a',role:'user',text:'offline words',status:'delivered'}]})});
+ await s.run('refreshHistory()');
+ assert.equal(s.run("state.history.filter(r=>r.text==='offline words').length"),1);
+ assert.equal(s.run("state.history.find(r=>r.text==='offline words').delivery"),'delivered');
+ s.run('disconnect()');
+});
+test('Nothing goes on a new socket before the room answers its hello, and then it goes to the new session',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;c.drop(c.first);
+ await c.until(()=>c.sockets.length===2,'reconnect socket');
+ const socket=c.sockets.at(-1);socket.readyState=1;socket.onopen();
+ voice.emit('turn',{client_msg_id:'during-hello',turn_id:'off',phase:'finished',text:'during hello',offline:true});
+ assert.equal(sentOf(c,socket,'voice-user-turn').length,0,'held until the session is known');
+ c.push(socket,{type:'voice-session',data:{session_id:'s2',resume:{token:'new'},resumed:false}});
+ await c.until(()=>!s.run('state.reconnecting'),'new session');
+ await c.until(()=>sentOf(c,socket,'voice-user-turn').length===1,'sent once the new session holds');
+ assert.equal(sentOf(c,socket,'voice-user-turn')[0].session_id,'s2');
+ s.run('disconnect()');
+});
+test('A start of a replaced session is not sent again: its words go as said while away',()=>{
+ const s=setup();
+ s.run("var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({client_msg_id:'old-start',turn_id:'a',phase:'started'});voiceTurn({client_msg_id:'old-end',turn_id:'a',phase:'finished',text:'words'});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
+ assert.deepEqual(plain(s.run("__sent.map(m=>[m.data.client_msg_id,m.data.phase,m.data.offline,m.data.session_id])")),[['old-end','finished',true,'new']]);
+ assert.equal(s.run("outbox.get('old-start')"),null);
 });
