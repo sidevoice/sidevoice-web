@@ -264,21 +264,14 @@ function flushOutbox(socket=state.ws){
    const route=relay.route(data);
    if(route.wait)return;
    if(route.drop){outbox.remove(entry.id);continue}
-   data=roomTurn(route.send);
+   data=route.send;
    if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-offline:'+entry.id);
   }
-  if(entry.kind==='playback')data=roomPlayback(data);
   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
   if(entry.kind==='user-turn'&&data.phase==='started')relay.sent(data.turn_id,entry.id);
   entry.sentOn=socket;
  }
 }
-// The voice's turn as the room reads it: its measured stages under the room's name for them.
-function roomTurn(data){const {timings,...turn}=data;return timings?{...turn,timings_ms:timings}:turn}
-/* The voice's playback report as the room takes it: a reason only from the room's list. The voice names a failure by
- * its own code (`credential-missing`, say), which the room would refuse; the room says `playback_failed` itself. */
-const ROOM_PLAYBACK_REASONS=new Set(['user_interrupted','newer_turn','user_skipped','focus_changed','call_ended','unheard']);
-function roomPlayback(data){const {reason,...report}=data;return ROOM_PLAYBACK_REASONS.has(reason)?data:report}
 // Words said while away become the room's own row: the bubble takes that row's id, so history and receipts find it.
 function nameOfflineRow(turnId,id){
  const draft='turn:'+turnId;if(!state.history.some(r=>r.segment===draft))return;
@@ -911,10 +904,11 @@ function voiceTurn(turn){
 }
 // A receipt the room sent before this page had the row it is about: handed over once, then forgotten.
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
+// Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
+// be acted on, and in the machine's log. The voice's turns and playback reports are already in the room's shape.
+function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:String(error?.code||'')})}
 function voicePlayback(report){
  if(report.status!=='playing')repliesSpoken.delete(report.utterance_id);
- // Why a reply could not be said stays here, where it can be acted on, and in the machine's log.
- if(report.status==='failed'&&report.reason){setRoomError(voiceErrorText({code:report.reason}));reportClientError({kind:'playback',message:report.utterance_id+': '+report.reason})}
  keepMessage('playback','voice-playback',report);flushOutbox();
 }
 function voiceStateChanged(next){
@@ -1040,7 +1034,7 @@ function disconnect() {
 const voiceListeners=[];
 function attachVoice(next){
  voiceListeners.push(next.onUserTurn(voiceTurn),next.onPlayback(voicePlayback),next.onState(voiceStateChanged),next.onLevel(voiceLevel),
-  next.onKaraoke(updateKaraoke),next.onError(error=>setRoomError(voiceErrorText(error))));
+  next.onKaraoke(updateKaraoke),next.onError(voiceFailed));
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
