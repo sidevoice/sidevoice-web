@@ -12,9 +12,9 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. The resolver is TypeScript (packages/browser-audio/offers.ts), transpiled here.
- const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection'};
+ const modules={'../../../../packages/browser-audio/refusals.js':'Refusals','../../../../packages/browser-audio/model-check.js':'ModelCheck','../../../../packages/browser-audio/page-models.js':'PageModels','../state/stage-settings.js':'StageSettings','./stage-settings.js':'StageSettings','./downloads-view.js':'DownloadsView','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./webrtc-mic.js':'WebrtcMic','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','../../../../packages/browser-audio/offers':'Offers','./downloads.js':'Downloads','./load-and-verify.js':'LoadAndVerify','./stage-selection.js':'StageSelection','./outbox.js':'Outbox'};
  const audio=sourceRoot+'/../../../packages/browser-audio/';
- const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts'};
+ const files={Refusals:audio+'refusals.js',ModelCheck:audio+'model-check.js',PageModels:audio+'page-models.js',StageSettings:sourceRoot+'/state/stage-settings.js',DownloadsView:sourceRoot+'/state/downloads-view.js',Downloads:sourceRoot+'/services/downloads.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',WebrtcMic:sourceRoot+'/services/webrtc-mic.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Offers:audio+'offers.ts',LoadAndVerify:sourceRoot+'/services/load-and-verify.js',StageSelection:sourceRoot+'/services/stage-selection.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -482,7 +482,7 @@ function settingsFetch({integrations=async()=>({ok:true,json:async()=>LISTING(OP
   if(path.includes('/integrations'))return integrations();
   if(path.includes('/transcription/models'))return {ok:true,json:async()=>({models:[{id:'gpt-4o-transcribe',label:'GPT-4o'}]})};
   if(path.includes('/voice-catalog'))return {ok:true,json:async()=>({providers:{elevenlabs:{models:[],voices:[]}}})};
-  return {ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:1,replay_on_return_seconds:120,turn_patience:'normal',stt:{place:'device',model:'whisper-tiny',options:{},build:null}})};
+  return {ok:true,json:async()=>({ui_language:'es',audio_grace_seconds:1,turn_patience:'normal',stt:{place:'device',model:'whisper-tiny',options:{},build:null}})};
  };
  return {fetch,calls};
 }
@@ -760,12 +760,11 @@ test('Final messages use send timestamps, even when answering an older turn',()=
 test('The UI distinguishes audio suppression reasons without inferring unknown ones',()=>{
  const s=setup();
  assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'newer_turn'})"),'Sin audio · Empezaste otra intervención');
- assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'focus_changed'})"),'Sin audio · No estabas en esta conversación · Se repite al volver');
- assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'session_changed'})"),'Sin audio · No estabas en la llamada · Se repite al volver','a reply nobody heard says what the room will do, not what a socket did');
+ assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'focus_changed'})"),'Sin audio · No estabas en esta conversación');
+ assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'session_changed'})"),'Sin audio · No estabas en la llamada','a reply nobody heard is not promised again: replaying it is the person\'s to ask');
  assert.equal(s.run("audioNote({audio:'text_only'})"),'Sin audio · Motivo no registrado');
- assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'call_ended',time:1000},0,{seconds:120,now:60000})"),'Sin audio · No estabas en la llamada · Se repite al volver');
- assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'call_ended',time:1000},0,{seconds:120,now:200000})"),'Sin audio · No estabas en la llamada','past the window it promises nothing');
- assert.equal(s.run("audioNote({audio:'text_only',audio_reason:'focus_changed',time:1000},0,{seconds:0,now:2000})"),'Sin audio · No estabas en esta conversación','nor when this device turned repetition off');
+ assert.equal(s.run("audioNote({audio:'interrupted',audio_reason:'unheard'})"),'Audio no reproducido','published while this device was away: it never sounded, it was not cut off');
+ assert.equal(s.run("audioNote({audio:'interrupted',interrupted:true,audio_reason:'unheard'})"),'Audio no reproducido');
  assert.equal(s.run("audioNote({audio:'failed',audio_reason:'unconfirmed'})"),'Audio sin confirmar · Este dispositivo no dijo si llegó a sonar','a reply the room stopped waiting for does not claim it failed to play');
 });
 
@@ -1614,7 +1613,7 @@ test('When the room goes away the call stays up: the socket is reopened by itsel
  const pending=s.run('lostConnection')({code:1006},epoch,{browserStt:false,sttRuntime:null});
  await new Promise(resolve=>setTimeout(resolve,5));
  assert.equal(sockets.length,1,'a new socket is opened after the first delay');
- assert.deepEqual(joinLine,[null,'Reconectando con la sala…'],'the reconnection uses the join line, not the transcript status');
+ assert.ok(!joinLine.some(text=>/Reconectando/.test(text||'')),'within the grace a drop shows no line at all');
  const socket=sockets[0];socket.readyState=1;socket.onopen();
  const hello=JSON.parse(socket.sent[0]);
  assert.equal(hello.type,'client-ready');assert.equal(hello.data.conversation,'t-1','the remembered conversation travels in the hello');
@@ -1832,20 +1831,19 @@ test('Saving the settings form stores every device setting, the ambient bed amon
  s.context.localStorage={getItem:()=>null,setItem:(key,value)=>stored.push([key,JSON.parse(value)]),removeItem(){}};
  await measured(s,{webgpu:false,wasm:true});
  s.run("ws=null;roomStore.patch({voicePreferences:{stt_provider:'openai',tts_execution:'browser',spanish_voice:'em_alex'}})");
- for(const [id,value] of [['ui-language','es'],['audio-grace-seconds','2'],['presence-sound','on'],['locked-call','on'],['replay-on-return-seconds','300'],['turn-patience','fast']])
+ for(const [id,value] of [['ui-language','es'],['audio-grace-seconds','2'],['presence-sound','on'],['locked-call','on'],['turn-patience','fast']])
   s.run(`$('${id}').value=${JSON.stringify(value)}`);
  await s.run("$('language-form').onsubmit({preventDefault(){}})");
  assert.ok(!s.run("$('settings-error').textContent"),'the form reached the end without throwing');
  assert.match(s.run("liveNote"),/Preferencias guardadas/,"the notice is a fact; the live region renders it");
  const saved=stored.find(([key])=>key==='sidevoice.settings')?.[1];
  assert.ok(saved,'something was stored at all');
- assert.deepEqual(Object.keys(saved).sort(),['audio_grace_seconds','locked_call','presence_sound','replay_on_return_seconds','turn_patience','ui_language'],
+ assert.deepEqual(Object.keys(saved).sort(),['audio_grace_seconds','locked_call','presence_sound','turn_patience','ui_language'],
   'old fields are dropped, not translated (F11)');
  const stages=stored.find(([key])=>key==='sidevoice.stages')[1][PAIRED.fp];
  assert.deepEqual(stages.stt,{place:'device',model:'whisper-tiny',options:{language:s.run('speechLanguage')},build:null},'with nothing chosen, this device\'s best offer');
  assert.equal(stages.tts.model,'kokoro-82m-v1.0');
  assert.equal(saved.presence_sound,'on');
- assert.equal(saved.replay_on_return_seconds,300,'how far back to repeat is this device\'s, and a number');
 });
 // ----- what the microphone kept hearing while the socket was down -----
 // 20 ms frames of 16 kHz PCM, the shape the capture worklet posts to the page.
@@ -1960,9 +1958,12 @@ test('While the room is away the microphone keeps being captured, and the new se
  const socket=sockets[0];socket.readyState=1;socket.onopen();
  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
  await pending;
+ // The catch-up waits for the room to say which conversation this browser is on; the call does not wait for it.
+ await new Promise(resolve=>setTimeout(resolve,5));
  const catchup=socket.sent.map(value=>JSON.parse(value)).filter(m=>m.type==='voice-catchup');
  assert.ok(catchup.length,'what was said during the gap reaches the session that came back');
  assert.equal(catchup[0].data.session_id,'new-session','it is this browser\'s new call that carries it');
+ assert.ok(catchup[0].data.client_msg_id&&catchup.every(m=>m.data.client_msg_id===catchup[0].data.client_msg_id),'every slice names the same catch-up');
  assert.equal(catchup.at(-1).data.final,true);
  assert.equal(s.run('gap.armed'),false);
  assert.equal(s.run('stream')!==null,true,'and the microphone stream is still the same one');
@@ -2119,34 +2120,6 @@ test('A new turn cancels the catch-up, and no bubble claims a repetition that ne
  cancelled.emit('voice-cancel',{session_id:'s',revision:1});
  assert.equal(cancelled.note('old:voice:1'),'Repetición cancelada');
 });
-test('The tab names the sessions it has used, so the room can answer what this browser never heard',async()=>{
- const s=setup();const sockets=[],store={};
- s.context.WebSocket=class{constructor(url){this.url=url;this.readyState=0;this.sent=[];sockets.push(this)}send(m){this.sent.push(m)}close(){this.readyState=3}};
- s.context.WebSocket.OPEN=1;
- s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});s.context.crypto={randomUUID:()=>'hello-id'};
- s.context.fetch=async()=>({ok:true,json:async()=>({binding:null,room:{revision:0},clients:[],call:null,participants:[]})});
- s.context.sessionStorage={getItem:key=>store[key]??null,setItem:(key,value)=>{store[key]=value},removeItem:key=>{delete store[key]}};
- s.run(`startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
-  window.roomVoice={unlock:async()=>{},cancel(){},context:{state:'running'}};window.roomTranscription={stop(){},start(){}};
-  voicePreferences={stt:{place:'openai',model:'gpt-4o-transcribe'}};stream={getAudioTracks:()=>[{enabled:true}]}`);
- for(const id of ['first-session','second-session']){
-  const joining=s.run('joinRoom')(s.run('connectEpoch'),{browserStt:false,sttRuntime:null});
-  const socket=sockets.at(-1);socket.readyState=1;socket.onopen();
-  const hello=JSON.parse(socket.sent[0]).data;
-  assert.deepEqual(hello.sessions,id==='first-session'?[]:['first-session'],
-   'the hello carries the ids this tab used before, and only those');
-  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:id,sample_rate:16000,channels:1}})});
-  await joining;
- }
- assert.deepEqual(JSON.parse(store['sidevoice.sessions']),['first-session','second-session']);
- assert.deepEqual(s.run('rememberedSessions')(),['first-session','second-session']);
- // Bounded, and never poisoned by whatever happens to be in storage.
- s.run("for(let i=0;i<20;i++)rememberSession('id-'+i)");
- assert.equal(s.run('rememberedSessions')().length,s.run('REMEMBERED_SESSIONS'));
- store['sidevoice.sessions']='no es json';
- assert.equal(s.run('rememberedSessions')().length,0,'storage that is not a list of ids is no list of ids');
-});
-
 test('A cancelled playback cannot be revived by a late playing callback or completion',async()=>{
  const s=presenceSetup();let onPlaying,finish;
  s.context.window.roomVoice.speak=(_d,_status,playing)=>{onPlaying=playing;return new Promise(resolve=>finish=resolve)};
@@ -2570,7 +2543,7 @@ test('A reconnection comes back to the same machine by whichever of its addresse
  assert.deepEqual([...socket.protocols],['sidevoice','sidevoice.token.tok-1']);
  socket.readyState=1;socket.onopen();
  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'new-session',sample_rate:16000,channels:1}})});
- await pending;
+ await pending;await new Promise(resolve=>setTimeout(resolve,5));
  assert.ok(socket.sent.map(value=>JSON.parse(value)).filter(m=>m.type==='voice-catchup').length>0,'the same machine: what was said meanwhile reaches it');
 });
 
@@ -3162,4 +3135,199 @@ test('A voice download the desktop app cancelled while a call connects is said c
  s.context.__reject(Object.assign(Error('Descarga cancelada.'),{step:'download',reason:{key:'install_cancelled',message:'x'}}));
  await assert.rejects(loading);
  assert.deepEqual(plain(s.run('state.downloads')).map(item=>[item.state,item.error]),[['cancelled','']]);
+});
+
+// ----- a dropped call taken back as it was -----
+// The room numbers its frames, parks a dropped call and takes it back on a hello naming the session, its single-use
+// token and the last frame handled. Here the room is the test: it answers each hello and replays what it is told to.
+const settleSoon=()=>new Promise(resolve=>setTimeout(resolve,5));
+async function callOnRoom({timers=null}={}){
+ const s=setup();const sockets=socketsOf(s);let ids=0;
+ s.context.crypto={randomUUID:()=>'id-'+(++ids)};
+ s.context.atob=value=>Buffer.from(value,'base64').toString('binary');
+ s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
+ s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
+ if(timers)s.context.setTimeout=timers;
+ const posts=[],tones=[],stt={started:[],stopped:0,attached:[]},voice={cancelled:0},room={offline:false};
+ s.context.fetch=async(url,init={})=>{
+  if(url.includes('browser-receipt')){posts.push({offline:room.offline,body:JSON.parse(init.body)});if(room.offline)throw new TypeError('Failed to fetch');return {ok:true,status:200,json:async()=>({})}}
+  return {ok:true,status:200,json:async()=>({binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,participants:[],messages:[]})};
+ };
+ s.run(`RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);startMeter=()=>{};stopMeter=()=>{};startCapture=async()=>{};keepScreenAwake=()=>{};
+  roomBinding={thread_id:'a',title:'A',binding_id:'b'};voicePreferences={stt:{place:'device',model:'whisper-tiny'}};stream={getAudioTracks:()=>[{enabled:true}],getTracks:()=>[]};
+  ${GAP_FRAMES}
+  concat=buffers=>{const parts=buffers.map(b=>new Int16Array(b)),out=new Int16Array(parts.reduce((n,p)=>n+p.length,0));let at=0;for(const p of parts){out.set(p,at);at+=p.length}return out};`);
+ s.context.window.roomVoice={unlock:async()=>{},cancel(){voice.cancelled++},signal:tone=>tones.push(tone),context:{state:'running'}};
+ s.context.window.roomTranscription={start(options){stt.started.push(options)},stop(){stt.stopped++},attach(socket){stt.attached.push(socket)}};
+ const frames=socket=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m));
+ // The room answers the newest socket's hello.
+ const answer=async data=>{const socket=sockets.at(-1);socket.readyState=1;socket.onopen();const hello=JSON.parse(socket.sent[0]);
+  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{sample_rate:16000,channels:1,...data}})});await settleSoon();return {socket,hello}};
+ const push=(socket,frame)=>socket.onmessage({data:JSON.stringify(frame)});
+ const stream=(socket,peaks)=>{s.context.__peaks=peaks;s.context.__socket=socket;s.run('for(const frame of makeFrames(__peaks))sendMicFrame(__socket,frame)')};
+ const drop=socket=>{socket.readyState=3;socket.onclose({code:1006})};
+ const until=async(check,what)=>{for(let i=0;i<500;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,2))}assert.fail('never: '+what)};
+ const pongs=socket=>frames(socket).filter(m=>m.type==='voice-pong').length;
+ const catchupOf=socket=>{const slices=frames(socket).filter(m=>m.type==='voice-catchup');s.context.__sent=slices.map(m=>JSON.stringify(m));return {slices,samples:slices.length?Array.from(s.run('decode(__sent)')):[]}};
+ const pcm=peaks=>{s.context.__peaks=peaks;return Array.from(s.run('concat(makeFrames(__peaks))'))};
+ const joining=s.run('joinRoom')(s.run('connectEpoch'),{browserStt:true,sttRuntime:null});
+ const {socket,hello}=await answer({session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false});await joining;
+ return {s,sockets,posts,tones,stt,voice,room,frames,answer,push,stream,drop,until,pongs,catchupOf,pcm,first:socket,firstHello:hello};
+}
+test('A dropped call is taken back as it was: what was said and answered meanwhile arrives once, and a frame already handled is not handled again',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ assert.equal(c.firstHello.data.resume,undefined,'a first join resumes nothing');
+ assert.equal(c.firstHello.data.sessions,undefined,'nor names earlier sessions: nothing unheard is replayed by itself');
+ assert.equal(c.firstHello.data.conversation,'t-1');
+ // A turn opens and three frames go out; a reply is playing.
+ c.push(first,{type:'voice-user-turn',seq:1,data:{session_id:'s1',phase:'started',revision:1,thread_id:'a'}});
+ c.stream(first,[0.3,0.4,0.5]);
+ c.push(first,{type:'voice-ping',seq:2,data:{session_id:'s1'}});
+ s.run("captureNode={};activeSpeech={session_id:'s1',revision:1,utterance_id:'u1',thread_id:'a',started:true}");
+ // The socket dies.
+ c.room.offline=true;c.drop(first);
+ assert.equal(s.run('state.reconnecting'),true);
+ // Meanwhile the transcription in flight answers, the reply plays through, and the person keeps talking.
+ c.stt.started[0].send({type:'voice-transcript',data:{session_id:'s1',request_id:'r1',text:'lo que dije'}});
+ s.run("sendReceipt({session_id:'s1',revision:1,utterance_id:'u1',status:'playing'});sendReceipt({session_id:'s1',revision:1,utterance_id:'u1',status:'playback_finished'})");
+ c.stream(first,[0.6,0.7]);
+ assert.equal(c.stt.stopped,0,'a drop does not stop the transcription');
+ assert.equal(c.voice.cancelled,0,'nor the reply playing');
+ assert.equal(s.run('activeSpeech.utterance_id'),'u1');
+ await c.until(()=>c.sockets.length===2,'a socket for the way back');
+ c.room.offline=false;
+ const {socket,hello}=await c.answer({session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true});
+ assert.deepEqual(plain(hello.data.resume),{session_id:'s1',token:'tok-a',last_seq:2},'the hello names the session, its token and the last frame handled');
+ await c.until(()=>!s.run('state.reconnecting'),'back in the call');
+ assert.equal(s.run('sessionId'),'s1','the same session');
+ assert.equal(c.stt.attached[0],socket,'the transcription answers on the new socket');
+ assert.equal(c.stt.started.length,1,'without starting over, so nothing in flight is dropped');
+ assert.equal(s.run('captureSocket'),socket,'and the microphone streams on it without restarting the capture');
+ // The room replays from the last frame handled: one already handled is not handled again.
+ c.push(socket,{type:'voice-ping',seq:2,data:{session_id:'s1'}});
+ c.push(socket,{type:'voice-ping',seq:3,data:{session_id:'s1'}});
+ assert.equal(c.pongs(socket),1);
+ // The transcript said offline goes once, with its id, and is let go when the room acknowledges it.
+ const transcripts=()=>c.frames(socket).filter(m=>m.type==='voice-transcript');
+ assert.equal(transcripts().length,1);
+ assert.equal(transcripts()[0].data.request_id,'r1');assert.ok(transcripts()[0].data.client_msg_id);
+ c.push(socket,{type:'voice-ack',seq:4,data:{session_id:'s1',client_msg_id:transcripts()[0].data.client_msg_id}});
+ // The catch-up is today's: the open turn's copy, then what was said while away. A room that still holds that turn
+ // hears its start twice.
+ const catchup=c.catchupOf(socket);
+ assert.deepEqual(catchup.samples,c.pcm([0.3,0.4,0.5,0.6,0.7]));
+ assert.ok(catchup.slices.every(m=>m.data.session_id==='s1'&&m.data.client_msg_id===catchup.slices[0].data.client_msg_id));
+ assert.equal(catchup.slices[0].data.truncated,false);
+ c.push(socket,{type:'voice-ack',seq:5,data:{session_id:'s1',client_msg_id:catchup.slices[0].data.client_msg_id}});
+ s.run('flushOutbox()');
+ assert.equal(transcripts().length,1,'acknowledged: never again');
+ assert.equal(c.frames(socket).filter(m=>m.type==='voice-catchup').length,catchup.slices.length);
+ // The receipts that failed offline are sent again, in order, each as the same message, and once.
+ const online=c.posts.filter(p=>!p.offline).map(p=>p.body);
+ assert.deepEqual(online.map(b=>b.status),['playing','playback_finished']);
+ assert.equal(online[0].client_msg_id,c.posts[0].body.client_msg_id,'a retry is the same message');
+ assert.notEqual(online[0].client_msg_id,online[1].client_msg_id);
+ assert.equal(s.run('outbox.size'),0,'nothing left owed');
+ assert.deepEqual(c.tones,[],'a drop shorter than the grace is never heard');
+ // A hang-up is said as one: any other close the room would take for a drop, and park the call.
+ socket.close=function(code){this.closedWith=code;this.readyState=3};
+ s.run('window.sidevoiceActions.toggleCall()');
+ assert.equal(socket.closedWith,1000);
+});
+test('A resume the room refuses is a new session: the open turn and the gap go to it as one catch-up, the old session\'s answers do not',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ c.push(first,{type:'voice-user-turn',seq:1,data:{session_id:'s1',phase:'started',revision:1,thread_id:'a'}});
+ c.stream(first,[0.3,0.4]);
+ c.drop(first);
+ c.stt.started[0].send({type:'voice-transcript',data:{session_id:'s1',request_id:'r1',text:'para la sesión vieja'}});
+ c.stream(first,[0.6]);
+ await c.until(()=>c.sockets.length===2,'a socket for the way back');
+ const {socket,hello}=await c.answer({session_id:'s2',resume:{token:'tok-c',seconds:60},resumed:false,resume_refused:'unknown'});
+ assert.equal(hello.data.resume.token,'tok-a');
+ await c.until(()=>!s.run('state.reconnecting'),'back in the call');
+ await settleSoon();
+ assert.equal(s.run('sessionId'),'s2');
+ assert.equal(c.stt.started.length,2,'a new session starts the transcription afresh');
+ assert.equal(c.frames(socket).filter(m=>m.type==='voice-transcript').length,0,'an answer for a session that is gone is let go');
+ assert.equal(s.run("outbox.list().filter(e=>e.kind==='transcript').length"),0);
+ const catchup=c.catchupOf(socket);
+ assert.deepEqual(catchup.samples,c.pcm([0.3,0.4,0.6]),'the turn the room lost, then what was said while it was away');
+ assert.ok(catchup.slices.every(m=>m.data.session_id==='s2'));
+ // The numbering starts again with the new session, and the next drop names it.
+ c.push(socket,{type:'voice-ping',seq:1,data:{session_id:'s2'}});
+ assert.equal(c.pongs(socket),1);
+ c.drop(socket);
+ await c.until(()=>c.sockets.length===3,'another socket');
+ const again=await c.answer({session_id:'s2',resume:{token:'tok-d',seconds:60},resumed:true});
+ assert.deepEqual(plain(again.hello.data.resume),{session_id:'s2',token:'tok-c',last_seq:1});
+ await c.until(()=>!s.run('state.reconnecting'),'back again');
+});
+test('Within the grace a drop is neither heard nor shown and holds no control; past it, one line and one tone, and the way back is heard',async()=>{
+ const graces=[];
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>ms===30000?(graces.push(fn),0):setTimeout(fn,ms,...rest)});const {s,first}=c;
+ assert.equal(s.run('RECONNECT_GRACE_MS'),30000);
+ const view=()=>s.run('roomStore.getState()');
+ c.drop(first);
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ assert.deepEqual(c.tones,[]);
+ assert.equal(view().join,null,'no line');
+ assert.equal(view().call.busy,false);
+ assert.equal(view().call.joined,true,'still a call: the button hangs up');
+ assert.equal(view().session.tab,'listening');
+ assert.doesNotMatch(view().live,/Reconectando|Entra en la sala/);
+ assert.equal(view().mic.disabled,false);
+ s.run("var __track={enabled:true};stream={getAudioTracks:()=>[__track],getTracks:()=>[]};window.sidevoiceActions.toggleMic()");
+ assert.equal(s.run('micEnabled'),false,'muting works during the grace');
+ // Past the grace: said once, heard once, and still nothing held.
+ graces.forEach(fn=>fn());
+ assert.deepEqual(c.tones,['lost']);
+ assert.match(view().join.text,/Reconectando con la sala/);
+ assert.equal(view().call.busy,true);
+ assert.equal(view().session.tab,'reconnecting');
+ assert.equal(view().mic.disabled,false);
+ // Another attempt fails: not another tone every few seconds.
+ c.sockets.at(-1).onclose({code:1006});
+ await c.until(()=>c.sockets.length===3,'another attempt');
+ assert.deepEqual(c.tones,['lost']);
+ await c.answer({session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'back in the call');
+ assert.deepEqual(c.tones,['lost','back']);
+ assert.equal(view().join,null);
+ assert.equal(view().call.busy,false);
+});
+test('A reconnection whose requests hang still moves on: a hello nobody answers, an attempt past its deadline, a rejoin whose questions never return',async()=>{
+ const parked=[];
+ const c=await callOnRoom({timers:(fn,ms,...rest)=>{if([25000,30000,35000].includes(ms)){parked.push({fn,ms});return 0}return setTimeout(fn,[3000,4000,5000].includes(ms)?0:ms,...rest)}});
+ const {s,first}=c;
+ // From here nothing the page asks over HTTP is answered, and the output never unlocks.
+ s.context.fetch=()=>new Promise(()=>{});
+ s.context.window.roomVoice.unlock=()=>new Promise(()=>{});
+ c.drop(first);
+ await c.until(()=>c.sockets.length===2,'a first attempt');
+ // It opens and the room never says a word: asking why goes unanswered too, and the attempt still ends.
+ c.sockets[1].readyState=1;c.sockets[1].onopen();
+ parked.filter(timer=>timer.ms===25000).at(-1).fn();
+ await c.until(()=>c.sockets.length===3,'a second attempt');
+ // This one never even opens: past its deadline it is let go, and its socket with it.
+ parked.filter(timer=>timer.ms===35000).at(-1).fn();
+ await c.until(()=>c.sockets.length===4,'a third attempt');
+ assert.equal(c.sockets[2].readyState,3);
+ // The third is answered; what the page asks after it hangs, and the call is back all the same.
+ await c.answer({session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true});
+ await c.until(()=>!s.run('state.reconnecting'),'back without waiting on its requests');
+ assert.equal(s.run('sessionId'),'s1');
+});
+test('Hanging up during a drop ends the call, and lets go of what it still owed its session but not a playback receipt',async()=>{
+ const c=await callOnRoom();const {s,first}=c;
+ c.room.offline=true;c.drop(first);
+ c.stt.started[0].send({type:'voice-transcript',data:{session_id:'s1',request_id:'r1',text:'x'}});
+ s.run("sendReceipt({session_id:'s1',revision:1,utterance_id:'u1',status:'playback_finished'})");
+ assert.deepEqual(plain(s.run('outbox.list().map(e=>e.kind)')),['transcript','receipt']);
+ s.run('window.sidevoiceActions.toggleCall()');
+ assert.equal(s.run('state.reconnecting'),true,'the loop notices at its next step');
+ assert.deepEqual(plain(s.run('outbox.list().map(e=>e.kind)')),['receipt']);
+ assert.equal(s.run('resumeTicket()'),null,'nothing left to resume');
+ await c.until(()=>!s.run('state.reconnecting'),'the reconnection gives up');
+ await settleSoon();
+ assert.equal(c.sockets.length,1,'no attempt after the hang-up');
 });

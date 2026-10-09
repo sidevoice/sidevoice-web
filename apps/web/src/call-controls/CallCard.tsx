@@ -309,7 +309,7 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
               onClick={() => setPanel(panel === "devices" ? null : "devices")} disabled={!call.devices}>
               <ChevronIcon size={13} />
             </button>
-            <button type="button" className="card-mute" aria-pressed={muted} disabled={call.micDisabled || reconnecting}
+            <button type="button" className="card-mute" aria-pressed={muted} disabled={call.micDisabled}
               title={state.muteShortcut ? t("card.shortcut", { action: muteLabel, shortcut: state.muteShortcut }) : muteLabel} aria-label={muteLabel}
               onClick={() => run({ command: "toggle-mute" })}>
               {muted ? <MicrophoneOffIcon size={17} /> : <MicrophoneIcon size={17} />}
