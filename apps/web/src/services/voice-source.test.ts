@@ -70,6 +70,9 @@ test("what this device cannot run is refused with the seam's code before anythin
   expect(settingsRefusal(catalogue, settings({ stt: { model: "parakeet", build: null, language: null } }))).toBe("model-unknown");
   expect(settingsRefusal(catalogue, settings({ stt: { model: "kokoro-82m-v1.0", build: null, language: null } }))).toBe("model-wrong-task");
   expect(settingsRefusal(catalogue, settings({ stt: { model: "whisper-base", build: "whisper-base/gpu", language: null } }))).toBe("build-unfit");
+  // Automatic with no build that runs here is refused too, not left to fail at loading.
+  const unfit = [...catalogue, model("whisper-large", ["stt"], [build("whisper-large/gpu", { available: false })])];
+  expect(settingsRefusal(unfit, settings({ stt: { model: "whisper-large", build: null, language: null } }))).toBe("model-unfit");
   expect(settingsRefusal(catalogue.filter((m) => m.id !== "smart-turn-v3"), settings({ end_of_turn: "smart-turn" }))).toBe("end-of-turn-unavailable");
   const noVad = catalogue.filter((m) => !m.capabilities.includes("vad"));
   expect(settingsRefusal(noVad, settings())).toBe("vad-unavailable");

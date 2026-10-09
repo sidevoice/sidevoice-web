@@ -35,6 +35,8 @@ export function settingsRefusal(catalogue: Model[], settings: VoiceSettings): st
     if (!model) return "model-unknown";
     if (!model.capabilities.includes(task)) return "model-wrong-task";
     if (stage.build != null && !model.builds.some((build) => build.id === stage.build && build.available)) return "build-unfit";
+    // The automatic build is one that runs here: with none, the model cannot be loaded on this device.
+    if (stage.build == null && !model.builds.some((build) => build.available)) return "model-unfit";
   }
   if (!runnable(catalogue, "vad")) return "vad-unavailable";
   if (settings.end_of_turn === "smart-turn" && !runnable(catalogue, "end-of-turn")) return "end-of-turn-unavailable";

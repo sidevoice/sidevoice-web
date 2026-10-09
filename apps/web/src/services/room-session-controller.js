@@ -40,6 +40,7 @@ const VOICE_FAILURES={
  'end-of-turn-unavailable':()=>'El fin de turno inteligente aún no está disponible: el turno termina con el silencio.',
  'credential-missing':()=>'Falta la clave del proveedor. Añádela en Configuración → Proveedores.',
  'model-unknown':()=>'Ese modelo no está en el catálogo de la voz.',
+ 'model-unfit':()=>'Ese modelo no se puede ejecutar en este dispositivo. Elige otro.',
 };
 // What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
 function voiceErrorText(error){const code=String(error?.code||'');return VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.'}
