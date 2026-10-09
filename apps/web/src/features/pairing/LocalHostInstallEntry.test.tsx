@@ -8,6 +8,8 @@ import { LocalHostInstallEntry } from "./LocalHostInstallEntry";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 
+vi.mock("../../services/room-session-controller.js", () => ({}));
+
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd" };
 
 function deferred<T>() {
