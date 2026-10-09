@@ -99,13 +99,13 @@ test('Delivery tick is immediate, follows the matching receipt and does not impl
  const s=setup();const emit=(type,data)=>s.run(`message(${JSON.stringify(JSON.stringify({type,data}))})`);
  s.run("relay.sent('t1');voiceTurn({client_msg_id:'m1',turn_id:'t1',phase:'started'});voiceTurn({client_msg_id:'m2',turn_id:'t1',phase:'finished',text:'Hola'})");
  assert.equal(s.run('history[0].delivery'),'pending');
- emit('voice-user-turn',{phase:'started',revision:1,thread_id:'a',session_id:'s'});
- assert.equal(s.run('history[0].segment'),'s:user-turn:1','the room\'s revision names the row');
- emit('voice-input-receipt',{revision:1,thread_id:'other',status:'delivered'});
+ assert.equal(s.run('history[0].segment'),'s:user-turn:t1','the turn\'s name names the row, as the room does');
+ emit('voice-user-turn',{phase:'started',turn_id:'t1',revision:1,thread_id:'a',session_id:'s'});
+ emit('voice-input-receipt',{turn_id:'t1',revision:1,thread_id:'other',status:'delivered'});
  assert.equal(s.run('history[0].delivery'),'pending');
- emit('voice-input-receipt',{revision:1,thread_id:'a',status:'pending'});
+ emit('voice-input-receipt',{turn_id:'t1',revision:1,thread_id:'a',status:'pending'});
  assert.equal(s.run('history[0].delivery'),'pending');
- emit('voice-input-receipt',{revision:1,thread_id:'a',status:'delivered'});
+ emit('voice-input-receipt',{turn_id:'t1',revision:1,thread_id:'a',status:'delivered'});
  assert.equal(s.run('history[0].delivery'),'delivered');
 });
 test('A joined empty room selects its only listening conversation automatically',async()=>{
@@ -127,8 +127,8 @@ test('A joined empty room selects its only listening conversation automatically'
 test('A receipt arriving before the final bubble is retained instead of disappearing',()=>{
  const s=setup();const emit=(type,data)=>s.run(`message(${JSON.stringify(JSON.stringify({type,data}))})`);
  s.run("relay.sent('t2');voiceTurn({client_msg_id:'m1',turn_id:'t2',phase:'started'})");
- emit('voice-user-turn',{phase:'started',revision:2,thread_id:'a',session_id:'s'});
- emit('voice-input-receipt',{revision:2,thread_id:'a',session_id:'s',status:'delivered'});
+ emit('voice-user-turn',{phase:'started',turn_id:'t2',revision:2,thread_id:'a',session_id:'s'});
+ emit('voice-input-receipt',{turn_id:'t2',history_id:'s:user-turn:t2',revision:2,thread_id:'a',session_id:'s',status:'delivered'});
  s.run("voiceTurn({client_msg_id:'m2',turn_id:'t2',phase:'finished',text:'Ya llegó'})");
  assert.equal(s.run('history[0].delivery'),'delivered');
  assert.equal(s.run('Object.keys(inputReceipts).length'),0);
@@ -869,7 +869,7 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{},models=[]}={}){
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
-  speak:reply=>calls.push(['speak',reply]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
+  speak:reply=>calls.push(['speak',reply]),turnStarted:started=>calls.push(['turnStarted',started]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
   onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
   models:async()=>models,setProviderKey:async(provider,key)=>{calls.push(['setProviderKey',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasProviderKey:async provider=>!!keys[provider]};
 }
@@ -923,26 +923,32 @@ test('A call subscribes to its voice, chooses, starts it, and only then joins th
  c.s.run('window.sidevoiceActions.toggleCall()');
  assert.deepEqual(voice.calls.at(-1),['stop'],'a hang-up stops the voice');
 });
-test('A turn is said with the revision the room gave its start, and its end waits for that answer',async()=>{
+test('A turn is said by its name, and its end waits for the room\'s answer to its start',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
- voice.emit('turn',{client_msg_id:'c-1',turn_id:'u1',phase:'started',revision:0,offline:false});
+ voice.emit('turn',{client_msg_id:'c-1',turn_id:'u1',phase:'started',offline:false});
  assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.client_msg_id,d.session_id]),[['started','c-1','s1']]);
- voice.emit('turn',{client_msg_id:'c-2',turn_id:'u1',phase:'finished',revision:0,text:'Hola',offline:false});
+ voice.emit('turn',{client_msg_id:'c-2',turn_id:'u1',phase:'finished',text:'Hola',offline:false});
  assert.equal(sentOf(c,first,'voice-user-turn').length,1,'the end waits for the start\'s answer');
  assert.equal(s.run('history.at(-1).text'),'Hola');
  assert.equal(s.run('history.at(-1).delivery'),'pending');
- c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',revision:7,thread_id:'a'}});
+ // An answer about another turn is not this one's.
+ c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'elsewhere',revision:6,thread_id:'a'}});
+ assert.equal(sentOf(c,first,'voice-user-turn').length,1);
+ const answer={session_id:'s1',phase:'started',turn_id:'u1',revision:7,thread_id:'a'};
+ c.push(first,{type:'voice-user-turn',data:answer});
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='turnStarted')),['turnStarted',answer],'the voice takes the turn\'s boundary');
  const ended=sentOf(c,first,'voice-user-turn').at(-1);
- assert.deepEqual([ended.phase,ended.revision,ended.client_msg_id,ended.text],['finished',7,'c-2','Hola']);
- assert.equal(s.run('history.at(-1).segment'),'s1:user-turn:7');
+ assert.deepEqual([ended.phase,ended.turn_id,ended.revision,ended.client_msg_id,ended.text],['finished','u1',undefined,'c-2','Hola']);
+ assert.equal(s.run('history.at(-1).segment'),'s1:user-turn:u1');
  c.push(first,{type:'voice-ack',data:{client_msg_id:'c-1'}});c.push(first,{type:'voice-ack',data:{client_msg_id:'c-2'}});
  assert.equal(s.run('outbox.list().length'),0,'acknowledged, forgotten');
 });
 test('Words said while the room was away go as their own offline message; a start the room refused does too',async()=>{
  const c=await callOnRoom();const {voice,first}=c;
- voice.emit('turn',{client_msg_id:'o-1',turn_id:'u2',phase:'started',offline:true});
+ // The voice reports a turn started offline only as finished: its words are a row of their own.
  voice.emit('turn',{client_msg_id:'o-2',turn_id:'u2',phase:'finished',text:'Sin sala',offline:true});
- assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.offline,d.revision]),[['finished',true,undefined]],'an offline start is not said');
+ assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.offline,d.turn_id]),[['finished',true,'u2']]);
+ assert.deepEqual([c.s.run('history.at(-1).text'),c.s.run('history.at(-1).segment')],['Sin sala','s1:user-turn:u2']);
  voice.emit('turn',{client_msg_id:'r-1',turn_id:'u3',phase:'started',offline:false});
  c.push(first,{type:'error',data:{key:'room.no_conversation',client_msg_id:'r-1'}});
  voice.emit('turn',{client_msg_id:'r-2',turn_id:'u3',phase:'finished',text:'Rechazado',offline:false});

@@ -246,9 +246,9 @@ let outboxHold=null;
 // A message the voice made, kept under the `client_msg_id` it already carries.
 function keepMessage(kind,type,data){return outbox.add({id:data.client_msg_id,kind,session_id:state.sessionId,node:state.node,payload:{type,data}})}
 /* Everything waiting, in order, on the socket the call has now, under the session it has now. A turn belongs to the
- * conversation, not to the session that heard it: its end is said with the revision this session gave its start, or
- * as words said while away when this session never saw that start (`turn-relay.js`). A turn's end whose start is not
- * answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
+ * conversation, not to the session that heard it: the room knows it by its `turn_id` on the session that took its start,
+ * and as words said while away when this session never took that start (`turn-relay.js`). A turn's end whose start is
+ * not answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
  * is let go. */
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for.
@@ -265,7 +265,7 @@ function flushOutbox(socket=state.ws){
    if(route.wait)return;
    if(route.drop){outbox.remove(entry.id);continue}
    data=route.send;
-   if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-offline:'+entry.id);
+   if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
   }
   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
   if(entry.kind==='user-turn'&&data.phase==='started')relay.sent(data.turn_id,entry.id);
@@ -274,8 +274,8 @@ function flushOutbox(socket=state.ws){
 }
 // Words said while away become the room's own row: the bubble takes that row's id, so history and receipts find it.
 function nameOfflineRow(turnId,id){
- const draft='turn:'+turnId;if(!state.history.some(r=>r.segment===draft))return;
- state.history=state.history.map(r=>r.segment===draft?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
+ const mine=r=>r.turn_id===turnId&&r.segment!==id;if(!state.history.some(mine))return;
+ state.history=state.history.map(r=>mine(r)?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
 }
 
 // Where the reader of a reply is, on the bubble of that reply: its row, by the reply this page was handed.
@@ -775,9 +775,15 @@ function openTurnTrace(threadId,revision){
  if(!traceparent||!state.ws||state.ws.readyState!==1||!state.sessionId)return;
  try{state.ws.send(JSON.stringify({type:'voice-turn-trace',data:{session_id:state.sessionId,thread_id:threadId,revision,traceparent}}))}catch{}
 }
+const latencyRevisions=new Map();
 function observeLatencyEvent(type,data){
  const now=latencyNow();if(!Number.isFinite(now))return;
  if(type==='voice-user-turn'){
+  // The room names the turn; only its answer to `started` carries the revision the turn is measured under.
+  if(data.phase==='started'&&data.turn_id!=null){latencyRevisions.set(data.turn_id,data.revision);if(latencyRevisions.size>128)latencyRevisions.delete(latencyRevisions.keys().next().value)}
+  const revision=data.revision??latencyRevisions.get(data.turn_id);
+  if(revision==null)return;
+  data={...data,revision};
   const key=latencyKey(data.thread_id,data.revision);
   if(data.phase==='started'){latencyActiveTurn=key;if(!latencyTurns.has(key))latencyTurns.set(key,{});openTurnTrace(data.thread_id,data.revision)}
   if(data.phase==='cancelled'){latencyTurns.delete(key);if(latencyActiveTurn===key)latencyActiveTurn=null;window.sidevoiceTelemetry?.endTurn?.(data.thread_id,data.revision,data.merged?'merged':'cancelled')}
@@ -826,23 +832,20 @@ function recordMessage(raw, socket) {
         receiveReply(d);
         return;
     }
-    // The room's answer to a turn this page said started: the revision the turn is said with to its end.
+    // The room's answer to a turn this page said started, by the turn's name: its end may go now, the conversation it
+    // goes to is the one the room captured, and the voice takes the turn's revision as its boundary for stale replies.
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
-        const turn = relay.answered(d.revision);
-        if (turn != null) {
-            const draft = 'turn:' + turn, segment = state.sessionId + ':user-turn:' + d.revision;
-            state.history = state.history.map(r => r.segment === draft ? { ...r, segment, revision: d.revision, delivery: takeReceipt(segment) || r.delivery } : r);
-            if (state.userTurn?.id === turn)
-                state.userTurn = { ...state.userTurn, segment, thread: d.thread_id };
-            save();
-            markHistorySeen();
+        if (relay.answered(d.turn_id)) {
+            voice?.turnStarted?.(d);
+            if (state.userTurn?.id === d.turn_id)
+                state.userTurn = { ...state.userTurn, thread: d.thread_id };
         }
         flushOutbox();
         return;
     }
     if (t === 'voice-input-receipt') {
-        const receiptId = d.history_id || (d.session_id || state.sessionId) + ':user-turn:' + d.revision;
+        const receiptId = d.history_id || (d.session_id || state.sessionId) + ':user-turn:' + d.turn_id;
         const row = state.history.find(r => r.thread === d.thread_id && r.segment === receiptId);
         if (row) {
             state.history = state.history.map(r => r === row ? { ...r, delivery: d.status } : r);
@@ -887,7 +890,8 @@ function voiceTurn(turn){
   if(turn.phase==='started'){
    personSignal();
    state.cancelledInput=false;
-   state.userTurn={id:turn.turn_id,segment:'turn:'+turn.turn_id,thread:targetId()};
+   // The row's id is the room's for this turn (`session:user-turn:turn_id`) from the start.
+   state.userTurn={id:turn.turn_id,segment:state.sessionId+':user-turn:'+turn.turn_id,thread:targetId()};
    state.pendingPhase='listening';
    partial('');
   }else if(state.userTurn?.id===turn.turn_id){
@@ -895,8 +899,13 @@ function voiceTurn(turn){
    state.pendingPhase='';partial('');state.userTurn=null;
    if(turn.phase==='finished'&&turn.text?.trim()){
     state.history=state.history.filter(r=>r.segment!==segment);
-    add('user',turn.text,null,thread,{history_id:segment,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
+    add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
    }else state.history=state.history.filter(r=>r.segment!==segment);
+   markHistorySeen();
+  }else if(turn.phase==='finished'&&turn.offline&&turn.text?.trim()){
+   // A turn started while the room was out of reach is only ever finished: its row is the words said while away.
+   const segment=state.sessionId+':user-turn:'+turn.turn_id;
+   add('user',turn.text,null,targetId(),{history_id:segment,turn_id:turn.turn_id,offline:true,draft:false,time:Date.now(),delivery:takeReceipt(segment)||'pending'});
    markHistorySeen();
   }
  });
