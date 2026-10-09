@@ -1088,18 +1088,21 @@ test('A hang-up while the settings are taken never starts the microphone, and on
  assert.deepEqual(slow.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['start','stop','stop'],'the hang-up, then what the join started');
  assert.equal(d.sockets.length,0);
 });
-test('The room gets the turn\'s timings under its own name, and a failed reply without a reason it would refuse',async()=>{
+test('The voice\'s turns and playback reports go as the room reads them, and a voice failure is said and logged',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  voice.emit('turn',{client_msg_id:'t-start',turn_id:'t',phase:'started'});
  c.push(c.first,{type:'voice-user-turn',data:{phase:'started',revision:1,session_id:'s1',thread_id:'a'}});
- voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
- const sent=sentOf(c,c.first,'voice-user-turn').at(-1);
- assert.deepEqual(plain(sent.timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});assert.equal(sent.timings,undefined);
- voice.emit('playback',{client_msg_id:'failed',utterance_id:'reply',status:'failed',heard_chars:0,reason:'credential-missing'});
+ // @sidevoice/voice writes the timings under the room's name, and the page passes them on as they are.
+ voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings_ms:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').at(-1).timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});
+ // A failure has no reason in the room's words; its code arrives as the voice's error event.
+ voice.emit('playback',{client_msg_id:'failed',utterance_id:'reply',status:'failed',heard_chars:0});
  const failed=sentOf(c,c.first,'voice-playback').at(-1);
  assert.equal(failed.status,'failed');assert.equal('reason' in failed,false);
- voice.emit('playback',{client_msg_id:'cut',utterance_id:'other',status:'interrupted',heard_chars:3,reason:'user_interrupted'});
- assert.equal(sentOf(c,c.first,'voice-playback').at(-1).reason,'user_interrupted','a reason of the room\'s own list goes');
+ const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>name==='setBootError'?value=>said.push(value):()=>{}});
+ voice.emit('error',{code:'credential-missing'});
+ assert.match(said.at(-1)||'',/Falta la clave del proveedor/);
+ assert.deepEqual(plain(c.frames(c.first).filter(m=>m.type==='voice-client-error').map(m=>[m.data.kind,m.data.message])),[['voice','credential-missing']]);
  s.run('disconnect()');
 });
 test('A move to another conversation silences the last one\'s voice, and a late reply of it is not said',async()=>{
