@@ -1,126 +1,29 @@
-name: CI
+name: ci
 
-# What runs when (RELEASING.md):
-# - pull request: the build and the tests on Linux, and the static site assembled. Nothing is packaged.
-# - push to main, manual run: the same, then the static site as a tarball; a green run on main replaces the
-#   `nightly` pre-release.
-# - a release (called by release-please.yml with the tag it created): the same, attached to that release.
+# Every pull request: the build, the tests, and the release packaging exactly as a release builds it
+# (`node scripts/release.mjs dist`), publishing nothing. What passes here is what merging publishes (release.yml).
+# RELEASING.md.
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  # release-please.yml dispatches it on the release PR, whose pushes start no workflow.
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      release-tag:
-        description: The draft release release-please created (vX.Y.Z); its assets are built from that tag.
-        type: string
-        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  # Per ref. A release (github.workflow is the caller's, release-please) never shares a group with a push.
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  web:
-    name: Web (Node)
+  test:
+    name: Build, test and package
     runs-on: ubuntu-24.04
-    outputs:
-      # Where the assets go: the release that called this, or the rolling `nightly` pre-release on a push to main.
-      publish: ${{ steps.kind.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.release-tag }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - id: kind
-        run: echo "publish=${{ inputs.release-tag && 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'nightly' || '' }}" >> "$GITHUB_OUTPUT"
-      - run: npm ci
-      # The page and its packages are built before the suites run, so they test what a deployment serves,
-      # and the static site is assembled the way a deployment (and the desktop app's vendoring) assembles it.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/setup
+      # The page and its packages are built before the suites run, so they test what a deployment serves.
       - run: npm run build
       - run: npm test
-      - run: node scripts/assemble-static-web.mjs "$RUNNER_TEMP/site"
-      - name: The static site as a tarball, and its SHA256SUMS
-        if: github.event_name != 'pull_request'
-        env:
-          KIND: ${{ steps.kind.outputs.publish }}
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          # The nightly carries the version of the last release, so it says it is not that version.
-          NAME="sidevoice-web-${VERSION}$([ "$KIND" = nightly ] && echo -nightly || true).tar.gz"
-          mkdir dist-release
-          # The layout scripts/assemble-static-web.mjs makes, at the root of the archive: index.html, voice/,
-          # voice-browser/.
-          tar -C "$RUNNER_TEMP/site" --sort=name --owner=0 --group=0 --numeric-owner \
-            -czf "dist-release/$NAME" index.html voice voice-browser
-          tar -tzf "dist-release/$NAME" | grep -x 'voice/index.html' >/dev/null
-          tar -tzf "dist-release/$NAME" | grep -x 'voice-browser/worker.js' >/dev/null
-          (cd dist-release && sha256sum -- * > SHA256SUMS)
-          ls -la dist-release; cat dist-release/SHA256SUMS
-      - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
-        with:
-          name: sidevoice-web-dist
-          path: dist-release/
-          retention-days: 7
-          if-no-files-found: error
-
-  # Only after the build and the tests passed. Pull requests never get here.
-  publish:
-    name: Publish (release or nightly)
-    needs: web
-    if: needs.web.outputs.publish != ''
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      TAG: ${{ inputs.release-tag }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: sidevoice-web-dist
-          path: assets
-      - name: Attach to the release, then publish it (a version with -rc.N is a pre-release, never latest)
-        if: needs.web.outputs.publish == 'release'
-        run: |
-          set -euo pipefail
-          gh release upload "$TAG" assets/* --clobber
-          if [[ "$TAG" == *-* ]]; then
-            gh release edit "$TAG" --draft=false --prerelease --latest=false
-          else
-            gh release edit "$TAG" --draft=false --prerelease=false --latest
-          fi
-      - name: Replace the nightly pre-release (move its tag here, replace every asset)
-        if: needs.web.outputs.publish == 'nightly'
-        env:
-          WHEN: ${{ github.event.head_commit.timestamp }}
-        run: |
-          set -euo pipefail
-          if gh api "repos/$GH_REPO/git/ref/tags/nightly" >/dev/null 2>&1; then
-            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true >/dev/null
-          else
-            gh api -X POST "repos/$GH_REPO/git/refs" -f ref=refs/tags/nightly -f sha="$GITHUB_SHA" >/dev/null
-          fi
-          NOTES="Snapshot of \`main\` at $GITHUB_SHA (committed $WHEN). Not a versioned release: the \`nightly\` tag moves to every commit on \`main\` whose CI passes, and these assets are replaced each time. Versioned releases are the \`vX.Y.Z\` ones."
-          if gh release view nightly >/dev/null 2>&1; then
-            gh release edit nightly --title "Nightly (main)" --notes "$NOTES" --prerelease --latest=false
-            gh release upload nightly assets/* --clobber
-            # Anything left from an older snapshot that this one did not replace (the tarball is named after the version).
-            gh release view nightly --json assets -q '.assets[].name' | while read -r name; do
-              [ -e "assets/$name" ] || gh release delete-asset nightly "$name" --yes
-            done
-          else
-            gh release create nightly assets/* --verify-tag --title "Nightly (main)" --notes "$NOTES" \
-              --prerelease --latest=false
-          fi
+      - run: node scripts/release.mjs dist
