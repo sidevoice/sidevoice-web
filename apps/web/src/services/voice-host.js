@@ -3,25 +3,35 @@
  * `host.voice` is the same one; the module's own `createVoiceHost(engine)` replaces this file once it is released,
  * and until then this behaves as it:
  *
- * - the call exists from the first `setSettings`, and emits nothing before `start()`;
+ * - `setSettings` refuses, before anything changes, a model the catalogue lacks or of the wrong task (`model-unknown`,
+ *   `model-wrong-task`), a build not listed or not running here (`build-unfit`) and `smart-turn` with no end-of-turn
+ *   model (`end-of-turn-unavailable`); the first creates the call, which emits nothing before `start()`;
  * - `start()` resolves on the first `state` whose `listening` is not `"idle"` and rejects `{code, message?}`; a
  *   second `start()` settles with the pending one, and one while listening resolves at once;
  * - `stop()` is safe at any time: a pending `start()` rejects `{code: "stopped"}`;
  * - listeners get what is emitted after they subscribe, in the order the call emitted it. */
 
 /** The module's configuration (`VoiceConfig`) for the person's `settings`: the stages they chose, and the rest. */
-export function voiceConfig(settings = {}) {
-  const language = settings.stt?.language;
+export function voiceConfig(settings) {
   return {
     vad: { model: 'silero-vad' },
-    stt: { model: settings.stt?.model ?? 'whisper-base', ...(language ? { language } : {}) },
-    tts: {
-      model: settings.tts?.model ?? 'kokoro-82m-v1.0',
-      ...(settings.tts?.voice ? { voice: settings.tts.voice } : {}),
-      ...(settings.tts?.speed ? { speed: settings.tts.speed } : {}),
-    },
+    stt: { model: settings.stt.model, build: settings.stt.build ?? null, language: settings.stt.language ?? null },
+    tts: { model: settings.tts.model, build: settings.tts.build ?? null, voice: settings.tts.voice ?? null, speed: settings.tts.speed ?? 1 },
     patience: settings.patience ?? 'normal',
+    end_of_turn: settings.end_of_turn ?? 'silence',
   };
+}
+
+/** Why the catalogue `models` cannot take `settings`, as the interface's code, or null when it can. */
+export function settingsRefusal(models, settings) {
+  for (const [task, stage] of [['stt', settings.stt], ['tts', settings.tts]]) {
+    const model = models.find((candidate) => candidate.id === stage.model);
+    if (!model) return 'model-unknown';
+    if (!model.capabilities.includes(task)) return 'model-wrong-task';
+    if (stage.build != null && !model.builds.some((build) => build.id === stage.build && build.available)) return 'build-unfit';
+  }
+  if (settings.end_of_turn === 'smart-turn' && !models.some((model) => model.capabilities.includes('end-of-turn'))) return 'end-of-turn-unavailable';
+  return null;
 }
 
 const KEY_PREFIX = 'sidevoice.provider-key.';
@@ -64,8 +74,10 @@ export function createVoiceHost(engine, { VoiceCall, storage = globalThis.localS
   }
   return {
     async setSettings(next) {
-      let config;
-      try { config = voiceConfig(next ?? {}); if (call) call.setConfig(config); else create(config); }
+      const refusal = settingsRefusal(await engine.models(), next);
+      if (refusal) throw voiceFailure(refusal);
+      const config = voiceConfig(next);
+      try { if (call) call.setConfig(config); else create(config); }
       catch (cause) { throw voiceFailure(cause?.code || 'voice-settings-invalid', cause); }
     },
     start() {

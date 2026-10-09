@@ -8,11 +8,6 @@ import { createVoiceHost, providerKey, voiceFailure } from './voice-host.js';
 
 const VOICE = '@sidevoice/voice', ENGINE = '@sidevoice/engine';
 
-/** The person's choices a call starts with, in `language`. */
-export function defaultVoiceSettings(language) {
-  return { stt: { model: 'whisper-base', language: language || null }, tts: { model: 'kokoro-82m-v1.0' }, patience: 'normal' };
-}
-
 /** The page as the engine's host: what this browser can run models on, and the provider keys this device keeps. */
 export async function browserHost(navigator = globalThis.navigator) {
   const accelerators = ['wasm'];

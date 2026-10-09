@@ -1,5 +1,7 @@
 import { DialogFrame } from "../../components/ui/DialogFrame";
-import { GeneralIcon, MachinesIcon } from "../../components/ui/Icons";
+import { GeneralIcon, IntegrationsIcon, MachinesIcon, VoicesIcon } from "../../components/ui/Icons";
+import { VoiceSettings } from "./VoiceSettings";
+import { ProviderKeys } from "./ProviderKeys";
 import { MachineList } from "../room/MachineList";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
@@ -21,9 +23,11 @@ export function SettingsDialog() {
         <div className="settings-layout">
           <nav className="settings-nav" aria-label="Secciones de configuración">
             <Button variant="ghost" id="settings-general" aria-controls="pane-general" aria-pressed="true"><GeneralIcon /> General</Button>
+            <Button variant="ghost" id="settings-voice" aria-controls="pane-voice" aria-pressed="false"><VoicesIcon /> Voz</Button>
+            <Button variant="ghost" id="settings-providers" aria-controls="pane-providers" aria-pressed="false"><IntegrationsIcon /> Proveedores</Button>
             <Button variant="ghost" id="settings-machines" aria-controls="pane-machines" aria-pressed="false"><MachinesIcon /> Máquinas</Button>
           </nav>
-          <div className="settings-content"><GeneralSettings /><MachineSettings /></div>
+          <div className="settings-content"><GeneralSettings /><VoiceSettings /><ProviderKeys /><MachineSettings /></div>
         </div>
       </form>
     </DialogFrame>

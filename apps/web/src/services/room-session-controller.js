@@ -6,7 +6,8 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
-import {openVoice,defaultVoiceSettings} from './voice-module.js';
+import {openVoice} from './voice-module.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,PROVIDERS} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {refusalText as sayRefusal} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
@@ -35,6 +36,10 @@ const VOICE_FAILURES={
  'audio-device-unavailable':()=>'Falta el dispositivo de audio de la llamada. Conéctalo y vuelve a entrar.',
  'audio-device-failed':()=>'El dispositivo de audio de la llamada falló. Conéctalo de nuevo y vuelve a entrar.',
  'voice-module-unavailable':()=>'La voz de la llamada aún no está disponible en esta versión de la página.',
+ 'build-unfit':()=>'Esa compilación no se puede ejecutar en este dispositivo. Elige otra o deja la automática.',
+ 'end-of-turn-unavailable':()=>'El fin de turno inteligente aún no está disponible: el turno termina con el silencio.',
+ 'credential-missing':()=>'Falta la clave del proveedor. Añádela en Configuración → Proveedores.',
+ 'model-unknown':()=>'Ese modelo no está en el catálogo de la voz.',
 };
 // What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
 function voiceErrorText(error){const code=String(error?.code||'');return VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.'}
@@ -522,18 +527,14 @@ function renderLatencyStats(snapshot,thread){
  const firstReplies=new Map();
  for(const reply of replies){const key=reply.reply_revision,value=reply.server_ms?.input_queued_to_reply_received_ms;
   if(statsNumber(value)&&(!firstReplies.has(key)||value<firstReplies.get(key)))firstReplies.set(key,value)}
- $('stats-endpoint').textContent=statsDuration(statsMedian(replies.map(r=>r.input_ms?.speech_end_to_transcript_ms)));
+ $('stats-recognition').textContent=statsDuration(statsMedian(replies.map(r=>r.input_ms?.recognition_ms)));
  $('stats-response').textContent=statsDuration(statsMedian([...firstReplies.values()]));
- $('stats-synthesis').textContent=statsDuration(statsMedian(replies.map(r=>r.provider_ms?.request_to_complete_ms)));
- $('stats-playout').textContent=statsDuration(statsMedian(replies.map(r=>r.browser_ms?.audio_received_to_playback_scheduled_ms)));
- const states={queued:'En cola',synthesizing:'Generando voz',ready:'Audio listo',dispatched:'Audio enviado',playing:'Reproduciendo',completed:'Reproducción terminada',interrupted:'Interrumpida',failed:'Falló',disconnected:'Desconectada'};
+ const states={queued:'En cola',playing:'Reproduciendo',playback_finished:'Escuchada',interrupted:'Interrumpida',failed:'Falló'};
  const rows=replies.slice(-12).reverse().map(r=>{
-  const row=document.createElement('tr'),input=r.input_ms||{},server=r.server_ms||{},provider=r.provider_ms||{};
+  const row=document.createElement('tr'),input=r.input_ms||{},server=r.server_ms||{};
   row.append(statsCell('td',r.reply_revision),...[
-   input.speech_end_to_transcript_ms,input.endpoint_silence_ms,input.recognition_ms,
-   server.input_queued_to_reply_received_ms,server.reply_received_to_synthesis_started_ms,
-   provider.request_to_first_chunk_ms,provider.request_to_complete_ms,
-   r.browser_ms?.audio_received_to_playback_scheduled_ms
+   input.endpoint_silence_ms,input.recognition_ms,
+   server.input_queued_to_reply_received_ms,server.reply_received_to_synthesis_started_ms
   ].map(value=>statsCell('td',statsDuration(value))),statsCell('td',states[r.status]||r.status||'—'));
   return row;
  });
@@ -547,14 +548,11 @@ function renderLatencyStats(snapshot,thread){
 const LATENCY_STAGES=[
  ['Silencio hasta cerrar el turno',r=>r.input_ms?.endpoint_silence_ms,'endpoint_silence'],
  ['Turno cerrado → texto',r=>r.input_ms?.recognition_ms,'recognition'],
- ['Whisper en este dispositivo',r=>r.input_ms?.request_to_transcript_ms,'request_to_transcript'],
  ['Texto → entregado al agente',r=>r.input_ms?.transcript_to_delivery_ms,'transcript_to_delivery'],
  ['Entregado → leído por la conversación',r=>r.server_ms?.delivery_accepted_to_read_ms??r.server_ms?.input_queued_to_read_ms,'delivery_to_read'],
  ['Leído → primera respuesta',r=>r.server_ms?.read_to_reply_received_ms,'read_to_reply'],
  ['Agente: entrega → primera respuesta',r=>r.server_ms?.input_queued_to_reply_received_ms,'input_queued_to_reply'],
- ['Respuesta → inicio de síntesis',r=>r.server_ms?.reply_received_to_synthesis_started_ms,'reply_to_synthesis'],
- ['Síntesis en el proveedor',r=>r.provider_ms?.request_to_complete_ms,'provider_synthesis'],
- ['Audio recibido → reproducción',r=>r.browser_ms?.audio_received_to_playback_scheduled_ms,'audio_received_to_playback'],
+ ['Respuesta → enviada a este dispositivo',r=>r.server_ms?.reply_received_to_synthesis_started_ms,'reply_to_synthesis'],
 ];
 function renderLatencyStages(reply){
  const list=$('stats-stages');if(!list)return;list.replaceChildren();
@@ -1020,9 +1018,9 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
  try{
   if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}
   if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}
-  const next=await openVoice();if(epoch!==connectEpoch)return;
+  const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
-  await next.setSettings(defaultVoiceSettings(state.speechLanguage));
+  await next.setSettings(state.voiceSettings);
   await next.start();if(epoch!==connectEpoch)return;
   applyMicState();applyLockScreen(true);
   joinStatus('room');
@@ -1138,19 +1136,50 @@ async function replayReply(historyId){
  catch(error){setRoomError(error.message||'No se pudo volver a reproducir.')}
 }
 
+/* ----- the voice's settings and the remote providers' keys: this device's, never the room's -----
+ * One voice for the page: the settings pane asks it for its catalogue and keeps keys with it, and every call of this
+ * page drives it. A key goes from the pane to the voice and nowhere else: the voice keeps it (the desktop app in the
+ * system keychain, a browser in this page's storage) and hands it to the provider. */
+let voiceHostOpening=null;
+function voiceHost(){return voiceHostOpening??=openVoice().catch(error=>{voiceHostOpening=null;throw error})}
+async function keptProviderKeys(host){return Object.fromEntries(await Promise.all(PROVIDERS.map(async provider=>[provider,await host.hasProviderKey(provider).catch(()=>null)])))}
+async function loadVoiceCatalogue(){
+ roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
+ try{const host=await voiceHost();const [models,keys]=await Promise.all([host.models(),keptProviderKeys(host)]);roomStore.patch({voiceCatalogue:{state:'ready',models,error:''},providerKeys:keys})}
+ catch(error){roomStore.patch({voiceCatalogue:{state:'failed',models:[],error:voiceErrorText(error)}})}
+}
+function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.models)})}
+// The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
+async function saveVoiceSettings(){
+ const draft=state.voiceDraft;if(!draft||JSON.stringify(draft)===JSON.stringify(state.voiceSettings))return;
+ const host=await voiceHost().catch(()=>null);
+ if(host)await host.setSettings(draft);
+ writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
+}
+async function saveProviderKey(provider,key){
+ try{const host=await voiceHost();await host.setProviderKey(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
+ const host=await voiceHost();
+ roomStore.patch({providerKeys:await keptProviderKeys(host)});
+ const models=await host.models().catch(()=>null);if(models)roomStore.patch({voiceCatalogue:{state:'ready',models,error:''}});
+}
+roomStore.patch({voiceSettings:readVoiceSettings(pageStorage(),state.speechLanguage)});
+
 $('settings-open').onclick=()=>{try{
  if(nodeBase==null)settingsSection('machines');
+ roomStore.patch({voiceDraft:state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
  $('ui-language').value=p.ui_language;
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-function settingsSection(name){for(const section of ['general','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
+function settingsSection(name){for(const section of ['general','voice','providers','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
 $('call-settings-open').onclick=()=>{$('call-menu').open=false;$('settings-open').click()};
 $('settings-general').onclick=()=>settingsSection('general');
+$('settings-voice').onclick=()=>settingsSection('voice');
+$('settings-providers').onclick=()=>settingsSection('providers');
 $('settings-machines').onclick=()=>settingsSection('machines');
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
-$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
+$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings(state.speechLanguage)});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
 // says. Only the settings of today's shape are read back.
@@ -1161,15 +1190,19 @@ function storedPreferences(){const stored=readStored(SETTINGS_KEY);return Object
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))))}catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
 // The interface's language is this device's: saved here, said to the call in progress, applied at once.
-function saveSettings(){
+async function saveSettings(){
+ await saveVoiceSettings();
  const p={...devicePreferences(),ui_language:$('ui-language').value||devicePreferences().ui_language};
  storePreferences(p);window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
  $('language-settings').close();state.liveNote='Preferencias guardadas';
 }
-$('language-form').onsubmit=e=>{e.preventDefault();try{saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
+$('language-form').onsubmit=e=>{e.preventDefault();$('settings-error').textContent='';saveSettings().catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)})};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
+ editVoice,
+ saveProviderKey,
+ loadVoiceCatalogue,
  replayReply,
  toggleMic,
  toggleCall,

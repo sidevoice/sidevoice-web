@@ -6,14 +6,14 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={};
- if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element())}
+ if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-recognition','stats-response'])elements.set(id,new Element())}
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-host.js':'VoiceHost','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',VoiceHost:sourceRoot+'/services/voice-host.js',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-host.js':'VoiceHost','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',VoiceHost:sourceRoot+'/services/voice-host.js',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -262,17 +262,17 @@ test('Settings are reached from the call menu',()=>{
 test('Stats omit missing durations and use first reply per turn, only for selected thread',()=>{
  const s=setup({strictDOM:true});
  s.run(`renderLatencyStats({replies:[
- {thread_id:'a',reply_revision:1,status:'completed',input_ms:{speech_end_to_transcript_ms:2490,endpoint_silence_ms:2000,recognition_ms:450},server_ms:{input_queued_to_reply_received_ms:4000},provider_ms:{request_to_complete_ms:300},browser_ms:{audio_received_to_playback_scheduled_ms:50}},
- {thread_id:'a',reply_revision:1,status:'completed',server_ms:{input_queued_to_reply_received_ms:8000},provider_ms:{request_to_complete_ms:500}},
+ {thread_id:'a',reply_revision:1,status:'playback_finished',input_ms:{endpoint_silence_ms:2000,recognition_ms:450},server_ms:{input_queued_to_reply_received_ms:4000}},
+ {thread_id:'a',reply_revision:1,status:'playback_finished',input_ms:{recognition_ms:250},server_ms:{input_queued_to_reply_received_ms:8000}},
  {thread_id:'a',reply_revision:2,status:'failed',server_ms:{input_queued_to_reply_received_ms:6000}},
  {thread_id:'other',reply_revision:3,server_ms:{input_queued_to_reply_received_ms:100000}}
  ]},'a')`);
- assert.equal(s.run("$('stats-endpoint').textContent"),'2.49 s');
+ assert.equal(s.run("$('stats-recognition').textContent"),'350 ms');
  assert.equal(s.run("$('stats-response').textContent"),'5.00 s');
- assert.equal(s.run("$('stats-synthesis').textContent"),'400 ms');
- assert.equal(s.run("$('stats-playout').textContent"),'50 ms');
  assert.equal(s.run("$('stats-rows').children.length"),3);
- assert.equal(s.run("$('stats-rows').children[0].children[6].textContent"),'—');
+ assert.equal(s.run("$('stats-rows').children[0].children.length"),6,'turn, four stages, status');
+ assert.equal(s.run("$('stats-rows').children[0].children[1].textContent"),'—');
+ assert.equal(s.run("$('stats-rows').children[1].children[5].textContent"),'Escuchada');
  for(const value of ['null','undefined','NaN','Infinity','-1','true',"'10'"])
   assert.equal(s.run('statsDuration('+value+')'),'—');
  assert.equal(s.run('statsDuration(0)'),'0 ms');
@@ -362,16 +362,17 @@ test('Aggregates summarize with nearest-rank percentiles and never turn a missin
 test('Aggregates keep one row per stage, named as the last-turn view names them',()=>{
  const s=setup();
  const rows=s.run(`statsAggregate([
- {thread_id:'a',input_ms:{endpoint_silence_ms:600,recognition_ms:400},server_ms:{input_queued_to_reply_received_ms:3000,input_queued_to_read_ms:900},provider_ms:{request_to_complete_ms:200}},
+ {thread_id:'a',input_ms:{endpoint_silence_ms:600,recognition_ms:400},server_ms:{input_queued_to_reply_received_ms:3000,input_queued_to_read_ms:900}},
  {thread_id:'a',input_ms:{endpoint_silence_ms:1000},server_ms:{input_queued_to_reply_received_ms:9000,delivery_accepted_to_read_ms:100}},
  null
  ]).map(row=>[row.key,row.count,row.mean,row.p50,row.p90,row.max])`);
  assert.equal(rows.length,s.run('LATENCY_STAGES.length'),'every stage keeps its row');
  assert.equal(JSON.stringify(rows[0]),JSON.stringify(['endpoint_silence',2,800,600,1000,1000]));
  assert.equal(JSON.stringify(rows[1]),JSON.stringify(['recognition',1,400,400,400,400]));
- assert.equal(JSON.stringify(rows[2]),JSON.stringify(['request_to_transcript',0,null,null,null,null]),'a stage nobody measured stays empty, not zero');
- assert.equal(JSON.stringify(rows[4]),JSON.stringify(['delivery_to_read',2,500,100,900,900]),'the read stage falls back to queued → read, as the last-turn view does');
- assert.equal(JSON.stringify(rows[6]),JSON.stringify(['input_queued_to_reply',2,6000,3000,9000,9000]));
+ assert.equal(JSON.stringify(rows[2]),JSON.stringify(['transcript_to_delivery',0,null,null,null,null]),'a stage nobody measured stays empty, not zero');
+ assert.equal(JSON.stringify(rows[3]),JSON.stringify(['delivery_to_read',2,500,100,900,900]),'the read stage falls back to queued → read, as the last-turn view does');
+ assert.equal(JSON.stringify(rows[5]),JSON.stringify(['input_queued_to_reply',2,6000,3000,9000,9000]));
+ assert.deepEqual(plain(s.run('LATENCY_STAGES.map(stage=>stage[2])')),['endpoint_silence','recognition','transcript_to_delivery','delivery_to_read','read_to_reply','input_queued_to_reply','reply_to_synthesis'],'only what the room still measures');
  assert.equal(s.run("statsAggregate([]).every(row=>row.count===0&&row.max===null)"),true);
 });
 test('Copying the aggregates puts a plain-text table on the clipboard and says so',async()=>{
@@ -863,14 +864,14 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
 });
 
 // ----- the call's voice: the VoiceHost the page drives, here a fake that records what it was asked -----
-function fakeVoice({start=async()=>{}}={}){
- const on={},calls=[];
+function fakeVoice({start=async()=>{},setSettings=async()=>{},models=[]}={}){
+ const on={},calls=[],keys={};
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
-  setSettings:async settings=>{calls.push(['setSettings',settings])},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
+  setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
   speak:reply=>calls.push(['speak',reply]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
   onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
-  models:async()=>[],setProviderKey:async()=>{},hasProviderKey:async()=>false};
+  models:async()=>models,setProviderKey:async(provider,key)=>{calls.push(['setProviderKey',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasProviderKey:async provider=>!!keys[provider]};
 }
 // The desktop app's place for the voice is where the page finds it: `null` is a page with no voice at all.
 function withVoice(s,voice){const desktop=s.context.window.__sidevoiceDesktop||{};s.context.window.__sidevoiceDesktop={...desktop,host:{...desktop.host,...(voice?{voice}:{})}};return voice}
@@ -913,7 +914,7 @@ const sentOf=(c,socket,type)=>c.frames(socket).filter(m=>m.type===type).map(m=>m
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
  assert.deepEqual(voice.calls.map(([name])=>name).slice(0,3),['setSettings','start','mute']);
- assert.deepEqual(plain(voice.calls[0][1].stt),{model:'whisper-base',language:c.s.run('speechLanguage')||null});
+ assert.deepEqual(plain(voice.calls[0][1]),plain(c.s.run('voiceSettings')),'the settings this device keeps');
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','ui_language']);
  assert.equal(firstHello.data.conversation,'a');
@@ -966,9 +967,74 @@ test('A reply is written at once and handed to the voice; its karaoke follows th
  c.push(first,{type:'voice-reply',data:{...reply,session_id:'other'}});
  assert.equal(voice.calls.filter(([name])=>name==='speak').length,1,'another session\'s reply is not said here');
 });
-test('Settings send only the interface language to the room',()=>{
+test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
- s.run("$('ui-language').value='en';saveSettings()");
+ await s.run("$('ui-language').value='en';saveSettings()");
  assert.deepEqual(sent.filter(m=>m.type==='voice-settings').map(m=>Object.keys(m.data).sort()),[['session_id','ui_language']]);
+});
+
+// ----- the voice's settings and the providers' keys: kept on this device, checked by the voice, never sent to the room -----
+const CATALOGUE=[
+ {id:'whisper-base',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[{id:'whisper-base/int8',backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true}],recommendedBuild:'whisper-base/int8'},
+ {id:'kokoro-82m-v1.0',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],installed:true,builds:[{id:'kokoro/int8',backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true}]},
+ {id:'gpt-4o-transcribe',capabilities:['stt'],languages:[],voices:[],installed:false,builds:[{id:'gpt-4o-transcribe/openai',backend:'openai',accelerator:'remote',precision:'remote',downloadBytes:0,memoryMb:0,available:true,reasons:[],installed:false}]},
+];
+function settingsPage(options){
+ const s=setup({strictDOM:true});const voice=withVoice(s,fakeVoice({models:CATALOGUE,...options}));
+ const asked=[];s.context.fetch=async(url,init={})=>{asked.push({url,init});return {ok:true,status:200,json:async()=>({})}};
+ s.context.localStorage.setItem('sidevoice.settings','{}');
+ return {s,voice,asked};
+}
+test('Opening the settings reads the voice\'s catalogue and which providers have a key',async()=>{
+ const {s,voice}=settingsPage();
+ await voice.setProviderKey('openai','sk-1');voice.calls.length=0;
+ s.run("$('settings-open').onclick()");await settleSoon();
+ const facts=s.run('roomStore.getState().facts');
+ assert.equal(facts.voiceCatalogue.state,'ready');
+ assert.deepEqual(plain(facts.voiceCatalogue.models.map(m=>m.id)),['whisper-base','kokoro-82m-v1.0','gpt-4o-transcribe']);
+ assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false});
+ assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
+});
+test('Saved voice settings are checked by the voice, kept on this device, and the next call starts with them',async()=>{
+ const {s,voice,asked}=settingsPage();
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({stt:{model:'gpt-4o-transcribe'},patience:'calm'})");
+ assert.equal(s.run('voiceDraft.stt.build'),null,'a new model takes the automatic build');
+ await s.run("saveSettings()");
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),plain(s.run('voiceDraft')));
+ const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
+ assert.equal(kept.stt.model,'gpt-4o-transcribe');assert.equal(kept.patience,'calm');
+ assert.equal(s.run('voiceSettings.stt.model'),'gpt-4o-transcribe');
+ assert.equal(asked.some(({init})=>String(init.body||'').includes('gpt-4o-transcribe')),false,'the room is not told');
+});
+test('Settings the voice refuses are not kept, and the reason is said',async()=>{
+ const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'build-unfit'})}});
+ s.run("$('settings-open').onclick()");await settleSoon();
+ const before=plain(s.run('voiceSettings'));
+ s.run("window.sidevoiceActions.editVoice({stt:{build:'whisper-base/int8'}})");
+ s.run("$('language-form').onsubmit({preventDefault(){}})");await settleSoon();
+ assert.match(s.run("$('settings-error').textContent"),/compilación no se puede ejecutar/);
+ assert.deepEqual(plain(s.run('voiceSettings')),before);
+ assert.equal(s.run("localStorage.getItem('sidevoice.voice-settings')"),null);
+});
+test('A provider key goes to the voice and nowhere else',async()=>{
+ const {s,voice,asked}=settingsPage();
+ await s.run("window.sidevoiceActions.saveProviderKey('elevenlabs','xi-secret')");
+ assert.deepEqual(voice.calls.find(([name])=>name==='setProviderKey'),['setProviderKey','elevenlabs','xi-secret']);
+ assert.equal(s.run('providerKeys.elevenlabs'),true);
+ assert.equal(JSON.stringify(asked).includes('xi-secret'),false,'no request carries it');
+ assert.equal(JSON.stringify(s.saved).includes('xi-secret'),false,'the page keeps no copy of its own');
+ await s.run("window.sidevoiceActions.saveProviderKey('elevenlabs',null)");
+ assert.equal(s.run('providerKeys.elevenlabs'),false);
+});
+test('A page with no voice keeps its settings unchecked and says why it cannot keep a key',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ assert.equal(s.run('voiceCatalogue.state'),'failed');
+ assert.match(s.run('voiceCatalogue.error'),/aún no está disponible/);
+ s.run("window.sidevoiceActions.editVoice({patience:'fast'})");
+ await s.run('saveSettings()');
+ assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).patience,'fast');
+ await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),/aún no está disponible/);
 });

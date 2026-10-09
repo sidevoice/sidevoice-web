@@ -26,13 +26,22 @@ function fakeCall() {
   };
   return { VoiceCall, made };
 }
-const engine = { models: async () => [] };
+const build = (id: string) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 1, memoryMb: 1, available: true, reasons: [], installed: true });
+const catalogue = [
+  { id: "whisper-base", capabilities: ["stt"], languages: ["es", "en"], voices: [], installed: true, builds: [build("whisper-base/int8"), { ...build("whisper-base/gpu"), available: false }] },
+  { id: "kokoro-82m-v1.0", capabilities: ["tts"], languages: ["es"], voices: [{ id: "ef_dora", languages: ["es"] }], installed: true, builds: [build("kokoro/int8")] },
+];
+const engine = { models: async () => catalogue };
+const settings = (patch: Record<string, unknown> = {}) => ({
+  stt: { model: "whisper-base", build: null, language: "es" }, tts: { model: "kokoro-82m-v1.0", build: null, voice: null, speed: 1 },
+  patience: "normal", end_of_turn: "silence", ...patch,
+});
 
 test("start needs settings first, and resolves once the call listens", async () => {
   const { VoiceCall, made } = fakeCall();
   const host = createVoiceHost(engine, { VoiceCall });
   await expect(host.start()).rejects.toMatchObject({ code: "settings-missing" });
-  await host.setSettings({ stt: { model: "whisper-tiny", language: "es" }, tts: { model: "kokoro-82m-v1.0" } });
+  await host.setSettings(settings());
   expect(made).toHaveLength(1);
   const started = host.start();
   expect(host.start()).toBe(started);
@@ -46,7 +55,7 @@ test("start needs settings first, and resolves once the call listens", async () 
 test("a failing start rejects with the call's code, and a stop rejects a pending one as stopped", async () => {
   const { VoiceCall, made } = fakeCall();
   const host = createVoiceHost(engine, { VoiceCall });
-  await host.setSettings({});
+  await host.setSettings(settings());
   const failed = host.start();
   made[0].emit({ type: "error", data: { code: "microphone-denied" } });
   await expect(failed).rejects.toMatchObject({ code: "microphone-denied" });
@@ -62,7 +71,7 @@ test("the call's room messages reach the turn and playback listeners, and replie
   host.onUserTurn((t: unknown) => turns.push(t));
   host.onPlayback((p: unknown) => played.push(p));
   const off = host.onLevel((l: unknown) => levels.push(l));
-  await host.setSettings({});
+  await host.setSettings(settings());
   made[0].emit({ type: "room-message", data: { type: "voice-user-turn", data: { client_msg_id: "c-1", turn_id: "t", phase: "started" } } });
   made[0].emit({ type: "room-message", data: { type: "voice-playback", data: { client_msg_id: "c-2", utterance_id: "u", status: "heard" } } });
   made[0].emit({ type: "level", data: 0.4 });
@@ -79,11 +88,25 @@ test("new settings reconfigure the same call, and a mute chosen before it exists
   const { VoiceCall, made } = fakeCall();
   const host = createVoiceHost(engine, { VoiceCall });
   host.mute(true);
-  await host.setSettings({});
-  await host.setSettings({ tts: { model: "kokoro-82m-v1.0", voice: "ef_dora", speed: 1.1 } });
+  await host.setSettings(settings());
+  const next = settings({ tts: { model: "kokoro-82m-v1.0", build: null, voice: "ef_dora", speed: 1.1 }, patience: "calm" });
+  await host.setSettings(next);
   expect(made).toHaveLength(1);
   expect(made[0].asked[0]).toEqual(["mute", true]);
-  expect(made[0].asked[1]).toEqual(["setConfig", voiceConfig({ tts: { model: "kokoro-82m-v1.0", voice: "ef_dora", speed: 1.1 } })]);
+  expect(made[0].asked[1]).toEqual(["setConfig", voiceConfig(next)]);
+  expect(voiceConfig(next)).toMatchObject({ stt: { build: null, language: "es" }, tts: { voice: "ef_dora", speed: 1.1 }, patience: "calm", end_of_turn: "silence" });
+});
+
+test("settings the catalogue cannot take are refused before anything changes", async () => {
+  const { VoiceCall, made } = fakeCall();
+  const host = createVoiceHost(engine, { VoiceCall });
+  await expect(host.setSettings(settings({ stt: { model: "parakeet", build: null, language: null } }))).rejects.toMatchObject({ code: "model-unknown" });
+  await expect(host.setSettings(settings({ stt: { model: "kokoro-82m-v1.0", build: null, language: null } }))).rejects.toMatchObject({ code: "model-wrong-task" });
+  await expect(host.setSettings(settings({ stt: { model: "whisper-base", build: "whisper-base/gpu", language: null } }))).rejects.toMatchObject({ code: "build-unfit" });
+  await expect(host.setSettings(settings({ end_of_turn: "smart-turn" }))).rejects.toMatchObject({ code: "end-of-turn-unavailable" });
+  expect(made).toHaveLength(0);
+  await host.setSettings(settings({ stt: { model: "whisper-base", build: "whisper-base/int8", language: null } }));
+  expect(made[0].config).toMatchObject({ stt: { model: "whisper-base", build: "whisper-base/int8", language: null } });
 });
 
 test("provider keys stay on this device", async () => {
