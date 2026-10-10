@@ -6,8 +6,8 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal,
-  Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
+  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal,
+  PanelLeftClose, PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -26,6 +26,10 @@ export const ConversationsIcon = mark(MessagesSquare, 16);
 export const MachinesIcon = mark(Monitor, 16);
 export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
+/** Puts away what dropped from above: a phone's conversations panel. */
+export const CloseUpIcon = mark(ChevronUp, 18);
+export const SidebarCollapseIcon = mark(PanelLeftClose, 18);
+export const SidebarExpandIcon = mark(PanelLeftOpen, 18);
 export const MoreIcon = mark(MoreHorizontal, 18);
 export const CloseIcon = mark(X, 18);
 export const CopyIcon = mark(Copy, 18);
@@ -44,6 +48,7 @@ export const SkipIcon = mark(SkipForward, 22);
 export const DownloadsIcon = mark(Download, 18);
 export const ListenAgainIcon = mark(Play, 14);
 export const KeyboardIcon = mark(Keyboard, 20);
+export const TranscriptIcon = mark(MessageSquareText, 22);
 
 // ----- a message's delivery, drawn like the play mark beside it so both sit on the time's line at one size
 export const SentIcon = mark(Check, 12);

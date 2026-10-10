@@ -1,0 +1,258 @@
+/* The call view (2026-10-10, sidevoice/sidevoice-web#64): the conversations, the stage and the transcript, the
+   header that names what is on the stage, and the avatars. Below 900px the conversations live in the header and
+   drop as a panel, and the transcript is a sheet; isNarrow() in state/call-layout.ts says the same width. */
+
+/* ---------- the layout ---------- */
+#root > main.call-layout { display:flex;flex-direction:row;height:auto;padding:0;gap:0;position:relative;overflow:hidden }
+
+/* ---------- the header ---------- */
+.room-header { height:var(--sv-header-height);display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 14px 0 20px }
+.room-header .brand { flex:none;height:28px;margin:0;font-size:16px }
+.room-header .brand + .conversation-trigger { position:relative;margin-left:12px }
+.room-header .brand + .conversation-trigger::before { content:"";position:absolute;left:-12px;top:6px;bottom:6px;border-left:1px solid var(--sv-border) }
+.conversation-trigger { display:flex;align-items:center;gap:10px;flex:1;min-width:0;margin:0;padding:6px 8px;border:1px solid transparent;border-radius:12px;background:transparent;color:inherit;text-align:left }
+.conversation-trigger:hover { background:var(--sv-surface) }
+.trigger-avatar { width:36px;height:36px;border-radius:50%;background:var(--av-bg) }
+.trigger-copy { display:flex;flex-direction:column;gap:1px;min-width:0 }
+.trigger-title { font-size:15px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.trigger-sub { display:flex;align-items:center;gap:5px;min-width:0;color:var(--sv-muted);font-size:12px;line-height:1.3;white-space:nowrap }
+.trigger-where { min-width:0;overflow:hidden;text-overflow:ellipsis }
+.trigger-caret { flex:none;display:none }
+.live-dot { flex:none;width:7px;height:7px;border-radius:50%;background:var(--sv-state-idle) }
+.live-dot[data-live] { background:var(--sv-state-in-call);box-shadow:0 0 0 3px color-mix(in srgb, var(--sv-state-in-call) 18%, transparent) }
+.header-conversations { display:none }
+.header-menu { position:relative;flex:none;margin:0 0 0 auto;font-size:inherit;color:inherit }
+.header-menu summary { width:40px;height:40px;display:grid;place-items:center;list-style:none;border:1px solid var(--sv-border);border-radius:12px;background:var(--sv-surface-raised);cursor:pointer }
+.header-menu summary::-webkit-details-marker { display:none }
+.header-menu summary:hover,.header-menu[open] summary { background:#333d49 }
+.header-menu summary:focus-visible { outline:2px solid var(--sv-primary);outline-offset:3px }
+.header-menu-panel { position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:14rem;padding:6px;border:1px solid var(--sv-border);border-radius:14px;background:var(--sv-surface);box-shadow:0 18px 50px rgb(0 0 0 / 50%) }
+.header-menu-panel .ui-button { display:flex;justify-content:flex-start;width:100%;padding:10px 12px;border:0;border-radius:10px;background:transparent;font-size:13px;text-align:left }
+.header-menu-panel .ui-button:hover { background:var(--sv-surface-raised) }
+
+/* ---------- the conversations: a column, a rail, or a phone's panel ---------- */
+#root .conversation-sidebar { display:flex;flex-direction:column;flex:none;width:288px;min-height:0;padding:12px 10px;overflow:hidden auto;background:transparent;border:0;border-right:1px solid var(--sv-border);border-radius:0;transition:width .26s cubic-bezier(.3,.7,.2,1) }
+.sidebar-head { display:flex;align-items:center;gap:8px;min-height:36px;margin:0 0 4px 6px }
+.sidebar-head h2 { flex:1;min-width:0;margin:0;white-space:nowrap;overflow:hidden;transition:opacity .15s }
+.sidebar-collapse,.sidebar-close { flex:none;width:36px;height:36px;padding:0;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;color:var(--sv-muted) }
+.sidebar-collapse:hover,.sidebar-close:hover { background:var(--sv-surface-raised);color:var(--sv-text) }
+.sidebar-close { display:none }
+.sidebar-body { min-width:0 }
+.sidebar-group-label { position:relative;height:14px;margin:14px 6px 6px;color:var(--sv-muted);opacity:.8;font-size:10.5px;font-weight:400;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap }
+.sidebar-group-label span { display:block;overflow:hidden;text-overflow:ellipsis;transition:opacity .15s }
+.sidebar-group-label::after { content:"";position:absolute;left:8px;right:8px;top:7px;border-top:1px solid var(--sv-border);opacity:0;transition:opacity .2s }
+.sidebar-rows .participant-row { margin:0 0 3px;padding:0;border-radius:14px;white-space:nowrap }
+.sidebar-rows .participant-row .person { justify-content:flex-start;gap:12px;padding:7px;border-radius:14px }
+.sidebar-rows .participant-copy { flex:1;min-width:0;overflow:hidden;transition:opacity .15s }
+.sidebar-rows .person-sub { font-size:11.5px }
+/* A row's options wait over its right end until the row is pointed at or focused: the title keeps the width. */
+.sidebar-rows .participant-row { position:relative }
+/* Hidden, it takes no pointer, but it stays focusable: the keyboard reaches it, and its menu gives focus back to it. */
+.sidebar-rows .participant-more { position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--sv-surface-raised);opacity:0;pointer-events:none }
+.sidebar-rows .participant-row:hover .participant-more,.sidebar-rows .participant-row:focus-within .participant-more,.sidebar-rows .participant-more[data-state=open] { opacity:1;pointer-events:auto }
+/* Nothing hovers on a touch screen, and a button nobody can see must not take a tap: there the options are always
+   shown, and the title stops short of them. */
+@media (hover:none),(pointer:coarse) {
+  .sidebar-rows .participant-more { opacity:1;pointer-events:auto }
+  .conversation-sidebar:not([data-collapsed]) .sidebar-rows .participant-row .person { padding-right:44px }
+}
+:is(.state-dot,.sidebar-state)[data-state=in-call] { --state-color:var(--sv-state-in-call) }
+:is(.state-dot,.sidebar-state)[data-state=working] { --state-color:var(--sv-state-working) }
+:is(.state-dot,.sidebar-state)[data-state=waiting] { --state-color:var(--sv-state-waiting) }
+.sidebar-state { color:var(--state-color, var(--sv-muted)) }
+.sidebar-state svg { margin-inline-end:4px;vertical-align:-1px;opacity:.85 }
+.sidebar-empty { margin:10px 6px;line-height:1.5 }
+.conversations-scrim { display:none }
+
+@media (min-width:900px) {
+  #root .conversation-sidebar[data-collapsed] { width:76px }
+  .conversation-sidebar[data-collapsed] .sidebar-head { justify-content:center;margin-left:0 }
+  .conversation-sidebar[data-collapsed] .sidebar-head h2 { flex:0;width:0;opacity:0 }
+  .conversation-sidebar[data-collapsed] .sidebar-group-label span { opacity:0 }
+  .conversation-sidebar[data-collapsed] .sidebar-group-label::after { opacity:1 }
+  .conversation-sidebar[data-collapsed] .participant-copy { opacity:0 }
+  .conversation-sidebar[data-collapsed] .participant-more { display:none }
+}
+
+/* A conversation's agent, small, with its state's dot. */
+.conversation-avatar { position:relative;flex:none;display:block;width:40px;height:40px }
+.conversation-avatar .sv-avatar { width:100%;height:100%;border-radius:50%;background:var(--av-bg) }
+.state-dot { position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border:2px solid var(--sv-bg);border-radius:50%;background:var(--state-color, var(--sv-state-idle)) }
+
+/* ---------- the stage ---------- */
+.call-stage { flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;padding:12px }
+.stage-tile { container:stage / inline-size;position:relative;flex:1;min-width:0;min-height:0;display:grid;place-items:center;overflow:hidden;border:1px solid var(--sv-border);border-radius:20px;
+  background:radial-gradient(circle at 50% 62%, color-mix(in srgb, var(--av-color, var(--sv-primary)) 14%, transparent), transparent 60%), var(--sv-surface);transition:border-color .2s,box-shadow .2s }
+.stage-tile[data-mood=speaking] { border-color:var(--sv-selected-border);box-shadow:0 0 0 3px color-mix(in srgb, var(--sv-primary) 22%, transparent) }
+.stage-agent { width:min(46%,260px,34dvh);aspect-ratio:1 }
+.stage-top { position:absolute;z-index:2;top:16px;left:16px;right:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;pointer-events:none }
+.stage-top>* { grid-area:1/1;align-self:start }
+.speech-bubble { min-width:0;padding:10px 14px;border-radius:16px;background:var(--sv-primary-soft);color:var(--sv-on-primary);line-height:1.45;box-shadow:0 8px 24px rgb(0 0 0 / 35%);overflow-wrap:anywhere }
+.speech-bubble::after { content:"";position:absolute;bottom:-8px;border:9px solid transparent;border-bottom:0;border-top-color:var(--sv-primary-soft) }
+.stage-bubble { position:relative;width:100%;max-width:620px;font-size:18px;opacity:0;transform:translateY(-6px) scale(.98);transition:opacity .18s,transform .18s }
+.stage-bubble[data-visible] { opacity:1;transform:none }
+.stage-bubble::after { left:calc(50% - 9px) }
+/* Dimmer than what has been said (11.9:1), and still text anyone reads: 4.7:1 for the line before, 5.2:1 for the words
+   to come. */
+.stage-bubble-previous { display:block;margin-bottom:3px;font-size:13px;color:color-mix(in srgb, var(--sv-on-primary) 67%, var(--sv-primary-soft));white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.stage-bubble .karaoke-text[data-progress] .karaoke-upcoming,
+.stage-bubble .karaoke-text[data-playback=playing]:not([data-progress]) { color:color-mix(in srgb, var(--sv-on-primary) 70%, var(--sv-primary-soft));opacity:1 }
+.stage-activity { display:inline-flex;align-items:center;gap:8px;max-width:100%;margin:0;padding:6px 14px;border:1px dashed color-mix(in srgb, var(--sv-voice) 45%, transparent);border-radius:var(--sv-radius-pill);background:color-mix(in srgb, var(--sv-bg) 80%, transparent);color:var(--sv-voice);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.stage-spinner { flex:none;width:11px;height:11px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sv-spin .8s linear infinite }
+.stage-tags { position:absolute;z-index:2;left:12px;bottom:12px;display:flex;gap:6px;max-width:calc(100% - 150px) }
+.stage-tag { display:inline-flex;align-items:center;gap:5px;min-width:0;padding:3px 9px;border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill);background:color-mix(in srgb, var(--sv-bg) 75%, transparent);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px) }
+.stage-pip { position:absolute;z-index:3;right:16px;bottom:16px;width:112px;height:140px;display:grid;place-items:center;border:1px solid var(--sv-border);border-radius:20px;
+  background:radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--av-color) 22%, transparent), var(--av-bg) 72%);box-shadow:0 10px 30px rgb(0 0 0 / 45%);transition:border-color .2s }
+.stage-pip[data-speaking] { border-color:var(--sv-selected-border) }
+.stage-pip .sv-avatar { width:80px;height:80px }
+.stage-pip .stage-tag { position:absolute;left:8px;bottom:8px }
+.pip-bubble { position:absolute;right:0;bottom:calc(100% + 10px);width:max-content;max-width:min(70vw,300px,calc(100cqw - 32px));padding:9px 12px;font-size:14px }
+.pip-bubble::after { right:28px }
+.pip-bubble .voice-wave { width:10rem;height:1.9rem;color:var(--sv-on-primary) }
+.pip-bubble .cancel-input { color:color-mix(in srgb, var(--sv-danger) 75%, black) }
+/* The room's errors, above the stage now that the transcript is out of the way (#error is the runtime's id). */
+#error.stage-error { flex:none;margin:0;padding:8px 14px;border:1px solid #7d4a45;border-radius:14px;background:#2a1d1c;color:#f2c6bd;font-size:12px;line-height:1.45 }
+#error.stage-error[hidden] { display:none }
+.stage-empty { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;color:var(--sv-muted);text-align:center }
+.stage-empty p { margin:0;line-height:1.5 }
+@container stage (min-width:560px) {
+  .stage-pip { width:200px;height:150px }
+  .stage-pip .sv-avatar { width:104px;height:104px }
+  .stage-tags { max-width:calc(100% - 240px) }
+}
+@container stage (max-width:480px) {
+  .stage-bubble { font-size:16px }
+}
+@media (min-width:900px) {
+  .stage-choose { display:none }
+}
+@keyframes sv-spin { to { transform:rotate(360deg) } }
+
+/* ---------- the call bar's transcript button ---------- */
+.call-bar .transcript-toggle { width:52px;height:56px;padding:0;border:0;border-radius:26px;background:#303134;color:#e8eaed }
+.call-bar .transcript-toggle:hover { background:#414245 }
+.call-bar .transcript-toggle[aria-expanded=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }
+
+/* ---------- the transcript: docked at the call's right, or a sheet on a phone ---------- */
+#root > main.call-layout > .transcript { flex:none;width:380px;min-height:0;border:0;border-left:1px solid var(--sv-border);border-radius:0;background:var(--sv-surface) }
+#root > main.call-layout > .transcript:not([data-open]) { display:none }
+.transcript-grab,.transcript-scrim { display:none }
+.call-layout .transcript-head { position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 12px 18px }
+.call-layout .transcript-heading { display:flex;flex:1;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;text-align:left }
+.call-layout .transcript-heading strong { font-size:15px }
+.call-layout #transcript-title { max-width:100%;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.transcript-close { flex:none;color:var(--sv-muted) }
+
+@media (max-width:899px) {
+  .room-header { gap:6px;padding:0 10px 0 6px }
+  .room-header .brand + .conversation-trigger { margin-left:0 }
+  .room-header .brand + .conversation-trigger::before { display:none }
+  .room-header .brand { position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0 }
+  .conversation-trigger .trigger-avatar { display:none }
+  .trigger-caret { display:block }
+  .header-conversations { display:flex;align-items:center;gap:2px;flex:none }
+  .header-avatar { position:relative;width:40px;height:40px;padding:3px;border:0;border-radius:50%;background:transparent }
+  .header-avatar .conversation-avatar { width:34px;height:34px }
+  .header-avatar .state-dot { width:11px;height:11px }
+  .header-more { display:inline-flex;align-items:center;gap:2px;height:30px;min-width:40px;margin-left:2px;padding:0 8px;border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill);background:var(--sv-surface-raised);color:var(--sv-muted);font-size:12px;font-variant-numeric:tabular-nums }
+
+  #root > main.call-layout { flex-direction:column }
+  /* The conversations drop from the header as a panel over the dimmed call. */
+  #root .conversation-sidebar { position:fixed;z-index:31;top:calc(var(--sv-header-height) + 6px);left:10px;right:10px;width:auto;max-height:min(62dvh,32rem);padding:12px 10px 16px;
+    background:var(--sv-surface);border:1px solid var(--sv-border);border-radius:20px;box-shadow:var(--sv-shadow-dialog);
+    transform-origin:calc(100% - 40px) 0;transform:translateY(-6px) scale(.96);opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .18s,transform .22s cubic-bezier(.3,.7,.2,1),visibility 0s linear .22s }
+  #root .conversation-sidebar[data-open] { opacity:1;transform:none;visibility:visible;pointer-events:auto;transition:opacity .18s,transform .22s cubic-bezier(.3,.7,.2,1) }
+  .sidebar-collapse { display:none }
+  .sidebar-close { display:grid }
+  .conversations-scrim,.transcript-scrim { display:block;position:fixed;inset:0;z-index:30;background:rgb(0 0 0 / 50%);opacity:0;pointer-events:none;transition:opacity .2s }
+  .conversations-scrim[data-open],.transcript-scrim[data-open] { opacity:1;pointer-events:auto }
+
+  /* The transcript rises from the bottom as a sheet. */
+  #root > main.call-layout > .transcript,#root > main.call-layout > .transcript:not([data-open]) { display:flex;position:fixed;z-index:31;left:0;right:0;bottom:0;width:auto;height:82dvh;
+    border:1px solid var(--sv-border);border-bottom:0;border-radius:22px 22px 0 0;transform:translateY(105%);visibility:hidden;transition:transform .25s ease,visibility 0s linear .25s }
+  #root > main.call-layout > .transcript[data-open] { transform:none;visibility:visible;transition:transform .25s ease }
+  .transcript-grab { display:block;flex:none;width:40px;height:4px;margin:9px auto 0;border-radius:2px;background:#4a5360 }
+  .call-layout .transcript-head .compose-toggle:not([hidden]) { position:static;transform:none;flex:none }
+
+}
+
+/* ---------- avatars ---------- */
+.ui-avatar.chat-character { overflow:hidden;background:var(--sv-surface-raised) }
+.chat-character .sv-avatar { width:100%;height:100%;background:var(--av-bg) }
+.sv-avatar { position:relative;display:inline-block;flex:none;line-height:0 }
+.sv-avatar svg { display:block;width:100%;height:100%;overflow:visible }
+.sv-avatar .av-body { fill:var(--av-color) }
+.av-ink { fill:var(--sv-avatar-ink) }
+.av-line { fill:none;stroke:var(--sv-avatar-ink);stroke-linecap:round }
+.av-shine { fill:var(--sv-avatar-shine) }
+.av-lens { fill:var(--sv-avatar-shine);stroke:var(--sv-avatar-ink) }
+.av-cheek { fill:var(--sv-avatar-cheek);opacity:.45 }
+.av-accent { fill:var(--sv-avatar-accent) }
+.av-accent-deep { fill:var(--sv-avatar-accent-deep) }
+.av-accent-light { fill:var(--sv-avatar-accent-light) }
+.av-gear { fill:none;stroke:var(--sv-avatar-gear) }
+.av-gear-fill { fill:var(--sv-avatar-gear) }
+.av-cup { fill:var(--sv-voice) }
+.av-leaf { fill:var(--sv-avatar-leaf) }
+.av-stem { fill:none;stroke:var(--sv-avatar-stem) }
+/* An accessory never wears its body's colour: on that body it takes another. */
+.sv-avatar[data-tone="2"] .av-cup { fill:var(--sv-avatar-accent) }
+.sv-avatar[data-tone="4"] .av-accent { fill:var(--sv-avatar-accent-alt) }
+.sv-avatar[data-tone="4"] .av-accent-deep { fill:var(--sv-avatar-accent-alt-deep) }
+.sv-avatar[data-tone="4"] .av-accent-light { fill:var(--sv-avatar-accent-alt-light) }
+.sv-avatar[data-tone="7"] .av-leaf { fill:var(--sv-avatar-stem) }
+.av-figure,.av-look,.av-eyes,.av-mouth-open { transform-box:fill-box }
+.av-figure { transform-origin:50% 90% }
+.av-look { transition:transform .5s ease }
+.av-eyes { transform-origin:50% 50%;animation:sv-av-blink 4.5s infinite }
+.av-mouth-open { transform-origin:50% 50%;opacity:0;transform:scaleY(.2) }
+.av-thinking { position:absolute;top:4%;right:-4%;display:none;gap:5px }
+.av-thinking i { width:8px;height:8px;border-radius:50%;background:var(--sv-voice);opacity:.3;animation:sv-av-think 1.2s ease-in-out infinite }
+.av-thinking i:nth-child(2) { animation-delay:.2s }
+.av-thinking i:nth-child(3) { animation-delay:.4s }
+
+/* Speaking: the mouth follows the voice — a beat per spoken word when the voice says where it is, a loop while it
+   does not, the microphone's level for the person — and the figure sways a little. */
+.sv-avatar[data-mood=speaking] .av-mouth-rest { opacity:0 }
+.sv-avatar[data-mood=speaking] .av-mouth-open { opacity:1;animation:sv-av-talk .52s ease-in-out infinite alternate }
+.sv-avatar[data-mood=speaking][data-beat] .av-mouth-open { animation:sv-av-word .34s ease-out both }
+.sv-avatar[data-mood=speaking][data-mouth=level] .av-mouth-open { animation:none;transform:scaleY(calc(.2 + var(--mouth, .3) * .8));transition:transform 80ms linear }
+.sv-avatar[data-mood=speaking] .av-figure { animation:sv-av-talk-sway 1.8s ease-in-out infinite }
+/* Working: it looks aside, breathes slowly, and thinks beside its head. */
+.sv-avatar[data-mood=working] .av-look { transform:translate(10%,-22%) }
+.sv-avatar[data-mood=working] .av-figure { transform-origin:50% 100%;animation:sv-av-breathe 2.8s ease-in-out infinite }
+.sv-avatar[data-mood=working] .av-thinking { display:flex }
+/* Waiting for you: it looks toward your picture, sways idly, and blinks slowly. */
+.sv-avatar[data-mood=waiting] .av-look { transform:translate(8%,22%) }
+.sv-avatar[data-mood=waiting] .av-figure { animation:sv-av-sway 3.4s ease-in-out infinite }
+.sv-avatar[data-mood=waiting] .av-eyes { animation-duration:6.5s }
+/* Idle or out of reach: still, eyes half closed, its colour dimmed. */
+.sv-avatar[data-mood=idle] svg { filter:saturate(.45) brightness(.75);transition:filter .4s }
+.sv-avatar[data-mood=idle] .av-eyes { animation:none;transform:scaleY(.4) }
+.sv-avatar[data-mood=idle] .av-figure { animation:none }
+
+/* Small ones do the reduced version: the whole avatar breathes while working, sways while waiting, and is dimmed
+   while idle; nothing inside it moves. */
+.sv-avatar[data-size=small] .av-figure,.sv-avatar[data-size=small] .av-eyes,.sv-avatar[data-size=small] .av-mouth-open { animation:none }
+.sv-avatar[data-size=small] .av-look { transform:none }
+.sv-avatar[data-size=small][data-mood=speaking] .av-mouth-open { transform:scaleY(.6) }
+.sv-avatar[data-size=small][data-mood=working] { animation:sv-av-breathe 2.8s ease-in-out infinite }
+.sv-avatar[data-size=small][data-mood=waiting] { transform-origin:50% 90%;animation:sv-av-sway 3.4s ease-in-out infinite }
+
+@keyframes sv-av-blink { 0%,94%,100% { transform:scaleY(1) } 96% { transform:scaleY(.1) } }
+@keyframes sv-av-breathe { 0%,100% { transform:scale(1) } 50% { transform:scale(1.035) } }
+@keyframes sv-av-sway { 0%,100% { transform:rotate(-2.5deg) } 50% { transform:rotate(2.5deg) } }
+@keyframes sv-av-talk-sway { 0%,100% { transform:rotate(-1.2deg) translateY(0) } 50% { transform:rotate(1.2deg) translateY(-1.5%) } }
+@keyframes sv-av-talk { 0% { transform:scaleY(.25) } 35% { transform:scaleY(.9) } 70% { transform:scaleY(.45) } 100% { transform:scaleY(1) } }
+@keyframes sv-av-word { 0% { transform:scaleY(.3) } 35% { transform:scaleY(1) } 100% { transform:scaleY(.35) } }
+@keyframes sv-av-think { 0%,100% { opacity:.25;transform:translateY(0) } 40% { opacity:1;transform:translateY(-4px) } }
+
+/* Under reduced motion nothing here moves: the state stays readable from the still drawing (where it looks, its
+   eyes, its colour, the thinking dots) and from the dot and the words beside it. */
+@media (prefers-reduced-motion:reduce) {
+  .sv-avatar,.sv-avatar *,.stage-spinner { animation:none !important;transition:none !important }
+  .sv-avatar[data-mood=speaking] .av-mouth-open { transform:scaleY(.6) !important }
+  .av-thinking i { opacity:.8 }
+  .stage-spinner { border-right-color:currentColor;opacity:.7 }
+}

@@ -303,18 +303,11 @@ body,
 @keyframes thinking-dot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.thinking-dots i{animation:none;opacity:.7}}
 
-/* On a phone the conversations are behind a button beside the title (2026-09-26): the list is the desktop
-   sidebar itself, opened over the transcript, with its names, machines and harnesses. */
-.conversations-toggle { display:none }
+/* On a phone the conversations live in the header and drop from it as a panel (styles/call.css); a screen with no
+   machine keeps its single column. */
 @media (max-width:750px) {
   .transcript-head { position:relative }
-  /* In the head's top-left corner, on the title's line: the head keeps its height. */
-  .conversations-toggle { position:absolute;left:.75rem;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .5rem;border-radius:999px;border:1px solid #303742;background:transparent;color:#c9d2db;line-height:1 }
-  .conversations-count { min-width:1.1rem;padding:.1rem .3rem;border-radius:999px;background:var(--sv-primary-muted);color:var(--sv-primary-soft);font-size:.7rem;font-weight:600;text-align:center }
   main { grid-template-columns:minmax(0,1fr) }
-  main > aside:not([data-open]) { display:none }
-  main > aside[data-open] { position:fixed;z-index:40;top:4.6rem;left:.5rem;width:min(86vw,20rem);height:auto;max-height:70dvh;overflow:auto }
-  main > aside[data-open] .sidebar-toggle { display:none }
 }
 /* The skip button is always there, dimmed while nothing plays. */
 #skip-reply:disabled { opacity:.35 }
@@ -363,7 +356,7 @@ body,
 /* A touch screen keeps a tapped button in its hover look until something else is touched: those looks
    belong to a pointer that hovers. */
 @media (hover:none) {
-  .compose-toggle:hover,.conversations-toggle:hover,.status-summary-toggle:hover,.listen-again:hover,
+  .compose-toggle:hover,.status-summary-toggle:hover,.listen-again:hover,
   .call-bar .engine-slot:not([data-open]) .engine-toggle:hover { background:transparent;color:#9aa6b3 }
 }
 /* Small to the eye, not to a finger: the play mark's tap area reaches beyond what it draws. */

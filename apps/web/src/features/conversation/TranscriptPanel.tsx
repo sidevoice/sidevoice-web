@@ -1,30 +1,30 @@
-import { useRoomStore } from "../../state/room-store";
-import { Button } from "../../components/ui/Button";
-import { MessageList } from "./MessageList";
-import { ConversationsIcon, KeyboardIcon } from "../../components/ui/Icons";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { TOGGLE_CONVERSATIONS } from "../room/ParticipantSidebar";
+import { useRoomStore } from "../../state/room-store";
+import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { useSurface } from "../../lib/use-surface";
+import { Button } from "../../components/ui/Button";
+import { CloseIcon, KeyboardIcon } from "../../components/ui/Icons";
+import { conversationTranslator } from "./conversation-i18n";
+import { MessageList } from "./MessageList";
 
-/* On a phone the list of conversations lives behind this button, with how many are there to choose. */
-function ConversationsToggle() {
-  const available = useRoomStore((state) => state.participants.filter((participant) => participant.available).length);
-  return (
-    <button type="button" className="conversations-toggle" aria-label={`Conversaciones (${available})`} title="Conversaciones"
-      onClick={() => window.dispatchEvent(new Event(TOGGLE_CONVERSATIONS))}>
-      <ConversationsIcon size={18} />{available > 0 && <span className="conversations-count">{available}</span>}
-    </button>
-  );
-}
-
-function BootError() {
-  const error = useRoomStore((state) => state.bootError);
-  return <div id="error" role="alert">{error}</div>;
-}
-
+/* The whole conversation, out of the call's way behind the call bar's button (2026-10-10): docked at the call's
+ * right on a desktop, the call narrowing to make room; a sheet from the bottom on a phone, a dialog over the dimmed
+ * call that holds focus until it closes. It opens on the latest message. It stays mounted while closed — the runtime
+ * binds the text box by its ids — and is inert then. */
 export function TranscriptPanel() {
+  const t = conversationTranslator();
   const conversation = useRoomStore((state) => state.conversation);
   const title = useRoomStore((state) => state.title);
+  const open = useCallLayout((state) => state.transcriptOpen);
+  const close = useCallLayout((state) => state.closeTranscript);
+  const modal = useMedia(NARROW_QUERY) && open;
+  const panel = useRef<HTMLElement>(null);
+  useSurface({
+    open, close, container: panel, modal,
+    initialFocus: () => panel.current?.querySelector<HTMLElement>(".transcript-close"),
+    fallbackFocus: () => document.getElementById("transcript-toggle"),
+  });
   // On a phone the text box is away until it is asked for: a keyboard button opens it, and sending — or
   // leaving it empty — puts it away again, so the conversation keeps the height (2026-09-26).
   const [composing, setComposing] = useState(false);
@@ -35,17 +35,22 @@ export function TranscriptPanel() {
     composer.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
   };
   return (
-    <section className="transcript">
-      <div className="transcript-head">
-        <div className="transcript-heading"><ConversationsToggle /><strong id="transcript-title" title={title}>{title}</strong></div>
-        <button type="button" className="compose-toggle" hidden={composing} aria-label="Escribir un mensaje" title="Escribir un mensaje"
-          onClick={compose}><KeyboardIcon /></button>
-      </div>
-      <MessageList conversation={conversation} />
-      <form id="text-composer" className="text-composer" ref={composer} data-open={composing || undefined}
-        onSubmitCapture={() => setComposing(false)}
-        onBlurCapture={(event) => { const next = event.relatedTarget as Node | null; if (next && composer.current?.contains(next)) return; if (!composer.current?.querySelector<HTMLTextAreaElement>("textarea")?.value.trim()) setComposing(false); }}><textarea id="text-message" rows={2} maxLength={12000} aria-label="Mensaje escrito" placeholder="Escribe un mensaje…" disabled /><Button id="text-send" type="submit" variant="primary" disabled aria-label="Enviar mensaje">Enviar</Button></form>
-      <BootError />
-    </section>
+    <>
+      <section id="transcript" ref={panel} className="transcript" data-open={open || undefined} inert={!open}
+        role={modal ? "dialog" : undefined} aria-modal={modal || undefined} aria-label={t("transcript.title")}>
+        <div className="transcript-grab" aria-hidden="true" />
+        <div className="transcript-head">
+          <div className="transcript-heading"><strong>{t("transcript.title")}</strong><span id="transcript-title" className="muted" title={title} translate="no">{title}</span></div>
+          <button type="button" className="compose-toggle" hidden={composing} aria-label={t("transcript.compose")} title={t("transcript.compose")}
+            onClick={compose}><KeyboardIcon /></button>
+          <Button variant="ghost" size="icon" className="transcript-close" aria-label={t("transcript.close")} title={t("transcript.close")} onClick={close}><CloseIcon /></Button>
+        </div>
+        <MessageList conversation={conversation} visible={open} />
+        <form id="text-composer" className="text-composer" ref={composer} data-open={composing || undefined}
+          onSubmitCapture={() => setComposing(false)}
+          onBlurCapture={(event) => { const next = event.relatedTarget as Node | null; if (next && composer.current?.contains(next)) return; if (!composer.current?.querySelector<HTMLTextAreaElement>("textarea")?.value.trim()) setComposing(false); }}><textarea id="text-message" rows={2} maxLength={12000} aria-label={t("transcript.message")} placeholder={t("transcript.placeholder")} disabled /><Button id="text-send" type="submit" variant="primary" disabled aria-label={t("transcript.sendLabel")}>{t("transcript.send")}</Button></form>
+      </section>
+      <div className="transcript-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
+    </>
   );
 }
