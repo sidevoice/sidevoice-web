@@ -1,8 +1,8 @@
 import type { DeviceVoiceSettings } from '../services/voice-settings.js';
+/** The part of a reply sounding now, as offsets into its text; `from` and `to` are the same between its chunks. */
 export interface KaraokeRange {
   from: number;
   to: number;
-  mode?: "word" | "chunk" | "segment";
 }
 
 export interface ChatMessage {

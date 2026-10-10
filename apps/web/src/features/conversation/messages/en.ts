@@ -9,8 +9,6 @@ export const en = {
   "transcript.send": "Send",
   "transcript.sendLabel": "Send message",
 
-  "karaoke.word": "Following the voice · words",
-  "karaoke.chunk": "Following the voice · chunks",
   "karaoke.playing": "Playing this reply",
 } as const;
 

@@ -15,7 +15,7 @@ export function initialSessionFacts() {
         people: [], history: [], roomSeen: {}, inputReceipts: {},
         userLive: false, botLive: false,
         userTurn: null, pendingPhase: '', pendingUserText: '', cancelledInput: false, textSending: false, micEnabled: true,
-        // Where the call's voice is (`{listening, recognising, playback, online}`, as it reports it), or null outside a call.
+        // Where the call's voice is (`{listening, recognising, playback}`, as it reports it), or null outside a call.
         voiceState: null,
         joinStep: null, joinFailure: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0, liveNote: '',
@@ -143,17 +143,21 @@ export function capabilityPanel(s) {
     const rows = [], voice = s.voiceState;
     if (voice)
         rows.push({ id: 'voice', label: 'Voz', value: LISTENING_WORDS[voice.listening] || voice.listening,
-            state: voice.online === false ? 'warn' : 'ok', note: voice.online === false ? 'Sin la sala: lo que digas se envía al volver.' : '' });
+            state: s.reconnecting ? 'warn' : 'ok', note: s.reconnecting ? 'Sin la sala: lo que digas se envía al volver.' : '' });
     if (s.screenLock?.state)
         rows.push({ id: 'screen', label: 'Pantalla',
             value: s.screenLock.state === 'on' ? 'Se mantiene encendida' : 'No se pudo mantener',
             state: s.screenLock.state === 'on' ? 'ok' : 'warn', note: s.screenLock.note });
     return rows;
 }
+/** Whether the voice is saying reply `r` now. */
+function saying(s, r) {
+    return !!s.karaokeState && s.karaokeState.segment === r.segment;
+}
 export function playbackState(r, s) {
     if (r.role !== 'assistant')
         return undefined;
-    if (s.karaokeState?.segment === r.segment)
+    if (saying(s, r))
         return 'playing';
     if (['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause'].includes(r.audio))
         return 'pending';
@@ -163,11 +167,6 @@ export function receiptView(status) {
     const symbols = { pending: '◷', sending: '◷', delivered: '✓', unconfirmed: '✓', read: '✓✓', uncertain: '!', not_sent: '!' };
     const labels = { pending: 'Enviando', sending: 'Enviando', delivered: 'Entregado a la conversación; lectura sin confirmar', unconfirmed: 'Escrito en la conversación, sin acuse', read: 'Leído por la conversación', uncertain: 'Entrega sin confirmar', not_sent: 'No enviado' };
     return { symbol: symbols[status] || '', label: labels[status] || '' };
-}
-/** The voice's cue as the runtime keeps it (`start`/`end` of the part sounding) as the range a reply lights: all
- *  of it, from its start up to the end of what is sounding, has been said. */
-export function karaokeRange(k) {
-    return k ? { from: 0, to: k.end } : null;
 }
 export function orderedHistory(s, id) { return s.history.filter(r => r.thread === id).slice().sort((a, b) => Number(!!a.draft) - Number(!!b.draft) || a.time - b.time || (a.seq || 0) - (b.seq || 0)); }
 export function unreadCount(s, id) { return s.history.filter(r => r.thread === id && r.role === 'assistant' && r.seq > (s.roomSeen[id] || 0)).length; }
@@ -185,7 +184,7 @@ export function conversationView(s) {
     }
     return { messages: records.map(r => ({ ...r, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
             audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
-            playback: playbackState(r, s), karaoke: s.karaokeState?.segment === r.segment ? karaokeRange(s.karaokeState) : null })),
+            playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null })),
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }

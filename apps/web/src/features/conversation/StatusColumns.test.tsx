@@ -19,8 +19,9 @@ test("the call bar carries the lights at its left edge and the models at its rig
   expect(bar.lastElementChild!.className).toBe("engine-slot");
   expect(bar.lastElementChild!.querySelector("#engine-column")).not.toBeNull();
   act(() => {
-    store.patch({ ws: {}, screenLock: { state: "on", note: "" },
-      voiceState: { listening: "listening", recognising: 0, playback: "idle", online: false },
+    // The room went away: the voice goes on, and its light says what it says is sent when the room is back.
+    store.patch({ ws: null, reconnecting: true, screenLock: { state: "on", note: "" },
+      voiceState: { listening: "listening", recognising: 0, playback: "idle" },
       roomBinding: { thread_id: "t-1", binding_id: "b-1", title: "Sidevoice" },
       people: [{ thread_id: "t-1", title: "Sidevoice", available: true, engine: { model: "claude-opus-5", effort: "high" } }] });
   });

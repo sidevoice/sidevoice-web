@@ -12,8 +12,9 @@ export function wordEnd(text: string, at: number) {
  * whether or not playback is running, so a cue never remounts the text. */
 export function KaraokeText({ text, range, playback = "complete" }: { text: string; range?: KaraokeRange | null; playback?: "pending" | "playing" | "complete" }) {
   const t = conversationTranslator();
-  const valid = !!range && Number.isInteger(range.from) && Number.isInteger(range.to) && range.from >= 0 && range.to > range.from && range.to <= text.length;
+  // Lit up to the end of the part sounding: between its chunks `from` and `to` meet, at the end of what was heard.
+  const valid = !!range && Number.isInteger(range.from) && Number.isInteger(range.to) && range.from >= 0 && range.to >= range.from && range.to > 0 && range.to <= text.length;
   const spoken = valid && range ? wordEnd(text, range.to) : 0;
-  const title = valid && range ? (range.mode === "word" ? t("karaoke.word") : range.mode === "chunk" ? t("karaoke.chunk") : t("karaoke.playing")) : undefined;
+  const title = valid ? t("karaoke.playing") : undefined;
   return <span className="karaoke-text" data-playback={valid ? "playing" : playback} data-progress={valid ? "true" : undefined} aria-live="off" title={title}><span className="karaoke-played">{text.slice(0, spoken)}</span><span className="karaoke-upcoming">{text.slice(spoken)}</span></span>;
 }

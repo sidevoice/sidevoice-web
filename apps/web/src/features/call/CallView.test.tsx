@@ -52,7 +52,7 @@ function viewport({ narrow = false, crowded = false }) {
 const escape = () => act(() => { fireEvent.keyDown(document, { key: "Escape" }); });
 
 test("the stage plays what the agent says as a karaoke bubble, the chunk before dim above it", () => {
-  const store = room({ botLive: true, karaokeState: { segment: "h-2", start: 52, end: 57 } });
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
   const bubble = document.querySelector(".stage-bubble")!;
@@ -209,10 +209,25 @@ test("two machines with the same name, or none, are two groups, each with its ow
 });
 
 test("the bubble lights whole words, and its tooltip speaks the interface's language", () => {
-  room({ botLive: true, karaokeState: { segment: "h-2", start: 41, end: 42 } });
-  // The cue stops inside "look": the word lights whole.
+  room({ botLive: true, karaokeState: { segment: "h-2", from: 42, to: 42 } });
+  // What was heard ends inside "look": the word lights whole.
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("then look");
   expect(document.querySelector(".stage-bubble .karaoke-text")).toHaveAttribute("title", "Playing this reply");
+});
+
+test("a whole sentence sounding is read clause by clause at a speaking pace, never past its end", () => {
+  vi.useFakeTimers();
+  // The voice's chunk is the reply's first sentence and a half: "Okay. I'll start with the login".
+  room({ botLive: true, karaokeState: { segment: "h-2", from: 0, to: 31 } });
+  // The sentence has just started: its first clause is up, nothing lit yet.
+  expect(document.querySelector(".stage-bubble .stage-bubble-previous")).toBeNull();
+  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("");
+  act(() => { vi.advanceTimersByTime(1000); });
+  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent?.length).toBeGreaterThan(0);
+  // Long after the voice would have got there, the bubble waits at the end of the part sounding.
+  act(() => { vi.advanceTimersByTime(20000); });
+  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login");
+  expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(" and");
 });
 
 test("without a cue from the voice, the bubble reads on at a speaking pace instead of staying dim", () => {

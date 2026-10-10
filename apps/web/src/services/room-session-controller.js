@@ -9,6 +9,7 @@ import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
+import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
@@ -72,9 +73,8 @@ const desktopLocalHost=localHostBridge();
 const LOCAL_HOST_SELECTION_KEY='sidevoice.local-host-selected',LOCAL_HOST_SELECTION_ID='@sidevoice/local-host';
 function readLocalHostSelected(){try{return pairingStorage?.getItem(LOCAL_HOST_SELECTION_KEY)==='true'}catch{return false}}
 function saveLocalHostSelected(){try{if(localHostSelected)pairingStorage?.setItem(LOCAL_HOST_SELECTION_KEY,'true');else pairingStorage?.removeItem(LOCAL_HOST_SELECTION_KEY)}catch{}}
-// Older versions stored the native fingerprint as the in-use pointer but intentionally did not store its
-// per-launch credentials. If it matches no browser pairing, retain the local selection while native reconnects.
-let localHostSelected=!!desktopLocalHost&&(readLocalHostSelected()||!!storedPairingState.inUse&&!storedPairingState.list.some(p=>p.fp===storedPairingState.inUse));
+// The local host is selected only when this page said so (LOCAL_HOST_SELECTION_KEY) and the app offers it.
+let localHostSelected=!!desktopLocalHost&&readLocalHostSelected();
 roomStore.patch({localHostAvailable:!!desktopLocalHost,localHostSelected});
 function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
 function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
@@ -242,35 +242,47 @@ const post=(path,body,method='POST')=>api(path,{method,headers:{'Content-Type':'
 const OUTBOX_SCOPE_KEY='sidevoice.outbox-scope';
 function outboxScope(){try{let scope=sessionStorage.getItem(OUTBOX_SCOPE_KEY);if(!scope){scope=crypto.randomUUID();sessionStorage.setItem(OUTBOX_SCOPE_KEY,scope)}return scope}catch{return 'page'}}
 const outbox=createOutbox({scope:outboxScope()});
+// What an earlier load of this tab kept may come back after the call has already flushed: it goes once it is here.
+// flushOutbox sends only on the open socket of the current session, so a hang-up or a new session meanwhile is safe.
+outbox.ready.then(()=>flushOutbox(),()=>{});
 // While a new session's room has not said which conversation this browser is on, nothing goes on its socket.
 let outboxHold=null;
-// A message the voice made, kept under the `client_msg_id` it already carries.
-function keepMessage(kind,type,data){return outbox.add({id:data.client_msg_id,kind,session_id:state.sessionId,node:state.node,payload:{type,data}})}
+// A message for the room, kept under the `client_msg_id` the page gives it.
+function keepMessage(kind,type,data,id=crypto.randomUUID()){return outbox.add({id,kind,session_id:state.sessionId,node:state.node,payload:{type,data}})}
 /* Everything waiting, in order, on the socket the call has now, under the session it has now. A turn belongs to the
  * conversation, not to the session that heard it: the room knows it by its `turn_id` on the session that took its start,
- * and as words said while away when this session never took that start (`turn-relay.js`). A turn's end whose start is
- * not answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
- * is let go. */
+ * and as words said while away when this session never took that start (`turn-relay.js`). One socket keeps them in
+ * order, so nothing waits for the room's answers. Anything for another machine is let go. */
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for.
  if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId||socket.session!==state.sessionId)return;
- for(const entry of outbox.list()){
-  if(entry.sentOn===socket)continue;
-  if(entry.node!==state.node){outbox.remove(entry.id);continue}
-  let data=entry.payload.data;
-  if(entry.kind==='user-turn'){
-   // A start made for a session the room has replaced is never answered there: the room takes each message once
-   // per device, so sent again it is only acknowledged. Its turn's end goes as words said while away.
-   if(data.phase==='started'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
-   const route=relay.route(data);
-   if(route.wait)return;
-   if(route.drop){outbox.remove(entry.id);continue}
-   data=route.send;
-   if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
+ for(let again=true;again;){
+  again=false;
+  for(const entry of outbox.list()){
+   if(entry.sentOn===socket)continue;
+   if(entry.node!==state.node){outbox.remove(entry.id);continue}
+   // What a reply of a replaced session became is that session's; the room ended its replies with it.
+   if(entry.kind==='playback'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
+   let data=entry.payload.data;
+   if(entry.kind==='user-turn'){
+    // A start made for a session the room has replaced is never answered there: the room takes each message once
+    // per device, so sent again it is only acknowledged. Its turn's end goes as words said while away.
+    if(data.phase==='started'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
+    const route=relay.route(data);
+    if(route.hold)continue;
+    if(route.drop){outbox.remove(entry.id);continue}
+    data=route.send;
+    if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
+   }
+   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
+   entry.sentOn=socket;
+   if(entry.kind!=='user-turn')continue;
+   // A held turn's start went: its words, earlier in the outbox, go on the next pass.
+   if(data.phase==='started'){if(relay.sent(data.turn_id,entry.id,data))again=true;continue}
+   // A turn of this session ended: a start the room had no room for is said again, after it, as a new message.
+   const retry=data.offline?null:relay.ended(data.turn_id,entry.id,entry.payload.data);
+   if(retry){keepMessage('user-turn','voice-user-turn',retry);again=true;break}
   }
-  try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
-  if(entry.kind==='user-turn'&&data.phase==='started')relay.sent(data.turn_id,entry.id);
-  entry.sentOn=socket;
  }
 }
 // Words said while away become the room's own row: the bubble takes that row's id, so history and receipts find it.
@@ -279,11 +291,31 @@ function nameOfflineRow(turnId,id){
  state.history=state.history.map(r=>mine(r)?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
 }
 
-// Where the reader of a reply is, on the bubble of that reply: its row, by the reply this page was handed.
-const repliesSpoken=new Map();
-function updateKaraoke(k){
- const reply=repliesSpoken.get(k?.utterance_id);
- state.karaokeState=reply&&Array.isArray(k.sounding)?{segment:speechSegment(reply),start:k.sounding[0],end:k.sounding[1]}:null;
+/* ----- the replies being said -----
+ * The voice says a reply as something of its own (a handle); the room names it by its `utterance_id`. While a reply
+ * lives the page keeps one for the other: the room may withdraw it (`voice-reply-withdrawn`), and how it ended is the
+ * room's `voice-playback`. Where its reader is lights the reply's bubble. */
+const replies=new Map(); // utterance_id → {reply, saying, withdrawn}
+function sayReply(reply){
+ const saying=voice?.say(reply.text,reply.language?{language:reply.language}:undefined);if(!saying)return;
+ const said={reply,saying,withdrawn:null};replies.set(reply.utterance_id,said);
+ const report=data=>{keepMessage('playback','voice-playback',{utterance_id:reply.utterance_id,...data});flushOutbox()};
+ saying.onEvent(event=>{
+  if(replies.get(reply.utterance_id)!==said)return;
+  // From `playing` to `done` the reply is being said: where the voice is in it lights its words.
+  if(event.type==='playing'){state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
+  else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
+  else if(event.type==='done'){
+   replies.delete(reply.utterance_id);
+   if(state.karaokeState?.segment===speechSegment(reply))state.karaokeState=null;
+   report(playbackReport(event.outcome,reply.text,said.withdrawn));
+  }
+ });
+}
+// The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
+function withdrawReplies(d){
+ if(d.session_id!==state.sessionId)return;
+ for(const id of d.utterance_ids||[]){const said=replies.get(id);if(said){said.withdrawn=d.reason;said.saying.cancel()}}
 }
 function markHistorySeen() {
     const id = historyThreadId(), seen = Math.max(state.roomSeen[id] || 0, ...state.history.filter(r => r.thread === id).map(r => r.seq || 0));
@@ -347,7 +379,6 @@ async function refresh(){if(nodeBase==null)return;const asked=++refreshAsked,ses
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(call.error);});
  applyMicState();
- if(previousThread&&targetId()!==previousThread)void silenceLeftConversation();
  // The page follows the build of whoever serves it: this answer's only when the node itself served the page.
  if(target===''&&nodeBase==='')followServedBuild(d.room?.web_build);
 }catch{state.liveNote='Servidor no disponible'}}
@@ -552,7 +583,7 @@ function renderLatencyStats(snapshot,thread){
   const row=document.createElement('tr'),input=r.input_ms||{},server=r.server_ms||{};
   row.append(statsCell('td',r.reply_revision),...[
    input.endpoint_silence_ms,input.recognition_ms,
-   server.input_queued_to_reply_received_ms,server.reply_received_to_synthesis_started_ms
+   server.input_queued_to_reply_received_ms,server.reply_received_to_dispatched_ms
   ].map(value=>statsCell('td',statsDuration(value))),statsCell('td',states[r.status]||r.status||'—'));
   return row;
  });
@@ -570,7 +601,7 @@ const LATENCY_STAGES=[
  ['Entregado → leído por la conversación',r=>r.server_ms?.delivery_accepted_to_read_ms??r.server_ms?.input_queued_to_read_ms,'delivery_to_read'],
  ['Leído → primera respuesta',r=>r.server_ms?.read_to_reply_received_ms,'read_to_reply'],
  ['Agente: entrega → primera respuesta',r=>r.server_ms?.input_queued_to_reply_received_ms,'input_queued_to_reply'],
- ['Respuesta → enviada a este dispositivo',r=>r.server_ms?.reply_received_to_synthesis_started_ms,'reply_to_synthesis'],
+ ['Respuesta → enviada a este dispositivo',r=>r.server_ms?.reply_received_to_dispatched_ms,'reply_to_dispatch'],
 ];
 function renderLatencyStages(reply){
  const list=$('stats-stages');if(!list)return;list.replaceChildren();
@@ -839,17 +870,16 @@ function recordMessage(raw, socket) {
         receiveReply(d);
         return;
     }
-    // The room's answer to a turn this page said started, by the turn's name: its end may go now, the conversation it
-    // goes to is the one the room captured, and the voice takes the turn's revision as its boundary for stale replies.
+    if (t === 'voice-reply-withdrawn') {
+        withdrawReplies(d);
+        return;
+    }
+    // The room's answer to a turn this page said started, by the turn's name: the conversation it goes to is the one the
+    // room captured.
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
-        // Every answer goes to the voice, an offline turn's too: it keeps those of its own turns and ignores the rest.
-        voice?.turnStarted?.(d);
-        if (relay.answered(d.turn_id)) {
-            if (state.userTurn?.id === d.turn_id)
-                state.userTurn = { ...state.userTurn, thread: d.thread_id };
-        }
-        flushOutbox();
+        if (state.userTurn?.id === d.turn_id)
+            state.userTurn = { ...state.userTurn, thread: d.thread_id };
         return;
     }
     if (t === 'voice-input-receipt') {
@@ -880,10 +910,14 @@ function recordMessage(raw, socket) {
         }
     }
     if (t === 'error') {
-        // A refusal of one of this page's own messages is about that message: a turn's start the room would not
-        // take never gets a revision, and the rest is the room keeping its own books.
+        // A refusal of one of this page's own messages is about that message (`turn-relay.js`): a turn the room has no
+        // room for yet (`room.turns_full`) is kept, words and all, and started again once another ends; any other
+        // refused start makes its turn's words go as said while away; the rest is the room keeping its own books.
         if (d.client_msg_id) {
-            relay.refusedMessage(d.client_msg_id);
+            // An end refused because its start was: its words go again, as the start now allows.
+            const words = relay.refusedMessage(d.client_msg_id, d.key);
+            if (words)
+                keepMessage('user-turn', 'voice-user-turn', words);
             flushOutbox();
             return;
         }
@@ -910,24 +944,15 @@ function voiceTurn(turn){
     add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
    }else state.history=state.history.filter(r=>r.segment!==segment);
    markHistorySeen();
-  }else if(turn.phase==='finished'&&turn.offline&&turn.text?.trim()){
-   // A turn started while the room was out of reach is only ever finished: its row is the words said while away.
-   const segment=state.sessionId+':user-turn:'+turn.turn_id;
-   add('user',turn.text,null,targetId(),{history_id:segment,turn_id:turn.turn_id,offline:true,draft:false,time:Date.now(),delivery:takeReceipt(segment)||'pending'});
-   markHistorySeen();
   }
  });
- keepMessage('user-turn','voice-user-turn',turn);flushOutbox();
+ keepMessage('user-turn','voice-user-turn',turnMessage(turn));flushOutbox();
 }
 // A receipt the room sent before this page had the row it is about: handed over once, then forgotten.
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 // Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
-// be acted on, and in the machine's log. The voice's turns and playback reports are already in the room's shape.
+// be acted on, and in the machine's log.
 function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:String(error?.code||'')})}
-function voicePlayback(report){
- if(report.status!=='playing')repliesSpoken.delete(report.utterance_id);
- keepMessage('playback','voice-playback',report);flushOutbox();
-}
 function voiceStateChanged(next){
  roomStore.batch(()=>{
   state.voiceState=next;
@@ -949,24 +974,14 @@ function voiceLevel(level){
 }
 // The bubble of the turn being recorded draws the level the voice reports, as a waveform of the last moments.
 window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
+// A reply to say: written in the conversation, and said after what is being said. Which replies are stale is the
+// room's to say (`voice-reply-withdrawn`); one this page already says is not said twice.
 function receiveReply(d){
  if(d.session_id!==state.sessionId)return;
  state.roomRevision=Math.max(state.roomRevision,d.revision);
  if(!d.replay)state.turns=recordReply(state,d);
  add('assistant',d.text,'voice:'+d.utterance_id,d.thread_id,{history_id:d.history_id,session:d.session_id,revision:d.revision});
- // A reply of a conversation this call has left is not said: the room hears so, unless the person asked for it.
- if(d.thread_id!==targetId()&&!d.requested){
-  keepMessage('playback','voice-playback',{client_msg_id:crypto.randomUUID(),utterance_id:d.utterance_id,status:'unplayed',heard_chars:0,reason:'focus_changed',at:Date.now()});
-  flushOutbox();return;
- }
- repliesSpoken.set(d.utterance_id,d);
- voice?.speak(d);
-}
-// A move to another conversation ends what the last one was saying here: the voice stops (the reply playing cut, the
-// queue dropped, each reported) and listens again on the same models.
-async function silenceLeftConversation(){
- const current=voice;if(!current)return;
- try{await current.stop();if(voice===current)await current.start()}catch(error){if(voice===current)setRoomError(voiceErrorText(error))}
+ if(!replies.has(d.utterance_id))sayReply(d);
 }
 function roomSocketUrl(){if(nodeBase==null)throw Error(reachNote(state)||NO_MACHINE);return callSocketUrl(nodeBase,location)}
 const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.';
@@ -1029,6 +1044,8 @@ function disconnect() {
     const socket = state.ws, current = voice;
     state.ws = null;
     voice = null;
+    // What is being said ends with the call, and the room ends its replies with the session: nothing is reported.
+    replies.clear();
     current?.stop().catch(() => {});
     for (const stop of voiceListeners.splice(0)) stop();
     // 1000 is a hang-up: any other close the room takes for a drop, and parks the call for its return.
@@ -1039,7 +1056,6 @@ function disconnect() {
     state.pendingPhase = '';
     state.voiceState = null;
     state.karaokeState = null;
-    repliesSpoken.clear();
     partial('');
     state.holding = false;
     state.liveNote = '';
@@ -1050,8 +1066,7 @@ function disconnect() {
 // The voice's reports, for as long as this call has it.
 const voiceListeners=[];
 function attachVoice(next){
- voiceListeners.push(next.onUserTurn(voiceTurn),next.onPlayback(voicePlayback),next.onState(voiceStateChanged),next.onLevel(voiceLevel),
-  next.onKaraoke(updateKaraoke),next.onError(voiceFailed));
+ voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
@@ -1072,7 +1087,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   applyMicState();applyLockScreen(true);
   joinStatus('room');
   const session=await joinRoom(epoch,{resume:storedTicket()});if(epoch!==connectEpoch||!session)return;
-  voice.setOnline(true);updateMic();
+  updateMic();
   const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});
   await refresh();await refreshPeople();
   if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}
@@ -1140,7 +1155,6 @@ async function lostConnection(event,epoch){
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
  // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
- voice?.setOnline(false);
  if(event?.code===4401){pairingRefused(pairings.inUse,{call:true});return}
  if(!shouldReconnect(event)){disconnect();failJoin('La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.');return}
  state.reconnecting=true;
@@ -1170,7 +1184,6 @@ async function lostConnection(event,epoch){
     roomStore.patch({harness:{},turns:{}});state.userLive=false;state.pendingUserText='';state.pendingPhase='';markHistorySeen();
     hold=outboxHold={};
    }
-   voice?.setOnline(true);
    // The same session again: what waited in the outbox goes now, not at the next thing the voice says.
    if(!hold)flushOutbox();
    void settleRejoin(epoch,hold);
