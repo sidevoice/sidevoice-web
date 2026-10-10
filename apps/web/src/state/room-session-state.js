@@ -161,6 +161,11 @@ export function receiptView(status) {
     const labels = { pending: 'Enviando', sending: 'Enviando', delivered: 'Entregado a la conversación; lectura sin confirmar', unconfirmed: 'Escrito en la conversación, sin acuse', read: 'Leído por la conversación', uncertain: 'Entrega sin confirmar', not_sent: 'No enviado' };
     return { symbol: symbols[status] || '', label: labels[status] || '' };
 }
+/** The voice's cue as the runtime keeps it (`start`/`end` of the part sounding) as the range a reply lights: all
+ *  of it, from its start up to the end of what is sounding, has been said. */
+export function karaokeRange(k) {
+    return k ? { from: 0, to: k.end } : null;
+}
 export function orderedHistory(s, id) { return s.history.filter(r => r.thread === id).slice().sort((a, b) => Number(!!a.draft) - Number(!!b.draft) || a.time - b.time || (a.seq || 0) - (b.seq || 0)); }
 export function unreadCount(s, id) { return s.history.filter(r => r.thread === id && r.role === 'assistant' && r.seq > (s.roomSeen[id] || 0)).length; }
 export function conversationView(s) {
@@ -177,7 +182,7 @@ export function conversationView(s) {
     }
     return { messages: records.map(r => ({ ...r, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
             audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
-            playback: playbackState(r, s), karaoke: s.karaokeState?.segment === r.segment ? s.karaokeState : null })),
+            playback: playbackState(r, s), karaoke: s.karaokeState?.segment === r.segment ? karaokeRange(s.karaokeState) : null })),
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }

@@ -19,13 +19,15 @@ export interface ConversationRowsProps {
   aside?(row: ParticipantView): ReactNode;
   /** The row's tooltip; its title by default. */
   tooltip?(row: ParticipantView): string;
+  /** What leads the row; by default its initials and its state dot. The room's sidebar gives each agent's avatar. */
+  lead?(row: ParticipantView): ReactNode;
   id?: string;
   className?: string;
 }
 
-/** The conversations of the call, as rows to choose from: the room's sidebar (ParticipantList) and the desktop app's
+/** The conversations of the call, as rows to choose from: the room's sidebar (ConversationSidebar) and the desktop app's
  *  call controls card both show them through this, each with its own words and actions. */
-export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, tooltip = (row) => row.title, id, className }: ConversationRowsProps) {
+export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, tooltip = (row) => row.title, lead, id, className }: ConversationRowsProps) {
   return (
     <div id={id} className={className}>
       {rows.map((row) => (
@@ -39,8 +41,8 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
             title={tooltip(row)}
             onClick={() => onSelect(row.threadId)}
           >
-            <span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined} title={row.stateLabel}><span className="dot" /></span>
-            <span className="participant-copy"><span className="person-name" title={row.title}>{row.title}</span><span className="person-sub muted">{sub(row)}</span></span>
+            {lead ? lead(row) : <><span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined} title={row.stateLabel}><span className="dot" /></span></>}
+            <span className="participant-copy"><span className="person-name" title={row.title} translate="no">{row.title}</span><span className="person-sub muted">{sub(row)}</span></span>
           </Button>
           {aside?.(row)}
         </div>

@@ -1185,7 +1185,6 @@ $('settings-open').onclick=()=>{try{
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 function settingsSection(name){for(const section of ['general','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
-$('call-settings-open').onclick=()=>{$('call-menu').open=false;$('settings-open').click()};
 $('settings-general').onclick=()=>settingsSection('general');
 $('settings-machines').onclick=()=>settingsSection('machines');
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
