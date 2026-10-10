@@ -12,13 +12,27 @@ test("the chat width is contained at every layout boundary",()=>{
 
 const roomCss=fs.readFileSync(__dirname+"/../src/styles/room.css","utf8").replace(/\s+/g," ");
 
-test("on a phone the conversations keep a rail of their own and the transcript keeps a column that can shrink",()=>{
- // Where the columns go on a phone is said once, in room.css. react.css used to say it too, from a
- // selector that named the root and therefore always won, which is how the rail kept disappearing.
+const callCss=fs.readFileSync(__dirname+"/../src/styles/call.css","utf8").replace(/\s+/g," ");
+const narrow=callCss.slice(callCss.indexOf("@media (max-width:899px)"));
+/** The declarations of the first rule for `selector` in `text`, in whatever order they are written. */
+function rule(text,selector){const at=text.indexOf(selector+" {");assert.ok(at>=0,selector);return text.slice(at+selector.length+2,text.indexOf("}",at))}
+
+test("the call view is laid out in call.css alone, and on a phone the conversations and the transcript leave the row",()=>{
+ // react.css used to place the columns from a selector that named the root and therefore always won.
  assert.doesNotMatch(css,/@media \(max-width: 750px\)[\s\S]*?#root > main \{[^}]*grid-template-columns/);
- assert.match(roomCss,/@media\(max-width:750px\)\{ main\{grid-template-columns:62px minmax\(0,1fr\)/);
+ assert.doesNotMatch(roomCss,/grid-template-columns:62px/);
+ // A phone: the conversations drop from the header only while open, and the transcript rises as a sheet.
+ assert.match(rule(narrow,"#root .conversation-sidebar"),/position:fixed/);
+ assert.match(rule(narrow,"#root .conversation-sidebar"),/visibility:hidden/);
+ assert.match(rule(narrow,"#root .conversation-sidebar[data-open]"),/visibility:visible/);
+ assert.match(rule(narrow,"#root > main.call-layout > .transcript,#root > main.call-layout > .transcript:not([data-open])"),/position:fixed/);
+ // A desktop: a closed transcript takes no room beside the stage.
+ assert.match(rule(callCss,"#root > main.call-layout > .transcript:not([data-open])"),/display:none/);
 });
 
+test("nothing of an avatar moves under reduced motion",()=>{
+ assert.match(callCss,/@media \(prefers-reduced-motion:reduce\) \{ \.sv-avatar,\.sv-avatar \*,\.stage-spinner \{ animation:none !important;transition:none !important \}/);
+});
 
 test("the settings dialog keeps one stable viewport and one scrolling content pane",()=>{
  assert.match(css,/\.settings-dialog\[open\] \{[^}]*grid-template-rows:auto minmax\(0,1fr\) auto;[^}]*height:min\(52rem,calc\(100dvh - 2rem\)\);[^}]*overflow:hidden/);

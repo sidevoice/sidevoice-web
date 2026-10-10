@@ -4,8 +4,9 @@ import type { RoomStore } from "../state/room-store";
 import { localHostInstallController } from "../services/local-host-install";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { RoomHeader } from "../features/room/RoomHeader";
-import { ParticipantSidebar } from "../features/room/ParticipantSidebar";
+import { ConversationSidebar } from "../features/room/ConversationSidebar";
 import { TranscriptPanel } from "../features/conversation/TranscriptPanel";
+import { CallStage } from "../features/call/CallStage";
 import { CallToolbar } from "../features/call/CallToolbar";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
@@ -48,9 +49,11 @@ function RoomContent() {
       <LocalHostBanner />
       {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
         <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
-      <main>
+      {/* The call: the conversations, the stage, and the transcript when it is open (2026-10-10). */}
+      <main className={noMachine ? undefined : "call-layout"}>
         {noMachine ? <NoMachineScreen source="no-machine" /> : <>
-          <ErrorBoundary area="participants"><ParticipantSidebar /></ErrorBoundary>
+          <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
+          <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
           <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
         </>}
       </main>
