@@ -12,8 +12,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-settings.js':'VoiceSettings'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -889,17 +889,22 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
 });
 
 // ----- the call's voice: the VoiceHost the page drives, here a fake that records what it was asked -----
-function fakeVoice({start=async()=>{},setSettings=async()=>{},models=[]}={}){
- const on={},calls=[],keys={};
+function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
+ const on={},calls=[];
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
   speak:reply=>calls.push(['speak',reply]),turnStarted:started=>calls.push(['turnStarted',started]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
-  models:async()=>models,setProviderKey:async(provider,key)=>{calls.push(['setProviderKey',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasProviderKey:async provider=>!!keys[provider]};
+  onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error')};
+}
+// The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
+function fakeEngine(catalogs){
+ const calls=[],keys={};
+ return {calls,catalogs:async()=>catalogs.map(catalog=>catalog.id==='local'||keys[catalog.id]?catalog:{...catalog,status:{stale:false,reason:{code:'credential-missing',params:{}}},models:[]}),
+  setCredential:async(provider,key)=>{calls.push(['setCredential',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasCredential:async provider=>!!keys[provider]};
 }
 // The desktop app's place for the voice is where the page finds it: `null` is a page with no voice at all.
-function withVoice(s,voice){const desktop=s.context.window.__sidevoiceDesktop||{};s.context.window.__sidevoiceDesktop={...desktop,host:{...desktop.host,...(voice?{voice}:{})}};return voice}
+function withVoice(s,voice,engine){const desktop=s.context.window.__sidevoiceDesktop||{};s.context.window.__sidevoiceDesktop={...desktop,host:{...desktop.host,...(voice?{voice}:{}),...(engine?{engine}:{})}};return voice}
 function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,max:8},start,voice=fakeVoice({start})}={}){
  const sockets=socketsOf(s);
  s.context.crypto={randomUUID:()=>'hello-id'};
@@ -1012,58 +1017,71 @@ test('Settings send only the interface language to the room',async()=>{
 });
 
 // ----- the voice's settings and the providers' keys: kept on this device, checked by the voice, never sent to the room -----
-const CATALOGUE=[
- {id:'whisper-base',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[{id:'whisper-base/int8',backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true}],recommendedBuild:'whisper-base/int8'},
- {id:'kokoro-82m-v1.0',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],installed:true,builds:[{id:'kokoro/int8',backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true}]},
- {id:'gpt-4o-transcribe',capabilities:['stt'],languages:[],voices:[],installed:false,builds:[{id:'gpt-4o-transcribe/openai',backend:'openai',accelerator:'remote',precision:'remote',downloadBytes:0,memoryMb:0,available:true,reasons:[],installed:false}]},
+const build=(id,extra={})=>({id,backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true,...extra});
+const CATALOGS=[
+ {id:'local',name:null,status:{stale:false},models:[
+  {id:'whisper-base',family:'whisper',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[build('whisper-base/int8')]},
+  {id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],speed:{min:0.5,max:2},installed:true,builds:[build('kokoro/int8')]},
+ ]},
+ {id:'openai',name:'OpenAI',status:{stale:false},models:[{id:'gpt-4o-transcribe',capabilities:['stt'],languages:[],voices:[]}]},
+ {id:'elevenlabs',name:'ElevenLabs',status:{stale:false},models:[{id:'eleven_flash_v2_5',capabilities:['tts'],languages:[],voices:[]}]},
 ];
 function settingsPage(options){
- const s=setup({strictDOM:true});const voice=withVoice(s,fakeVoice({models:CATALOGUE,...options}));
+ const s=setup({strictDOM:true});const engine=fakeEngine(CATALOGS);const voice=withVoice(s,fakeVoice(options),engine);
  const asked=[];s.context.fetch=async(url,init={})=>{asked.push({url,init});return {ok:true,status:200,json:async()=>({})}};
  s.context.localStorage.setItem('sidevoice.settings','{}');
- return {s,voice,asked};
+ return {s,voice,engine,asked};
 }
-test('Opening the settings reads the voice\'s catalogue and which providers have a key',async()=>{
- const {s,voice}=settingsPage();
- await voice.setProviderKey('openai','sk-1');voice.calls.length=0;
+test('Opening the settings reads the engine\'s catalogues and which providers have a key',async()=>{
+ const {s,engine}=settingsPage();
+ await engine.setCredential('openai','sk-1');
  s.run("$('settings-open').onclick()");await settleSoon();
  const facts=s.run('roomStore.getState().facts');
  assert.equal(facts.voiceCatalogue.state,'ready');
- assert.deepEqual(plain(facts.voiceCatalogue.models.map(m=>m.id)),['whisper-base','kokoro-82m-v1.0','gpt-4o-transcribe']);
- assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false});
+ assert.deepEqual(plain(facts.voiceCatalogue.catalogs.map(c=>[c.id,c.models.map(m=>m.id)])),[['local',['whisper-base','kokoro-82m-v1.0']],['openai',['gpt-4o-transcribe']],['elevenlabs',[]]]);
+ assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false},'one key per remote catalogue');
  assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
 });
 test('Saved voice settings are checked by the voice, kept on this device, and the next call starts with them',async()=>{
- const {s,voice,asked}=settingsPage();
+ const {s,voice,engine,asked}=settingsPage();
+ await engine.setCredential('openai','sk-1');
  s.run("$('settings-open').onclick()");await settleSoon();
- s.run("window.sidevoiceActions.editVoice({stt:{model:'gpt-4o-transcribe'},patience:'calm'})");
- assert.equal(s.run('voiceDraft.stt.build'),null,'a new model takes the automatic build');
+ s.run("window.sidevoiceActions.editVoice({stt:{catalog:'openai'},patience:'calm'})");
+ assert.deepEqual(plain(s.run('voiceDraft.stt')),{catalog:'openai',model:'gpt-4o-transcribe',language:s.run('voiceSettings.stt.language')},'another source takes its first model');
  await s.run("saveSettings()");
  assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),plain(s.run('voiceDraft')));
  const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
- assert.equal(kept.stt.model,'gpt-4o-transcribe');assert.equal(kept.patience,'calm');
+ assert.deepEqual([kept.stt.catalog,kept.stt.model,kept.patience],['openai','gpt-4o-transcribe','calm']);
  assert.equal(s.run('voiceSettings.stt.model'),'gpt-4o-transcribe');
  assert.equal(asked.some(({init})=>String(init.body||'').includes('gpt-4o-transcribe')),false,'the room is not told');
 });
-test('Settings the voice refuses are not kept, and the reason is said',async()=>{
- const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'build-unfit'})}});
+test('Settings the voice refuses are not kept, and the reason is said with the provider\'s own words',async()=>{
+ const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'credential-missing',detail:'invalid_api_key'})}});
  s.run("$('settings-open').onclick()");await settleSoon();
  const before=plain(s.run('voiceSettings'));
- s.run("window.sidevoiceActions.editVoice({stt:{build:'whisper-base/int8'}})");
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'elevenlabs',model:'eleven_flash_v2_5'}})");
  s.run("$('language-form').onsubmit({preventDefault(){}})");await settleSoon();
- assert.match(s.run("$('settings-error').textContent"),/compilación no se puede ejecutar/);
+ assert.match(s.run("$('settings-error').textContent"),/Falta la clave del proveedor.*invalid_api_key/);
  assert.deepEqual(plain(s.run('voiceSettings')),before);
  assert.equal(s.run("localStorage.getItem('sidevoice.voice-settings')"),null);
 });
-test('A provider key goes to the voice and nowhere else',async()=>{
- const {s,voice,asked}=settingsPage();
+test('A provider key goes to the engine\'s host and nowhere else, and its catalogue is read again with it',async()=>{
+ const {s,voice,engine,asked}=settingsPage();
  await s.run("window.sidevoiceActions.saveProviderKey('elevenlabs','xi-secret')");
- assert.deepEqual(voice.calls.find(([name])=>name==='setProviderKey'),['setProviderKey','elevenlabs','xi-secret']);
+ assert.deepEqual(engine.calls,[['setCredential','elevenlabs','xi-secret']]);
+ assert.equal(voice.calls.length,0,'the voice keeps no keys');
  assert.equal(s.run('providerKeys.elevenlabs'),true);
+ assert.deepEqual(plain(s.run("voiceCatalogue.catalogs.find(c=>c.id==='elevenlabs').models.map(m=>m.id)")),['eleven_flash_v2_5']);
  assert.equal(JSON.stringify(asked).includes('xi-secret'),false,'no request carries it');
  assert.equal(JSON.stringify(s.saved).includes('xi-secret'),false,'the page keeps no copy of its own');
  await s.run("window.sidevoiceActions.saveProviderKey('elevenlabs',null)");
  assert.equal(s.run('providerKeys.elevenlabs'),false);
+});
+test('An app that does not give the page its catalogues yet says so, and still keeps the settings',async()=>{
+ const s=setup({strictDOM:true});withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ assert.equal(s.run('voiceCatalogue.state'),'failed');
+ assert.match(s.run('voiceCatalogue.error'),/lista de modelos/);
 });
 test('A page with no voice keeps its settings unchecked and says why it cannot keep a key',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');

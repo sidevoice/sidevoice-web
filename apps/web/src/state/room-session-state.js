@@ -31,9 +31,9 @@ export function initialSessionFacts() {
         pairingOpen: false, pairingNote: '',
         // The language this device speaks in a call, and whether this page runs inside the desktop app.
         speechLanguage: 'en', inApp: false,
-        // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the voice's
-        // catalogue for its choices, and whether this device keeps a key for each remote provider (never the key).
-        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', models: [], error: '' }, providerKeys: {},
+        // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
+        // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, providerKeys: {},
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
