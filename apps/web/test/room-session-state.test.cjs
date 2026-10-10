@@ -45,19 +45,6 @@ test('Failed delivery and another browser never count as this conversation worki
  for(const patch of [{status:'pending'},{status:'not_sent'},{status:'channel_closed'},{session:'other'},{thread:'b'}])
   assert.equal(api.working(facts(api,{turns:{one:turn(patch)}})),false);
 });
-test('The ambient breath is exactly working plus silence, at one fixed default level',async()=>{
- const api=await moduleReady;
- for(const busy of [false,true])for(const userLive of [false,true])for(const botLive of [false,true])for(const activeSpeech of [null,{}])for(const previewJob of [null,{}])for(const sound of ['on','off',undefined]){
-  const s=facts(api,{harness:{a:busy},userLive,botLive,activeSpeech,previewJob,voicePreferences:{presence_sound:sound,presence_volume:8}});
-  assert.equal(api.sessionStatus(s).bed,busy&&!userLive&&!botLive&&!activeSpeech&&!previewJob&&sound!=='off');
- }
- assert.equal(api.PRESENCE_LEVEL,.1);
-});
-test('Reconnecting, switching, and leaving cannot play ambient audio',async()=>{
- const api=await moduleReady;
- for(const patch of [{ws:null},{reconnecting:true},{switching:true},{switchingSession:true},{switchingTranscription:true}])
-  assert.equal(api.sessionStatus(facts(api,{harness:{a:true},...patch})).bed,false);
-});
 test('The person and room speaking are independent of harness work and tab transcription',async()=>{
  const api=await moduleReady;
  const v=api.sessionStatus(facts(api,{harness:{a:true},userLive:true,botLive:true,pendingPhase:'transcribing'}));
@@ -66,7 +53,7 @@ test('The person and room speaking are independent of harness work and tab trans
  assert.equal(api.sessionStatus(facts(api)).conversation,'idle');
 });
 test('A waveform belongs only to the viewed active input, and cancelled input cannot be cancelled again',async()=>{
- const api=await moduleReady;const s=facts(api,{userTurn:{thread:'a',key:'user-turn:1'},pendingPhase:'listening'});
+ const api=await moduleReady;const s=facts(api,{userTurn:{id:'t1',segment:'turn:t1',thread:'a'},pendingPhase:'listening'});
  assert.equal(api.conversationView(s).pendingPhase,'listening');
  s.pendingPhase='transcribing';assert.equal(api.conversationView(s).pendingPhase,'transcribing');
  s.viewedThread='b';assert.equal(api.conversationView(s).pendingPhase,'');assert.equal(api.conversationView(s).pendingCancellable,false);
@@ -75,19 +62,9 @@ test('A waveform belongs only to the viewed active input, and cancelled input ca
 test('Join progress, returning subject and failure text are derived from the same join facts',async()=>{
  const api=await moduleReady;const s=facts(api);
  for(const [step,text] of Object.entries(api.JOIN_STEPS))assert.equal(api.joinView({...s,joinStep:step,joinSubject:'A'}).text,text+(step==='conversation'?'A':''));
- assert.equal(api.joinView({...s,joinStep:'whisper',joinProgress:16.7}).text,'Cargando Whisper (17 %)');
+ assert.equal(api.joinView({...s,joinStep:'voice',joinProgress:16.7}).text,'Preparando la voz (17 %)');
  assert.deepEqual(api.joinView({...s,joinStep:'room',joinFailure:'No permission'}),{step:'failed',text:'No permission',progress:null,failed:true});
  assert.equal(api.joinView(s),null);
-});
-test('Echo coverage reports observed AEC and sink facts without inferring detector performance',async()=>{
- const {echoCoverage}=await moduleReady;
- for(const [patch,expected] of [[{connected:false},''],[{track:false},''],[{aec:false},'off'],[{aec:undefined},'partial'],[{health:{output:'context'}},'partial'],[{health:{output:'context',strategy:'element'}},'partial'],[{health:{output:'context',strategy:'context'}},'on'],[{health:{output:'element',element:{paused:true}}},'partial'],[{},'on']])
-  assert.equal(echoCoverage({connected:true,track:true,aec:true,health:{output:'element'},...patch}).state,expected);
-});
-test('The engine badge derives processing, fallback and output health from runtime facts',async()=>{
- const api=await moduleReady;const s=facts(api,{engineReady:true,voicePreferences:{stt:{place:'device',model:'whisper-base'}},sttRuntime:{model:'whisper-base',engine:'transformers-js',accelerator:'wasm',fallback_from:'webgpu'},outputHealth:'recovering'});
- assert.match(api.engineView(s).text,/Whisper base · CPU \(GPU falló\) · smart-turn · audio ↻/);
- assert.equal(api.engineView({...s,engineReady:false}).text,'');
 });
 test('Two ticks require read; transport delivery and unconfirmed delivery each have one',async()=>{
  const {receiptView}=await moduleReady;
@@ -96,28 +73,31 @@ test('Two ticks require read; transport delivery and unconfirmed delivery each h
  for(const status of ['pending','sending'])assert.equal(receiptView(status).symbol,'◷');
  for(const status of ['uncertain','not_sent'])assert.equal(receiptView(status).symbol,'!');
 });
-test('Playback and replay labels are projections of the utterance facts, preserving its full text',async()=>{
- const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1};
- const s=facts(api,{history:[row],activeSpeech:{history_id:'h'},replayMarks:{h:'queued'}});
+test('Playback labels are projections of the reply facts, preserving its full text',async()=>{
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'queued'};
+ const s=facts(api,{history:[row]});
  assert.equal(api.conversationView(s).messages[0].playback,'pending');
- s.activeSpeech={history_id:'h',started:true};assert.equal(api.conversationView(s).messages[0].playback,'playing');
- s.activeSpeech=null;s.replayMarks={h:'done'};const message=api.conversationView(s).messages[0];
- assert.equal(message.playback,'complete');assert.equal(message.replayNote,'Repetido al volver');assert.equal(message.text,row.text);
+ s.karaokeState={segment:'h',from:0,to:3};assert.equal(api.conversationView(s).messages[0].playback,'playing');
+ s.karaokeState=null;s.history=[{...row,audio:'playback_finished'}];const message=api.conversationView(s).messages[0];
+ assert.equal(message.playback,'complete');assert.equal(message.text,row.text);
 });
-test('The bed waits for the breath after a turn, not only for the turn to close',async()=>{
- // A turn closing is not a person having finished: the bed used to start in the pause between two of them.
- const api=await moduleReady;const quiet=1000;
- const s=facts(api,{harness:{a:true},userLive:false,userQuietAt:quiet,now:quiet+500});
- assert.equal(api.sessionStatus(s).bed,false,'half a breath later is too soon');
- assert.equal(api.sessionStatus({...s,now:quiet+api.BED_AFTER_USER_MS}).bed,true,'once the silence holds, it may sound');
- assert.equal(api.sessionStatus({...s,userLive:true,now:quiet+9999}).bed,false,'and never over someone speaking');
- assert.equal(api.sessionStatus({...s,userQuietAt:0,now:0}).bed,true,'a call where nobody has spoken yet is not waiting for anything');
+test('The reply being said carries the part sounding to its bubble, and only that reply plays',async()=>{
+ // The runtime keeps where the voice is as the range a bubble reads: one shape from the voice's handle to the view.
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'heard'};
+ const s=facts(api,{history:[row,{role:'assistant',thread:'a',text:'No id yet',time:2}],karaokeState:{segment:'h',from:4,to:7}});
+ assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:4,to:7});
+ assert.equal(api.conversationView(s).messages[0].playback,'playing');
+ assert.equal(api.conversationView(s).messages[1].karaoke,null,'a row without an id is never the one being said');
+ // Between chunks the range closes on what was heard: still the reply being said.
+ s.karaokeState={segment:'h',from:7,to:7};assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:7,to:7});
+ s.karaokeState={segment:'other',from:0,to:3};assert.equal(api.conversationView(s).messages[0].karaoke,null);
+ s.karaokeState=null;assert.equal(api.conversationView(s).messages[0].playback,'complete');
+ assert.equal(api.conversationView(s).messages[1].playback,'complete');
 });
-
 test('One store transition publishes one coherent projection, without calls from a handler to render or sound',async()=>{
  const api=await moduleReady;const store=api.createRoomSessionStore(facts(api));const seen=[];store.subscribe(s=>seen.push(s));
  store.batch(()=>{store.facts.harness={a:true};store.facts.userLive=true});
- assert.equal(seen.length,1);assert.equal(seen[0].session.working,true);assert.equal(seen[0].session.bed,false);
- store.facts.userLive=false;assert.equal(seen[1].session.bed,true);
+ assert.equal(seen.length,1);assert.equal(seen[0].session.working,true);assert.equal(seen[0].session.speaker,'user');
+ store.facts.userLive=false;assert.equal(seen[1].session.speaker,'nobody');
  assert.equal(seen[0].facts.userLive,true,'prior snapshots do not change');
 });

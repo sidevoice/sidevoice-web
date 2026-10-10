@@ -9,9 +9,8 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChevronIcon, HangupIcon, HARNESS_NAMES, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon, SpeakerIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
-import type { AudioDeviceOption } from "../state/room-session-state";
 import type { ParticipantView } from "../state/room-types";
-import type { CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
+import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import type { Translate } from "./i18n";
 
 /** Space around the card inside its window, for its shadow. */
@@ -309,7 +308,7 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
               onClick={() => setPanel(panel === "devices" ? null : "devices")} disabled={!call.devices}>
               <ChevronIcon size={13} />
             </button>
-            <button type="button" className="card-mute" aria-pressed={muted} disabled={call.micDisabled || reconnecting}
+            <button type="button" className="card-mute" aria-pressed={muted} disabled={call.micDisabled}
               title={state.muteShortcut ? t("card.shortcut", { action: muteLabel, shortcut: state.muteShortcut }) : muteLabel} aria-label={muteLabel}
               onClick={() => run({ command: "toggle-mute" })}>
               {muted ? <MicrophoneOffIcon size={17} /> : <MicrophoneIcon size={17} />}

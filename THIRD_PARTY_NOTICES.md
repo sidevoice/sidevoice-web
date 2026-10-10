@@ -6,14 +6,8 @@ browser assets.
 
 Major components include Pipecat, Transformers.js, ONNX Runtime, Kokoro-82M and
 its ONNX conversion, eSpeak NG, the OpenTelemetry SDKs for Python and the browser
-(Apache-2.0), Socket.IO (MIT) at both ends of the connector link, and the MCP
-TypeScript SDK in the Claude draft.
+(Apache-2.0), and the MCP TypeScript SDK in the Claude draft.
 Earlier experiments reference MLX Audio, Pocket TTS and FluidAudio.
-
-The published client `@sidevoice/uplink` declares no runtime dependencies
-because it is bundled: esbuild puts `socket.io-client` inside `dist/cli.mjs`,
-so that file redistributes Socket.IO's client and its own dependencies under
-their MIT licenses.
 
 The desktop app's call controls card bundles the DM Sans typeface
 (`apps/web/public/fonts/`), under the SIL Open Font License 1.1, with its

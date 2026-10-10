@@ -3,7 +3,15 @@
  * "The call controls card"). The card never sees the room page: the app relays the call to it and carries its
  * buttons back. Outside the app the seam is absent and the page shows nothing. */
 import type { ParticipantView } from "../state/room-types";
-import type { AudioDevices } from "../state/room-session-state";
+
+/** One device to choose, as the app lists it. `system` is the system's own choice, `number` a device the system lists
+ *  without a name (its place, from 1), `missing` the chosen one, no longer connected: the card words those itself. */
+export interface AudioDeviceOption { id: string; label: string; system?: boolean; number?: number; missing?: boolean }
+/** The app's microphones and speakers, the chosen ones, and whether each can be chosen now. */
+export interface AudioDevices {
+  inputs: AudioDeviceOption[]; outputs: AudioDeviceOption[];
+  inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
+}
 
 /** What the agent is doing: the avatar shows it, and only it. */
 export type AgentState = "idle" | "working" | "speaking";

@@ -1,29 +1,24 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
-import { stageView } from './stage-settings.js';
-import { downloadsView } from './downloads-view.js';
-export const PRESENCE_LEVEL = .1;
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
-export const GAP_BUFFER_SECONDS = 30;
-// A turn closing is not the same as a person having finished: between one turn and the next there is a
-// breath, and the bed used to start in it, over someone who was still talking (2026-09-20).
-export const BED_AFTER_USER_MS = 2000;
-export const JOIN_STEPS = { audio: 'Preparando audio', whisper: 'Cargando Whisper', voice: 'Cargando el modelo de voz', microphone: 'Pidiendo el micrófono', room: 'Entrando en la sala', conversation: 'Volviendo a ', reconnect: 'Reconectando con la sala…', transcription: 'Cambiando de transcripción…', mic: 'Aplicando los ajustes del micrófono…' };
+// A dropped socket is the network's business for this long: the call goes on as if nothing happened (no tone, no
+// line, no control held), and only a drop that outlasts it says the call is reconnecting.
+export const RECONNECT_GRACE_MS = 30000;
+export const JOIN_STEPS = { voice: 'Preparando la voz', room: 'Entrando en la sala', conversation: 'Volviendo a ', reconnect: 'Reconectando con la sala…' };
 export const NO_MACHINE = 'Ninguna máquina disponible. Enciende la que usas, o empareja una en Configuración › Máquinas.';
 export const UNPAIRED = 'Este dispositivo no está emparejado con ninguna máquina. Emparéjalo para poder entrar.';
-export const REPLAY_NOTES = { queued: 'Repitiendo lo que no oíste', playing: 'Repitiendo lo que no oíste', done: 'Repetido al volver', cancelled: 'Repetición cancelada', gone: 'No se pudo repetir · la sala ya no tiene ese audio' };
-const OUTPUT_MARKS = { ok: '', recovering: ' · audio ↻', failed: ' · audio ✕' };
-const OUTPUT_TITLES = { ok: 'Salida de audio en orden', recovering: 'La salida de audio se atascó y se está recuperando', failed: 'La salida de audio falló; revisa las estadísticas' };
 export function initialSessionFacts() {
     return {
-        ws: null, stream: null, sessionId: null, roomRevision: 0, roomInfo: null, connecting: false, reconnecting: false,
-        switching: false, switchingSession: false, switchingTranscription: false, roomBinding: null, viewedThread: null,
-        people: [], history: [], roomSeen: {}, replayMarks: {}, inputReceipts: {},
-        userLive: false, botLive: false, activeSpeech: null, previewJob: null,
+        ws: null, sessionId: null, roomRevision: 0, roomInfo: null, connecting: false, reconnecting: false,
+        // A reconnection that outlasted RECONNECT_GRACE_MS: only then is it shown.
+        reconnectShown: false,
+        switching: false, roomBinding: null, viewedThread: null,
+        people: [], history: [], roomSeen: {}, inputReceipts: {},
+        userLive: false, botLive: false,
         userTurn: null, pendingPhase: '', pendingUserText: '', cancelledInput: false, textSending: false, micEnabled: true,
-        voicePreferences: null, enginePreferences: null, sttRuntime: null, engineReady: false, outputHealth: 'ok', echoFacts: null,
+        // Where the call's voice is (`{listening, recognising, playback}`, as it reports it), or null outside a call.
+        voiceState: null,
         joinStep: null, joinFailure: '', joinProgress: null, joinDetail: '', joinSubject: '',
-        screenLock: { state: '', note: '' }, deviceNote: '', holding: false, userQuietAt: 0, liveNote: '',
-        audioDevices: { inputs: [], outputs: [], inputId: 'default', outputId: 'default', available: true, outputAvailable: true, busy: false },
+        screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0, liveNote: '',
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
         // The machines this device is paired with (never their tokens), the one in use, and the clock of the
         // moment they were read so a row can say "hace 3 días" without reading one.
@@ -36,38 +31,22 @@ export function initialSessionFacts() {
         rendezvous: '', node: null, nodeReach: '',
         // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
         pairingOpen: false, pairingNote: '',
-        // The machine's integrations as it listed them for this device — never a key, only whether there is one
-        // — or null until read; why they could not be read; what is typed in each row and not yet
-        // stored, what the machine said about it, and the row a pane's "Configurar" opened.
-        integrations: null, integrationsError: '', integrationDrafts: {}, integrationChecks: {}, integrationFocus: null,
-        // Whether that listing is the current machine's: 'loading', 'ready', or 'failed' (then `integrationsError`
-        // says why). A listing that is not in is not a listing without providers: a pane keeps the choice it has.
-        integrationsStatus: 'idle',
-        // What the stages (transcription, voice) are chosen from (sidevoice/sidevoice-core#21): the model catalogue this page was built
-        // with, the speech languages and their voices' names, the person's system language, whether this page
-        // runs inside the desktop app, what this device measured about itself and the resolver's offers for it,
-        // the builds already on its disk (the app's), and each provider's own lists keyed `place:task`.
-        modelCatalog: null, voiceLanguages: [], speechLanguage: 'en', inApp: false,
-        deviceCapabilities: null, deviceOffers: null, installedBuilds: [], remoteModels: {},
-        // The settings dialog's unsaved stages ({stt, tts}), or null when it shows what is saved.
-        stageDraft: null,
-        // What the voice pane says about a preview and about preloading the model.
-        previewNote: '', prepareNote: '',
-        // This page's WebGPU failed to load a model and is set aside, until the person asks to try it again.
-        gpuSetAside: false,
-        // Selecting a model loads and checks it first (sidevoice/sidevoice-core#21): per stage, the selection in flight or just over
-        // (stage-selection.js's record), and what the last check measured, for Diagnóstico (sidevoice/sidevoice-core#13). In a page, what
-        // the page itself has: its WebGPU adapter, whether it is cross-origin isolated, its threads and cores.
-        stageChecks: {}, stageDiagnostics: {}, pageFacts: null,
-        // Every model or engine download in flight, and the ones that just ended (services/downloads.js).
-        downloads: [],
+        // The language this device speaks in a call, and whether this page runs inside the desktop app.
+        speechLanguage: 'en', inApp: false,
+        // Whether this browser refuses the page any storage (site data blocked), found once at start.
+        storageBlocked: false,
+        // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
+        // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, providerKeys: {},
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
+// A call whose socket is being reopened is still a call: the person is not told otherwise until the grace is over.
+function inCall(s) { return !!(s.ws || s.reconnecting); }
 export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
 export function speechSegment(speech) { return speech.history_id || speech.session_id + ':voice:' + speech.utterance_id; }
 export function working(s, thread = selectedThread(s)) {
-    if (!s.ws || !thread)
+    if (!inCall(s) || !thread)
         return false;
     // false is an authoritative report too. Receipts and replies can never override it.
     if (typeof s.harness[thread] === 'boolean')
@@ -76,29 +55,24 @@ export function working(s, thread = selectedThread(s)) {
         !['not_sent', 'channel_closed'].includes(t.status) &&
         (t.status === 'read' || (['delivered', 'unconfirmed'].includes(t.status) && s.now >= t.readyAt)));
 }
-/** Whether enough silence has passed since this person last spoke for an ambient sound to be welcome. */
-export function userSettled(s) {
-    return !s.userQuietAt || s.now >= s.userQuietAt + BED_AFTER_USER_MS;
-}
 export function sessionStatus(s) {
-    const speaker = s.userLive ? 'user' : s.botLive || s.activeSpeech?.started ? 'room' : 'nobody';
+    const speaker = s.userLive ? 'user' : s.botLive ? 'room' : 'nobody';
     const busy = working(s);
-    const tab = s.reconnecting ? 'reconnecting' : s.switching || s.switchingSession || s.switchingTranscription ? 'switching' :
-        !s.ws ? 'out' : s.pendingPhase === 'transcribing' ? 'transcribing' : 'listening';
+    const tab = s.reconnectShown ? 'reconnecting' : s.switching ? 'switching' :
+        !inCall(s) ? 'out' : s.pendingPhase === 'transcribing' ? 'transcribing' : 'listening';
     return { speaker, conversation: busy ? 'working' : speaker === 'room' ? 'speaking' : 'idle', tab,
         selected: selectedThread(s), viewed: viewedThread(s), harness: s.harness[selectedThread(s)] ?? null,
-        working: busy, bed: busy && speaker === 'nobody' && userSettled(s) && !s.activeSpeech && !s.previewJob &&
-            !s.reconnecting && !s.switching && !s.switchingSession && !s.switchingTranscription && s.voicePreferences?.presence_sound !== 'off' };
+        working: busy };
 }
 /** What the desktop app's call controls card shows (sidevoice/sidevoice-desktop#4), projected from the facts: the
  *  agent and the person are independent — both can speak at once, and the agent works while a turn is transcribed —
  *  and the card names the conversation the call is on (the microphone's), never a transcript being browsed. */
 export function callCardView(s) {
     const selected = selectedThread(s);
-    const agentSpeaking = !!(s.botLive || s.activeSpeech?.started);
+    const agentSpeaking = !!s.botLive;
     const agent = agentSpeaking ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
     const row = selected ? s.people.find(p => p.thread_id === selected) : null;
-    return { agent, youTalking: !!s.userLive, canSkip: !!s.activeSpeech, conversation: selected,
+    return { agent, youTalking: !!s.userLive, canSkip: false, conversation: selected,
         title: row?.title || s.roomBinding?.title || '' };
 }
 export function joinView(s) {
@@ -113,22 +87,6 @@ export function joinView(s) {
     const base = JOIN_STEPS[s.joinStep] + (s.joinStep === 'conversation' ? s.joinSubject : '');
     const note = s.joinProgress != null ? Math.round(s.joinProgress) + ' %' : s.joinDetail;
     return { step: s.joinStep, text: note ? base + ' (' + note + ')' : base, progress: s.joinProgress, failed: false };
-}
-export function echoCoverage(f) {
-    if (!f?.connected || !f.track)
-        return { state: '', note: '' };
-    if (f.aec === false)
-        return { state: 'off', note: 'El micrófono no tiene cancelación de eco: la voz de la sala por el altavoz abrirá intervenciones.' };
-    if (f.aec !== true)
-        return { state: 'partial', note: 'Este dispositivo no confirma la cancelación de eco del micrófono.' };
-    // Off the iPhone the voice plays straight through the context on purpose, and the browser cancels it.
-    if (f.health && f.health.strategy === 'context' && f.health.output === 'context')
-        return { state: 'on', note: 'Cancelación de eco activa; la voz sale directa por el contexto de audio.' };
-    if (f.health && f.health.output !== 'element')
-        return { state: 'partial', note: 'La voz no sale por el elemento de audio: en el iPhone no entra en la cancelación de eco.' };
-    if (f.health?.element?.paused)
-        return { state: 'partial', note: 'La salida de audio está en pausa; se recupera con la siguiente locución.' };
-    return { state: 'on', note: 'Cancelación de eco activa y la voz sale por el elemento de audio.' };
 }
 /** The microphone button: what it says and whether it can be pressed. The level itself is not here —
  *  it changes per animation frame and belongs to whoever owns the meter. */
@@ -146,8 +104,8 @@ export function micView(s) {
 }
 /** The call button: joining and leaving are the same button, and it says which one it is now. */
 export function callView(s) {
-    const joined = !!(s.ws || s.connecting);
-    return { joined, busy: !!(s.reconnecting || s.switchingSession),
+    const joined = !!(inCall(s) || s.connecting);
+    return { joined, busy: !!s.reconnectShown,
         label: joined ? 'Salir de la sala' : 'Entrar en la sala' };
 }
 /** The name over the transcript: the conversation being looked at, whoever it is. */
@@ -159,20 +117,6 @@ export function viewedTitle(s) {
         || s.history.find(r => r.thread === id && r.role === 'assistant')?.name
         || s.roomBinding?.title || 'Conversación en directo';
 }
-export function engineView(s) {
-    const base = s.engineReady ? engineBadgeText(s.enginePreferences || s.voicePreferences, s.sttRuntime) : '';
-    return { text: base ? base + OUTPUT_MARKS[s.outputHealth] : '', title: base ? base + ' · ' + OUTPUT_TITLES[s.outputHealth] : '', output: s.outputHealth };
-}
-/** A stage's model as a few words: a catalogue model by its label, a provider's by its own id. */
-function stageModelText(s, stage, runtime) {
-    if (!stage)
-        return '';
-    if (stage.place !== 'device')
-        return (s.modelCatalog?.providers?.find(p => p.id === stage.place)?.label || stage.place) + ' · ' + (stage.model || '');
-    const id = runtime?.model || stage.model;
-    return (s.modelCatalog?.models?.find(m => m.id === id)?.label || id || '') + ' · en este dispositivo';
-}
-const ACCELERATOR_WORDS = { webgpu: 'GPU', wasm: 'CPU', cpu: 'CPU', coreml: 'Core ML', metal: 'Metal', cuda: 'CUDA' };
 const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1);
 /** The model a conversation thinks with, said the way a person says it: the family and its version,
  *  without the vendor prefix or the build date (`claude-fable-5-1` → `Fable 5.1`, `gpt-5.6-terra` →
@@ -187,17 +131,9 @@ export function shortModel(name) {
         return 'GPT-' + gpt[1] + (gpt[2] ? ' ' + gpt[2].split('-').map(capitalize).join(' ') : '');
     return raw;
 }
-/** Who is answering: one row per model, and the agent's own when its harness could read it. No row for
- *  anything that is not a choice — how a turn ends is the room's and the same for everyone. */
+/** Who is answering: the agent's own model, when its harness could read it. */
 export function enginePanel(s) {
-    const p = s.enginePreferences || s.voicePreferences, runtime = s.sttRuntime, rows = [];
-    if (p) {
-        rows.push({ id: 'stt', label: 'STT',
-            value: stageModelText(s, p.stt, runtime),
-            state: runtime?.fallback_from ? 'warn' : 'ok',
-            note: runtime?.fallback_from ? 'La GPU no pudo con el modelo; va por CPU.' : '' });
-        rows.push({ id: 'tts', label: 'TTS', value: stageModelText(s, p.tts, null), state: 'ok', note: '' });
-    }
+    const rows = [];
     const engine = s.people?.find(person => person.thread_id === selectedThread(s))?.engine;
     if (engine?.model)
         rows.push({ id: 'agent', label: 'LLM',
@@ -205,35 +141,28 @@ export function enginePanel(s) {
             state: 'ok', note: '' });
     return rows;
 }
-/** What this call has switched on right now, as lights: the browser's own hardware, echo coverage, the
- *  screen. Facts about the device, not choices, which is why they sit apart from the models. */
+const LISTENING_WORDS = { muted: 'Silenciado', listening: 'Escuchando', speaking: 'Te escucha', idle: 'Sin iniciar' };
+/** What this call has switched on right now, as lights: the voice, and the screen. */
 export function capabilityPanel(s) {
-    const rows = [], runtime = s.sttRuntime;
-    if (runtime?.accelerator)
-        rows.push({ id: 'device', label: ACCELERATOR_WORDS[runtime.accelerator] || runtime.accelerator,
-            value: 'La transcripción usa ' + (runtime.accelerator === 'webgpu' ? 'la GPU' : ['wasm', 'cpu'].includes(runtime.accelerator) ? 'la CPU' : ACCELERATOR_WORDS[runtime.accelerator] || runtime.accelerator),
-            state: runtime.fallback_from ? 'warn' : 'ok',
-            note: runtime.fallback_from ? 'Se pidió GPU y no pudo con el modelo.' : '' });
-    const echo = echoCoverage({ ...s.echoFacts, connected: !!s.ws, track: !!s.stream });
-    if (echo.state)
-        rows.push({ id: 'echo', label: 'Eco',
-            value: echo.state === 'on' ? 'Cancelación activa' : echo.state === 'partial' ? 'Cobertura parcial' : 'Sin cancelación',
-            state: echo.state === 'on' ? 'ok' : echo.state === 'partial' ? 'warn' : 'fail', note: echo.note });
+    const rows = [], voice = s.voiceState;
+    if (voice)
+        rows.push({ id: 'voice', label: 'Voz', value: LISTENING_WORDS[voice.listening] || voice.listening,
+            state: s.reconnecting ? 'warn' : 'ok', note: s.reconnecting ? 'Sin la sala: lo que digas se envía al volver.' : '' });
     if (s.screenLock?.state)
         rows.push({ id: 'screen', label: 'Pantalla',
             value: s.screenLock.state === 'on' ? 'Se mantiene encendida' : 'No se pudo mantener',
             state: s.screenLock.state === 'on' ? 'ok' : 'warn', note: s.screenLock.note });
-    rows.push({ id: 'output', label: 'Audio',
-        value: s.outputHealth === 'failed' ? 'El audio falló' : s.outputHealth === 'recovering' ? 'Recuperándose' : 'Audio en orden',
-        state: s.outputHealth === 'failed' ? 'fail' : s.outputHealth === 'recovering' ? 'warn' : 'ok',
-        note: OUTPUT_TITLES[s.outputHealth] });
     return rows;
+}
+/** Whether the voice is saying reply `r` now. */
+function saying(s, r) {
+    return !!s.karaokeState && s.karaokeState.segment === r.segment;
 }
 export function playbackState(r, s) {
     if (r.role !== 'assistant')
         return undefined;
-    if (s.activeSpeech && r.segment === speechSegment(s.activeSpeech))
-        return s.activeSpeech.started ? 'playing' : 'pending';
+    if (saying(s, r))
+        return 'playing';
     if (['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause'].includes(r.audio))
         return 'pending';
     return r.audio === 'playing' ? 'playing' : 'complete';
@@ -246,7 +175,7 @@ export function receiptView(status) {
 export function orderedHistory(s, id) { return s.history.filter(r => r.thread === id).slice().sort((a, b) => Number(!!a.draft) - Number(!!b.draft) || a.time - b.time || (a.seq || 0) - (b.seq || 0)); }
 export function unreadCount(s, id) { return s.history.filter(r => r.thread === id && r.role === 'assistant' && r.seq > (s.roomSeen[id] || 0)).length; }
 export function conversationView(s) {
-    const id = viewedThread(s), own = s.userTurn?.thread === id, activeDraft = own ? s.sessionId + ':' + s.userTurn.key : null;
+    const id = viewedThread(s), own = s.userTurn?.thread === id, activeDraft = own ? s.userTurn.segment : null;
     // A browser outside the room reads no transcript. What was said belongs to the call, and showing it
     // to somebody who has not joined put the last thing they said, undelivered, on an empty page. The
     // session, not the socket: a reconnection must not blank the transcript somebody is reading.
@@ -258,8 +187,8 @@ export function conversationView(s) {
         sounding += Number(r.role === 'assistant' && ['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause', 'playing'].includes(r.audio));
     }
     return { messages: records.map(r => ({ ...r, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
-            audioNote: audioNote(r, ahead.get(r), { seconds: Number(s.voicePreferences?.replay_on_return_seconds ?? 120), now: s.now || Date.now() }), offlineNote: offlineNote(r), deliveryNote: deliveryNote(r), replayNote: r.role === 'assistant' ? REPLAY_NOTES[s.replayMarks[r.segment]] || '' : '',
-            playback: playbackState(r, s), karaoke: s.karaokeState?.segment === r.segment ? s.karaokeState : null })),
+            audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
+            playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null })),
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
 }
@@ -349,40 +278,6 @@ export function machinesView(s) {
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
-const CAPABILITY_LABELS = { transcription: 'transcripción', voice: 'voz' };
-/** One row per provider of the machine in use, for any paired device: the key as far as anyone may see it (masked,
- *  its last four), where it came from, what the provider can do, and what is typed in the row and not stored. */
-export function integrationsView(s) {
-    return (s.integrations?.providers || []).map(p => {
-        const check = s.integrationChecks[p.id], environment = p.configured && p.source === 'environment';
-        return { id: p.id, label: p.label, uses: capitalize((p.capabilities || []).map(c => CAPABILITY_LABELS[c] || c).join(' y ')),
-            configured: !!p.configured, placeholder: p.configured ? '•••••••• ' + (p.hint || '') : 'Sin clave',
-            note: check?.note || (environment ? 'Esta clave viene del entorno de la máquina' + (p.environment ? ' (' + p.environment + ')' : '') + '; no se puede quitar desde aquí.' : ''),
-            status: check?.status || '', canClear: !!p.configured && p.source === 'stored',
-            draft: s.integrationDrafts[p.id] || '', focused: s.integrationFocus === p.id };
-    });
-}
-/** A provider that needs a key, as a pane offers it: 'ready' with its key, 'missing' — greyed out, with a
- *  way to configure it — when the machine lists it without one, to any paired device (there is no owner and no
- *  guest: every paired device has the machine's full authority), and 'absent' when the machine does not list it
- *  at all — it cannot call that provider — or the list is not known. */
-export function keyedProvider(s, id) {
-    const row = s.integrations?.providers?.find(p => p.id === id);
-    return !row ? 'absent' : row.configured ? 'ready' : 'missing';
-}
-/** What a stage is chosen from, as stage-settings.js reads it. */
-export function stageContext(s) {
-    return { catalog: s.modelCatalog, offers: s.deviceOffers, installed: s.installedBuilds, inApp: s.inApp, language: s.speechLanguage,
-        languages: s.voiceLanguages, remote: s.remoteModels, integrations: s.integrationsStatus, keyed: (id) => keyedProvider(s, id),
-        checks: s.stageChecks, diagnostics: s.stageDiagnostics, pageFacts: s.pageFacts };
-}
-/** Transcription and voice as their panes show them: the draft while the dialog edits one, else what is saved. */
-export function stagesView(s) {
-    if (!s.modelCatalog)
-        return null;
-    const ctx = stageContext(s), source = s.stageDraft || s.voicePreferences || {};
-    return { stt: stageView(ctx, 'stt', source.stt), tts: stageView(ctx, 'tts', source.tts) };
-}
 /** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). */
 export function reachNote(s) {
     const p = (s.pairings || []).find(x => x.fp === s.pairingInUse), called = p?.host ? '«' + p.host + '»' : 'la máquina';
@@ -408,7 +303,7 @@ export function liveText(s) {
         return 'Reconectando con la sala…';
     if (v.tab === 'switching')
         return 'Cambiando de conversación…';
-    if (s.ws && s.stream && s.micEnabled === false)
+    if (inCall(s) && s.voiceState && s.micEnabled === false)
         return 'Micrófono silenciado';
     if (v.speaker === 'user')
         return 'Te estamos escuchando…';
@@ -416,7 +311,7 @@ export function liveText(s) {
         return 'La conversación está hablando · Puedes interrumpir';
     if (v.tab === 'transcribing')
         return 'Procesando tu intervención…';
-    return s.ws ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la sala · Esperando a una conversación') : 'Entra en la sala para hablar.';
+    return inCall(s) ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la sala · Esperando a una conversación') : 'Entra en la sala para hablar.';
 }
 // A receipt/reply records evidence about its own turn, never an instruction to extinguish a light.
 export function recordReceipt(s, id, status, at) {
@@ -438,14 +333,11 @@ export function createRoomSessionStore(seed = {}) {
     let snapshot;
     function project() {
         return { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants: participantsView(facts),
-            join: joinView(facts), engine: engineView(facts), echo: echoCoverage({ ...facts.echoFacts, connected: !!facts.ws, track: !!facts.stream }), live: liveText(facts),
-            mic: micView(facts), call: callView(facts), callCard: callCardView(facts), title: viewedTitle(facts), screenLock: facts.screenLock, deviceNote: facts.deviceNote,
+            join: joinView(facts), live: liveText(facts),
+            mic: micView(facts), call: callView(facts), callCard: callCardView(facts), title: viewedTitle(facts), screenLock: facts.screenLock,
             enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
-            audioDevices: facts.audioDevices, machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
-            integrations: { error: facts.integrationsError,
-                status: facts.integrationsStatus, rows: integrationsView(facts) },
-            bootError: facts.bootError, stages: stagesView(facts), downloads: downloadsView(facts.downloads),
-            voiceTools: { previewing: facts.previewJob?.language || null, previewNote: facts.previewNote, prepareNote: facts.prepareNote, gpuSetAside: facts.gpuSetAside } };
+            machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
+            bootError: facts.bootError };
     }
     function publish() { if (depth || !dirty)
         return; dirty = false; const previous = snapshot; snapshot = project(); for (const listener of listeners)
@@ -475,20 +367,10 @@ export function deliveryNote(r) {
         ? 'No llegó a la conversación: la máquina no volvió a tiempo'
         : 'No llegó a la conversación';
 }
-export function offlineNote(r) {
-    // Only what changes the reading of it: a message the gap buffer had to cut is incomplete and says so.
-    // That it was captured while the room was away is how it got here, not something to tell anybody.
-    return r.role === 'user' && r.offline === 'truncated'
-        ? 'Solo se guardaron los últimos ' + GAP_BUFFER_SECONDS + ' s'
-        : '';
-}
-export function audioNote(r, ahead = 0, replay = null) {
-    // Three of these mean nobody was listening when the reply arrived; the room keeps it and repeats it when
-    // someone returns to the conversation within this device's window, and the note promises it only while
-    // that is still true — past the window it says what happened and nothing more.
-    const repeats = !replay || (replay.seconds > 0 && (!r.time || replay.now - r.time < replay.seconds * 1000));
-    const away = where => where + (repeats ? ' · Se repite al volver' : '');
-    const reasons = { newer_turn: 'Empezaste otra intervención', user_speaking: 'Estabas hablando', focus_changed: away('No estabas en esta conversación'), call_ended: away('No estabas en la llamada'), session_changed: away('No estabas en la llamada'), expired_audio_turn: 'El turno de audio había caducado', queue_full: 'Cola de audio llena', user_interrupted: 'Interrumpiste el audio', user_skipped: 'Lo saltaste', playback_failed: 'Falló la reproducción', service_restarted: 'Se reinició el servicio', channel_closed: 'Canal de voz cerrado' };
+export function audioNote(r, ahead = 0) {
+    // Nothing a person did not hear is repeated by itself: a reply nobody was there for says so, and replaying it
+    // is the person's choice.
+    const reasons = { newer_turn: 'Empezaste otra intervención', user_speaking: 'Estabas hablando', focus_changed: 'No estabas en esta conversación', call_ended: 'No estabas en la llamada', session_changed: 'No estabas en la llamada', expired_audio_turn: 'El turno de audio había caducado', queue_full: 'Cola de audio llena', user_interrupted: 'Interrumpiste el audio', user_skipped: 'Lo saltaste', playback_failed: 'Falló la reproducción', service_restarted: 'Se reinició el servicio', channel_closed: 'Canal de voz cerrado' };
     const reason = reasons[r.audio_reason];
     if (r.audio === 'waiting_for_pause')
         return 'Audio pendiente · Breve pausa antes de hablar';
@@ -499,6 +381,9 @@ export function audioNote(r, ahead = 0, replay = null) {
         return 'Audio pendiente · ' + (ahead > 1 ? 'Hay ' + ahead + ' respuestas antes' : 'Esperando a que termine la respuesta anterior');
     if (r.audio === 'text_only')
         return 'Sin audio' + (reason ? ' · ' + reason : ' · Motivo no registrado');
+    // Published while this device was away: none of it sounded, which is not the same as being cut off.
+    if (r.audio_reason === 'unheard')
+        return 'Audio no reproducido';
     if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)
         return 'Audio interrumpido' + (reason ? ' · ' + reason : '') + ' · El texto puede incluir partes que no sonaron';
     if (r.audio === 'failed' && r.audio_reason === 'unconfirmed')
@@ -506,14 +391,4 @@ export function audioNote(r, ahead = 0, replay = null) {
     if (r.audio === 'failed')
         return 'Audio no reproducido · Falló la reproducción';
     return '';
-}
-export function engineBadgeText(p, runtime) {
-    if (!p)
-        return '';
-    const turn = p.turn_end_mode === 'timer' ? 'silencio ' + String(p.user_speech_timeout ?? 2.5).replace('.', ',') + ' s' : 'smart-turn';
-    const stage = p.stt;
-    if (stage && stage.place !== 'device')
-        return (stage.place === 'openai' ? 'OpenAI' : stage.place) + ' · ' + (stage.model || '') + ' · ' + turn;
-    const model = String(runtime?.model || stage?.model || '').replace(/^whisper-/, 'Whisper ').replace('large-v3-turbo', 'large v3 turbo'), where = ACCELERATOR_WORDS[runtime?.accelerator] || '';
-    return [model, where + (runtime?.fallback_from ? ' (GPU falló)' : ''), turn].filter(Boolean).join(' · ');
 }

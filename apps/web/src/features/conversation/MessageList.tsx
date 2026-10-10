@@ -5,7 +5,8 @@ import { groupMessages } from "./group-messages";
 import { MessageGroup } from "./MessageGroup";
 import { VoiceWaveform } from "./VoiceWaveform";
 
-export function MessageList({ conversation }: { conversation: ConversationView }) {
+/** `visible`: the list is on screen. Hidden, it cannot scroll, so it lands on the latest message when it shows. */
+export function MessageList({ conversation, visible = true }: { conversation: ConversationView; visible?: boolean }) {
   const groups = useMemo(() => groupMessages(conversation.messages), [conversation.messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
@@ -30,6 +31,11 @@ export function MessageList({ conversation }: { conversation: ConversationView }
     else if (lastId && lastId !== previousLast.current) setShowNewMessages(true);
     previousLast.current = lastId;
   }, [lastId, conversation.pendingText, conversation.pendingPhase, conversation.working, conversation.messages.length]);
+
+  // Opening lands on the latest at once: "auto" would take the list's smooth scrolling and pass for being away.
+  useLayoutEffect(() => {
+    if (visible) scrollToBottom("instant");
+  }, [visible]);
 
   return (
     <div className="message-viewport-wrap">

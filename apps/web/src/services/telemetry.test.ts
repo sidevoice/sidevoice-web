@@ -142,6 +142,19 @@ describe("a room with no collector", () => {
     expect(() => module.telemetry.audioEvent("stall")).not.toThrow();
   });
 
+  it("asks nothing of a static site's own origin, which has no room", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    window.__SIDEVOICE_TARGET__ = null as unknown as string;
+    try {
+      const module = await import("./telemetry");
+      expect(await module.initTelemetry()).toBeNull();
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      delete window.__SIDEVOICE_TARGET__;
+    }
+  });
+
   it("does not trace against a room too old to have the endpoint", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
     const module = await import("./telemetry");

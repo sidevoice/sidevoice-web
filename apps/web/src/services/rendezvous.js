@@ -35,6 +35,12 @@ export function resolveTarget({ injected, origin } = {}) {
 export function pageTarget() {
     return resolveTarget({ injected: globalThis.window?.__SIDEVOICE_TARGET__, origin: globalThis.location?.origin });
 }
+/** Whether `target` is a server to ask: anywhere named, or this page's own origin unless whoever serves the build said
+ *  there is nothing there (`window.__SIDEVOICE_TARGET__ = null`, a static site's `target.js`), where every question
+ *  would only be a 404. */
+export function targetAnswers(target, injected = globalThis.window?.__SIDEVOICE_TARGET__) {
+    return target !== '' || injected !== null;
+}
 /** A conversation, a call, a setting the node applies, this device's own pairing, the model catalogue it serves:
  *  everything the node owns, and every one of them with this device's token. */
 export function isNodePath(path) {

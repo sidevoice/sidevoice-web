@@ -64,7 +64,11 @@ test("manual instructions come from the selected host and trigger four-second wa
   }
 });
 
-test("P11 pending notice on the Settings gear routes to its host's Agents screen", async () => {
+/** The menu's Settings entry, and the menu trigger that carries the notice. */
+const settingsEntry = () => document.getElementById("settings-open") as HTMLButtonElement;
+const menuTrigger = () => document.querySelector("#call-menu summary") as HTMLElement;
+
+test("P11 pending notice on the Settings entry routes to its host's Agents screen", async () => {
   const store = createRoomStore();
   const host = pairing("fp-nuc", "NUC");
   const pending = ready([known("cursor", { actionable: true, label: "Cursor" })]);
@@ -73,7 +77,9 @@ test("P11 pending notice on the Settings gear routes to its host's Agents screen
   act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: pending } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
-  const gear = screen.getByRole("button", { name: "New agents need attention. Open settings." });
+  expect(menuTrigger()).toHaveAttribute("aria-label", "New agents need attention. Open settings.");
+  expect(menuTrigger().querySelector(".settings-notice-dot")).toBeInTheDocument();
+  const gear = settingsEntry();
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
@@ -92,26 +98,27 @@ test("multiple pending hosts leave an explicit translated choice in Machines", a
     hostAgents: { "fp-nuc": ready([known("cursor", { actionable: true })]), "fp-laptop": ready([known("claude", { actionable: true })]) } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "New agents need attention. Open settings." })); });
+  await act(async () => { fireEvent.click(settingsEntry()); });
   expect(openAgentSettings).toHaveBeenCalledWith(null);
   expect(screen.getByRole("button", { name: "Review agents for NUC" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Review agents for Laptop" })).toBeInTheDocument();
 });
 
-test("forgotten or revoked hosts cannot leave an orphaned notice on the Settings gear", () => {
+test("forgotten or revoked hosts cannot leave an orphaned notice on the menu", () => {
   for (const pairings of [[], [{ ...pairing("fp-nuc", "NUC"), revoked: true }]]) {
     const store = createRoomStore();
     const host = pairing("fp-nuc", "NUC");
     act(() => store.patch({ pairings: [host], hostAgents: { [host.fp]: ready([known("cursor", { actionable: true })]) } }));
     const view = render(<RoomProvider store={store}><RoomHeader /></RoomProvider>);
-    expect(screen.getByRole("button", { name: "New agents need attention. Open settings." }).querySelector(".settings-notice-dot")).toBeInTheDocument();
+    expect(settingsEntry().querySelector(".settings-notice-dot")).toBeInTheDocument();
     act(() => store.patch({ pairings }));
-    expect(screen.getByRole("button", { name: "Open settings" }).querySelector(".settings-notice-dot")).not.toBeInTheDocument();
+    expect(settingsEntry().querySelector(".settings-notice-dot")).not.toBeInTheDocument();
+    expect(menuTrigger().querySelector(".settings-notice-dot")).not.toBeInTheDocument();
     view.unmount();
   }
 });
 
-test("Not now clears that host's agent notice from the gear and machine views", async () => {
+test("Not now clears that host's agent notice from the menu and machine views", async () => {
   const store = createRoomStore();
   const host = pairing("fp-nuc", "NUC");
   const state = ready([known("cursor", { actionable: true, label: "Cursor" })]);
@@ -123,10 +130,10 @@ test("Not now clears that host's agent notice from the gear and machine views", 
   act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: state } }));
 
   render(<RoomProvider store={store}><RoomHeader /><HostAgentsPanel fp={host.fp} /><MachineList /></RoomProvider>);
-  const gear = screen.getByRole("button", { name: "New agents need attention. Open settings." });
+  const gear = settingsEntry();
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Not now" }));
-  expect(await screen.findByRole("button", { name: "Open settings" })).toBeInTheDocument();
+  await vi.waitFor(() => expect(settingsEntry().querySelector(".settings-notice-dot")).not.toBeInTheDocument());
   expect(screen.getByRole("button", { name: "Review agents for NUC" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Review agents for NUC" }).querySelector(".host-agent-dot")).not.toBeInTheDocument();
 });

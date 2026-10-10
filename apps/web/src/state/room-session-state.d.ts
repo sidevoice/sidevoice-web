@@ -1,27 +1,25 @@
-import type { DownloadsView, ChatMessage, ConversationView, HostAgentsState, IntegrationListing, IntegrationsView, JoinStatusView, MachineView, SettingsAgentRequest, StageView, PairingPromptView, ParticipantView, KaraokeRange } from './room-types';
+import type { ChatMessage, ConversationView, HostAgentsState, JoinStatusView, MachineView, PairingPromptView, ParticipantView, KaraokeRange, SettingsAgentRequest } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
-/** One device to choose. `system` is the system's own choice, `number` a device the system lists without a name (its
- *  place, from 1), `missing` the chosen one, no longer connected: whoever shows it words those itself. */
-export interface AudioDeviceOption { id: string; label: string; system?: boolean; number?: number; missing?: boolean }
-export interface AudioDevices {
- inputs: AudioDeviceOption[]; outputs: AudioDeviceOption[];
- inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
-}
 export type NodeReach = '' | 'ok' | 'unpaired' | 'revoked' | 'offline' | 'away';
+/** Where the call's voice is, as it reports it. */
+export interface VoiceState {
+ listening: 'idle' | 'muted' | 'listening' | 'speaking'; recognising: number; playback: 'idle' | 'synthesizing' | 'playing';
+}
 export interface SessionFacts {
- ws: unknown; stream: unknown; sessionId: string | null; roomRevision: number; roomInfo: Record<string, unknown> | null;
- connecting: boolean; reconnecting: boolean; switching: boolean; switchingSession: boolean; switchingTranscription: boolean;
+ ws: unknown; sessionId: string | null; roomRevision: number; roomInfo: Record<string, unknown> | null;
+ connecting: boolean; reconnecting: boolean; reconnectShown: boolean; switching: boolean;
  roomBinding: {thread_id: string; title?: string; binding_id?: string} | null; viewedThread: string | null;
- people: unknown[]; history: ChatMessage[]; roomSeen: Record<string, number>; replayMarks: Record<string, string>; inputReceipts: Record<string, string>;
- userLive: boolean; botLive: boolean; activeSpeech: Record<string, unknown> | null; previewJob: unknown;
- userTurn: {thread: string; key: string; text?: string} | null; pendingPhase: '' | 'listening' | 'transcribing'; pendingUserText: string;
+ people: unknown[]; history: ChatMessage[]; roomSeen: Record<string, number>; inputReceipts: Record<string, string>;
+ userLive: boolean; botLive: boolean;
+ /** The person's turn being said: the voice's id for it, the bubble's segment, and the conversation it goes to. */
+ userTurn: {id: string; segment: string; thread: string | null} | null; pendingPhase: '' | 'listening' | 'transcribing'; pendingUserText: string;
  cancelledInput: boolean; textSending: boolean; micEnabled: boolean;
- voicePreferences: Record<string, unknown> | null; enginePreferences: Record<string, unknown> | null;
- sttRuntime: Record<string, unknown> | null; engineReady: boolean; outputHealth: 'ok' | 'recovering' | 'failed'; echoFacts: unknown;
+ voiceState: VoiceState | null;
  joinStep: string | null; joinFailure: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
- screenLock: {state: string; note: string}; deviceNote: string; holding: boolean; userQuietAt: number;
- audioDevices: AudioDevices; liveNote: string;
+ screenLock: {state: string; note: string}; holding: boolean; userQuietAt: number; liveNote: string;
  harness: Record<string, boolean>; turns: Record<string, {session: string; thread: string; status?: string; settled?: boolean; harnessEnded?: boolean; readyAt?: number}>;
+ /** The reply being said, and where the voice is in it: the part of `segment`'s text sounding now (`from`, `to`;
+  *  both the end of what was heard between its chunks). */
  now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null;
  /** The machines this device is paired with (never their tokens), the one in use, and the clock they were read at. */
  pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number; machinesReady: boolean;
@@ -33,42 +31,31 @@ export interface SessionFacts {
  rendezvous: '' | 'room' | 'node'; node: string | null; nodeReach: NodeReach;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */
  pairingOpen: boolean; pairingNote: string;
- /** The machine's integrations as listed for this device (never a key), or null until read; and why they were not. */
- integrations: IntegrationListing | null; integrationsError: string;
- /** What is typed in each integration's row and not stored yet, what the machine said about it, the row to open. */
- integrationDrafts: Record<string, string>; integrationChecks: Record<string, {note: string; status: 'checking' | 'verified' | 'refused'}>;
- integrationFocus: string | null;
- integrationsStatus: 'idle' | 'loading' | 'ready' | 'failed';
- modelCatalog: Record<string, unknown> | null; voiceLanguages: {id: string; label: string; voices?: [string, string][]; sample?: string}[];
+ /** The language this device speaks in a call, and whether this page runs inside the desktop app. */
  speechLanguage: string; inApp: boolean;
- deviceCapabilities: {runs: 'page' | 'native'; has: string[]; os?: string; arch?: string; memory_mb?: number | null} | null;
- deviceOffers: Record<string, unknown>[] | null; installedBuilds: {model: string; engine: string}[];
- remoteModels: Record<string, {models?: {id: string; label?: string; description?: string}[]; voices?: {id: string; label?: string; languages?: string[]}[]; error?: string}>;
- stageDraft: {stt?: Record<string, unknown>; tts?: Record<string, unknown>} | null;
- previewNote: string; prepareNote: string; gpuSetAside: boolean;
- /** Per stage, the model selection in flight or just over (sidevoice/sidevoice-core#21), and what its last check measured (sidevoice/sidevoice-core#13). */
- stageChecks: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>; stageDiagnostics: Partial<Record<'stt' | 'tts', Record<string, unknown> | null>>;
- /** Every model or engine download in flight, and the ones that just ended. */
- downloads: import('../services/downloads.js').DownloadItem[];
- pageFacts: {adapter: {vendor: string; architecture: string; device: string; description: string} | null; crossOriginIsolated: boolean; threads: number | null; cores: number | null} | null;
+ /** The voice settings this device keeps, the ones the settings pane is editing, the engine's catalogues, and whether a
+  *  key is kept for each remote provider. */
+ voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
+ voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string};
+ providerKeys: Record<string, boolean | null>;
+ /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
+ storageBlocked: boolean;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';
  tab: 'out' | 'listening' | 'transcribing' | 'reconnecting' | 'switching';
- selected: string | null; viewed: string | null; harness: boolean | null; working: boolean; bed: boolean;
+ selected: string | null; viewed: string | null; harness: boolean | null; working: boolean;
 }
 export interface SessionSnapshot {
  facts: SessionFacts; session: SessionStatus; conversation: ConversationView; participants: ParticipantView[];
- join: JoinStatusView | null; engine: {text: string; title: string; output: string}; echo: {state: string; note: string}; live: string;
- audioDevices: AudioDevices;
+ join: JoinStatusView | null; live: string;
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
  callCard: CallCardView;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
- screenLock: {state: string; note: string}; deviceNote: string;
- bootError: string | null; stages: {stt: StageView; tts: StageView} | null; downloads: DownloadsView; voiceTools: {previewing: string | null; previewNote: string; prepareNote: string; gpuSetAside: boolean}; machines: MachineView[]; pairing: PairingPromptView;
- integrations: IntegrationsView;
+ screenLock: {state: string; note: string};
+ bootError: string | null; machines: MachineView[]; pairing: PairingPromptView;
 }
 export interface CallCardView {
  agent: 'idle' | 'working' | 'speaking'; youTalking: boolean; canSkip: boolean; conversation: string | null; title: string;
@@ -84,13 +71,13 @@ export interface SessionStore {
 export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionStore;
 export function receiptView(status: string): {symbol: string; label: string};
 export function shortModel(name: string | null | undefined): string;
+export function speechSegment(reply: {history_id?: string; session_id?: string; utterance_id?: string}): string;
+export function recordReply(s: SessionFacts, reply: {session_id?: string; thread_id?: string; revision?: number; reply_revision?: number}): SessionFacts['turns'];
+export function recordReceipt(s: SessionFacts, id: string, status: string, at: number): SessionFacts['turns'];
 export const NO_MACHINE: string;
+export const RECONNECT_GRACE_MS: number;
 export const UNPAIRED: string;
 export function machinesView(s: SessionFacts): MachineView[];
-export function keyedProvider(s: SessionFacts, id: string): 'ready' | 'missing' | 'absent';
 export function reachNote(s: SessionFacts): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;
 export function sinceText(seconds: number | null | undefined, now: number): string;
-/** What a stage is chosen from, as stage-settings.js reads it. */
-export function stageContext(s: SessionFacts): Record<string, unknown> & { keyed(id: string): 'ready' | 'missing' | 'absent' };
-export function stagesView(s: SessionFacts): {stt: StageView; tts: StageView} | null;

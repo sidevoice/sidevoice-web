@@ -4,6 +4,7 @@ import { DialogFrame } from "../../components/ui/DialogFrame";
 import { useRoomStore } from "../../state/room-store";
 import { currentDeviceName } from "../../state/device-name";
 import { hostTranslator } from "../settings/host-i18n";
+import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "./connector-commands";
 
 function pairingError(reason: unknown, t: ReturnType<typeof hostTranslator>) {
   const message = reason instanceof Error ? reason.message : String(reason);
@@ -24,7 +25,7 @@ function pairingError(reason: unknown, t: ReturnType<typeof hostTranslator>) {
  *  The code is checked and redeemed by the controller; this only collects it and says how that went. */
 export function PairingDialog() {
   const t = hostTranslator();
-  const setupCommand = t("noMachine.setupCommand");
+  const setupCommand = CONNECTOR_INSTALL;
   const prompt = useRoomStore((state) => state.pairing);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -83,7 +84,7 @@ export function PairingDialog() {
         <h3>{t("noMachine.prepareTitle")}</h3>
         <p>{t("noMachine.prepareBody")}</p>
         <div className="setup-command"><code>{setupCommand}</code><Button variant="ghost" size="compact" onClick={() => void copySetupCommand()}>{t("noMachine.copyCommand")}</Button></div>
-        <p className="muted" role="status">{copyNote || t("noMachine.pairingBody")}</p>
+        <p className="muted" role="status">{copyNote || t("noMachine.pairingBody", { command: CONNECTOR_PAIR_DEVICE })}</p>
       </section>
       {prompt.note && <p className="pairing-note" role="status">{prompt.note}</p>}
       <form className="pairing-form" onSubmit={submit} aria-busy={busy}>

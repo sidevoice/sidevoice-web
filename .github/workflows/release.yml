@@ -1,0 +1,116 @@
+name: release
+
+# Merging is publishing. Every push to main replaces the `nightly` pre-release; release-please.yml calls this with
+# the vX.Y.Z tag it created. The build and the tests, then `node scripts/release.mjs dist` (the static site as a
+# tarball, and SHA256SUMS), one attestation over the tarball, and `node scripts/release.mjs publish` (attach, read
+# back, verify, publish). Once the tests pass, the same commit as a container image too (deploy/web-static/Dockerfile,
+# for linux/amd64 and linux/arm64), pushed to ghcr.io/sidevoice/sidevoice-web as `:nightly`, or `:vX.Y.Z` and
+# `:latest`, with its own attestation. RELEASING.md.
+on:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      tag:
+        description: The draft vX.Y.Z release release-please created; its assets are built from that tag.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# Never cancelled half-way. Nightlies queue behind each other (a newer one replaces a waiting one); each version
+# has its own group.
+concurrency:
+  group: release-${{ inputs.tag || 'nightly' }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || 'nightly' }}
+
+jobs:
+  dist:
+    name: Build, test and package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+      - uses: ./.github/actions/setup
+      - run: npm run build
+      - run: npm test
+      - run: node scripts/release.mjs dist ${{ inputs.tag && format('--tag {0}', inputs.tag) || '' }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/release/
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Attest and publish
+    needs: dist
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+      - id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+      - run: cp "${{ steps.attest.outputs.bundle-path }}" dist/attestation.sigstore.json
+      - run: node scripts/release.mjs publish dist "$TAG"
+
+  image:
+    name: Container image
+    needs: dist
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      # A version is also `latest`; the nightly is only `nightly`. The attestation below is the image's provenance.
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/web-static/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:${{ inputs.tag || 'nightly' }}
+            ${{ inputs.tag && format('{0}:latest', env.IMAGE) || '' }}
+          cache-from: type=gha,scope=web-image
+          cache-to: type=gha,scope=web-image,mode=max
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

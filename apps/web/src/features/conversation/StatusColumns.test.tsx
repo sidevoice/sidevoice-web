@@ -5,7 +5,6 @@ import { TranscriptPanel } from "./TranscriptPanel";
 import { CallToolbar } from "../call/CallToolbar";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import catalog from "../../../../../packages/browser-audio/models.json";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -20,24 +19,21 @@ test("the call bar carries the lights at its left edge and the models at its rig
   expect(bar.lastElementChild!.className).toBe("engine-slot");
   expect(bar.lastElementChild!.querySelector("#engine-column")).not.toBeNull();
   act(() => {
-    store.patch({ ws: {}, stream: {}, echoFacts: { aec: false }, screenLock: { state: "on", note: "" },
+    // The room went away: the voice goes on, and its light says what it says is sent when the room is back.
+    store.patch({ ws: null, reconnecting: true, screenLock: { state: "on", note: "" },
+      voiceState: { listening: "listening", recognising: 0, playback: "idle" },
       roomBinding: { thread_id: "t-1", binding_id: "b-1", title: "Sidevoice" },
-      modelCatalog: catalog, enginePreferences: { stt: { place: "openai", model: "gpt-transcribe" }, tts: { place: "elevenlabs", model: "eleven_flash_v2_5" } },
       people: [{ thread_id: "t-1", title: "Sidevoice", available: true, engine: { model: "claude-opus-5", effort: "high" } }] });
   });
   const lights = document.getElementById("capability-column")!;
-  expect(lights.textContent).toMatch(/Eco/);
+  expect(lights.textContent).toMatch(/Voz/);
   expect(lights.textContent).toMatch(/Pantalla/);
-  expect(lights.textContent).toMatch(/Audio/);
-  expect(lights.textContent).not.toMatch(/Nube/);
   // A light says the name of the thing and its colour says the rest: the sentence beside it repeated
   // what the dot had already said. It is still there for whoever asks the row what it means.
-  expect(lights.textContent).not.toMatch(/Cancelación activa|Se mantiene encendida|Audio en orden/);
-  expect(lights.querySelector('.status-line[title*="cancelación"]')).not.toBeNull();
-  expect(lights.querySelector('.status-line[data-state="fail"] .engine-dot')).not.toBeNull();
+  expect(lights.textContent).not.toMatch(/Escuchando|Se mantiene encendida/);
+  expect(lights.querySelector('.status-line[title*="Sin la sala"]')).not.toBeNull();
+  expect(lights.querySelector('.status-line[data-state="warn"] .engine-dot')).not.toBeNull();
   const models = document.getElementById("engine-column")!;
-  expect(models.textContent).toMatch(/OpenAI · gpt-transcribe/);
-  expect(models.textContent).toMatch(/ElevenLabs/);
   expect(models.textContent).toMatch(/Opus 5 · esfuerzo high/);
   expect(models.querySelector(".engine-dot")).toBeNull();
   expect(models.textContent).not.toMatch(/smart-turn/);

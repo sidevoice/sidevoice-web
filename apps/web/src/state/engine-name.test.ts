@@ -17,7 +17,6 @@ test("what a conversation thinks with reaches the models panel, shortened — an
   const store = createRoomSessionStore();
   store.patch({
     roomBinding: { thread_id: "t-1", binding_id: "b-1", title: "Sidevoice" },
-    enginePreferences: { stt: { place: "openai", model: "gpt-transcribe" }, tts: { place: "device", model: "kokoro-82m-v1.0" } },
     people: [
       { thread_id: "t-1", title: "Sidevoice", available: true, engine: { model: "claude-fable-5-1", effort: null, thinking: null } },
       { thread_id: "t-2", title: "Astra", available: true, engine: { model: "gpt-5.6-terra" } },
@@ -34,7 +33,6 @@ test("no row for what no harness has said", () => {
   const store = createRoomSessionStore();
   store.patch({
     roomBinding: { thread_id: "t-1", binding_id: "b-1", title: "Sidevoice" },
-    enginePreferences: { stt: { place: "openai", model: "gpt-transcribe" }, tts: { place: "device", model: "kokoro-82m-v1.0" } },
     people: [{ thread_id: "t-1", title: "Sidevoice", available: true }],
   });
   expect(store.getState().enginePanel.some((row) => row.id === "agent")).toBe(false);

@@ -15,5 +15,5 @@ Rules for any coding agent (and person) working in this repository.
 
 ## Before changing things
 
-Today the web's source strings are Spanish, translated by pairs in `packages/browser-audio/room-i18n.js`; moving
+Today the web's source strings are Spanish, translated by pairs in `apps/web/src/i18n/room-i18n.js`; moving
 to English-keyed bundles is #17 — new text follows the rule above, not the old pattern.

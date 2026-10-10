@@ -22,9 +22,9 @@ test("the agent works while the person's turn is transcribed, even when its harn
   expect(store.getState().callCard.agent).toBe("idle");
 });
 
-test("a reply that has started playing is the agent speaking, and something to skip", () => {
-  const store = createRoomSessionStore({ ...base, activeSpeech: { started: true } } as never);
-  expect(store.getState().callCard).toMatchObject({ agent: "speaking", canSkip: true });
+test("a reply sounding is the agent speaking; the call's voice offers nothing to skip", () => {
+  const store = createRoomSessionStore({ ...base, botLive: true } as never);
+  expect(store.getState().callCard).toMatchObject({ agent: "speaking", canSkip: false });
 });
 
 test("the card names the conversation the call is on, not a transcript being browsed", () => {

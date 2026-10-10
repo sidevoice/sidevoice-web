@@ -29,8 +29,10 @@
 .host-agent-problem p { margin:0;line-height:1.45 }
 .host-agent-tab-label { display:inline-flex;align-items:center;gap:.45rem }
 .host-agent-dot { display:inline-block;flex:none;width:.48rem;height:.48rem;border-radius:50%;background:#e0a640;box-shadow:0 0 0 2px #e0a64022 }
-#settings-open { position:relative }
-#settings-open .settings-notice-dot { position:absolute;top:.28rem;right:.28rem;width:.62rem;height:.62rem;border:2px solid #222a34;border-radius:50%;background:#e0a640 }
+/* Agents waiting on a paired machine: a dot on the header menu's trigger, and beside its Settings entry. */
+#call-menu > summary { position:relative }
+#call-menu > summary .settings-notice-dot { position:absolute;top:.15rem;right:.15rem;width:.62rem;height:.62rem;border:2px solid #222a34;border-radius:50%;background:#e0a640 }
+#settings-open .settings-notice-dot { display:inline-block;width:.5rem;height:.5rem;margin-left:.45rem;border-radius:50%;background:#e0a640;vertical-align:middle }
 .machine-row[data-agent-notice] { border-color:#786432 }
 @media(max-width:550px) {
   .host-agent-main,.host-agent-other-head { align-items:flex-start;flex-wrap:wrap }

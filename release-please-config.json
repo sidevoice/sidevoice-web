@@ -11,11 +11,9 @@
       "extra-files": [
         { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.dependencies['@sidevoice/protocol']" },
-        { "type": "json", "path": "packages/browser-audio/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/protocol/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['apps/web'].version" },
         { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['apps/web'].dependencies['@sidevoice/protocol']" },
-        { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['packages/browser-audio'].version" },
         { "type": "json", "path": "package-lock.json", "jsonpath": "$.packages['packages/protocol'].version" }
       ]
     }

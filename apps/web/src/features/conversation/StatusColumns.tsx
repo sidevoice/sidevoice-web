@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-/** A popover here closes when the page is touched anywhere outside it. */
+/** A popover here closes when the page is touched anywhere outside it, and on Escape before anything under it. */
 function useCloseOutside(ref: RefObject<HTMLElement | null>, open: boolean, close: () => void) {
+  useSurface({ open, close, container: ref, modal: false });
   useEffect(() => {
     if (!open) return;
     const away = (event: PointerEvent) => { if (!ref.current?.contains(event.target as Node)) close(); };
@@ -12,7 +13,7 @@ function useCloseOutside(ref: RefObject<HTMLElement | null>, open: boolean, clos
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { ModelsIcon } from "../../components/ui/Icons";
-import { Downloads } from "../call/Downloads";
+import { useSurface } from "../../lib/use-surface";
 
 /* The two edges of the call bar. Left: what this call has switched on, as a light and the name of the
  * thing — never the sentence, which said "cancelación activa" beside a green dot that had already said
@@ -71,7 +72,6 @@ export function EngineColumn() {
   useCloseOutside(box, open, () => setOpen(false));
   return (
     <div className="engine-slot" ref={box} data-open={open || undefined}>
-      <Downloads />
       <Button id="engine-open" variant="ghost" size="icon" className="engine-toggle" aria-expanded={open}
         aria-label="Qué modelos responden" title="Qué modelos responden" onClick={() => setOpen(!open)}>
         <ModelsIcon />
