@@ -52,12 +52,14 @@ Each release attaches `sidevoice-web-X.Y.Z.tar.gz`, a static site, with its `SHA
 microphone needs a secure context). `voice/target.js` may set where the interface looks first; without it, the
 pairing code says where the machine is.
 
-Or build the container image from this repository:
+Or run the container image, for linux/amd64 and linux/arm64 (Apple silicon natively):
 
 ```sh
-docker build -f deploy/web-static/Dockerfile -t sidevoice-web .
-docker run -p 8080:8080 sidevoice-web          # optional: -e SIDEVOICE_TARGET=https://your-machine.example
+docker run -p 8080:8080 ghcr.io/sidevoice/sidevoice-web:nightly   # optional: -e SIDEVOICE_TARGET=https://your-machine.example
 ```
+
+then open http://localhost:8080. `:nightly` follows `main`; each release is `:vX.Y.Z`, and the newest also `:latest`
+(RELEASING.md). To build it yourself: `docker build -f deploy/web-static/Dockerfile -t sidevoice-web .`
 
 The container serves plain HTTP on port 8080: fine on `localhost`, but anywhere else put HTTPS in front of it, or
 the browser will not allow the microphone.
