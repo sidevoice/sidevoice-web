@@ -870,10 +870,14 @@ function recordMessage(raw, socket) {
         }
     }
     if (t === 'error') {
-        // A refusal of one of this page's own messages is about that message: a turn's start the room would not
-        // take never gets a revision, and the rest is the room keeping its own books.
+        // A refusal of one of this page's own messages is about that message, and goes to the voice, which made it. A
+        // turn the room has no room for yet (`room.turns_full`) the voice keeps, words and all, and says again once
+        // another ends; any other refused start makes its turn's words go as said while away, and the rest is the
+        // room keeping its own books.
         if (d.client_msg_id) {
-            relay.refusedMessage(d.client_msg_id);
+            voice?.roomRefused?.(d);
+            if (d.key !== 'room.turns_full')
+                relay.refusedMessage(d.client_msg_id);
             flushOutbox();
             return;
         }

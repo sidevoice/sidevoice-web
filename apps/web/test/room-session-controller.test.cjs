@@ -872,7 +872,7 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{},models=[]}={}){
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
-  speak:reply=>calls.push(['speak',reply]),turnStarted:started=>calls.push(['turnStarted',started]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
+  speak:reply=>calls.push(['speak',reply]),turnStarted:started=>calls.push(['turnStarted',started]),roomRefused:refusal=>calls.push(['roomRefused',refusal]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
   onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
   models:async()=>models,setProviderKey:async(provider,key)=>{calls.push(['setProviderKey',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasProviderKey:async provider=>!!keys[provider]};
 }
@@ -1192,4 +1192,22 @@ test('A start of a replaced session is not sent again: its words go as said whil
  s.run("var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({client_msg_id:'old-start',turn_id:'a',phase:'started'});voiceTurn({client_msg_id:'old-end',turn_id:'a',phase:'finished',text:'words'});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
  assert.deepEqual(plain(s.run("__sent.map(m=>[m.data.client_msg_id,m.data.phase,m.data.offline,m.data.session_id])")),[['old-end','finished',true,'new']]);
  assert.equal(s.run("outbox.get('old-start')"),null);
+});
+
+test('A turn the room has no room for yet is the voice\'s to keep; another refused start still goes as said while away',async()=>{
+ const c=await callOnRoom();const {voice,first}=c;
+ voice.emit('turn',{client_msg_id:'f-1',turn_id:'u9',phase:'started',offline:false});
+ const full={key:'room.turns_full',message:'Too many turns',client_msg_id:'f-1'};
+ c.push(first,{type:'error',data:full});
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='roomRefused')),[['roomRefused',full]],'the voice gets the refusal');
+ // The voice says the turn again later; nothing turns it into words said while away here.
+ voice.emit('turn',{client_msg_id:'f-2',turn_id:'u9',phase:'finished',text:'Otra vez',offline:false});
+ const end=sentOf(c,first,'voice-user-turn').find(d=>d.client_msg_id==='f-2');
+ assert.deepEqual([end.turn_id,end.offline],['u9',false]);
+ // Any other refusal reaches the voice too, and its turn's words go as said while away.
+ voice.emit('turn',{client_msg_id:'g-1',turn_id:'u10',phase:'started',offline:false});
+ c.push(first,{type:'error',data:{key:'room.no_conversation',client_msg_id:'g-1'}});
+ voice.emit('turn',{client_msg_id:'g-2',turn_id:'u10',phase:'finished',text:'Sin conversación',offline:false});
+ assert.equal(voice.calls.filter(([name])=>name==='roomRefused').length,2);
+ assert.equal(sentOf(c,first,'voice-user-turn').find(d=>d.client_msg_id==='g-2').offline,true);
 });
