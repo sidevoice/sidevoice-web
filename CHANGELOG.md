@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/sidevoice/sidevoice-web/compare/v0.2.0...v0.2.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **web:** the connector's commands are npx sidevoice install and pair-device ([#70](https://github.com/sidevoice/sidevoice-web/issues/70)) ([64c6159](https://github.com/sidevoice/sidevoice-web/commit/64c615933bd668ba7f15c031695679508cb72464))
+
 ## [0.2.0](https://github.com/sidevoice/sidevoice-web/compare/v0.1.0...v0.2.0) (2026-10-10)
 
 
