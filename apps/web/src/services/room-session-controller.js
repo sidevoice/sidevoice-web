@@ -1217,7 +1217,6 @@ $('settings-open').onclick=()=>{try{
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 function settingsSection(name){for(const section of ['general','voice','providers','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
-$('call-settings-open').onclick=()=>{$('call-menu').open=false;$('settings-open').click()};
 $('settings-general').onclick=()=>settingsSection('general');
 $('settings-voice').onclick=()=>settingsSection('voice');
 $('settings-providers').onclick=()=>settingsSection('providers');

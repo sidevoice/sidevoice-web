@@ -18,7 +18,8 @@ export interface SessionFacts {
  joinStep: string | null; joinFailure: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
  screenLock: {state: string; note: string}; holding: boolean; userQuietAt: number; liveNote: string;
  harness: Record<string, boolean>; turns: Record<string, {session: string; thread: string; status?: string; settled?: boolean; harnessEnded?: boolean; readyAt?: number}>;
- now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null;
+ /** Where the voice is in a reply: the characters of `segment`'s text sounding now, as its karaoke cue says. */
+ now: number; karaokeState: {segment: string; start: number; end: number} | null; bootError: string | null;
  /** The machines this device is paired with (never their tokens), the one in use, and the clock they were read at. */
  pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number; machinesReady: boolean;
  localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
@@ -64,6 +65,7 @@ export interface SessionStore {
 }
 export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionStore;
 export function receiptView(status: string): {symbol: string; label: string};
+export function karaokeRange(k: {start: number; end: number} | null): KaraokeRange | null;
 export function shortModel(name: string | null | undefined): string;
 export function speechSegment(reply: {history_id?: string; session_id?: string; utterance_id?: string}): string;
 export function recordReply(s: SessionFacts, reply: {session_id?: string; thread_id?: string; revision?: number; reply_revision?: number}): SessionFacts['turns'];

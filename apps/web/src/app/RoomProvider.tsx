@@ -1,5 +1,6 @@
 import { useEffect, useRef, type PropsWithChildren } from "react";
 import { createRoomStore, installRoomBridge, RoomStoreContext, type RoomStore } from "../state/room-store";
+import { CallLayoutContext, createCallLayoutStore, type CallLayoutStore } from "../state/call-layout";
 
 let controllerImport: Promise<unknown> | null = null;
 
@@ -12,6 +13,9 @@ export function RoomProvider({ children, store: suppliedStore }: RoomProviderPro
   const storeRef = useRef<RoomStore | null>(null);
   if (!storeRef.current) storeRef.current = suppliedStore ?? createRoomStore();
   const store = storeRef.current;
+  const layoutRef = useRef<CallLayoutStore | null>(null);
+  // How the call view is laid out on this device (state/call-layout.ts).
+  if (!layoutRef.current) layoutRef.current = createCallLayoutStore();
 
   useEffect(() => {
     installRoomBridge(store);
@@ -28,5 +32,9 @@ export function RoomProvider({ children, store: suppliedStore }: RoomProviderPro
     });
   }, [store]);
 
-  return <RoomStoreContext.Provider value={store}>{children}</RoomStoreContext.Provider>;
+  return (
+    <RoomStoreContext.Provider value={store}>
+      <CallLayoutContext.Provider value={layoutRef.current}>{children}</CallLayoutContext.Provider>
+    </RoomStoreContext.Provider>
+  );
 }

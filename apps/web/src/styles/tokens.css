@@ -21,4 +21,41 @@
   --sv-radius-md: 18px;
   --sv-radius-pill: 999px;
   --sv-shadow-dialog: 0 24px 80px rgb(0 0 0 / 55%);
+  --sv-header-height: 64px;
+  /* A conversation's state, as the dot on its avatar says it. */
+  --sv-state-in-call: var(--sv-positive);
+  --sv-state-working: var(--sv-voice);
+  --sv-state-waiting: var(--sv-primary);
+  --sv-state-idle: #6b7885;
+  /* Avatars (features/avatar): a figure colour and the stage behind it, by number, and the few inks they share.
+     The first three are the brand's own colours. */
+  --sv-avatar-ink: #1d1530;
+  --sv-avatar-shine: #ffffff;
+  --sv-avatar-cheek: #f19a8e;
+  --sv-avatar-accent: #f19a8e;
+  --sv-avatar-accent-deep: #e07e70;
+  --sv-avatar-accent-light: #f6c3bb;
+  --sv-avatar-gear: #3b3550;
+  --sv-avatar-leaf: #b9e07a;
+  --sv-avatar-stem: #6c8f3c;
+  /* The accent, for a body that already wears it. */
+  --sv-avatar-accent-alt: #8fb8ef;
+  --sv-avatar-accent-alt-deep: #6f9be0;
+  --sv-avatar-accent-alt-light: #c4dbf7;
+  --sv-avatar-1: var(--sv-primary);
+  --sv-avatar-1-bg: var(--sv-selected);
+  --sv-avatar-2: var(--sv-voice);
+  --sv-avatar-2-bg: #2e2a1f;
+  --sv-avatar-3: var(--sv-positive);
+  --sv-avatar-3-bg: #1f2e29;
+  --sv-avatar-4: #f19a8e;
+  --sv-avatar-4-bg: #33232a;
+  --sv-avatar-5: #8fb8ef;
+  --sv-avatar-5-bg: #1e2738;
+  --sv-avatar-6: #e7d9c2;
+  --sv-avatar-6-bg: #2b2b2b;
+  --sv-avatar-7: #b9e07a;
+  --sv-avatar-7-bg: #232b1d;
+  --sv-avatar-8: #f2a7d0;
+  --sv-avatar-8-bg: #33232a;
 }
