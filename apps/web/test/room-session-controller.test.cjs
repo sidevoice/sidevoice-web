@@ -4,11 +4,11 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),asse
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
 function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null,localHost=null,localHostSelected=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
- class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
- const elements=new Map(),handlers={};
- if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element());for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-recognition','stats-response'])elements.set(id,new Element())}
+ class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
+ const elements=new Map(),handlers={},documentHandlers={},observers=[];
+ if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
- const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
+ const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
@@ -30,7 +30,11 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
  if(paired)vm.runInContext("nodeBase='';verified.set('',Date.now());roomStore.patch({node:pairings.inUse,nodeReach:'ok'})",context);
  vm.runInContext("roomBinding={thread_id:'a',title:'A'};sessionId='s'",context);
- return {context,handlers,Element,elements,saved,run:code=>vm.runInContext(code,context)};
+ // An event dispatched to the document, as one bubbles up from `target`: every listener there hears it.
+ const dispatch=(name,event)=>Promise.all((documentHandlers[name]||[]).map(fn=>fn({preventDefault(){},...event})));
+ // The page's nodes changed, as React mounting or unmounting a view changes them.
+ const mutated=()=>observers.forEach(fn=>fn([]));
+ return {context,handlers,Element,elements,saved,dispatch,mutated,run:code=>vm.runInContext(code,context)};
 }
 test('The runtime never writes into a node React fills itself',()=>{
  // Two owners for the join line cost a blank room: setting textContent removed React's children, and the
@@ -184,9 +188,30 @@ test('Text submission freezes its destination and clears only the submitted draf
  const s=setup(),sent=[];s.context.crypto={randomUUID:()=> 'test-message'};
  s.run("ws={};$('text-message').value='Un mensaje escrito';roomBinding.binding_id='binding-a'");
  s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));s.run("$('text-message').value='Ya escribiendo el siguiente'");return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
- await s.run("$('text-composer').onsubmit({preventDefault(){}})");
+ await s.dispatch('submit',{target:s.run("$('text-composer')")});
  assert.equal(sent[0].thread_id,'a');assert.equal(sent[0].text,'Un mensaje escrito');
  assert.equal(s.run("$('text-message').value"),'Ya escribiendo el siguiente');
+});
+
+test('A text box mounted after the page loaded sends what is typed in it',async()=>{
+ // The call view mounts after the controller runs, as it does after pairing the first machine: no box at first.
+ const s=setup({strictDOM:true}),sent=[];s.context.crypto={randomUUID:()=>'late-message'};
+ for(const id of ['text-composer','text-message','text-send'])s.elements.delete(id);s.mutated();
+ assert.doesNotThrow(()=>s.run("ws={};roomBinding.binding_id='binding-a';updateComposer()"),'no box is nothing to update');
+ const form=new s.Element('text-composer'),input=new s.Element('text-message'),send=new s.Element('text-send');
+ input.disabled=send.disabled=true;let submitted=0;form.requestSubmit=()=>submitted++;
+ s.elements.set('text-composer',form);s.elements.set('text-message',input);s.elements.set('text-send',send);
+ s.mutated();
+ assert.equal(input.disabled,false,'the new box is brought up to date as it appears, and can send');assert.equal(send.disabled,false);
+ input.value='Escrito tras emparejar';
+ await s.dispatch('keydown',{target:input,key:'Enter'});
+ assert.equal(submitted,1,'Enter in the new box submits it');
+ s.context.fetch=async(path,options)=>{if(options){sent.push(JSON.parse(options.body));return {ok:true,json:async()=>({accepted:true})}}return {ok:true,json:async()=>({messages:[]})}};
+ await s.dispatch('submit',{target:form});
+ assert.equal(sent.length,1);assert.equal(sent[0].text,'Escrito tras emparejar');assert.equal(sent[0].thread_id,'a');
+ assert.equal(input.value,'','the sent draft is cleared');
+ await s.dispatch('submit',{target:new s.Element()});
+ assert.equal(sent.length,1,'another form on the page sends nothing');
 });
 
 test('Text entry is unavailable when viewing a different inactive history',()=>{
