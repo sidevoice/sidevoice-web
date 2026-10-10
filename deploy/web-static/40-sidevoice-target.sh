@@ -7,7 +7,8 @@ nl='
 '
 case "${SIDEVOICE_TARGET:-}" in *"$nl"*|*"</"*) echo "SIDEVOICE_TARGET must be one line, a URL" >&2; exit 1 ;; esac
 case "${SIDEVOICE_TARGET:-}" in
-  "") echo "/* no SIDEVOICE_TARGET: the pairing code says where the machine is */" > "$file" ;;
+  "") printf '%s\n' "/* no SIDEVOICE_TARGET: nothing at this origin; the pairing code says where the machine is */" \
+        "window.__SIDEVOICE_TARGET__ = null;" > "$file" ;;
   http://*|https://*)
     escaped=$(printf '%s' "$SIDEVOICE_TARGET" | sed 's/\\/\\\\/g; s/"/\\"/g')
     printf 'window.__SIDEVOICE_TARGET__ = "%s";\n' "$escaped" > "$file" ;;

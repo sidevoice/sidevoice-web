@@ -267,6 +267,7 @@ body,
 .host-update-guidance { margin:.35rem 0 0;line-height:1.5;color:#d8c99d }
 .host-update-control .local-install-error { flex-basis:100% }
 .local-host-banner { display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.5rem;padding:.6rem 1rem;background:#2c2226;border-bottom:1px solid #6b4046;color:#f0c9c4;line-height:1.45;text-align:center }
+.storage-blocked-banner { padding:.6rem 1rem;background:#2c2226;border-bottom:1px solid #6b4046;color:#f0c9c4;line-height:1.45;text-align:center }
 .remote-setup-guidance { margin:.5rem 0 1rem;padding:.8rem;border:1px solid var(--sv-border);border-radius:.75rem;background:var(--sv-surface) }
 .remote-setup-guidance h3 { margin:.15rem 0 .4rem;font-size:1rem }
 .remote-setup-guidance p { line-height:1.5 }

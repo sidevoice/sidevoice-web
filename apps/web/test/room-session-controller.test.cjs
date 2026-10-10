@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -1310,4 +1310,34 @@ test('A held turn refused again keeps its words, and starts again at the next en
  assert.deepEqual(plain(words.map(d=>[d.text,d.offline])),[['Espera',null],['Espera',null]]);
  assert.notEqual(words[0].client_msg_id,words[1].client_msg_id);
  s.run('disconnect()');
+});
+
+// ----- a browser that blocks site data, and a page served as a static site -----
+test('A browser\'s own refusal is said in words, by its name: never its legacy number',()=>{
+ const s=setup({strictDOM:true});
+ // A DOMException carries a numeric code (18 for a SecurityError): that is never what the person reads.
+ const security={name:'SecurityError',code:18,message:'The operation is insecure.'};
+ assert.match(s.run('voiceErrorText')(security),/blocking site data for this page/);
+ assert.match(s.run('voiceErrorText')({code:'storage-blocked'}),/blocking site data for this page/);
+ const denied=s.run('voiceErrorText')({name:'NotAllowedError',code:0});
+ assert.match(denied,/NotAllowedError/);assert.doesNotMatch(denied,/\(\d+\)/);
+ assert.doesNotMatch(s.run('voiceErrorText')({name:'InvalidStateError',code:11}),/\b11\b/);
+ // The engine's own codes keep their sentence, and a provider's words follow.
+ assert.match(s.run('voiceErrorText')({code:'credential-missing',detail:'invalid_api_key'}),/Falta la clave del proveedor.*invalid_api_key/);
+});
+test('A static site asks its own origin nothing; a page with a room in front of it still does',async()=>{
+ const s=setup({strictDOM:true}),asked=[];
+ s.context.fetch=async url=>{asked.push(url);return {ok:false,status:404,json:async()=>({})}};
+ s.context.window.__SIDEVOICE_TARGET__=null;
+ assert.equal(await s.run('describeTarget()'),null);
+ assert.deepEqual(asked,[],'no /api/rendezvous to a server that has none');
+ delete s.context.window.__SIDEVOICE_TARGET__;
+ await s.run('describeTarget()');
+ assert.deepEqual(asked,['/api/rendezvous'],'with no word from whoever serves it, the origin is asked as before');
+});
+test('Storage the browser refuses is found once at start and said on top',async()=>{
+ const s=setup({strictDOM:true});
+ assert.equal(s.run('roomStore.getState().facts.storageBlocked'),false,'a browser that keeps site data');
+ const probe=await s.run('probeSiteStorage')({localStorage:()=>{throw {name:'SecurityError',code:18}},indexedDB:null,storage:null});
+ assert.deepEqual(plain(probe),{blocked:true,refused:[{store:'localStorage',code:'SecurityError'}]});
 });

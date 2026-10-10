@@ -235,6 +235,9 @@ export const en = {
   "keys.removed": "Key removed.",
   "keys.failed": "Could not save the key ({code}).",
   "keys.failedPlain": "Could not save the key.",
+  "storage.blocked": "This browser is blocking site data for this page. Allow it (site settings → cookies and site data) to pair a machine and use voice.",
+  "voice.error.browser": "The browser refused something the call's voice needs ({name}).",
+  "keys.loading": "Loading the providers…",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

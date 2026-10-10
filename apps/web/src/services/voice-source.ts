@@ -15,6 +15,7 @@ import type {
   VoiceEndOfTurn, VoiceModels, VoiceModelSource, VoiceSettings, VoiceSpeaker, VoiceTranscriber, VoiceVad,
 } from "@sidevoice/voice";
 import { LOCAL_CATALOG } from "./model-catalogs.js";
+import { engineFailureCode } from "./failure-code.js";
 
 /** How the detector decides, as the voice's turn logic was written against: probability, and confirmation times. */
 export const VAD_OPTIONS = { threshold: 0.6, minSilenceMs: 200, minSpeechMs: 400 };
@@ -28,10 +29,10 @@ export function voiceRefusal(code: string, message = code, detail?: string): Err
   return Object.assign(new Error(message), { code }, detail ? { detail } : {});
 }
 
-/** An engine failure as the voice's: its code and the provider's detail kept. */
+/** An engine failure as the voice's: its code (a platform exception's name), and the provider's detail, kept. */
 function asRefusal(error: unknown): Error {
-  const failure = error as Partial<EngineError> | null;
-  return failure?.code ? voiceRefusal(failure.code, (error as Error).message, failure.detail) : (error as Error);
+  const code = engineFailureCode(error, "");
+  return code ? voiceRefusal(code, (error as Error).message, (error as Partial<EngineError>).detail) : (error as Error);
 }
 
 /** `choice` as the settings hold it, or null when it does not name a catalogue and a model. */

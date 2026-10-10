@@ -40,3 +40,12 @@ test("a provider's key is kept in this browser where the engine's host reads it,
   await catalogs.setCredential("openai", null);
   expect(stored.size).toBe(0);
 });
+
+test("a catalogue whose listing fails with no reason of its own is not an empty list: the failure is its status", async () => {
+  const blocked = new DOMException("The operation is insecure.", "SecurityError");
+  const engine = { catalogs: () => [{ id: "local", name: undefined, status: async () => ({ stale: false }), models: async () => { throw blocked; } }] } as unknown as WebEngine;
+  const { storage } = memory();
+  expect(await engineCatalogs(engine, localStorageCredentials(storage)).catalogs()).toEqual([
+    { id: "local", name: null, status: { stale: false, reason: { code: "storage-blocked", params: {} } }, models: [] },
+  ]);
+});
