@@ -71,9 +71,8 @@ const desktopLocalHost=localHostBridge();
 const LOCAL_HOST_SELECTION_KEY='sidevoice.local-host-selected',LOCAL_HOST_SELECTION_ID='@sidevoice/local-host';
 function readLocalHostSelected(){try{return pairingStorage?.getItem(LOCAL_HOST_SELECTION_KEY)==='true'}catch{return false}}
 function saveLocalHostSelected(){try{if(localHostSelected)pairingStorage?.setItem(LOCAL_HOST_SELECTION_KEY,'true');else pairingStorage?.removeItem(LOCAL_HOST_SELECTION_KEY)}catch{}}
-// Older versions stored the native fingerprint as the in-use pointer but intentionally did not store its
-// per-launch credentials. If it matches no browser pairing, retain the local selection while native reconnects.
-let localHostSelected=!!desktopLocalHost&&(readLocalHostSelected()||!!storedPairingState.inUse&&!storedPairingState.list.some(p=>p.fp===storedPairingState.inUse));
+// The local host is selected only when this page said so (LOCAL_HOST_SELECTION_KEY) and the app offers it.
+let localHostSelected=!!desktopLocalHost&&readLocalHostSelected();
 roomStore.patch({localHostAvailable:!!desktopLocalHost,localHostSelected});
 function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
 function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
@@ -241,15 +240,17 @@ const post=(path,body,method='POST')=>api(path,{method,headers:{'Content-Type':'
 const OUTBOX_SCOPE_KEY='sidevoice.outbox-scope';
 function outboxScope(){try{let scope=sessionStorage.getItem(OUTBOX_SCOPE_KEY);if(!scope){scope=crypto.randomUUID();sessionStorage.setItem(OUTBOX_SCOPE_KEY,scope)}return scope}catch{return 'page'}}
 const outbox=createOutbox({scope:outboxScope()});
+// What an earlier load of this tab kept may come back after the call has already flushed: it goes once it is here.
+// flushOutbox sends only on the open socket of the current session, so a hang-up or a new session meanwhile is safe.
+outbox.ready.then(()=>flushOutbox(),()=>{});
 // While a new session's room has not said which conversation this browser is on, nothing goes on its socket.
 let outboxHold=null;
 // A message the voice made, kept under the `client_msg_id` it already carries.
 function keepMessage(kind,type,data){return outbox.add({id:data.client_msg_id,kind,session_id:state.sessionId,node:state.node,payload:{type,data}})}
 /* Everything waiting, in order, on the socket the call has now, under the session it has now. A turn belongs to the
  * conversation, not to the session that heard it: the room knows it by its `turn_id` on the session that took its start,
- * and as words said while away when this session never took that start (`turn-relay.js`). A turn's end whose start is
- * not answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
- * is let go. */
+ * and as words said while away when this session never took that start (`turn-relay.js`). One socket keeps them in
+ * order, so nothing waits for the room's answers. Anything for another machine is let go. */
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for.
  if(outboxHold||!socket||socket.readyState!==WebSocket.OPEN||!state.sessionId||socket.session!==state.sessionId)return;
@@ -262,7 +263,6 @@ function flushOutbox(socket=state.ws){
    // per device, so sent again it is only acknowledged. Its turn's end goes as words said while away.
    if(data.phase==='started'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
    const route=relay.route(data);
-   if(route.wait)return;
    if(route.drop){outbox.remove(entry.id);continue}
    data=route.send;
    if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
@@ -832,17 +832,14 @@ function recordMessage(raw, socket) {
         receiveReply(d);
         return;
     }
-    // The room's answer to a turn this page said started, by the turn's name: its end may go now, the conversation it
-    // goes to is the one the room captured, and the voice takes the turn's revision as its boundary for stale replies.
+    // The room's answer to a turn this page said started, by the turn's name: the conversation it goes to is the one the
+    // room captured, and the voice takes the turn's revision as its boundary for stale replies.
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
         // Every answer goes to the voice, an offline turn's too: it keeps those of its own turns and ignores the rest.
         voice?.turnStarted?.(d);
-        if (relay.answered(d.turn_id)) {
-            if (state.userTurn?.id === d.turn_id)
-                state.userTurn = { ...state.userTurn, thread: d.thread_id };
-        }
-        flushOutbox();
+        if (state.userTurn?.id === d.turn_id)
+            state.userTurn = { ...state.userTurn, thread: d.thread_id };
         return;
     }
     if (t === 'voice-input-receipt') {

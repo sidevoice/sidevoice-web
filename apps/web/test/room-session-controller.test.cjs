@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),asse
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null,localHost=null,localHostSelected=false}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null,localHost=null,localHostSelected=false,indexedDB=null,outboxScope=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={};
@@ -10,6 +10,9 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element())}return elements.get(id)},createElement:()=>new Element(),addEventListener(){}},window:{addEventListener:(name,fn)=>handlers[name]=fn},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
+ // The outbox's storage across reloads, and this tab's scope in it.
+ if(indexedDB)context.indexedDB=indexedDB;
+ if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
  const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-settings.js':'VoiceSettings'};
@@ -887,8 +890,8 @@ function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,
  s.run("keepScreenAwake=()=>{};people=[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
-async function callOnRoom({timers=null}={}){
- const s=setup();const sockets=socketsOf(s);let ids=0;
+async function callOnRoom({timers=null,indexedDB=null,outboxScope=null}={}){
+ const s=setup({indexedDB,outboxScope});const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
  const store={'sidevoice.selected':'a'};s.context.sessionStorage=storageOf(store);
@@ -923,17 +926,15 @@ test('A call subscribes to its voice, chooses, starts it, and only then joins th
  c.s.run('window.sidevoiceActions.toggleCall()');
  assert.deepEqual(voice.calls.at(-1),['stop'],'a hang-up stops the voice');
 });
-test('A turn is said by its name, and its end waits for the room\'s answer to its start',async()=>{
+test('A turn is said by its name, and its end follows its start without waiting for the room\'s answer',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
  voice.emit('turn',{client_msg_id:'c-1',turn_id:'u1',phase:'started',offline:false});
  assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.client_msg_id,d.session_id]),[['started','c-1','s1']]);
  voice.emit('turn',{client_msg_id:'c-2',turn_id:'u1',phase:'finished',text:'Hola',offline:false});
- assert.equal(sentOf(c,first,'voice-user-turn').length,1,'the end waits for the start\'s answer');
+ assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.turn_id,d.offline]),[['started','u1',false],['finished','u1',false]],'one socket keeps them in order');
  assert.equal(s.run('history.at(-1).text'),'Hola');
  assert.equal(s.run('history.at(-1).delivery'),'pending');
- // An answer about another turn is not this one's.
  c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'elsewhere',revision:6,thread_id:'a'}});
- assert.equal(sentOf(c,first,'voice-user-turn').length,1);
  const answer={session_id:'s1',phase:'started',turn_id:'u1',revision:7,thread_id:'a'};
  c.push(first,{type:'voice-user-turn',data:answer});
  // Every answer reaches the voice, which keeps those of its own turns: the other turn's, then this one's.
@@ -1078,21 +1079,37 @@ test('A refusal after its acknowledgement still finds the start it refuses, and 
  assert.equal(sentOf(c,c.first,'voice-playback').length,1);
  s.run('disconnect()');
 });
-test('A start sent twice is waited for once, and each start is answered by its own turn_id',async()=>{
+test('A start sent again is only acknowledged by the room, and nothing waits for an answer it will not send',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  voice.emit('turn',{client_msg_id:'start-a',turn_id:'a',phase:'started'});
- // The same start again on the same session (after a resume, say): the room only acknowledges a repeat.
+ // The same start again on the same session (after a resume or a reload, say): the room only acknowledges a repeat.
  s.run("outbox.get('start-a').sentOn=null;flushOutbox()");
  assert.equal(sentOf(c,c.first,'voice-user-turn').filter(d=>d.client_msg_id==='start-a').length,2);
- voice.emit('turn',{client_msg_id:'start-b',turn_id:'b',phase:'started'});
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:'start-a'}});
  voice.emit('turn',{client_msg_id:'end-a',turn_id:'a',phase:'finished',text:'first'});
- // The room answers by name, here b before a: a's end waits for a's answer only.
- c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'b',revision:2,thread_id:'a'}});
- assert.equal(sentOf(c,c.first,'voice-user-turn').some(d=>d.client_msg_id==='end-a'),false);
- c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'a',revision:1,thread_id:'a'}});
  const end=sentOf(c,c.first,'voice-user-turn').find(d=>d.client_msg_id==='end-a');
- assert.deepEqual([end.turn_id,end.offline],['a',undefined],'its end goes as it is, named');
+ assert.deepEqual([end?.turn_id,end?.offline],['a',undefined],'its end goes as it is, named, with no answer');
  s.run('disconnect()');
+});
+
+test('Messages a reload kept go once the outbox has them back, though the call flushed before',async()=>{
+ let release=()=>{};
+ const kept={id:'kept-1',scope:'tab-1',kind:'playback',session_id:'s1',node:PAIRED.fp,created:1,order:1,
+  payload:{type:'voice-playback',data:{client_msg_id:'kept-1',utterance_id:'u',status:'heard',heard_chars:3,at:1}}};
+ const store={put(){},delete(){},getAll(){const request={};release=()=>{request.result=[kept];request.onsuccess?.()};return request}};
+ const db={createObjectStore(){},transaction:()=>({objectStore:()=>store})};
+ const indexedDB={open(){const request={};setTimeout(()=>{request.result=db;request.onsuccess?.()},0);return request}};
+ const c=await callOnRoom({indexedDB,outboxScope:'tab-1'});
+ assert.equal(sentOf(c,c.first,'voice-playback').length,0,'not back yet');
+ release();await settleSoon();
+ assert.deepEqual(sentOf(c,c.first,'voice-playback').map(d=>d.client_msg_id),['kept-1'],'sent as it came back');
+ c.s.run('disconnect()');
+});
+
+test('An in-use fingerprint no pairing knows does not select the local host by itself',()=>{
+ const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd'}),subscribe:()=>()=>{},pairing:()=>null};
+ const s=setup({paired:false,stored:{in_use:'obsolete-fingerprint',pairings:[]},localHost:bridge});
+ assert.equal(s.run('localHostSelected'),false,'only the page\'s own selection selects it');
 });
 test('A hang-up while the settings are taken never starts the microphone, and one while starting stops it',async()=>{
  const s=setup();let release;
