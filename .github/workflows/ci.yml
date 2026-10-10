@@ -1,7 +1,8 @@
 name: ci
 
 # Every pull request: the build, the tests, and the release packaging exactly as a release builds it
-# (`node scripts/release.mjs dist`), publishing nothing. What passes here is what merging publishes (release.yml).
+# (`node scripts/release.mjs dist`), and the container image for both platforms, publishing nothing. What passes here
+# is what merging publishes (release.yml).
 # RELEASING.md.
 on:
   pull_request:
@@ -27,3 +28,19 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: node scripts/release.mjs dist
+
+  image:
+    name: Container image (built, not pushed)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # Both platforms a release pushes, so a change that breaks either fails here and not after merging.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/web-static/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+          cache-from: type=gha,scope=web-image
