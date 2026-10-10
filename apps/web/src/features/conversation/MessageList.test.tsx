@@ -18,7 +18,7 @@ test("renders consecutive incoming messages as one WhatsApp-style group with one
 });
 
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {
-  const { container } = render(<MessageList conversation={view([message({ segment: "voice", text: "Respuesta activa ahora", playback: "playing", karaoke: { from: 10, to: 16, mode: "word" } })], "Sigo hablando…")} />);
+  const { container } = render(<MessageList conversation={view([message({ segment: "voice", text: "Respuesta activa ahora", playback: "playing", karaoke: { from: 10, to: 16 } })], "Sigo hablando…")} />);
   expect(screen.getByText("Sigo hablando…")).toBeInTheDocument();
   expect(container.querySelector(".karaoke-played")?.textContent).toBe("Respuesta activa");
   expect(container.querySelector("mark")).toBeNull();

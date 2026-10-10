@@ -1,7 +1,8 @@
 /* What the call's voice says, in the room's words, and back. The voice (@sidevoice/voice, `js/voice-events.d.ts`)
  * knows nothing of the room: it names its own turns and the things it says, and tells how each ended. The room
  * (sidevoice-core) takes a person's turn as `voice-user-turn` and what became of a reply as `voice-playback`, with
- * its own reasons. Nothing here keeps state: the page holds the replies and the outbox. */
+ * its own reasons. Where the voice is in a reply it tells in its own count of characters, which the page turns into
+ * offsets into the reply's text. Nothing here keeps state: the page holds the replies and the outbox. */
 
 /** The reasons the room takes on a playback report. */
 export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'user_skipped', 'focus_changed', 'call_ended', 'unheard'];
@@ -28,6 +29,30 @@ export function turnMessage(turn) {
 /** How many characters `text` has, as the voice counts them (Unicode scalar values). */
 export function characters(text) {
   return [...(text ?? '')].length;
+}
+
+/** Where the voice's character `at` (a count of Unicode scalar values) falls in `text`, as JavaScript indexes it. */
+function offset(text, at) {
+  let units = 0, counted = 0;
+  for (const character of text) {
+    if (counted >= at) break;
+    units += character.length;
+    counted += 1;
+  }
+  return units;
+}
+
+/**
+ * Where the voice is in a reply of `text`, as a `progress` step tells it, in the page's offsets into `text`: the
+ * chunk sounding now (`from`, `to`), or between chunks the end of what was heard (`from` and `to` both).
+ * @param {{sounding: [number, number] | null, heard_chars: number}} progress
+ * @param {string} text
+ * @returns {{from: number, to: number}}
+ */
+export function sayingRange(progress, text) {
+  if (progress.sounding) return { from: offset(text, progress.sounding[0]), to: offset(text, progress.sounding[1]) };
+  const heard = offset(text, progress.heard_chars);
+  return { from: heard, to: heard };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { bubbleAt, PACE, readingPosition, readOn, speechChunks } from "./speech-chunks";
+import { bubbleAt, PACE, readingMoves, readingPosition, readOn, speechChunks } from "./speech-chunks";
 
 const REPLY = "Okay. I'll start with the login and then look at the cart tests. I'll tell you as soon as I have something.";
 
@@ -49,17 +49,26 @@ test("without a cue the reply is read at a speaking pace, only while it sounds, 
   expect(readingPosition(readOn(reading, "r2", true, null, 5000)!)).toBe(0);
 });
 
-test("a late first cue never sends the bubble back, later cues move it on, and a cue going back is the reply heard again", () => {
+test("a late first cue never sends the bubble back, the part sounding is read at a pace up to its end, and a cue going back is the reply heard again", () => {
   let reading = readOn(null, "r1", true, null, 0);
   reading = readOn(reading, "r1", true, null, 4000);
   expect(readingPosition(reading!)).toBe(4 * PACE);
-  reading = readOn(reading, "r1", true, 5, 4000);
+  reading = readOn(reading, "r1", true, { from: 5, to: 10 }, 4000);
   expect(readingPosition(reading!)).toBe(4 * PACE);
-  reading = readOn(reading, "r1", true, 80, 6000);
+  // A chunk starts sounding: the words move on from its start at a speaking pace, and stop at its end.
+  reading = readOn(reading, "r1", true, { from: 80, to: 120 }, 6000);
   expect(readingPosition(reading!)).toBe(80);
-  // The cue is the only clock now: a gap in the cues does not advance it.
-  reading = readOn(reading, "r1", true, null, 9000);
-  expect(readingPosition(reading!)).toBe(80);
-  reading = readOn(reading, "r1", true, 3, 9500);
-  expect(readingPosition(reading!)).toBe(3);
+  expect(readingMoves(reading!)).toBe(true);
+  reading = readOn(reading, "r1", true, { from: 80, to: 120 }, 8000);
+  expect(readingPosition(reading!)).toBe(80 + 2 * PACE);
+  reading = readOn(reading, "r1", true, { from: 80, to: 120 }, 9000);
+  expect(readingPosition(reading!)).toBe(120);
+  expect(readingMoves(reading!)).toBe(false);
+  // Between chunks, what was heard; the row giving no cue for a moment does not move it either.
+  reading = readOn(reading, "r1", true, { from: 120, to: 120 }, 9200);
+  reading = readOn(reading, "r1", true, null, 9400);
+  expect(readingPosition(reading!)).toBe(120);
+  // The reply said again from its start.
+  reading = readOn(reading, "r1", true, { from: 0, to: 0 }, 9500);
+  expect(readingPosition(reading!)).toBe(0);
 });

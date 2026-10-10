@@ -77,19 +77,22 @@ test('Playback labels are projections of the reply facts, preserving its full te
  const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'queued'};
  const s=facts(api,{history:[row]});
  assert.equal(api.conversationView(s).messages[0].playback,'pending');
- s.karaokeState={segment:'h',start:0,end:3};assert.equal(api.conversationView(s).messages[0].playback,'playing');
+ s.karaokeState={segment:'h',from:0,to:3};assert.equal(api.conversationView(s).messages[0].playback,'playing');
  s.karaokeState=null;s.history=[{...row,audio:'playback_finished'}];const message=api.conversationView(s).messages[0];
  assert.equal(message.playback,'complete');assert.equal(message.text,row.text);
 });
-test('The voice cue lights a reply up to the end of what is sounding',async()=>{
- // The runtime keeps the cue as the voice gives it (start/end of the part sounding); the bubbles read a range.
- const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'playing'};
- const s=facts(api,{history:[row],karaokeState:{segment:'h',start:4,end:7}});
- assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:0,to:7});
- // A cue that has not moved yet is still where the voice is, not nothing said.
- s.karaokeState={segment:'h',start:7,end:7};assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:0,to:7});
- s.karaokeState={segment:'other',start:0,end:3};assert.equal(api.conversationView(s).messages[0].karaoke,null);
- assert.equal(api.karaokeRange(null),null);
+test('The reply being said carries the part sounding to its bubble, and only that reply plays',async()=>{
+ // The runtime keeps where the voice is as the range a bubble reads: one shape from the voice's handle to the view.
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'heard'};
+ const s=facts(api,{history:[row,{role:'assistant',thread:'a',text:'No id yet',time:2}],karaokeState:{segment:'h',from:4,to:7}});
+ assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:4,to:7});
+ assert.equal(api.conversationView(s).messages[0].playback,'playing');
+ assert.equal(api.conversationView(s).messages[1].karaoke,null,'a row without an id is never the one being said');
+ // Between chunks the range closes on what was heard: still the reply being said.
+ s.karaokeState={segment:'h',from:7,to:7};assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:7,to:7});
+ s.karaokeState={segment:'other',from:0,to:3};assert.equal(api.conversationView(s).messages[0].karaoke,null);
+ s.karaokeState=null;assert.equal(api.conversationView(s).messages[0].playback,'complete');
+ assert.equal(api.conversationView(s).messages[1].playback,'complete');
 });
 test('One store transition publishes one coherent projection, without calls from a handler to render or sound',async()=>{
  const api=await moduleReady;const store=api.createRoomSessionStore(facts(api));const seen=[];store.subscribe(s=>seen.push(s));

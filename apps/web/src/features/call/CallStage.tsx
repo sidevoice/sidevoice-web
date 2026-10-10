@@ -9,7 +9,7 @@ import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import { personMood } from "./conversation-state";
-import { bubbleAt, readingPosition, readOn, type Reading } from "./speech-chunks";
+import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
@@ -28,14 +28,14 @@ function sounding(messages: ChatMessage[], voiceLive: boolean) {
   return voiceLive ? messages.find((message) => message.role === "assistant" && message.playback === "pending") ?? null : null;
 }
 
-/** How far into `reply` the voice is (speech-chunks.ts `readOn`): its cue, or a speaking pace while it gives none — a
- *  voice that does not, or the moment before the first — so the bubble moves on and its words light up all the same.
- *  A reply that has finished, or left the list, is read from the start if it sounds again (listening again). */
+/** How far into `reply` the voice is (speech-chunks.ts `readOn`): the part sounding now, its words moving on at a
+ *  speaking pace within it, or that pace from the start while the voice gives no cue yet. A reply that has finished,
+ *  or left the list, is read from the start if it sounds again (listening again). */
 function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]): number | null {
   const reading = useRef<Reading | null>(null);
   const kept = reading.current && messages.some((message) => message.segment === reading.current!.segment && message.playback !== "complete") ? reading.current : null;
-  reading.current = readOn(kept, reply?.segment ?? null, sounding, reply?.karaoke ? reply.karaoke.to : null, Date.now());
-  const ticking = sounding && !!reply && reading.current?.cue === null;
+  reading.current = readOn(kept, reply?.segment ?? null, sounding, reply?.karaoke ?? null, Date.now());
+  const ticking = !!reply && !!reading.current && readingMoves(reading.current);
   const [, tick] = useReducer((count: number) => count + 1, 0);
   useEffect(() => {
     if (!ticking) return;

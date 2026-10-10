@@ -987,8 +987,13 @@ test('A reply is written at once and said by the voice; its handle lights the ro
  const handle=voice.said[0];
  handle.step({type:'playing'});
  assert.deepEqual(plain(sentOf(c,first,'voice-playback').map(d=>[d.utterance_id,d.status,d.session_id])),[['r-1','playing','s1']]);
+ assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',from:0,to:0},'from its start the reply is being said');
  handle.step({type:'progress',sounding:[0,6],heard_chars:0});
- assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',start:0,end:6});
+ assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',from:0,to:6});
+ // Between its chunks nothing sounds: the reply is still being said, lit up to what was heard.
+ handle.step({type:'progress',sounding:null,heard_chars:6});
+ assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',from:6,to:6});
+ assert.equal(s.run("SessionState.conversationView(state).messages.at(-1).playback"),'playing');
  handle.step({type:'done',outcome:{status:'heard'}});
  assert.deepEqual(plain(sentOf(c,first,'voice-playback').at(-1)),{utterance_id:'r-1',status:'heard',heard_chars:11,session_id:'s1',client_msg_id:sentOf(c,first,'voice-playback').at(-1).client_msg_id});
  assert.equal(s.run('karaokeState'),null);

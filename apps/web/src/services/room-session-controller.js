@@ -9,7 +9,7 @@ import {createOutbox} from './outbox.js';
 import {openVoice} from './voice-module.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,PROVIDERS} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
-import {turnMessage,playbackReport} from './voice-room.js';
+import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
@@ -301,8 +301,9 @@ function sayReply(reply){
  const report=data=>{keepMessage('playback','voice-playback',{utterance_id:reply.utterance_id,...data});flushOutbox()};
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
-  if(event.type==='playing')report({status:'playing',heard_chars:0});
-  else if(event.type==='progress')state.karaokeState=Array.isArray(event.sounding)?{segment:speechSegment(reply),start:event.sounding[0],end:event.sounding[1]}:null;
+  // From `playing` to `done` the reply is being said: where the voice is in it lights its words.
+  if(event.type==='playing'){state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
+  else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
   else if(event.type==='done'){
    replies.delete(reply.utterance_id);
    if(state.karaokeState?.segment===speechSegment(reply))state.karaokeState=null;
