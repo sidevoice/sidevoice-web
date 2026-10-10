@@ -1,24 +1,30 @@
 /* The person's voice settings: kept on this device (the room keeps none), handed to the voice as its `VoiceSettings`
- * (@sidevoice/voice `js/voice-host.d.ts`), and the choices the settings pane offers from the voice's catalogue
- * (`models()`, the engine's models with their builds ranked for this device). */
+ * (@sidevoice/voice `js/voice-host.d.ts`), and the choices the settings pane offers from the engine's catalogues
+ * (`model-catalogs.js`). A slot names its model by catalogue and id, `{catalog, model}`: the catalogue of models that
+ * run on this device (`local`), or a remote provider's. What the pane shows it says by message key, with its params. */
+
+import { LOCAL_CATALOG } from './model-catalogs.js';
 
 /**
  * @typedef {import('@sidevoice/voice').VoiceSettings} VoiceSettings
- * @typedef {import('@sidevoice/voice').VoiceModel} VoiceModel
+ * @typedef {import('./model-catalogs.js').CatalogView} CatalogView
+ * @typedef {import('./model-catalogs.js').CatalogModel} CatalogModel
  * @typedef {{
- *   stt: {model: string, build: string | null, language: string | null},
- *   tts: {model: string, build: string | null, voice: string | null, speed: number},
+ *   stt: {catalog: string, model: string, language: string | null},
+ *   tts: {catalog: string, model: string, voice: string | null, speed: number},
  *   patience: NonNullable<VoiceSettings['patience']>,
  *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
  * }} DeviceVoiceSettings The settings this device keeps: every field filled, so they are the voice's `VoiceSettings` as they are.
+ * @typedef {{key: string, params?: Record<string, string | number>, reasons?: string[], detail?: string}} Note What the pane
+ *   says about a choice: a message key and its params, the codes of why a model does not run here, and a provider's own
+ *   words.
  */
 
 export const VOICE_SETTINGS_KEY = 'sidevoice.voice-settings';
 export const PATIENCE = ['fast', 'normal', 'calm'];
 export const END_OF_TURN = ['silence', 'smart-turn'];
-/** The remote providers whose keys this device keeps: a remote build's `backend`. */
-export const PROVIDERS = ['openai', 'elevenlabs'];
-export const SPEED = { min: 0.5, max: 2, step: 0.05 };
+/** The normal pace, and the step the pane moves a speed by. */
+export const SPEED = { normal: 1, step: 0.05 };
 
 /**
  * What a call starts with when the person chose nothing, in `language`.
@@ -27,8 +33,8 @@ export const SPEED = { min: 0.5, max: 2, step: 0.05 };
  */
 export function defaultVoiceSettings(language) {
   return {
-    stt: { model: 'whisper-base', build: null, language: language || null },
-    tts: { model: 'kokoro-82m-v1.0', build: null, voice: null, speed: 1 },
+    stt: { catalog: LOCAL_CATALOG, model: 'whisper-base', language: language || null },
+    tts: { catalog: LOCAL_CATALOG, model: 'kokoro-82m-v1.0', voice: null, speed: SPEED.normal },
     patience: 'normal',
     end_of_turn: 'silence',
   };
@@ -37,25 +43,27 @@ export function defaultVoiceSettings(language) {
 const text = (value) => (typeof value === 'string' && value ? value : null);
 
 /**
- * `value` as settings, field by field: what is missing or malformed takes `defaults`' value.
+ * `value` as settings, field by field: what is missing or malformed takes `defaults`' value. A slot whose catalogue or
+ * model is missing takes the default slot whole, so a model is never looked for in another catalogue.
  * @param {any} value
  * @param {DeviceVoiceSettings} defaults
  * @returns {DeviceVoiceSettings}
  */
 export function normaliseVoiceSettings(value, defaults) {
   const stt = value?.stt ?? {}, tts = value?.tts ?? {};
+  const sttNamed = text(stt.catalog) && text(stt.model), ttsNamed = text(tts.catalog) && text(tts.model);
   const speed = Number(tts.speed);
   return {
     stt: {
-      model: text(stt.model) ?? defaults.stt.model,
-      build: text(stt.build),
+      catalog: sttNamed ? stt.catalog : defaults.stt.catalog,
+      model: sttNamed ? stt.model : defaults.stt.model,
       language: stt.language === null ? null : text(stt.language) ?? defaults.stt.language,
     },
     tts: {
-      model: text(tts.model) ?? defaults.tts.model,
-      build: text(tts.build),
-      voice: text(tts.voice),
-      speed: Number.isFinite(speed) ? Math.min(SPEED.max, Math.max(SPEED.min, speed)) : defaults.tts.speed,
+      catalog: ttsNamed ? tts.catalog : defaults.tts.catalog,
+      model: ttsNamed ? tts.model : defaults.tts.model,
+      voice: ttsNamed ? text(tts.voice) : null,
+      speed: Number.isFinite(speed) && speed > 0 ? speed : defaults.tts.speed,
     },
     patience: PATIENCE.includes(value?.patience) ? value.patience : defaults.patience,
     end_of_turn: END_OF_TURN.includes(value?.end_of_turn) ? value.end_of_turn : defaults.end_of_turn,
@@ -82,109 +90,130 @@ export function writeVoiceSettings(storage, settings) {
   try { storage?.setItem(VOICE_SETTINGS_KEY, JSON.stringify(settings)); } catch { /* a full or blocked storage keeps nothing */ }
 }
 
+/** The model `id` of catalogue `catalog`, as `catalogs` list it. */
+function findModel(catalogs, catalog, id) {
+  return catalogs.find((candidate) => candidate.id === catalog)?.models.find((model) => model.id === id) ?? null;
+}
+
+/** `speed` within what `model` takes; the normal pace for a model that takes none. */
+function speedFor(model, speed) {
+  if (!model?.speed) return SPEED.normal;
+  return Math.min(model.speed.max, Math.max(model.speed.min, speed));
+}
+
 /**
- * `settings` with `patch` applied: a new model drops the build, and the voice or a language it does not have.
+ * `settings` with `patch` applied. Another source takes that source's first model for the slot; another model drops
+ * the voice and a language it does not have, and brings the speed within its range.
  * @param {DeviceVoiceSettings} settings
  * @param {{stt?: Partial<DeviceVoiceSettings["stt"]>, tts?: Partial<DeviceVoiceSettings["tts"]>, patience?: DeviceVoiceSettings["patience"], end_of_turn?: DeviceVoiceSettings["end_of_turn"]}} patch
- * @param {VoiceModel[]} [models]
+ * @param {CatalogView[]} [catalogs]
  * @returns {DeviceVoiceSettings}
  */
-export function editVoiceSettings(settings, patch, models = []) {
+export function editVoiceSettings(settings, patch, catalogs = []) {
   const stt = { ...settings.stt, ...patch.stt }, tts = { ...settings.tts, ...patch.tts };
-  if (patch.stt?.model && patch.stt.model !== settings.stt.model) {
-    stt.build = null;
-    const languages = models.find((model) => model.id === stt.model)?.languages ?? [];
+  for (const [slot, capability, before] of [[stt, 'stt', settings.stt], [tts, 'tts', settings.tts]]) {
+    if (slot.catalog !== before.catalog && !(patch[capability]?.model)) {
+      const first = offered(catalogs.find((catalog) => catalog.id === slot.catalog), capability).find((model) => runs(model));
+      slot.model = first?.id ?? '';
+    }
+  }
+  if (stt.catalog !== settings.stt.catalog || stt.model !== settings.stt.model) {
+    const languages = findModel(catalogs, stt.catalog, stt.model)?.languages ?? [];
     if (stt.language && languages.length && !languages.some((tag) => sameLanguage(tag, stt.language))) stt.language = null;
   }
-  if (patch.tts?.model && patch.tts.model !== settings.tts.model) { tts.build = null; tts.voice = null; }
+  if (tts.catalog !== settings.tts.catalog || tts.model !== settings.tts.model) {
+    tts.voice = null;
+    tts.speed = speedFor(findModel(catalogs, tts.catalog, tts.model), tts.speed);
+  }
   return { ...settings, ...patch, stt, tts };
 }
 
-/** The provider a model is called at, for a remote one: its remote build's backend. */
-export function providerOf(model) {
-  return model?.builds?.find((build) => build.accelerator === 'remote')?.backend ?? null;
-}
-
 const sameLanguage = (a, b) => a.toLowerCase().split('-')[0] === b.toLowerCase().split('-')[0];
-const megabytes = (bytes) => (bytes >= 1e9 ? (bytes / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(bytes / 1e6)) + ' MB');
 
-/** Why a build does not run here, in words: one sentence per reason code, the code itself when it is a new one. */
-export const BUILD_REASONS = {
-  memory: 'no cabe en la memoria de este dispositivo',
-  cores: 'necesita más núcleos de los que tiene este dispositivo',
-  'wasm-memory': 'necesita más memoria de la que una página puede usar',
-  'no-accelerator': 'su motor no tiene aquí ningún acelerador',
-  'build-accelerator': 'necesita un acelerador que este dispositivo no tiene',
-  'backend-not-in-this-build': 'su motor no está en esta versión',
-};
-function buildNote(build) {
-  return (build.reasons ?? []).map((reason) => BUILD_REASONS[reason.code] ?? reason.code).join('; ');
+/** A catalogue's models of `capability`. */
+function offered(catalog, capability) {
+  return (catalog?.models ?? []).filter((model) => model.capabilities.includes(capability));
 }
-function buildLabel(build) {
-  return [build.backend, build.precision, build.accelerator, build.downloadBytes ? megabytes(build.downloadBytes) : null]
-    .filter(Boolean).join(' · ') + (build.installed ? ' · descargado' : '');
+
+/** Whether `model` can be used here: a remote one always (its provider runs it), a local one when a build of it runs. */
+function runs(model) {
+  return !model.builds || model.builds.some((build) => build.available);
+}
+
+/** Why a local model does not run here: its first build's reason codes. */
+function unfitNote(model) {
+  const reasons = (model.builds?.[0]?.reasons ?? []).map((reason) => reason.code);
+  return reasons.length ? { key: 'voice.model.unfit', reasons } : { key: 'voice.model.unfitUnknown' };
+}
+
+/** Why a catalogue cannot be chosen from, or says its models may be old: its status, as a note. */
+function statusNote(catalog) {
+  const reason = catalog.status?.reason;
+  if (!reason) return null;
+  return { key: 'voice.catalog.reason', params: { code: reason.code }, ...(catalog.status.detail ? { detail: catalog.status.detail } : {}) };
 }
 
 /**
- * A model as an option of the pane: usable or not here, and why.
- * @param {VoiceModel} model
- * @param {Record<string, boolean | null>} keys
- * @returns {{id: string, provider: string | null, disabled: boolean, note: string}}
+ * One slot's choices: its sources (`local` first, then each provider's, one of them disabled when it has no model for
+ * the slot, with why), and the chosen source's models (a local one grouped by its family, disabled when it does not run
+ * here). The chosen model is kept even when its catalogue no longer lists it, and says so.
+ * @param {CatalogView[]} catalogs
+ * @param {'stt' | 'tts'} capability
+ * @param {{catalog: string, model: string}} slot
  */
-function modelOption(model, keys) {
-  const provider = providerOf(model);
-  if (provider) {
-    const keyed = keys[provider] === true;
-    return { id: model.id, provider, disabled: !keyed, note: keyed ? '' : 'Falta la clave de ' + PROVIDER_NAMES[provider] };
+function slotChoices(catalogs, capability, slot) {
+  const sources = catalogs.map((catalog) => {
+    const models = offered(catalog, capability);
+    const note = statusNote(catalog);
+    return {
+      id: catalog.id, local: catalog.id === LOCAL_CATALOG, name: catalog.name,
+      disabled: !models.length && catalog.id !== slot.catalog,
+      note: note ?? (models.length ? null : { key: 'voice.catalog.empty' }),
+    };
+  });
+  if (!sources.some((source) => source.id === slot.catalog)) {
+    sources.push({ id: slot.catalog, local: false, name: null, disabled: false, note: { key: 'voice.catalog.missing' } });
   }
-  const runs = model.builds.some((build) => build.available);
-  return { id: model.id, provider: null, disabled: !runs, note: runs ? '' : buildNote(model.builds[0] ?? {}) || 'no se puede ejecutar aquí' };
-}
-
-export const PROVIDER_NAMES = { openai: 'OpenAI', elevenlabs: 'ElevenLabs' };
-
-/**
- * One stage's choices: its models (the chosen one kept even when the catalogue lacks it), and the chosen model's builds.
- * @param {VoiceModel[]} models
- * @param {string} capability
- * @param {{model: string}} stage
- * @param {Record<string, boolean | null>} keys
- */
-function stageChoices(models, capability, stage, keys) {
-  const offered = models.filter((model) => model.capabilities.includes(capability));
-  const options = offered.map((model) => modelOption(model, keys));
-  const model = offered.find((candidate) => candidate.id === stage.model) ?? null;
-  if (!model) options.unshift({ id: stage.model, provider: null, disabled: false, note: 'no está en el catálogo de esta voz' });
-  const builds = model && !providerOf(model)
-    ? model.builds.map((build) => ({ id: build.id, label: buildLabel(build), disabled: !build.available, note: buildNote(build) }))
-    : [];
-  return { model, options, builds, recommendedBuild: model?.recommendedBuild ?? null };
+  const catalog = catalogs.find((candidate) => candidate.id === slot.catalog);
+  const models = offered(catalog, capability);
+  const options = models.map((model) => ({
+    id: model.id, group: model.family ?? null, disabled: !runs(model) && model.id !== slot.model, note: runs(model) ? null : unfitNote(model),
+  }));
+  const model = models.find((candidate) => candidate.id === slot.model) ?? null;
+  if (!model && slot.model) options.unshift({ id: slot.model, group: null, disabled: false, note: { key: 'voice.model.missing' } });
+  return { sources, options, model };
 }
 
 /**
- * What the pane offers, for `settings`, from `models` (the voice's catalogue) and `keys` (`{provider: boolean}`, whether
- * this device keeps a key for it). `languages` are the tags offered for a model that lists none (a remote one).
- * @param {VoiceModel[]} models
+ * What the pane offers, for `settings`, from `catalogs` (the engine's). `languages` are the tags offered for a model
+ * that lists none (a remote one).
+ * @param {CatalogView[]} catalogs
  * @param {DeviceVoiceSettings} settings
- * @param {Record<string, boolean | null>} [keys]
  * @param {string[]} [languages]
  */
-export function voiceChoices(models, settings, keys = {}, languages = []) {
-  const stt = stageChoices(models, 'stt', settings.stt, keys);
-  const tts = stageChoices(models, 'tts', settings.tts, keys);
-  const smartTurn = models.some((model) => model.capabilities.includes('end-of-turn'));
+export function voiceChoices(catalogs, settings, languages = []) {
+  const stt = slotChoices(catalogs, 'stt', settings.stt);
+  const tts = slotChoices(catalogs, 'tts', settings.tts);
+  const local = catalogs.find((catalog) => catalog.id === LOCAL_CATALOG);
+  const smartTurn = offered(local, 'end-of-turn').some(runs);
   const voices = tts.model?.voices ?? [];
   return {
     stt: { ...stt, languages: stt.model?.languages?.length ? stt.model.languages : languages },
     tts: {
       ...tts,
-      voices: voices.map((voice) => ({ id: voice.id, languages: voice.languages ?? [], gender: voice.gender ?? null })),
+      voices: voices.map((voice) => ({ id: voice.id, name: voice.name ?? null, languages: voice.languages ?? [], gender: voice.gender ?? null })),
       // A provider whose voices are the account's own lists none: the voice is the account's first.
-      voiceNote: tts.model && !voices.length ? (providerOf(tts.model) ? 'La primera voz de tu cuenta.' : 'La voz del modelo.') : '',
+      voiceNote: tts.model && !voices.length ? { key: settings.tts.catalog === LOCAL_CATALOG ? 'voice.voice.model' : 'voice.voice.account' } : null,
+      speed: tts.model?.speed ?? null,
     },
-    endOfTurn: {
-      smartTurn,
-      note: smartTurn ? '' : 'Aún no hay un modelo de fin de turno en el motor de voz: el turno termina con el silencio.',
-    },
+    endOfTurn: { smartTurn, note: smartTurn ? null : { key: 'voice.endOfTurn.none' } },
   };
+}
+
+/**
+ * The remote catalogues, for the keys the person keeps for them: each provider's id and name.
+ * @param {CatalogView[]} catalogs
+ */
+export function remoteProviders(catalogs) {
+  return catalogs.filter((catalog) => catalog.id !== LOCAL_CATALOG).map((catalog) => ({ id: catalog.id, name: catalog.name ?? catalog.id }));
 }

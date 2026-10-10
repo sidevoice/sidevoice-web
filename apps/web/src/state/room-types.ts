@@ -122,7 +122,7 @@ export interface SidevoiceActions {
   editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]>; tts?: Partial<DeviceVoiceSettings["tts"]>; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"] }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
   saveProviderKey(provider: string, key: string | null): Promise<void>;
-  /** Asks the voice for its catalogue and the providers' keys again. */
+  /** Reads the engine's catalogues, and which providers have a key, again. */
   loadVoiceCatalogue(): Promise<void>;
   replayReply(historyId: string | null): Promise<void>;
   toggleMic(): void;

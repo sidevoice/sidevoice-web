@@ -6,8 +6,8 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
-import {openVoice} from './voice-module.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,PROVIDERS} from './voice-settings.js';
+import {pageVoice} from './voice-module.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
@@ -37,14 +37,15 @@ const VOICE_FAILURES={
  'audio-device-unavailable':()=>'Falta el dispositivo de audio de la llamada. Conéctalo y vuelve a entrar.',
  'audio-device-failed':()=>'El dispositivo de audio de la llamada falló. Conéctalo de nuevo y vuelve a entrar.',
  'voice-module-unavailable':()=>'La voz de la llamada aún no está disponible en esta versión de la página.',
- 'build-unfit':()=>'Esa compilación no se puede ejecutar en este dispositivo. Elige otra o deja la automática.',
+ 'catalogs-unavailable':()=>'Esta versión de la app aún no da a la página la lista de modelos.',
  'end-of-turn-unavailable':()=>'El fin de turno inteligente aún no está disponible: el turno termina con el silencio.',
  'credential-missing':()=>'Falta la clave del proveedor. Añádela en Configuración → Proveedores.',
  'model-unknown':()=>'Ese modelo no está en el catálogo de la voz.',
  'model-unfit':()=>'Ese modelo no se puede ejecutar en este dispositivo. Elige otro.',
 };
 // What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
-function voiceErrorText(error){const code=String(error?.code||'');return VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.'}
+// A provider's own words, when it is the one refusing, follow as it said them.
+function voiceErrorText(error){const code=String(error?.code||'');const text=VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.';return error?.detail?text+' '+String(error.detail):text}
 function joinFailureText(step,error){
  if(step==='voice')return voiceErrorText(error);
  const message=String(error?.message||error||'');
@@ -1200,18 +1201,21 @@ async function replayReply(historyId){
 }
 
 /* ----- the voice's settings and the remote providers' keys: this device's, never the room's -----
- * One voice for the page: the settings pane asks it for its catalogue and keeps keys with it, and every call of this
- * page drives it. A key goes from the pane to the voice and nowhere else: the voice keeps it (the desktop app in the
- * system keychain, a browser in this page's storage) and hands it to the provider. */
-let voiceHostOpening=null;
-function voiceHost(){return voiceHostOpening??=openVoice().catch(error=>{voiceHostOpening=null;throw error})}
-async function keptProviderKeys(host){return Object.fromEntries(await Promise.all(PROVIDERS.map(async provider=>[provider,await host.hasProviderKey(provider).catch(()=>null)])))}
+ * One voice for the page, and the engine's catalogues it chooses models from (`voice-module.js`): the settings pane
+ * lists the catalogues and keeps keys with the engine, and every call of this page drives the voice. A key goes from
+ * the pane to the engine's host and nowhere else (the desktop app keeps it in the system keychain, a browser in this
+ * page's storage), and the engine hands it to the provider. */
+const page=pageVoice();
+let voiceHostOpening=null,catalogsOpening=null;
+function voiceHost(){return voiceHostOpening??=page.voice().catch(error=>{voiceHostOpening=null;throw error})}
+function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{catalogsOpening=null;throw error})}
+async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
- try{const host=await voiceHost();const [models,keys]=await Promise.all([host.models(),keptProviderKeys(host)]);roomStore.patch({voiceCatalogue:{state:'ready',models,error:''},providerKeys:keys})}
- catch(error){roomStore.patch({voiceCatalogue:{state:'failed',models:[],error:voiceErrorText(error)}})}
+ try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)})}
+ catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
 }
-function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.models)})}
+function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)})}
 // The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
 async function saveVoiceSettings(){
  const draft=state.voiceDraft;if(!draft||JSON.stringify(draft)===JSON.stringify(state.voiceSettings))return;
@@ -1219,11 +1223,12 @@ async function saveVoiceSettings(){
  if(host)await host.setSettings(draft);
  writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
 }
+// A key changes what a provider lists: its catalogue is read again with it.
 async function saveProviderKey(provider,key){
- try{const host=await voiceHost();await host.setProviderKey(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
- const host=await voiceHost();
- roomStore.patch({providerKeys:await keptProviderKeys(host)});
- const models=await host.models().catch(()=>null);if(models)roomStore.patch({voiceCatalogue:{state:'ready',models,error:''}});
+ let models;
+ try{models=await modelCatalogs();await models.setCredential(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
+ const catalogs=await models.catalogs().catch(()=>null);
+ if(catalogs)roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
 roomStore.patch({voiceSettings:readVoiceSettings(pageStorage(),state.speechLanguage)});
 
