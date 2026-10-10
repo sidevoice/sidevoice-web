@@ -30,6 +30,11 @@ export interface SessionFacts {
  pairingOpen: boolean; pairingNote: string;
  /** The language this device speaks in a call, and whether this page runs inside the desktop app. */
  speechLanguage: string; inApp: boolean;
+ /** The voice settings this device keeps, the ones the settings pane is editing, the engine's catalogues, and whether a
+  *  key is kept for each remote provider. */
+ voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
+ voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string};
+ providerKeys: Record<string, boolean | null>;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';

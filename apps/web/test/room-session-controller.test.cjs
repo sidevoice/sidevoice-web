@@ -6,14 +6,14 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
- if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-endpoint','stats-response','stats-synthesis','stats-playout','default-model-info','stt-model-info'])elements.set(id,new Element(id))}
+ if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-host.js':'VoiceHost','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',VoiceHost:sourceRoot+'/services/voice-host.js',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -103,13 +103,13 @@ test('Delivery tick is immediate, follows the matching receipt and does not impl
  const s=setup();const emit=(type,data)=>s.run(`message(${JSON.stringify(JSON.stringify({type,data}))})`);
  s.run("relay.sent('t1');voiceTurn({client_msg_id:'m1',turn_id:'t1',phase:'started'});voiceTurn({client_msg_id:'m2',turn_id:'t1',phase:'finished',text:'Hola'})");
  assert.equal(s.run('history[0].delivery'),'pending');
- emit('voice-user-turn',{phase:'started',revision:1,thread_id:'a',session_id:'s'});
- assert.equal(s.run('history[0].segment'),'s:user-turn:1','the room\'s revision names the row');
- emit('voice-input-receipt',{revision:1,thread_id:'other',status:'delivered'});
+ assert.equal(s.run('history[0].segment'),'s:user-turn:t1','the turn\'s name names the row, as the room does');
+ emit('voice-user-turn',{phase:'started',turn_id:'t1',revision:1,thread_id:'a',session_id:'s'});
+ emit('voice-input-receipt',{turn_id:'t1',revision:1,thread_id:'other',status:'delivered'});
  assert.equal(s.run('history[0].delivery'),'pending');
- emit('voice-input-receipt',{revision:1,thread_id:'a',status:'pending'});
+ emit('voice-input-receipt',{turn_id:'t1',revision:1,thread_id:'a',status:'pending'});
  assert.equal(s.run('history[0].delivery'),'pending');
- emit('voice-input-receipt',{revision:1,thread_id:'a',status:'delivered'});
+ emit('voice-input-receipt',{turn_id:'t1',revision:1,thread_id:'a',status:'delivered'});
  assert.equal(s.run('history[0].delivery'),'delivered');
 });
 test('A joined empty room selects its only listening conversation automatically',async()=>{
@@ -131,8 +131,8 @@ test('A joined empty room selects its only listening conversation automatically'
 test('A receipt arriving before the final bubble is retained instead of disappearing',()=>{
  const s=setup();const emit=(type,data)=>s.run(`message(${JSON.stringify(JSON.stringify({type,data}))})`);
  s.run("relay.sent('t2');voiceTurn({client_msg_id:'m1',turn_id:'t2',phase:'started'})");
- emit('voice-user-turn',{phase:'started',revision:2,thread_id:'a',session_id:'s'});
- emit('voice-input-receipt',{revision:2,thread_id:'a',session_id:'s',status:'delivered'});
+ emit('voice-user-turn',{phase:'started',turn_id:'t2',revision:2,thread_id:'a',session_id:'s'});
+ emit('voice-input-receipt',{turn_id:'t2',history_id:'s:user-turn:t2',revision:2,thread_id:'a',session_id:'s',status:'delivered'});
  s.run("voiceTurn({client_msg_id:'m2',turn_id:'t2',phase:'finished',text:'Ya llegó'})");
  assert.equal(s.run('history[0].delivery'),'delivered');
  assert.equal(s.run('Object.keys(inputReceipts).length'),0);
@@ -287,17 +287,17 @@ test('Settings are reached from the header menu',()=>{
 test('Stats omit missing durations and use first reply per turn, only for selected thread',()=>{
  const s=setup({strictDOM:true});
  s.run(`renderLatencyStats({replies:[
- {thread_id:'a',reply_revision:1,status:'completed',input_ms:{speech_end_to_transcript_ms:2490,endpoint_silence_ms:2000,recognition_ms:450},server_ms:{input_queued_to_reply_received_ms:4000},provider_ms:{request_to_complete_ms:300},browser_ms:{audio_received_to_playback_scheduled_ms:50}},
- {thread_id:'a',reply_revision:1,status:'completed',server_ms:{input_queued_to_reply_received_ms:8000},provider_ms:{request_to_complete_ms:500}},
+ {thread_id:'a',reply_revision:1,status:'playback_finished',input_ms:{endpoint_silence_ms:2000,recognition_ms:450},server_ms:{input_queued_to_reply_received_ms:4000}},
+ {thread_id:'a',reply_revision:1,status:'playback_finished',input_ms:{recognition_ms:250},server_ms:{input_queued_to_reply_received_ms:8000}},
  {thread_id:'a',reply_revision:2,status:'failed',server_ms:{input_queued_to_reply_received_ms:6000}},
  {thread_id:'other',reply_revision:3,server_ms:{input_queued_to_reply_received_ms:100000}}
  ]},'a')`);
- assert.equal(s.run("$('stats-endpoint').textContent"),'2.49 s');
+ assert.equal(s.run("$('stats-recognition').textContent"),'350 ms');
  assert.equal(s.run("$('stats-response').textContent"),'5.00 s');
- assert.equal(s.run("$('stats-synthesis').textContent"),'400 ms');
- assert.equal(s.run("$('stats-playout').textContent"),'50 ms');
  assert.equal(s.run("$('stats-rows').children.length"),3);
- assert.equal(s.run("$('stats-rows').children[0].children[6].textContent"),'—');
+ assert.equal(s.run("$('stats-rows').children[0].children.length"),6,'turn, four stages, status');
+ assert.equal(s.run("$('stats-rows').children[0].children[1].textContent"),'—');
+ assert.equal(s.run("$('stats-rows').children[1].children[5].textContent"),'Escuchada');
  for(const value of ['null','undefined','NaN','Infinity','-1','true',"'10'"])
   assert.equal(s.run('statsDuration('+value+')'),'—');
  assert.equal(s.run('statsDuration(0)'),'0 ms');
@@ -387,16 +387,17 @@ test('Aggregates summarize with nearest-rank percentiles and never turn a missin
 test('Aggregates keep one row per stage, named as the last-turn view names them',()=>{
  const s=setup();
  const rows=s.run(`statsAggregate([
- {thread_id:'a',input_ms:{endpoint_silence_ms:600,recognition_ms:400},server_ms:{input_queued_to_reply_received_ms:3000,input_queued_to_read_ms:900},provider_ms:{request_to_complete_ms:200}},
+ {thread_id:'a',input_ms:{endpoint_silence_ms:600,recognition_ms:400},server_ms:{input_queued_to_reply_received_ms:3000,input_queued_to_read_ms:900}},
  {thread_id:'a',input_ms:{endpoint_silence_ms:1000},server_ms:{input_queued_to_reply_received_ms:9000,delivery_accepted_to_read_ms:100}},
  null
  ]).map(row=>[row.key,row.count,row.mean,row.p50,row.p90,row.max])`);
  assert.equal(rows.length,s.run('LATENCY_STAGES.length'),'every stage keeps its row');
  assert.equal(JSON.stringify(rows[0]),JSON.stringify(['endpoint_silence',2,800,600,1000,1000]));
  assert.equal(JSON.stringify(rows[1]),JSON.stringify(['recognition',1,400,400,400,400]));
- assert.equal(JSON.stringify(rows[2]),JSON.stringify(['request_to_transcript',0,null,null,null,null]),'a stage nobody measured stays empty, not zero');
- assert.equal(JSON.stringify(rows[4]),JSON.stringify(['delivery_to_read',2,500,100,900,900]),'the read stage falls back to queued → read, as the last-turn view does');
- assert.equal(JSON.stringify(rows[6]),JSON.stringify(['input_queued_to_reply',2,6000,3000,9000,9000]));
+ assert.equal(JSON.stringify(rows[2]),JSON.stringify(['transcript_to_delivery',0,null,null,null,null]),'a stage nobody measured stays empty, not zero');
+ assert.equal(JSON.stringify(rows[3]),JSON.stringify(['delivery_to_read',2,500,100,900,900]),'the read stage falls back to queued → read, as the last-turn view does');
+ assert.equal(JSON.stringify(rows[5]),JSON.stringify(['input_queued_to_reply',2,6000,3000,9000,9000]));
+ assert.deepEqual(plain(s.run('LATENCY_STAGES.map(stage=>stage[2])')),['endpoint_silence','recognition','transcript_to_delivery','delivery_to_read','read_to_reply','input_queued_to_reply','reply_to_synthesis'],'only what the room still measures');
  assert.equal(s.run("statsAggregate([]).every(row=>row.count===0&&row.max===null)"),true);
 });
 test('Copying the aggregates puts a plain-text table on the clipboard and says so',async()=>{
@@ -893,12 +894,17 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
-  speak:reply=>calls.push(['speak',reply]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
-  models:async()=>[],setProviderKey:async()=>{},hasProviderKey:async()=>false};
+  speak:reply=>calls.push(['speak',reply]),turnStarted:started=>calls.push(['turnStarted',started]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
+  onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error')};
+}
+// The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
+function fakeEngine(catalogs){
+ const calls=[],keys={};
+ return {calls,catalogs:async()=>catalogs.map(catalog=>catalog.id==='local'||keys[catalog.id]?catalog:{...catalog,status:{stale:false,reason:{code:'credential-missing',params:{}}},models:[]}),
+  setCredential:async(provider,key)=>{calls.push(['setCredential',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasCredential:async provider=>!!keys[provider]};
 }
 // The desktop app's place for the voice is where the page finds it: `null` is a page with no voice at all.
-function withVoice(s,voice){const desktop=s.context.window.__sidevoiceDesktop||{};s.context.window.__sidevoiceDesktop={...desktop,host:{...desktop.host,...(voice?{voice}:{})}};return voice}
+function withVoice(s,voice,engine){const desktop=s.context.window.__sidevoiceDesktop||{};s.context.window.__sidevoiceDesktop={...desktop,host:{...desktop.host,...(voice?{voice}:{}),...(engine?{engine}:{})}};return voice}
 function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,max:8},start,voice=fakeVoice({start})}={}){
  const sockets=socketsOf(s);
  s.context.crypto={randomUUID:()=>'hello-id'};
@@ -938,7 +944,7 @@ const sentOf=(c,socket,type)=>c.frames(socket).filter(m=>m.type===type).map(m=>m
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
  assert.deepEqual(voice.calls.map(([name])=>name).slice(0,3),['setSettings','start','mute']);
- assert.deepEqual(plain(voice.calls[0][1].stt),{model:'whisper-base',language:c.s.run('speechLanguage')||null});
+ assert.deepEqual(plain(voice.calls[0][1]),plain(c.s.run('voiceSettings')),'the settings this device keeps');
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','ui_language']);
  assert.equal(firstHello.data.conversation,'a');
@@ -947,26 +953,38 @@ test('A call subscribes to its voice, chooses, starts it, and only then joins th
  c.s.run('window.sidevoiceActions.toggleCall()');
  assert.deepEqual(voice.calls.at(-1),['stop'],'a hang-up stops the voice');
 });
-test('A turn is said with the revision the room gave its start, and its end waits for that answer',async()=>{
+test('A turn is said by its name, and its end waits for the room\'s answer to its start',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
- voice.emit('turn',{client_msg_id:'c-1',turn_id:'u1',phase:'started',revision:0,offline:false});
+ voice.emit('turn',{client_msg_id:'c-1',turn_id:'u1',phase:'started',offline:false});
  assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.client_msg_id,d.session_id]),[['started','c-1','s1']]);
- voice.emit('turn',{client_msg_id:'c-2',turn_id:'u1',phase:'finished',revision:0,text:'Hola',offline:false});
+ voice.emit('turn',{client_msg_id:'c-2',turn_id:'u1',phase:'finished',text:'Hola',offline:false});
  assert.equal(sentOf(c,first,'voice-user-turn').length,1,'the end waits for the start\'s answer');
  assert.equal(s.run('history.at(-1).text'),'Hola');
  assert.equal(s.run('history.at(-1).delivery'),'pending');
- c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',revision:7,thread_id:'a'}});
+ // An answer about another turn is not this one's.
+ c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'elsewhere',revision:6,thread_id:'a'}});
+ assert.equal(sentOf(c,first,'voice-user-turn').length,1);
+ const answer={session_id:'s1',phase:'started',turn_id:'u1',revision:7,thread_id:'a'};
+ c.push(first,{type:'voice-user-turn',data:answer});
+ // Every answer reaches the voice, which keeps those of its own turns: the other turn's, then this one's.
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted').map(([,started])=>started.turn_id)),['elsewhere','u1']);
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted').at(-1)),['turnStarted',answer],'the voice takes the turn\'s boundary');
  const ended=sentOf(c,first,'voice-user-turn').at(-1);
- assert.deepEqual([ended.phase,ended.revision,ended.client_msg_id,ended.text],['finished',7,'c-2','Hola']);
- assert.equal(s.run('history.at(-1).segment'),'s1:user-turn:7');
+ assert.deepEqual([ended.phase,ended.turn_id,ended.revision,ended.client_msg_id,ended.text],['finished','u1',undefined,'c-2','Hola']);
+ assert.equal(s.run('history.at(-1).segment'),'s1:user-turn:u1');
  c.push(first,{type:'voice-ack',data:{client_msg_id:'c-1'}});c.push(first,{type:'voice-ack',data:{client_msg_id:'c-2'}});
  assert.equal(s.run('outbox.list().length'),0,'acknowledged, forgotten');
 });
 test('Words said while the room was away go as their own offline message; a start the room refused does too',async()=>{
  const c=await callOnRoom();const {voice,first}=c;
- voice.emit('turn',{client_msg_id:'o-1',turn_id:'u2',phase:'started',offline:true});
+ // The voice reports a turn started offline only as finished: its words are a row of their own.
  voice.emit('turn',{client_msg_id:'o-2',turn_id:'u2',phase:'finished',text:'Sin sala',offline:true});
- assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.offline,d.revision]),[['finished',true,undefined]],'an offline start is not said');
+ assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.offline,d.turn_id]),[['finished',true,'u2']]);
+ assert.deepEqual([c.s.run('history.at(-1).text'),c.s.run('history.at(-1).segment')],['Sin sala','s1:user-turn:u2']);
+ // The room takes it and answers with its revision: the voice gets that boundary too, though no start was sent.
+ const taken={session_id:'s1',phase:'started',turn_id:'u2',revision:9,thread_id:'a'};
+ c.push(first,{type:'voice-user-turn',data:taken});
+ assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted')),[['turnStarted',taken]]);
  voice.emit('turn',{client_msg_id:'r-1',turn_id:'u3',phase:'started',offline:false});
  c.push(first,{type:'error',data:{key:'room.no_conversation',client_msg_id:'r-1'}});
  voice.emit('turn',{client_msg_id:'r-2',turn_id:'u3',phase:'finished',text:'Rechazado',offline:false});
@@ -991,11 +1009,89 @@ test('A reply is written at once and handed to the voice; its karaoke follows th
  c.push(first,{type:'voice-reply',data:{...reply,session_id:'other'}});
  assert.equal(voice.calls.filter(([name])=>name==='speak').length,1,'another session\'s reply is not said here');
 });
-test('Settings send only the interface language to the room',()=>{
+test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
- s.run("$('ui-language').value='en';saveSettings()");
+ await s.run("$('ui-language').value='en';saveSettings()");
  assert.deepEqual(sent.filter(m=>m.type==='voice-settings').map(m=>Object.keys(m.data).sort()),[['session_id','ui_language']]);
+});
+
+// ----- the voice's settings and the providers' keys: kept on this device, checked by the voice, never sent to the room -----
+const build=(id,extra={})=>({id,backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true,...extra});
+const CATALOGS=[
+ {id:'local',name:null,status:{stale:false},models:[
+  {id:'whisper-base',family:'whisper',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[build('whisper-base/int8')]},
+  {id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],speed:{min:0.5,max:2},installed:true,builds:[build('kokoro/int8')]},
+ ]},
+ {id:'openai',name:'OpenAI',status:{stale:false},models:[{id:'gpt-4o-transcribe',capabilities:['stt'],languages:[],voices:[]}]},
+ {id:'elevenlabs',name:'ElevenLabs',status:{stale:false},models:[{id:'eleven_flash_v2_5',capabilities:['tts'],languages:[],voices:[]}]},
+];
+function settingsPage(options){
+ const s=setup({strictDOM:true});const engine=fakeEngine(CATALOGS);const voice=withVoice(s,fakeVoice(options),engine);
+ const asked=[];s.context.fetch=async(url,init={})=>{asked.push({url,init});return {ok:true,status:200,json:async()=>({})}};
+ s.context.localStorage.setItem('sidevoice.settings','{}');
+ return {s,voice,engine,asked};
+}
+test('Opening the settings reads the engine\'s catalogues and which providers have a key',async()=>{
+ const {s,engine}=settingsPage();
+ await engine.setCredential('openai','sk-1');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ const facts=s.run('roomStore.getState().facts');
+ assert.equal(facts.voiceCatalogue.state,'ready');
+ assert.deepEqual(plain(facts.voiceCatalogue.catalogs.map(c=>[c.id,c.models.map(m=>m.id)])),[['local',['whisper-base','kokoro-82m-v1.0']],['openai',['gpt-4o-transcribe']],['elevenlabs',[]]]);
+ assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false},'one key per remote catalogue');
+ assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
+});
+test('Saved voice settings are checked by the voice, kept on this device, and the next call starts with them',async()=>{
+ const {s,voice,engine,asked}=settingsPage();
+ await engine.setCredential('openai','sk-1');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({stt:{catalog:'openai'},patience:'calm'})");
+ assert.deepEqual(plain(s.run('voiceDraft.stt')),{catalog:'openai',model:'gpt-4o-transcribe',language:s.run('voiceSettings.stt.language')},'another source takes its first model');
+ await s.run("saveSettings()");
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),plain(s.run('voiceDraft')));
+ const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
+ assert.deepEqual([kept.stt.catalog,kept.stt.model,kept.patience],['openai','gpt-4o-transcribe','calm']);
+ assert.equal(s.run('voiceSettings.stt.model'),'gpt-4o-transcribe');
+ assert.equal(asked.some(({init})=>String(init.body||'').includes('gpt-4o-transcribe')),false,'the room is not told');
+});
+test('Settings the voice refuses are not kept, and the reason is said with the provider\'s own words',async()=>{
+ const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'credential-missing',detail:'invalid_api_key'})}});
+ s.run("$('settings-open').onclick()");await settleSoon();
+ const before=plain(s.run('voiceSettings'));
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'elevenlabs',model:'eleven_flash_v2_5'}})");
+ s.run("$('language-form').onsubmit({preventDefault(){}})");await settleSoon();
+ assert.match(s.run("$('settings-error').textContent"),/Falta la clave del proveedor.*invalid_api_key/);
+ assert.deepEqual(plain(s.run('voiceSettings')),before);
+ assert.equal(s.run("localStorage.getItem('sidevoice.voice-settings')"),null);
+});
+test('A provider key goes to the engine\'s host and nowhere else, and its catalogue is read again with it',async()=>{
+ const {s,voice,engine,asked}=settingsPage();
+ await s.run("window.sidevoiceActions.saveProviderKey('elevenlabs','xi-secret')");
+ assert.deepEqual(engine.calls,[['setCredential','elevenlabs','xi-secret']]);
+ assert.equal(voice.calls.length,0,'the voice keeps no keys');
+ assert.equal(s.run('providerKeys.elevenlabs'),true);
+ assert.deepEqual(plain(s.run("voiceCatalogue.catalogs.find(c=>c.id==='elevenlabs').models.map(m=>m.id)")),['eleven_flash_v2_5']);
+ assert.equal(JSON.stringify(asked).includes('xi-secret'),false,'no request carries it');
+ assert.equal(JSON.stringify(s.saved).includes('xi-secret'),false,'the page keeps no copy of its own');
+ await s.run("window.sidevoiceActions.saveProviderKey('elevenlabs',null)");
+ assert.equal(s.run('providerKeys.elevenlabs'),false);
+});
+test('An app that does not give the page its catalogues yet says so, and still keeps the settings',async()=>{
+ const s=setup({strictDOM:true});withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ assert.equal(s.run('voiceCatalogue.state'),'failed');
+ assert.match(s.run('voiceCatalogue.error'),/lista de modelos/);
+});
+test('A page with no voice keeps its settings unchecked and says why it cannot keep a key',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ assert.equal(s.run('voiceCatalogue.state'),'failed');
+ assert.match(s.run('voiceCatalogue.error'),/aún no está disponible/);
+ s.run("window.sidevoiceActions.editVoice({patience:'fast'})");
+ await s.run('saveSettings()');
+ assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).patience,'fast');
+ await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),/aún no está disponible/);
 });
 
 // ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
@@ -1025,11 +1121,21 @@ test('A refusal after its acknowledgement still finds the start it refuses, and 
  assert.equal(sentOf(c,c.first,'voice-playback').length,1);
  s.run('disconnect()');
 });
-test('A start sent twice is waited for once: the next start gets the next answer',()=>{
- const s=setup();
- s.run("var __s={readyState:1,session:'s',send(){}};ws=__s;voiceTurn({client_msg_id:'start-a',turn_id:'a',phase:'started'});ws={readyState:1,session:'s',send(){}};flushOutbox();relay.answered(1);outbox.remove('start-a');voiceTurn({client_msg_id:'start-b',turn_id:'b',phase:'started'});relay.answered(2)");
- assert.equal(s.run("relay.revision('a')"),1);
- assert.equal(s.run("relay.revision('b')"),2);
+test('A start sent twice is waited for once, and each start is answered by its own turn_id',async()=>{
+ const c=await callOnRoom();const {s,voice}=c;
+ voice.emit('turn',{client_msg_id:'start-a',turn_id:'a',phase:'started'});
+ // The same start again on the same session (after a resume, say): the room only acknowledges a repeat.
+ s.run("outbox.get('start-a').sentOn=null;flushOutbox()");
+ assert.equal(sentOf(c,c.first,'voice-user-turn').filter(d=>d.client_msg_id==='start-a').length,2);
+ voice.emit('turn',{client_msg_id:'start-b',turn_id:'b',phase:'started'});
+ voice.emit('turn',{client_msg_id:'end-a',turn_id:'a',phase:'finished',text:'first'});
+ // The room answers by name, here b before a: a's end waits for a's answer only.
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'b',revision:2,thread_id:'a'}});
+ assert.equal(sentOf(c,c.first,'voice-user-turn').some(d=>d.client_msg_id==='end-a'),false);
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'a',revision:1,thread_id:'a'}});
+ const end=sentOf(c,c.first,'voice-user-turn').find(d=>d.client_msg_id==='end-a');
+ assert.deepEqual([end.turn_id,end.offline],['a',undefined],'its end goes as it is, named');
+ s.run('disconnect()');
 });
 test('A hang-up while the settings are taken never starts the microphone, and one while starting stops it',async()=>{
  const s=setup();let release;
@@ -1047,18 +1153,21 @@ test('A hang-up while the settings are taken never starts the microphone, and on
  assert.deepEqual(slow.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['start','stop','stop'],'the hang-up, then what the join started');
  assert.equal(d.sockets.length,0);
 });
-test('The room gets the turn\'s timings under its own name, and a failed reply without a reason it would refuse',async()=>{
+test('The voice\'s turns and playback reports go as the room reads them, and a voice failure is said and logged',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  voice.emit('turn',{client_msg_id:'t-start',turn_id:'t',phase:'started'});
- c.push(c.first,{type:'voice-user-turn',data:{phase:'started',revision:1,session_id:'s1',thread_id:'a'}});
- voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
- const sent=sentOf(c,c.first,'voice-user-turn').at(-1);
- assert.deepEqual(plain(sent.timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});assert.equal(sent.timings,undefined);
- voice.emit('playback',{client_msg_id:'failed',utterance_id:'reply',status:'failed',heard_chars:0,reason:'credential-missing'});
+ c.push(c.first,{type:'voice-user-turn',data:{phase:'started',turn_id:'t',revision:1,session_id:'s1',thread_id:'a'}});
+ // @sidevoice/voice writes the timings under the room's name, and the page passes them on as they are.
+ voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings_ms:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').at(-1).timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});
+ // A failure has no reason in the room's words; its code arrives as the voice's error event.
+ voice.emit('playback',{client_msg_id:'failed',utterance_id:'reply',status:'failed',heard_chars:0});
  const failed=sentOf(c,c.first,'voice-playback').at(-1);
  assert.equal(failed.status,'failed');assert.equal('reason' in failed,false);
- voice.emit('playback',{client_msg_id:'cut',utterance_id:'other',status:'interrupted',heard_chars:3,reason:'user_interrupted'});
- assert.equal(sentOf(c,c.first,'voice-playback').at(-1).reason,'user_interrupted','a reason of the room\'s own list goes');
+ const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>name==='setBootError'?value=>said.push(value):()=>{}});
+ voice.emit('error',{code:'credential-missing'});
+ assert.match(said.at(-1)||'',/Falta la clave del proveedor/);
+ assert.deepEqual(plain(c.frames(c.first).filter(m=>m.type==='voice-client-error').map(m=>[m.data.kind,m.data.message])),[['voice','credential-missing']]);
  s.run('disconnect()');
 });
 test('A move to another conversation silences the last one\'s voice, and a late reply of it is not said',async()=>{
@@ -1085,8 +1194,8 @@ test('Words said while away take the room\'s row id, so history shows them once 
  const c=await callOnRoom();const {s,voice}=c;
  voice.emit('turn',{client_msg_id:'off-start',turn_id:'off',phase:'started',offline:true});
  voice.emit('turn',{client_msg_id:'off-end',turn_id:'off',phase:'finished',text:'offline words',offline:true});
- assert.equal(s.run("state.history.find(r=>r.text==='offline words').segment"),'s1:user-offline:off-end');
- s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'s1:user-offline:off-end',session:'s1',revision:0,thread:'a',role:'user',text:'offline words',status:'delivered'}]})});
+ assert.equal(s.run("state.history.find(r=>r.text==='offline words').segment"),'s1:user-turn:off','the room names the row by the turn');
+ s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'s1:user-turn:off',session:'s1',revision:0,thread:'a',role:'user',text:'offline words',status:'delivered'}]})});
  await s.run('refreshHistory()');
  assert.equal(s.run("state.history.filter(r=>r.text==='offline words').length"),1);
  assert.equal(s.run("state.history.find(r=>r.text==='offline words').delivery"),'delivered');

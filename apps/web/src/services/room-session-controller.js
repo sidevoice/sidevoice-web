@@ -6,7 +6,8 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
-import {openVoice,defaultVoiceSettings} from './voice-module.js';
+import {pageVoice} from './voice-module.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {refusalText as sayRefusal} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
@@ -35,9 +36,15 @@ const VOICE_FAILURES={
  'audio-device-unavailable':()=>'Falta el dispositivo de audio de la llamada. Conéctalo y vuelve a entrar.',
  'audio-device-failed':()=>'El dispositivo de audio de la llamada falló. Conéctalo de nuevo y vuelve a entrar.',
  'voice-module-unavailable':()=>'La voz de la llamada aún no está disponible en esta versión de la página.',
+ 'catalogs-unavailable':()=>'Esta versión de la app aún no da a la página la lista de modelos.',
+ 'end-of-turn-unavailable':()=>'El fin de turno inteligente aún no está disponible: el turno termina con el silencio.',
+ 'credential-missing':()=>'Falta la clave del proveedor. Añádela en Configuración → Proveedores.',
+ 'model-unknown':()=>'Ese modelo no está en el catálogo de la voz.',
+ 'model-unfit':()=>'Ese modelo no se puede ejecutar en este dispositivo. Elige otro.',
 };
 // What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
-function voiceErrorText(error){const code=String(error?.code||'');return VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.'}
+// A provider's own words, when it is the one refusing, follow as it said them.
+function voiceErrorText(error){const code=String(error?.code||'');const text=VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.';return error?.detail?text+' '+String(error.detail):text}
 function joinFailureText(step,error){
  if(step==='voice')return voiceErrorText(error);
  const message=String(error?.message||error||'');
@@ -181,7 +188,7 @@ let holding=false,spaceDown=false;
 // How long a call may go without a sign of a person before it asks, and then leaves.
 var IDLE_MS=15*60*1000,IDLE_WARN_MS=60*1000,lastPersonSignal=Date.now(),idleWarned=false,idleTimer=null;
 let screenWakeLock=null,wakeRequest=null,wakeEpoch=0,wakeRetries=0;
-/* ----- the call's voice (`voice-host.js`): it hears the person and says the replies; the page only carries what it
+/* ----- the call's voice (`voice-module.js`): it hears the person and says the replies; the page only carries what it
  * reports to the room, and hands it what the room sends ----- */
 let voice=null;
 const relay=createTurnRelay();
@@ -240,9 +247,9 @@ let outboxHold=null;
 // A message the voice made, kept under the `client_msg_id` it already carries.
 function keepMessage(kind,type,data){return outbox.add({id:data.client_msg_id,kind,session_id:state.sessionId,node:state.node,payload:{type,data}})}
 /* Everything waiting, in order, on the socket the call has now, under the session it has now. A turn belongs to the
- * conversation, not to the session that heard it: its end is said with the revision this session gave its start, or
- * as words said while away when this session never saw that start (`turn-relay.js`). A turn's end whose start is not
- * answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
+ * conversation, not to the session that heard it: the room knows it by its `turn_id` on the session that took its start,
+ * and as words said while away when this session never took that start (`turn-relay.js`). A turn's end whose start is
+ * not answered yet holds what comes after it, so the room hears a person's turns in order. Anything for another machine
  * is let go. */
 function flushOutbox(socket=state.ws){
  // A socket carries nothing until the room has answered its hello with the session it speaks for.
@@ -258,25 +265,18 @@ function flushOutbox(socket=state.ws){
    const route=relay.route(data);
    if(route.wait)return;
    if(route.drop){outbox.remove(entry.id);continue}
-   data=roomTurn(route.send);
-   if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-offline:'+entry.id);
+   data=route.send;
+   if(data.offline)nameOfflineRow(data.turn_id,state.sessionId+':user-turn:'+data.turn_id);
   }
-  if(entry.kind==='playback')data=roomPlayback(data);
   try{socket.send(JSON.stringify({type:entry.payload.type,data:{...data,session_id:state.sessionId,client_msg_id:entry.id}}))}catch{return}
   if(entry.kind==='user-turn'&&data.phase==='started')relay.sent(data.turn_id,entry.id);
   entry.sentOn=socket;
  }
 }
-// The voice's turn as the room reads it: its measured stages under the room's name for them.
-function roomTurn(data){const {timings,...turn}=data;return timings?{...turn,timings_ms:timings}:turn}
-/* The voice's playback report as the room takes it: a reason only from the room's list. The voice names a failure by
- * its own code (`credential-missing`, say), which the room would refuse; the room says `playback_failed` itself. */
-const ROOM_PLAYBACK_REASONS=new Set(['user_interrupted','newer_turn','user_skipped','focus_changed','call_ended','unheard']);
-function roomPlayback(data){const {reason,...report}=data;return ROOM_PLAYBACK_REASONS.has(reason)?data:report}
 // Words said while away become the room's own row: the bubble takes that row's id, so history and receipts find it.
 function nameOfflineRow(turnId,id){
- const draft='turn:'+turnId;if(!state.history.some(r=>r.segment===draft))return;
- state.history=state.history.map(r=>r.segment===draft?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
+ const mine=r=>r.turn_id===turnId&&r.segment!==id;if(!state.history.some(mine))return;
+ state.history=state.history.map(r=>mine(r)?{...r,segment:id,offline:true,delivery:takeReceipt(id)||r.delivery}:r);save();markHistorySeen();
 }
 
 // Where the reader of a reply is, on the bubble of that reply: its row, by the reply this page was handed.
@@ -545,18 +545,14 @@ function renderLatencyStats(snapshot,thread){
  const firstReplies=new Map();
  for(const reply of replies){const key=reply.reply_revision,value=reply.server_ms?.input_queued_to_reply_received_ms;
   if(statsNumber(value)&&(!firstReplies.has(key)||value<firstReplies.get(key)))firstReplies.set(key,value)}
- $('stats-endpoint').textContent=statsDuration(statsMedian(replies.map(r=>r.input_ms?.speech_end_to_transcript_ms)));
+ $('stats-recognition').textContent=statsDuration(statsMedian(replies.map(r=>r.input_ms?.recognition_ms)));
  $('stats-response').textContent=statsDuration(statsMedian([...firstReplies.values()]));
- $('stats-synthesis').textContent=statsDuration(statsMedian(replies.map(r=>r.provider_ms?.request_to_complete_ms)));
- $('stats-playout').textContent=statsDuration(statsMedian(replies.map(r=>r.browser_ms?.audio_received_to_playback_scheduled_ms)));
- const states={queued:'En cola',synthesizing:'Generando voz',ready:'Audio listo',dispatched:'Audio enviado',playing:'Reproduciendo',completed:'Reproducción terminada',interrupted:'Interrumpida',failed:'Falló',disconnected:'Desconectada'};
+ const states={queued:'En cola',playing:'Reproduciendo',playback_finished:'Escuchada',interrupted:'Interrumpida',failed:'Falló'};
  const rows=replies.slice(-12).reverse().map(r=>{
-  const row=document.createElement('tr'),input=r.input_ms||{},server=r.server_ms||{},provider=r.provider_ms||{};
+  const row=document.createElement('tr'),input=r.input_ms||{},server=r.server_ms||{};
   row.append(statsCell('td',r.reply_revision),...[
-   input.speech_end_to_transcript_ms,input.endpoint_silence_ms,input.recognition_ms,
-   server.input_queued_to_reply_received_ms,server.reply_received_to_synthesis_started_ms,
-   provider.request_to_first_chunk_ms,provider.request_to_complete_ms,
-   r.browser_ms?.audio_received_to_playback_scheduled_ms
+   input.endpoint_silence_ms,input.recognition_ms,
+   server.input_queued_to_reply_received_ms,server.reply_received_to_synthesis_started_ms
   ].map(value=>statsCell('td',statsDuration(value))),statsCell('td',states[r.status]||r.status||'—'));
   return row;
  });
@@ -570,14 +566,11 @@ function renderLatencyStats(snapshot,thread){
 const LATENCY_STAGES=[
  ['Silencio hasta cerrar el turno',r=>r.input_ms?.endpoint_silence_ms,'endpoint_silence'],
  ['Turno cerrado → texto',r=>r.input_ms?.recognition_ms,'recognition'],
- ['Whisper en este dispositivo',r=>r.input_ms?.request_to_transcript_ms,'request_to_transcript'],
  ['Texto → entregado al agente',r=>r.input_ms?.transcript_to_delivery_ms,'transcript_to_delivery'],
  ['Entregado → leído por la conversación',r=>r.server_ms?.delivery_accepted_to_read_ms??r.server_ms?.input_queued_to_read_ms,'delivery_to_read'],
  ['Leído → primera respuesta',r=>r.server_ms?.read_to_reply_received_ms,'read_to_reply'],
  ['Agente: entrega → primera respuesta',r=>r.server_ms?.input_queued_to_reply_received_ms,'input_queued_to_reply'],
- ['Respuesta → inicio de síntesis',r=>r.server_ms?.reply_received_to_synthesis_started_ms,'reply_to_synthesis'],
- ['Síntesis en el proveedor',r=>r.provider_ms?.request_to_complete_ms,'provider_synthesis'],
- ['Audio recibido → reproducción',r=>r.browser_ms?.audio_received_to_playback_scheduled_ms,'audio_received_to_playback'],
+ ['Respuesta → enviada a este dispositivo',r=>r.server_ms?.reply_received_to_synthesis_started_ms,'reply_to_synthesis'],
 ];
 function renderLatencyStages(reply){
  const list=$('stats-stages');if(!list)return;list.replaceChildren();
@@ -789,9 +782,15 @@ function openTurnTrace(threadId,revision){
  if(!traceparent||!state.ws||state.ws.readyState!==1||!state.sessionId)return;
  try{state.ws.send(JSON.stringify({type:'voice-turn-trace',data:{session_id:state.sessionId,thread_id:threadId,revision,traceparent}}))}catch{}
 }
+const latencyRevisions=new Map();
 function observeLatencyEvent(type,data){
  const now=latencyNow();if(!Number.isFinite(now))return;
  if(type==='voice-user-turn'){
+  // The room names the turn; only its answer to `started` carries the revision the turn is measured under.
+  if(data.phase==='started'&&data.turn_id!=null){latencyRevisions.set(data.turn_id,data.revision);if(latencyRevisions.size>128)latencyRevisions.delete(latencyRevisions.keys().next().value)}
+  const revision=data.revision??latencyRevisions.get(data.turn_id);
+  if(revision==null)return;
+  data={...data,revision};
   const key=latencyKey(data.thread_id,data.revision);
   if(data.phase==='started'){latencyActiveTurn=key;if(!latencyTurns.has(key))latencyTurns.set(key,{});openTurnTrace(data.thread_id,data.revision)}
   if(data.phase==='cancelled'){latencyTurns.delete(key);if(latencyActiveTurn===key)latencyActiveTurn=null;window.sidevoiceTelemetry?.endTurn?.(data.thread_id,data.revision,data.merged?'merged':'cancelled')}
@@ -840,23 +839,21 @@ function recordMessage(raw, socket) {
         receiveReply(d);
         return;
     }
-    // The room's answer to a turn this page said started: the revision the turn is said with to its end.
+    // The room's answer to a turn this page said started, by the turn's name: its end may go now, the conversation it
+    // goes to is the one the room captured, and the voice takes the turn's revision as its boundary for stale replies.
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
-        const turn = relay.answered(d.revision);
-        if (turn != null) {
-            const draft = 'turn:' + turn, segment = state.sessionId + ':user-turn:' + d.revision;
-            state.history = state.history.map(r => r.segment === draft ? { ...r, segment, revision: d.revision, delivery: takeReceipt(segment) || r.delivery } : r);
-            if (state.userTurn?.id === turn)
-                state.userTurn = { ...state.userTurn, segment, thread: d.thread_id };
-            save();
-            markHistorySeen();
+        // Every answer goes to the voice, an offline turn's too: it keeps those of its own turns and ignores the rest.
+        voice?.turnStarted?.(d);
+        if (relay.answered(d.turn_id)) {
+            if (state.userTurn?.id === d.turn_id)
+                state.userTurn = { ...state.userTurn, thread: d.thread_id };
         }
         flushOutbox();
         return;
     }
     if (t === 'voice-input-receipt') {
-        const receiptId = d.history_id || (d.session_id || state.sessionId) + ':user-turn:' + d.revision;
+        const receiptId = d.history_id || (d.session_id || state.sessionId) + ':user-turn:' + d.turn_id;
         const row = state.history.find(r => r.thread === d.thread_id && r.segment === receiptId);
         if (row) {
             state.history = state.history.map(r => r === row ? { ...r, delivery: d.status } : r);
@@ -901,7 +898,8 @@ function voiceTurn(turn){
   if(turn.phase==='started'){
    personSignal();
    state.cancelledInput=false;
-   state.userTurn={id:turn.turn_id,segment:'turn:'+turn.turn_id,thread:targetId()};
+   // The row's id is the room's for this turn (`session:user-turn:turn_id`) from the start.
+   state.userTurn={id:turn.turn_id,segment:state.sessionId+':user-turn:'+turn.turn_id,thread:targetId()};
    state.pendingPhase='listening';
    partial('');
   }else if(state.userTurn?.id===turn.turn_id){
@@ -909,8 +907,13 @@ function voiceTurn(turn){
    state.pendingPhase='';partial('');state.userTurn=null;
    if(turn.phase==='finished'&&turn.text?.trim()){
     state.history=state.history.filter(r=>r.segment!==segment);
-    add('user',turn.text,null,thread,{history_id:segment,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
+    add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
    }else state.history=state.history.filter(r=>r.segment!==segment);
+   markHistorySeen();
+  }else if(turn.phase==='finished'&&turn.offline&&turn.text?.trim()){
+   // A turn started while the room was out of reach is only ever finished: its row is the words said while away.
+   const segment=state.sessionId+':user-turn:'+turn.turn_id;
+   add('user',turn.text,null,targetId(),{history_id:segment,turn_id:turn.turn_id,offline:true,draft:false,time:Date.now(),delivery:takeReceipt(segment)||'pending'});
    markHistorySeen();
   }
  });
@@ -918,10 +921,11 @@ function voiceTurn(turn){
 }
 // A receipt the room sent before this page had the row it is about: handed over once, then forgotten.
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
+// Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
+// be acted on, and in the machine's log. The voice's turns and playback reports are already in the room's shape.
+function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:String(error?.code||'')})}
 function voicePlayback(report){
  if(report.status!=='playing')repliesSpoken.delete(report.utterance_id);
- // Why a reply could not be said stays here, where it can be acted on, and in the machine's log.
- if(report.status==='failed'&&report.reason){setRoomError(voiceErrorText({code:report.reason}));reportClientError({kind:'playback',message:report.utterance_id+': '+report.reason})}
  keepMessage('playback','voice-playback',report);flushOutbox();
 }
 function voiceStateChanged(next){
@@ -1047,7 +1051,7 @@ function disconnect() {
 const voiceListeners=[];
 function attachVoice(next){
  voiceListeners.push(next.onUserTurn(voiceTurn),next.onPlayback(voicePlayback),next.onState(voiceStateChanged),next.onLevel(voiceLevel),
-  next.onKaraoke(updateKaraoke),next.onError(error=>setRoomError(voiceErrorText(error))));
+  next.onKaraoke(updateKaraoke),next.onError(voiceFailed));
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
@@ -1057,9 +1061,9 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
  try{
   if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}
   if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}
-  const next=await openVoice();if(epoch!==connectEpoch)return;
+  const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
-  await next.setSettings(defaultVoiceSettings(state.speechLanguage));
+  await next.setSettings(state.voiceSettings);
   // A hang-up while the settings were taken leaves this join: nothing of it may start the microphone after it.
   if(epoch!==connectEpoch)return;
   await next.start();
@@ -1183,18 +1187,53 @@ async function replayReply(historyId){
  catch(error){setRoomError(error.message||'No se pudo volver a reproducir.')}
 }
 
+/* ----- the voice's settings and the remote providers' keys: this device's, never the room's -----
+ * One voice for the page, and the engine's catalogues it chooses models from (`voice-module.js`): the settings pane
+ * lists the catalogues and keeps keys with the engine, and every call of this page drives the voice. A key goes from
+ * the pane to the engine's host and nowhere else (the desktop app keeps it in the system keychain, a browser in this
+ * page's storage), and the engine hands it to the provider. */
+const page=pageVoice();
+let voiceHostOpening=null,catalogsOpening=null;
+function voiceHost(){return voiceHostOpening??=page.voice().catch(error=>{voiceHostOpening=null;throw error})}
+function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{catalogsOpening=null;throw error})}
+async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
+async function loadVoiceCatalogue(){
+ roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
+ try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)})}
+ catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
+}
+function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)})}
+// The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
+async function saveVoiceSettings(){
+ const draft=state.voiceDraft;if(!draft||JSON.stringify(draft)===JSON.stringify(state.voiceSettings))return;
+ const host=await voiceHost().catch(()=>null);
+ if(host)await host.setSettings(draft);
+ writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
+}
+// A key changes what a provider lists: its catalogue is read again with it.
+async function saveProviderKey(provider,key){
+ let models;
+ try{models=await modelCatalogs();await models.setCredential(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
+ const catalogs=await models.catalogs().catch(()=>null);
+ if(catalogs)roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
+}
+roomStore.patch({voiceSettings:readVoiceSettings(pageStorage(),state.speechLanguage)});
+
 $('settings-open').onclick=()=>{try{
  if(nodeBase==null)settingsSection('machines');
+ roomStore.patch({voiceDraft:state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
  $('ui-language').value=p.ui_language;
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-function settingsSection(name){for(const section of ['general','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
+function settingsSection(name){for(const section of ['general','voice','providers','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
 $('settings-general').onclick=()=>settingsSection('general');
+$('settings-voice').onclick=()=>settingsSection('voice');
+$('settings-providers').onclick=()=>settingsSection('providers');
 $('settings-machines').onclick=()=>settingsSection('machines');
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
-$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo; la llamada en curso no se interrumpe.'};
+$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings(state.speechLanguage)});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
 // says. Only the settings of today's shape are read back.
@@ -1205,15 +1244,19 @@ function storedPreferences(){const stored=readStored(SETTINGS_KEY);return Object
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))))}catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
 // The interface's language is this device's: saved here, said to the call in progress, applied at once.
-function saveSettings(){
+async function saveSettings(){
+ await saveVoiceSettings();
  const p={...devicePreferences(),ui_language:$('ui-language').value||devicePreferences().ui_language};
  storePreferences(p);window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
  $('language-settings').close();state.liveNote='Preferencias guardadas';
 }
-$('language-form').onsubmit=e=>{e.preventDefault();try{saveSettings()}catch(error){$('settings-error').textContent=error?.message||String(error)}};
+$('language-form').onsubmit=e=>{e.preventDefault();$('settings-error').textContent='';saveSettings().catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)})};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
+ editVoice,
+ saveProviderKey,
+ loadVoiceCatalogue,
  replayReply,
  toggleMic,
  toggleCall,
