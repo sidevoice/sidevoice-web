@@ -23,8 +23,9 @@ function languageName(tag: string) {
 function noteText(t: HostTranslate, note: Note | null | undefined) {
   if (!note) return "";
   const reasons = note.reasons?.map((code) => t(("voice.unfit." + code) as HostMessageKey)).join("; ");
-  const text = note.key === "voice.catalog.reason" && note.params?.code === "credential-missing"
-    ? t("voice.catalog.noKey")
+  const code = note.key === "voice.catalog.reason" ? note.params?.code : null;
+  const text = code === "credential-missing" ? t("voice.catalog.noKey")
+    : code === "storage-blocked" ? t("storage.blocked")
     : t(note.key as HostMessageKey, { ...note.params, ...(reasons ? { reasons } : {}) });
   return note.detail ? text + " — " + note.detail : text;
 }

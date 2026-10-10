@@ -15,7 +15,7 @@
  */
 import { TELEMETRY_API } from "@sidevoice/protocol";
 import type { RoomTelemetry, TelemetryAttributes } from "./telemetry-types";
-import { pageTarget } from "./rendezvous.js";
+import { pageTarget, targetAnswers } from "./rendezvous.js";
 
 let implementation: RoomTelemetry | null = null;
 let loading: Promise<RoomTelemetry | null> | null = null;
@@ -59,7 +59,10 @@ export const telemetry: RoomTelemetry = {
 export function initTelemetry(): Promise<RoomTelemetry | null> {
   loading ??= (async () => {
     try {
-      const url = pageTarget() + TELEMETRY_API;
+      const target = pageTarget();
+      // A static site's origin has no room to ask.
+      if (!targetAnswers(target)) return null;
+      const url = target + TELEMETRY_API;
       const response = await fetch(url, { headers: { accept: "application/json" } });
       if (!response.ok) return null;
       const state = (await response.json()) as { enabled?: boolean };

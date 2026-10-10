@@ -7,6 +7,7 @@
  * Both packages are loaded the first time the page needs either, each in its own chunk, and the page makes one engine. */
 import { engineVoiceSource, voiceRefusal } from './voice-source.ts';
 import { engineCatalogs, localStorageCredentials } from './model-catalogs.js';
+import { engineFailureCode } from './failure-code.js';
 
 /** The page as the engine's host: what this browser can run models on, and the provider keys `credentials` keeps. */
 export async function browserHost(navigator, credentials) {
@@ -35,9 +36,15 @@ function browserParts(load) {
       throw Object.assign(voiceRefusal('voice-module-unavailable'), { cause });
     }
     const credentials = localStorageCredentials();
-    // The engine reads a provider's key where the page keeps it, each time it needs one.
-    const webEngine = await engine.WebEngine.create(await browserHost(globalThis.navigator, credentials));
-    return { voice, engine: webEngine, credentials };
+    // The engine reads a provider's key where the page keeps it, each time it needs one. Its failure to start is the
+    // voice's, by a code the page can say (`engineFailureCode`).
+    try {
+      const webEngine = await engine.WebEngine.create(await browserHost(globalThis.navigator, credentials));
+      return { voice, engine: webEngine, credentials };
+    } catch (cause) {
+      const code = engineFailureCode(cause);
+      throw Object.assign(voiceRefusal(code, String(cause?.message || code), cause?.detail), { cause });
+    }
   })();
 }
 

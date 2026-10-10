@@ -1,9 +1,11 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,NO_MACHINE,reachNote} from '../state/room-session-state.js';
-import {pageTarget,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
+import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
+import {failureCode} from './failure-code.js';
+import {probeSiteStorage} from './site-storage.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
@@ -15,6 +17,9 @@ const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
 roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.voice});
+// Whether this browser lets the page keep anything: when it does not, one message says so, rather than each store
+// failing on its own (`site-storage.js`).
+void probeSiteStorage().then(probe=>roomStore.patch({storageBlocked:probe.blocked}),()=>{});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
 const $=id=>document.getElementById(id);
 function setRoomError(message){const value=message||null;if(window.sidevoiceUI)window.sidevoiceUI.setBootError(value);else $("error").textContent=value||""}
@@ -45,7 +50,14 @@ const VOICE_FAILURES={
 };
 // What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
 // A provider's own words, when it is the one refusing, follow as it said them.
-function voiceErrorText(error){const code=String(error?.code||'');const text=VOICE_FAILURES[code]?.()||'La voz de la llamada falló'+(code?' ('+code+')':'')+'.';return error?.detail?text+' '+String(error.detail):text}
+// A browser's own refusal (a DOMException) is said by its name, never by its legacy number; one that blocks the page's
+// storage is the message of a blocked site.
+function voiceErrorText(error){
+ const code=failureCode(error,''),t=hostTranslator();
+ if(code==='storage-blocked'||code==='SecurityError')return t('storage.blocked');
+ const text=VOICE_FAILURES[code]?.()||(/^[A-Z][A-Za-z]*Error$/.test(code)?t('voice.error.browser',{name:code}):'La voz de la llamada falló'+(code?' ('+code+')':'')+'.');
+ return error?.detail?text+' '+String(error.detail):text;
+}
 function joinFailureText(step,error){
  if(step==='voice')return voiceErrorText(error);
  const message=String(error?.message||error||'');
@@ -60,6 +72,8 @@ function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?'
  * address that proved — with the key pinned when pairing — that it is that node. Until one has there is none,
  * null, and nothing of a node is asked: every such request carries this device's token. */
 const target=pageTarget();
+// What the target is: asked only of a server that may answer (`targetAnswers`); a static site's origin is none.
+const describeTarget=()=>targetAnswers(target)?askTarget(target,fetch):Promise.resolve(null);
 let nodeBase=null;
 // This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
@@ -462,7 +476,7 @@ async function locate({move=!(state.ws||state.connecting||state.reconnecting),fr
  try{
   // The pairing's own addresses are asked while the target says what it is: its answer can only add one more.
   void firstProven(candidateBases(pairing,{origin:location.origin}),pairing,deps,started).catch(()=>{});
-  const about=await askTarget(target,fetch);
+  const about=await describeTarget();
   if(about)targetAbout=about;
   found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,deps,started);
   // With nothing proven, the room the machine links with says whether it is there at all.
@@ -505,7 +519,7 @@ function pairingRefused(fp,{call=false}={}){
 }
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
 async function pairDevice(code,name){
- const about=await askTarget(target,fetch);if(about)targetAbout=about;
+ const about=await describeTarget();if(about)targetAbout=about;
  const t=hostTranslator(),defaultName=currentDeviceName(where=>t('pair.deviceName',{where}));
  const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,target,about,origin:location.origin,get:fetch});
  if(localPairing?.fp===pairing.fp){
@@ -952,7 +966,7 @@ function voiceTurn(turn){
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 // Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
 // be acted on, and in the machine's log.
-function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:String(error?.code||'')})}
+function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
 function voiceStateChanged(next){
  roomStore.batch(()=>{
   state.voiceState=next;

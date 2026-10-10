@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { VoiceSettings } from "./VoiceSettings";
 import { ProviderKeys } from "./ProviderKeys";
+import { StorageBlockedBanner } from "./StorageBlockedBanner";
 import { createRoomStore, installRoomBridge, RoomStoreContext } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { SidevoiceActions } from "../../state/room-types";
@@ -106,4 +107,30 @@ test("one key per remote catalogue: handed to the engine's host, the field empti
   cleanup();
   renderPane("keys", { voiceCatalogue: { state: "ready", catalogs: [catalogs[0]], error: "" } });
   expect(document.getElementById("provider-keys-none")).toBeInTheDocument();
+});
+
+test("the providers are the catalogues: while they load it says so, and when they could not be read it says why, never an empty list", () => {
+  renderPane("keys", { voiceCatalogue: { state: "loading", catalogs: [], error: "" } });
+  expect(document.getElementById("provider-keys-loading")).toBeInTheDocument();
+  expect(document.getElementById("provider-keys-none")).toBeNull();
+  cleanup();
+  const { actions } = renderPane("keys", { voiceCatalogue: { state: "failed", catalogs: [], error: "This browser is blocking site data for this page." } });
+  expect(screen.getByRole("alert")).toHaveTextContent("blocking site data");
+  expect(document.getElementById("provider-keys-none")).toBeNull();
+  fireEvent.click(document.getElementById("provider-keys-retry")!);
+  expect(actions.loadVoiceCatalogue).toHaveBeenCalled();
+});
+
+test("a catalogue its storage was refused to says the browser blocks site data", () => {
+  const blocked = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, status: { stale: false, reason: { code: "storage-blocked", params: {} } }, models: [] } : catalog) as CatalogView[];
+  renderPane("voice", { voiceCatalogue: { state: "ready", catalogs: blocked, error: "" } });
+  expect(options("stt-source")[0].textContent).toMatch(/On this device — This browser is blocking site data for this page/);
+});
+
+test("a browser that blocks site data is said once, on top, while it does", () => {
+  const store = createRoomStore();
+  render(<RoomStoreContext.Provider value={store}><StorageBlockedBanner /></RoomStoreContext.Provider>);
+  expect(document.getElementById("storage-blocked")).toBeNull();
+  act(() => store.patch({ storageBlocked: true }));
+  expect(screen.getByRole("alert")).toHaveTextContent("This browser is blocking site data for this page. Allow it");
 });

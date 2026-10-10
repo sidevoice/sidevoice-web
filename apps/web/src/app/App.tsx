@@ -15,6 +15,7 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
+import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { useRoomStore } from "../state/room-store";
 
 function RoomContent() {
@@ -46,6 +47,7 @@ function RoomContent() {
   return (
     <>
       <RoomHeader />
+      <StorageBlockedBanner />
       <LocalHostBanner />
       {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
         <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}

@@ -40,3 +40,13 @@ test("packages that do not load are the voice's own refusal, and the next ask tr
   await expect(page.voice()).rejects.toMatchObject({ code: "voice-module-unavailable" });
   await expect(page.voice()).resolves.toBeTruthy();
 });
+
+test("an engine the browser will not let keep files (site data blocked) is the voice's storage-blocked, never a bare number", async () => {
+  const load = vi.fn(async () => [
+    { default: async () => {}, createVoiceHost: () => ({}) },
+    { default: async () => {}, WebEngine: { create: async () => { throw new DOMException("The operation is insecure.", "SecurityError"); } } },
+  ]);
+  const page = pageVoice({ host: {}, load });
+  await expect(page.voice()).rejects.toMatchObject({ code: "storage-blocked" });
+  await expect(page.catalogs()).rejects.toMatchObject({ code: "storage-blocked" });
+});

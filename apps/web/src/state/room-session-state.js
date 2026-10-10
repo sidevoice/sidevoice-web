@@ -31,6 +31,8 @@ export function initialSessionFacts() {
         pairingOpen: false, pairingNote: '',
         // The language this device speaks in a call, and whether this page runs inside the desktop app.
         speechLanguage: 'en', inApp: false,
+        // Whether this browser refuses the page any storage (site data blocked), found once at start.
+        storageBlocked: false,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
         voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, providerKeys: {},

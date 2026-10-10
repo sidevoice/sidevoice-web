@@ -17,6 +17,7 @@ declare global {
 
 export function resolveTarget(sources?: { injected?: unknown; origin?: string | null }): string;
 export function pageTarget(): string;
+export function targetAnswers(target: string, injected?: unknown): boolean;
 export function isNodePath(path: string): boolean;
 export function routeUrl(path: string, target: string, nodeBase: string | null): string | null;
 export function callSocketUrl(nodeBase: string, location: { protocol: string; host: string }): string;

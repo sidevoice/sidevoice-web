@@ -237,4 +237,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "keys.removed": "Clave quitada.",
   "keys.failed": "No se pudo guardar la clave ({code}).",
   "keys.failedPlain": "No se pudo guardar la clave.",
+  "storage.blocked": "Este navegador está bloqueando los datos de sitio de esta página. Permítelos (configuración del sitio → cookies y datos de sitios) para emparejar una máquina y usar la voz.",
+  "voice.error.browser": "El navegador rechazó algo que necesita la voz de la llamada ({name}).",
+  "keys.loading": "Cargando los proveedores…",
 };

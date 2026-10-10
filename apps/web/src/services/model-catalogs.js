@@ -21,6 +21,8 @@
 /** The id of the catalogue of models that run on this device. */
 export const LOCAL_CATALOG = 'local';
 
+import { engineFailureCode } from './failure-code.js';
+
 const KEY_PREFIX = 'sidevoice.provider-key.';
 
 /**
@@ -39,12 +41,13 @@ export function localStorageCredentials(storage = globalThis.localStorage) {
 
 /** What a catalogue that failed to answer stands as: its error as the reason it is not current. */
 function failed(error) {
-  return { stale: false, reason: { code: String(error?.code || 'catalog-failed'), params: error?.params ?? {} }, ...(error?.detail ? { detail: String(error.detail) } : {}) };
+  return { stale: false, reason: { code: engineFailureCode(error, 'catalog-failed'), params: error?.params ?? {} }, ...(error?.detail ? { detail: String(error.detail) } : {}) };
 }
 
 /**
  * `engine`'s catalogues as `ModelCatalogs`, with the keys in `credentials`. A catalogue that cannot list its models
- * (a provider with no key, say) is listed with none, and its status says why.
+ * (a provider with no key, say) is listed with none, and its status says why: when the catalogue itself gave no
+ * reason, the failure of its listing is the reason.
  * @param {import('@sidevoice/engine').WebEngine} engine
  * @param {{get(provider: string): string | null, set(provider: string, key: string | null): void}} credentials
  * @returns {ModelCatalogs}
@@ -55,8 +58,9 @@ export function engineCatalogs(engine, credentials) {
       const status = await catalog.status().catch(failed);
       // Every capability at once: the engine lists all of a catalogue's models when it is given none.
       const list = /** @type {() => Promise<CatalogModel[]>} */ (/** @type {unknown} */ (catalog.models.bind(catalog)));
-      const models = await list().catch(() => []);
-      return { id: catalog.id, name: catalog.name ?? null, status, models };
+      let failure = null;
+      const models = await list().catch((error) => { failure = error; return []; });
+      return { id: catalog.id, name: catalog.name ?? null, status: failure && !status.reason ? failed(failure) : status, models };
     })),
     async setCredential(provider, key) {
       credentials.set(provider, typeof key === 'string' && key.trim() ? key.trim() : null);

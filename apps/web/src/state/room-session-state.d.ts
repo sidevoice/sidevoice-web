@@ -36,6 +36,8 @@ export interface SessionFacts {
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
  voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string};
  providerKeys: Record<string, boolean | null>;
+ /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
+ storageBlocked: boolean;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';

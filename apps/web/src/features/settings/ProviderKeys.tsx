@@ -49,8 +49,8 @@ function ProviderKey({ provider, name, t }: { provider: string; name: string; t:
 export function ProviderKeys() {
   const t = hostTranslator();
   const inApp = useRoomStore((state) => state.facts.inApp);
-  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
-  const providers = remoteProviders(catalogs);
+  const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
+  const providers = remoteProviders(catalogue.catalogs);
   return (
     <section id="pane-providers" aria-labelledby="settings-providers" hidden>
       <h3>{t("keys.title")}</h3>
@@ -58,9 +58,15 @@ export function ProviderKeys() {
       {inApp
         ? <p className="muted" id="provider-keys-where">{t("keys.inApp")}</p>
         : <p className="provider-keys-warning" id="provider-keys-where" role="note">{t("keys.browser")}</p>}
-      {providers.length
+      {/* The providers are the engine's remote catalogues: while they load, or when they could not be read, it says so
+          rather than listing none. */}
+      {catalogue.state === "loading" || catalogue.state === "idle" ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
+      {catalogue.state === "failed" ? (
+        <p role="alert" className="voice-catalogue-error" id="provider-keys-failed">{catalogue.error} <Button id="provider-keys-retry" variant="ghost" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button></p>
+      ) : null}
+      {catalogue.state === "ready" ? (providers.length
         ? providers.map((provider) => <ProviderKey key={provider.id} provider={provider.id} name={provider.name} t={t} />)
-        : <p className="muted" id="provider-keys-none">{t("keys.none")}</p>}
+        : <p className="muted" id="provider-keys-none">{t("keys.none")}</p>) : null}
     </section>
   );
 }

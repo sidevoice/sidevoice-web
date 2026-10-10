@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import { askRoomNode, askTarget, callSocketUrl, describeTarget, isNodePath, pageTarget, resolveTarget, routeUrl } from "./rendezvous.js";
+import { askRoomNode, askTarget, callSocketUrl, describeTarget, isNodePath, pageTarget, resolveTarget, routeUrl, targetAnswers } from "./rendezvous.js";
 
 const ORIGIN = "https://room.example";
 
@@ -95,4 +95,12 @@ test("the call socket opens on the node base, in the page's scheme or the target
   expect(callSocketUrl("/nodes/mac", { protocol: "http:", host: "127.0.0.1:5173" })).toBe("ws://127.0.0.1:5173/nodes/mac/api/presentation/ws");
   expect(callSocketUrl("http://node.lan:8767", page)).toBe("ws://node.lan:8767/api/presentation/ws");
   expect(callSocketUrl("https://room.example/nodes/mac", page)).toBe("wss://room.example/nodes/mac/api/presentation/ws");
+});
+
+test("a target is asked unless it is the page's own origin and a static site's target.js said nothing is there", () => {
+  expect(targetAnswers("https://room.example", null)).toBe(true);
+  expect(targetAnswers("", undefined)).toBe(true);
+  expect(targetAnswers("", null)).toBe(false);
+  window.__SIDEVOICE_TARGET__ = null as unknown as string;
+  expect(targetAnswers(pageTarget())).toBe(false);
 });
