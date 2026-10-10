@@ -3,7 +3,7 @@ import type { PairingSummary } from '../services/device-pairing.js';
 export type NodeReach = '' | 'ok' | 'unpaired' | 'revoked' | 'offline' | 'away';
 /** Where the call's voice is, as it reports it. */
 export interface VoiceState {
- listening: 'idle' | 'muted' | 'listening' | 'speaking'; recognising: number; playback: 'idle' | 'synthesizing' | 'playing'; online: boolean;
+ listening: 'idle' | 'muted' | 'listening' | 'speaking'; recognising: number; playback: 'idle' | 'synthesizing' | 'playing';
 }
 export interface SessionFacts {
  ws: unknown; sessionId: string | null; roomRevision: number; roomInfo: Record<string, unknown> | null;

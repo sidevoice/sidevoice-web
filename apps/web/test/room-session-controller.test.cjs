@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-settings.js':'VoiceSettings'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -100,7 +100,7 @@ test('Keyboard shortcuts ignore typing and auto-repeat',()=>{
 });
 test('Delivery tick is immediate, follows the matching receipt and does not imply read',()=>{
  const s=setup();const emit=(type,data)=>s.run(`message(${JSON.stringify(JSON.stringify({type,data}))})`);
- s.run("relay.sent('t1');voiceTurn({client_msg_id:'m1',turn_id:'t1',phase:'started'});voiceTurn({client_msg_id:'m2',turn_id:'t1',phase:'finished',text:'Hola'})");
+ s.run("relay.sent('t1');voiceTurn({turn_id:'t1',phase:'started',started_at:1});voiceTurn({turn_id:'t1',phase:'finished',text:'Hola',started_at:1,ended_at:2,merged:false,timings:{}})");
  assert.equal(s.run('history[0].delivery'),'pending');
  assert.equal(s.run('history[0].segment'),'s:user-turn:t1','the turn\'s name names the row, as the room does');
  emit('voice-user-turn',{phase:'started',turn_id:'t1',revision:1,thread_id:'a',session_id:'s'});
@@ -129,15 +129,15 @@ test('A joined empty room selects its only listening conversation automatically'
 
 test('A receipt arriving before the final bubble is retained instead of disappearing',()=>{
  const s=setup();const emit=(type,data)=>s.run(`message(${JSON.stringify(JSON.stringify({type,data}))})`);
- s.run("relay.sent('t2');voiceTurn({client_msg_id:'m1',turn_id:'t2',phase:'started'})");
+ s.run("relay.sent('t2');voiceTurn({turn_id:'t2',phase:'started',started_at:1})");
  emit('voice-user-turn',{phase:'started',turn_id:'t2',revision:2,thread_id:'a',session_id:'s'});
  emit('voice-input-receipt',{turn_id:'t2',history_id:'s:user-turn:t2',revision:2,thread_id:'a',session_id:'s',status:'delivered'});
- s.run("voiceTurn({client_msg_id:'m2',turn_id:'t2',phase:'finished',text:'Ya llegó'})");
+ s.run("voiceTurn({turn_id:'t2',phase:'finished',text:'Ya llegó',started_at:1,ended_at:2,merged:false,timings:{}})");
  assert.equal(s.run('history[0].delivery'),'delivered');
  assert.equal(s.run('Object.keys(inputReceipts).length'),0);
 });
 test('A finished turn without a selected conversation is visibly not sent',()=>{
- const s=setup();s.run("roomBinding=null;voiceTurn({client_msg_id:'m1',turn_id:'t3',phase:'started'});voiceTurn({client_msg_id:'m2',turn_id:'t3',phase:'finished',text:'Sin destino'})");
+ const s=setup();s.run("roomBinding=null;voiceTurn({turn_id:'t3',phase:'started',started_at:1});voiceTurn({turn_id:'t3',phase:'finished',text:'Sin destino',started_at:1,ended_at:2,merged:false,timings:{}})");
  assert.equal(s.run('history[0].delivery'),'not_sent');
 });
 test('Space repeats and release suppress native button activation without toggling the mic',()=>{
@@ -375,7 +375,7 @@ test('Aggregates keep one row per stage, named as the last-turn view names them'
  assert.equal(JSON.stringify(rows[2]),JSON.stringify(['transcript_to_delivery',0,null,null,null,null]),'a stage nobody measured stays empty, not zero');
  assert.equal(JSON.stringify(rows[3]),JSON.stringify(['delivery_to_read',2,500,100,900,900]),'the read stage falls back to queued → read, as the last-turn view does');
  assert.equal(JSON.stringify(rows[5]),JSON.stringify(['input_queued_to_reply',2,6000,3000,9000,9000]));
- assert.deepEqual(plain(s.run('LATENCY_STAGES.map(stage=>stage[2])')),['endpoint_silence','recognition','transcript_to_delivery','delivery_to_read','read_to_reply','input_queued_to_reply','reply_to_synthesis'],'only what the room still measures');
+ assert.deepEqual(plain(s.run('LATENCY_STAGES.map(stage=>stage[2])')),['endpoint_silence','recognition','transcript_to_delivery','delivery_to_read','read_to_reply','input_queued_to_reply','reply_to_dispatch'],'only what the room still measures');
  assert.equal(s.run("statsAggregate([]).every(row=>row.count===0&&row.max===null)"),true);
 });
 test('Copying the aggregates puts a plain-text table on the clipboard and says so',async()=>{
@@ -808,13 +808,13 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
 const settleSoon=()=>new Promise(resolve=>setTimeout(resolve,5));
 // A tab's sessionStorage, which a reload of the same tab finds as it was.
 const storageOf=store=>({getItem:key=>key in store?store[key]:null,setItem:(key,value)=>{store[key]=String(value)},removeItem:key=>{delete store[key]}});
-test('Within the grace a drop is not shown and holds no control; past it, one line, and the voice is told both ways',async()=>{
+test('Within the grace a drop is not shown and holds no control; past it, one line, and the voice goes on as it was',async()=>{
  const graces=[];
  const c=await callOnRoom({timers:(fn,ms,...rest)=>ms===30000?(graces.push(fn),0):setTimeout(fn,ms,...rest)});const {s,first,voice}=c;
  assert.equal(s.run('RECONNECT_GRACE_MS'),30000);
  const view=()=>s.run('roomStore.getState()');
  c.drop(first);
- assert.deepEqual(voice.calls.at(-1),['setOnline',false],'the voice goes on, offline');
+ const asked=voice.calls.length;
  await c.until(()=>c.sockets.length===2,'an attempt');
  assert.equal(view().join,null,'no line');
  assert.equal(view().call.busy,false);
@@ -834,7 +834,7 @@ test('Within the grace a drop is not shown and holds no control; past it, one li
  await c.until(()=>c.sockets.length===3,'another attempt');
  await c.answer({session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true});
  await c.until(()=>!s.run('state.reconnecting'),'back in the call');
- assert.deepEqual(voice.calls.filter(([name])=>name==='setOnline').map(([,on])=>on),[true,false,true]);
+ assert.deepEqual([...new Set(voice.calls.slice(asked).map(([name])=>name))],['mute'],'the voice went on through the drop, told nothing but the mute');
  assert.equal(view().join,null);
  assert.equal(view().call.busy,false);
 });
@@ -868,12 +868,20 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
 
 // ----- the call's voice: the VoiceHost the page drives, here a fake that records what it was asked -----
 function fakeVoice({start=async()=>{},setSettings=async()=>{},models=[]}={}){
- const on={},calls=[],keys={};
+ const on={},calls=[],keys={},said=[];
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
- return {calls,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
+ // What the voice is asked to say: a handle the test steps through (`step`), as the voice's own goes.
+ const say=(text,options)=>{
+  calls.push(['say',text,options]);const listeners=new Set();
+  const handle={id:'say-'+(said.length+1),text,options,cancelled:false,
+   cancel(){handle.cancelled=true;calls.push(['cancel',handle.id])},
+   onEvent(listener){listeners.add(listener)},step(event){for(const listener of listeners)listener(event)}};
+  said.push(handle);return handle;
+ };
+ return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
-  speak:reply=>calls.push(['speak',reply]),turnStarted:started=>calls.push(['turnStarted',started]),roomRefused:refusal=>calls.push(['roomRefused',refusal]),setOnline:online=>calls.push(['setOnline',online]),mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onUserTurn:sub('turn'),onPlayback:sub('playback'),onState:sub('state'),onLevel:sub('level'),onKaraoke:sub('karaoke'),onError:sub('error'),
+  say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
+  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onError:sub('error'),
   models:async()=>models,setProviderKey:async(provider,key)=>{calls.push(['setProviderKey',provider,key]);if(key)keys[provider]=true;else delete keys[provider]},hasProviderKey:async provider=>!!keys[provider]};
 }
 // The desktop app's place for the voice is where the page finds it: `null` is a page with no voice at all.
@@ -913,6 +921,11 @@ async function callOnRoom({timers=null,indexedDB=null,outboxScope=null}={}){
 }
 // What the page sent the room, of one type, without what every frame carries.
 const sentOf=(c,socket,type)=>c.frames(socket).filter(m=>m.type===type).map(m=>m.data);
+// The voice's turn events, as it reports them.
+const started=(turn_id,at=1)=>({turn_id,phase:'started',started_at:at});
+const finished=(turn_id,text)=>({turn_id,phase:'finished',text,started_at:1,ended_at:2,merged:false,timings:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
+// The message the page sent for a turn's phase.
+const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filter(d=>d.turn_id===turn_id&&d.phase===phase);
 
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
@@ -921,64 +934,93 @@ test('A call subscribes to its voice, chooses, starts it, and only then joins th
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','ui_language']);
  assert.equal(firstHello.data.conversation,'a');
- assert.deepEqual(voice.calls.find(([name])=>name==='setOnline'),['setOnline',true]);
  assert.equal(c.s.run('sessionId'),'s1');
  c.s.run('window.sidevoiceActions.toggleCall()');
  assert.deepEqual(voice.calls.at(-1),['stop'],'a hang-up stops the voice');
 });
-test('A turn is said by its name, and its end follows its start without waiting for the room\'s answer',async()=>{
+test('A turn is said by its name in messages of the page\'s own, and its end follows its start without waiting for the room\'s answer',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
- voice.emit('turn',{client_msg_id:'c-1',turn_id:'u1',phase:'started',offline:false});
- assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.client_msg_id,d.session_id]),[['started','c-1','s1']]);
- voice.emit('turn',{client_msg_id:'c-2',turn_id:'u1',phase:'finished',text:'Hola',offline:false});
- assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.turn_id,d.offline]),[['started','u1',false],['finished','u1',false]],'one socket keeps them in order');
+ voice.emit('turn',started('u1',1000));
+ voice.emit('turn',finished('u1','Hola'));
+ const turns=sentOf(c,first,'voice-user-turn');
+ assert.deepEqual(plain(turns.map(d=>[d.phase,d.turn_id,d.offline,d.session_id])),[['started','u1',null,'s1'],['finished','u1',null,'s1']],'one socket keeps them in order');
+ assert.ok(turns[0].client_msg_id&&turns[0].client_msg_id!==turns[1].client_msg_id,'each a message of its own');
+ assert.equal(turns[0].started_at,1000);
+ assert.deepEqual(plain(turns[1].timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600},'the voice\'s timings under the room\'s name');
+ assert.equal('timings' in turns[1],false);
+ assert.deepEqual([turns[1].text,turns[1].ended_at,turns[1].merged],['Hola',2,false]);
  assert.equal(s.run('history.at(-1).text'),'Hola');
  assert.equal(s.run('history.at(-1).delivery'),'pending');
- c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'elsewhere',revision:6,thread_id:'a'}});
- const answer={session_id:'s1',phase:'started',turn_id:'u1',revision:7,thread_id:'a'};
- c.push(first,{type:'voice-user-turn',data:answer});
- // Every answer reaches the voice, which keeps those of its own turns: the other turn's, then this one's.
- assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted').map(([,started])=>started.turn_id)),['elsewhere','u1']);
- assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted').at(-1)),['turnStarted',answer],'the voice takes the turn\'s boundary');
- const ended=sentOf(c,first,'voice-user-turn').at(-1);
- assert.deepEqual([ended.phase,ended.turn_id,ended.revision,ended.client_msg_id,ended.text],['finished','u1',undefined,'c-2','Hola']);
  assert.equal(s.run('history.at(-1).segment'),'s1:user-turn:u1');
- c.push(first,{type:'voice-ack',data:{client_msg_id:'c-1'}});c.push(first,{type:'voice-ack',data:{client_msg_id:'c-2'}});
+ const asked=voice.calls.length;
+ c.push(first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'u1',revision:7,thread_id:'a'}});
+ assert.equal(voice.calls.length,asked,'the room\'s answer is the page\'s: the voice is told nothing');
+ for(const turn of turns)c.push(first,{type:'voice-ack',data:{client_msg_id:turn.client_msg_id}});
  assert.equal(s.run('outbox.list().length'),0,'acknowledged, forgotten');
 });
 test('Words said while the room was away go as their own offline message; a start the room refused does too',async()=>{
- const c=await callOnRoom();const {voice,first}=c;
- // The voice reports a turn started offline only as finished: its words are a row of their own.
- voice.emit('turn',{client_msg_id:'o-2',turn_id:'u2',phase:'finished',text:'Sin sala',offline:true});
- assert.deepEqual(sentOf(c,first,'voice-user-turn').map(d=>[d.phase,d.offline,d.turn_id]),[['finished',true,'u2']]);
- assert.deepEqual([c.s.run('history.at(-1).text'),c.s.run('history.at(-1).segment')],['Sin sala','s1:user-turn:u2']);
- // The room takes it and answers with its revision: the voice gets that boundary too, though no start was sent.
- const taken={session_id:'s1',phase:'started',turn_id:'u2',revision:9,thread_id:'a'};
- c.push(first,{type:'voice-user-turn',data:taken});
- assert.deepEqual(plain(voice.calls.filter(([name])=>name==='turnStarted')),[['turnStarted',taken]]);
- voice.emit('turn',{client_msg_id:'r-1',turn_id:'u3',phase:'started',offline:false});
- c.push(first,{type:'error',data:{key:'room.no_conversation',client_msg_id:'r-1'}});
- voice.emit('turn',{client_msg_id:'r-2',turn_id:'u3',phase:'finished',text:'Rechazado',offline:false});
- const last=sentOf(c,first,'voice-user-turn').at(-1);
- assert.deepEqual([last.client_msg_id,last.offline],['r-2',true]);
- voice.emit('turn',{client_msg_id:'x-1',turn_id:'u4',phase:'started',offline:true});
- voice.emit('turn',{client_msg_id:'x-2',turn_id:'u4',phase:'cancelled',offline:true});
- assert.equal(sentOf(c,first,'voice-user-turn').at(-1).client_msg_id,'r-2','a cancelled turn nobody heard is nothing to say');
+ const c=await callOnRoom();const {s,voice,first}=c;
+ c.drop(first);
+ voice.emit('turn',started('u2'));
+ voice.emit('turn',finished('u2','Sin sala'));
+ await c.until(()=>c.sockets.length===2,'an attempt');
+ const {socket}=await c.answer({session_id:'s2',resume:{token:'new'},resumed:false});
+ await c.until(()=>sentOf(c,socket,'voice-user-turn').length===1,'the words, once the new session holds');
+ assert.deepEqual(plain(sentOf(c,socket,'voice-user-turn').map(d=>[d.phase,d.turn_id,d.offline,d.session_id])),[['finished','u2',true,'s2']],'its start was the old session\'s');
+ voice.emit('turn',started('u3'));
+ c.push(socket,{type:'error',data:{key:'room.no_conversation',client_msg_id:turnSent(c,socket,'u3','started')[0].client_msg_id}});
+ voice.emit('turn',finished('u3','Rechazado'));
+ assert.equal(turnSent(c,socket,'u3','finished')[0].offline,true);
+ voice.emit('turn',started('u4'));
+ c.push(socket,{type:'error',data:{key:'room.no_conversation',client_msg_id:turnSent(c,socket,'u4','started')[0].client_msg_id}});
+ voice.emit('turn',{turn_id:'u4',phase:'cancelled',merged:false});
+ assert.equal(turnSent(c,socket,'u4','cancelled').length,0,'a cancelled turn the room never took is nothing to say');
+ s.run('disconnect()');
 });
-test('A reply is written at once and handed to the voice; its karaoke follows the row and playback goes to the room',async()=>{
+test('A reply is written at once and said by the voice; its handle lights the row and tells the room how it went',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
  const reply={session_id:'s1',utterance_id:'r-1',revision:3,reply_revision:1,thread_id:'a',history_id:'h-1',text:'Buenos días',language:'es'};
  c.push(first,{type:'voice-reply',data:reply});
  assert.equal(s.run('history.at(-1).role'),'assistant');
  assert.equal(s.run('history.at(-1).text'),'Buenos días');
- assert.deepEqual(plain(voice.calls.at(-1)),['speak',reply]);
- voice.emit('karaoke',{utterance_id:'r-1',sounding:[0,6],heard_chars:0});
+ assert.deepEqual(plain(voice.calls.at(-1)),['say','Buenos días',{language:'es'}]);
+ const handle=voice.said[0];
+ handle.step({type:'playing'});
+ assert.deepEqual(plain(sentOf(c,first,'voice-playback').map(d=>[d.utterance_id,d.status,d.session_id])),[['r-1','playing','s1']]);
+ handle.step({type:'progress',sounding:[0,6],heard_chars:0});
  assert.deepEqual(plain(s.run('karaokeState')),{segment:'h-1',start:0,end:6});
- voice.emit('playback',{client_msg_id:'p-1',utterance_id:'r-1',status:'heard',heard_chars:11});
- const played=sentOf(c,first,'voice-playback');
- assert.deepEqual([played[0].client_msg_id,played[0].status,played[0].session_id],['p-1','heard','s1']);
- c.push(first,{type:'voice-reply',data:{...reply,session_id:'other'}});
- assert.equal(voice.calls.filter(([name])=>name==='speak').length,1,'another session\'s reply is not said here');
+ handle.step({type:'done',outcome:{status:'heard'}});
+ assert.deepEqual(plain(sentOf(c,first,'voice-playback').at(-1)),{utterance_id:'r-1',status:'heard',heard_chars:11,session_id:'s1',client_msg_id:sentOf(c,first,'voice-playback').at(-1).client_msg_id});
+ assert.equal(s.run('karaokeState'),null);
+ c.push(first,{type:'voice-reply',data:{...reply,utterance_id:'r-2',session_id:'other'}});
+ assert.equal(voice.said.length,1,'another session\'s reply is not said here');
+ s.run('disconnect()');
+});
+
+test('The room\'s withdrawals cancel what it names, and each reply\'s end goes to the room in its words',async()=>{
+ const c=await callOnRoom();const {voice,first,s}=c;
+ const reply=(id,text)=>c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,revision:3,reply_revision:1,thread_id:'a',history_id:'h-'+id,text}});
+ for(const id of ['r-1','r-2','r-3','r-4','r-5'])reply(id,'Hola mundo');
+ const [one,two,three,four,five]=voice.said;
+ one.step({type:'playing'});
+ c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['r-2','gone'],reason:'newer_turn'}});
+ assert.deepEqual([one.cancelled,two.cancelled],[false,true],'only what it names; an id this page no longer holds is ignored');
+ two.step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
+ c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['r-1'],reason:'focus_changed'}});
+ one.step({type:'done',outcome:{status:'heard-up-to',heard_chars:4,reason:'cancelled'}});
+ three.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+ four.step({type:'done',outcome:{status:'not-played',reason:'barge-in'}});
+ five.step({type:'done',outcome:{status:'not-played',reason:'failed',code:'credential-missing'}});
+ const ends=sentOf(c,first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status,d.reason,d.heard_chars]);
+ assert.deepEqual(plain(ends),[
+  ['r-2','unplayed','newer_turn',0],
+  ['r-1','interrupted','focus_changed',4],
+  ['r-3','interrupted','user_interrupted',2],
+  ['r-4','unplayed','newer_turn',0],
+  ['r-5','failed',null,0],
+ ]);
+ c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'other',utterance_ids:['r-6'],reason:'newer_turn'}});
+ s.run('disconnect()');
 });
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
@@ -1055,40 +1097,41 @@ test('A page with no voice keeps its settings unchecked and says why it cannot k
 // ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
 test('A resumed session sends at once what waited while the room was away',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r-1',revision:1,reply_revision:1,thread_id:'a',history_id:'h',text:'twelve chars'}});
  c.drop(c.first);
- voice.emit('turn',{client_msg_id:'offline-end',turn_id:'off',phase:'finished',text:'offline words',offline:true});
- voice.emit('playback',{client_msg_id:'heard-offline',utterance_id:'reply',status:'heard',heard_chars:12});
+ voice.emit('turn',started('away'));
+ voice.emit('turn',finished('away','offline words'));
+ voice.said[0].step({type:'done',outcome:{status:'heard'}});
  await c.until(()=>c.sockets.length===2,'reconnect socket');
  const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
  await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
- assert.deepEqual(c.frames(socket).filter(f=>['voice-user-turn','voice-playback'].includes(f.type)).map(f=>f.data.client_msg_id),['offline-end','heard-offline'],'no later voice event needed');
- c.push(socket,{type:'voice-ack',data:{client_msg_id:'offline-end'}});c.push(socket,{type:'voice-ack',data:{client_msg_id:'heard-offline'}});
+ const sent=c.frames(socket).filter(f=>['voice-user-turn','voice-playback'].includes(f.type));
+ assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status,f.data.offline])),[['voice-user-turn','started',null],['voice-user-turn','finished',null],['voice-playback','heard',null]],'no later voice event needed; the same session takes the turn as it is');
+ for(const frame of sent)c.push(socket,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
  assert.equal(s.run('outbox.size'),0);
  s.run('disconnect()');
 });
 test('A refusal after its acknowledgement still finds the start it refuses, and nothing behind it waits',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
- voice.emit('turn',{client_msg_id:'start',turn_id:'turn',phase:'started'});
+ voice.emit('turn',started('turn'));
+ const id=turnSent(c,c.first,'turn','started')[0].client_msg_id;
  // The room acknowledges a message before it answers or refuses it.
- c.push(c.first,{type:'voice-ack',data:{client_msg_id:'start'}});
- c.push(c.first,{type:'error',data:{client_msg_id:'start',key:'room.browser_absent'}});
- voice.emit('turn',{client_msg_id:'end',turn_id:'turn',phase:'finished',text:'words'});
- voice.emit('playback',{client_msg_id:'report',utterance_id:'reply',status:'heard',heard_chars:4});
- const turns=sentOf(c,c.first,'voice-user-turn');
- assert.deepEqual(turns.map(d=>[d.client_msg_id,d.phase,d.offline]),[['start','started',undefined],['end','finished',true]],'its words go as said while away');
- assert.equal(sentOf(c,c.first,'voice-playback').length,1);
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:id}});
+ c.push(c.first,{type:'error',data:{client_msg_id:id,key:'room.browser_absent'}});
+ voice.emit('turn',finished('turn','words'));
+ assert.equal(turnSent(c,c.first,'turn','finished')[0].offline,true,'its words go as said while away');
  s.run('disconnect()');
 });
 test('A start sent again is only acknowledged by the room, and nothing waits for an answer it will not send',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
- voice.emit('turn',{client_msg_id:'start-a',turn_id:'a',phase:'started'});
+ voice.emit('turn',started('a'));
+ const id=turnSent(c,c.first,'a','started')[0].client_msg_id;
  // The same start again on the same session (after a resume or a reload, say): the room only acknowledges a repeat.
- s.run("outbox.get('start-a').sentOn=null;flushOutbox()");
- assert.equal(sentOf(c,c.first,'voice-user-turn').filter(d=>d.client_msg_id==='start-a').length,2);
- c.push(c.first,{type:'voice-ack',data:{client_msg_id:'start-a'}});
- voice.emit('turn',{client_msg_id:'end-a',turn_id:'a',phase:'finished',text:'first'});
- const end=sentOf(c,c.first,'voice-user-turn').find(d=>d.client_msg_id==='end-a');
- assert.deepEqual([end?.turn_id,end?.offline],['a',undefined],'its end goes as it is, named, with no answer');
+ s.context.__id=id;s.run("outbox.get(__id).sentOn=null;flushOutbox()");
+ assert.equal(turnSent(c,c.first,'a','started').filter(d=>d.client_msg_id===id).length,2);
+ c.push(c.first,{type:'voice-ack',data:{client_msg_id:id}});
+ voice.emit('turn',finished('a','first'));
+ assert.deepEqual([turnSent(c,c.first,'a','finished')[0]?.offline],[undefined],'its end goes as it is, named, with no answer');
  s.run('disconnect()');
 });
 
@@ -1127,47 +1170,34 @@ test('A hang-up while the settings are taken never starts the microphone, and on
  assert.deepEqual(slow.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['start','stop','stop'],'the hang-up, then what the join started');
  assert.equal(d.sockets.length,0);
 });
-test('The voice\'s turns and playback reports go as the room reads them, and a voice failure is said and logged',async()=>{
+test('A voice failure is said and logged',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
- voice.emit('turn',{client_msg_id:'t-start',turn_id:'t',phase:'started'});
- c.push(c.first,{type:'voice-user-turn',data:{phase:'started',turn_id:'t',revision:1,session_id:'s1',thread_id:'a'}});
- // @sidevoice/voice writes the timings under the room's name, and the page passes them on as they are.
- voice.emit('turn',{client_msg_id:'t-end',turn_id:'t',phase:'finished',text:'words',timings_ms:{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600}});
- assert.deepEqual(plain(sentOf(c,c.first,'voice-user-turn').at(-1).timings_ms),{audio_ms:900,endpoint_silence_ms:400,recognition_ms:600});
- // A failure has no reason in the room's words; its code arrives as the voice's error event.
- voice.emit('playback',{client_msg_id:'failed',utterance_id:'reply',status:'failed',heard_chars:0});
- const failed=sentOf(c,c.first,'voice-playback').at(-1);
- assert.equal(failed.status,'failed');assert.equal('reason' in failed,false);
  const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>name==='setBootError'?value=>said.push(value):()=>{}});
  voice.emit('error',{code:'credential-missing'});
  assert.match(said.at(-1)||'',/Falta la clave del proveedor/);
  assert.deepEqual(plain(c.frames(c.first).filter(m=>m.type==='voice-client-error').map(m=>[m.data.kind,m.data.message])),[['voice','credential-missing']]);
  s.run('disconnect()');
 });
-test('A move to another conversation silences the last one\'s voice, and a late reply of it is not said',async()=>{
+test('A move to another conversation leaves its replies to the room, which withdraws them; the call keeps listening',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'old-reply',revision:1,reply_revision:1,thread_id:'a',history_id:'row',text:'old conversation'}});
  const before=voice.calls.length;
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
  await s.run("select('b')");await settleSoon();
  assert.equal(s.run('targetId()'),'b');
- assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['stop','start']);
- const spoken=voice.calls.filter(([name])=>name==='speak').length;
- c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:1,reply_revision:2,thread_id:'a',history_id:'row-2',text:'late'}});
- assert.equal(voice.calls.filter(([name])=>name==='speak').length,spoken,'not said');
+ assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),[],'not stopped: what is stale is the room\'s to say');
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['old-reply'],reason:'focus_changed'}});
+ assert.equal(voice.said[0].cancelled,true);
+ voice.said[0].step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
  const report=sentOf(c,c.first,'voice-playback').at(-1);
- assert.deepEqual([report.utterance_id,report.status,report.reason],['late','unplayed','focus_changed']);
- // A rebind of the same conversation is not a move.
- const kept=voice.calls.length;
- s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'again'},room:{revision:0}})});
- await s.run('refresh()');await settleSoon();
- assert.equal(voice.calls.slice(kept).some(([name])=>name==='stop'),false);
+ assert.deepEqual([report.utterance_id,report.status,report.reason],['old-reply','unplayed','focus_changed']);
  s.run('disconnect()');
 });
 test('Words said while away take the room\'s row id, so history shows them once with their receipt',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
- voice.emit('turn',{client_msg_id:'off-start',turn_id:'off',phase:'started',offline:true});
- voice.emit('turn',{client_msg_id:'off-end',turn_id:'off',phase:'finished',text:'offline words',offline:true});
+ voice.emit('turn',started('off'));
+ c.push(c.first,{type:'error',data:{key:'room.no_conversation',client_msg_id:turnSent(c,c.first,'off','started')[0].client_msg_id}});
+ voice.emit('turn',finished('off','offline words'));
  assert.equal(s.run("state.history.find(r=>r.text==='offline words').segment"),'s1:user-turn:off','the room names the row by the turn');
  s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'s1:user-turn:off',session:'s1',revision:0,thread:'a',role:'user',text:'offline words',status:'delivered'}]})});
  await s.run('refreshHistory()');
@@ -1179,35 +1209,57 @@ test('Nothing goes on a new socket before the room answers its hello, and then i
  const c=await callOnRoom();const {s,voice}=c;c.drop(c.first);
  await c.until(()=>c.sockets.length===2,'reconnect socket');
  const socket=c.sockets.at(-1);socket.readyState=1;socket.onopen();
- voice.emit('turn',{client_msg_id:'during-hello',turn_id:'off',phase:'finished',text:'during hello',offline:true});
+ voice.emit('turn',started('hello'));
+ voice.emit('turn',finished('hello','during hello'));
  assert.equal(sentOf(c,socket,'voice-user-turn').length,0,'held until the session is known');
  c.push(socket,{type:'voice-session',data:{session_id:'s2',resume:{token:'new'},resumed:false}});
  await c.until(()=>!s.run('state.reconnecting'),'new session');
  await c.until(()=>sentOf(c,socket,'voice-user-turn').length===1,'sent once the new session holds');
- assert.equal(sentOf(c,socket,'voice-user-turn')[0].session_id,'s2');
+ assert.deepEqual(plain(sentOf(c,socket,'voice-user-turn').map(d=>[d.phase,d.session_id,d.offline])),[['finished','s2',true]]);
  s.run('disconnect()');
 });
 test('A start of a replaced session is not sent again: its words go as said while away',()=>{
  const s=setup();
- s.run("var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({client_msg_id:'old-start',turn_id:'a',phase:'started'});voiceTurn({client_msg_id:'old-end',turn_id:'a',phase:'finished',text:'words'});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
- assert.deepEqual(plain(s.run("__sent.map(m=>[m.data.client_msg_id,m.data.phase,m.data.offline,m.data.session_id])")),[['old-end','finished',true,'new']]);
- assert.equal(s.run("outbox.get('old-start')"),null);
+ s.run("var __sent=[];ws={readyState:1,session:'s',send(m){__sent.push(JSON.parse(m))}};voiceTurn({turn_id:'a',phase:'started',started_at:1});voiceTurn({turn_id:'a',phase:'finished',text:'words',started_at:1,ended_at:2,merged:false,timings:{}});__sent.length=0;sessionId='new';relay.reset();ws={readyState:1,session:'new',send(m){__sent.push(JSON.parse(m))}};flushOutbox()");
+ assert.deepEqual(plain(s.run("__sent.map(m=>[m.data.phase,m.data.offline,m.data.session_id])")),[['finished',true,'new']]);
+ assert.equal(s.run("outbox.list().some(entry=>entry.payload.data.phase==='started')"),false);
 });
 
-test('A turn the room has no room for yet is the voice\'s to keep; another refused start still goes as said while away',async()=>{
- const c=await callOnRoom();const {voice,first}=c;
- voice.emit('turn',{client_msg_id:'f-1',turn_id:'u9',phase:'started',offline:false});
- const full={key:'room.turns_full',message:'Too many turns',client_msg_id:'f-1'};
- c.push(first,{type:'error',data:full});
- assert.deepEqual(plain(voice.calls.filter(([name])=>name==='roomRefused')),[['roomRefused',full]],'the voice gets the refusal');
- // The voice says the turn again later; nothing turns it into words said while away here.
- voice.emit('turn',{client_msg_id:'f-2',turn_id:'u9',phase:'finished',text:'Otra vez',offline:false});
- const end=sentOf(c,first,'voice-user-turn').find(d=>d.client_msg_id==='f-2');
- assert.deepEqual([end.turn_id,end.offline],['u9',false]);
- // Any other refusal reaches the voice too, and its turn's words go as said while away.
- voice.emit('turn',{client_msg_id:'g-1',turn_id:'u10',phase:'started',offline:false});
- c.push(first,{type:'error',data:{key:'room.no_conversation',client_msg_id:'g-1'}});
- voice.emit('turn',{client_msg_id:'g-2',turn_id:'u10',phase:'finished',text:'Sin conversación',offline:false});
- assert.equal(voice.calls.filter(([name])=>name==='roomRefused').length,2);
- assert.equal(sentOf(c,first,'voice-user-turn').find(d=>d.client_msg_id==='g-2').offline,true);
+test('A turn the room has no room for yet keeps its words and starts again, as a new message, when another turn ends',async()=>{
+ const c=await callOnRoom();const {voice,first,s}=c;
+ voice.emit('turn',started('open'));
+ voice.emit('turn',started('u9'));
+ const refused=turnSent(c,first,'u9','started')[0].client_msg_id;
+ c.push(first,{type:'voice-ack',data:{client_msg_id:refused}});
+ c.push(first,{type:'error',data:{key:'room.turns_full',message:'Too many turns',client_msg_id:refused}});
+ voice.emit('turn',finished('u9','Otra vez'));
+ assert.equal(turnSent(c,first,'u9','finished').length,0,'held, words and all');
+ assert.equal(s.run('outbox.list().some(entry=>entry.payload.data.text==="Otra vez")'),true);
+ // Another turn ends: after its end, the held turn starts again under a message of its own, and its words follow.
+ voice.emit('turn',finished('open','Primera'));
+ const order=sentOf(c,first,'voice-user-turn').map(d=>[d.turn_id,d.phase,d.offline]);
+ assert.deepEqual(plain(order.slice(-3)),[['open','finished',null],['u9','started',null],['u9','finished',null]]);
+ const again=turnSent(c,first,'u9','started').at(-1).client_msg_id;
+ assert.notEqual(again,refused,'the room takes each message once: a new one');
+ s.run('disconnect()');
+});
+
+test('A held turn refused again keeps its words, and starts again at the next end',async()=>{
+ const c=await callOnRoom();const {voice,first,s}=c;
+ for(const id of ['a','b','held'])voice.emit('turn',started(id));
+ const full=id=>c.push(first,{type:'error',data:{key:'room.turns_full',client_msg_id:id}});
+ full(turnSent(c,first,'held','started')[0].client_msg_id);
+ voice.emit('turn',finished('held','Espera'));
+ voice.emit('turn',finished('a','A'));
+ // Started again after `a`, its words right behind: the room has no room yet, and refuses both.
+ assert.equal(turnSent(c,first,'held','finished').length,1);
+ full(turnSent(c,first,'held','started').at(-1).client_msg_id);
+ c.push(first,{type:'error',data:{key:'room.input_ended',client_msg_id:turnSent(c,first,'held','finished')[0].client_msg_id}});
+ assert.equal(turnSent(c,first,'held','finished').length,1,'its words kept again, held');
+ voice.emit('turn',{turn_id:'b',phase:'cancelled',merged:false});
+ assert.equal(turnSent(c,first,'held','started').length,3,'started again after the next end');
+ const words=turnSent(c,first,'held','finished');
+ assert.deepEqual(plain(words.map(d=>[d.text,d.offline])),[['Espera',null],['Espera',null]]);
+ assert.notEqual(words[0].client_msg_id,words[1].client_msg_id);
+ s.run('disconnect()');
 });

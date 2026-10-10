@@ -106,7 +106,7 @@ export const TURN_STAGES = [
   "delivery_to_read",
   "read_to_reply",
   "input_queued_to_reply",
-  "reply_to_synthesis",
+  "reply_to_dispatch",
   "provider_synthesis",
   "audio_received_to_playback",
 ] as const;

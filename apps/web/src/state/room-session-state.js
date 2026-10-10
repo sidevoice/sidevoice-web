@@ -15,7 +15,7 @@ export function initialSessionFacts() {
         people: [], history: [], roomSeen: {}, inputReceipts: {},
         userLive: false, botLive: false,
         userTurn: null, pendingPhase: '', pendingUserText: '', cancelledInput: false, textSending: false, micEnabled: true,
-        // Where the call's voice is (`{listening, recognising, playback, online}`, as it reports it), or null outside a call.
+        // Where the call's voice is (`{listening, recognising, playback}`, as it reports it), or null outside a call.
         voiceState: null,
         joinStep: null, joinFailure: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0, liveNote: '',
@@ -143,7 +143,7 @@ export function capabilityPanel(s) {
     const rows = [], voice = s.voiceState;
     if (voice)
         rows.push({ id: 'voice', label: 'Voz', value: LISTENING_WORDS[voice.listening] || voice.listening,
-            state: voice.online === false ? 'warn' : 'ok', note: voice.online === false ? 'Sin la sala: lo que digas se envía al volver.' : '' });
+            state: s.reconnecting ? 'warn' : 'ok', note: s.reconnecting ? 'Sin la sala: lo que digas se envía al volver.' : '' });
     if (s.screenLock?.state)
         rows.push({ id: 'screen', label: 'Pantalla',
             value: s.screenLock.state === 'on' ? 'Se mantiene encendida' : 'No se pudo mantener',
