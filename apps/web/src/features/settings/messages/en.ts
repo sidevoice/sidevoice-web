@@ -607,7 +607,6 @@ export const en = {
   "hosts.devices.done": "Done",
   "hosts.devices.pairIntro": "Create a one-time code here, then enter it on the device you are pairing.",
   "hosts.devices.codeExpiresIn": "Expires in {time}. Share it only with the device you are pairing.",
-  "hosts.thisComputerTag": "This computer",
   "hosts.stoppedNote": "Sidevoice is stopped on this computer. Start it here, or it starts again when you next sign in.",
   "hosts.stoppedNoLoginNote": "Sidevoice is stopped on this computer and does not start when you sign in. Start it here when you need it.",
   // What wants updating (UpdatesEntry).

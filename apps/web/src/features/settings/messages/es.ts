@@ -609,7 +609,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.devices.done": "Hecho",
   "hosts.devices.pairIntro": "Crea aquí un código de un solo uso y escríbelo en el dispositivo que emparejas.",
   "hosts.devices.codeExpiresIn": "Caduca en {time}. Compártelo solo con el dispositivo que emparejas.",
-  "hosts.thisComputerTag": "Este ordenador",
   "hosts.stoppedNote": "Sidevoice está detenido en este ordenador. Inícialo aquí, o se iniciará al volver a entrar en la sesión.",
   "hosts.stoppedNoLoginNote": "Sidevoice está detenido en este ordenador y no se inicia al entrar en la sesión. Inícialo aquí cuando lo necesites.",
   // What wants updating (UpdatesEntry).

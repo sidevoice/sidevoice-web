@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
+import { AddIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -74,14 +74,16 @@ export function MachineNav({ current }: { current: boolean }) {
         const copy = machineCopy(machine, status, t);
         const state = machineState(machine, copy, t);
         return (
-          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={state.label + " · " + copy.subtitle} aria-label={`${copy.name}, ${state.label} · ${copy.subtitle}`}
+          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.name + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.name}, ${state.label} · ${copy.subtitle}`}
             data-name={copy.name} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
-            <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
+            {/* This computer, an icon before its name; the name cut short when long (whole in the title); the state's dot
+                last. An entry never grows past the column. */}
+            {machine.local && <span className="machine-nav-here" title={t("hosts.thisComputer")}><ThisComputerIcon /><span className="sr-only">{t("hosts.thisComputer")}</span></span>}
             <span className="machine-nav-name">{copy.name}</span>
-            {machine.local && copy.name !== t("hosts.thisComputer") && <span className="machine-nav-local">{t("hosts.thisComputerTag")}</span>}
             {notice(machine) && <NewDot label={t("highlights.navNew")} />}
+            <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
           </button>
         );
       })}

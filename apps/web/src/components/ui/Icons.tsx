@@ -9,7 +9,7 @@ import {
   Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform, ArrowUp, ArrowRight,
+  Box, AudioWaveform, ArrowUp, ArrowRight, Laptop,
   Timer, ScrollText,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -34,6 +34,8 @@ function mark(Drawing: LucideLike, fallbackSize: number) {
 // ----- the room
 export const ConversationsIcon = mark(MessagesSquare, 16);
 export const MachinesIcon = mark(Monitor, 16);
+/** This computer, among machines. */
+export const ThisComputerIcon = mark(Laptop, 14);
 export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
 /** Puts away what dropped from above: a phone's conversations panel. */
