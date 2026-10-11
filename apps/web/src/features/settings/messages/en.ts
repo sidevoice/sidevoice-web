@@ -98,6 +98,8 @@ export const en = {
   "settings.deviceName": "This device’s name",
   "settings.deviceName.hint": "How the machines you pair with list this device. Changing it renames it on them.",
   "settings.deviceName.saved": "Saved, and your machines were told.",
+  "settings.deviceName.tooLong": "Up to 60 characters.",
+  "settings.deviceName.invalid": "Remove the invisible control or direction characters.",
   "settings.deviceName.partly": "Saved. {n} machine(s) couldn’t be told; they keep the old name for now.",
   "hosts.devices.renameSave": "Save",
   "hosts.devices.revoked": "Device revoked.",

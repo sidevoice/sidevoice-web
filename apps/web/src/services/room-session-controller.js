@@ -12,6 +12,7 @@ import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-langua
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
+import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
@@ -103,7 +104,7 @@ function aliased(summary){const alias=machineAliases()[summary.fp];return typeof
 function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary).map(aliased),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
 /** Renames a machine on this device only; null goes back to the machine's own name. */
 function renameMachine(fp,name){
- const next={...machineAliases()},text=typeof name==='string'?name.trim().slice(0,60):'';
+ const next={...machineAliases()},text=typeof name==='string'?clampDeviceName(name):'';
  if(text)next[fp]=text;else delete next[fp];
  try{pageStorage()?.setItem(ALIASES_KEY,JSON.stringify(next))}catch{}
  publishPairings();
@@ -111,7 +112,9 @@ function renameMachine(fp,name){
 /** This device's name, as machines list it: kept for the next pairing, and asked of each machine it is paired with now
  *  (renaming this device in their lists). Resolves with how many could not be told. */
 async function setDeviceName(name){
- const text=String(name||'').trim().slice(0,60);
+ const text=clampDeviceName(name||'');
+ // One a machine would refuse is not kept, nor sent (the field says why).
+ if(text&&deviceNameProblem(text))throw Object.assign(Error('device.name_invalid'),{key:'device.name_invalid'});
  try{if(text)pageStorage()?.setItem('sidevoice.deviceName',text);else pageStorage()?.removeItem('sidevoice.deviceName')}catch{}
  roomStore.patch({deviceName:text||null});
  if(!text)return 0;
@@ -714,7 +717,7 @@ async function revokeLocalHostDevice(id){
 async function machineDevices(fp){return deviceRows(await hostApi(fp,'/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'}))}
 async function revokeMachineDevice(fp,id){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}})}
 // A device renamed in a machine's list: the machine keeps its name (PATCH, sidevoice-web #75; a contract gap in core).
-const renameBody=name=>({method:'PATCH',headers:{'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({name:String(name).trim().slice(0,60)})});
+const renameBody=name=>({method:'PATCH',headers:{'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({name:clampDeviceName(name)})});
 async function renameMachineDevice(fp,id,name){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 async function renameLocalHostDevice(id,name){await localHostApi('/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.

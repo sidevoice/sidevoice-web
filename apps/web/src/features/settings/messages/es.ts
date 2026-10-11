@@ -100,6 +100,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "settings.deviceName": "Nombre de este dispositivo",
   "settings.deviceName.hint": "Cómo lo ven las máquinas con las que lo emparejas. Cambiarlo lo renombra en ellas.",
   "settings.deviceName.saved": "Guardado, y tus máquinas lo saben.",
+  "settings.deviceName.tooLong": "Hasta 60 caracteres.",
+  "settings.deviceName.invalid": "Quita los caracteres invisibles de control o de dirección.",
   "settings.deviceName.partly": "Guardado. {n} máquina(s) no se enteraron; de momento siguen con el nombre anterior.",
   "hosts.devices.renameSave": "Guardar",
   "hosts.devices.revoked": "Dispositivo revocado.",

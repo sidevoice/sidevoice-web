@@ -13,6 +13,7 @@
  * No DOM and no clock of its own: storage, fetch, WebCrypto and the time are handed in, so each step can be
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
 import { patiently } from './rendezvous.js';
+import { clampDeviceName } from './device-name-rules.js';
 export const PAIRING_CODE_PREFIX = 'SV1.';
 export const PAIRINGS_KEY = 'sidevoice.pairings';
 export const IDENTITY_PREFIX = 'sidevoice-node-identity:';
@@ -274,7 +275,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     try {
         // Never redirected: a 307 would hand the secret, in the body, to wherever it pointed.
         response = await get(place.base + '/api/device/pair', { method: 'POST', headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-            body: JSON.stringify({ secret: payload.secret, name: String(name || '').trim().slice(0, 60) || deviceName() }), cache: 'no-store', redirect: 'error' });
+            body: JSON.stringify({ secret: payload.secret, name: clampDeviceName(name || '') || deviceName() }), cache: 'no-store', redirect: 'error' });
     } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.'); }
     try { answer = await response.json(); } catch { /* no body */ }
     if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.');

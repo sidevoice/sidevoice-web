@@ -143,3 +143,4 @@
 .host-rename-open:hover, .host-rename-open:focus-visible { opacity: 1; }
 .host-alias { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); }
 .device-name-note { display: block; margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
+.device-name-error { display: block; margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); color: var(--sv-danger); }
