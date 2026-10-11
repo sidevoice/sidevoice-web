@@ -1340,9 +1340,19 @@ async function installVoiceModel(task){
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
 // A key changes what a provider lists: its catalogue is read again with it.
+// A provider's key tested: the provider asked again, and the catalogues read with what it said. A host without a way to
+// ask again (an older desktop app) reads them as they are.
+async function testProviderKey(provider){
+ const models=await modelCatalogs();
+ await models.refresh?.(provider).catch(()=>undefined);
+ const catalogs=await models.catalogs();
+ roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
+}
 async function saveProviderKey(provider,key){
  let models;
  try{models=await modelCatalogs();await models.setCredential(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
+ // A key just given is checked with the provider at once, past any list kept from the key before.
+ if(key)await models.refresh?.(provider).catch(()=>undefined);
  const catalogs=await models.catalogs().catch(()=>null);
  if(catalogs)roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
@@ -1389,6 +1399,7 @@ window.sidevoiceActions={
  skipReply,
  editVoice,
  saveProviderKey,
+ testProviderKey,
  loadVoiceCatalogue,
  replayReply,
  toggleMic,

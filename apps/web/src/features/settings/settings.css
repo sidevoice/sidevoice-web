@@ -40,3 +40,32 @@
   .settings-nav .ui-nav-item { width: auto; flex: none; }
   .settings-column { padding: var(--sv-space-5) var(--sv-space-4) var(--sv-space-8); }
 }
+
+/* Providers as connected accounts: a row each — mark, name and state, what it is for and the key's last four, its
+ * actions — and the key's form or the removal's question opening under it. */
+.provider-row { display: grid; gap: var(--sv-space-3); padding: var(--sv-space-4) var(--sv-space-5); }
+.provider-row + .provider-row { border-top: 1px solid var(--sv-border); }
+.provider-row-main { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.provider-row-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.provider-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
+.provider-row-title .ui-badge svg { width: 12px; height: 12px; }
+.provider-row-detail { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-row-problem { display: flex; align-items: center; gap: var(--sv-space-1-5); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.provider-row-problem svg { flex: none; color: var(--sv-warning); }
+.provider-row[data-state="rejected"] .provider-row-problem svg, .provider-row[data-state="unreadable"] .provider-row-problem svg { color: var(--sv-danger); }
+.provider-row-actions { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; }
+.provider-row-note { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
+.provider-row-note:empty { display: none; }
+.provider-row .provider-mark { width: 36px; height: 36px; border-radius: var(--sv-radius-md); }
+.provider-row > .provider-key, .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; font-size: var(--sv-font-sm); font-weight: 600; color: var(--sv-accent-text); text-decoration: none; }
+.provider-key-link:hover { text-decoration: underline; }
+.provider-key-input { display: flex; gap: var(--sv-space-2); }
+.provider-key-input .ui-input { flex: 1; }
+.provider-key-cost, .provider-key-replacing { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-remove p { margin: 0 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
+@media (max-width: 767px) {
+  .provider-row-main { flex-wrap: wrap; }
+  .provider-row-actions { width: 100%; padding-inline-start: 48px; }
+  .provider-row > .provider-key, .provider-remove { margin-inline-start: 0; }
+}

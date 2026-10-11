@@ -20,6 +20,7 @@
  *   install(model: string, options?: InstallOptions): Promise<void>,
  *   setCredential(provider: string, key: string | null): Promise<void>,
  *   hasCredential(provider: string): Promise<boolean>,
+ *   refresh?(provider: string): Promise<void>,
  * }} ModelCatalogs
  */
 
@@ -103,6 +104,10 @@ export function engineCatalogs(engine, credentials) {
     },
     async hasCredential(provider) {
       return credentials.get(provider) != null;
+    },
+    // Asks the provider again, past any list kept: what a test of its key needs.
+    async refresh(provider) {
+      await engine.catalogs().find((catalog) => catalog.id === provider)?.refresh();
     },
   };
 }

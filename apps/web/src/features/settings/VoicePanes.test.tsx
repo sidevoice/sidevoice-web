@@ -101,22 +101,37 @@ test("in a browser the key pane warns where the key lives and to cap the spend; 
   expect(document.getElementById("provider-keys-where")).toHaveTextContent(/system keychain/);
 });
 
-test("one key per remote catalogue: handed to the engine's host, the field emptied, and a kept key removable", async () => {
+test("each provider is a row with its state: one without a key is added in place, one with a key is connected, its last four shown", async () => {
   const { actions, store } = renderPane("keys");
-  expect([...document.querySelectorAll(".provider-key")].map((row) => row.getAttribute("data-provider"))).toEqual(["elevenlabs", "openai"]);
+  const rows = [...document.querySelectorAll(".provider-row")];
+  expect(rows.map((row) => [row.getAttribute("data-provider"), row.getAttribute("data-state")])).toEqual([["elevenlabs", "connected"], ["openai", "absent"]]);
+  expect(rows[0]).toHaveTextContent("Connected");
+  expect(rows[1]).toHaveTextContent("Not connected");
+  // OpenAI: its key is added in place — where to get one, the field hidden, and Connect.
+  fireEvent.click(screen.getByRole("button", { name: "Add key" }));
   const field = document.getElementById("provider-key-openai") as HTMLInputElement;
   expect(field.type).toBe("password");
-  expect((document.getElementById("provider-key-remove-openai") as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.change(field, { target: { value: " sk-test " } });
+  expect(screen.getByRole("link", { name: /Get a key at OpenAI/ })).toHaveAttribute("href", "https://platform.openai.com/api-keys");
+  fireEvent.change(field, { target: { value: " sk-test-7f3a " } });
   await act(async () => { fireEvent.click(document.getElementById("provider-key-save-openai")!); });
-  expect(actions.saveProviderKey).toHaveBeenCalledWith("openai", "sk-test");
-  expect(field.value).toBe("");
+  expect(actions.saveProviderKey).toHaveBeenCalledWith("openai", "sk-test-7f3a");
   act(() => store.patch({ providerKeys: { openai: true, elevenlabs: true } }));
-  await act(async () => { fireEvent.click(document.getElementById("provider-key-remove-openai")!); });
-  expect(actions.saveProviderKey).toHaveBeenLastCalledWith("openai", null);
+  expect(document.querySelector(".provider-row[data-provider='openai']")).toHaveTextContent("key ending in 7f3a");
+  // Its menu (replace, manage, remove after asking) is Radix's, which jsdom cannot open: the browser checks it.
+  expect(screen.getByRole("button", { name: "More for OpenAI" })).toBeInTheDocument();
   cleanup();
   renderPane("keys", { voiceCatalogue: { state: "ready", catalogs: [catalogs[0]], error: "" } });
   expect(document.getElementById("provider-keys-none")).toBeInTheDocument();
+});
+
+test("a kept key the provider refused says so, and offers to replace it", () => {
+  const refused = catalogs.map((catalog) => catalog.id === "elevenlabs" ? { ...catalog, status: { stale: false, reason: { code: "credential-rejected", params: {} } } } : catalog) as CatalogView[];
+  renderPane("keys", { voiceCatalogue: { state: "ready", catalogs: refused, error: "" } });
+  const row = document.querySelector(".provider-row[data-provider='elevenlabs']")!;
+  expect(row).toHaveAttribute("data-state", "rejected");
+  expect(row).toHaveTextContent("Key rejected");
+  expect(row).toHaveTextContent("didn't accept the key");
+  expect(row.querySelector("button")).toHaveTextContent("Replace key");
 });
 
 test("the providers are the catalogues: while they load it says so, and when they could not be read it says why, never an empty list", () => {

@@ -50,6 +50,8 @@ export const MicrophoneIcon = mark(Mic, 24);
 export const MicrophoneOffIcon = mark(MicOff, 24);
 /** Back to the whole app, from the desktop app's call controls card. */
 export const OpenAppIcon = mark(ExternalLink, 16);
+/** A link that opens somewhere else, in a new tab. */
+export const ExternalLinkIcon = mark(ExternalLink, 14);
 export const SpeakerIcon = mark(Volume2, 20);
 export const CallIcon = mark(Phone, 22);
 export const HangupIcon = mark(PhoneOff, 22);
