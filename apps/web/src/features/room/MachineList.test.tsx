@@ -43,7 +43,7 @@ function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   return store;
 }
 
-test("the local host is first, remote rows say Connected without revealing a route, and Use switches machines", async () => {
+test("the local host is first, remote rows say Connected without revealing a route, and no page offers to switch to its machine", async () => {
   const done = actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { pairingInUse: "fp-other", node: "fp-other", nodeReach: "ok",
@@ -55,13 +55,12 @@ test("the local host is first, remote rows say Connected without revealing a rou
   expect(rows[1].getAttribute("aria-label")).toMatch(/NUC/);
   expect(rows[1].getAttribute("aria-label")).toMatch(/Connected/);
   expect(rows[1].getAttribute("aria-label")).not.toMatch(/room\.example|nuc-1|fingerprint|relay/i);
-  // Each machine's page, reached from its entry, offers Use.
+  // Every paired machine is talked to at once (web #83): a machine's page has no Use.
   await act(async () => { entry("MacBook").click(); });
-  await act(async () => { screen.getByRole("button", { name: "Use MacBook" }).click(); });
-  expect(done.chooseMachine).toHaveBeenCalledWith("fp-local");
+  expect(screen.queryByRole("button", { name: /^Use / })).toBeNull();
   await act(async () => { entry("NUC").click(); });
-  await act(async () => { screen.getByRole("button", { name: "Use NUC" }).click(); });
-  expect(done.chooseMachine).toHaveBeenCalledWith("fp-nuc");
+  expect(screen.queryByRole("button", { name: /^Use / })).toBeNull();
+  expect(done.chooseMachine).not.toHaveBeenCalled();
 });
 
 test("an unreachable remote machine only says No response, and can still be forgotten from this device's row", () => {
@@ -139,14 +138,16 @@ test("local F6 status shows only supported service actions", async () => {
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: { state: "not-installed", installed: false, service: "none" } });
   await act(async () => { entry("MacBook").click(); });
-  expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(document.querySelector(".host-status-summary")).toHaveTextContent("Does not start when you sign in");
-  expect(screen.getAllByRole("button", { name: "Start at login" })).toHaveLength(1);
+  // Not installed: its one action is Start, which installs the service; Start at sign-in comes once there is one.
+  expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
+  expect(screen.queryByRole("switch", { name: "Start at sign-in" })).toBeNull();
   expect(screen.queryByRole("button", { name: /agent/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /copy from another machine/i })).toBeNull();
   expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
-  await act(async () => { screen.getByRole("button", { name: "Start at login" }).click(); });
+  await act(async () => { screen.getByRole("button", { name: "Start" }).click(); });
   expect(serviceInstall).toHaveBeenCalledOnce();
 });
 
@@ -284,11 +285,11 @@ test.each([
   expect(update).not.toHaveBeenCalled();
 });
 
-test("stopping the local host requires confirmation and Cancel leaves it running", async () => {
+test("stopping the local host while calls are active asks first, and Cancel leaves it running", async () => {
   const stop = vi.fn().mockResolvedValue(undefined);
   setBridge({ stop });
   actions();
-  room([local], { pairingInUse: "fp-local" });
+  room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 1 } });
   await act(async () => { entry("MacBook").click(); });
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
@@ -300,6 +301,18 @@ test("stopping the local host requires confirmation and Cancel leaves it running
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
+  expect(stop).toHaveBeenCalledOnce();
+});
+
+test("with no active calls, Stop stops the local host without asking", async () => {
+  const stop = vi.fn().mockResolvedValue(undefined);
+  setBridge({ stop });
+  actions();
+  room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
+  await act(async () => { entry("MacBook").click(); });
+
+  await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
+  expect(screen.queryByText("Stop Sidevoice on this computer? Active calls will end.")).toBeNull();
   expect(stop).toHaveBeenCalledOnce();
 });
 
@@ -480,8 +493,8 @@ test("a reachable local core stays Connected when its service state is not runni
 
 
 test("a remote machine's page has it all: how it is reached, its agents, its devices (others revocable, never this one), and Forget", async () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "a" }));
-  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "This browser", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" }];
+  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "Chrome on Mac", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" },
+    { device_id: "d-self", name: "NUC", kind: "local" }];
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue(devices), revokeMachineDevice: vi.fn().mockResolvedValue(undefined), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { pairingInUse: "fp-nuc", node: "fp-nuc", nodeReach: "ok",
@@ -489,14 +502,28 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
   expect(done.machineDevices).toHaveBeenCalledWith("fp-nuc");
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Revoke This browser" })).toBeNull();
+  const rows = [...document.querySelectorAll<HTMLElement>(".host-device-row")];
+  // This device's row: its name, "This device", and forgetting the machine — never revoking itself.
+  expect(rows[0]).toHaveTextContent("Chrome on Mac");
+  expect(within(rows[0]).getByText("This device")).toBeInTheDocument();
+  expect(within(rows[0]).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Revoke Chrome on Mac" })).toBeNull();
+  // The machine's own Sidevoice, paired with itself: "This machine", with why, and not revocable from here.
+  expect(within(rows[2]).getByText("This machine")).toBeInTheDocument();
+  expect(within(rows[2]).getByRole("button", { name: "About this device" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Revoke NUC" })).toBeNull();
+  // Devices are named where they are (this one in General); none is renamed here. Read once: nothing to retry.
+  expect(screen.queryByRole("button", { name: /^Rename (Chrome on Mac|Phone)/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Revoke Phone" }));
   const confirm = screen.getByRole("group", { name: "Revoke Phone" });
   await act(async () => { fireEvent.click(within(confirm).getByRole("button", { name: "Revoke Phone" })); });
   expect(done.revokeMachineDevice).toHaveBeenCalledWith("fp-nuc", "d-phone");
   // Pairing goes from a device to the machine, never from here.
   expect(screen.queryByRole("button", { name: "Pair another device" })).toBeNull();
-  expect(screen.queryByRole("heading", { name: "Sidevoice on this computer" })).toBeNull();
+  // Its Sidevoice card is to read: it is run there.
+  expect(screen.getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
   fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
   expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
@@ -523,13 +550,16 @@ test("the machines are entries under Machines, Add a machine last; an entry show
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   const store = room([local, paired()], { remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
   const nav = document.querySelector(".machines-inline .machine-nav")!;
-  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^MacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
+  // This computer's entry says so before its name (an icon, in words to a screen reader).
+  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^This computerMacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
   expect(entry("NUC")).toHaveAccessibleName("NUC, Online · Connected");
   // Machines alone is the first machine.
-  expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
   await act(async () => { entry("NUC").click(); });
   expect(store.getState().facts.machinesView.machine).not.toBeNull();
-  expect(screen.queryByRole("heading", { name: "Sidevoice on this computer" })).toBeNull();
+  // Every machine's page has its Sidevoice card: another machine's, to read.
+  expect(screen.queryByRole("heading", { name: "Sidevoice on MacBook" })).toBeNull();
+  expect(screen.getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
 });
