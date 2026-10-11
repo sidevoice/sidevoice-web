@@ -83,6 +83,9 @@ export interface LocalHostBridge {
   restart?(): Promise<unknown>;
   serviceInstall?(): Promise<unknown>;
   serviceUninstall?(): Promise<unknown>;
+  /** Whether the service starts at the next sign-in, and only that: a running service keeps running, a stopped one stays
+   *  stopped. (serviceInstall/serviceUninstall also start and stop it.) */
+  setStartAtLogin?(enabled: boolean): Promise<unknown>;
   reconnect?(): Promise<unknown>;
   revealLog?(): Promise<unknown> | unknown;
   pairingCode?(): Promise<LocalPairingCode>;

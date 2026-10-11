@@ -244,6 +244,15 @@ function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; ti
     catch { setNote(t("hosts.actionFailed")); }
     finally { setBusy(null); }
   }
+  const bridge = localHostBridge();
+  const canSetLogin = typeof bridge?.setStartAtLogin === "function";
+  async function setLogin(enabled: boolean) {
+    if (busy || !bridge?.setStartAtLogin) return;
+    setBusy(loginAction);setNote("");
+    try { await bridge.setStartAtLogin(enabled); }
+    catch { setNote(t("hosts.actionFailed")); }
+    finally { setBusy(null); }
+  }
   async function copyDetails() {
     try { await navigator.clipboard.writeText(JSON.stringify(details, null, 2));setCopied(true);setNote(t("hosts.detailsCopied")); }
     catch { setCopied(false);setNote(t("hosts.actionFailed")); }
@@ -274,9 +283,13 @@ function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; ti
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
         </div>
       )}
+      {/* Start at sign-in is its own: it changes only whether the service starts at the next sign-in, never whether it
+          runs now. Where the app can only set it by installing or removing the service (which starts or stops it too),
+          it is shown, and says why it cannot change here. */}
       {loginAction && <label className="host-status-login">
-        <span><span className="host-status-login-label">{t("hosts.startAtSignIn")}</span><span className="muted">{t("hosts.startAtSignInHint")}</span></span>
-        <Switch checked={installed} disabled={!!busy} aria-label={t("hosts.startAtSignIn")} onChange={() => void run(loginAction)} />
+        <span><span className="host-status-login-label">{t("hosts.startAtSignIn")}</span>
+          <span className="muted">{t(canSetLogin ? "hosts.startAtSignInHint" : "hosts.startAtSignInUnavailable")}</span></span>
+        <Switch checked={installed} disabled={!!busy || !canSetLogin} aria-label={t("hosts.startAtSignIn")} onChange={(next) => void setLogin(next)} />
       </label>}
       {confirmStop ? <div className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
           <p>{t("hosts.stopConfirm")}</p>
