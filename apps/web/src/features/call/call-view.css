@@ -219,3 +219,4 @@
 .stage-tile:has(.person-bubble) .transcript-entry--turn { display: none; }
 .stage-tile:has(.transcript-entry--turn) .stage-tags { left: var(--stage-inset); transform: none; justify-content: flex-start; max-width: calc(50% - var(--stage-inset)); }
 @media (prefers-reduced-motion: reduce) { .transcript-entry { transition: none; } }
+.stage-badge:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }

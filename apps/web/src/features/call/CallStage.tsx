@@ -14,6 +14,16 @@ import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from ".
 import { useStageConversation } from "./stage-view";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
+import { Tooltip } from "../../components/ui/Tooltip";
+
+/** A harness by its product name, for the badge's tooltip; one not known, as it is reported. */
+function harnessName(id: string | null | undefined) {
+  if (!id) return "";
+  if (/^claude/.test(id)) return "Claude Code";
+  if (/^codex/.test(id)) return "Codex";
+  if (/^cursor/.test(id)) return "Cursor";
+  return id;
+}
 import "./call-view.css";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
@@ -130,10 +140,12 @@ export function CallStage() {
         <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage"
           mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agent", { title: stage.title })} />
         <div className="stage-tags">
-          {(stage.row?.harness || stage.row?.model) && <span className="stage-tag stage-badge">
-            {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
-            <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
-          </span>}
+          {(stage.row?.harness || stage.row?.model) && <Tooltip content={[harnessName(stage.row?.harness), stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}>
+            <span className="stage-tag stage-badge" tabIndex={0}>
+              {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
+              <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
+            </span>
+          </Tooltip>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
         <TranscriptEntry row={stage.row ?? null} />
