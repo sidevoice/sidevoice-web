@@ -61,7 +61,6 @@ export const en = {
   "hosts.state.stopped": "Stopped",
   "hosts.state.failed": "Failed",
   "hosts.productVersion": "Sidevoice {version}",
-  "hosts.fact.calls": "Active calls",
   "hosts.startAtSignIn": "Start at sign-in",
   "hosts.startAtSignInHint": "Sidevoice starts when you sign in to this computer.",
   "hosts.startAtSignInUnavailable": "This version of the app can’t change this without stopping Sidevoice.",

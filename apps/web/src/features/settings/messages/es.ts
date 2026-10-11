@@ -63,7 +63,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.state.stopped": "Parado",
   "hosts.state.failed": "Ha fallado",
   "hosts.productVersion": "Sidevoice {version}",
-  "hosts.fact.calls": "Llamadas activas",
   "hosts.startAtSignIn": "Arrancar al iniciar sesión",
   "hosts.startAtSignInHint": "Sidevoice arranca cuando inicias sesión en este ordenador.",
   "hosts.startAtSignInUnavailable": "Esta versión de la aplicación no puede cambiarlo sin parar Sidevoice.",

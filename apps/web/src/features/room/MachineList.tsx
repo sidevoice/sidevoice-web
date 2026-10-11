@@ -197,7 +197,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
 }
 
 /** Another machine's Sidevoice, to read: how this device reaches it (directly, through the room, not at all), whether
- *  without encryption, and — where the machine says — its version and active calls. No controls: it is run there. */
+ *  without encryption, and — where the machine says — its Sidevoice version. No controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
   const t = hostTranslator();
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
@@ -211,9 +211,8 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
         <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
         <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
       </div>
-      {(machine.insecure || info?.version || info?.calls != null) && <dl className="host-status-facts">
+      {(machine.insecure || info?.version) && <dl className="host-status-facts">
         {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
-        {info?.calls != null && <div><dt>{t("hosts.fact.calls")}</dt><dd>{info.calls}</dd></div>}
         {machine.insecure && <div><Badge tone="warning" dot>{t("hosts.notEncrypted")}</Badge></div>}
       </dl>}
     </div>
@@ -230,7 +229,7 @@ function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" |
   }
 }
 
-/* This computer's service as a status card: its state with its dot, first; its version and active calls as compact facts;
+/* This computer's service as a status card: its state with its dot, first; its version ("Sidevoice 0.8.1");
  * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
  * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
 function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStatus; titleId: string; name: string }) {
@@ -297,7 +296,6 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
       <dl className="host-status-facts">
         {/* One version, the product's as the person installed it (never the core's or the connector's). */}
         {details.product_version && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version })}</div>}
-        {details.calls !== undefined && <div><dt>{t("hosts.fact.calls")}</dt><dd>{calls}</dd></div>}
       </dl>
       {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
       {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not

@@ -46,8 +46,8 @@ export interface SessionFacts {
   machinesView: { machine: string | null };
  localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its
-  *  Sidevoice version and active calls. */
- remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null; calls?: number | null}>;
+  *  Sidevoice version. */
+ remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null}>;
  /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */
  rendezvous: '' | 'room' | 'node'; node: string | null; nodeReach: NodeReach;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */
