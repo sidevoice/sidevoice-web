@@ -267,3 +267,9 @@
 .ui-snippet-copy[data-state="failed"] { border-color: var(--sv-danger); color: var(--sv-danger); }
 .ui-snippet-note { min-height: 1rem; margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
 .ui-snippet-note[data-state="done"] { color: var(--sv-positive); }
+
+/* ----- Tooltip: a few words more about what it points at, on hover or focus; never what one must know to act. */
+.ui-tooltip { z-index: 70; max-width: 300px; padding: 6px 10px; border-radius: var(--sv-radius-sm); background: var(--sv-tooltip-bg); color: var(--sv-tooltip-text); font: var(--sv-weight-regular) var(--sv-font-sm) / 1.25rem var(--sv-font-sans); box-shadow: var(--sv-shadow-md); }
+.ui-tooltip-arrow { fill: var(--sv-tooltip-bg); }
+.ui-infotip { width: 24px; height: 24px; color: var(--sv-text-subtle); vertical-align: middle; }
+.ui-infotip svg { width: 16px; height: 16px; }
