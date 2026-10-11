@@ -3,17 +3,18 @@ import { JoinStatus } from "./JoinStatus";
 import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon, TranscriptIcon } from "../../components/ui/Icons";
-import { useCallLayout } from "../../state/call-layout";
+import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { callTranslator } from "./call-i18n";
 
-/** The whole transcript, behind one button of the call (TranscriptPanel). */
-function TranscriptToggle() {
+/** The whole transcript, behind one button of the call (TranscriptPanel): at the call bar's right edge, and on a phone
+ *  over the stage's corner instead (CallStage), where it takes no room from the call's controls. */
+export function TranscriptToggle({ className = "transcript-toggle" }: { className?: string }) {
   const t = callTranslator();
   const open = useCallLayout((state) => state.transcriptOpen);
   const toggle = useCallLayout((state) => state.toggleTranscript);
   const label = open ? t("transcript.hide") : t("transcript.show");
   return (
-    <Button id="transcript-toggle" variant="ghost" className="transcript-toggle" aria-controls="transcript" aria-expanded={open}
+    <Button id="transcript-toggle" variant="ghost" className={className} aria-controls="transcript" aria-expanded={open}
       aria-label={label} title={label} onClick={toggle}>
       <TranscriptIcon />
     </Button>
@@ -47,6 +48,7 @@ function CallMenu() {
  * right edge. */
 export function CallToolbar() {
   const t = callTranslator();
+  const narrow = useMedia(NARROW_QUERY);
   return (
     <footer className="call-bar">
       <div className="controls" id="call-controls">
@@ -62,7 +64,7 @@ export function CallToolbar() {
         </div>
       </div>
       <div className="call-bar-end">
-        <TranscriptToggle />
+        {!narrow && <TranscriptToggle />}
       </div>
     </footer>
   );

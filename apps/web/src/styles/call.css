@@ -123,6 +123,11 @@
 @keyframes sv-spin { to { transform:rotate(360deg) } }
 
 /* ---------- the call bar: ⋯ beside the call, the transcript's button at the right edge ---------- */
+@media (max-width:899px) {
+  .stage-tile .stage-transcript-toggle { position:absolute;z-index:3;right:12px;bottom:12px;display:grid;place-items:center;width:46px;height:46px;padding:0;border:1px solid var(--sv-border);border-radius:50%;
+    background:color-mix(in srgb, var(--sv-bg) 75%, transparent);color:var(--sv-text);backdrop-filter:blur(6px) }
+  .stage-tile .stage-transcript-toggle[aria-expanded=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }
+}
 .call-bar .call-bar-end { grid-column:3;grid-row:1;justify-self:end;display:flex;align-items:center;gap:10px }
 .call-bar #skip-reply { width:52px;height:56px;padding:0;border:0;border-radius:26px;background:#303134;color:#e8eaed }
 .call-bar #skip-reply:not(:disabled):hover { background:#414245 }

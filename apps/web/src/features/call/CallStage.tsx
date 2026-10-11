@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, type CSSProperties } from "react";
 import { HARNESS_NAMES, HarnessIcon } from "../../components/ui/Icons";
-import { useCallLayout } from "../../state/call-layout";
+import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
@@ -10,6 +10,7 @@ import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
+import { TranscriptToggle } from "./CallToolbar";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
  * a time as the voice reaches it, the spoken words lit and the chunk before kept dim above. Between turns its
@@ -85,6 +86,7 @@ export function CallStage() {
   const stage = useStageConversation();
   const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
+  const narrow = useMedia(NARROW_QUERY);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   const harness = stage.row?.harness ? HARNESS_NAMES[stage.row.harness] : null;
@@ -122,6 +124,7 @@ export function CallStage() {
           </span>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
+        {narrow && <TranscriptToggle className="transcript-toggle stage-transcript-toggle" />}
       </div>
     </section>
   );
