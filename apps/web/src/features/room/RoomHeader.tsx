@@ -1,6 +1,5 @@
-import { useRef } from "react";
 import { Button } from "../../components/ui/Button";
-import { SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useVariant } from "../../lib/variants";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
@@ -30,26 +29,24 @@ export function RoomHeader() {
         <HeaderConversations t={t} />
         <SettingsButton t={t} />
       </header>
-      <ConversationsGrab t={t} />
     </>
   );
 }
 
-/** The phone's handle under the header: a tap, or pulling it down, brings the conversations down. */
-function ConversationsGrab({ t }: { t: CallTranslate }) {
+/** A phone's way to every conversation: the chevron after the header's avatars. A tap drops the conversations (by
+ *  machine, a new one, and Settings at their foot) under the header and turns the chevron up; another tap, a tap
+ *  outside or Escape puts them away. */
+function ConversationsToggle({ t }: { t: CallTranslate }) {
   const count = useRoomStore((state) => state.participants.length);
   const open = useCallLayout((state) => state.conversationsOpen);
   const openConversations = useCallLayout((state) => state.openConversations);
-  const from = useRef<number | null>(null);
-  if (!count) return null;
+  const closeConversations = useCallLayout((state) => state.closeConversations);
+  const label = t("header.allConversations", { n: count });
   return (
-    <button type="button" className="conversations-grab" aria-label={t("header.allConversations", { n: count })} title={t("header.allConversations", { n: count })}
-      aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={openConversations}
-      onPointerDown={(event) => { from.current = event.clientY; }}
-      onPointerMove={(event) => { if (from.current !== null && event.clientY - from.current > 24) { from.current = null; openConversations(); } }}
-      onPointerUp={() => { from.current = null; }}>
-      <i aria-hidden="true" />
-    </button>
+    <Button variant="ghost" tone="neutral" size="icon-sm" className="conversations-toggle" aria-label={label} title={label}
+      aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
+      <ChevronIcon size={18} />
+    </Button>
   );
 }
 
@@ -60,7 +57,6 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   const inCall = useRoomStore(selectInCall);
   const stage = useStageConversation();
   const closeConversations = useCallLayout((state) => state.closeConversations);
-  if (!participants.length) return null;
   const label = (row: ParticipantView) => t("header.otherConversation", { title: row.title, state: stateText(row, inCall, t) });
   return (
     <div className="header-conversations">
@@ -70,6 +66,7 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
           <ConversationAvatar row={row} />
         </button>
       ))}
+      <ConversationsToggle t={t} />
     </div>
   );
 }
@@ -88,7 +85,8 @@ export function openSettings() {
   document.getElementById("settings-open")?.click();
 }
 
-/* The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
+/* Never shown: Settings sits at the conversations' foot (a desktop's column, a phone's dropped panel), and presses this
+ * button. The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
  * onClick it resets the element's handler on every render), so its wrapper hears it. With agents waiting, Settings
  * then opens at theirs. */
 function SettingsButton({ t }: { t: CallTranslate }) {

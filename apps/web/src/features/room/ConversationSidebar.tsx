@@ -67,7 +67,7 @@ export function ConversationSidebar() {
     open: modal, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".participant-row[data-selected] .person:not(:disabled)")
       ?? panel.current?.querySelector<HTMLElement>(".person:not(:disabled)") ?? panel.current?.querySelector<HTMLElement>(".sidebar-close"),
-    fallbackFocus: () => document.querySelector<HTMLElement>("button.conversations-grab"),
+    fallbackFocus: () => document.querySelector<HTMLElement>("button.conversations-toggle"),
   });
 
   const select = (threadId: string) => {
@@ -132,8 +132,9 @@ export function ConversationSidebar() {
           {/* A new conversation follows the last one, in either layout. */}
           <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>
         </div>
-        {/* Settings holds the foot on a desktop; what joins it later (notifications…) opens upward from here. */}
-        {!narrow && <div className="sidebar-foot"><SidebarSettings rail={rail} /></div>}
+        {/* Settings holds the foot, a desktop's and a phone's dropped panel's; what joins it later (notifications…) opens
+            upward from here. */}
+        <div className="sidebar-foot"><SidebarSettings rail={rail && !narrow} onOpen={close} /></div>
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>
@@ -141,13 +142,13 @@ export function ConversationSidebar() {
 }
 
 /** Settings at the conversations' foot: named beside the list, a gear in the rail; its dot when agents wait. */
-function SidebarSettings({ rail }: { rail: boolean }) {
+function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
   const t = callTranslator();
   const hosts = hostTranslator();
   const notice = usePendingAgentHosts().length > 0;
   const label = notice ? hosts("agents.gear.pending") : t("header.settings");
   return (
-    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={openSettings}>
+    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); }}>
       <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}{notice && <span className="settings-notice-dot" aria-hidden="true" />}
     </Button>
   );

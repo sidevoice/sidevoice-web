@@ -21,7 +21,7 @@
 .header-settings { flex: none; margin-inline-start: auto; }
 /* Agents waiting to be connected: a dot on the gear, as a notice and never the only word (the label says it too). */
 .header-settings #settings-open .settings-notice-dot { position: absolute; top: 8px; right: 8px; display: block; width: 8px; height: 8px; margin: 0; box-sizing: content-box; border: 2px solid var(--sv-bg); border-radius: 50%; background: var(--sv-voice); }
-.header-conversations, .conversations-grab, .conversations-scrim { display: none; }
+.header-conversations, .conversations-scrim { display: none; }
 
 /* ----- the conversations: a column on a desktop */
 .conversation-sidebar { --dot-ring: var(--sv-bg-subtle); display: flex; flex-direction: column; gap: var(--sv-space-4); flex: none; width: 288px; min-height: 0; padding: var(--sv-space-3); overflow: hidden auto; border-right: 1px solid var(--sv-border); background: var(--sv-bg-subtle); transition: width var(--sv-dur-slow) var(--sv-ease); }
@@ -89,19 +89,15 @@
   .header-conversations { display: flex; align-items: center; gap: var(--sv-space-1); flex: none; }
   .room-header[data-avatars="centre"] .header-conversations { position: absolute; left: 50%; transform: translateX(-50%); }
   .room-header[data-avatars="right"] .header-conversations { margin-inline-start: auto; }
-  .room-header[data-avatars="right"] .header-conversations + .header-settings { margin-inline-start: 0; }
   .header-avatar { display: grid; place-items: center; flex: none; margin: 0; padding: 2px; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .header-avatar .conversation-avatar { width: 34px; height: 34px; }
   .header-avatar:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 0; }
   .header-avatar:disabled { cursor: default; opacity: .6; }
   @media (hover: hover) { .header-avatar:not(:disabled):hover { background: var(--sv-hover); } }
 
-  /* The handle the whole list comes down from: the header's lower edge. */
-  .room-header:has(+ .conversations-grab) { border-bottom-color: transparent; }
-  .room-header[data-list-down] { border-bottom-color: var(--sv-border); }
-  .conversations-grab { display: grid; place-items: center; flex: none; width: 100%; height: 24px; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--sv-border); border-radius: 0; background: var(--sv-bg); touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent; }
-  .conversations-grab i { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--sv-border-strong); }
-  .conversations-grab:focus-visible { outline-offset: -2px; }
+  /* The chevron after the avatars, wherever the variant puts them: it drops the list, and turns up while it is down. */
+  .conversations-toggle svg { transition: transform var(--sv-dur-base) var(--sv-ease); }
+  .conversations-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 
   /* The list drops from under the header as a panel over the dimmed call. */
   .conversation-sidebar { --dot-ring: var(--sv-surface); position: fixed; z-index: 31; top: var(--conversations-top, var(--sv-header-height)); left: 0; right: 0; width: auto; max-height: min(72dvh, 36rem); gap: var(--sv-space-2);
@@ -119,9 +115,9 @@
 .conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
 .sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 
-/* Settings at the conversations' foot on a desktop: the header's gear steps aside there (a phone keeps it, having no
- * column); the list ends with New conversation, and Settings holds the foot. */
-@media (min-width: 900px) { .room-header .header-settings { display: none; } }
+/* Settings at the conversations' foot, a desktop's column and a phone's dropped panel alike: the header's gear is never
+ * shown (the runtime's button, pressed from the foot); the list ends with New conversation, and Settings holds the foot. */
+.room-header .header-settings { display: none; }
 .sidebar-new { display: flex; justify-content: center; }
 .sidebar-settings { position: relative; justify-content: flex-start; }
 .conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }

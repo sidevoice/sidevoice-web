@@ -87,3 +87,17 @@ test("Settings sits at the conversations' foot: it opens Settings through the he
   expect(document.querySelector(".sidebar-body .sidebar-new")).toHaveTextContent("New conversation");
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
+
+test("the chevron after the header's avatars drops the conversations and puts them away again, turning with them", () => {
+  room();
+  const chevron = document.querySelector<HTMLButtonElement>(".header-conversations .conversations-toggle")!;
+  expect(chevron).toHaveAttribute("aria-expanded", "false");
+  expect(chevron).toHaveAttribute("aria-controls", "conversations");
+  act(() => { fireEvent.click(chevron); });
+  expect(chevron).toHaveAttribute("aria-expanded", "true");
+  act(() => { fireEvent.click(chevron); });
+  expect(chevron).toHaveAttribute("aria-expanded", "false");
+  // No handle to drag, and Settings at the list's foot, not in the header.
+  expect(document.querySelector(".conversations-grab")).toBeNull();
+  expect(document.querySelector("#conversations .sidebar-foot .sidebar-settings")).toBeInTheDocument();
+});
