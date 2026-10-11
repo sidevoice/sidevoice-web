@@ -77,7 +77,7 @@ function liveFacts(room: RoomViewState) {
   };
 }
 
-export function OnboardingProvider({ children, repository: given }: { children: ReactNode; repository?: OnboardingRepository }) {
+export function OnboardingProvider({ children, repository: given, startAt }: { children: ReactNode; repository?: OnboardingRepository; startAt?: OnboardingStep }) {
   const room = useRoomStore((state) => state);
   const roomStore = useContext(RoomStoreContext);
   if (!roomStore) throw new Error("OnboardingProvider must be inside RoomProvider");
@@ -123,14 +123,17 @@ export function OnboardingProvider({ children, repository: given }: { children: 
 
   // Once the record and the machines are known: an unfinished setup opens where it stands, unless it was put off.
   useEffect(() => {
-    if (!ready || decided.current || record.completed_at || !room.facts.machinesReady) return;
+    if (!ready || decided.current || !room.facts.machinesReady) return;
+    // A step asked for (the storyboard's) opens there, whatever the record says.
+    if (startAt) { decided.current = true; setStep(startAt); setOpen(true); return; }
+    if (record.completed_at) return;
     decided.current = true;
     if (record.deferred_at) return;
     // A machine already running here (an \`npx\` install) is the agents path, chosen.
     if (live.localReady && !record.choice) void persist({ choice: "agents" });
     setStep(resume(live.localReady && !record.choice ? { ...record, choice: "agents" } : record, live));
     setOpen(true);
-  }, [ready, record, room.facts.machinesReady, live, persist, resume]);
+  }, [ready, record, room.facts.machinesReady, live, persist, resume, startAt]);
 
   const rescanLocalAgents = useCallback(async () => {
     const bridge = localHostBridge();

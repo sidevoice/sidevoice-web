@@ -20,6 +20,7 @@ import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner"
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
+import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
@@ -82,10 +83,11 @@ function RoomContent() {
   );
 }
 
-export function App({ store }: { store?: RoomStore } = {}) {
+/** `onboarding`: where the setup keeps its record, and a step to open at — the journeys' storyboard shows each step. */
+export function App({ store, onboarding }: { store?: RoomStore; onboarding?: { repository?: OnboardingRepository; startAt?: OnboardingStep } } = {}) {
   return (
     <RoomProvider store={store}>
-      <OnboardingProvider>
+      <OnboardingProvider repository={onboarding?.repository} startAt={onboarding?.startAt}>
         <TooltipProvider>
           <RoomContent />
         </TooltipProvider>

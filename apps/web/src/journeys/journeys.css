@@ -1,0 +1,17 @@
+/* The journeys' storyboard: each journey a heading and its shots, each shot its frames (a phone, a desktop) and a caption.
+ * A shot alone (?shot=) is the app itself, full page. */
+html:not([data-shot]) body { background: var(--sv-bg-subtle); }
+.journeys { max-width: 1680px; margin: 0 auto; padding: var(--sv-space-8) var(--sv-space-6) var(--sv-space-12); color: var(--sv-text); font-family: var(--sv-font-sans); }
+.journeys-head h1 { margin: 0; font-size: var(--sv-font-2xl, 1.75rem); }
+.journeys-head p { margin: var(--sv-space-2) 0; color: var(--sv-text-muted); }
+.journeys-head nav a { color: var(--sv-accent-text); }
+.journeys-head nav a[aria-current] { font-weight: var(--sv-weight-bold); text-decoration: none; color: var(--sv-text); }
+.journey { margin-top: var(--sv-space-10); }
+.journey h2 { margin: 0; font-size: var(--sv-font-xl); }
+.journey-note { margin: var(--sv-space-1) 0 var(--sv-space-4); color: var(--sv-text-muted); }
+.journey-shots { display: flex; flex-wrap: wrap; gap: var(--sv-space-6); margin: 0; padding: 0; list-style: none; }
+.journey-shot { display: grid; gap: var(--sv-space-2); max-width: 600px; }
+.journey-frames { display: flex; align-items: flex-start; gap: var(--sv-space-3); }
+.journey-frame { overflow: hidden; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg); box-shadow: var(--sv-shadow-sm); }
+.journey-frame iframe { display: block; border: 0; transform-origin: 0 0; pointer-events: none; }
+.journey-caption { margin: 0; max-width: 560px; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
