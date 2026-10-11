@@ -26,6 +26,11 @@ const ready = (agents = [known()]): HostAgentsState => ({
 const pairing = (fp: string, host: string): PairingSummary => ({ fp, host, urls: [`https://${host.toLowerCase()}.example`], rv: null,
   device_id: `device-${fp}`, paired_at: 1_700_000_000, revoked: false });
 
+/** Opens a row's ⋯ menu, as a keyboard does (Radix opens it on a key or a pointer press, not a click). */
+function openMenu(name: string) {
+  fireEvent.keyDown(document.querySelector(`button[aria-label="${name}"]`) as HTMLElement, { key: "Enter" });
+}
+
 function setActions(actions: Partial<NonNullable<typeof window.sidevoiceActions>>) {
   window.sidevoiceActions = actions as typeof window.sidevoiceActions;
 }
@@ -45,23 +50,27 @@ test("P10 unreachable and no-connector states offer a retry", async () => {
 });
 
 test("manual instructions come from the selected host and trigger four-second watch rescans", async () => {
-  vi.useFakeTimers();
+  // The watch's interval faked; Radix's menu runs on real timeouts.
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  let view: ReturnType<typeof render> | undefined;
   try {
     const store = createRoomStore();
     const loadHostAgents = vi.fn(async () => {});
     setActions({ loadHostAgents, hostAgentAction: vi.fn(async () => {}) });
-    act(() => store.patch({ hostAgents: { "fp-a": ready() } }));
-    render(<RoomProvider store={store}><HostAgentsPanel fp="fp-a" /></RoomProvider>);
+    act(() => store.patch({ hostAgents: { "fp-a": ready([known("codex", { connect: "manual" })]) } }));
+    view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp-a" /></RoomProvider>);
 
-    fireEvent.click(screen.getByRole("button", { name: "Do it myself" }));
+    // Connected by hand only: its one action opens how.
+    fireEvent.click(document.querySelector('button[aria-label="Connect Codex to Sidevoice"]') as HTMLElement);
     expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === "CODE" && element.textContent?.includes("[mcp_servers.sidevoice]"))).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show setup" }));
-    expect(screen.getByText("connector 4.2.1")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Don’t see yours? Connect it by hand"));
     expect(screen.getByText("sidevoice connector mcp")).toBeInTheDocument();
-    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    act(() => { vi.advanceTimersByTime(4000); });
     expect(loadHostAgents).toHaveBeenCalledWith("fp-a", { rescan: true, watch: "codex" });
   } finally {
+    // Unmounted on the fake clock, so its intervals go with it.
+    view?.unmount();
     vi.useRealTimers();
   }
 });
@@ -87,7 +96,7 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
   expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Agents" })).toBeInTheDocument();
+  expect(document.getElementById("host-agents-title")).toHaveTextContent("Agents");
   expect(screen.getByText("Cursor")).toBeInTheDocument();
 });
 
@@ -140,26 +149,6 @@ test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", (
   }
 });
 
-test("Not now clears that host's agent notice from the menu and machine views", async () => {
-  const store = createRoomStore();
-  const host = pairing("fp-nuc", "NUC");
-  const state = ready([known("cursor", { actionable: true, label: "Cursor" })]);
-  setActions({ hostAgentAction: vi.fn(async (_fp: string, id: string, action: "connect" | "disconnect" | "dismiss") => {
-    if (action !== "dismiss") return;
-    const agents = state.value!.agents.map((agent) => agent.id === id ? { ...agent, dismissed: true, actionable: false } : agent);
-    act(() => store.patch({ hostAgents: { [host.fp]: { ...state, value: { ...state.value!, agents } } } }));
-  }) });
-  act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: state } }));
-
-  render(<RoomProvider store={store}><RoomHeader /><HostAgentsPanel fp={host.fp} /><MachineList /></RoomProvider>);
-  const gear = settingsEntry();
-  expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
-  expect(entry("NUC")).toHaveTextContent("New agent");
-  fireEvent.click(screen.getAllByRole("button", { name: "Not now" })[0]);
-  await vi.waitFor(() => expect(settingsEntry().querySelector(".settings-notice-dot")).not.toBeInTheDocument());
-  expect(entry("NUC")).not.toHaveTextContent("New agent");
-});
-
 test("a foreign Codex row exposes its host-provided replacement command and Copy without automatic actions", async () => {
   const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
     "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
@@ -181,7 +170,7 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Not now" })).toBeNull();
 
-    fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Replace manually" }));
+    fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Connect Codex to Sidevoice" }));
     expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp remove sidevoice");
     expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio");
     expect(foreignRow as HTMLElement).toHaveTextContent("after you replace the agent configuration");
@@ -207,7 +196,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
   try {
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
     const row = screen.getByText("Connected to a different MCP server").closest("li") as HTMLElement;
-    const reveal = within(row).getByRole("button", { name: "Replace manually" });
+    const reveal = within(row).getByRole("button", { name: "Connect Codex to Sidevoice" });
     fireEvent.click(reveal);
     expect(reveal).toHaveAttribute("aria-expanded", "true");
     expect(row).toHaveTextContent("codex mcp remove sidevoice");
@@ -229,7 +218,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
 
     const disconnected = known("codex", { registration: "not-connected", actionable: false });
     act(() => store.patch({ hostAgents: { fp: ready([disconnected]) } }));
-    expect(within(row).getByRole("button", { name: "Do it myself" })).toHaveAttribute("aria-expanded", "false");
+    expect(within(row).getByRole("button", { name: "Connect Codex to Sidevoice" })).not.toHaveAttribute("aria-expanded");
     expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
   } finally {
     view?.unmount();
@@ -278,4 +267,15 @@ test("a row is always its name and one status line: connecting turns that line t
     act(() => store.patch({ hostAgents: { fp: ready([notConnected]) } }));
     expect(lines()).toEqual(["Not connected"]);
   } finally { vi.useRealTimers(); }
+});
+
+// Last in the file: Radix's menu leaves the document slow for whatever renders after it in jsdom.
+test("an agent Sidevoice can connect keeps connecting by hand in its menu", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  act(() => store.patch({ hostAgents: { fp: ready() } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  openMenu("More for Codex");
+  fireEvent.click(screen.getByText("Connect by hand"));
+  expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument();
 });

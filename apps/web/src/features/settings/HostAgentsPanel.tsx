@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "../../components/ui/Button";
+import { Button, type ButtonProps } from "../../components/ui/Button";
+import { SplitButton } from "../../components/ui/SplitButton";
+import { useVariant } from "../../lib/variants";
 import { cn } from "../../lib/cn";
-import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon } from "../../components/ui/Icons";
+import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
+import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, MoreIcon, RefreshIcon } from "../../components/ui/Icons";
+import { Tooltip } from "../../components/ui/Tooltip";
 import type { DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { actionableAgent } from "../../services/host-agents";
@@ -15,10 +19,20 @@ function translatedError(t: HostTranslate, key: string, params?: Record<string, 
   return message === messageKey ? t("agents.error.unknown") : message;
 }
 
-function timestamp(value: string | number | null | undefined): string {
+/** How long ago `value` was, in words ("2 minutes ago"), kept current as time passes. */
+function useRelativeTime(value: string | number | null | undefined): string {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   if (value == null) return "";
-  const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
-  return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(navigator.language, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  const at = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value).valueOf();
+  if (Number.isNaN(at)) return "";
+  const seconds = Math.round((at - Math.max(now, at)) / 1000);
+  const words = new Intl.RelativeTimeFormat(navigator.language, { numeric: "auto" });
+  const minutes = Math.round(seconds / 60), hours = Math.round(seconds / 3600), days = Math.round(seconds / 86400);
+  return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
 }
 
 function CodeBlock({ code }: { code: string }) {
@@ -99,15 +113,29 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     return () => window.clearTimeout(timer);
   }, [justConnected]);
 
-  const run = (action: "connect" | "disconnect" | "dismiss") =>
+  const actions = useVariant("agent-actions", ["menu", "split"] as const);
+  const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
   const status: { text: string; tone: "ok" | "error" | "muted" | "" } = errorText ? { text: errorText, tone: "error" }
+    : busy ? { text: t(`agents.busy.${busy}` as HostMessageKey), tone: "muted" }
     : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
     : agent.registration === "connected" ? { text: t("agents.connected"), tone: "" }
     : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted" }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
+  const howTo = manualOnly || agent.registration === "foreign";
+  const main: ButtonProps | null = agent.registration === "connected"
+    ? { variant: "secondary", size: "sm", loading: busy === "disconnect", disabled: !!busy || confirming, "aria-label": t("agents.disconnectNamed", { agent: agent.label }),
+        onClick: () => setConfirming(true), children: t("agents.disconnect") }
+    : !readOnly || (agent.registration === "foreign" && hasManualInstructions)
+      ? { variant: "primary", size: "sm", loading: busy === "connect", disabled: !!busy, "aria-label": t("agents.connectNamed", { agent: agent.label }),
+          "aria-expanded": howTo ? open : undefined, "aria-controls": howTo ? panelId : undefined,
+          onClick: () => howTo ? setOpen((value) => !value) : run("connect"), children: t("agents.connect") }
+      : null;
+  const more = t("agents.more", { agent: agent.label });
+  const menu = hasManualInstructions && !howTo && agent.registration === "not-connected"
+    ? [<DropdownMenuItem key="manual" onSelect={() => setOpen(true)}>{t("agents.byHand")}</DropdownMenuItem>] : [];
   return (
     <li className="host-agent-row" data-registration={agent.registration} data-open={open || undefined}>
       <div className="host-agent-main">
@@ -121,19 +149,16 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
             role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
         </span>
+        {/* One action: Connect or Disconnect (an agent connected by hand only, or to another server, opens how to); the
+            others in a menu — a ⋯ beside it, or a chevron joined to it (variant "agent-actions"). */}
         <span className="host-agent-actions">
-          {busy ? <span className="muted" role="status">{t(`agents.busy.${busy}` as HostMessageKey)}</span>
-            : agent.registration === "connected" ? !confirming && <Button variant="ghost" size="sm" aria-label={t("agents.disconnectNamed", { agent: agent.label })} onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
-              : agent.registration === "foreign" ? hasManualInstructions && <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
-                {open ? t("agents.close") : t("agents.foreign.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
-              </Button>
-                : readOnly ? null : <>
-                {isNew && <Button variant="ghost" size="sm" onClick={() => run("dismiss")}>{t("agents.notNow")}</Button>}
-                <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
-                  {t("agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
-                </Button>
-                {!manualOnly && <Button variant="primary" size="sm" onClick={() => run("connect")}>{t("agents.connect")}</Button>}
-              </>}
+          {main && (actions === "split" ? <SplitButton {...main} menuLabel={more} items={menu} /> : <>
+            <Button {...main} />
+            {menu.length > 0 && <DropdownMenu label={more}
+              trigger={<Button variant="ghost" tone="neutral" size="icon-sm" aria-label={more} disabled={!!busy}><MoreIcon size={16} /></Button>}>
+              {menu}
+            </DropdownMenu>}
+          </>)}
         </span>
       </div>
       {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}>
@@ -149,20 +174,17 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   );
 }
 
+/** For an agent the list does not show: one discreet link at its foot, opening how to connect any MCP agent by hand. */
 function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) {
   const t = hostTranslator();
   const [open, setOpen] = useState(false);
   if (!custom) return null;
   return (
     <section className="host-agent-other">
-      <div className="host-agent-other-head">
-        <span className="host-agent-icon"><ConnectorIcon size={16} /></span>
-            <span className="host-agent-copy"><strong>{t("agents.other.heading")}</strong>{custom.version && <span className="muted">{custom.version}</span>}<span className="muted">{t("agents.other.sub")}</span></span>
-        <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-          {open ? t("agents.close") : t("agents.other.open")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
-        </Button>
-      </div>
-      {open && <div className="host-agent-howto">
+      <button type="button" className="host-agent-other-link" aria-expanded={open} aria-controls="host-agent-other-howto" onClick={() => setOpen((value) => !value)}>
+        {t("agents.other.link")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
+      </button>
+      {open && <div className="host-agent-howto" id="host-agent-other-howto">
         <p className="muted">{t("agents.other.detail")}</p>
         {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><CodeBlock code={custom.command} /></>}
         {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><CodeBlock code={custom.snippet} /></>}
@@ -181,6 +203,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   const t = hostTranslator();
   const listing = useRoomStore((state) => fp ? state.facts.hostAgents[fp] : undefined) as HostAgentsState | undefined;
   const value = listing?.value;
+  const searchedAgo = useRelativeTime(value?.scanned_at);
   useEffect(() => {
     if (fp) void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true });
   }, [fp]);
@@ -195,19 +218,20 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   if (!value && (listing?.status === "loading" || !listing || listing.status === "idle")) return <p className="muted" role="status">{t("agents.scanning")}</p>;
 
   const rows = (value?.agents ?? []).filter((agent) => agent.present || agent.registration === "connected");
-  const checkedAt = timestamp(value?.scanned_at);
+  const scanning = listing?.status === "loading";
   return (
     <section className="host-agents" aria-labelledby="host-agents-title">
+      {/* The heading, when the list was searched (in words, as time passes), and searching again as an icon. */}
       <div className="host-agents-heading">
         <h4 id="host-agents-title">{t("agents.heading")}</h4>
-        <Button variant="ghost" size="sm" disabled={listing?.status === "loading"}
-          onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>
-          {listing?.status === "loading" ? t("agents.refreshing") : t("agents.refresh")}
-        </Button>
+        <span className="host-agents-scanned" role="status">{scanning ? t("agents.searching") : searchedAgo ? t("agents.searchedAgo", { time: searchedAgo }) : ""}</span>
+        <Tooltip content={t("agents.searchAgain")}>
+          <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("agents.searchAgain")} disabled={scanning}
+            onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>
+            {scanning ? <span className="ui-spinner ui-spinner--inline" aria-hidden /> : <RefreshIcon size={16} />}
+          </Button>
+        </Tooltip>
       </div>
-      <p className="host-agents-scanned muted" role="status">
-        {listing?.status === "loading" ? t("agents.refreshing") : checkedAt ? t("agents.scannedAt", { time: checkedAt }) : ""}
-      </p>
       {rows.length === 0 ? <p className="muted">{t("agents.none")}</p> : <ul className="host-agent-rows">
         {rows.map((agent) => <HostAgentRow key={agent.id} fp={fp} agent={agent} />)}
       </ul>}

@@ -273,3 +273,9 @@
 .ui-tooltip-arrow { fill: var(--sv-tooltip-bg); }
 .ui-infotip { width: 24px; height: 24px; color: var(--sv-text-subtle); vertical-align: middle; }
 .ui-infotip svg { width: 16px; height: 16px; }
+
+/* A split button (SplitButton): the main action and its chevron, one control with a seam between them. */
+.ui-split { display: inline-flex; align-items: stretch; min-width: 0; }
+.ui-split > .ui-button:first-child { border-start-end-radius: 0; border-end-end-radius: 0; }
+.ui-split > .ui-split-more { width: auto; min-width: 0; padding-inline: var(--sv-space-2); border-start-start-radius: 0; border-end-start-radius: 0; border-inline-start: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+.ui-split > .ui-split-more svg { width: 14px; height: 14px; }
