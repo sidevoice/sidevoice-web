@@ -614,7 +614,8 @@ function keepPendingRevoke(pairing){
 /** Tells a machine this device is gone (its token revoked there), at an address that proves it is that machine. */
 async function revokeOn(pairing,knownBase=null){
  try{
-  const place=knownBase?{base:knownBase}:await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+  // The page's own origin is the base '', which is known all the same.
+  const place=knownBase!=null?{base:knownBase}:await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
   if(!place)return false;
   const response=await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
   // Gone there already (401/404) is as good as told.
