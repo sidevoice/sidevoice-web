@@ -186,7 +186,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       </header>
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
-        {machine.local ? <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} name={copy.name} />
+        {machine.local ? <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} name={machine.host || null} />
           : <RemoteHostCard machine={machine} name={copy.name} titleId={"host-status-" + machine.id} />}
       </section>
       <section className="host-section" ref={agents}>
@@ -234,7 +234,7 @@ function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" |
 /* This computer's service as a status card: its state with its dot, first; its version ("Sidevoice 0.8.1");
  * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
  * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
-function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStatus; titleId: string; name: string }) {
+function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStatus; titleId: string; name: string | null }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -291,7 +291,8 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
-        <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
+        {/* "Sidevoice on MacBook"; with no name to say yet (its pairing lost), "Sidevoice on this computer". */}
+        <h4 id={titleId}>{name ? t("hosts.serviceOn", { machine: name }) : t("hosts.section.service")}</h4>
         <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
