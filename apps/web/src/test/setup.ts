@@ -17,6 +17,12 @@ Object.defineProperty(HTMLElement.prototype, "scrollTo", {
   value: () => undefined,
 });
 
+// A select's open list brings its chosen option into view; jsdom lays nothing out to scroll.
+Object.defineProperty(Element.prototype, "scrollIntoView", {
+  configurable: true,
+  value: () => undefined,
+});
+
 
 class TestResizeObserver {
   observe() {}

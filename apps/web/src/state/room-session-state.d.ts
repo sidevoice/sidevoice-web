@@ -32,6 +32,8 @@ export interface SessionFacts {
   settingsSection: string;
   /** When a setting was last kept (there is no Save: each applies as it changes), for a moment's "Saved". */
   settingsSavedAt: number;
+  /** The interface language this device keeps; '' is Automatic (the system's, followed as it is). */
+  uiLanguage: string;
   /** A control in Settings to bring into view and point at, by its id (what's new's Set up); cleared once done. */
   settingsFocus: string | null;
   /** The voice's microphones and speakers, and which are chosen (null: the voice offers no choice, or not yet). */

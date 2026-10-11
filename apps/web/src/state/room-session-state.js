@@ -26,7 +26,7 @@ export function initialSessionFacts() {
         // Host-owned agent state is keyed by fingerprint, never by the machine currently in use.
         hostAgents: {}, settingsAgentRequest: null,
         // The section Settings shows (SettingsDialog).
-        settingsSection: 'general', machinesView: { machine: null }, settingsSavedAt: 0, webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
+        settingsSection: 'general', machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
         localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.

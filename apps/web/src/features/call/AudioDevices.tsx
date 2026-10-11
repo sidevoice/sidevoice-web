@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select } from "../../components/ui/Select";
 import { ChevronIcon, CloseIcon, RefreshIcon } from "../../components/ui/Icons";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { MicWave } from "./CallIndicators";
@@ -52,7 +52,8 @@ export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boole
   useEffect(() => { if (open) void window.sidevoiceActions?.refreshAudioDevices?.(); }, [open]);
   useEffect(() => {
     if (!open) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    // An Escape something open in it took (a select's list) closes that alone.
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [open, onClose]);
@@ -73,16 +74,12 @@ export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boole
     <div id={id} className="audio-devices" role="group" aria-label={t("devices.toggle")}>
       {!devices ? <p className="audio-devices-note" role="status">{t("devices.loading")}</p> : <>
         <Field label={t("devices.mic")} className="audio-devices-field">
-          <NativeSelect id="audio-input" value={devices.input ?? ""} disabled={busy} onChange={(event) => void choose({ input: event.target.value || null })}>
-            <option value="">{t("devices.default")}</option>
-            {devices.inputs.map((device, index) => <option key={device.id} value={device.id}>{deviceName(device.label, index, "mic", t)}</option>)}
-          </NativeSelect>
+          <Select id="audio-input" value={devices.input ?? ""} disabled={busy} onValueChange={(input) => void choose({ input: input || null })}
+            options={[{ value: "", label: t("devices.default") }, ...devices.inputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "mic", t) }))]} />
         </Field>
         <Field label={t("devices.speaker")} className="audio-devices-field" hint={devices.outputSelectable ? undefined : t("devices.speakerFixed")}>
-          <NativeSelect id="audio-output" value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onChange={(event) => void choose({ output: event.target.value || null })}>
-            <option value="">{t("devices.default")}</option>
-            {devices.outputs.map((device, index) => <option key={device.id} value={device.id}>{deviceName(device.label, index, "speaker", t)}</option>)}
-          </NativeSelect>
+          <Select id="audio-output" value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })}
+            options={[{ value: "", label: t("devices.default") }, ...devices.outputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "speaker", t) }))]} />
         </Field>
       </>}
       <span className="audio-devices-actions">
