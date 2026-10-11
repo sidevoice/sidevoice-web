@@ -603,4 +603,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "whatsNew.endOfTurn.line": "Un modelo pequeño oye cuándo has terminado, y una pausa para pensar no te corta.",
   "whatsNew.speechLanguage.title": "El idioma en que hablas",
   "whatsNew.speechLanguage.line": "Dile a la transcripción tu idioma en vez de que lo detecte cada vez.",
+  "wizard.prepareStarting": "Iniciando Sidevoice en este ordenador…",
+  "wizard.prepareAnswering": "Comprobando que este ordenador responde…",
+  "wizard.prepareRetry": "Reintentar",
 };

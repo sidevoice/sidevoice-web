@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -17,6 +17,7 @@ import { Group, Row } from "../../components/ui/Card";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { TryResult, useModelState, useVoiceTry, type ModelState, catalogueShown } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { hostStatusText } from "../settings/local-host-status";
 import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
 import "./onboarding.css";
@@ -176,6 +177,17 @@ export function Wizard() {
   const touched = useRef(false);
   const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
   const install = useLocalInstallOffer();
+  const installSnapshot = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
+  const hostStatus = useRoomStore((state) => state.facts.localHostStatus);
+  // Preparing this computer, from the press (or an install already under way) until it answers or fails; a cancelled
+  // install offers Prepare again.
+  const [preparing, setPreparing] = useState(false);
+  useEffect(() => {
+    if (installSnapshot.phase === "installing" || installSnapshot.phase === "succeeded") setPreparing(true);
+    if (installSnapshot.phase === "cancelled") setPreparing(false);
+  }, [installSnapshot.phase]);
+  const hostFailed = hostStatus.state === "failed" || hostStatus.state === "service-failed";
+  const prepare = () => { setPreparing(true); localHostInstallController.start("no-machine"); };
   const { step } = onboarding;
   const stageTask = step === "W4" ? "stt" : step === "W4v" ? "tts" : null;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -284,8 +296,16 @@ export function Wizard() {
         <p>{t("localInstall.description")}</p>
         {/* The step's own action, here: pressed, its progress shows in its place (downloading, preparing, starting…),
             with what failed and Retry; once this computer answers, its agents follow in the same step. */}
-        {install.offered && <Button type="button" variant="primary" id="wizard-prepare" onClick={() => localHostInstallController.start("no-machine")}>{t("wizard.prepare")}</Button>}
+        {!preparing && install.offered && <Button type="button" variant="primary" id="wizard-prepare" onClick={prepare}>{t("wizard.prepare")}</Button>}
         <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" />
+        {/* Installed, the step waits for this computer to answer: never back to Prepare in between (the install's own
+            state is cleared once its machine is chosen, before this device reaches it). */}
+        {preparing && installSnapshot.phase !== "installing" && installSnapshot.phase !== "failed" && installSnapshot.phase !== "cancelled" && !onboarding.localReady && (
+          hostFailed
+            ? <div className="wizard-prepare-failed" role="alert"><p>{hostStatusText(hostStatus, t)}</p>
+                <Button type="button" variant="primary" id="wizard-prepare-retry" onClick={prepare}>{t("wizard.prepareRetry")}</Button></div>
+            : <p className="wizard-loading wizard-prepare-wait" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />
+                {t(hostStatus.state === "running" ? "wizard.prepareAnswering" : "wizard.prepareStarting")}</p>)}
         <Button type="button" variant="ghost" size="sm" className="wizard-alternative" onClick={() => void choosePath("remote")}>{t("wizard.installRemote")}</Button>
       </section>}
       {step === "W2r" && <section>

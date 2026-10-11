@@ -601,6 +601,9 @@ export const en = {
   "whatsNew.endOfTurn.line": "A small model hears when you have finished, so a pause to think does not cut you off.",
   "whatsNew.speechLanguage.title": "The language you speak",
   "whatsNew.speechLanguage.line": "Tell transcription your language instead of having it detected each time.",
+  "wizard.prepareStarting": "Starting Sidevoice on this computer…",
+  "wizard.prepareAnswering": "Checking that this computer answers…",
+  "wizard.prepareRetry": "Try again",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

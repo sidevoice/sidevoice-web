@@ -4,6 +4,7 @@ import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import { ONBOARDING_STORAGE_KEY } from "../../services/onboarding-state";
+import { localHostInstallController } from "../../services/local-host-install";
 import type { SidevoiceActions } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 
@@ -159,4 +160,32 @@ test("a model not on this device is downloaded first, in its block as in Setting
   expect(tryButton()).not.toBeDisabled();
   expect(stageAction()).not.toHaveAttribute("aria-disabled");
   expect(document.getElementById("stt-language")).toBeInTheDocument();
+});
+
+test("preparing this computer never offers Prepare again: the install, then waiting for it to answer, then its agents", async () => {
+  let finish!: (status: unknown) => void;
+  const install = vi.fn(() => Object.assign(new Promise((resolve) => { finish = resolve; }), { job: "prep-job" }));
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" }, voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  expect(title()).toHaveTextContent("Prepare this computer");
+  await act(async () => { fireEvent.click(document.getElementById("wizard-prepare")!); });
+  expect(document.getElementById("wizard-prepare")).toBeNull();
+  // Installed: the room chooses this computer's machine and lets the install's state go, before this device reaches it.
+  await act(async () => { finish({ state: "starting", installed: true, reachable: false }); await Promise.resolve(); });
+  act(() => { localHostInstallController.clear(); store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }); });
+  expect(document.getElementById("wizard-prepare")).toBeNull();
+  expect(screen.getByText("Starting Sidevoice on this computer…")).toBeInTheDocument();
+  act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true } }));
+  expect(screen.getByText("Checking that this computer answers…")).toBeInTheDocument();
+  expect(document.getElementById("wizard-prepare")).toBeNull();
+  // Answering, in use: its agents, in the same step.
+  act(() => store.patch({ pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    pairingInUse: "fp-local", node: "fp-local", nodeReach: "ok" }));
+  expect(screen.getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
+  act(() => localHostInstallController.clear());
 });
