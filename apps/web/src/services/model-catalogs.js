@@ -21,7 +21,9 @@
  *   setCredential(provider: string, key: string | null): Promise<void>,
  *   hasCredential(provider: string): Promise<boolean>,
  *   refresh?(provider: string): Promise<void>,
+ *   uninstall?(model: string): Promise<void>,
  * }} ModelCatalogs
+ *   `uninstall`, where the engine has it, takes a model off this device: every build of it.
  */
 
 /** The id of the catalogue of models that run on this device. */
@@ -99,6 +101,8 @@ export function engineCatalogs(engine, credentials) {
     install: (model, { build = null, onProgress, signal } = {}) =>
       engine.install(model, build ?? undefined, (progress) => onProgress?.(webInstallProgress(progress)), signal)
         .catch((error) => { throw signal?.aborted || error?.code === 'cancelled' ? cancelled() : error; }),
+    // Off this device, every build; refused `model-in-use` while one is loaded.
+    uninstall: (model) => engine.uninstall(model),
     async setCredential(provider, key) {
       credentials.set(provider, typeof key === 'string' && key.trim() ? key.trim() : null);
     },

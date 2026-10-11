@@ -189,6 +189,7 @@ export interface SidevoiceActions {
   installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
   cancelVoiceInstall?(): void;
+  uninstallVoiceModel?(model: string): Promise<void>;
   /** Stops the try in progress, which then rejects `trial-cancelled`. */
   cancelVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */

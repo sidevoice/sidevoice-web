@@ -41,7 +41,7 @@ export function initialSessionFacts() {
         voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
-        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, providerKeys: {},
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, providerKeys: {},
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }

@@ -99,3 +99,10 @@ test("in the desktop app the native engine installs it: its bytes as the share d
   await expect(stopped).rejects.toMatchObject({ code: "install-cancelled" });
   expect(cancelled).toEqual(["install-1-kokoro-82m-v1.0-sherpa-onnx"]);
 });
+
+test("on the web a model is taken off this device through the engine, every build of it", async () => {
+  const seen: unknown[] = [];
+  const engine = { catalogs: () => [], uninstall: async (...args: unknown[]) => void seen.push(args) } as unknown as WebEngine;
+  await engineCatalogs(engine, localStorageCredentials(memory().storage)).uninstall!("whisper-base");
+  expect(seen).toEqual([["whisper-base"]]);
+});

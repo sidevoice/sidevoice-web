@@ -71,3 +71,26 @@ test("the thinking sound and the screen are this device's, applied at once", () 
   expect(JSON.parse(localStorage.getItem("sidevoice.call-preferences")!).presence).toBe("always");
   localStorage.removeItem("sidevoice.call-preferences");
 });
+
+test("Advanced lists the models on this device with their size; Delete asks, says what uses one, and takes it off", async () => {
+  const store = open("whisper-base");
+  act(() => store.patch({ modelsRemovable: true }));
+  const uninstall = vi.fn(async () => {});
+  window.sidevoiceActions = { ...window.sidevoiceActions, uninstallVoiceModel: uninstall } as unknown as SidevoiceActions;
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  const rows = [...document.querySelectorAll("#downloaded-models .downloaded-model")];
+  expect(rows.map((row) => row.getAttribute("data-model"))).toEqual(["whisper-base", "kokoro-82m-v1.0"]);
+  expect(rows[0]).toHaveTextContent("63 MB");
+  fireEvent.click(screen.getByRole("button", { name: "Delete whisper-base from this device" }));
+  expect(screen.getByRole("group", { name: "Delete whisper-base from this device" })).toHaveTextContent("Transcription use whisper-base.");
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
+  expect(uninstall).toHaveBeenCalledWith("whisper-base");
+});
+
+test("where the engine can't delete models, they are listed without Delete, and it says so", () => {
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  expect(document.querySelectorAll("#downloaded-models .downloaded-model")).toHaveLength(2);
+  expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+  expect(document.getElementById("pane-advanced")).toHaveTextContent("This version of the app can't delete them yet.");
+});

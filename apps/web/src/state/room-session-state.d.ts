@@ -39,6 +39,8 @@ export interface SessionFacts {
   *  key is kept for each remote provider. */
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
  voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string};
+ /** Whether this device's engine can take a model off it (`uninstallVoiceModel`). */
+ modelsRemovable: boolean;
  providerKeys: Record<string, boolean | null>;
  /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
  storageBlocked: boolean;

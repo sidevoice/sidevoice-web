@@ -82,3 +82,13 @@
 .settings-page[data-header="app"] .ui-dialog-title { font-size: var(--sv-font-lg); line-height: 1.5rem; }
 .settings-page[data-header="app"] .ui-dialog-title > .settings-crumb > span:last-child { font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
 @media (max-width: 767px) { .settings-page[data-header="app"] .ui-dialog-head { padding: 0 var(--sv-space-2) 0 var(--sv-space-4); } }
+
+/* Advanced → Downloaded models: one line each, its size, and Delete asking in place. */
+.downloaded-models { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
+.downloaded-model { display: grid; gap: var(--sv-space-2); }
+.downloaded-model-main { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 36px; }
+.downloaded-model-copy { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
+.downloaded-model-name { font-size: var(--sv-font-sm); overflow-wrap: anywhere; }
+.downloaded-model-size { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.downloaded-model .provider-remove { margin: 0; }
+.downloaded-model-error { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-danger); }

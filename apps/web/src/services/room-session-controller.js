@@ -1293,7 +1293,7 @@ function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
- try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)})}
+ try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)})}
  catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
 }
 function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)})}
@@ -1341,6 +1341,13 @@ async function installVoiceModel(task){
  finally{if(voiceInstall===abort)voiceInstall=null}
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
+// A model taken off this device, every build of it, where the engine can (`modelsRemovable`); the catalogues read again.
+// Its code stays on what it throws, for the pane to say a model in use as such.
+async function uninstallVoiceModel(model){
+ const models=await modelCatalogs();
+ try{await models.uninstall(model)}catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ await loadVoiceCatalogue();
+}
 // A key changes what a provider lists: its catalogue is read again with it.
 // A provider's key tested: the provider asked again, and the catalogues read with what it said. A host without a way to
 // ask again (an older desktop app) reads them as they are.
@@ -1425,6 +1432,7 @@ window.sidevoiceActions={
  cancelVoiceTry,
  installVoiceModel,
  cancelVoiceInstall,
+ uninstallVoiceModel,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,
