@@ -45,6 +45,20 @@ export const en = {
 
   "transcript.show": "Show transcript",
   "transcript.hide": "Hide transcript",
+  // The call's voice models (VoiceModels).
+  "voiceModels.label": "Your voice: {stt} turns speech to text, {tts} speaks",
+  "voiceModels.stt": "Speech to text",
+  "voiceModels.tts": "Text to speech",
+  "voiceModels.none": "none chosen",
+  "voiceModels.here": "on this device",
+  "voiceModels.provider": "through {provider}",
+  "voiceModels.state.ready": "ready",
+  "voiceModels.state.downloading": "downloading",
+  "voiceModels.state.verifying": "checking the download",
+  "voiceModels.state.loading": "loading",
+  "voiceModels.state.absent": "not downloaded",
+  "voiceModels.state.failed": "download failed",
+  "voiceModels.state.unavailable": "not available now",
 } as const;
 
 export type CallMessageKey = keyof typeof en;

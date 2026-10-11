@@ -4,6 +4,7 @@ import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon, TranscriptIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { VoiceModels } from "./VoiceModels";
 import { callTranslator } from "./call-i18n";
 
 /** The whole transcript, behind one button of the call (TranscriptPanel): at the call bar's right edge, a round
@@ -66,6 +67,7 @@ export function CallToolbar() {
         </div>
       </div>
       <div className="call-bar-end">
+        <VoiceModels place="bar" />
         {!narrow && <TranscriptToggle />}
       </div>
     </footer>

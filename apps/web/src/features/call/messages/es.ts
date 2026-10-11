@@ -46,4 +46,18 @@ export const es: Partial<Record<CallMessageKey, string>> = {
 
   "transcript.show": "Ver la transcripción",
   "transcript.hide": "Ocultar la transcripción",
+  // The call's voice models (VoiceModels).
+  "voiceModels.label": "Tu voz: {stt} pasa la voz a texto, {tts} habla",
+  "voiceModels.stt": "Voz a texto",
+  "voiceModels.tts": "Texto a voz",
+  "voiceModels.none": "ninguno elegido",
+  "voiceModels.here": "en este dispositivo",
+  "voiceModels.provider": "a través de {provider}",
+  "voiceModels.state.ready": "listo",
+  "voiceModels.state.downloading": "descargándose",
+  "voiceModels.state.verifying": "comprobando la descarga",
+  "voiceModels.state.loading": "cargando",
+  "voiceModels.state.absent": "sin descargar",
+  "voiceModels.state.failed": "la descarga falló",
+  "voiceModels.state.unavailable": "no disponible ahora",
 };

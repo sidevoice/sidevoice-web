@@ -13,6 +13,7 @@ import { callTranslator, type CallTranslate } from "./call-i18n";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 import { TranscriptToggle } from "./CallToolbar";
+import { VoiceModels } from "./VoiceModels";
 import "./call-view.css";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
@@ -115,11 +116,13 @@ export function CallStage() {
       <header className="stage-title" translate="no">
         <h2 title={stage.title}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
+        <VoiceModels place="title" />
       </header>
       <div className="stage-tile" data-mood={stage.mood} style={avatarTone(spec) as CSSProperties}>
         <div className="stage-name" translate="no">
           <h2 title={stage.title}>{stage.title}</h2>
           {stage.row?.machine && <span>{stage.row.machine}</span>}
+          <VoiceModels place="title" />
         </div>
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
@@ -132,6 +135,7 @@ export function CallStage() {
             {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
             <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
           </span>}
+          <VoiceModels place="tile" />
         </div>
         <PersonTurn conversation={conversation} t={t} />
         {narrow && <TranscriptToggle floating />}

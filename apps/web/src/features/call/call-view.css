@@ -178,3 +178,21 @@
   .room-shell[data-layout="meet"] .stage-title span { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
   .room-shell[data-layout="meet"] .stage-name { display: none; }
 }
+
+/* The call's voice models (VoiceModels; VARIANTS voice-models). A: at the tile's foot, the agent's badge left and the
+ * voice's right (clear of a phone's transcript button); B: chips in the call bar; C: beside the conversation's name. */
+.stage-tags:has(.voice-models--tile) { left: var(--stage-inset); right: var(--stage-inset); justify-content: space-between; max-width: none; transform: none; }
+.stage-tile:has(.stage-transcript-toggle) .stage-tags:has(.voice-models--tile) { right: calc(var(--sv-space-3) + var(--sv-control-md) + var(--sv-space-2)); max-width: none; }
+.voice-models--tile { margin-inline-start: auto; }
+.voice-models--tile > svg, .voice-models--title > svg { flex: none; }
+.voice-models-sep { color: var(--sv-text-subtle); }
+.voice-models--bar { display: flex; align-items: center; gap: var(--sv-space-1-5); }
+.voice-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1); max-width: 12rem; height: 28px; padding: 0 var(--sv-space-2-5, 10px); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill);
+  background: var(--sv-surface); color: var(--sv-text-muted); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); white-space: nowrap; }
+.voice-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.voice-chip svg { flex: none; }
+.voice-models--title { display: inline-flex; align-items: center; gap: var(--sv-space-1); min-width: 0; max-width: 100%; overflow: hidden; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; }
+.voice-models:focus-visible, .voice-chip:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.voice-models-details { display: grid; gap: 2px; }
+.voice-models-line b { font-weight: var(--sv-weight-semibold); }
+@media (max-width: 599px) { .voice-models--bar .voice-chip { max-width: 7rem; } }
