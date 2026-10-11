@@ -14,6 +14,7 @@ import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
+import { DeviceNameField } from "./DeviceNameField";
 import { NewDot, useHighlights } from "../highlights/highlights";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
@@ -53,6 +54,7 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
         <NativeSelect id="ui-language" defaultValue=""><option value="">{t("settings.general.languageAuto")}</option><option value="es">Español</option><option value="en">English</option></NativeSelect>
       </Row>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
+      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
     </Group>
   </Section>;
 }

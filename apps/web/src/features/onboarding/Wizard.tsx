@@ -19,6 +19,7 @@ import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { hostStatusText } from "../settings/local-host-status";
 import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
+import { DeviceNameField } from "../settings/DeviceNameField";
 import { ReadyStep } from "./ReadyStep";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
@@ -75,6 +76,7 @@ function BasicsStep({ t }: { t: HostTranslate }) {
           <option value="">{t("wizard.languageAuto")}</option><option value="es">Español</option><option value="en">English</option>
         </NativeSelect>
       </Row>
+      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="wizard-device-name"><DeviceNameField id="wizard-device-name" /></Row>
       <Row label={t("wizard.basics.speech")} description={t("wizard.basics.speechHint")} htmlFor="wizard-speech-language">
         <NativeSelect id="wizard-speech-language" value={draft?.stt.language ?? ""} onChange={(event) => window.sidevoiceActions?.editVoice({ stt: { language: event.target.value || null } })}>
           <option value="">{t("wizard.languageAuto")}</option><option value="es">Español</option><option value="en">English</option>

@@ -144,6 +144,8 @@ function reachText(machine: MachineView, t: HostTranslate) {
  *  paired with it, and forgetting it. */
 function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean }) {
   const t = hostTranslator();
+  // Renaming the machine on this device: the name being typed, or null.
+  const [naming, setNaming] = useState<string | null>(null);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const agents = useRef<HTMLElement>(null);
@@ -155,7 +157,19 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          <h3>{copy.name}</h3>
+          {naming !== null ? <form className="host-rename" onSubmit={(event) => { event.preventDefault(); window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming.trim() || null); setNaming(null); }}>
+              <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } }} />
+              <Button type="submit" size="sm" variant="primary">{t("hosts.devices.renameSave")}</Button>
+              <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
+            </form>
+            : <h3 className="host-name">{copy.name}
+              {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: copy.name })} title={t("hosts.rename", { machine: copy.name })}
+                onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
+            </h3>}
+          {/* Renamed here: whose name it really is, and the way back to it. */}
+          {machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
+            <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
