@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
@@ -16,7 +16,7 @@ import type { CallMessageKey } from "./messages/en";
 /** A model's slot as the badge says it; `attention` when something must be done or waited for before it works. */
 type Slot = { id: string; where: string; state: string; attention: boolean };
 
-function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
+function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
@@ -26,6 +26,7 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
   const settings = saved ? voiceSettingsHere(saved, catalogs) : null;
   const stt = useModelState("stt", settings);
   const tts = useModelState("tts", settings);
+  const turn = useModelState("end-of-turn", settings);
   const slot = (task: "stt" | "tts", model: typeof stt): Slot | null => {
     const chosen = settings?.[task];
     if (!chosen?.model) return null;
@@ -39,13 +40,18 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
       attention: status !== "ready" && status !== "unknown",
     };
   };
-  return { stt: slot("stt", stt), tts: slot("tts", tts) };
+  // The smart end of turn has a model of its own; the silence one has none, and no badge.
+  const turnId = settings?.end_of_turn === "smart-turn" ? turn.model?.id ?? settings.turn_model ?? null : null;
+  const turnStatus = !known ? "unknown" : turn.status ?? "unavailable";
+  const turnSlot: Slot | null = turnId ? { id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as CallMessageKey),
+    attention: turnStatus !== "ready" && turnStatus !== "unknown" } : null;
+  return { stt: slot("stt", stt), tts: slot("tts", tts), turn: turnSlot };
 }
 
-function Details({ stt, tts, t }: { stt: Slot | null; tts: Slot | null; t: CallTranslate }) {
+function Details({ stt, tts, turn, t }: { stt: Slot | null; tts: Slot | null; turn: Slot | null; t: CallTranslate }) {
   const line = (label: string, slot: Slot | null) =>
     <span className="voice-models-line"><b>{label}</b> {slot ? `${slot.id} · ${slot.where} · ${slot.state}` : t("voiceModels.none")}</span>;
-  return <span className="voice-models-details">{line(t("voiceModels.stt"), stt)}{line(t("voiceModels.tts"), tts)}</span>;
+  return <span className="voice-models-details">{line(t("voiceModels.stt"), stt)}{line(t("voiceModels.tts"), tts)}{turn && line(t("voiceModels.turn"), turn)}</span>;
 }
 
 /** One model: quiet while it is ready (full contrast on hover or focus), and saying its state in words, in the
@@ -61,17 +67,19 @@ function Chip({ slot, label, icon, details }: { slot: Slot; label: string; icon:
   );
 }
 
-/** The two models, stacked; nothing before any is chosen. */
+/** The models, stacked: speech to text, text to speech, and the end of turn's when it is the smart one; nothing before
+ *  any is chosen. */
 export function VoiceModels() {
   const t = callTranslator();
-  const { stt, tts } = useSlots(t);
+  const { stt, tts, turn } = useSlots(t);
   if (!stt && !tts) return null;
   const label = t("voiceModels.label", { stt: stt?.id ?? t("voiceModels.none"), tts: tts?.id ?? t("voiceModels.none") });
-  const details = <Details stt={stt} tts={tts} t={t} />;
+  const details = <Details stt={stt} tts={tts} turn={turn} t={t} />;
   return (
     <div className="voice-models" role="group" aria-label={label} translate="no">
       {stt && <Chip slot={stt} label={t("voiceModels.stt")} icon={<TranscriptionIcon size={12} />} details={details} />}
       {tts && <Chip slot={tts} label={t("voiceModels.tts")} icon={<VoicesIcon size={12} />} details={details} />}
+      {turn && <Chip slot={turn} label={t("voiceModels.turn")} icon={<EndOfTurnIcon size={12} />} details={details} />}
     </div>
   );
 }

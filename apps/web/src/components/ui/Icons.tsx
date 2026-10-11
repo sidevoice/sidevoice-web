@@ -10,6 +10,7 @@ import {
   MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp,
+  Timer,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -81,6 +82,8 @@ export const SpeaksIcon = mark(AudioWaveform, 12);
 export const GeneralIcon = mark(SlidersHorizontal, 16);
 export const VoicesIcon = mark(AudioWaveform, 16);
 export const TranscriptionIcon = mark(Mic, 16);
+/** When the person's turn ends: the smart end of turn's model. */
+export const EndOfTurnIcon = mark(Timer, 16);
 /** The call's own behaviour: your turn, the sound while the agent works, the screen. */
 export const CallSettingsIcon = mark(Phone, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);

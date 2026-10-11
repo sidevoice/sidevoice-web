@@ -50,6 +50,7 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "voiceModels.label": "Tu voz: {stt} pasa la voz a texto, {tts} habla",
   "voiceModels.stt": "Voz a texto",
   "voiceModels.tts": "Texto a voz",
+  "voiceModels.turn": "Fin de turno",
   "voiceModels.none": "ninguno elegido",
   "voiceModels.here": "en este dispositivo",
   "voiceModels.provider": "a través de {provider}",

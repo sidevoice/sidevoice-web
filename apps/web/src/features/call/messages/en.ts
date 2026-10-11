@@ -49,6 +49,7 @@ export const en = {
   "voiceModels.label": "Your voice: {stt} turns speech to text, {tts} speaks",
   "voiceModels.stt": "Speech to text",
   "voiceModels.tts": "Text to speech",
+  "voiceModels.turn": "End of turn",
   "voiceModels.none": "none chosen",
   "voiceModels.here": "on this device",
   "voiceModels.provider": "through {provider}",

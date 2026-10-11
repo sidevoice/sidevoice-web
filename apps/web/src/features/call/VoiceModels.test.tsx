@@ -47,3 +47,16 @@ test("before the catalogue is read, a badge claims nothing about its model: quie
   expect([...document.querySelectorAll(".voice-chip")].map((chip) => chip.hasAttribute("data-attention"))).toEqual([false, false]);
   expect(document.querySelector(".voice-chip-state")).toBeNull();
 });
+
+test("the smart end of turn adds its model's badge under the other two; the silence one adds none", () => {
+  const turnModel = { id: "smart-turn-v3", family: "smart-turn", capabilities: ["end-of-turn"], installed: false, builds: [{ ...build, installed: false }], languages: [], voices: [] };
+  const withTurn = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, turnModel] } : catalog) as CatalogView[];
+  const store = createRoomStore();
+  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn" }, voiceCatalogue: { state: "ready", catalogs: withTurn, error: "" } }));
+  render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
+  const chips = [...document.querySelectorAll(".voice-chip")];
+  expect(chips).toHaveLength(3);
+  expect(chips[2]).toHaveAccessibleName("End of turn: smart-turn-v3, not downloaded");
+  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } }));
+  expect(document.querySelectorAll(".voice-chip")).toHaveLength(2);
+});
