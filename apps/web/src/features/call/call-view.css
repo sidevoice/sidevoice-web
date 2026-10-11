@@ -191,32 +191,12 @@
 .voice-models-details { display: grid; gap: 2px; }
 .voice-models-line b { font-weight: var(--sv-weight-semibold); }
 
-/* The way into the transcript, in the tile (TranscriptEntry; VARIANTS transcript-entry). Opaque, for contrast over the
- * tile's glow; 44px to touch. A: the peek strip across the foot, the agent's badge and the person's bubble above it.
- * B: a round button in the corner, a dot when something is unread. C: "Send a message" in the person's turn's place. */
-.transcript-entry { position: absolute; z-index: 3; bottom: var(--stage-inset); display: flex; align-items: center; gap: var(--sv-space-2); min-height: 44px;
-  border: 1px solid var(--sv-border); background: var(--sv-surface); box-shadow: var(--sv-shadow-xs); color: var(--sv-text); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.transcript-entry:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.transcript-entry:active { background: var(--sv-pressed); }
-.transcript-entry[aria-expanded="true"] { border-color: color-mix(in srgb, var(--sv-accent) 40%, var(--sv-border)); }
-.transcript-entry-count { flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--sv-radius-pill); background: var(--sv-accent); color: var(--sv-on-accent);
-  font-size: var(--sv-font-xs); line-height: 20px; font-weight: var(--sv-weight-semibold); text-align: center; font-variant-numeric: tabular-nums; }
-.transcript-entry--peek { left: var(--stage-inset); right: var(--stage-inset); padding: 0 var(--sv-space-3); border-radius: var(--sv-radius-pill); font: inherit; text-align: start; touch-action: pan-x; }
-.transcript-entry-face .conversation-avatar { width: 24px; height: 24px; }
-.transcript-entry-face { flex: none; display: grid; }
-.transcript-entry-who { flex: none; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
-.transcript-entry-line { flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; }
-.transcript-entry-line.muted { color: var(--sv-text-muted); }
-.transcript-entry-chevron { flex: none; color: var(--sv-text-muted); transform: rotate(180deg); }
-.transcript-entry > svg:first-child { flex: none; color: var(--sv-text-muted); }
-.stage-tile:has(.transcript-entry--peek) :is(.stage-tags, .person-bubble) { bottom: calc(var(--stage-inset) + 44px + var(--sv-space-2)); }
-.transcript-entry--button { right: var(--stage-inset); width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+/* The way into the transcript, in the tile's corner (TranscriptEntry): round, opaque for contrast over the tile's glow,
+ * 44px to touch, a dot when something arrived unread; the person's bubble and the agent's badge keep clear of it. */
+.transcript-entry { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); width: 44px; height: 44px; padding: 0; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
+.transcript-entry[aria-expanded="true"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 .transcript-entry-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
-.stage-tile:has(.transcript-entry--button) .person-bubble { right: calc(var(--stage-inset) + 44px + var(--sv-space-2)); }
-.stage-tile:has(.transcript-entry--button) .stage-tags { max-width: calc(100% - 2 * (var(--stage-inset) + 44px + var(--sv-space-2))); }
-.transcript-entry--turn { right: var(--stage-inset); max-width: calc(100% - 2 * var(--stage-inset)); padding: 0 var(--sv-space-3) 0 var(--sv-space-4);
-  border-radius: var(--sv-radius-xl); border-bottom-right-radius: var(--sv-radius-xs); background: var(--sv-bubble-self); font: inherit; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
-.stage-tile:has(.person-bubble) .transcript-entry--turn { display: none; }
-.stage-tile:has(.transcript-entry--turn) .stage-tags { left: var(--stage-inset); transform: none; justify-content: flex-start; max-width: calc(50% - var(--stage-inset)); }
-@media (prefers-reduced-motion: reduce) { .transcript-entry { transition: none; } }
+.stage-tile:has(.transcript-entry) .person-bubble { right: calc(var(--stage-inset) + 44px + var(--sv-space-2)); }
+.stage-tile:has(.transcript-entry) .stage-tags { max-width: calc(100% - 2 * (var(--stage-inset) + 44px + var(--sv-space-2))); }
+
 .stage-badge:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }

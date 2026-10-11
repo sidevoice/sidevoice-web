@@ -46,9 +46,6 @@ export const en = {
   "transcript.show": "Show transcript",
   "transcript.hide": "Hide transcript",
   "transcript.showUnread": "Show transcript, {n} unread",
-  "transcript.send": "Send a message",
-  "transcript.nothingYet": "Nothing said yet",
-  "transcript.you": "You:",
   // The call's voice models (VoiceModels).
   "voiceModels.label": "Your voice: {stt} turns speech to text, {tts} speaks",
   "voiceModels.stt": "Speech to text",

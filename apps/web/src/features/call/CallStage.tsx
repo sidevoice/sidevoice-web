@@ -113,7 +113,7 @@ export function CallStage() {
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
-          <TranscriptEntry row={null} />
+          <TranscriptEntry />
         </div>
       </section>
     );
@@ -148,7 +148,7 @@ export function CallStage() {
           </Tooltip>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
-        <TranscriptEntry row={stage.row ?? null} />
+        <TranscriptEntry />
       </div>
     </section>
   );

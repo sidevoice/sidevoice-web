@@ -257,11 +257,6 @@
 .pt-stage:has(.pt-bubble--person) .pt-stage-tags { display: none; }
 .pt-sidebar-new { display: flex; justify-content: center; }
 
-/* The transcript's peek strip at the tile's foot (the room's TranscriptEntry, variant A); the tags sit above it. */
-.pt-peek { position: absolute; left: var(--sv-space-3); right: var(--sv-space-3); bottom: var(--sv-space-3); display: flex; align-items: center; gap: var(--sv-space-2); min-height: 44px; padding: 0 var(--sv-space-3);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-surface); box-shadow: var(--sv-shadow-xs); color: var(--sv-text); font: inherit; text-align: start; }
-.pt-peek-who { flex: none; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
-.pt-peek-line { flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); white-space: nowrap; text-overflow: ellipsis; }
-.pt-peek-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--sv-radius-pill); background: var(--sv-accent); color: var(--sv-on-accent); font-size: var(--sv-font-xs); line-height: 20px; font-weight: var(--sv-weight-semibold); text-align: center; }
-.pt-peek-chevron { flex: none; color: var(--sv-text-muted); transform: rotate(180deg); }
-.pt-stage:has(.pt-peek) :is(.pt-stage-tags, .pt-bubble--person) { margin-bottom: 52px; }
+/* The transcript's button in the tile's corner (the room's TranscriptEntry), a dot when something is unread. */
+.pt-transcript { position: absolute; right: var(--sv-space-3); bottom: var(--sv-space-3); width: 44px; height: 44px; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
+.pt-transcript-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }

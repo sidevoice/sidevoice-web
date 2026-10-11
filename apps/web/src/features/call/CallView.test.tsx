@@ -368,30 +368,28 @@ test("the header menu gives focus back to its button however it closes, unless a
   await waitFor(() => expect(document.activeElement).toBe(button));
 });
 
-test("exactly one way into the transcript, in the tile, for every variant on a phone and a desktop, with or without a conversation on the stage", () => {
-  for (const entry of ["peek", "button", "turn"]) for (const narrow of [false, true]) for (const binding of [{ thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" }, null]) {
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ "transcript-entry": entry }));
+test("exactly one way into the transcript, the button in the tile, on a phone and a desktop, with or without a conversation on the stage", () => {
+  for (const narrow of [false, true]) for (const binding of [{ thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" }, null]) {
     viewport({ narrow });
     room({ roomBinding: binding });
     const ways = document.querySelectorAll("#transcript-toggle");
-    expect([entry, narrow, !!binding, ways.length]).toEqual([entry, narrow, !!binding, 1]);
+    expect([narrow, !!binding, ways.length]).toEqual([narrow, !!binding, 1]);
     expect(ways[0].closest(".stage-tile")).not.toBeNull();
-    expect(ways[0]).toHaveClass("transcript-entry--" + entry);
     cleanup();
     vi.restoreAllMocks();
   }
 });
 
-test("the peek strip shows the latest line, counts what arrives while the transcript is closed, and opening it reads them", async () => {
+test("the transcript button wears a dot for what arrives while it is closed; opening it reads them", async () => {
   const store = room();
-  const strip = document.getElementById("transcript-toggle")!;
-  expect(strip).toHaveClass("transcript-entry--peek");
-  expect(strip).toHaveAccessibleName("Show transcript");
+  const button = document.getElementById("transcript-toggle")!;
+  expect(button).toHaveAccessibleName("Show transcript");
+  expect(button.querySelector(".transcript-entry-dot")).toBeNull();
   patch(store, { history: [...store.getState().facts.history,
-    { segment: "h-3", thread: "t-login", role: "assistant", text: "Shall I also add a retry around the token refresh?", name: "Fix the slow login", time: 2, session: "s1" }] });
-  expect(strip).toHaveTextContent("Shall I also add a retry around the token refresh?");
-  expect(strip).toHaveAccessibleName("Show transcript, 1 unread");
-  await act(async () => { fireEvent.click(strip); });
-  await act(async () => { fireEvent.click(strip); });
-  expect(strip).toHaveAccessibleName("Show transcript");
+    { segment: "h-3", thread: "t-login", role: "assistant", text: "Shall I also add a retry?", name: "Fix the slow login", time: 2, session: "s1" }] });
+  expect(button).toHaveAccessibleName("Show transcript, 1 unread");
+  expect(button.querySelector(".transcript-entry-dot")).not.toBeNull();
+  await act(async () => { fireEvent.click(button); });
+  await act(async () => { fireEvent.click(button); });
+  expect(button).toHaveAccessibleName("Show transcript");
 });

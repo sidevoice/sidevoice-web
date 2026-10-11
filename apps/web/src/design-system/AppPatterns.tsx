@@ -162,11 +162,8 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
         <span>…and make the dark theme a little warmer</span>
         <Button variant="ghost" tone="neutral" size="sm">{t("stage.cancelTurn")}</Button>
       </div>}
-      {/* The way into the transcript, phone and desktop: here the peek strip (VARIANTS transcript-entry A). */}
-      <button type="button" className="pt-peek" aria-label={t("transcript.showUnread", { n: 1 })}>
-        <span className="pt-peek-who">{t("transcript.you")}</span><span className="pt-peek-line">…and make the dark theme a little warmer</span>
-        <span className="pt-peek-count" aria-hidden>1</span><ChevronIcon size={16} className="pt-peek-chevron" />
-      </button>
+      {/* The way into the transcript, phone and desktop: a round button in the tile's corner, a dot when something is unread. */}
+      <Button size="icon" variant="secondary" className="pt-transcript" aria-label={t("transcript.showUnread", { n: 1 })}><TranscriptIcon size={20} /><span className="pt-transcript-dot" aria-hidden /></Button>
     </div>
   );
 }
