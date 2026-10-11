@@ -26,7 +26,7 @@ test("it opens when asked with remote setup guidance before the code, and no dev
   expect(element().open).toBe(true);
   expect(screen.getByRole("heading", { name: "Connect to a machine" })).toBeInTheDocument();
   expect(screen.getByText("«mac» ya no reconoce este dispositivo.")).toBeInTheDocument();
-  expect([...element().querySelectorAll(".setup-command code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
+  expect([...element().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
   expect(screen.queryByRole("textbox", { name: /device name/i })).toBeNull();
   expect(submit().disabled).toBe(true);           // nothing to redeem yet
 });

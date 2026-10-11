@@ -124,8 +124,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "noMachine.stepPair": "Después saca allí un código de emparejamiento, o pídeselo a tu agente, y pégalo abajo con la dirección de la máquina:",
   "noMachine.copyPairCommand": "Copiar comando de emparejamiento",
   "noMachine.copyCommand": "Copiar comando de instalación",
-  "noMachine.commandCopied": "Comando copiado.",
-  "noMachine.commandCopyFailed": "Selecciona y copia el comando.",
   "noMachine.pairingTitle": "Empareja este dispositivo",
   "noMachine.connect": "Conectar con una máquina",
   "noMachine.closePairing": "Cerrar emparejamiento",

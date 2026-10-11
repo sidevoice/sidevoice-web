@@ -122,8 +122,6 @@ export const en = {
   "noMachine.stepPair": "Then get a pairing code there, or ask your agent for one, and paste it below with the machine's address:",
   "noMachine.copyPairCommand": "Copy pairing command",
   "noMachine.copyCommand": "Copy setup command",
-  "noMachine.commandCopied": "Command copied.",
-  "noMachine.commandCopyFailed": "Select and copy the command.",
   "noMachine.pairingTitle": "Pair this device",
   "noMachine.connect": "Connect to a machine",
   "noMachine.closePairing": "Close pairing",
