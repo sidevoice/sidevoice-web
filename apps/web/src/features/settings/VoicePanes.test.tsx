@@ -6,10 +6,10 @@ import { ProviderKeys } from "./ProviderKeys";
 import { StorageBlockedBanner } from "./StorageBlockedBanner";
 import { createRoomStore, installRoomBridge, RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
-import type { SidevoiceActions } from "../../state/room-types";
+import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.variants"); });
 
 /** Settings' transcription, voice and advanced sections, as the voice is chosen in them. */
 function VoicePanes() {
@@ -210,6 +210,84 @@ test("once it is here its voices appear, and it can be tried without saving; a p
   renderPane("voice", { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
   expect(document.getElementById("stt-model-card")).toHaveTextContent("No download needed");
   expect(document.getElementById("stt-language")).toBeInTheDocument();
+});
+
+/** A try that runs until the test ends it, and what the pane asked it to tell as it goes. */
+function pendingTry(actions: { tryVoiceSettings: ReturnType<typeof vi.fn> }) {
+  const running: { told: TrialProgress; finish(result: unknown): void } = { told: {}, finish: () => {} };
+  actions.tryVoiceSettings.mockImplementation((_task: string, options: TrialProgress) => {
+    running.told = options;
+    return new Promise((resolve) => { running.finish = resolve; });
+  });
+  return running;
+}
+
+/** What was heard, taller than its two lines where it is drawn (jsdom draws nothing: its drawn height is 0). */
+function overflowing() {
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get(this: HTMLElement) { return this.tagName === "BLOCKQUOTE" ? 96 : 0; } });
+  return () => { delete (HTMLElement.prototype as { scrollHeight?: number }).scrollHeight; };
+}
+
+test("try-result card: a try is all in the model's block — getting ready, listening with the level, what was heard quoted with See all, how quick, again", async () => {
+  const { actions } = renderPane("voice");
+  const card = document.getElementById("stt-model-card")!;
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: false }));
+  expect(card).toHaveTextContent("Getting ready…");
+  expect(document.getElementById("stt-try")).toHaveTextContent("Stop");
+  act(() => running.told.onListening!());
+  expect(card).toHaveTextContent("Listening… say a short sentence");
+  expect(card.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  // Longer than its two lines where it is drawn: the rest a See all away.
+  const long = "una frase bastante larga para la prueba ".repeat(6).trim();
+  const restore = overflowing();
+  await act(async () => { running.finish({ text: long, timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }); });
+  restore();
+  expect(card.querySelector("blockquote#stt-heard")).toHaveTextContent(long);
+  expect(card.querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
+  // See all opens the Popover with the whole of it (opened here, a Radix popover stalls jsdom for the tests after it).
+  expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-haspopup", "dialog");
+  expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("try-result card: a try that failed says why in the model's block, and offers it again", async () => {
+  const { actions } = renderPane("voice");
+  actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  expect(within(document.getElementById("stt-model-card")!).getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
+  expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
+});
+
+test("try-result dialog: the try opens its own dialog — the sentence lit as it is heard, how quick, again or Done; the block keeps one line", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "try-result": "dialog" }));
+  const { actions } = renderPane("voice");
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies.", keep: false }));
+  const dialog = document.getElementById("tts-try-dialog")!;
+  expect(dialog).toHaveAttribute("open");
+  expect(dialog).toHaveTextContent("Try the voice");
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 4, to: 4 }); });
+  expect(dialog).toHaveTextContent("Playing…");
+  expect(dialog.querySelector(".model-try-said")).toHaveTextContent(/^Hi!$/);
+  expect(dialog.querySelector(".model-try-unsaid")).toHaveTextContent(/^This is how/);
+  await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
+  expect(dialog.querySelector("#tts-timing")).toHaveTextContent("Starts speaking in 0.3 s");
+  expect(dialog.querySelector(".model-try-sentence")).toHaveAttribute("data-done");
+  expect(document.getElementById("tts-try-repeat")).toHaveTextContent("Listen again");
+  fireEvent.click(document.getElementById("tts-try-done")!);
+  expect(dialog).not.toHaveAttribute("open");
+  expect(document.getElementById("tts-timing")).toBeNull();
+  expect(document.querySelector("#tts-model-card .model-try-summary")).toHaveTextContent("Starts speaking in 0.3 s");
+  // Closed while it runs, the try stops.
+  pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(dialog).toHaveAttribute("open");
+  fireEvent.click(document.getElementById("tts-try-stop")!);
+  expect(actions.cancelVoiceTry).toHaveBeenCalled();
+  expect(dialog).not.toHaveAttribute("open");
 });
 
 test("how a model runs folds under it: each build with what it runs on and its sizes, Automatic the engine's own", () => {

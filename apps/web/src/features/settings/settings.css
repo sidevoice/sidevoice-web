@@ -24,17 +24,14 @@
 .provider-key-actions [role="status"] { margin: 0 auto 0 0; font-size: var(--sv-font-sm); }
 .provider-key-actions [role="status"]:empty { visibility: hidden; }
 
-/* A voice slot: the model's block under its row; a try's outcome under the block; the speed with its value. */
+/* A voice slot: the model's block under its row, its try in it (model-prepare.css); the speed with its value. */
 .ui-row--block .model-prepare { margin-top: var(--sv-space-3); }
-.voice-try-result:empty { display: none; }
-.voice-try-result { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-3); font-size: var(--sv-font-sm); }
 /* How quick a try was: one plain line, the slow hint after it, each phase in its (i). */
 .voice-try-timing { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); margin: 0; color: var(--sv-text-muted); }
 .voice-try-timing > span:first-child { color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
 .voice-try-slow { color: var(--sv-warning); }
 .voice-try-phases { display: grid; gap: 2px; }
-.voice-try-result .speech-bubble { margin: var(--sv-space-1) 0 0; padding: var(--sv-space-2) var(--sv-space-3); border-radius: var(--sv-radius-lg); background: var(--sv-bubble-self); color: var(--sv-text); font-size: var(--sv-font-md); }
-.stage-try-error { color: var(--sv-danger); }
+.stage-try-error { margin: 0; color: var(--sv-danger); }
 .voice-speed { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
 .voice-speed input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
 .voice-speed output { min-width: 3.5em; font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }

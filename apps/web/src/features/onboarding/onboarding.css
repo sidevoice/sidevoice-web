@@ -57,12 +57,11 @@
 .wizard-choice-note { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
 .wizard-choices .ui-card > .wizard-choice-note { padding-inline-end: var(--sv-space-2); }
 
-/* ----- transcription and voice: the choices (Settings' own), the sentence to hear, and the try */
+/* ----- transcription and voice: the choices (Settings' own), the try in the model's block; the sentence to hear is
+   edited there too, or beside it while the try has its own dialog */
 .wizard-stage-step { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .wizard-stage-step > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .wizard-stage { min-width: 0; }
-.wizard-trial { display: grid; gap: var(--sv-space-2); min-width: 0; }
-.wizard-trial > .ui-button { justify-self: start; }
 
 
 /* ----- Ready (ReadyStep): the mark arriving, the title, what was set up, what to tell an agent; Enter in the footer —
