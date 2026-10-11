@@ -319,6 +319,8 @@
 .ui-copy-button:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .ui-copy-button[data-state="copied"] { border-color: var(--sv-accent); background: var(--sv-accent); color: var(--sv-on-accent); }
 .ui-copy-button[data-state="failed"] { border-color: var(--sv-danger); background: var(--sv-danger-soft); color: var(--sv-danger); }
+/* On touch it reaches 44px, further than it shows. */
+@media (pointer: coarse) { .ui-copy-button { position: relative; } .ui-copy-button::after { content: ""; position: absolute; inset: -6px; } }
 /* How visible it is waits on VARIANTS copy-button. Faint: low contrast until the pointer is over the snippet or the
  * focus is in it. Hover: not shown until then — but always on a touch screen, which has no pointer over anything. Never
  * while it says how a copy went; and keyboard focus (focus-within) always shows it, so it is only ever made transparent,
