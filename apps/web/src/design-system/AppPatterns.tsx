@@ -162,7 +162,11 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
         <span>…and make the dark theme a little warmer</span>
         <Button variant="ghost" tone="neutral" size="sm">{t("stage.cancelTurn")}</Button>
       </div>}
-      {phone && <Button size="icon" variant="secondary" className="pt-floating" aria-label={t("transcript.show")}><TranscriptIcon size={20} /></Button>}
+      {/* The way into the transcript, phone and desktop: here the peek strip (VARIANTS transcript-entry A). */}
+      <button type="button" className="pt-peek" aria-label={t("transcript.showUnread", { n: 1 })}>
+        <span className="pt-peek-who">{t("transcript.you")}</span><span className="pt-peek-line">…and make the dark theme a little warmer</span>
+        <span className="pt-peek-count" aria-hidden>1</span><ChevronIcon size={16} className="pt-peek-chevron" />
+      </button>
     </div>
   );
 }
@@ -191,7 +195,6 @@ function CallBar({ joined = false, muted = false, menu = false, transcript = fal
           </span>
         </div>
       </div>
-      {!phone && <button type="button" className="pt-call-button pt-transcript-toggle" aria-expanded={transcript} aria-label={transcript ? t("transcript.hide") : t("transcript.show")}><TranscriptIcon size={22} /></button>}
     </div>
   );
 }

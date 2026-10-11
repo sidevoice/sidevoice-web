@@ -46,6 +46,10 @@ export const es: Partial<Record<CallMessageKey, string>> = {
 
   "transcript.show": "Ver la transcripción",
   "transcript.hide": "Ocultar la transcripción",
+  "transcript.showUnread": "Ver la transcripción, {n} sin leer",
+  "transcript.send": "Envía un mensaje",
+  "transcript.nothingYet": "Aún no se ha dicho nada",
+  "transcript.you": "Tú:",
   // The call's voice models (VoiceModels).
   "voiceModels.label": "Tu voz: {stt} pasa la voz a texto, {tts} habla",
   "voiceModels.stt": "Voz a texto",

@@ -2,26 +2,9 @@ import { useRef, type SyntheticEvent } from "react";
 import { JoinStatus } from "./JoinStatus";
 import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
 import { Button } from "../../components/ui/Button";
-import { MoreVerticalIcon, TranscriptIcon } from "../../components/ui/Icons";
-import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { MoreVerticalIcon } from "../../components/ui/Icons";
+import { useCallLayout } from "../../state/call-layout";
 import { callTranslator } from "./call-i18n";
-
-/** The whole transcript, behind one button of the call (TranscriptPanel): at the call bar's right edge, a round
- *  button like the call's own, and on a phone floating over the stage's corner instead (CallStage), where it takes no
- *  room from the call's controls. */
-export function TranscriptToggle({ floating = false }: { floating?: boolean }) {
-  const t = callTranslator();
-  const open = useCallLayout((state) => state.transcriptOpen);
-  const toggle = useCallLayout((state) => state.toggleTranscript);
-  const label = open ? t("transcript.hide") : t("transcript.show");
-  return (
-    <Button id="transcript-toggle" variant={floating ? "secondary" : "ghost"} size={floating ? "icon" : undefined}
-      className={floating ? "transcript-toggle stage-transcript-toggle" : "transcript-toggle call-button"}
-      aria-controls="transcript" aria-expanded={open} aria-label={label} title={label} onClick={toggle}>
-      <TranscriptIcon size={floating ? 20 : 22} />
-    </Button>
-  );
-}
 
 /* The call's secondary actions, behind ⋮ beside the call's own, opening upwards. Its id and class are the runtime's:
  * it binds the statistics dialog to #stats-open, closes the menu when the statistics open, and closes it on a click
@@ -50,7 +33,6 @@ function CallMenu() {
  * join's line, and the transcript's button at the right edge. */
 export function CallToolbar() {
   const t = callTranslator();
-  const narrow = useMedia(NARROW_QUERY);
   return (
     <footer className="call-bar">
       <div className="controls" id="call-controls">
@@ -64,9 +46,6 @@ export function CallToolbar() {
           <CallButton />
           <CallMenu />
         </div>
-      </div>
-      <div className="call-bar-end">
-        {!narrow && <TranscriptToggle />}
       </div>
     </footer>
   );

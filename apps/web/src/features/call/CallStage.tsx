@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { HarnessIcon } from "../../components/ui/Icons";
-import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
@@ -12,7 +12,7 @@ import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
-import { TranscriptToggle } from "./CallToolbar";
+import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
 import "./call-view.css";
 
@@ -93,7 +93,6 @@ export function CallStage() {
   const stage = useStageConversation();
   const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
-  const narrow = useMedia(NARROW_QUERY);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
 
@@ -104,6 +103,7 @@ export function CallStage() {
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
+          <TranscriptEntry row={null} />
         </div>
       </section>
     );
@@ -136,7 +136,7 @@ export function CallStage() {
           </span>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
-        {narrow && <TranscriptToggle floating />}
+        <TranscriptEntry row={stage.row ?? null} />
       </div>
     </section>
   );

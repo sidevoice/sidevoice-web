@@ -7,6 +7,7 @@ import { CloseIcon } from "../../components/ui/Icons";
 import { Composer } from "./Composer";
 import { conversationTranslator } from "./conversation-i18n";
 import { MessageList } from "./MessageList";
+import { useMarkTranscriptSeen } from "./transcript-unread";
 import "./transcript.css";
 
 /* The whole conversation, out of the call's way behind the call bar's button (2026-10-10): docked at the call's
@@ -22,6 +23,7 @@ export function TranscriptPanel() {
   const narrow = useMedia(NARROW_QUERY);
   const modal = narrow && open;
   const panel = useRef<HTMLElement>(null);
+  useMarkTranscriptSeen();
   useSurface({
     open, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".transcript-close"),

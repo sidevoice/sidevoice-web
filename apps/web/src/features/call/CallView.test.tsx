@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
@@ -150,13 +150,13 @@ test("the transcript opens and closes from the call bar, and is inert while clos
   expect(transcript).toHaveAttribute("inert");
   // The runtime binds the text box by id, so it is there even while the panel is closed.
   expect(document.getElementById("text-composer")).toBeInTheDocument();
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Show transcript" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
   expect(transcript).toHaveAttribute("data-open");
   expect(transcript).not.toHaveAttribute("inert");
   expect(screen.getByRole("button", { name: "Hide transcript" })).toHaveAttribute("aria-expanded", "true");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Close transcript" })); });
   expect(transcript).not.toHaveAttribute("data-open");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Show transcript" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
   await act(async () => { fireEvent.keyDown(document, { key: "Escape" }); });
   expect(transcript).not.toHaveAttribute("data-open");
 });
@@ -197,7 +197,7 @@ test("the transcript opens on its latest message, whatever arrived while it was 
   const store = room({ history: lines.slice(0, 5) });
   patch(store, { history: lines });
   const scrolls = vi.spyOn(HTMLElement.prototype, "scrollTo");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Show transcript" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
   expect(scrolls.mock.contexts).toContain(document.getElementById("messages"));
 });
 
@@ -247,7 +247,7 @@ test("without a cue from the voice, the bubble reads on at a speaking pace inste
 test("Escape closes only the topmost: a dialog, a menu or a handler above the transcript answers it first", async () => {
   room();
   const transcript = document.getElementById("transcript")!;
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Show transcript" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
   const dialog = document.createElement("dialog");
   dialog.setAttribute("open", "");
   document.body.append(dialog);
@@ -294,7 +294,7 @@ test("on a phone the transcript is a dialog too, and gives focus back to its but
   viewport({ narrow: true });
   room();
   const transcript = document.getElementById("transcript")!;
-  const toggle = screen.getByRole("button", { name: "Show transcript" });
+  const toggle = screen.getByRole("button", { name: /^Show transcript/ });
   toggle.focus();
   await act(async () => { fireEvent.click(toggle); });
   expect(transcript).toHaveAttribute("role", "dialog");
@@ -310,7 +310,7 @@ test("a desktop too narrow for both shows the rail while the transcript is docke
   room();
   const sidebar = document.getElementById("conversations")!;
   expect(sidebar).not.toHaveAttribute("data-collapsed");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Show transcript" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
   expect(sidebar).toHaveAttribute("data-collapsed");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Expand conversations" })); });
   expect(sidebar).not.toHaveAttribute("data-collapsed");
@@ -324,7 +324,7 @@ test("the phone sheet keeps Tab inside, and steps aside for a dialog opened over
   // jsdom lays nothing out; here every control counts as on screen.
   vi.spyOn(Element.prototype, "getClientRects").mockReturnValue({ length: 1 } as unknown as DOMRectList);
   room();
-  const toggle = screen.getByRole("button", { name: "Show transcript" });
+  const toggle = screen.getByRole("button", { name: /^Show transcript/ });
   toggle.focus();
   await act(async () => { fireEvent.click(toggle); });
   // In the room the runtime enables the text box, the sheet's last stop: from its first, Shift+Tab wraps to it.
@@ -348,7 +348,7 @@ test("the phone sheet keeps Tab inside, and steps aside for a dialog opened over
 test("on a phone the runtime's call to open the list puts the transcript away: one dialog at a time", async () => {
   viewport({ narrow: true });
   room();
-  const toggle = screen.getByRole("button", { name: "Show transcript" });
+  const toggle = screen.getByRole("button", { name: /^Show transcript/ });
   toggle.focus();
   await act(async () => { fireEvent.click(toggle); });
   await act(async () => { window.dispatchEvent(new Event(OPEN_CONVERSATIONS)); });
@@ -366,4 +366,32 @@ test("the header menu gives focus back to its button however it closes, unless a
   document.getElementById("stats-open")!.focus();
   menu.open = false;
   await waitFor(() => expect(document.activeElement).toBe(button));
+});
+
+test("exactly one way into the transcript, in the tile, for every variant on a phone and a desktop, with or without a conversation on the stage", () => {
+  for (const entry of ["peek", "button", "turn"]) for (const narrow of [false, true]) for (const binding of [{ thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" }, null]) {
+    localStorage.setItem("sidevoice.variants", JSON.stringify({ "transcript-entry": entry }));
+    viewport({ narrow });
+    room({ roomBinding: binding });
+    const ways = document.querySelectorAll("#transcript-toggle");
+    expect([entry, narrow, !!binding, ways.length]).toEqual([entry, narrow, !!binding, 1]);
+    expect(ways[0].closest(".stage-tile")).not.toBeNull();
+    expect(ways[0]).toHaveClass("transcript-entry--" + entry);
+    cleanup();
+    vi.restoreAllMocks();
+  }
+});
+
+test("the peek strip shows the latest line, counts what arrives while the transcript is closed, and opening it reads them", async () => {
+  const store = room();
+  const strip = document.getElementById("transcript-toggle")!;
+  expect(strip).toHaveClass("transcript-entry--peek");
+  expect(strip).toHaveAccessibleName("Show transcript");
+  patch(store, { history: [...store.getState().facts.history,
+    { segment: "h-3", thread: "t-login", role: "assistant", text: "Shall I also add a retry around the token refresh?", name: "Fix the slow login", time: 2, session: "s1" }] });
+  expect(strip).toHaveTextContent("Shall I also add a retry around the token refresh?");
+  expect(strip).toHaveAccessibleName("Show transcript, 1 unread");
+  await act(async () => { fireEvent.click(strip); });
+  await act(async () => { fireEvent.click(strip); });
+  expect(strip).toHaveAccessibleName("Show transcript");
 });

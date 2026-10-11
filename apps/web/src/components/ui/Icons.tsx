@@ -7,10 +7,10 @@
  * generic icons and are drawn here. */
 import {
   Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
-  MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
+  MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp,
-  Timer,
+  Timer, ScrollText,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -61,7 +61,8 @@ export const SkipIcon = mark(SkipForward, 22);
 export const DownloadsIcon = mark(Download, 18);
 export const ListenAgainIcon = mark(Play, 14);
 export const KeyboardIcon = mark(Keyboard, 20);
-export const TranscriptIcon = mark(MessageSquareText, 22);
+/** The record of what was said: unlike the conversations' bubbles, a scroll of text. */
+export const TranscriptIcon = mark(ScrollText, 22);
 /** Sends what was written. */
 export const SendIcon = mark(ArrowUp, 18);
 
