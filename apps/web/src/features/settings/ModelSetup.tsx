@@ -110,12 +110,21 @@ const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range
 export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?: boolean; onTried?: (task: Task) => void } = {}) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [trial, setTrial] = useState<TryState>(IDLE);
+  const trialRef = useRef(trial);
+  trialRef.current = trial;
   const [open, setOpen] = useState(false);
   const inDialog = useTryResult() === "dialog";
   const attempt = useRef(0);
   const level = useMemo(createMicLevelChannel, []);
   const slot = JSON.stringify(task && draft ? draft[task] : null);
-  useEffect(() => { setTrial({ ...IDLE, attempt: attempt.current }); }, [slot, task]);
+  // A setting of the model under try changed: the try running stops (what it would say describes the old one), and
+  // what the last one said goes.
+  const tried = useRef(slot);
+  useEffect(() => {
+    if (tried.current !== slot && trialRef.current.phase === "running") window.sidevoiceActions?.cancelVoiceTry?.();
+    tried.current = slot;
+    setTrial({ ...IDLE, attempt: attempt.current });
+  }, [slot, task]);
   useEffect(() => () => window.sidevoiceActions?.cancelVoiceTry?.(), [task]);
   const cancel = () => window.sidevoiceActions?.cancelVoiceTry?.();
   async function run(options: { text?: string; language?: string | null } = {}) {
