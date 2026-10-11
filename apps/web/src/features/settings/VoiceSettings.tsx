@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { Button } from "../../components/ui/Button";
@@ -104,9 +104,24 @@ function prepareStatus(model: ModelState, sourceNote: Note | null | undefined): 
   return model.status;
 }
 
-/** One slot: where it runs, its model made ready, then its options. `setup`: the first-run setup's — a provider's
- *  missing key is asked for in place, and the try is the setup's own. */
+/** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one. */
+function useFirstModel(task: "stt" | "tts") {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  useEffect(() => {
+    const slot = draft?.[task];
+    if (!slot || slot.model) return;
+    const first = catalogs.find((catalog) => catalog.id === slot.catalog)?.models
+      .find((model) => model.capabilities.includes(task) && (!model.builds || model.builds.some((build) => build.available)));
+    if (first) window.sidevoiceActions?.editVoice({ [task]: { model: first.id } });
+  }, [draft, catalogs, task]);
+}
+
+/** One slot: where it runs, its model made ready, then its options. A provider that only lacks its key can be chosen,
+ *  and asks for it in place (ProviderKey, as Providers does), saved where Providers keeps it; `setup`: the first-run
+ *  setup's, whose try is its own. */
 function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; setup: boolean }) {
+  useFirstModel(task);
   const t = hostTranslator();
   const choices = useChoices(draft);
   const slot = choices[task];
@@ -117,8 +132,8 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
     ? t("voice.prepare.willSwitch", { model: inUse.model }) : undefined;
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const { trial, run, cancel } = useVoiceTry(setup ? null : task, { keep: false });
-  // In the setup a provider that only lacks its key can be chosen, and asks for it below.
-  const sources = setup ? slot.sources.map((source) => keyless(source.note) ? { ...source, disabled: false } : source) : slot.sources;
+  // A provider that only lacks its key can be chosen, and asks for it below.
+  const sources = slot.sources.map((source) => keyless(source.note) ? { ...source, disabled: false } : source);
   const sourceNote = slot.sources.find((source) => source.id === draft[task].catalog)?.note;
   const provider = keyless(sourceNote) ? slot.sources.find((source) => source.id === draft[task].catalog) : null;
   const status = prepareStatus(model, sourceNote);
@@ -137,14 +152,12 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
       <Row label={t("voice.source")} description={sourceNote && !provider ? noteText(t, sourceNote) : undefined} htmlFor={task + "-source"}>
         <SourceSelect id={task + "-source"} value={draft[task].catalog} sources={sources} onChange={(catalog) => edit({ [task]: { catalog } })} t={t} />
       </Row>
-      {provider && (setup
-        ? <Row label={provider.name ?? provider.id} block><ProviderKey provider={provider.id} name={provider.name ?? provider.id} t={t} /></Row>
-        : null)}
+      {provider && <Row label={provider.name ?? provider.id} block><ProviderKey provider={provider.id} name={provider.name ?? provider.id} t={t} /></Row>}
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
           readyAction={tryButton || undefined} onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)}
-          onAddKey={() => window.sidevoiceActions?.showSettingsSection?.("providers")} />
+          />
         <ModelRuntime task={task} state={model} locked={model.installing} />
         {!setup && <TryResult task={task} trial={trial} t={t} />}
       </Row>

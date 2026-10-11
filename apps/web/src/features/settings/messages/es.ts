@@ -286,7 +286,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "voice.endOfTurn.smart": "Inteligente (recomendado)",
   "voice.endOfTurn.none": "Aún no hay un modelo de fin de turno que funcione en este dispositivo: el turno termina con el silencio.",
   "voice.restartNote": "Durante una llamada, cambiar un origen, un modelo o el fin del turno reinicia la voz un momento: lo que estés diciendo se descarta y la respuesta que suena se corta. El idioma, la voz, la velocidad y la paciencia se aplican sin cortar.",
-  "voice.catalog.noKey": "necesita tu clave (Proveedores)",
+  "voice.catalog.noKey": "necesita tu clave",
   "voice.catalog.reason": "no disponible ({code})",
   "voice.catalog.empty": "sin modelos para esto",
   "voice.catalog.missing": "ya no aparece",

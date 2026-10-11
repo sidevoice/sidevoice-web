@@ -49,12 +49,12 @@ function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {})
 
 const options = (id: string) => [...(document.getElementById(id) as HTMLSelectElement).options];
 
-test("a slot's source comes first: this device, then each provider, one without its key disabled with why", () => {
+test("a slot's source comes first: this device, then each provider; one without its key says so, and asks for it right there", () => {
   const { actions } = renderPane("voice");
   expect(options("stt-source").map((option) => [option.value, option.textContent, option.disabled])).toEqual([
     ["local", "On this device", false],
     ["elevenlabs", "ElevenLabs", false],
-    ["openai", "OpenAI — needs your key (Providers)", true],
+    ["openai", "OpenAI — needs your key", false],
   ]);
   fireEvent.change(document.getElementById("stt-source")!, { target: { value: "elevenlabs" } });
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { catalog: "elevenlabs" } });
@@ -242,4 +242,13 @@ test("the smart end of turn has its model chosen like the others — just the mo
   expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
   fireEvent.click(document.getElementById("turn-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");
+});
+
+test("a provider chosen without its key asks for it right there, and saves it where Providers keeps it", async () => {
+  const { actions } = renderPane("voice", { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "openai", model: "", language: null } } });
+  const key = document.getElementById("provider-key-openai") as HTMLInputElement;
+  expect(key).toBeInTheDocument();
+  fireEvent.change(key, { target: { value: "sk-test-1234" } });
+  await act(async () => { fireEvent.click(document.getElementById("provider-key-save-openai")!); });
+  expect(actions.saveProviderKey).toHaveBeenCalledWith("openai", "sk-test-1234");
 });

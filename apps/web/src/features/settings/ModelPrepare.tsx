@@ -86,7 +86,7 @@ export function ModelPrepare({ pending, status, model, pickers, meta, size = nul
         </>}
         {status === "needs-key" && <>
           <div className="model-prepare-state"><Badge tone="warning" dot>{t("voice.prepare.badge.needsKey")}</Badge></div>
-          <Button size="sm" variant="ghost" onClick={onAddKey}>{t("voice.prepare.addKey")}</Button>
+          {onAddKey && <Button size="sm" variant="ghost" onClick={onAddKey}>{t("voice.prepare.addKey")}</Button>}
         </>}
         {status === "failed" && <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })}
           action={<Button size="sm" id={actionId("retry")} onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>}

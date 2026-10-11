@@ -95,19 +95,6 @@ function TurnStep({ t }: { t: HostTranslate }) {
   </section>;
 }
 
-/** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one. */
-function useFirstModel(task: "stt" | "tts") {
-  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
-  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
-  useEffect(() => {
-    const slot = draft?.[task];
-    if (!slot || slot.model) return;
-    const first = catalogs.find((catalog) => catalog.id === slot.catalog)?.models
-      .find((model) => model.capabilities.includes(task) && (!model.builds || model.builds.some((build) => build.available)));
-    if (first) window.sidevoiceActions?.editVoice({ [task]: { model: first.id } });
-  }, [draft, catalogs, task]);
-}
-
 /** Where the setup stands: the step and its group in words, then the five groups as a bar, done and current lit. */
 function Stepper({ groups, current, t }: { groups: typeof GROUPS; current: number; t: HostTranslate }) {
   return <div className="wizard-stepper">
@@ -142,7 +129,6 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   const onboarding = useOnboarding();
   const { trial } = stage;
-  useFirstModel(task);
   useEffect(() => {
     if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue();
     window.sidevoiceActions?.editVoice({});
