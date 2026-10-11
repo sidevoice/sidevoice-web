@@ -1,0 +1,29 @@
+/* The room's page: the box model, the page itself on the theme's background, and the room's shell — header, the call,
+ * the call bar — filling the screen. Each part styles itself in its own feature's CSS; the tokens and shared components
+ * are styles/theme.css and components/ui/ui.css. */
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body, #root { width: 100%; max-width: 100%; min-width: 0; height: 100%; margin: 0; }
+body { overflow: hidden; background: var(--sv-bg); color: var(--sv-text); }
+#root { height: 100dvh; max-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4, h5, p { margin: 0; }
+code, kbd, pre, output { font-family: var(--sv-font-mono); }
+:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.muted { color: var(--sv-text-muted); }
+
+/* The room (header, call, call bar) is one box, so the first-run setup can hide it whole. */
+#root > .room-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+#root > .room-shell > header, #root > .room-shell > .call-bar { flex: none; }
+#root > .room-shell > main { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; }
+#root > .room-shell > main.call-layout { position: relative; flex-direction: row; }
+@media (max-width: 899px) { #root > .room-shell > main.call-layout { flex-direction: column; } }
+
+.startup-error { width: min(34rem, calc(100% - 2rem)); min-height: 100dvh; margin: auto; padding: var(--sv-space-8); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--sv-space-3); }
+.setup-main { flex: 1; display: grid; place-items: center; min-height: 0; padding: var(--sv-space-4); overflow: auto; background: var(--sv-bg-subtle); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
