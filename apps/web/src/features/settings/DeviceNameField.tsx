@@ -24,7 +24,7 @@ export function DeviceNameField({ id }: { id: string }) {
     <Input id={id} value={value} maxLength={60} autoComplete="off" spellCheck={false}
       onChange={(event) => { setValue(event.target.value); setNote(""); }}
       onBlur={() => void save()}
-      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void save(); } if (event.key === "Escape") setValue(saved); }} />
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void save(); } if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setValue(saved); } }} />
     {note && <span className="device-name-note" role="status">{note}</span>}
   </>;
 }

@@ -33,6 +33,10 @@
 .host-agent-tab-label { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
 @media (max-width: 550px) {
   .host-agent-main { gap: var(--sv-space-2); padding: var(--sv-space-3) var(--sv-space-4); }
+  /* On a phone the name keeps its width: the actions go under it, the whole width, in every row alike. */
+  .host-agent-main { flex-wrap: wrap; }
+  .host-agent-copy { flex: 1 1 calc(100% - 48px); }
+  .host-agent-actions { flex: 1 1 100%; justify-content: flex-end; }
   .host-agent-problem { align-items: flex-start; flex-direction: column; }
 }
 
