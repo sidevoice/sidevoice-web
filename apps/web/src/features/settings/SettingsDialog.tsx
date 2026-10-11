@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, CallSettingsIcon, SidevoiceMark, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, CallSettingsIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { NativeSelect } from "../../components/ui/NativeSelect";
@@ -121,13 +121,8 @@ function Pane({ id, current, children }: { id: string; current: string; children
   return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
 }
 
-/** How Settings is headed (VARIANTS `settings-header`): its own header (A), or the room's kept in place, the brand where
- *  it always is and Settings after it as a breadcrumb (B). */
-const SETTINGS_HEADER = ["own", "app"] as const;
-
 export function SettingsDialog() {
   const t = hostTranslator();
-  const header = useVariant("settings-header", SETTINGS_HEADER);
   const machinesLayout = useVariant("machines", MACHINES_LAYOUT);
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
@@ -137,10 +132,10 @@ export function SettingsDialog() {
   const blocked = waits.stt || waits.tts || waits.turn;
   const reason = waits.stt ? t("settings.save.waitTranscription") : waits.tts ? t("settings.save.waitVoice") : waits.turn ? t("settings.save.waitTurn") : "";
   return (
-    <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" data-header={header} aria-labelledby="settings-title">
+    <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" aria-labelledby="settings-title">
       <OverlayPortalProvider container={dialog}>
         <DialogSurface titleId="settings-title" closeId="settings-close" closeable flush closeLabel={t("settings.close")}
-          title={header === "app" ? <span className="settings-crumb"><SidevoiceMark size={22} /><span className="settings-crumb-brand">Sidevoice</span><span className="settings-crumb-sep" aria-hidden="true">·</span><span>{t("settings.title")}</span></span> : t("settings.title")}
+          title={t("settings.title")}
           footer={<>
             <p id="settings-error" className="settings-error" role="alert" />
             {blocked && <p className="ui-dialog-reason" id="settings-save-reason">{reason}</p>}

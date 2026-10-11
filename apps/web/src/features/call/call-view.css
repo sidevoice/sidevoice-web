@@ -169,14 +169,14 @@
   .join-status-dot { opacity: .8; }
 }
 
-/* The stage's conversation named above its tile (VARIANTS layout "meet", a desktop); elsewhere the tile names it. */
+/* The stage's conversation named above its tile on a desktop (no header there); on a phone the tile names it. */
 .stage-title { display: none; }
 @media (min-width: 900px) {
-  .room-shell[data-layout="meet"] .call-stage { padding-top: var(--sv-space-5); }
-  .room-shell[data-layout="meet"] .stage-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--sv-space-3); flex: none; min-width: 0; padding: 0 var(--sv-space-1); }
-  .room-shell[data-layout="meet"] .stage-title h2 { min-width: 0; overflow: hidden; margin: 0; font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-semibold); letter-spacing: -.015em; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
-  .room-shell[data-layout="meet"] .stage-title span { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-  .room-shell[data-layout="meet"] .stage-name { display: none; }
+  .room-shell .call-stage { padding-top: var(--sv-space-5); }
+  .room-shell .stage-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--sv-space-3); flex: none; min-width: 0; padding: 0 var(--sv-space-1); }
+  .room-shell .stage-title h2 { min-width: 0; overflow: hidden; margin: 0; font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-semibold); letter-spacing: -.015em; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
+  .room-shell .stage-title span { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+  .room-shell .stage-name { display: none; }
 }
 
 /* The call's voice models (VoiceModels): the tile's top-right corner, one under the other, small; the conversation's
