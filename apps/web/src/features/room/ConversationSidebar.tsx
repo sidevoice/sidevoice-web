@@ -13,8 +13,7 @@ import { conversationState, machineGroups, stateText } from "../call/conversatio
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
-import { openSettings, SETTINGS_GEAR, usePendingAgentHosts } from "./RoomHeader";
-import { useVariant } from "../../lib/variants";
+import { openSettings, usePendingAgentHosts } from "./RoomHeader";
 import { hostTranslator } from "../settings/host-i18n";
 import "./room.css";
 
@@ -46,8 +45,6 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
-  // A design variant (RoomHeader SETTINGS_GEAR): on a desktop, Settings may sit at the foot of the conversations.
-  const gearHere = useVariant("settings-gear", SETTINGS_GEAR) === "sidebar" && !narrow;
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
   const rail = collapsed || crowded;
   const modal = narrow && open;
@@ -133,7 +130,8 @@ export function ConversationSidebar() {
           {/* A new conversation follows the last one, in either layout. */}
           <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>
         </div>
-        {gearHere && <div className="sidebar-foot"><SidebarSettings rail={rail} /></div>}
+        {/* Settings holds the foot on a desktop; what joins it later (notifications…) opens upward from here. */}
+        {!narrow && <div className="sidebar-foot"><SidebarSettings rail={rail} /></div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>

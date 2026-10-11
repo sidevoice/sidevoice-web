@@ -78,22 +78,12 @@ test("a row says its state in words beside its dot, and what is unread as a badg
   expect(row.getAttribute("title")).toMatch(/^Review the nightly backups · Waiting for you · 2 new/);
 });
 
-test("Settings at the conversations' foot (variant B): it opens Settings through the header's own button, and a new conversation follows the list", () => {
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "settings-gear": "sidebar" }));
+test("Settings sits at the conversations' foot: it opens Settings through the header's own button, and a new conversation follows the list", () => {
   room();
-  expect(header()).toHaveAttribute("data-gear", "sidebar");
   const opened = vi.fn();
   document.getElementById("settings-open")!.onclick = opened;
   fireEvent.click(document.querySelector(".sidebar-foot .sidebar-settings")!);
   expect(opened).toHaveBeenCalledOnce();
   expect(document.querySelector(".sidebar-body .sidebar-new")).toHaveTextContent("New conversation");
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
-});
-
-test("Settings in the header's corner (variant A, the default): no foot, and a new conversation follows the list", () => {
-  room();
-  expect(header()).toHaveAttribute("data-gear", "top");
-  expect(document.querySelector(".sidebar-foot")).toBeNull();
-  expect(document.querySelector(".sidebar-body .sidebar-new")).toHaveTextContent("New conversation");
-  expect(document.querySelector(".sidebar-settings")).toBeNull();
 });
