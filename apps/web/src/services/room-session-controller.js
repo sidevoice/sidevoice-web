@@ -1159,6 +1159,42 @@ function disconnect() {
 const voiceListeners=[];
 function attachVoice(next){
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
+ void watchAudioDevices();
+}
+/* The microphone and the speaker the voice uses (the same seam on the web and in the desktop app): this device's
+ * choices, kept here and given to the voice when it is made, and its list followed as it changes. A chosen device that
+ * goes away leaves the system's default in use: the choice is dropped, and said once (audioLost). */
+const AUDIO_KEY='sidevoice.audio-devices';
+function storedAudio(){try{const kept=JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}');return kept&&typeof kept==='object'?kept:{}}catch{return {}}}
+function keepAudio(choice){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(choice))}catch{}}
+let audioWatched=null;
+async function watchAudioDevices(){
+ const host=await voiceHost().catch(()=>null);if(!host||audioWatched===host)return;audioWatched=host;
+ if(typeof host.audioDevices!=='function'){roomStore.patch({audioDevices:null});return}
+ host.onAudioDevices(audioDevicesChanged);
+ const kept=storedAudio();
+ let devices=null;
+ try{devices=Object.keys(kept).length?await host.setAudioDevices(kept):await host.audioDevices()}
+ catch{devices=await host.audioDevices().catch(()=>null)}
+ if(devices)audioDevicesChanged(devices);
+}
+function audioDevicesChanged(devices){
+ if(devices.lost){const kept=storedAudio();if(devices.lost.input)delete kept.input;if(devices.lost.output)delete kept.output;keepAudio(kept)}
+ roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
+  ...(devices.lost?{audioLost:devices.lost}:{})});
+}
+async function setAudioDevices(choice){
+ const host=await voiceHost();
+ let devices;
+ try{devices=await host.setAudioDevices(choice)}catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ // Kept for this device; the system's default keeps nothing.
+ const kept=storedAudio();
+ for(const kind of ['input','output'])if(kind in choice){if(choice[kind]==null)delete kept[kind];else kept[kind]=choice[kind]}
+ keepAudio(kept);audioDevicesChanged(devices);return devices;
+}
+async function refreshAudioDevices(){
+ await watchAudioDevices();
+ const host=await voiceHost();if(typeof host.audioDevices==='function')audioDevicesChanged(await host.audioDevices());
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
@@ -1454,6 +1490,8 @@ window.sidevoiceActions={
  editVoice,
  saveProviderKey,
  connectProviderKey,
+ setAudioDevices,
+ refreshAudioDevices,
  // The interface's language, as the first-run setup asks it: '' is Automatic.
  interfaceLanguage:()=>storedPreferences().ui_language||'',
  // The newer build the room serves, loaded now (the updates' Reload): out of a call only.

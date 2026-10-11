@@ -1461,3 +1461,33 @@ test('The first answer from the room asks for the conversations at once, not on 
  assert.ok(asked.some(path=>path.includes('/api/presentation/participants')),'asked with the first answer');
  assert.equal(s.run('people[0].engine.model'),'claude-opus-5-5');
 });
+
+// ----- the microphone and the speaker: this device's choices given to the voice, its list followed -----
+function voiceWithDevices(){
+ const voice=fakeVoice();let chosen={input:null,output:null};const listeners=new Set();
+ const list=()=>({inputs:[{id:'mic-a',label:'Built-in'},{id:'mic-b',label:'Headset'}],outputs:[{id:'out-a',label:'Speakers'}],...chosen,outputSelectable:true});
+ Object.assign(voice,{
+  audioDevices:async()=>list(),
+  setAudioDevices:async choice=>{voice.calls.push(['setAudioDevices',choice]);chosen={...chosen,...choice};return list()},
+  onAudioDevices:listener=>{listeners.add(listener);return ()=>listeners.delete(listener)},
+  lose:kind=>{chosen={...chosen,[kind]:null};for(const listener of listeners)listener({...list(),lost:{[kind]:kind==='input'?'mic-b':'out-a'}})},
+ });
+ return voice;
+}
+test('This device\'s microphone and speaker are given to the voice when it is made, kept as chosen, and a lost one is said once',async()=>{
+ const s=setup();const voice=withVoice(s,voiceWithDevices());
+ s.context.localStorage.setItem('sidevoice.audio-devices',JSON.stringify({input:'mic-b'}));
+ await s.run('watchAudioDevices')();
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='setAudioDevices')[1]),{input:'mic-b'},'the kept choice, given to the voice');
+ assert.equal(s.run('audioDevices.input'),'mic-b');
+ await s.run("window.sidevoiceActions.setAudioDevices({output:'out-a'})");
+ assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{input:'mic-b',output:'out-a'});
+ // The system's default keeps nothing.
+ await s.run("window.sidevoiceActions.setAudioDevices({output:null})");
+ assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{input:'mic-b'});
+ // The headset unplugged: the default in use, the choice dropped, and said once.
+ voice.lose('input');
+ assert.equal(s.run('audioDevices.input'),null);
+ assert.deepEqual(plain(s.run('audioLost')),{input:'mic-b'});
+ assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{});
+});

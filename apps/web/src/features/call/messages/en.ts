@@ -77,6 +77,26 @@ export const en = {
   "voiceModels.download": "Download",
   "voiceModels.retry": "Try again",
   "voiceModels.openSettings": "Open its settings",
+  // The microphone and the speaker (AudioDevices).
+  "devices.toggle": "Microphone and speaker",
+  "devices.mic": "Microphone",
+  "devices.speaker": "Speaker",
+  "devices.default": "System default",
+  "devices.refresh": "Look for devices again",
+  "devices.close": "Close",
+  "devices.loading": "Looking for devices…",
+  "devices.unnamedMic": "Microphone {n}",
+  "devices.unnamedSpeaker": "Speaker {n}",
+  "devices.speakerFixed": "This browser plays through the system's speaker: choose it in the system's sound settings.",
+  "devices.lostInput": "The chosen microphone is gone: the system's default is in use.",
+  "devices.lostOutput": "The chosen speaker is gone: the system's default is in use.",
+  "devices.lostBoth": "The chosen microphone and speaker are gone: the system's defaults are in use.",
+  "devices.gotIt": "Got it",
+  "devices.error.micDenied": "The microphone is blocked: allow it for this page, then choose it again.",
+  "devices.error.micUnavailable": "That microphone could not be used. Choose another.",
+  "devices.error.outputUnselectable": "The speaker cannot be chosen here: it plays through the system's default.",
+  "devices.error.outputFailed": "That speaker could not be used; it plays through the one before.",
+  "devices.error.other": "That device could not be chosen.",
 } as const;
 
 export type CallMessageKey = keyof typeof en;

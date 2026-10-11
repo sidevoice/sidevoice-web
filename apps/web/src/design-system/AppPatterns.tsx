@@ -5,6 +5,7 @@ import { Button } from "../components/ui/Button";
 import { ChoiceCard, Group, Row, Section } from "../components/ui/Card";
 import { DialogSurface } from "../components/ui/Dialog";
 import { Field } from "../components/ui/Field";
+import { NativeSelect } from "../components/ui/NativeSelect";
 import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
@@ -170,6 +171,22 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
       </div>}
       {/* The way into the transcript, phone and desktop: a round button in the tile's corner, a dot when something is unread. */}
       <Button size="icon" variant="secondary" className="pt-transcript" aria-label={t("transcript.showUnread", { n: 1 })}><TranscriptIcon size={20} /><span className="pt-transcript-dot" aria-hidden /></Button>
+    </div>
+  );
+}
+
+/** The microphone and the speaker's bar, as the call shows it (features/call/AudioDevices). */
+function DevicesBar({ fixed = false, lost = false }: { fixed?: boolean; lost?: boolean }) {
+  const t = callTranslator();
+  return (
+    <div className="pt-devices">
+      <Field label={t("devices.mic")}><NativeSelect defaultValue="headset"><option value="">{t("devices.default")}</option><option value="headset">AirPods Pro</option><option>MacBook Pro Microphone</option></NativeSelect></Field>
+      <Field label={t("devices.speaker")} hint={fixed ? t("devices.speakerFixed") : undefined}>
+        <NativeSelect defaultValue="" disabled={fixed}><option value="">{t("devices.default")}</option><option>AirPods Pro</option><option>MacBook Pro Speakers</option></NativeSelect>
+      </Field>
+      <span className="pt-devices-actions"><Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("devices.refresh")}><RefreshIcon size={16} /></Button>
+        <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("devices.close")}><CloseIcon size={16} /></Button></span>
+      {lost && <p className="pt-devices-lost">{t("devices.lostInput")} <Button variant="ghost" tone="neutral" size="sm">{t("devices.gotIt")}</Button></p>}
     </div>
   );
 }
@@ -554,6 +571,10 @@ export function AppPatterns() {
         <Frame><CallBar joined transcript /></Frame>
         <Frame className="pt-frame--tall"><CallBar joined muted menu /></Frame>
         <Phone label="Phone"><CallBar joined phone /></Phone>
+      </Pattern>
+      <Pattern title="Call · microphone and speaker" note="The chevron joined to the microphone opens a bar above the call's controls: the microphone, the speaker and a refresh. Where the speaker cannot be chosen (a browser that lacks it), it is disabled and says why; a chosen device that went away is said once.">
+        <Frame><DevicesBar /></Frame>
+        <Frame><DevicesBar fixed lost /></Frame>
       </Pattern>
       <Pattern title="Transcript" note="Docked beside the call on a desktop, a sheet on a phone. The agent in lila, you in crema; time, read marks and listen again. The text box is a rounded field pinned at the foot, Send an arrow inside it; it grows with what you write and is never resized by hand.">
         <Frame className="pt-frame--transcript"><Transcript /></Frame>

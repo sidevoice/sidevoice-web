@@ -31,6 +31,10 @@ export interface SessionFacts {
   settingsSavedAt: number;
   /** A control in Settings to bring into view and point at, by its id (what's new's Set up); cleared once done. */
   settingsFocus: string | null;
+  /** The voice's microphones and speakers, and which are chosen (null: the voice offers no choice, or not yet). */
+  audioDevices: { inputs: { id: string; label: string }[]; outputs: { id: string; label: string }[]; input: string | null; output: string | null; outputSelectable: boolean } | null;
+  /** A chosen device that went away (the default in use since), to say once; cleared when said. */
+  audioLost: { input?: string; output?: string } | null;
   /** A newer build of this page the room serves, held while a call is on (the updates' list says so). */
   webUpdate: string | null;
   /** The machine whose page Settings → Machines shows (MachineNav); null is the first. */

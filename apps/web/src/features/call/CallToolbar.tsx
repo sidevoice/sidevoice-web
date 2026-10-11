@@ -1,5 +1,6 @@
-import { useRef, type SyntheticEvent } from "react";
+import { useRef, useState, type SyntheticEvent } from "react";
 import { JoinStatus } from "./JoinStatus";
+import { AudioDevicesBar, AudioDevicesToggle } from "./AudioDevices";
 import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon } from "../../components/ui/Icons";
@@ -33,14 +34,17 @@ function CallMenu() {
  * join's line, and the transcript's button at the right edge. */
 export function CallToolbar() {
   const t = callTranslator();
+  const [devicesOpen, setDevicesOpen] = useState(false);
   return (
     <footer className="call-bar">
+      <AudioDevicesBar id="audio-devices" open={devicesOpen} onClose={() => setDevicesOpen(false)} />
       <div className="controls" id="call-controls">
         <JoinStatus />
         <div className="call-actions">
           <MicControl>
             <span id="mic-level-meter" className="sr-only" role="meter" aria-label={t("toolbar.micLevel")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} />
             <MuteButton />
+            <AudioDevicesToggle open={devicesOpen} controls="audio-devices" onToggle={() => setDevicesOpen((was) => !was)} />
           </MicControl>
           <SkipButton />
           <CallButton />

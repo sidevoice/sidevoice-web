@@ -168,6 +168,8 @@ export interface SidevoiceActions {
   connectProviderKey?(provider: string, key: string): Promise<void>;
   interfaceLanguage?(): string;
   reloadToUpdate?(): void;
+  setAudioDevices?(choice: { input?: string | null; output?: string | null }): Promise<unknown>;
+  refreshAudioDevices?(): Promise<void>;
   setInterfaceLanguage?(value: string): void;
   /** Asks a provider again about its key, and reads the catalogues with what it said. */
   testProviderKey?(provider: string): Promise<void>;
