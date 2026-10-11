@@ -259,7 +259,8 @@ function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; ti
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
       <dl className="host-status-facts">
-        {details.core?.version && <div><dt>{t("hosts.fact.version")}</dt><dd>{details.core.version}</dd></div>}
+        {/* One version, the product's as the person installed it (never the core's or the connector's). */}
+        {details.product_version && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version })}</div>}
         {details.calls !== undefined && <div><dt>{t("hosts.fact.calls")}</dt><dd>{calls}</dd></div>}
       </dl>
       {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}

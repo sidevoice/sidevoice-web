@@ -126,3 +126,4 @@
 .host-status-login .muted { font-size: var(--sv-font-xs); }
 .host-status-actions { padding-top: var(--sv-space-1); }
 .host-status-card .host-stop-confirm { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-3); border-radius: var(--sv-radius-lg); background: var(--sv-danger-soft); }
+.host-status-product { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }

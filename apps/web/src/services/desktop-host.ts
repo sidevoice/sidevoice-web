@@ -8,6 +8,9 @@ export interface LocalHostStatus {
   service?: "launchd" | "systemd" | "none";
   installed?: boolean;
   core?: { pid?: number; version?: string; api?: number; launch_id?: string } | null;
+  /** The installed Sidevoice's version — the `sidevoice` package, which bundles the core — as the person knows it.
+   *  The one version the UI shows. */
+  product_version?: string | null;
   calls?: number | null;
   reachable?: boolean;
   attempts?: number | null;
