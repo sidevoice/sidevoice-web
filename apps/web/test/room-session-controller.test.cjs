@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -1370,4 +1370,51 @@ test('the Agents API accepts and reuses a proved same-origin empty base',async()
  assert.equal(identities.length,identityProofs,'both scans reuse the previously proved empty base');
  assert.ok(identities.every(request=>request.auth===null),'identity proof remains unauthenticated');
  assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
+});
+
+// ----- trying this device's voice settings, outside any call (the first-run setup) -----
+test('A try of the voice settings being edited goes through the page\'s voice, outside the room, and keeps what worked on this device',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const asked=[];s.context.fetch=async(url,init={})=>{asked.push(url);return {ok:true,status:200,json:async()=>({})}};
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'moonshine-tiny',language:null}}})");
+ const tried=s.run("window.sidevoiceActions.tryVoiceSettings('stt')");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+ assert.deepEqual(plain(await tried),{text:'hola'});
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop'],'the voice is started for the try and stopped after it');
+ assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
+ assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
+ assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
+ // During a call the voice is the call's: no try takes it.
+ s.run('state.connecting=true');
+ await assert.rejects(s.run("window.sidevoiceActions.tryVoiceSettings('stt')"),{code:'trial-in-call'});
+});
+
+// ----- a model of this device installed for a voice slot -----
+test('A model the slot names but that is not on this device installs, its progress in the store, and the catalogues are read again',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[{id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],installed:false,recommendedBuild:'kokoro/q8',
+  builds:[{id:'kokoro/q8',backend:'transformers-js',precision:'q8',downloadBytes:92e6,memoryMb:300,available:true,reasons:[],installed:false}]}]}];
+ const engine=fakeEngine(catalogs),progress=[];let finish,fail;
+ engine.install=(model,{build,engine:backend,onProgress,signal})=>{engine.calls.push(['install',model,build,backend]);signal.addEventListener('abort',()=>fail(Object.assign(Error('x'),{code:'install-cancelled'})));
+  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;resolve()};fail=reject})};
+ withVoice(s,fakeVoice(),engine);
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'kokoro-82m-v1.0'}})");
+ const installing=s.run("window.sidevoiceActions.installVoiceModel('tts')");await settleSoon();
+ assert.deepEqual(plain(s.run('state.voiceInstall')),{task:'tts',model:'kokoro-82m-v1.0',state:'running',fraction:null,error:''});
+ finish();await installing;await settleSoon();
+ assert.deepEqual(engine.calls.find(([name])=>name==='install'),['install','kokoro-82m-v1.0','kokoro/q8','transformers-js'],'its recommended build, by its engine');
+ assert.equal(plain(progress[0]).fraction,0.5);
+ assert.equal(s.run('state.voiceInstall'),null,'done: nothing left in progress');
+ assert.equal(s.run("voiceCatalogue.catalogs[0].models[0].installed"),true,'the catalogue says it is here now');
+ // A cancel leaves nothing behind; a failure says why.
+ catalogs[0].models[0].installed=false;
+ const cancelled=s.run("window.sidevoiceActions.installVoiceModel('tts')");await settleSoon();
+ s.run('window.sidevoiceActions.cancelVoiceInstall()');await cancelled;
+ assert.equal(s.run('state.voiceInstall'),null);
+ engine.install=async()=>{throw Object.assign(Error('net'),{code:'download-failed'})};
+ await s.run("window.sidevoiceActions.installVoiceModel('tts')");
+ assert.equal(s.run('state.voiceInstall.state'),'failed');
+ assert.match(s.run('state.voiceInstall.error'),/download-failed/);
 });

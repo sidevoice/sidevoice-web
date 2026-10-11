@@ -37,6 +37,8 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "stage.cancelTurn": "Cancelar envío",
 
   "toolbar.micLevel": "Nivel de micrófono",
+  "stage.effort": "esfuerzo {effort}",
+  "toolbar.skip": "Saltar lo que está sonando",
 
   "transcript.show": "Ver la transcripción",
   "transcript.hide": "Ocultar la transcripción",

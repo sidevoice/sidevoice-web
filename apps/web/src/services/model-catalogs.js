@@ -11,8 +11,13 @@
  *   A model as its catalogue lists it; a local one also has its family and builds.
  * @typedef {{id: string, name: string | null, status: CatalogStatus, models: CatalogModel[]}} CatalogView
  *   One catalogue: `local` first, then each remote provider's, its id the provider's.
+ * @typedef {{fraction: number | null, done: number | null, total: number | null}} InstallProgress How far an install has
+ *   got: the share of it done (null while unknown), and its bytes when the engine counts them.
+ * @typedef {{build?: string | null, engine?: string | null, onProgress?: (progress: InstallProgress) => void, signal?: AbortSignal}} InstallOptions
+ *   Which build (its id, and its engine for a native engine), where progress goes, and the signal that cancels it.
  * @typedef {{
  *   catalogs(): Promise<CatalogView[]>,
+ *   install(model: string, options?: InstallOptions): Promise<void>,
  *   setCredential(provider: string, key: string | null): Promise<void>,
  *   hasCredential(provider: string): Promise<boolean>,
  * }} ModelCatalogs
@@ -39,6 +44,33 @@ export function localStorageCredentials(storage = globalThis.localStorage) {
   };
 }
 
+/** A cancelled install, whoever ran it, by one code. */
+const cancelled = () => Object.assign(new Error('install-cancelled'), { code: 'install-cancelled' });
+
+/** The web engine's progress (files done of all, and the bytes of the one downloading) as a share of the install. */
+export function webInstallProgress(progress) {
+  const files = progress?.files || 0;
+  if (!files) return { fraction: null, done: null, total: null };
+  const current = progress.size ? Math.min(1, (progress.received || 0) / progress.size) : 0;
+  return { fraction: Math.min(1, ((progress.done || 0) + current) / files), done: null, total: null };
+}
+
+/** The desktop app's native engine install (`host.nativeEngine`, sidevoice-desktop's BRIDGE.md) as `install`: its
+ *  bytes as the share done, and the signal as its `cancel(job)`.
+ * @param {{install(model: string, engine: string | null, onProgress: (report: {done: number, total: number}) => void): Promise<void> & {job: string}, cancel(job: string): unknown}} nativeEngine
+ * @returns {ModelCatalogs['install']}
+ */
+export function nativeInstall(nativeEngine) {
+  return (model, { engine = null, onProgress, signal } = {}) => {
+    if (signal?.aborted) return Promise.reject(cancelled());
+    const running = nativeEngine.install(model, engine, (report) => onProgress?.({
+      fraction: report?.total ? Math.min(1, report.done / report.total) : null, done: report?.done ?? null, total: report?.total ?? null,
+    }));
+    signal?.addEventListener('abort', () => { void nativeEngine.cancel(running.job); }, { once: true });
+    return running.then(() => undefined, (error) => { throw error?.key === 'install_cancelled' ? cancelled() : error; });
+  };
+}
+
 /** What a catalogue that failed to answer stands as: its error as the reason it is not current. */
 function failed(error) {
   return { stale: false, reason: { code: engineFailureCode(error, 'catalog-failed'), params: error?.params ?? {} }, ...(error?.detail ? { detail: String(error.detail) } : {}) };
@@ -62,6 +94,10 @@ export function engineCatalogs(engine, credentials) {
       const models = await list().catch((error) => { failure = error; return []; });
       return { id: catalog.id, name: catalog.name ?? null, status: failure && !status.reason ? failed(failure) : status, models };
     })),
+    // On this device, in its private storage: the build named, or the one the engine recommends.
+    install: (model, { build = null, onProgress, signal } = {}) =>
+      engine.install(model, build ?? undefined, (progress) => onProgress?.(webInstallProgress(progress)), signal)
+        .catch((error) => { throw signal?.aborted || error?.code === 'cancelled' ? cancelled() : error; }),
     async setCredential(provider, key) {
       credentials.set(provider, typeof key === 'string' && key.trim() ? key.trim() : null);
     },

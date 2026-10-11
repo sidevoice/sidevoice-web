@@ -16,6 +16,8 @@ import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
+import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
+import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
 
 function RoomContent() {
@@ -24,6 +26,9 @@ function RoomContent() {
   const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
   const pendingLocalSelection = useRef(false);
   const noMachine = ready && machines.length === 0;
+  const onboarding = useOnboarding();
+  // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
+  const setupPending = !onboarding.ready || !onboarding.record.completed_at;
 
   useEffect(() => {
     if (install.phase === "installing") {
@@ -46,22 +51,26 @@ function RoomContent() {
 
   return (
     <>
-      <RoomHeader />
       <StorageBlockedBanner />
-      <LocalHostBanner />
-      {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
-        <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
-      {/* The call: the conversations, the stage, and the transcript when it is open (2026-10-10). */}
-      <main className={noMachine ? undefined : "call-layout"}>
-        {noMachine ? <NoMachineScreen source="no-machine" /> : <>
-          <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
-          <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
-          <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
-        </>}
-      </main>
-      {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
-      <ConnectionStatsDialog />
-      <SettingsDialog />
+      <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
+        <RoomHeader />
+        <LocalHostBanner />
+        {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
+          <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
+        {/* The call: the conversations, the stage, and the transcript when it is open (2026-10-10). */}
+        <main className={noMachine ? undefined : "call-layout"}>
+          {noMachine ? <NoMachineScreen source="no-machine" /> : <>
+            <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
+            <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
+            <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
+          </>}
+        </main>
+        {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
+        <ConnectionStatsDialog />
+        <SettingsDialog />
+      </div>
+      {setupPending && onboarding.ready && !onboarding.open && <main className="setup-main"><SetupPending /></main>}
+      {onboarding.ready && <Wizard />}
       <PairingDialog />
     </>
   );
@@ -70,9 +79,11 @@ function RoomContent() {
 export function App({ store }: { store?: RoomStore } = {}) {
   return (
     <RoomProvider store={store}>
-      <TooltipProvider>
-        <RoomContent />
-      </TooltipProvider>
+      <OnboardingProvider>
+        <TooltipProvider>
+          <RoomContent />
+        </TooltipProvider>
+      </OnboardingProvider>
     </RoomProvider>
   );
 }

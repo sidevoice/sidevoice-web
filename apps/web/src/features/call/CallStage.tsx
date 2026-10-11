@@ -3,12 +3,11 @@ import { HARNESS_NAMES, HarnessIcon } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
-import { avatarFor, avatarTone, PERSON_AVATAR } from "../avatar/avatar-spec";
+import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callTranslator, type CallTranslate } from "./call-i18n";
-import { personMood } from "./conversation-state";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 
@@ -63,28 +62,15 @@ function latestWords(text: string) {
   return "…" + cut.slice(cut.indexOf(" ") + 1);
 }
 
-function PersonPip({ inCall, speaking, conversation, t }: { inCall: boolean; speaking: boolean; conversation: ConversationView; t: CallTranslate }) {
-  const avatar = useRef<HTMLSpanElement>(null);
-  // While the person speaks their mouth follows the microphone, written straight onto the avatar: no render per level.
-  useEffect(() => {
-    const node = avatar.current;
-    const channel = window.sidevoiceUI?.micLevel;
-    if (!speaking || !node || !channel) return;
-    const unsubscribe = channel.subscribe((level) => node.style.setProperty("--mouth", String(Math.min(1, level / 45))));
-    return () => { unsubscribe(); node.style.removeProperty("--mouth"); };
-  }, [speaking]);
-  const turn = !!(conversation.pendingText || conversation.pendingPhase);
+/** What the person is saying, while they say it: their latest words (or the voice listening), and a way to take it back
+ *  before it is sent. No picture of them: the transcript has what they said. */
+function PersonTurn({ conversation, t }: { conversation: ConversationView; t: CallTranslate }) {
+  if (!conversation.pendingText && !conversation.pendingPhase) return null;
   return (
-    <div className="stage-pip" data-speaking={speaking || undefined} style={avatarTone(PERSON_AVATAR) as CSSProperties}>
-      {turn && (
-        <div className="speech-bubble pip-bubble" translate="no">
-          {conversation.pendingText ? <span>{latestWords(conversation.pendingText)}</span>
-            : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}
-          {conversation.pendingCancellable && <button type="button" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</button>}
-        </div>
-      )}
-      <CharacterAvatar ref={avatar} spec={PERSON_AVATAR} mood={personMood({ inCall, speaking })} size="pip" mouth="level" label={t("stage.yourAvatar")} />
-      <span className="stage-tag">{t("stage.you")}</span>
+    <div className="speech-bubble person-bubble" translate="no">
+      {conversation.pendingText ? <span>{latestWords(conversation.pendingText)}</span>
+        : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}
+      {conversation.pendingCancellable && <button type="button" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</button>}
     </div>
   );
 }
@@ -98,11 +84,9 @@ export function CallStage() {
   const t = callTranslator();
   const stage = useStageConversation();
   const conversation = useRoomStore((state) => state.conversation);
-  const userLive = useRoomStore((state) => state.facts.userLive);
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
-  const personSpeaking = stage.inCall && (userLive || conversation.pendingPhase === "listening");
   const harness = stage.row?.harness ? HARNESS_NAMES[stage.row.harness] : null;
 
   if (!stage.threadId) {
@@ -121,6 +105,10 @@ export function CallStage() {
     <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
       <div className="stage-tile" data-mood={stage.mood} style={avatarTone(spec) as CSSProperties}>
+        <div className="stage-name" translate="no">
+          <h2 title={stage.title}>{stage.title}</h2>
+          {stage.row?.machine && <span>{stage.row.machine}</span>}
+        </div>
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
           {stage.mood === "working" && <p className="stage-activity" role="status"><i className="stage-spinner" aria-hidden="true" />{t("stage.working")}</p>}
@@ -128,9 +116,12 @@ export function CallStage() {
         <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage"
           mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agent", { title: stage.title })} />
         <div className="stage-tags">
-          {harness && <span className="stage-tag">{stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}{harness}</span>}
+          {(harness || stage.row?.model) && <span className="stage-tag stage-badge">
+            {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
+            {[harness, stage.row?.model, stage.row?.effort && t("stage.effort", { effort: stage.row.effort })].filter(Boolean).join(" · ")}
+          </span>}
         </div>
-        <PersonPip inCall={stage.inCall} speaking={personSpeaking} conversation={conversation} t={t} />
+        <PersonTurn conversation={conversation} t={t} />
       </div>
     </section>
   );

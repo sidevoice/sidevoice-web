@@ -35,6 +35,8 @@ export function initialSessionFacts() {
         speechLanguage: 'en', inApp: false,
         // Whether this browser refuses the page any storage (site data blocked), found once at start.
         storageBlocked: false,
+        // A model of this device being installed for a voice slot, how far it has got, or why it failed.
+        voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
         voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, providerKeys: {},
@@ -221,6 +223,7 @@ export function participantsView(s) {
         return { threadId: p.thread_id, title: p.title, selected: p.thread_id === selected, available: !!p.available, switching: s.switching,
             unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
             machine: p.machine?.host || null, machineId: p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
+            model: p.engine?.model ? shortModel(p.engine.model) : null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }

@@ -1,8 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
+import { markSetUp } from "./onboarding";
 
 afterEach(cleanup);
+
+// Every test starts on a device whose first setup is finished, so the room renders; the setup's own tests start from
+// an empty record (features/onboarding).
+beforeEach(markSetUp);
 
 // Store updates outside an event handler are what the runtime does all day; act() needs to know this is a test.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

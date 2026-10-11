@@ -64,6 +64,9 @@ export interface ParticipantView {
   machineId?: string | null;
   /** The harness the conversation runs in ("claude", "codex"), shown as its icon; null when unknown. */
   harness?: string | null;
+  /** The agent's model, short ("Opus 5"), and its thinking effort ("high"), as the harness reports them; null when not. */
+  model?: string | null;
+  effort?: string | null;
   /** How that harness is reached, when the room says it (Cursor: its editor card, its CLI under persist, or
    *  listening only); null against a room that does not. */
   route?: string | null;
@@ -155,6 +158,8 @@ export interface PairingPromptView {
 
 export interface SidevoiceActions {
   cancelInput(): Promise<void>;
+  /** Stops the reply sounding now on this device; the reply stays written and what is queued after it plays on. */
+  skipReply(): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
   editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]>; tts?: Partial<DeviceVoiceSettings["tts"]>; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"] }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
@@ -171,9 +176,19 @@ export interface SidevoiceActions {
   /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */
   forgetMachine(id: string): Promise<void>;
   /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */
-  pairDevice(code: string, name: string): Promise<{ host: string | null }>;
+  /** Redeems a machine's pairing code; `address` is where the person says the machine is (host:port or a URL). */
+  pairDevice(code: string, name: string, address?: string): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
+  /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
+   *  that work become this device's. Rejects with a sentence and the failure's `code`. */
+  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean }): Promise<{ text?: string }>;
+  /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
+  installVoiceModel?(task: "stt" | "tts"): Promise<void>;
+  /** Cancels that install: nothing of it is kept. */
+  cancelVoiceInstall?(): void;
+  /** Stops the try in progress, which then rejects `trial-cancelled`. */
+  cancelVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */
   loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
   /** Connect, disconnect, or dismiss an agent on the identified machine. */

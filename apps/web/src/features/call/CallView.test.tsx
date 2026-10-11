@@ -5,6 +5,7 @@ import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
 import type { SessionFacts } from "../../state/room-session-state.js";
+import { markSetUp } from "../../test/onboarding";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -37,6 +38,7 @@ const rowOf = (title: string) => [...document.querySelectorAll(".conversation-si
 let selectParticipant: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   localStorage.clear();
+  markSetUp();
   selectParticipant = vi.fn();
   window.sidevoiceActions = { selectParticipant, cancelInput: vi.fn().mockResolvedValue(undefined), closeParticipant: vi.fn() } as unknown as typeof window.sidevoiceActions;
 });
@@ -74,20 +76,17 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   expect(stageAgent()).toHaveAttribute("data-mood", "waiting");
   expect(document.querySelector(".stage-activity")).toBeNull();
 
-  // Out of the call the agent is idle, and so is the person.
+  // Out of the call the agent is idle.
   patch(store, { ws: null });
   expect(stageAgent()).toHaveAttribute("data-mood", "idle");
-  expect(document.querySelector(".stage-pip .sv-avatar")).toHaveAttribute("data-mood", "idle");
 });
 
-test("the person is the picture-in-picture, with a bubble of their own while they speak", async () => {
+test("the person has no picture on the stage, only a bubble of their own while they speak", async () => {
   const store = room();
-  const pip = () => document.querySelector(".stage-pip .sv-avatar")!;
-  expect(pip()).toHaveAttribute("data-mood", "present");
-  expect(document.querySelector(".pip-bubble")).toBeNull();
+  expect(document.querySelector(".stage-pip")).toBeNull();
+  expect(document.querySelector(".person-bubble")).toBeNull();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
-  expect(pip()).toHaveAttribute("data-mood", "speaking");
-  expect(document.querySelector(".pip-bubble")).toHaveTextContent("Split it into two commits.");
+  expect(document.querySelector(".person-bubble")).toHaveTextContent("Split it into two commits.");
   // The agent waits for the person meanwhile, looking toward them.
   expect(stageAgent()).toHaveAttribute("data-mood", "waiting");
   await act(async () => { screen.getByRole("button", { name: "Cancel sending" }).click(); });
@@ -107,7 +106,7 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
 });
 
-test("a phone's header avatars bring the conversations down, and picking one switches the call to it", async () => {
+test("a phone's header avatars switch the call at a tap, and the handle brings the whole list down", async () => {
   viewport({ narrow: true });
   room();
   const others = [...document.querySelectorAll(".header-avatar")];
@@ -115,16 +114,19 @@ test("a phone's header avatars bring the conversations down, and picking one swi
   expect(others.map((button) => button.getAttribute("aria-label"))).toEqual([
     "Review the nightly backups · Waiting for you", "Migrate the payments API · Working",
   ]);
-  expect(screen.getByRole("button", { name: "All conversations (4)" })).toBeInTheDocument();
   const sidebar = document.getElementById("conversations")!;
-  expect(sidebar).not.toHaveAttribute("data-open");
+  // A tap on one moves the call to it, without the list.
   await act(async () => { fireEvent.click(others[0]); });
-  expect(sidebar).toHaveAttribute("data-open");
-  await act(async () => { fireEvent.click(rowOf("Review the nightly backups")); });
   expect(selectParticipant).toHaveBeenCalledWith("t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
+  // The whole list comes down from the handle under the header; picking one there switches too.
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
+  expect(sidebar).toHaveAttribute("data-open");
+  await act(async () => { fireEvent.click(rowOf("Migrate the payments API")); });
+  expect(selectParticipant).toHaveBeenLastCalledWith("t-pay");
+  expect(sidebar).not.toHaveAttribute("data-open");
 
-  // The chevron, a tap outside and Escape put it away too.
+  // The close button, a tap outside and Escape put it away too.
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Close conversations" })); });
   expect(sidebar).not.toHaveAttribute("data-open");
@@ -169,21 +171,19 @@ test("the desktop sidebar collapses to a rail and expands, and a reload keeps th
   expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBe("0");
 });
 
-test("the header's ⋯ menu holds the secondary actions under the runtime's ids", async () => {
+test("the header holds Settings, and the call bar's ⋯ the statistics, under the runtime's ids", async () => {
   room();
-  expect(document.querySelector("#call-menu #stats-open")).toHaveTextContent("Connection statistics");
-  expect(document.querySelector("#call-menu #settings-open")).toHaveTextContent("Settings");
-  expect(document.querySelector(".call-bar #call-menu")).toBeNull();
+  expect(document.querySelector(".room-header #settings-open")).toHaveAccessibleName("Settings");
+  expect(document.querySelector(".call-bar #call-menu #stats-open")).toHaveTextContent("Connection statistics");
+  expect(document.querySelector(".room-header #call-menu")).toBeNull();
 });
 
-test("out of a call the room's binding is not a call: no conversation is in call, and the header's dot is not live", () => {
+test("out of a call the room's binding is not a call: no conversation is in call", () => {
   const store = room({ ws: null, sessionId: null });
   expect(rowOf("Fix the slow login").querySelector(".state-dot")).toHaveAttribute("data-state", "waiting");
   expect(rowOf("Fix the slow login")).toHaveTextContent("Waiting for you");
-  expect(document.querySelector(".conversation-trigger .live-dot")).not.toHaveAttribute("data-live");
   patch(store, { ws: {}, sessionId: "s1" });
   expect(rowOf("Fix the slow login").querySelector(".state-dot")).toHaveAttribute("data-state", "in-call");
-  expect(document.querySelector(".conversation-trigger .live-dot")).toHaveAttribute("data-live");
 });
 
 test("the transcript opens on its latest message, whatever arrived while it was closed", async () => {

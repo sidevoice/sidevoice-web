@@ -40,6 +40,8 @@ export interface SessionFacts {
  providerKeys: Record<string, boolean | null>;
  /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
  storageBlocked: boolean;
+ /** A model of this device being installed for a voice slot: how far it has got, or why it failed. */
+ voiceInstall: {task: 'stt' | 'tts'; model: string; state: 'running' | 'failed'; fraction: number | null; error: string} | null;
 }
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';

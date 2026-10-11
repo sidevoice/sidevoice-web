@@ -7,6 +7,7 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
+import {tryTranscription,tryVoice} from './voice-trial.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
@@ -56,6 +57,7 @@ const VOICE_FAILURES={
 function voiceErrorText(error){
  const code=failureCode(error,''),t=hostTranslator();
  if(code==='storage-blocked'||code==='SecurityError')return t('storage.blocked');
+ if(/^trial-[a-z-]+$/.test(code))return t('wizard.trial.'+code.slice(6));
  const text=VOICE_FAILURES[code]?.()||(/^[A-Z][A-Za-z]*Error$/.test(code)?t('voice.error.browser',{name:code}):'La voz de la llamada falló'+(code?' ('+code+')':'')+'.');
  return error?.detail?text+' '+String(error.detail):text;
 }
@@ -320,7 +322,7 @@ function sayReply(reply){
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
   // From `playing` to `done` the reply is being said: where the voice is in it lights its words.
-  if(event.type==='playing'){state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
+  if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
   else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
   else if(event.type==='done'){
    replies.delete(reply.utterance_id);
@@ -329,6 +331,9 @@ function sayReply(reply){
   }
  });
 }
+// Skipping what sounds now, without saying anything: only this device stops hearing it, the reply stays written, and
+// what is queued after it plays on.
+function skipReply(){for(const said of replies.values())if(said.playing){said.saying.cancel();return}}
 // The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
 function withdrawReplies(d){
  if(d.session_id!==state.sessionId)return;
@@ -522,10 +527,10 @@ function pairingRefused(fp,{call=false}={}){
  openPairing(reachFailure);
 }
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
-async function pairDevice(code,name){
+async function pairDevice(code,name,address=''){
  const about=await describeTarget();if(about)targetAbout=about;
  const t=hostTranslator(),defaultName=currentDeviceName(where=>t('pair.deviceName',{where}));
- const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,target,about,origin:location.origin,get:fetch});
+ const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
   closePairing();return {host:localPairing.host};
@@ -1296,6 +1301,41 @@ async function saveVoiceSettings(){
  if(host)await host.setSettings(draft);
  writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
 }
+// A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
+// one, since it would take that call's voice. Settings that work are this device's from then on.
+let voiceTry=null;
+async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
+ if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
+ voiceTry?.abort();const abort=voiceTry=new AbortController();
+ const settings=state.voiceDraft||state.voiceSettings;
+ try{
+  const host=await voiceHost();
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal})}
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal}),{});
+  if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
+  return result;
+ }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ finally{if(voiceTry===abort)voiceTry=null}
+}
+function cancelVoiceTry(){voiceTry?.abort()}
+// A model of this device's catalogue the slot names but that is not on disk: installed on this device (its recommended
+// build), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
+let voiceInstall=null;
+async function installVoiceModel(task){
+ const slot=(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
+ const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
+ const build=model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
+ voiceInstall?.abort();const abort=voiceInstall=new AbortController();
+ const at=fraction=>roomStore.patch({voiceInstall:{task,model:slot.model,state:'running',fraction,error:''}});
+ at(null);
+ try{
+  const models=await modelCatalogs();
+  await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
+  roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
+ }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,error:voiceErrorText(error)}})}
+ finally{if(voiceInstall===abort)voiceInstall=null}
+}
+function cancelVoiceInstall(){voiceInstall?.abort()}
 // A key changes what a provider lists: its catalogue is read again with it.
 async function saveProviderKey(provider,key){
  let models;
@@ -1342,6 +1382,7 @@ async function saveSettings(){
 $('language-form').onsubmit=e=>{e.preventDefault();$('settings-error').textContent='';saveSettings().catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)})};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
+ skipReply,
  editVoice,
  saveProviderKey,
  loadVoiceCatalogue,
@@ -1363,6 +1404,10 @@ window.sidevoiceActions={
   }
   await refresh();await refreshPeople();await refreshHistory()
  },
+ tryVoiceSettings,
+ cancelVoiceTry,
+ installVoiceModel,
+ cancelVoiceInstall,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,

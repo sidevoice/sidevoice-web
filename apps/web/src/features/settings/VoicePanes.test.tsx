@@ -21,6 +21,8 @@ const catalogs = [
     local("whisper-large", "whisper", ["stt"], { builds: [build("whisper-large/int8", { available: false, reasons: [{ code: "memory", params: {} }] })] }),
     local("moonshine-tiny", "moonshine", ["stt"]),
     local("kokoro-82m-v1.0", "kokoro", ["tts"], { voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 } }),
+    local("piper-es", "piper", ["tts"], { installed: false, voices: [{ id: "davefx", languages: ["es"] }], recommendedBuild: "piper-es/onnx",
+      builds: [build("piper-es/onnx", { downloadBytes: 63e6, installed: false })] }),
   ] },
   { id: "elevenlabs", name: "ElevenLabs", status: { stale: false }, models: [{ id: "scribe_v2", capabilities: ["stt"], languages: [], voices: [] }] },
   { id: "openai", name: "OpenAI", status: { stale: false, reason: { code: "credential-missing", params: {} } }, models: [] },
@@ -30,7 +32,8 @@ function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {})
   const store = createRoomStore();
   store.patch({ voiceSettings: defaultVoiceSettings("es"), voiceCatalogue: { state: "ready", catalogs, error: "" }, providerKeys: { openai: false, elevenlabs: true }, ...facts });
   installRoomBridge(store);
-  const actions = { editVoice: vi.fn(), saveProviderKey: vi.fn().mockResolvedValue(undefined), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined) };
+  const actions = { editVoice: vi.fn(), saveProviderKey: vi.fn().mockResolvedValue(undefined), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined),
+    installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(), tryVoiceSettings: vi.fn().mockResolvedValue({}), cancelVoiceTry: vi.fn() };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
   render(<RoomStoreContext.Provider value={store}>{pane === "voice" ? <VoiceSettings /> : <ProviderKeys />}</RoomStoreContext.Provider>);
   for (const section of document.querySelectorAll("section")) section.hidden = false;
@@ -133,4 +136,40 @@ test("a browser that blocks site data is said once, on top, while it does", () =
   expect(document.getElementById("storage-blocked")).toBeNull();
   act(() => store.patch({ storageBlocked: true }));
   expect(screen.getByRole("alert")).toHaveTextContent("This browser is blocking site data for this page. Allow it");
+});
+
+const withVoiceModel = (model: string, catalog = "local") => ({ ...defaultVoiceSettings("es"), tts: { catalog, model, voice: null, speed: 1 } });
+
+test("a model not on this device offers its download with its size; its voices wait until it is here", () => {
+  const { actions } = renderPane("voice", { voiceSettings: withVoiceModel("piper-es") });
+  expect(document.getElementById("tts-model-card")).toHaveTextContent("Not on this device yet · 63 MB to download");
+  expect(document.getElementById("tts-voice")).toBeNull();
+  expect(document.getElementById("tts-try")).toBeNull();
+  fireEvent.click(document.getElementById("tts-model-download")!);
+  expect(actions.installVoiceModel).toHaveBeenCalledWith("tts");
+});
+
+test("while it downloads the card shows how far it has got, and the download can be cancelled", () => {
+  const { actions } = renderPane("voice", { voiceSettings: withVoiceModel("piper-es"),
+    voiceInstall: { task: "tts", model: "piper-es", state: "running", fraction: 0.4, error: "" } });
+  const card = document.getElementById("tts-model-card")!;
+  expect(card).toHaveTextContent("Downloading… 40%");
+  expect((card.querySelector("progress") as HTMLProgressElement).value).toBe(0.4);
+  fireEvent.click(document.getElementById("tts-model-cancel")!);
+  expect(actions.cancelVoiceInstall).toHaveBeenCalled();
+  cleanup();
+  renderPane("voice", { voiceSettings: withVoiceModel("piper-es"), voiceInstall: { task: "tts", model: "piper-es", state: "failed", fraction: null, error: "The download failed." } });
+  expect(screen.getByRole("alert")).toHaveTextContent("The download failed.");
+});
+
+test("once it is here its voices appear, and it can be tried without saving; a provider's model needs no download", async () => {
+  const { actions } = renderPane("voice");
+  expect(document.getElementById("tts-model-card")).toHaveTextContent("On this device");
+  expect(options("tts-voice").map((option) => option.value)).toEqual(["", "ef_dora"]);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ keep: false }));
+  cleanup();
+  renderPane("voice", { voiceSettings: { ...defaultVoiceSettings("es"), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+  expect(document.getElementById("stt-model-card")).toBeNull();
+  expect(document.getElementById("stt-language")).toBeInTheDocument();
 });

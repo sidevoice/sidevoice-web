@@ -6,7 +6,7 @@
  *
  * Both packages are loaded the first time the page needs either, each in its own chunk, and the page makes one engine. */
 import { engineVoiceSource, voiceRefusal } from './voice-source.ts';
-import { engineCatalogs, localStorageCredentials } from './model-catalogs.js';
+import { engineCatalogs, localStorageCredentials, nativeInstall } from './model-catalogs.js';
 import { engineFailureCode } from './failure-code.js';
 
 /** The page as the engine's host: what this browser can run models on, and the provider keys `credentials` keeps. */
@@ -69,7 +69,10 @@ export function pageVoice({ host: given, load = loadPackages } = {}) {
       const host = appHost();
       if (host?.voice) {
         if (typeof host.engine?.catalogs !== 'function') throw voiceRefusal('catalogs-unavailable');
-        return host.engine;
+        // Its models install where they run: through the app's engine, or else its native engine's install.
+        if (typeof host.engine.install === 'function' || !host.nativeEngine?.install) return host.engine;
+        return { ...host.engine, catalogs: () => host.engine.catalogs(), setCredential: (provider, key) => host.engine.setCredential(provider, key),
+          hasCredential: (provider) => host.engine.hasCredential(provider), install: nativeInstall(host.nativeEngine) };
       }
       const { engine, credentials } = await browser();
       return engineCatalogs(engine, credentials);

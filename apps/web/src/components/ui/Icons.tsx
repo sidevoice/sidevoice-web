@@ -6,7 +6,7 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal,
+  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical,
   PanelLeftClose, PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -31,6 +31,7 @@ export const CloseUpIcon = mark(ChevronUp, 18);
 export const SidebarCollapseIcon = mark(PanelLeftClose, 18);
 export const SidebarExpandIcon = mark(PanelLeftOpen, 18);
 export const MoreIcon = mark(MoreHorizontal, 18);
+export const MoreVerticalIcon = mark(MoreVertical, 18);
 export const CloseIcon = mark(X, 18);
 export const CopyIcon = mark(Copy, 18);
 export const RefreshIcon = mark(RefreshCw, 18);

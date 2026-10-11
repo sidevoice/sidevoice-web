@@ -76,12 +76,25 @@ export function secureBase(base, origin = '') {
         return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
     } catch { return false; }
 }
+/** The address a person typed for a machine (`192.168.1.20:8765`, `https://mac.example`), as a base: https unless
+ *  it says otherwise, and only one a pairing secret may travel to (`secureBase`). Empty is null: the code's own
+ *  addresses are used. */
+export const ADDRESS_INVALID = 'address-invalid';
+export const ADDRESS_INSECURE = 'address-insecure';
+export function machineAddress(text) {
+    const raw = String(text ?? '').trim();
+    if (!raw) return null;
+    const base = httpUrl(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw);
+    if (!base) throw pairingError(ADDRESS_INVALID);
+    if (!secureBase(base)) throw pairingError(ADDRESS_INSECURE);
+    return base;
+}
 const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.';
 
 // ----- the code -----
 /** What a pasted code says, or why it cannot be used, in one sentence the person can act on. The code may
  *  arrive wrapped over lines or inside the sentence it was sent in: the `SV1.` token is found either way. */
-export function decodePairingCode(code, now = Date.now()) {
+export function decodePairingCode(code, now = Date.now(), { address = null } = {}) {
     const raw = String(code ?? ''), compact = raw.replace(/\s+/g, '');
     if (!compact) throw pairingError('Pega el código que te dio la máquina.');
     const text = /^SV1\.[A-Za-z0-9_-]+$/.test(compact) ? compact : raw.match(/SV1\.[A-Za-z0-9_-]+/)?.[0];
@@ -98,11 +111,11 @@ export function decodePairingCode(code, now = Date.now()) {
         !urlList || urlList.includes(null) || room === undefined || (room && !room.url) ||
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
         throw pairingError(DAMAGED);
-    if (!urlList.length && !room) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
+    if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
     // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
     // left with none cannot be used from here.
     const secureUrls = urlList.filter(url => secureBase(url)), secureRoom = room && secureBase(room.url) ? room : null;
-    if (!secureUrls.length && !secureRoom) throw pairingError(PLAINTEXT);
+    if (!secureUrls.length && !secureRoom && !address) throw pairingError(PLAINTEXT);
     // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
     // address is probed.
     if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
@@ -188,10 +201,14 @@ export async function firstProven(candidates, expected, deps = {}, started = new
 }
 
 // ----- redeeming a code -----
-/** Pair this device with the node a code names: find an address that proves it is that node, hand it the
+/** Pair this device with the node a code names, at the address the person typed if any: find an address that proves it is that node, hand it the
  *  one-time secret there and nowhere else, and keep the token only if the key it returns is the code's. */
-export async function redeemPairingCode(code, { name = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now() } = {}) {
-    const payload = decodePairingCode(code, now);
+export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now() } = {}) {
+    // The address the person typed comes first, and is kept with the pairing: it is where they know the machine is.
+    // It is trusted no more than the code's own: the machine there proves it is the code's before the secret goes.
+    const typed = machineAddress(address);
+    const decoded = decodePairingCode(code, now, { address: typed });
+    const payload = typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded;
     const crypto = webCrypto(subtle);
     const place = await firstProven(candidateBases(payload, { target, about, origin }), { fp: payload.fp }, { get, subtle: crypto });
     const called = payload.host ? '«' + payload.host + '»' : 'la máquina';

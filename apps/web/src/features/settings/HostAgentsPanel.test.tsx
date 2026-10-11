@@ -66,7 +66,6 @@ test("manual instructions come from the selected host and trigger four-second wa
 
 /** The menu's Settings entry, and the menu trigger that carries the notice. */
 const settingsEntry = () => document.getElementById("settings-open") as HTMLButtonElement;
-const menuTrigger = () => document.querySelector("#call-menu summary") as HTMLElement;
 
 test("P11 pending notice on the Settings entry routes to its host's Agents screen", async () => {
   const store = createRoomStore();
@@ -77,9 +76,8 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
   act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: pending } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
-  expect(menuTrigger()).toHaveAttribute("aria-label", "New agents need attention. Open settings.");
-  expect(menuTrigger().querySelector(".settings-notice-dot")).toBeInTheDocument();
   const gear = settingsEntry();
+  expect(gear).toHaveAttribute("aria-label", "New agents need attention. Open settings.");
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
@@ -124,7 +122,7 @@ test("multiple pending hosts leave an explicit translated choice in Machines", a
   expect(screen.getByRole("button", { name: "Review agents for Laptop" })).toBeInTheDocument();
 });
 
-test("forgotten or revoked hosts cannot leave an orphaned notice on the menu", () => {
+test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", () => {
   for (const pairings of [[], [{ ...pairing("fp-nuc", "NUC"), revoked: true }]]) {
     const store = createRoomStore();
     const host = pairing("fp-nuc", "NUC");
@@ -133,7 +131,6 @@ test("forgotten or revoked hosts cannot leave an orphaned notice on the menu", (
     expect(settingsEntry().querySelector(".settings-notice-dot")).toBeInTheDocument();
     act(() => store.patch({ pairings }));
     expect(settingsEntry().querySelector(".settings-notice-dot")).not.toBeInTheDocument();
-    expect(menuTrigger().querySelector(".settings-notice-dot")).not.toBeInTheDocument();
     view.unmount();
   }
 });

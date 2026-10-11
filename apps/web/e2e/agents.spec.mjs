@@ -65,9 +65,11 @@ async function installHarness(page) {
     if (pathname.startsWith("/api/")) return respond(route, {});
     return route.continue();
   });
-  // This device paired with that machine, and the page pointed at it: the static site's own origin.
+  // This device paired with that machine, its first setup finished (so the room shows, not the setup), and the page
+  // pointed at the machine: the static site's own origin.
   await page.addInitScript((hostPairing) => {
     localStorage.setItem("sidevoice.pairings", JSON.stringify({ in_use: hostPairing.fp, pairings: [hostPairing] }));
+    localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {} }));
     window.__SIDEVOICE_TARGET__ = window.location.origin;
   }, pairing);
   return fake;

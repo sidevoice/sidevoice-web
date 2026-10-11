@@ -47,6 +47,7 @@ test("keeps the active transcribed draft cancellable after listening text disapp
     forgetMachine: vi.fn(),
     pairDevice: vi.fn(),
     openPairing: vi.fn(),
+    skipReply: vi.fn(),
     closePairing: vi.fn(),
   };
   render(<MessageList conversation={view([message({ segment: "call:user-turn:4", role: "user", name: "Tú", text: "Una frase todavía abierta", draft: true, cancellable: true })])} />);

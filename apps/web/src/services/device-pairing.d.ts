@@ -65,7 +65,10 @@ export function bytesToBase64url(input: Uint8Array | ArrayBuffer): string;
 export function base64ToBytes(text: string): Uint8Array;
 export function utf8(text: string): Uint8Array;
 export function pairingError(message: string): Error & { pairing: true };
-export function decodePairingCode(code: string, now?: number): PairingCodePayload;
+export const ADDRESS_INVALID: "address-invalid";
+export const ADDRESS_INSECURE: "address-insecure";
+export function machineAddress(text: string): string | null;
+export function decodePairingCode(code: string, now?: number, options?: { address?: string | null }): PairingCodePayload;
 export function fingerprintOf(spki: Uint8Array | ArrayBuffer, subtle?: SubtleCrypto): Promise<string>;
 export function newNonce(random?: (bytes: Uint8Array) => Uint8Array): string;
 export function verifyIdentitySignature(proof: { publicKey: string; nonce: string; signature: string }, subtle?: SubtleCrypto): Promise<boolean>;
@@ -75,7 +78,7 @@ export function candidateBases(pairing: { fp: string; urls: string[]; rv: Pairin
   context?: { target?: string; about?: TargetAbout | null; origin?: string }): CandidateBase[];
 export function firstProven(candidates: CandidateBase[], expected: { fp: string; public_key?: string | null }, deps?: IdentityDeps,
   started?: Map<string, Promise<unknown>>): Promise<(CandidateBase & { publicKey: string }) | null>;
-export function redeemPairingCode(code: string, options?: { name?: string; target?: string; about?: TargetAbout | null; origin?: string;
+export function redeemPairingCode(code: string, options?: { name?: string; address?: string; target?: string; about?: TargetAbout | null; origin?: string;
   get?: typeof fetch; subtle?: SubtleCrypto; now?: number }): Promise<{ pairing: Pairing; base: CandidateBase & { publicKey: string } }>;
 export function deviceName(nav?: { userAgent?: string; platform?: string; userAgentData?: { platform?: string } }): string;
 export function readPairings(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;
