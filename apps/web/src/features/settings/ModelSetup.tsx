@@ -105,12 +105,13 @@ const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range
 /** A real try of the settings being edited for `task` (the controller's `tryVoiceSettings`): `keep` makes settings that
  *  work this device's (the setup); `onTried` hears each success. A changed setting clears it; leaving stops it. While
  *  it runs it follows what the try tells (TrialProgress); the microphone's level goes to `level`, drawn from there
- *  frame by frame, never through a render. `open` is the try's dialog (`try-result` `dialog`): a try opens it, and
+ *  frame by frame, never through a render. `open` is the try's dialog (`try-result` `dialog`): a try opens it there, and
  *  `close` shuts it, stopping a try that runs. */
 export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?: boolean; onTried?: (task: Task) => void } = {}) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [trial, setTrial] = useState<TryState>(IDLE);
   const [open, setOpen] = useState(false);
+  const inDialog = useTryResult() === "dialog";
   const attempt = useRef(0);
   const level = useMemo(createMicLevelChannel, []);
   const slot = JSON.stringify(task && draft ? draft[task] : null);
@@ -122,7 +123,7 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
     const mine = ++attempt.current;
     const update = (next: (trial: TryState) => TryState) => setTrial((trial) => trial.attempt === mine ? next(trial) : trial);
     level.publish(0);
-    setOpen(true);
+    setOpen(inDialog);
     setTrial({ ...IDLE, phase: "running", attempt: mine, said: options.text ?? "" });
     try {
       const result = await window.sidevoiceActions!.tryVoiceSettings!(task, { ...options, keep,

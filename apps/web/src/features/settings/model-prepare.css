@@ -15,7 +15,7 @@
 
 /* A ready model's try (ModelSetup.tsx TryPanel), in its block under the state: getting ready, then the microphone's
    level or the sentence lit as it is heard, then what was heard and how quick it was. In the try's dialog, the same. */
-.model-prepare .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-prepare > .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .model-try { display: grid; gap: var(--sv-space-3); min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .model-try[data-empty] { display: none; }
 .model-try-live { display: grid; gap: var(--sv-space-2); min-width: 0; }
