@@ -1,12 +1,13 @@
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import { CallIcon, HangupIcon, MicrophoneIcon, SkipIcon } from "../../components/ui/Icons";
+import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon } from "../../components/ui/Icons";
 import { callTranslator } from "./call-i18n";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
  * writes them: the runtime records the fact, React paints it. The microphone level is the one
- * exception, and it is not here — it changes per animation frame and the meter owns its own pixels. */
+ * exception, and it is not in the store — it changes with every reading, so the runtime writes it onto the page
+ * itself (MicWave). */
 
 export function ScreenLock() {
   const lock = useRoomStore((state) => state.screenLock);
@@ -24,20 +25,28 @@ export function SkipButton() {
   const t = callTranslator();
   const playing = useRoomStore((state) => state.facts.botLive);
   return (
-    <Button id="skip-reply" variant="ghost" disabled={!playing} aria-label={t("toolbar.skip")} title={t("toolbar.skip")}
+    <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} title={t("toolbar.skip")}
       onClick={() => window.sidevoiceActions?.skipReply()}>
-      <SkipIcon size={24} />
+      <SkipIcon size={22} />
     </Button>
   );
+}
+
+/* The microphone's level is drawn inside its own button: the runtime writes it as `--mic-fill` on #mute on every
+ * reading, and the bars beside the microphone take their height from it in CSS (call-view.css), so no render
+ * happens per reading. */
+function MicWave() {
+  return <span className="mic-wave" aria-hidden="true"><i /><i /><i /><i /></span>;
 }
 
 export function MuteButton() {
   const mic = useRoomStore((state) => state.mic);
   return (
-    <Button id="mute" variant="ghost" className={cn(mic.holding && "holding")} aria-label={mic.label} title={mic.title}
+    <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label} title={mic.title}
       aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts="Meta+D Control+D"
       onClick={() => window.sidevoiceActions?.toggleMic()}>
-      <MicrophoneIcon size={26} />
+      <MicWave />
+      {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
     </Button>
   );
 }
@@ -45,7 +54,7 @@ export function MuteButton() {
 export function CallButton() {
   const call = useRoomStore((state) => state.call);
   return (
-    <Button id="connect" variant="primary" className={cn(call.joined && "joined", call.busy && "reconnecting")}
+    <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
       aria-label={call.label} title={call.label} onClick={() => void window.sidevoiceActions?.toggleCall()}>
       {call.joined ? <HangupIcon /> : <CallIcon />}
     </Button>

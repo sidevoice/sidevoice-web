@@ -1,4 +1,6 @@
 import { useEffect, useReducer, useRef, type CSSProperties } from "react";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { HARNESS_NAMES, HarnessIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
@@ -11,12 +13,13 @@ import { callTranslator, type CallTranslate } from "./call-i18n";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 import { TranscriptToggle } from "./CallToolbar";
+import "./call-view.css";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
  * a time as the voice reaches it, the spoken words lit and the chunk before kept dim above. Between turns its
- * activity stands where the bubble was. The person is the picture-in-picture in the corner, with a bubble of their
- * own while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button
- * away (TranscriptPanel). */
+ * activity stands where the bubble was. The person has no picture: a bubble of their own rises at the stage's foot
+ * while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button away
+ * (TranscriptPanel). Its look is call-view.css. */
 
 /** The reply sounding now. Until its row says so the voice may already be playing it: then it is the oldest one
  *  waiting, since replies are said in order. */
@@ -71,14 +74,17 @@ function PersonTurn({ conversation, t }: { conversation: ConversationView; t: Ca
     <div className="speech-bubble person-bubble" translate="no">
       {conversation.pendingText ? <span>{latestWords(conversation.pendingText)}</span>
         : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}
-      {conversation.pendingCancellable && <button type="button" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</button>}
+      {conversation.pendingCancellable && <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
+        onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>}
     </div>
   );
 }
 
+/** The room's errors, above the stage (#error is the runtime's id). The box stays in the page so what appears in it is
+ *  read out at once. */
 function BootError() {
   const error = useRoomStore((state) => state.bootError);
-  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error}</div>;
+  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={error} />}</div>;
 }
 
 export function CallStage() {
@@ -97,7 +103,7 @@ export function CallStage() {
         <BootError />
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
-          <button type="button" className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</button>
+          <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
         </div>
       </section>
     );
@@ -113,18 +119,18 @@ export function CallStage() {
         </div>
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
-          {stage.mood === "working" && <p className="stage-activity" role="status"><i className="stage-spinner" aria-hidden="true" />{t("stage.working")}</p>}
+          {stage.mood === "working" && <p className="stage-activity" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>
         <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage"
           mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agent", { title: stage.title })} />
         <div className="stage-tags">
           {(harness || stage.row?.model) && <span className="stage-tag stage-badge">
             {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
-            {[harness, stage.row?.model, stage.row?.effort && t("stage.effort", { effort: stage.row.effort })].filter(Boolean).join(" · ")}
+            <span>{[harness, stage.row?.model, stage.row?.effort && t("stage.effort", { effort: stage.row.effort })].filter(Boolean).join(" · ")}</span>
           </span>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
-        {narrow && <TranscriptToggle className="transcript-toggle stage-transcript-toggle" />}
+        {narrow && <TranscriptToggle floating />}
       </div>
     </section>
   );

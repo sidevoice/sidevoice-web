@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
@@ -89,7 +89,9 @@ test("the person has no picture on the stage, only a bubble of their own while t
   expect(document.querySelector(".person-bubble")).toHaveTextContent("Split it into two commits.");
   // The agent waits for the person meanwhile, looking toward them.
   expect(stageAgent()).toHaveAttribute("data-mood", "waiting");
-  await act(async () => { screen.getByRole("button", { name: "Cancel sending" }).click(); });
+  // The transcript's live draft has the same button: this is the stage's.
+  const stage = document.querySelector<HTMLElement>(".call-stage")!;
+  await act(async () => { within(stage).getByRole("button", { name: "Cancel sending" }).click(); });
   expect(window.sidevoiceActions?.cancelInput).toHaveBeenCalledOnce();
 });
 
