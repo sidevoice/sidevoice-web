@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon, WarningIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Switch } from "../../components/ui/Switch";
@@ -34,7 +34,9 @@ function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTrans
       : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
       ? t("hosts.remoteNoResponse") : t("hosts.connected");
   const reachable = machine.local ? machine.selectable && status.reachable === true : machine.state === "connected";
-  return { name, subtitle, reachable };
+  // Paired without encryption, it is said with its name wherever the name alone would not show it.
+  const spoken = machine.insecure ? t("hosts.notEncryptedNamed", { host: name }) : name;
+  return { name, spoken, subtitle, reachable };
 }
 
 /* The paired machines, as Settings' own navigation lists them (MachineNav): under Machines a sub-entry per machine —
@@ -76,14 +78,15 @@ export function MachineNav({ current }: { current: boolean }) {
         const copy = machineCopy(machine, status, t);
         const state = machineState(machine, copy, t);
         return (
-          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.name + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.name}, ${state.label} · ${copy.subtitle}`}
+          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.spoken + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.spoken}, ${state.label} · ${copy.subtitle}`}
             data-name={copy.name} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
-            {/* This computer, an icon before its name; the name cut short when long (whole in the title); the state's dot
-                last. An entry never grows past the column. */}
+            {/* This computer, an icon before its name; the name cut short when long (whole in the title); a warning sign
+                after it when it is reached without encryption; the state's dot last. An entry never grows past the column. */}
             {machine.local && <span className="machine-nav-here" title={t("hosts.thisComputer")}><ThisComputerIcon /><span className="sr-only">{t("hosts.thisComputer")}</span></span>}
             <span className="machine-nav-name">{copy.name}</span>
+            {machine.insecure && <span className="machine-nav-insecure" aria-hidden="true"><WarningIcon size={14} /></span>}
             {notice(machine) && <NewDot label={t("highlights.navNew")} />}
             <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
           </button>
@@ -173,6 +176,11 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
+        {/* Reached without encryption, as the person agreed when pairing: said for as long as it is so. */}
+        {machine.insecure && <span className="host-insecure">
+          <Badge tone="warning"><WarningIcon size={12} />{t("hosts.notEncrypted")}</Badge>
+          <InfoTip label={t("hosts.notEncryptedAbout")}>{t("hosts.notEncryptedInfo")}</InfoTip>
+        </span>}
         {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
       </header>

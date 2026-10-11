@@ -32,3 +32,10 @@ test("the no-machine state stays empty when the desktop bridge says no local hos
   const store = createRoomSessionStore({ localHostAvailable: true, localHostStatus: { state: "absent" } });
   expect(store.getState().machines).toEqual([]);
 });
+
+test("a pairing kept without encryption by the person's choice is a machine that says so", () => {
+  const store = createRoomSessionStore({ pairings: [{ ...remote, insecure: true, urls: ["http://192.168.1.20:8765"], rv: null }, { ...remote, fp: "fp-other" }], pairingInUse: "fp-nuc" });
+  const [nuc, other] = store.getState().machines;
+  expect(nuc).toMatchObject({ id: "fp-nuc", insecure: true });
+  expect(other.insecure).toBe(false);
+});

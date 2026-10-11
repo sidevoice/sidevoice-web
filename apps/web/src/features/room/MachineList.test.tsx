@@ -534,3 +534,23 @@ test("this computer's machine is marked in the list; stopped, it says Start brin
   expect(screen.getByText(/does not start when you sign in\. Start it here/)).toBeInTheDocument();
 });
 
+
+test("a machine paired without encryption says so on its page, with why, and its entry carries a sign heard with its name", async () => {
+  actions();
+  const remote = { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 }, "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } };
+  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8765"], rv: null }), paired()], { remoteHostStatus: remote });
+  await act(async () => { entry("Lab box").click(); });
+  const page = screen.getByRole("region", { name: "Lab box" });
+  const badge = within(page.querySelector("header")!).getByText("Not encrypted");
+  expect(badge.closest(".ui-badge")).toHaveAttribute("data-tone", "warning");
+  expect(badge.closest(".ui-badge")!.querySelector("svg")).not.toBeNull();
+  expect(within(page).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
+  // In the list, a sign after the name (which gives way, the sign never), and in words to a screen reader.
+  expect(entry("Lab box").querySelector(".machine-nav-name + .machine-nav-insecure svg")).not.toBeNull();
+  expect(entry("Lab box").getAttribute("aria-label")).toMatch(/^Lab box, not encrypted, /);
+  // One paired over https says nothing of the kind.
+  expect(entry("NUC").querySelector(".machine-nav-insecure")).toBeNull();
+  expect(entry("NUC").getAttribute("aria-label")).not.toMatch(/not encrypted/);
+  await act(async () => { entry("NUC").click(); });
+  expect(screen.queryByText("Not encrypted")).toBeNull();
+});
