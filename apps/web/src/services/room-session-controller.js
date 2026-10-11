@@ -1363,6 +1363,23 @@ async function testProviderKey(provider){
  const catalogs=await models.catalogs();
  roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
+// A key that the provider refuses is not kept: tried first where the host can (`testCredential`), else kept, checked,
+// and taken back when the provider refuses it and there was none before. A refusal throws its code, and the provider's
+// words; any other trouble (no credit, too many requests, unreachable) keeps the key and the card says it.
+const KEY_REFUSALS=new Set(['credential-rejected','listing-not-permitted']);
+async function connectProviderKey(provider,key){
+ const refused=reason=>Object.assign(Error(reason.code),{code:reason.code,detail:reason.detail??''});
+ const models=await modelCatalogs();
+ if(models.testCredential){
+  const reason=await models.testCredential(provider,key);
+  if(reason&&KEY_REFUSALS.has(reason.code))throw refused(reason);
+  await saveProviderKey(provider,key);return;
+ }
+ const had=state.providerKeys[provider]===true;
+ await saveProviderKey(provider,key);
+ const status=state.voiceCatalogue.catalogs.find(catalog=>catalog.id===provider)?.status;
+ if(status?.reason&&KEY_REFUSALS.has(status.reason.code)){if(!had)await saveProviderKey(provider,null);throw refused({...status.reason,detail:status.detail})}
+}
 async function saveProviderKey(provider,key){
  let models;
  try{models=await modelCatalogs();await models.setCredential(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
@@ -1414,6 +1431,7 @@ window.sidevoiceActions={
  skipReply,
  editVoice,
  saveProviderKey,
+ connectProviderKey,
  testProviderKey,
  loadVoiceCatalogue,
  replayReply,

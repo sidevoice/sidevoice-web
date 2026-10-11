@@ -22,7 +22,10 @@
  *   hasCredential(provider: string): Promise<boolean>,
  *   refresh?(provider: string): Promise<void>,
  *   uninstall?(model: string): Promise<void>,
+ *   testCredential?(provider: string, key: string): Promise<CatalogStatus['reason'] | null>,
  * }} ModelCatalogs
+ *   `testCredential`, where the host can, asks the provider with a key without keeping it: what it said against it
+ *   (its catalogue's reason), or null when it took it.
  *   `uninstall`, where the engine has it, takes a model off this device: every build of it.
  */
 
@@ -39,9 +42,13 @@ const KEY_PREFIX = 'sidevoice.provider-key.';
  * @param {Storage | undefined} [storage]
  */
 export function localStorageCredentials(storage = globalThis.localStorage) {
+  /** Keys being tried, by provider: read in place of the kept one while a try lasts, and never stored. */
+  const trying = new Map();
   return {
     /** @param {string} provider */
-    get: (provider) => storage?.getItem(KEY_PREFIX + provider) ?? null,
+    get: (provider) => trying.get(provider) ?? storage?.getItem(KEY_PREFIX + provider) ?? null,
+    /** A key read instead of the kept one until `null` ends the try (`testCredential`). @param {string} provider @param {string | null} key */
+    trial: (provider, key) => { if (key == null) trying.delete(provider); else trying.set(provider, key); },
     /** @param {string} provider @param {string | null} key */
     set: (provider, key) => (key == null ? storage?.removeItem(KEY_PREFIX + provider) : storage?.setItem(KEY_PREFIX + provider, key)),
   };
@@ -84,7 +91,7 @@ function failed(error) {
  * (a provider with no key, say) is listed with none, and its status says why: when the catalogue itself gave no
  * reason, the failure of its listing is the reason.
  * @param {import('@sidevoice/engine').WebEngine} engine
- * @param {{get(provider: string): string | null, set(provider: string, key: string | null): void}} credentials
+ * @param {{get(provider: string): string | null, set(provider: string, key: string | null): void, trial?(provider: string, key: string | null): void}} credentials
  * @returns {ModelCatalogs}
  */
 export function engineCatalogs(engine, credentials) {
@@ -112,6 +119,21 @@ export function engineCatalogs(engine, credentials) {
     // Asks the provider again, past any list kept: what a test of its key needs.
     async refresh(provider) {
       await engine.catalogs().find((catalog) => catalog.id === provider)?.refresh();
+    },
+    // The provider asked with `key` in place of the kept one, then asked again with the kept one: nothing is kept.
+    async testCredential(provider, key) {
+      const catalog = engine.catalogs().find((entry) => entry.id === provider);
+      if (!catalog || !credentials.trial) return null;
+      credentials.trial(provider, key.trim());
+      try {
+        await catalog.refresh().catch(() => undefined);
+        const status = await catalog.status().catch(failed);
+        const listed = await /** @type {() => Promise<unknown[]>} */ (/** @type {unknown} */ (catalog.models.bind(catalog)))().then(() => null, failed);
+        return status.reason ?? listed?.reason ?? null;
+      } finally {
+        credentials.trial(provider, null);
+        await catalog.refresh().catch(() => undefined);
+      }
     },
   };
 }

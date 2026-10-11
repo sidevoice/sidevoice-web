@@ -106,3 +106,22 @@ test("on the web a model is taken off this device through the engine, every buil
   await engineCatalogs(engine, localStorageCredentials(memory().storage)).uninstall!("whisper-base");
   expect(seen).toEqual([["whisper-base"]]);
 });
+
+test("a key is tried with the provider without being kept: the engine reads it during the try, then the kept one again", async () => {
+  const { stored, storage } = memory();
+  stored.set("sidevoice.provider-key.openai", "sk-old");
+  const credentials = localStorageCredentials(storage);
+  const seen: (string | null)[] = [];
+  const catalog = {
+    id: "openai",
+    refresh: async () => void seen.push(credentials.get("openai")),
+    status: async () => (credentials.get("openai") === "sk-bad" ? { stale: false, reason: { code: "credential-rejected" } } : { stale: false }),
+    models: async () => [],
+  };
+  const catalogs = engineCatalogs({ catalogs: () => [catalog] } as unknown as WebEngine, credentials);
+  expect(await catalogs.testCredential!("openai", " sk-bad ")).toEqual({ code: "credential-rejected" });
+  expect(seen).toEqual(["sk-bad", "sk-old"]);
+  expect(stored.get("sidevoice.provider-key.openai")).toBe("sk-old");
+  expect(await catalogs.testCredential!("openai", "sk-good")).toBeNull();
+  expect(stored.get("sidevoice.provider-key.openai")).toBe("sk-old");
+});

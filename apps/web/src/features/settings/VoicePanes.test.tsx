@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SlotPane, TurnChoices } from "./VoiceSettings";
 import { ProviderKeys } from "./ProviderKeys";
 import { StorageBlockedBanner } from "./StorageBlockedBanner";
@@ -92,46 +92,59 @@ test("catalogues the engine could not give say why and can be asked again", () =
   expect(actions.loadVoiceCatalogue).toHaveBeenCalled();
 });
 
-test("in a browser the key pane warns where the key lives and to cap the spend; in the app it names the keychain", () => {
+test("in a browser one line says where the key lives and to cap the spend; in the app it names the keychain", () => {
   renderPane("keys");
-  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/in this browser, unencrypted/);
+  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/unencrypted in this browser/);
   expect(document.getElementById("provider-keys-where")).toHaveTextContent(/spending limit/);
   cleanup();
   renderPane("keys", { inApp: true });
   expect(document.getElementById("provider-keys-where")).toHaveTextContent(/system keychain/);
 });
 
-test("each provider is a row with its state: one without a key is added in place, one with a key is connected, its last four shown", async () => {
+test("each provider is a card: Connect opens the key in place, Test and save keeps it, and connected it shows a check, the last four, Replace and Remove", async () => {
   const { actions, store } = renderPane("keys");
-  const rows = [...document.querySelectorAll(".provider-row")];
-  expect(rows.map((row) => [row.getAttribute("data-provider"), row.getAttribute("data-state")])).toEqual([["elevenlabs", "connected"], ["openai", "absent"]]);
-  expect(rows[0]).toHaveTextContent("Connected");
-  expect(rows[1]).toHaveTextContent("Not connected");
-  // OpenAI: its key is added in place — where to get one, the field hidden, and Connect.
-  fireEvent.click(screen.getByRole("button", { name: "Add key" }));
+  const cards = [...document.querySelectorAll(".provider-card")];
+  expect(cards.map((card) => [card.getAttribute("data-provider"), card.getAttribute("data-state")])).toEqual([["elevenlabs", "connected"], ["openai", "absent"]]);
+  expect(cards[0]).toHaveTextContent("Connected");
+  expect(within(cards[0] as HTMLElement).getByRole("button", { name: "Replace the ElevenLabs key" })).toBeInTheDocument();
+  expect(within(cards[0] as HTMLElement).getByRole("button", { name: "Remove the ElevenLabs key" })).toBeInTheDocument();
+  // No key field until asked for.
+  expect(document.getElementById("provider-key-openai")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
   const field = document.getElementById("provider-key-openai") as HTMLInputElement;
   expect(field.type).toBe("password");
   expect(screen.getByRole("link", { name: /Get a key at OpenAI/ })).toHaveAttribute("href", "https://platform.openai.com/api-keys");
   fireEvent.change(field, { target: { value: " sk-test-7f3a " } });
+  expect(document.getElementById("provider-key-save-openai")).toHaveTextContent("Test and save");
   await act(async () => { fireEvent.click(document.getElementById("provider-key-save-openai")!); });
   expect(actions.saveProviderKey).toHaveBeenCalledWith("openai", "sk-test-7f3a");
   act(() => store.patch({ providerKeys: { openai: true, elevenlabs: true } }));
-  expect(document.querySelector(".provider-row[data-provider='openai']")).toHaveTextContent("key ending in 7f3a");
-  // Its menu (replace, manage, remove after asking) is Radix's, which jsdom cannot open: the browser checks it.
-  expect(screen.getByRole("button", { name: "More for OpenAI" })).toBeInTheDocument();
+  expect(document.querySelector(".provider-card[data-provider='openai'] .provider-card-masked")).toHaveTextContent("••••7f3a");
   cleanup();
   renderPane("keys", { voiceCatalogue: { state: "ready", catalogs: [catalogs[0]], error: "" } });
   expect(document.getElementById("provider-keys-none")).toBeInTheDocument();
 });
 
+test("a key the provider refuses on Test and save is not kept, and the form says why in the provider's words", async () => {
+  const { actions } = renderPane("keys");
+  const connect = vi.fn().mockRejectedValue(Object.assign(new Error("credential-rejected"), { code: "credential-rejected", detail: "invalid_api_key" }));
+  window.sidevoiceActions = { ...actions, connectProviderKey: connect } as unknown as typeof window.sidevoiceActions;
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+  fireEvent.change(document.getElementById("provider-key-openai")!, { target: { value: "sk-bad" } });
+  await act(async () => { fireEvent.click(document.getElementById("provider-key-save-openai")!); });
+  expect(connect).toHaveBeenCalledWith("openai", "sk-bad");
+  expect(document.querySelector(".provider-card[data-provider='openai']")).toHaveTextContent("OpenAI didn't accept the key: it was revoked or mistyped. invalid_api_key");
+  expect(document.getElementById("provider-key-openai")).toBeInTheDocument();
+});
+
 test("a kept key the provider refused says so, and offers to replace it", () => {
   const refused = catalogs.map((catalog) => catalog.id === "elevenlabs" ? { ...catalog, status: { stale: false, reason: { code: "credential-rejected", params: {} } } } : catalog) as CatalogView[];
   renderPane("keys", { voiceCatalogue: { state: "ready", catalogs: refused, error: "" } });
-  const row = document.querySelector(".provider-row[data-provider='elevenlabs']")!;
-  expect(row).toHaveAttribute("data-state", "rejected");
-  expect(row).toHaveTextContent("Key rejected");
-  expect(row).toHaveTextContent("didn't accept the key");
-  expect(row.querySelector("button")).toHaveTextContent("Replace key");
+  const card = document.querySelector(".provider-card[data-provider='elevenlabs']")!;
+  expect(card).toHaveAttribute("data-state", "rejected");
+  expect(card).toHaveTextContent("Key rejected");
+  expect(card).toHaveTextContent("didn't accept the key");
+  expect(within(card as HTMLElement).getByRole("button", { name: "Replace the ElevenLabs key" })).toBeInTheDocument();
 });
 
 test("the providers are the catalogues: while they load it says so, and when they could not be read it says why, never an empty list", () => {

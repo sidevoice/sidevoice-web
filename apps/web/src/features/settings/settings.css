@@ -92,3 +92,32 @@
 .downloaded-model-size { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 .downloaded-model .provider-remove { margin: 0; }
 .downloaded-model-error { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-danger); }
+
+/* Providers as cards: the mark, the name and what it is for, and Connect; connected, the check, the key's last four,
+ * Replace and Remove; the key's form opening in the card. Where keys are kept, in one line above them. */
+.provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0 0 var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-keys-where svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
+.provider-cards { display: grid; gap: var(--sv-space-3); }
+.provider-card { display: grid; gap: var(--sv-space-3); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); }
+.provider-card-main { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.provider-card .provider-mark { width: 40px; height: 40px; border-radius: var(--sv-radius-md); }
+.provider-card-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.provider-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
+.provider-card-purpose { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-card-key { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sv-space-2) var(--sv-space-3); padding-inline-start: 52px; }
+.provider-card-status { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
+.provider-card-status .ui-badge svg { width: 12px; height: 12px; }
+.provider-card-masked { font-size: var(--sv-font-sm); letter-spacing: .04em; color: var(--sv-text-muted); }
+.provider-card-actions { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
+.provider-card-problem { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; padding-inline-start: 52px; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.provider-card-problem svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
+.provider-card[data-state="rejected"] .provider-card-problem svg, .provider-card[data-state="unreadable"] .provider-card-problem svg { color: var(--sv-danger); }
+.provider-card-detail { color: var(--sv-text-muted); }
+.provider-card > .provider-key, .provider-card > .provider-remove { margin: 0 0 0 52px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.provider-card .provider-key-actions .provider-key-link { margin-inline-end: auto; }
+.provider-card-note { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
+.provider-card-note:empty { display: none; }
+@media (max-width: 640px) {
+  .provider-card-key, .provider-card-problem { padding-inline-start: 0; }
+  .provider-card > .provider-key, .provider-card > .provider-remove { margin-inline-start: 0; }
+}

@@ -164,6 +164,8 @@ export interface SidevoiceActions {
   editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]> & { build?: string | null }; tts?: Partial<DeviceVoiceSettings["tts"]> & { build?: string | null }; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number; turn_model?: string }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
   saveProviderKey(provider: string, key: string | null): Promise<void>;
+  /** A key tried with the provider and kept only when it takes it; a refusal throws its `code` and `detail`. */
+  connectProviderKey?(provider: string, key: string): Promise<void>;
   /** Asks a provider again about its key, and reads the catalogues with what it said. */
   testProviderKey?(provider: string): Promise<void>;
   /** Reads the engine's catalogues, and which providers have a key, again. */
