@@ -538,7 +538,7 @@ function pairingRefused(fp,{call=false}={}){
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
 async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
- const t=hostTranslator(),defaultName=currentDeviceName(where=>t('pair.deviceName',{where}));
+ const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t(kind==='app'?'pair.deviceNameApp':'pair.deviceNameBrowser',params));
  const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch,insecure});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
@@ -645,6 +645,10 @@ async function revokeLocalHostDevice(id){
 // revoke another (never itself: that is forgetting the machine).
 async function machineDevices(fp){return deviceRows(await hostApi(fp,'/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'}))}
 async function revokeMachineDevice(fp,id){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}})}
+// A device renamed in a machine's list: the machine keeps its name (PATCH, sidevoice-web #75; a contract gap in core).
+const renameBody=name=>({method:'PATCH',headers:{'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({name:String(name).trim().slice(0,60)})});
+async function renameMachineDevice(fp,id,name){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
+async function renameLocalHostDevice(id,name){await localHostApi('/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
 function callProtocols(){const token=pairingInUse(pairings)?.token;if(!token)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+token]}
 async function reselectRemembered(){
@@ -1561,6 +1565,8 @@ window.sidevoiceActions={
  pairDevice,
  localHostDevices,
  revokeLocalHostDevice,
+ renameLocalHostDevice,
+ renameMachineDevice,
  machineDevices,
  revokeMachineDevice,
  openPairing:()=>openPairing(),

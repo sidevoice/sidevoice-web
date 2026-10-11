@@ -221,6 +221,9 @@ export interface SidevoiceActions {
   revokeLocalHostDevice?(id: string): Promise<void>;
   machineDevices?(fp: string): Promise<HostDeviceView[]>;
   revokeMachineDevice?(fp: string, id: string): Promise<void>;
+  /** Renames a device in a machine's list (this computer's, or a paired machine's): the machine keeps the name. */
+  renameLocalHostDevice?(id: string, name: string): Promise<void>;
+  renameMachineDevice?(fp: string, id: string, name: string): Promise<void>;
 }
 
 /** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the
