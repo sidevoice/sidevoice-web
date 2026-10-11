@@ -8,9 +8,8 @@ import { NativeSelect } from "../../components/ui/NativeSelect";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import { useVariant } from "../../lib/variants";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
-import { MACHINES_LAYOUT, MachineList, MachineNav } from "../room/MachineList";
+import { MachineList, MachineNav } from "../room/MachineList";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
@@ -123,7 +122,6 @@ function Pane({ id, current, children }: { id: string; current: string; children
 
 export function SettingsDialog() {
   const t = hostTranslator();
-  const machinesLayout = useVariant("machines", MACHINES_LAYOUT);
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
   const waits = useVoiceReadiness();
@@ -145,12 +143,13 @@ export function SettingsDialog() {
           <form id="language-form" className="settings-layout">
             <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
               {SECTIONS.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
-                aria-current={section.id === current ? section.id === "machines" && machinesLayout === "c" ? "true" : "page" : undefined} onClick={() => show(section.id)}>
+                aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
+                onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                 {section.icon}<span>{t(section.label)}</span>
                 {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>
-              {/* Machines as Paseo's settings lay them out (VARIANTS machines C): the machine and its parts under it. */}
-              {section.id === "machines" && machinesLayout === "c" && <MachineNav current={current === "machines"} />}
+              {/* Each machine under Machines, and Add a machine after them. */}
+              {section.id === "machines" && <MachineNav current={current === "machines"} />}
               </Fragment>)}
             </nav>
             <div className="settings-content">

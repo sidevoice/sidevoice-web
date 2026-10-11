@@ -27,8 +27,8 @@ export interface SessionFacts {
  hostAgents: Record<string, HostAgentsState>; settingsAgentRequest: SettingsAgentRequest | null;
   /** The section Settings shows. */
   settingsSection: string;
-  /** Machines laid out as Settings' sub-items (VARIANTS machines C): the machine picked, and its part shown. */
-  machinesView: { machine: string | null; part: import('../features/room/MachineList').MachinePart };
+  /** The machine whose page Settings → Machines shows (MachineNav); null is the first. */
+  machinesView: { machine: string | null };
  localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number}>;
  /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */

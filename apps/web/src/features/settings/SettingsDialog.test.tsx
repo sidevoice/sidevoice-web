@@ -33,7 +33,7 @@ function open(draftModel: string) {
 
 test("the sections are General, Transcription, Voice, Call, Providers, Machines and Advanced, one showing at a time", () => {
   open("whisper-base");
-  expect([...document.querySelectorAll(".settings-nav button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
+  expect([...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
   fireEvent.click(document.getElementById("settings-advanced")!);
   expect(document.getElementById("pane-general")).toHaveAttribute("hidden");

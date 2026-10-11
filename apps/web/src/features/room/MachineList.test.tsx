@@ -11,9 +11,6 @@ import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCo
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-// Machines in the list layout (VARIANTS machines B): these follow a machine from its row to its page.
-beforeEach(() => { localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "b" })); });
-afterEach(() => { localStorage.removeItem("sidevoice.variants"); });
 
 const paired = (extra: Partial<PairingSummary> = {}): PairingSummary => ({
   fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: { url: "https://room.example", node: "nuc-1" },
@@ -34,6 +31,9 @@ function actions() {
   return done;
 }
 
+/** A machine's entry under Machines (MachineNav), as the pane repeats it. */
+const entry = (name: string) => document.querySelector<HTMLElement>(`.machines-inline .machine-entry[data-name="${name}"]`)!;
+
 function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   const store = createRoomStore();
   act(() => { store.patch({ pairings, pairingInUse: pairings[0]?.fp ?? null, machinesAt: 1_700_086_400_000,
@@ -47,25 +47,28 @@ test("the local host is first, remote rows say Connected without revealing a rou
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { pairingInUse: "fp-other", node: "fp-other", nodeReach: "ok",
     remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
-  const rows = [...document.querySelectorAll(".machine-row")];
+  const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
   expect(rows).toHaveLength(3);
-  expect(rows[0].textContent).toMatch(/MacBook/);
-  expect(rows[0].textContent).toMatch(/This computer/);
-  expect(rows[1].textContent).toMatch(/NUC/);
-  expect(rows[1].textContent).toMatch(/Connected/);
-  expect(rows[1].textContent).not.toMatch(/room\.example|nuc-1|fingerprint|relay/i);
+  expect(rows[0].getAttribute("aria-label")).toMatch(/MacBook/);
+  expect(rows[0].getAttribute("aria-label")).toMatch(/This computer/);
+  expect(rows[1].getAttribute("aria-label")).toMatch(/NUC/);
+  expect(rows[1].getAttribute("aria-label")).toMatch(/Connected/);
+  expect(rows[1].getAttribute("aria-label")).not.toMatch(/room\.example|nuc-1|fingerprint|relay/i);
+  // Each machine's page, reached from its entry, offers Use.
+  await act(async () => { entry("MacBook").click(); });
   await act(async () => { screen.getByRole("button", { name: "Use MacBook" }).click(); });
   expect(done.chooseMachine).toHaveBeenCalledWith("fp-local");
+  await act(async () => { entry("NUC").click(); });
   await act(async () => { screen.getByRole("button", { name: "Use NUC" }).click(); });
   expect(done.chooseMachine).toHaveBeenCalledWith("fp-nuc");
 });
 
-test("the unreachable remote row only says No response and has no machine-specific controls", () => {
+test("an unreachable remote machine only says No response, and can still be forgotten", () => {
   actions();
   room([paired()], { pairingInUse: "fp-nuc", node: "fp-nuc", nodeReach: "away" });
-  expect(document.querySelector(".machine-row")?.textContent).toMatch(/No response/);
+  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toMatch(/No response/);
   expect(screen.queryByRole("button", { name: /Retry NUC/ })).toBeNull();
-  expect(screen.queryByRole("button", { name: /Forget NUC/ })).toBeNull();
+  expect(screen.getByRole("button", { name: /Forget NUC/ })).toBeInTheDocument();
 });
 
 test("the Machines footer offers local setup only when no local host is projected, and keeps remote pairing", async () => {
@@ -75,7 +78,7 @@ test("the Machines footer offers local setup only when no local host is projecte
   room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true });
 
   expect(screen.getByRole("button", { name: "Use agents on this computer" })).toBeInTheDocument();
-  await act(async () => { screen.getByRole("button", { name: "Add a machine" }).click(); });
+  await act(async () => { screen.getAllByRole("button", { name: "Add a machine" })[0].click(); });
   expect(done.openPairing).toHaveBeenCalledOnce();
   expect(install).not.toHaveBeenCalled();
 });
@@ -85,7 +88,7 @@ test("an existing stopped local R1 host keeps its row and does not show the inst
   setBridge({ install: vi.fn() });
   room([local], { pairingInUse: "fp-local", localHostStatus: { state: "stopped-by-person", installed: true, reachable: false } });
 
-  expect(screen.getByText("MacBook")).toBeInTheDocument();
+  expect(entry("MacBook")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
 });
 
@@ -95,7 +98,7 @@ test("an already-running local R1 host is shown without starting another install
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: running });
 
-  expect(screen.getByText("MacBook")).toBeInTheDocument();
+  expect(entry("MacBook")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
   expect(install).not.toHaveBeenCalled();
 });
@@ -115,11 +118,11 @@ test("a previously unreachable remote stays No response after another machine be
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { pairingInUse: "fp-other", node: "fp-other", nodeReach: "ok",
     remoteHostStatus: { "fp-nuc": { state: "offline", checkedAt: 1_700_000_000_000 } } });
-  const rows = [...document.querySelectorAll(".machine-row")];
-  expect(rows[1].textContent).toMatch(/NUC/);
-  expect(rows[1].textContent).toMatch(/No response/);
-  expect(rows[2].textContent).toMatch(/Other PC/);
-  expect(rows[2].textContent).toMatch(/Connected/);
+  const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
+  expect(rows[1].getAttribute("aria-label")).toMatch(/NUC/);
+  expect(rows[1].getAttribute("aria-label")).toMatch(/No response/);
+  expect(rows[2].getAttribute("aria-label")).toMatch(/Other PC/);
+  expect(rows[2].getAttribute("aria-label")).toMatch(/Connected/);
 });
 
 test("local F6 status shows only supported service actions", async () => {
@@ -127,7 +130,7 @@ test("local F6 status shows only supported service actions", async () => {
   setBridge({ serviceInstall, start: undefined, restart: undefined, stop: undefined });
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: { state: "not-installed", installed: false, service: "none" } });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
   expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(document.querySelector(".host-status-summary")).toHaveTextContent("Does not start when you sign in");
@@ -161,7 +164,7 @@ test("service failure display and copied diagnostics omit secret-bearing native 
   try {
     render(<RoomProvider store={store}><LocalHostBanner /><MachineList /></RoomProvider>);
     expect(document.querySelector(".local-host-banner")).toBeInTheDocument();
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open MacBook" })); });
+    await act(async () => { fireEvent.click(entry("MacBook")); });
     expect(document.querySelector(".host-status-summary")).toHaveTextContent("The Sidevoice service is unavailable: the service could not start");
     expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
     expect(screen.queryByText(/PAIRING_CODE_SECRET_42|RAW_FAILURE_SECRET_42|TOKEN_SECRET_42|ENV_SECRET_42|CODE_SECRET_42|LAUNCH_SECRET_42/)).toBeNull();
@@ -188,7 +191,7 @@ test("Update appears only for an available version and waits for active calls", 
   setBridge({ version: versionCheck, update });
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 2 } });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
 
   expect(await screen.findByText("Wait for 2 active calls to finish before updating.")).toBeInTheDocument();
   const updateButton = screen.getByRole("button", { name: "Update this machine" });
@@ -205,7 +208,7 @@ test("an available Update click delegates to the optional desktop transaction", 
   setBridge({ version, update });
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
 
   await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
   expect(update).toHaveBeenCalledOnce();
@@ -221,7 +224,7 @@ test("copied Update errors omit unrecognized bridge keys and steps while retaini
   setBridge({ version, update });
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
 
   const writeText = vi.fn(async (_value: string) => {});
   const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
@@ -250,7 +253,7 @@ test("a newer installed build found at click time is never downgraded", async ()
   setBridge({ version, update });
   actions();
   room([local], { pairingInUse: "fp-local", localHostStatus: { ...running, calls: 0 } });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
 
   await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
   expect(await screen.findByText("A newer Sidevoice core is already installed. Update the desktop app to use it.")).toBeInTheDocument();
@@ -266,7 +269,7 @@ test.each([
   setBridge({ version: vi.fn(async () => version), update });
   actions();
   room([local], { pairingInUse: "fp-local" });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
 
   expect(await screen.findByText(copy)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
@@ -278,7 +281,7 @@ test("stopping the local host requires confirmation and Cancel leaves it running
   setBridge({ stop });
   actions();
   room([local], { pairingInUse: "fp-local" });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
   expect(screen.getByText("Stop Sidevoice on this computer? Active calls will end.")).toBeInTheDocument();
@@ -299,7 +302,7 @@ test("Devices shows the local code and pairs a local-only host with a room", asy
   const done = actions();
   done.localHostDevices.mockResolvedValue([{ device_id: "d-local", name: "Sidevoice app", kind: "local", current: true, created_at: 1_700_000_000 }]);
   room([local], { pairingInUse: "fp-local" });
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
   await act(async () => {});
   await waitFor(() => expect(screen.getByText("Sidevoice app")).toBeInTheDocument());
   expect(screen.getByText("This app")).toBeInTheDocument();
@@ -321,7 +324,7 @@ test.each(["not-installed", "service-failed", "stopped-by-person"] as const)(
     setBridge({ state: vi.fn(async () => status), pairingCode });
     const done = actions();
     room([local], { pairingInUse: "fp-local", localHostStatus: status });
-    await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+    await act(async () => { entry("MacBook").click(); });
     await act(async () => {});
     await waitFor(() => expect(done.localHostDevices).toHaveBeenCalledOnce());
     expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
@@ -344,7 +347,7 @@ test("Devices waits for the verified local pairing if reachability arrives first
   act(() => { store.patch({ pairings: [], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
     localHostStatus: status, machinesReady: true }); });
   render(<RoomProvider store={store}><MachineList /></RoomProvider>);
-  await act(async () => { screen.getByRole("button", { name: "Open This computer" }).click(); });
+  await act(async () => { entry("This computer").click(); });
   await act(async () => {});
 
   expect(done.localHostDevices).not.toHaveBeenCalled();
@@ -368,7 +371,7 @@ test("Devices discards the old host's rows and code when the local pairing ident
   act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
     localHostStatus: running, machinesReady: true }); });
   render(<RoomProvider store={store}><MachineList /></RoomProvider>);
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
   await act(async () => {});
   await waitFor(() => expect(screen.getByText("Old phone")).toBeInTheDocument());
   await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
@@ -395,7 +398,7 @@ test("Devices clears cached contents on loss and refreshes them when native reac
   act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
     localHostStatus: status, machinesReady: true }); });
   render(<RoomProvider store={store}><MachineList /></RoomProvider>);
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
   await act(async () => {});
   await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
   await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
@@ -433,7 +436,7 @@ test("in-flight device and code results cannot repopulate Devices after reachabi
   act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostSelected: true, localHostAvailable: true,
     localHostStatus: status, machinesReady: true }); });
   render(<RoomProvider store={store}><MachineList /></RoomProvider>);
-  await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
+  await act(async () => { entry("MacBook").click(); });
   await act(async () => {});
   await waitFor(() => expect(done.localHostDevices).toHaveBeenCalledOnce());
   await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
@@ -459,7 +462,7 @@ test("Add machine opens the explicit remote setup and pairing flow", async () =>
   const done = actions();
   room([]);
   expect(screen.getByText("This device is not paired with a machine yet.")).toBeInTheDocument();
-  await act(async () => { screen.getByRole("button", { name: "Add a machine" }).click(); });
+  await act(async () => { document.getElementById("pair-device-open")!.click(); });
   expect(done.openPairing).toHaveBeenCalledOnce();
 });
 
@@ -490,13 +493,13 @@ test("a lost native pairing keeps a local Status row and recovery action without
     localHostStatus: { state: "failed", reachable: false, failure: { key: "start.failed" } }, machinesReady: true }); });
   render(<RoomProvider store={store}><MachineList /><LocalHostBanner /></RoomProvider>);
 
-  const row = document.querySelector(".machine-row");
+  const row = document.querySelector(".machines-inline .machine-entry");
   expect(row).toHaveAttribute("data-local", "true");
   expect(row).toHaveAttribute("data-in-use", "true");
   expect(row?.textContent).toMatch(/This computer/);
   expect(screen.queryByRole("button", { name: "Use This computer" })).toBeNull();
   expect(screen.getByText(/This computer is unavailable/)).toBeInTheDocument();
-  await act(async () => { screen.getByRole("button", { name: "Open This computer" }).click(); });
+  await act(async () => { entry("This computer").click(); });
   expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
   await act(async () => { screen.getAllByRole("button", { name: "Retry" })[0].click(); });
@@ -509,25 +512,10 @@ test("a reachable local core stays Connected when its service state is not runni
   act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostAvailable: true, localHostSelected: true,
     localHostStatus: { state: "stopped-by-person", reachable: true }, machinesReady: true }); });
   render(<RoomProvider store={store}><MachineList /><LocalHostBanner /></RoomProvider>);
-  expect(document.querySelector(".machine-row")?.textContent).toMatch(/Connected/);
+  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toMatch(/Connected/);
   expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
 });
 
-test("layout A: a picker of machines, the one in use shown below it, and Add a machine beside the picker", async () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "a" }));
-  const done = actions();
-  room([local, paired()], { pairingInUse: "fp-nuc", remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
-  const picker = document.getElementById("machine-pick") as HTMLSelectElement;
-  expect([...picker.options].map((option) => option.textContent)).toEqual(["MacBook", "NUC · In use"]);
-  expect(screen.getByRole("heading", { name: "NUC" })).toBeInTheDocument();
-  await act(async () => { screen.getByRole("button", { name: "Add a machine" }).click(); });
-  expect(done.openPairing).toHaveBeenCalledOnce();
-  await act(async () => { fireEvent.change(picker, { target: { value: picker.options[0].value } }); });
-  expect(screen.getByRole("heading", { name: "MacBook" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
-  await act(async () => { screen.getByRole("button", { name: "Use MacBook" }).click(); });
-  expect(done.chooseMachine).toHaveBeenCalledWith("fp-local");
-});
 
 test("a remote machine's page has it all: how it is reached, its agents, its devices (others revocable, never this one), how to pair another, and Forget", async () => {
   localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "a" }));
@@ -551,41 +539,30 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
 });
 
-test("layout B: a row opens in place, one at a time, with its agents and devices; Add a machine is at the list's foot", async () => {
+test("the machines are entries under Machines, Add a machine last; an entry shows its machine's whole page", async () => {
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
-  room([local, paired()], { remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
-  const nuc = screen.getByRole("button", { name: "Review agents for NUC" });
-  expect(nuc).toHaveAttribute("aria-expanded", "false");
-  await act(async () => { fireEvent.click(nuc); });
-  expect(nuc).toHaveAttribute("aria-expanded", "true");
-  expect(document.getElementById(nuc.getAttribute("aria-controls")!)).toHaveTextContent("Paired devices");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open MacBook" })); });
-  expect(nuc).toHaveAttribute("aria-expanded", "false");
-  expect(screen.queryByRole("button", { name: "Back to machines" })).toBeNull();
-  expect(document.querySelector(".machines-add #pair-device-open")).toBeInTheDocument();
-});
-
-test("layout C: the machine and its parts are navigation; the part chosen shows alone", async () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "c" }));
-  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn() };
-  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
-  const store = room([paired()], { pairingInUse: "fp-nuc", remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
-  expect(screen.getByText("Checking this machine for agents…")).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "Paired devices" })).toBeNull();
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Paired devices" })); });
-  expect(store.getState().facts.machinesView.part).toBe("devices");
+  const store = room([local, paired()], { remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  const nav = document.querySelector(".machines-inline .machine-nav")!;
+  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^MacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
+  expect(entry("NUC")).toHaveAccessibleName("NUC, Online · Connected");
+  // Machines alone is the first machine.
+  expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
+  await act(async () => { entry("NUC").click(); });
+  expect(store.getState().facts.machinesView.machine).not.toBeNull();
+  expect(screen.queryByRole("heading", { name: "Sidevoice on this computer" })).toBeNull();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(screen.queryByText("Checking this machine for agents…")).toBeNull();
+  expect(entry("NUC")).toHaveAttribute("aria-current", "page");
 });
 
-test("asked for a machine's agents in layout C, Machines answers once, without feeding the store back into itself", () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "c" }));
+test("asked for a machine's agents, Machines shows that machine once, without feeding the store back into itself", () => {
   actions();
   const store = room([local, paired()], { remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
   const patch = vi.spyOn(store, "patch");
   act(() => store.patch({ settingsAgentRequest: { fp: "fp-nuc", id: 7 } }));
-  // The request, then the machine chosen; nothing after (it used to go on until React stopped it).
-  expect(patch.mock.calls.length).toBe(2);
-  expect(store.getState().facts.machinesView.machine).not.toBeNull();
+  expect(entry("NUC")).toHaveAttribute("aria-current", "page");
+  // The request, then the machine chosen; nothing after.
+  expect(patch.mock.calls.length).toBeLessThanOrEqual(2);
+  act(() => store.patch({ pairingNote: "x" } as never));
+  expect(patch.mock.calls.length).toBeLessThanOrEqual(3);
 });

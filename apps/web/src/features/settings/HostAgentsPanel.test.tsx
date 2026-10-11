@@ -10,8 +10,6 @@ import type { PairingSummary } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-// Machines in the list layout (VARIANTS machines B): these follow a machine from its row to its page.
-beforeEach(() => { localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "b" })); });
 afterEach(() => { localStorage.removeItem("sidevoice.variants"); });
 
 const known = (id = "codex", changes: Record<string, unknown> = {}) => ({
@@ -71,6 +69,8 @@ test("manual instructions come from the selected host and trigger four-second wa
 /** The menu's Settings entry, and the menu trigger that carries the notice. */
 const settingsEntry = () => document.getElementById("settings-open") as HTMLButtonElement;
 
+const entry = (name: string) => document.querySelector<HTMLElement>(`.machines-inline .machine-entry[data-name="${name}"]`);
+
 test("P11 pending notice on the Settings entry routes to its host's Agents screen", async () => {
   const store = createRoomStore();
   const host = pairing("fp-nuc", "NUC");
@@ -85,7 +85,7 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
-  expect(screen.getByRole("button", { name: /NUC/, expanded: true })).toBeInTheDocument();
+  expect(entry("NUC")).toHaveAttribute("aria-current", "page");
   expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Agents" })).toBeInTheDocument();
   expect(screen.getByText("Cursor")).toBeInTheDocument();
@@ -122,8 +122,9 @@ test("multiple pending hosts leave an explicit translated choice in Machines", a
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   await act(async () => { fireEvent.click(settingsEntry()); });
   expect(openAgentSettings).toHaveBeenCalledWith(null);
-  expect(screen.getByRole("button", { name: "Review agents for NUC" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Review agents for Laptop" })).toBeInTheDocument();
+  // Each machine under Machines, both marked as having agents waiting.
+  expect(entry("NUC")).toHaveTextContent("New agent");
+  expect(entry("Laptop")).toHaveTextContent("New agent");
 });
 
 test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", () => {
@@ -153,10 +154,10 @@ test("Not now clears that host's agent notice from the menu and machine views", 
   render(<RoomProvider store={store}><RoomHeader /><HostAgentsPanel fp={host.fp} /><MachineList /></RoomProvider>);
   const gear = settingsEntry();
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+  expect(entry("NUC")).toHaveTextContent("New agent");
+  fireEvent.click(screen.getAllByRole("button", { name: "Not now" })[0]);
   await vi.waitFor(() => expect(settingsEntry().querySelector(".settings-notice-dot")).not.toBeInTheDocument());
-  expect(screen.getByRole("button", { name: "Review agents for NUC" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Review agents for NUC" }).querySelector(".host-agent-dot")).not.toBeInTheDocument();
+  expect(entry("NUC")).not.toHaveTextContent("New agent");
 });
 
 test("a foreign Codex row exposes its host-provided replacement command and Copy without automatic actions", async () => {
