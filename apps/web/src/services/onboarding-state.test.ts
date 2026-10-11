@@ -8,8 +8,9 @@ import {
 
 const stt = { catalog: "local", model: "whisper-base", language: null };
 const tts = { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: "v1", speed: 1 };
+const basics = () => ({ ...emptyOnboardingRecord(), basics_done: true });
 const facts = (patch: Partial<ResumeFacts> = {}): ResumeFacts => ({
-  record: emptyOnboardingRecord(), canHostAgents: true, localReady: false, remoteReady: false,
+  record: basics(), canHostAgents: true, localReady: false, remoteReady: false,
   sttKey: trialKey(stt), ttsKey: trialKey(tts), ...patch,
 });
 function memory(fail: { set?: boolean; keep?: boolean } = {}) {
@@ -34,20 +35,25 @@ test("a tried setting keys the same however it was written, and differently once
   expect(trialKey(null)).toBeNull();
 });
 
-test("resume: where the agents run, then the machine, the agents, transcription, voice, ready", () => {
+test("resume: the basics, where the agents run, then the machine, the agents, transcription, voice, the end of turn, ready", () => {
+  expect(resumeOnboarding(facts({ record: emptyOnboardingRecord() }))).toBe("W0");
   expect(resumeOnboarding(facts())).toBe("W1");
   // A browser or a phone cannot run agents: it starts by pairing another machine.
   expect(resumeOnboarding(facts({ canHostAgents: false }))).toBe("W2r");
   // An npx machine already running here is the agents path, at its agents.
   expect(resumeOnboarding(facts({ localReady: true }))).toBe("W3");
-  const local = { ...emptyOnboardingRecord(), choice: "agents" as const };
+  const local = { ...basics(), choice: "agents" as const };
   expect(resumeOnboarding(facts({ record: local }))).toBe("W2");
   expect(resumeOnboarding(facts({ record: { ...local, agents_done: true }, localReady: true }))).toBe("W4");
-  const remote = { ...emptyOnboardingRecord(), choice: "remote" as const };
+  const remote = { ...basics(), choice: "remote" as const };
   expect(resumeOnboarding(facts({ record: remote }))).toBe("W2r");
   expect(resumeOnboarding(facts({ record: remote, remoteReady: true }))).toBe("W4");
-  const tried = { ...remote, trials: { stt: trialKey(stt)!, tts: trialKey(tts)! } };
+  const tried = { ...remote, trials: { stt: trialKey(stt)!, tts: trialKey(tts)! }, turn_done: true };
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true }))).toBe("W6");
+  // Chosen without a try counts the same; the end of turn is its own step.
+  const chosen = { ...remote, chosen: { stt: trialKey(stt)!, tts: trialKey(tts)! } };
+  expect(resumeOnboarding(facts({ record: chosen, remoteReady: true }))).toBe("W5");
+  expect(resumeOnboarding(facts({ record: { ...chosen, turn_done: true }, remoteReady: true }))).toBe("W6");
   // A setting changed since its try is tried again; a machine gone is paired again.
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true, ttsKey: trialKey({ ...tts, voice: "v2" }) }))).toBe("W4v");
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true, sttKey: null }))).toBe("W4");

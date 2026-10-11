@@ -11,7 +11,10 @@ import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHos
 import { ConnectorSteps } from "../pairing/ConnectorSteps";
 import { PairingCodeForm } from "../pairing/PairingDialog";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
-import { SpeechChoices, TranscriptionChoices } from "../settings/VoiceSettings";
+import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
+import { Appearance } from "../settings/SettingsDialog";
+import { Group, Row } from "../../components/ui/Card";
+import { NativeSelect } from "../../components/ui/NativeSelect";
 import { TryResult, useModelState, useVoiceTry, type ModelState, catalogueShown } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -21,32 +24,73 @@ import { useRoomStore } from "../../state/room-store";
 import type { OnboardingStep } from "../../services/onboarding-state";
 
 /* The first-run setup, one dialog over the room: of a fixed height, so nothing jumps between steps, and the whole
- * screen on a phone. Its progress groups are the approved ones: where you work, agents, transcription, voice, ready.
- * Transcription and voice are this device's settings (as in Settings → Voice), each tried for real before Continue:
- * the person speaks and sees the words, or hears a sentence they can edit. */
+ * screen on a phone. Its order is the operator's: the basics (appearance, the interface's and the person's
+ * languages), where the agents are (this computer prepared and its agents connected in one step, or another machine
+ * paired), transcription, voice, and when a turn ends. Transcription and voice are this device's settings (as in
+ * Settings); trying them is recommended, not required: Continue waits only for the chosen model to be ready. */
 
 const GROUPS: { key: HostMessageKey; steps: OnboardingStep[] }[] = [
-  { key: "wizard.group.where", steps: ["W1", "W2"] },
-  { key: "wizard.group.agents", steps: ["W3", "W2r"] },
+  { key: "wizard.group.basics", steps: ["W0"] },
+  { key: "wizard.group.where", steps: ["W1"] },
+  { key: "wizard.group.agents", steps: ["W2", "W3", "W2r"] },
   { key: "wizard.group.transcription", steps: ["W4"] },
   { key: "wizard.group.voice", steps: ["W4v"] },
+  { key: "wizard.group.call", steps: ["W5"] },
   { key: "wizard.group.ready", steps: ["W6"] },
 ];
 
+// Preparing this computer and connecting its agents are one step to the person: the same title through both.
 const TITLES: Record<OnboardingStep, HostMessageKey> = {
-  W1: "wizard.title.where", W2: "wizard.title.install", W2r: "wizard.title.pair", W3: "wizard.title.agents",
-  W4: "wizard.title.stt", W4v: "wizard.title.tts", W6: "wizard.title.ready",
+  W0: "wizard.title.basics", W1: "wizard.title.where", W2: "wizard.title.install", W2r: "wizard.title.pair", W3: "wizard.title.install",
+  W4: "wizard.title.stt", W4v: "wizard.title.tts", W5: "wizard.title.turn", W6: "wizard.title.ready",
 };
 
 const SAMPLE_MAX = 200;
 
 function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean): OnboardingStep | null {
+  if (step === "W1") return "W0";
   if (step === "W2" || step === "W3") return "W1";
-  if (step === "W2r") return canHostAgents ? "W1" : null;
+  if (step === "W2r") return canHostAgents ? "W1" : "W0";
   if (step === "W4") return path === "agents" ? "W3" : "W2r";
   if (step === "W4v") return "W4";
-  if (step === "W6") return "W4v";
+  if (step === "W5") return "W4v";
+  if (step === "W6") return "W5";
   return null;
+}
+
+/** The basics: how it looks, the interface's language and the one the person speaks; Automatic and System by default. */
+function BasicsStep({ t }: { t: HostTranslate }) {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const [language, setLanguage] = useState(() => window.sidevoiceActions?.interfaceLanguage?.() ?? "");
+  return <section className="wizard-basics">
+    <p>{t("wizard.basics.body")}</p>
+    <Group>
+      <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
+      <Row label={t("wizard.basics.uiLanguage")} htmlFor="wizard-ui-language">
+        <NativeSelect id="wizard-ui-language" value={language} onChange={(event) => { setLanguage(event.target.value); window.sidevoiceActions?.setInterfaceLanguage?.(event.target.value); }}>
+          <option value="">{t("wizard.languageAuto")}</option><option value="es">Español</option><option value="en">English</option>
+        </NativeSelect>
+      </Row>
+      <Row label={t("wizard.basics.speech")} description={t("wizard.basics.speechHint")} htmlFor="wizard-speech-language">
+        <NativeSelect id="wizard-speech-language" value={draft?.stt.language ?? ""} onChange={(event) => window.sidevoiceActions?.editVoice({ stt: { language: event.target.value || null } })}>
+          <option value="">{t("wizard.languageAuto")}</option><option value="es">Español</option><option value="en">English</option>
+        </NativeSelect>
+      </Row>
+    </Group>
+  </section>;
+}
+
+/** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience. */
+function TurnStep({ t }: { t: HostTranslate }) {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
+  useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return <section className="wizard-turn">
+    <p>{t("wizard.turnIntro")}</p>
+    {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
+      : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
+        : <TurnChoices draft={draft} />}
+  </section>;
 }
 
 /** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one. */
@@ -95,25 +139,25 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
         onChange={(event) => stage.setSample(event.target.value)} />
     </Field>}
     <div className="wizard-trial">
+      {trial.phase === "idle" && !onboarding.tried(task) && <p className="wizard-try-hint">{t("wizard.tryHint")}</p>}
       <TryResult task={task} trial={trial} t={t} />
       {onboarding.tried(task) && trial.phase !== "running" && <Button type="button" variant="ghost" size="sm" id="wizard-try-again" onClick={stage.again}>{t("wizard.trialAgain")}</Button>}
     </div>
   </section>;
 }
 
-/** The voice steps' footer action: the try (cancel while it runs), then Continue. The model is made ready in its own
- *  block above (ModelPrepare: download, cancel, retry), as in Settings; until it is, the try waits and says why. */
-function StageAction({ task, model, running, tried, disabled, onTry, onCancelTry, onContinue, t }: {
-  task: "stt" | "tts"; model: ModelState; running: boolean; tried: boolean; disabled: boolean;
+/** The voice steps' footer: the try, recommended (Cancel while it runs), and Continue, which waits only for the model to
+ *  be ready — made ready in its own block above (ModelPrepare), as in Settings — and never for a try. */
+function StageAction({ task, model, running, disabled, onTry, onCancelTry, onContinue, t }: {
+  task: "stt" | "tts"; model: ModelState; running: boolean; disabled: boolean;
   onTry(): void; onCancelTry(): void; onContinue(): void; t: HostTranslate;
 }) {
-  const waiting = !!model.model && !model.ready;
-  const [label, action, off] = running ? [t("wizard.cancelTrial"), onCancelTry, false]
-    : tried && !waiting ? [t("wizard.continue"), onContinue, false]
-      : [task === "stt" ? t("wizard.speak") : t("wizard.listen"), onTry, disabled || waiting];
+  const waiting = !model.model || !model.ready;
   return <>
     {waiting && <p className="ui-dialog-reason" id="wizard-stage-reason">{t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")}</p>}
-    <Button type="button" variant="primary" id="wizard-stage-action" disabled={off} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={action}>{label}</Button>
+    {running ? <Button type="button" variant="secondary" id="wizard-try" onClick={onCancelTry}>{t("wizard.cancelTrial")}</Button>
+      : <Button type="button" variant="secondary" id="wizard-try" disabled={disabled || waiting} onClick={onTry}>{task === "stt" ? t("wizard.speak") : t("wizard.listen")}</Button>}
+    <Button type="button" variant="primary" id="wizard-stage-action" disabled={waiting || running} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onContinue}>{t("wizard.continue")}</Button>
   </>;
 }
 
@@ -141,14 +185,15 @@ export function Wizard() {
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const tryAgain = () => void trial.run(stageTask === "stt" ? {} : { text: sample.trim(), language: draft?.stt.language || speechLanguage });
   const stage: StageTry = { ...trial, sample, setSample, again: tryAgain };
-  const stageTried = !!stageTask && onboarding.tried(stageTask);
+  // The end of turn waits for its model when it is the smart one, as the voice steps wait for theirs.
+  const turnModel = useModelState("end-of-turn", draft);
+  const turnWaits = !!turnModel.model && !turnModel.ready;
 
-  // W1's preselection: agents found here → here, else another machine; what the person picks wins.
+  // W1's preselection: this computer wherever it can host agents, else another machine; what the person picks wins.
   useEffect(() => {
-    if (touched.current || onboarding.record.choice || !onboarding.localAgentsScanned) return;
-    setChoice(onboarding.canHostAgents && onboarding.localAgents.length ? "agents" : "remote");
-  }, [onboarding.canHostAgents, onboarding.localAgentsScanned, onboarding.localAgents.length, onboarding.record.choice]);
-  useEffect(() => { if (!onboarding.canHostAgents && !choice) setChoice("remote"); }, [onboarding.canHostAgents, choice]);
+    if (touched.current || onboarding.record.choice) return;
+    setChoice(onboarding.canHostAgents ? "agents" : "remote");
+  }, [onboarding.canHostAgents, onboarding.record.choice]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -175,6 +220,18 @@ export function Wizard() {
 
   async function finishAgents() {
     if (await onboarding.markAgentsDone()) onboarding.goTo("W4");
+  }
+
+  async function finishBasics() {
+    if (await onboarding.markBasicsDone()) onboarding.goTo(onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? "W4" : "W2r");
+  }
+
+  async function finishStage(task: "stt" | "tts") {
+    if (await onboarding.markChosen(task)) onboarding.goTo(task === "stt" ? "W4v" : "W5");
+  }
+
+  async function finishTurn() {
+    if (await onboarding.markTurnDone()) onboarding.goTo("W6");
   }
 
   async function complete() {
@@ -222,8 +279,12 @@ export function Wizard() {
               : <p className="muted">{t("wizard.noAgents")}</p>}
         </div>}
       </section>}
-      {step === "W2" && <section>
+      {step === "W0" && <BasicsStep t={t} />}
+      {step === "W2" && <section className="wizard-prepare">
         <p>{t("localInstall.description")}</p>
+        {/* The step's own action, here: pressed, its progress shows in its place (downloading, preparing, starting…),
+            with what failed and Retry; once this computer answers, its agents follow in the same step. */}
+        {install.offered && <Button type="button" variant="primary" id="wizard-prepare" onClick={() => localHostInstallController.start("no-machine")}>{t("wizard.prepare")}</Button>}
         <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" />
         <Button type="button" variant="ghost" size="sm" className="wizard-alternative" onClick={() => void choosePath("remote")}>{t("wizard.installRemote")}</Button>
       </section>}
@@ -233,26 +294,26 @@ export function Wizard() {
         <PairingCodeForm idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
       {step === "W3" && <section>
+        <p>{t("wizard.agentsHere")}</p>
         {pairingInUse ? <HostAgentsPanel fp={pairingInUse} /> : null}
         {(!pairingInUse || (agents?.status === "ready" && agents.value?.agents.length === 0)) && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
       </section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
+      {step === "W5" && <TurnStep t={t} />}
       {step === "W6" && <section><p>{t("wizard.readyBody")}</p></section>}
     </div>
     <footer className="wizard-actions">
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
+      {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
-      {step === "W2" && (onboarding.localReady ? <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>
-        : install.offered && <Button type="button" variant="primary" onClick={() => localHostInstallController.start("no-machine")}>{t("localInstall.cta")}</Button>)}
+      {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
-      {step === "W3" && <>
-        <Button type="button" variant="ghost" tone="neutral" onClick={() => void finishAgents()}>{t("wizard.agentsSkip")}</Button>
-        <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>
-      </>}
-      {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"} tried={stageTried}
+      {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
+      {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"}
         disabled={!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim())}
-        onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => onboarding.goTo(stageTask === "stt" ? "W4v" : "W6")} t={t} />}
+        onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
+      {step === "W5" && <Button type="button" variant="primary" id="wizard-turn-continue" disabled={turnWaits} onClick={() => void finishTurn()}>{t("wizard.continue")}</Button>}
       {step === "W6" && <Button type="button" variant="primary" disabled={completing} onClick={() => void complete()}>
         {error ? t("wizard.retryCompletion") : t("wizard.enter")}
       </Button>}

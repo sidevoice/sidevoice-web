@@ -37,7 +37,7 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: ReactNode }[] = [
   { id: "advanced", label: "settings.section.advanced", icon: <AdvancedIcon /> },
 ];
 
-function Appearance({ t }: { t: HostTranslate }) {
+export function Appearance({ t }: { t: HostTranslate }) {
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const choose = (next: ThemePreference) => { setTheme(next); setThemePreference(next); };
   return <Segmented size="sm" label={t("settings.appearance")} value={theme} onChange={choose} items={[

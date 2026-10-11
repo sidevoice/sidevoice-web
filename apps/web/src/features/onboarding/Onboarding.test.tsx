@@ -9,9 +9,9 @@ import type { CatalogView } from "../../services/model-catalogs.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
-/* The first-run setup over the real room, in a browser: no agents here, so it pairs another machine, then tries this
- * device's transcription and voice for real (the actions stand in for the voice), and enters only once its completion
- * is stored. */
+/* The first-run setup over the real room, in a browser: the basics, then (no agents here) pairing another machine, this
+ * device's transcription and voice (trying them is suggested, not required; the actions stand in for the voice), when a
+ * turn ends, and it enters only once its completion is stored. */
 
 const CATALOGS = [{ id: "local", name: null, status: { stale: false }, models: [
   { id: "whisper-base", family: "whisper", capabilities: ["stt"], languages: ["es", "en"], voices: [], parametersM: 1, license: "MIT", installed: true, builds: [{ id: "whisper-base/int8", available: true, reasons: [] }] },
@@ -22,7 +22,8 @@ const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv:
 
 let actions: Record<string, ReturnType<typeof vi.fn>>;
 beforeEach(() => {
-  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  // Past the basics, unless a test is about them.
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
     openPairing: vi.fn(), chooseMachine: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
     tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?" }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
@@ -40,6 +41,7 @@ function room() {
 }
 const title = () => screen.getByRole("heading", { level: 2 });
 const stageAction = () => document.getElementById("wizard-stage-action") as HTMLButtonElement;
+const tryButton = () => document.getElementById("wizard-try") as HTMLButtonElement;
 const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], pairingInUse: NUC.fp, node: NUC.fp, nodeReach: "ok", rendezvous: "node" }));
 
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
@@ -55,34 +57,51 @@ test("a browser starts by pairing another machine, shown how to prepare it, and 
   expect(title()).toHaveTextContent("Set up transcription");
 });
 
-test("transcription and voice are this device's, each tried for real before Continue; a change asks for another try", async () => {
+test("the basics come first: appearance, the interface's language and the one the person speaks, Automatic by default", async () => {
+  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  actions.interfaceLanguage = vi.fn(() => "");
+  actions.setInterfaceLanguage = vi.fn();
+  room();
+  expect(title()).toHaveTextContent("The basics");
+  expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
+  expect((document.getElementById("wizard-ui-language") as HTMLSelectElement).value).toBe("");
+  expect((document.getElementById("wizard-speech-language") as HTMLSelectElement).value).toBe("");
+  fireEvent.change(document.getElementById("wizard-ui-language")!, { target: { value: "es" } });
+  expect(actions.setInterfaceLanguage).toHaveBeenCalledWith("es");
+  fireEvent.change(document.getElementById("wizard-speech-language")!, { target: { value: "en" } });
+  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { language: "en" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Continue" })); });
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).basics_done).toBe(true);
+  expect(title()).toHaveTextContent("Connect to your machine");
+});
+
+test("transcription and voice are this device's: trying them is recommended, and Continue does not wait for it", async () => {
   const store = room();
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
   // Source first, then the model, as in Settings → Voice.
   expect((document.getElementById("stt-source") as HTMLSelectElement).value).toBe("local");
-  expect(stageAction()).toHaveTextContent("Speak");
-  await act(async () => { fireEvent.click(stageAction()); });
+  expect(tryButton()).toHaveTextContent("Speak");
+  expect(document.querySelector(".wizard-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", { keep: true });
   expect(document.getElementById("stt-heard")).toHaveTextContent("hola, ¿me oyes?");
-  expect(stageAction()).toHaveTextContent("Continue");
-  // Another model is another setting: it is tried again before going on.
-  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "moonshine-tiny", language: null } } }));
-  await waitFor(() => expect(stageAction()).toHaveTextContent("Speak"));
   await act(async () => { fireEvent.click(stageAction()); });
-  fireEvent.click(stageAction());
 
   expect(title()).toHaveTextContent("Set up voice");
-  const sample = document.getElementById("wizard-sample") as HTMLTextAreaElement;
-  fireEvent.change(sample, { target: { value: "Probando la voz" } });
+  // Not tried: Continue goes on all the same.
+  expect(stageAction()).not.toHaveAttribute("aria-disabled");
   await act(async () => { fireEvent.click(stageAction()); });
-  // Transcription left to detect the language: the sample is said in the one this device speaks.
-  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", { text: "Probando la voz", language: "es", keep: true });
-  fireEvent.click(stageAction());
+
+  expect(title()).toHaveTextContent("When your turn ends");
+  expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
+  await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
 
   expect(title()).toHaveTextContent("Ready");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
-  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).completed_at).toBeGreaterThan(0);
+  const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);
+  expect(kept.completed_at).toBeGreaterThan(0);
+  expect(kept.trials.tts).toBeUndefined();
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
 });
 
@@ -90,13 +109,12 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   const store = room();
   paired(store);
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
-  await act(async () => { fireEvent.click(stageAction()); });
+  await act(async () => { fireEvent.click(tryButton()); });
   expect(screen.getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
-  expect(stageAction()).toHaveTextContent("Speak");
+  expect(title()).toHaveTextContent("Set up transcription");
   await act(async () => { fireEvent.click(stageAction()); });
-  fireEvent.click(stageAction());
   await act(async () => { fireEvent.click(stageAction()); });
-  fireEvent.click(stageAction());
+  await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
 
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key) => { if (key === ONBOARDING_STORAGE_KEY) throw new DOMException("blocked", "SecurityError"); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
@@ -119,7 +137,7 @@ test("put off, the setup leaves one action that resumes it where it stands", asy
   expect(title()).toHaveTextContent("Set up transcription");
 });
 
-test("a model not on this device is downloaded first, in its block as in Settings; the footer's try waits for it, saying why", async () => {
+test("a model not on this device is downloaded first, in its block as in Settings; the try and Continue wait for it, saying why", async () => {
   const store = room();
   const absent = CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id === "whisper-base"
     ? { ...model, installed: false, recommendedBuild: "whisper-base/int8", builds: [{ id: "whisper-base/int8", available: true, reasons: [], installed: false, downloadBytes: 148e6 }] } : model) }));
@@ -127,7 +145,7 @@ test("a model not on this device is downloaded first, in its block as in Setting
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
   expect(document.getElementById("stt-model-card")).toHaveTextContent(/Not downloaded\s*148 MB/);
-  expect(stageAction()).toHaveTextContent("Speak");
+  expect(tryButton()).toBeDisabled();
   expect(stageAction()).toHaveAttribute("aria-disabled", "true");
   expect(stageAction()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
   expect(document.getElementById("stt-language")).toBeNull();
@@ -138,6 +156,7 @@ test("a model not on this device is downloaded first, in its block as in Setting
   fireEvent.click(document.getElementById("stt-model-cancel")!);
   expect(actions.cancelVoiceInstall).toHaveBeenCalled();
   act(() => store.patch({ voiceInstall: null, voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
-  expect(stageAction()).toHaveTextContent("Speak");
+  expect(tryButton()).not.toBeDisabled();
+  expect(stageAction()).not.toHaveAttribute("aria-disabled");
   expect(document.getElementById("stt-language")).toBeInTheDocument();
 });

@@ -13,9 +13,9 @@ import {
 } from "../../services/onboarding-state";
 import { RoomStoreContext, useRoomStore, type RoomViewState } from "../../state/room-store";
 
-/* The first-run setup over the real room: where the agents run (W1), this computer prepared (W2) or another machine
- * paired (W2r), the agents connected (W3), transcription (W4) and voice (W4v) chosen and tried on this device, and
- * Ready (W6). Its own record says what the person answered; the machine, its pairing and the device's voice settings
+/* The first-run setup over the real room: the basics (W0: appearance, languages), where the agents run (W1), this
+ * computer prepared (W2) and its agents connected (W3), or another machine paired (W2r), transcription (W4) and voice
+ * (W4v) chosen on this device (trying them is suggested, not required), the end of turn (W5), and Ready (W6). Its own record says what the person answered; the machine, its pairing and the device's voice settings
  * say what is done, read live, so a step already achieved is never asked for again. */
 
 type ErrorKey = OnboardingStorageError["key"] | "onboarding.prerequisites";
@@ -39,6 +39,10 @@ interface OnboardingValue {
   goTo(step: OnboardingStep): void;
   setPath(path: "agents" | "remote"): Promise<boolean>;
   markAgentsDone(): Promise<boolean>;
+  markBasicsDone(): Promise<boolean>;
+  markTurnDone(): Promise<boolean>;
+  /** Records that the person went on with the settings being edited for `task`, tried or not. */
+  markChosen(task: "stt" | "tts"): Promise<boolean>;
   /** Records that the settings being edited for `task` worked. */
   markTried(task: "stt" | "tts"): Promise<boolean>;
   defer(): Promise<void>;
@@ -88,7 +92,7 @@ export function OnboardingProvider({ children, repository: given }: { children: 
   const [record, setRecord] = useState<OnboardingRecord>(initial.record);
   const [error, setError] = useState<ErrorKey | null>(initial.error as ErrorKey | null);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<OnboardingStep>("W1");
+  const [step, setStep] = useState<OnboardingStep>("W0");
   const [localAgents, setLocalAgents] = useState<OnboardingValue["localAgents"]>([]);
   const [localAgentsLoading, setLocalAgentsLoading] = useState(false);
   const [localAgentsScanned, setLocalAgentsScanned] = useState(false);
@@ -163,6 +167,12 @@ export function OnboardingProvider({ children, repository: given }: { children: 
     goTo: (next) => { setError(null); setStep(next); },
     setPath: (path) => persist({ choice: path, deferred_at: null }),
     markAgentsDone: () => persist({ agents_done: true }),
+    markBasicsDone: () => persist({ basics_done: true }),
+    markTurnDone: () => persist({ turn_done: true }),
+    markChosen(task) {
+      const key = draft ? trialKey(draft[task]) : null;
+      return key ? persist({ chosen: { [task]: key } }) : Promise.resolve(false);
+    },
     markTried(task) {
       const key = draft ? trialKey(draft[task]) : null;
       return key ? persist({ trials: { [task]: key } }) : Promise.resolve(false);

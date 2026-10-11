@@ -1,30 +1,38 @@
-/* The first-run setup's progress on this device: which way it went (agents here, or another machine), whether the
- * agents step was answered, when it was put off or finished, and which voice settings the person tried. It lives on
+/* The first-run setup's progress on this device: the basics (appearance, languages) seen, which way it went (agents
+ * here, or another machine), whether the agents step was answered, the transcription and voice chosen (and, apart, the
+ * ones the person tried: trying is optional), the end of turn chosen, and when it was put off or finished. It lives on
  * the device, like the voice settings it tries; the machine, its agents and its pairing keep their own state, and the
  * setup only reads them. Completion is written fail-closed: it counts only once it reads back. */
 
 export type OnboardingPath = "agents" | "remote";
-export type OnboardingStep = "W1" | "W2" | "W2r" | "W3" | "W4" | "W4v" | "W6";
+export type OnboardingStep = "W0" | "W1" | "W2" | "W2r" | "W3" | "W4" | "W4v" | "W5" | "W6";
 export type OnboardingTask = "stt" | "tts";
 
 export interface OnboardingRecord {
   version: 1;
+  /** The basics step (appearance, the interface's and the person's languages) was answered. */
+  basics_done: boolean;
   choice: OnboardingPath | null;
   agents_done: boolean;
+  /** The end of turn step was answered. */
+  turn_done: boolean;
   deferred_at: number | null;
   completed_at: number | null;
   /** Per voice slot, the key of the settings the person tried (`trialKey`): a changed setting is an untried one. */
   trials: Partial<Record<OnboardingTask, string>>;
+  /** Per voice slot, the key of the settings the person went on with, tried or not: a changed one is asked again. */
+  chosen: Partial<Record<OnboardingTask, string>>;
 }
 
-export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials">> & {
+export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials" | "chosen">> & {
   trials?: Partial<Record<OnboardingTask, string | null>>;
+  chosen?: Partial<Record<OnboardingTask, string | null>>;
 };
 
 export const ONBOARDING_STORAGE_KEY = "sidevoice.onboarding";
 
 export const emptyOnboardingRecord = (): OnboardingRecord => ({
-  version: 1, choice: null, agents_done: false, deferred_at: null, completed_at: null, trials: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {},
 });
 
 export class OnboardingStorageError extends Error {
@@ -40,28 +48,38 @@ const timestamp = (value: unknown) => typeof value === "number" && Number.isFini
 export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) return emptyOnboardingRecord();
   const input = value as Record<string, unknown>;
-  const trials: OnboardingRecord["trials"] = {};
-  const raw = input.trials && typeof input.trials === "object" && !Array.isArray(input.trials) ? input.trials as Record<string, unknown> : {};
-  for (const task of ["stt", "tts"] as const) if (typeof raw[task] === "string" && raw[task]) trials[task] = raw[task] as string;
+  const keys = (field: unknown) => {
+    const kept: Partial<Record<OnboardingTask, string>> = {};
+    const raw = field && typeof field === "object" && !Array.isArray(field) ? field as Record<string, unknown> : {};
+    for (const task of ["stt", "tts"] as const) if (typeof raw[task] === "string" && raw[task]) kept[task] = raw[task] as string;
+    return kept;
+  };
+  const trials = keys(input.trials);
   return {
     version: 1,
+    basics_done: input.basics_done === true,
     choice: input.choice === "agents" || input.choice === "remote" ? input.choice : null,
     agents_done: input.agents_done === true,
+    turn_done: input.turn_done === true,
     deferred_at: timestamp(input.deferred_at),
     completed_at: timestamp(input.completed_at),
     trials,
+    chosen: keys(input.chosen),
   };
 }
 
 export function mergeOnboardingRecord(record: OnboardingRecord, update: OnboardingPatch): OnboardingRecord {
-  const trials = { ...record.trials };
-  for (const task of ["stt", "tts"] as const) {
-    if (!update.trials || !(task in update.trials)) continue;
-    const value = update.trials[task];
-    if (value == null) delete trials[task];
-    else trials[task] = value;
-  }
-  return normalizeOnboardingRecord({ ...record, ...update, trials });
+  const merged = (kept: Partial<Record<OnboardingTask, string>>, changes?: Partial<Record<OnboardingTask, string | null>>) => {
+    const next = { ...kept };
+    for (const task of ["stt", "tts"] as const) {
+      if (!changes || !(task in changes)) continue;
+      const value = changes[task];
+      if (value == null) delete next[task];
+      else next[task] = value;
+    }
+    return next;
+  };
+  return normalizeOnboardingRecord({ ...record, ...update, trials: merged(record.trials, update.trials), chosen: merged(record.chosen, update.chosen) });
 }
 
 /** The key of a voice slot's settings as tried: its fields in a fixed order, so the same choice keys the same. */
@@ -92,13 +110,17 @@ export interface ResumeFacts {
  *  is never asked for again, and a changed setting is tried again. */
 export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   const { record } = facts;
+  if (!record.basics_done) return "W0";
   const path = !facts.canHostAgents ? "remote" : record.choice ?? (facts.localReady ? "agents" : null);
   if (!path) return "W1";
   if (path === "agents" && !facts.localReady) return "W2";
   if (path === "remote" && !facts.remoteReady) return "W2r";
   if (path === "agents" && !record.agents_done) return "W3";
-  if (!facts.sttKey || record.trials.stt !== facts.sttKey) return "W4";
-  if (!facts.ttsKey || record.trials.tts !== facts.ttsKey) return "W4v";
+  // Chosen, tried or not: trying is the setup's suggestion, not a condition.
+  const settled = (task: OnboardingTask, key: string | null) => !!key && (record.chosen[task] === key || record.trials[task] === key);
+  if (!settled("stt", facts.sttKey)) return "W4";
+  if (!settled("tts", facts.ttsKey)) return "W4v";
+  if (!record.turn_done) return "W5";
   return "W6";
 }
 

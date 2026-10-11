@@ -13,6 +13,7 @@ import type { HostMessageKey } from "./messages/en";
 import { ProviderKey } from "./ProviderKeys";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
+import { InfoTip } from "../../components/ui/InfoTip";
 import { cancelDownload, catalogueShown, downloadModel, TryResult, useModelState, useVoiceTry, type ModelState } from "./ModelSetup";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
@@ -202,12 +203,13 @@ export function TurnChoices({ draft }: { draft: Settings }) {
     ? t(saved.end_of_turn === "smart-turn" ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: saved.turn_model ?? "" }) : undefined;
   return (
     <Group title={t("settings.call.turn")}>
-      <Row label={t("voice.patience")} description={t(current.hint)}>
+      <Row label={<>{t("voice.patience")}<InfoTip label={t("voice.patience.infoLabel")}>{t("voice.patience.info")}</InfoTip></>} description={t(current.hint)}>
         <Segmented size="sm" label={t("voice.patience")} value={draft.patience} onChange={(value) => edit({ patience: value })}
           items={patience.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
-      <Row label={t("voice.endOfTurn")} description={choices.endOfTurn.note ? noteText(t, choices.endOfTurn.note) : t("voice.endOfTurn.hint")} htmlFor="voice-end-of-turn">
-        <NativeSelect id="voice-end-of-turn" value={smart ? "smart-turn" : "silence"} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
+      <Row label={<>{t("voice.endOfTurn")}<InfoTip label={t("voice.endOfTurn.infoLabel")}>{t("voice.endOfTurn.info")}</InfoTip></>}
+        description={choices.endOfTurn.note ? noteText(t, choices.endOfTurn.note) : t(smart ? "voice.endOfTurn.smartHint" : "voice.endOfTurn.silenceHint")}>
+        <NativeSelect id="voice-end-of-turn" aria-label={t("voice.endOfTurn")} value={smart ? "smart-turn" : "silence"} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
           <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn}>{t("voice.endOfTurn.smart")}</option>
           <option value="silence">{t("voice.endOfTurn.silence")}</option>
         </NativeSelect>

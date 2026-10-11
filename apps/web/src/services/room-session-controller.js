@@ -1449,6 +1449,9 @@ window.sidevoiceActions={
  editVoice,
  saveProviderKey,
  connectProviderKey,
+ // The interface's language, as the first-run setup asks it: '' is Automatic.
+ interfaceLanguage:()=>storedPreferences().ui_language||'',
+ setInterfaceLanguage(value){$('ui-language').value=value||'';saveLanguage()},
  testProviderKey,
  loadVoiceCatalogue,
  replayReply,
