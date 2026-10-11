@@ -5,7 +5,7 @@ export const en = {
   "ui.loading": "Working…",
   "ui.copy": "Copy",
   "ui.copied": "Copied",
-  "ui.copyFailed": "Couldn’t copy — select the text",
+  "ui.copyFailed": "Select and copy",
 } as const;
 
 export type UiMessageKey = keyof typeof en;
