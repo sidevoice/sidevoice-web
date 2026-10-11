@@ -510,6 +510,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "settings.advanced.never": "Nunca",
   "settings.advanced.days": "Tras {n} días sin usar",
   "settings.advanced.everyCall": "Cada llamada (detector de voz)",
+  "settings.advanced.everyCallChip": "Cada llamada",
+  "settings.advanced.deleteAllUnusedSized": "Quitar todos los sin usar · {size}",
   "settings.advanced.delete": "Borrar",
   "settings.advanced.deleteNamed": "Borrar {model} de este dispositivo",
   "settings.advanced.deleteConfirm": "¿Borrar {model} de este dispositivo y liberar {size}?",

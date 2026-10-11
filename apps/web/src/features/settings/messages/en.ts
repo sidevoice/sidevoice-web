@@ -508,6 +508,8 @@ export const en = {
   "settings.advanced.never": "Never",
   "settings.advanced.days": "After {n} days unused",
   "settings.advanced.everyCall": "Every call (voice detector)",
+  "settings.advanced.everyCallChip": "Every call",
+  "settings.advanced.deleteAllUnusedSized": "Remove all not in use · {size}",
   "settings.advanced.delete": "Delete",
   "settings.advanced.deleteNamed": "Delete {model} from this device",
   "settings.advanced.deleteConfirm": "Delete {model} from this device and free {size}?",
