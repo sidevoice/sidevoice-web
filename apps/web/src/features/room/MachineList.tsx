@@ -150,6 +150,8 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
   const t = hostTranslator();
   // Renaming the machine on this device: the name being typed, or null.
   const [naming, setNaming] = useState<string | null>(null);
+  // Not a form: Settings is one, and a form inside it would submit the page.
+  const saveAlias = () => { window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming?.trim() || null); setNaming(null); };
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const agents = useRef<HTMLElement>(null);
@@ -161,12 +163,12 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          {naming !== null ? <form className="host-rename" onSubmit={(event) => { event.preventDefault(); window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming.trim() || null); setNaming(null); }}>
+          {naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
               <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
-                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } }} />
-              <Button type="submit" size="sm" variant="primary">{t("hosts.devices.renameSave")}</Button>
+                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } if (event.key === "Enter") { event.preventDefault(); saveAlias(); } }} />
+              <Button size="sm" variant="primary" onClick={saveAlias}>{t("hosts.devices.renameSave")}</Button>
               <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
-            </form>
+            </div>
             : <h3 className="host-name">{copy.name}
               {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: copy.name })} title={t("hosts.rename", { machine: copy.name })}
                 onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
