@@ -24,8 +24,11 @@ export interface Shot {
   variants?: Record<string, string>;
   /** The desktop app's updater's answer, where it offers one. */
   updater?: { available: boolean; version?: string; required?: boolean };
-  /** A pairing code's redemption, for the pairing shots: its refusal, in the controller's words. */
+  /** A pairing code's redemption, for the pairing shots: its refusal, in the controller's words; the addresses the code
+   *  lists (its https one when absent); and an address typed through "Use a different address". */
   pairRefusal?: string;
+  pairUrls?: string[];
+  pairAddress?: string;
   views?: ("phone" | "desktop")[];
 }
 
@@ -93,6 +96,8 @@ const openSettings = (section: string) => (doc: Document) => {
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
 const running = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.4.0", api: 1 }, calls: 0 };
 const localBridge = (status: Record<string, unknown>) => ({ state: status, pairingCode: true });
+/** No machine yet, and the pairing dialog open. */
+const PAIRING = { pairings: [], pairingInUse: null, node: null, pairingOpen: true };
 
 export const JOURNEYS: Journey[] = [
   { id: "first-run", title: "First run", note: "The setup, step by step, on a device that has none yet.", shots: [
@@ -108,10 +113,17 @@ export const JOURNEYS: Journey[] = [
     { id: "w5", caption: "When your turn ends: Smart (recommended) or Silence, patience with its timings.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } } },
     { id: "w6", caption: "Ready: into the room.", setup: { step: "W6", record: { basics_done: true, choice: "remote", turn_done: true } } },
   ] },
-  { id: "pairing", title: "Pairing a machine", note: "The code pasted in this device; what it says when the code cannot be used.", shots: [
-    { id: "pair-open", caption: "Pairing: paste the code the machine gave.", facts: { pairings: [], pairingInUse: null, node: null, pairingOpen: true } },
-    { id: "pair-expired", caption: "The code expired or was used: ask the machine for a new one.", facts: { pairings: [], pairingInUse: null, node: null, pairingOpen: true }, pairRefusal: "The code expired" },
-    { id: "pair-insecure", caption: "The machine's address is not secure: the code cannot be sent there.", facts: { pairings: [], pairingInUse: null, node: null, pairingOpen: true }, pairRefusal: "address-insecure" },
+  { id: "pairing", title: "Pairing a machine", note: "The code pasted in this device; what it says when the code cannot be used. The layout is the pair-machine variant.", shots: [
+    { id: "pair-open", caption: "Pairing: paste the code the machine gave (code, the default).", facts: PAIRING },
+    { id: "pair-open-steps", caption: "Variant steps: what to run on the machine, then this device, as two numbered steps.", facts: PAIRING, variants: { "pair-machine": "steps" } },
+    { id: "pair-open-split", caption: "Variant split: the machine's column beside the form from 720px.", facts: PAIRING, variants: { "pair-machine": "split" } },
+    { id: "pair-expired", caption: "The code expired or was used: run pair-device again.", facts: PAIRING, pairRefusal: "The code expired" },
+    { id: "pair-unreachable", caption: "The code's addresses did not answer: its address is asked for.", facts: PAIRING, pairRefusal: "unreachable" },
+    { id: "pair-insecure", caption: "Plain http written to another machine: said under the address, nothing sent.", facts: PAIRING, pairRefusal: "address-insecure", pairAddress: "http://192.168.1.20:8765" },
+    { id: "pair-http-private", caption: "Only plain http answers on a private network: what that exposes, and Connect without encryption.", facts: PAIRING, pairRefusal: "pairing-http-private", pairUrls: ["http://192.168.1.20:8765"] },
+    { id: "pair-http-private-split", caption: "The same in split: the button the form column's width.", facts: PAIRING, pairRefusal: "pairing-http-private", pairUrls: ["http://192.168.1.20:8765"], variants: { "pair-machine": "split" } },
+    { id: "pair-http-only", caption: "Only plain http answers at a public address: refused.", facts: PAIRING, pairRefusal: "pairing-http-only", pairAddress: "203.0.113.5:8765" },
+    { id: "pair-http-blocked", caption: "Only plain http answers, and this page is https: pair from the desktop app.", facts: PAIRING, pairRefusal: "pairing-http-blocked", pairUrls: ["http://192.168.1.20:8765"] },
   ] },
   { id: "room", title: "The room", note: "The call with a conversation on the stage, and around it.", shots: [
     { id: "no-machine", caption: "No machine yet: connect one.", facts: { pairings: [], pairingInUse: null, node: null, nodeReach: "" } },
@@ -137,6 +149,7 @@ export const JOURNEYS: Journey[] = [
       facts: { pairings: [THIS, NUC], pairingInUse: NUC.fp, localHostStatus: { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" }, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-remote", caption: "Machines: a remote machine, connected.", facts: { pairings: [NUC, WORKSTATION, LAPTOP], remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1 } } }, after: openSettings("machines") },
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], pairingInUse: LAPTOP.fp, node: LAPTOP.fp, nodeReach: "away" }, after: openSettings("machines") },
+    { id: "s-machine-insecure", caption: "Machines: a machine reached without encryption, as agreed when pairing.", facts: { pairings: [{ ...NUC, insecure: true, urls: ["http://192.168.1.20:8765"] }, LAPTOP], remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1 } } }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], pairingInUse: NUC.fp, nodeReach: "revoked" }, after: openSettings("machines") },
     { id: "s-advanced", caption: "Advanced: memory when idle, the downloaded models, reset, the build.", facts: { modelsRemovable: true }, after: openSettings("advanced") },
   ] },
