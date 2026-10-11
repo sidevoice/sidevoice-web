@@ -215,11 +215,12 @@ export function Wizard() {
   }, [onboarding.open]);
   useEffect(() => { if (onboarding.open) title.current?.focus(); }, [onboarding.open, step]);
 
-  // A machine prepared or paired while its step is shown moves the setup on by itself.
+  // A machine prepared or paired while its step is shown moves the setup on by itself, to where it then stands (a
+  // machine that answers after the setup opened leaves the steps already done behind).
   useEffect(() => {
     if (!onboarding.open) return;
-    if (step === "W2" && onboarding.localReady) onboarding.goTo(onboarding.record.agents_done ? "W4" : "W3");
-    if (step === "W2r" && onboarding.remoteReady) onboarding.goTo("W4");
+    if (step === "W2" && onboarding.localReady) onboarding.openWizard();
+    if (step === "W2r" && onboarding.remoteReady) onboarding.openWizard();
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function choosePath(next: "agents" | "remote") {

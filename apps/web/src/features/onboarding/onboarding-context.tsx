@@ -129,7 +129,9 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
 
   // Once the record and the machines are known: an unfinished setup opens where it stands, unless it was put off.
   useEffect(() => {
-    if (!ready || decided.current || !room.facts.machinesReady) return;
+    // Where it resumes depends on this device's voice settings too (what was chosen): it waits for them as well as the
+    // machines, which the runtime may know first.
+    if (!ready || decided.current || !room.facts.machinesReady || !room.facts.voiceSettings) return;
     // A step asked for (the storyboard's) opens there, whatever the record says.
     if (startAt) { decided.current = true; setStep(startAt); setOpen(true); return; }
     if (record.completed_at) return;
@@ -139,7 +141,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     if (live.localReady && !record.choice) void persist({ choice: "agents" });
     setStep(resume(live.localReady && !record.choice ? { ...record, choice: "agents" } : record, live));
     setOpen(true);
-  }, [ready, record, room.facts.machinesReady, live, persist, resume, startAt]);
+  }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, live, persist, resume, startAt]);
 
   const rescanLocalAgents = useCallback(async () => {
     const bridge = localHostBridge();
