@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
+import { cn } from "../../lib/cn";
 import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon } from "../../components/ui/Icons";
 import type { DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
@@ -101,6 +102,12 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const run = (action: "connect" | "disconnect" | "dismiss") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
+  const status: { text: string; tone: "ok" | "error" | "muted" | "" } = errorText ? { text: errorText, tone: "error" }
+    : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
+    : agent.registration === "connected" ? { text: t("agents.connected"), tone: "" }
+    : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted" }
+    : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
+    : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   return (
     <li className="host-agent-row" data-registration={agent.registration} data-open={open || undefined}>
       <div className="host-agent-main">
@@ -109,12 +116,10 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <span className="host-agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}
             {isNew && <span className="host-agent-badge">{t("agents.new")}</span>}
           </span>
-          {justConnected && <span className="host-agent-status host-agent-ok" role="status">{t("agents.justConnected", { agent: agent.label })}</span>}
-          {errorText && <span className="host-agent-status host-agent-error" role="alert">{errorText}</span>}
-          {!errorText && agent.registration === "connected" && <span className="host-agent-status">{t("agents.connected")}</span>}
-          {!errorText && agent.registration === "foreign" && <span className="host-agent-status muted">{t("agents.foreign")}</span>}
-          {!errorText && agent.registration === "not-connected" && manualOnly && <span className="host-agent-status muted">{t("agents.manualOnly")}</span>}
-          {!errorText && agent.registration === "unknown" && <span className="host-agent-status muted">{t("agents.unknown")}</span>}
+          {/* Always one status line under the name, so a row never changes height: what went wrong, else a moment of
+              "ready" once connected, else where it stands. */}
+          <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
+            role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
         </span>
         <span className="host-agent-actions">
           {busy ? <span className="muted" role="status">{t(`agents.busy.${busy}` as HostMessageKey)}</span>

@@ -215,12 +215,12 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
     const connected = known("codex", { registration: "connected", actionable: false, instructions: null });
     act(() => store.patch({ hostAgents: { fp: ready([connected]) } }));
     expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
-    expect(row).toHaveTextContent("Codex is ready for new conversations.");
+    expect(row).toHaveTextContent("Codex is ready for new conversations");
     expect(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/ })).toBeInTheDocument();
     expect(hostAgentAction).not.toHaveBeenCalled();
 
     act(() => { vi.advanceTimersByTime(5000); });
-    expect(row).not.toHaveTextContent("Codex is ready for new conversations.");
+    expect(row).not.toHaveTextContent("Codex is ready for new conversations");
     fireEvent.click(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/ }));
     expect(hostAgentAction).not.toHaveBeenCalledWith("fp", "codex", "disconnect");
     expect(within(row).getByRole("group", { name: /^Disconnect .* from Sidevoice$/ })).toHaveTextContent("MCP servers");
@@ -257,4 +257,25 @@ test("foreign rows without host instructions stay read-only while an automatic c
   expect(within(foreignRow as HTMLElement).queryByRole("button")).toBeNull();
   await waitFor(() => expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument());
   expect(screen.getByRole("alert")).toHaveTextContent("Could not connect this agent.");
+});
+
+test("a row is always its name and one status line: connecting turns that line to ready, then connected; disconnecting, to not connected", () => {
+  vi.useFakeTimers();
+  try {
+    const store = createRoomStore();
+    setActions({ loadHostAgents: vi.fn(async () => {}) });
+    const notConnected = known();
+    act(() => store.patch({ hostAgents: { fp: ready([notConnected]) } }));
+    render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+    const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+    const lines = () => [...row().querySelectorAll(".host-agent-status")].map((line) => line.textContent);
+    expect(lines()).toEqual(["Not connected"]);
+    act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "connected" })]) } }));
+    expect(lines()).toEqual(["Codex is ready for new conversations"]);
+    expect(row().querySelector(".host-agent-status")).toHaveClass("host-agent-ok");
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(lines()).toEqual(["Connected to Sidevoice"]);
+    act(() => store.patch({ hostAgents: { fp: ready([notConnected]) } }));
+    expect(lines()).toEqual(["Not connected"]);
+  } finally { vi.useRealTimers(); }
 });
