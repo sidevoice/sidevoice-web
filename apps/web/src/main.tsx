@@ -3,6 +3,8 @@
 // wins a tie against a shared component's.
 import "./styles/tokens.css";
 import "./styles/call.css";
+// The bichos (the conversations' agents) and their stage: before the design tokens, which win a tie.
+import "./styles/bichos.css";
 import "./styles/theme.css";
 import "./components/ui/ui.css";
 import "./styles/app.css";

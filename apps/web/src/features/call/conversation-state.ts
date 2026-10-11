@@ -26,12 +26,12 @@ export function conversationState(row: ParticipantView, inCall: boolean): Conver
   return "waiting";
 }
 
-/** The reduced moves of a small avatar (sidebar, rail, header, panel): breathe while working, sway while waiting,
- *  dimmed while idle. The call's own conversation acts out what it is doing. */
-export function smallAvatarMood(row: ParticipantView, inCall: boolean): AvatarMood {
-  const state = conversationState(row, inCall);
-  if (state === "in-call") return row.working ? "working" : "waiting";
-  return state;
+/** A small avatar (sidebar, rail, header, panel): offline while the room cannot reach it (it sleeps), working while
+ *  its harness says so, idle otherwise — waiting for you included: the row's dot and line say that it hears you. A small
+ *  one never speaks or listens; the stage, and the header's copy of it, do. */
+export function smallAvatarMood(row: Pick<ParticipantView, "reach" | "working">): AvatarMood {
+  if (row.reach === "offline") return "offline";
+  return row.working ? "working" : "idle";
 }
 
 export interface StageFacts {
@@ -40,17 +40,26 @@ export interface StageFacts {
   /** The conversation on the stage is the one the microphone talks to. */
   isTarget: boolean;
   canHear: boolean;
+  /** How the room reaches it; null while the room has not listed it yet. */
+  reach: ParticipantView["reach"] | null;
   /** Its reply is sounding. */
   speaking: boolean;
+  /** The person's turn to it is open: they are talking, or it is being transcribed (ConversationView.pendingPhase). */
+  personSpeaking: boolean;
   working: boolean;
 }
 
-/** The agent on the stage: speaking over working over waiting; idle whenever it cannot hear the person. */
+/** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
+ *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
+ *  Short of offline it is idle whenever it cannot hear the person: out of the call, not the one the microphone talks
+ *  to, or holding what it is sent — a conversation that is holding does not react to the person at all. */
 export function stageMood(facts: StageFacts): AvatarMood {
+  if (facts.reach === "offline") return "offline";
   if (!facts.inCall || !facts.isTarget || !facts.canHear) return "idle";
   if (facts.speaking) return "speaking";
+  if (facts.personSpeaking && (facts.reach === "listening" || facts.reach === null)) return "listening";
   if (facts.working) return "working";
-  return "waiting";
+  return "idle";
 }
 
 /** The person in the picture-in-picture. */
@@ -82,6 +91,15 @@ export function stateText(row: ParticipantView, inCall: boolean, t: CallTranslat
   const words = state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
     : state === "waiting" ? t("state.waiting") : row.reach === "holding" && row.available ? t("state.holding") : t("state.offline");
   return row.unread && state !== "in-call" ? t("state.withUnread", { state: words, unread: t("state.unread", { n: row.unread }) }) : words;
+}
+
+/** The words for what an agent's avatar is acting out: the stage says them with its name. */
+export function moodText(mood: AvatarMood, t: CallTranslate): string {
+  if (mood === "offline") return t("state.offline");
+  if (mood === "speaking") return t("state.speaking");
+  if (mood === "listening") return t("state.listening");
+  if (mood === "working") return t("state.working");
+  return t("state.resting");
 }
 
 /** The conversations grouped by the machine they run on, in the order the room lists them. A machine is its id: two

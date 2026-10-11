@@ -13,6 +13,7 @@ import {
   SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
+import { avatarColor } from "../features/avatar/bicho-draw";
 import { CharacterAvatar, type AvatarSize } from "../features/avatar/CharacterAvatar";
 import { callTranslator } from "../features/call/call-i18n";
 import { conversationTranslator } from "../features/conversation/conversation-i18n";
@@ -29,9 +30,10 @@ import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/co
 type State = "in-call" | "working" | "waiting" | "idle";
 
 /** A conversation's agent, small, with the dot of its state — the sidebar, the rail, the phone's header. */
-function Avatar({ id, mood = "waiting", state, size = "small", person = false }: { id: string; mood?: AvatarMood; state?: State; size?: AvatarSize; person?: boolean }) {
+function Avatar({ id, mood = "idle", state, size = "small", person = false }: { id: string; mood?: AvatarMood; state?: State; size?: AvatarSize; person?: boolean }) {
   const spec = person ? PERSON_AVATAR : avatarFor(id);
-  const tone = { "--pt-tone": `var(--sv-avatar-${spec.tone})`, "--pt-tone-bg": `var(--sv-avatar-${spec.tone}-bg)` } as CSSProperties;
+  const color = avatarColor(spec);
+  const tone = { "--pt-tone": color, "--pt-tone-bg": `color-mix(in srgb, ${color} 22%, var(--sv-surface))` } as CSSProperties;
   return (
     <span className="pt-avatar" data-size={size} style={tone}>
       <CharacterAvatar spec={spec} mood={mood} size={size} />
@@ -61,7 +63,7 @@ function Pattern({ title, note, children }: { title: string; note?: string; chil
 const ROWS: { id: string; title: string; harness: string; state: State; mood: AvatarMood; selected?: boolean; unread?: number }[] = [
   { id: "sidevoice-web", title: "sidevoice-web", harness: "claude", state: "in-call", mood: "speaking", selected: true },
   { id: "release", title: "release", harness: "codex", state: "working", mood: "working" },
-  { id: "landing-copy", title: "landing copy", harness: "claude", state: "waiting", mood: "waiting", unread: 2 },
+  { id: "landing-copy", title: "landing copy", harness: "claude", state: "waiting", mood: "idle", unread: 2 },
   { id: "infra", title: "infra · terraform", harness: "cursor", state: "idle", mood: "idle" },
 ];
 
@@ -147,7 +149,7 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
   const t = callTranslator();
   const spec = avatarFor("sidevoice-web");
   return (
-    <div className="pt-stage" data-compact={compact || undefined} style={{ "--pt-tone": `var(--sv-avatar-${spec.tone})` } as CSSProperties}>
+    <div className="pt-stage" data-compact={compact || undefined} style={{ "--pt-tone": avatarColor(spec) } as CSSProperties}>
       <div className="pt-stage-name"><h3>sidevoice-web</h3><span>MacBook Pro</span></div>
       <div className="pt-stage-top">
         {mood === "speaking" && <div className="pt-bubble pt-bubble--agent">
@@ -156,7 +158,7 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
         </div>}
         {mood === "working" && <p className="pt-working" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("stage.working")}</p>}
       </div>
-      <Avatar id="sidevoice-web" mood={mood === "listening" ? "waiting" : mood} size="stage" />
+      <Avatar id="sidevoice-web" mood={mood === "waiting" ? "idle" : mood} size="stage" />
       <div className="pt-stage-tags"><span className="pt-tag"><HarnessIcon harness="claude-code" size={12} />claude-opus-5-5 · xhigh</span></div>
       {mood === "listening" && <div className="pt-bubble pt-bubble--person">
         <span>…and make the dark theme a little warmer</span>

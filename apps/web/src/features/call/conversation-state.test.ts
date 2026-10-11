@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "./call-i18n";
-import { conversationState, headerConversations, machineGroups, personMood, smallAvatarMood, stageMood, stateText } from "./conversation-state";
+import { conversationState, headerConversations, machineGroups, moodText, personMood, smallAvatarMood, stageMood, stateText } from "./conversation-state";
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
@@ -25,31 +25,55 @@ test("a conversation's state: the call's own, working, waiting for you, or out o
 test("the room's binding before a join or after a hang-up is not a call: no conversation is in call then", () => {
   const bound = row("a", { selected: true, unread: 2 });
   expect(conversationState(bound, false)).toBe("waiting");
-  expect(smallAvatarMood(bound, false)).toBe("waiting");
+  expect(smallAvatarMood(bound)).toBe("idle");
   expect(stateText(bound, false, en)).toBe("Waiting for you · 2 new");
   expect(stateText(bound, true, en)).toBe("In call");
   // Out of the call it may sit in the header like any other conversation waiting for you.
   expect(headerConversations([bound, row("b", { working: true })], null, false).map((item) => item.threadId)).toEqual(["a", "b"]);
 });
 
-test("state maps to the avatars' moves: small ones breathe, sway or dim; the stage acts the call out", () => {
-  expect(smallAvatarMood(row("a", { working: true }), true)).toBe("working");
-  expect(smallAvatarMood(row("a"), true)).toBe("waiting");
-  expect(smallAvatarMood(row("a", { available: false, reach: "offline" }), true)).toBe("idle");
-  expect(smallAvatarMood(row("a", { selected: true }), true)).toBe("waiting");
-  expect(smallAvatarMood(row("a", { selected: true, working: true }), true)).toBe("working");
+test("a small avatar is offline, working or idle: waiting for you is idle, and the dot says it hears you", () => {
+  expect(smallAvatarMood(row("a", { working: true }))).toBe("working");
+  expect(smallAvatarMood(row("a"))).toBe("idle");
+  expect(smallAvatarMood(row("a", { selected: true }))).toBe("idle");
+  expect(smallAvatarMood(row("a", { selected: true, working: true }))).toBe("working");
+  expect(smallAvatarMood(row("a", { reach: "holding" }))).toBe("idle");
+  expect(smallAvatarMood(row("a", { reach: "holding", working: true }))).toBe("working");
+  // Offline beats everything: the room cannot reach it, so it sleeps.
+  expect(smallAvatarMood(row("a", { available: false, reach: "offline" }))).toBe("offline");
+  expect(smallAvatarMood(row("a", { reach: "offline", working: true, unread: 3 }))).toBe("offline");
+});
 
-  const call = { inCall: true, isTarget: true, canHear: true, speaking: false, working: false };
-  expect(stageMood({ ...call, speaking: true, working: true })).toBe("speaking");
+test("the stage's agent, by priority: offline, speaking, listening, working, idle", () => {
+  const call = { inCall: true, isTarget: true, canHear: true, reach: "listening" as const, speaking: false, personSpeaking: false, working: false };
+  expect(stageMood({ ...call, reach: "offline", canHear: false, speaking: true, personSpeaking: true, working: true })).toBe("offline");
+  expect(stageMood({ ...call, speaking: true, personSpeaking: true, working: true })).toBe("speaking");
+  expect(stageMood({ ...call, personSpeaking: true, working: true })).toBe("listening");
   expect(stageMood({ ...call, working: true })).toBe("working");
-  expect(stageMood(call)).toBe("waiting");
-  expect(stageMood({ ...call, inCall: false })).toBe("idle");
-  expect(stageMood({ ...call, isTarget: false, speaking: true })).toBe("idle");
-  expect(stageMood({ ...call, canHear: false, working: true })).toBe("idle");
+  // What used to be "waiting for you" is idle now.
+  expect(stageMood(call)).toBe("idle");
+  // Offline shows whether or not the page is in the call: the poster is the conversation's, not the call's.
+  expect(stageMood({ ...call, inCall: false, reach: "offline", canHear: false })).toBe("offline");
+  expect(stageMood({ ...call, inCall: false, speaking: true })).toBe("idle");
+  expect(stageMood({ ...call, isTarget: false, speaking: true, personSpeaking: true })).toBe("idle");
+});
 
+test("it listens only while the person talks to it and it can hear them: holding, it does not react", () => {
+  const call = { inCall: true, isTarget: true, canHear: true, reach: "listening" as const, speaking: false, personSpeaking: true, working: false };
+  expect(stageMood(call)).toBe("listening");
+  expect(stageMood({ ...call, reach: "holding", canHear: false })).toBe("idle");
+  expect(stageMood({ ...call, reach: "holding", canHear: false, working: true })).toBe("idle");
+  // Bound to the call but not listed by the room yet, it hears the call.
+  expect(stageMood({ ...call, reach: null })).toBe("listening");
+  expect(stageMood({ ...call, personSpeaking: false })).toBe("idle");
+});
+
+test("the person in the picture-in-picture keeps their own moves; the stage says its agent's in words", () => {
   expect(personMood({ inCall: true, speaking: true })).toBe("speaking");
   expect(personMood({ inCall: true, speaking: false })).toBe("present");
   expect(personMood({ inCall: false, speaking: true })).toBe("idle");
+  expect(["offline", "speaking", "listening", "working", "idle"].map((mood) => moodText(mood as never, en)))
+    .toEqual(["Offline", "Speaking", "Listening to you", "Working", "Resting"]);
 });
 
 test("a phone's header shows at most two others: waiting for you first, then working; never idle ones or the stage's", () => {
