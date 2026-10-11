@@ -10,6 +10,12 @@ import {
   PanelLeftClose, PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
 } from "lucide-react";
 import type { ComponentType } from "react";
+// Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
+import claudeLogo from "../../assets/logos/claude.svg?raw";
+import codexLogo from "../../assets/logos/codex.svg?raw";
+import cursorLogo from "../../assets/logos/cursor.svg?raw";
+import elevenLabsLogo from "../../assets/logos/elevenlabs.svg?raw";
+import openAiLogo from "../../assets/logos/openai.svg?raw";
 
 type IconProps = { className?: string; size?: number };
 type LucideLike = ComponentType<{ className?: string; size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
@@ -88,12 +94,30 @@ export function WindowsIcon({ className, size = 12 }: IconProps) {
   return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><path d="M3 5.5 11 4.4v7.1H3V5.5Zm0 13 8 1.1v-7H3v5.9ZM12 4.2 21 3v8.5h-9V4.2Zm0 15.6 9 1.2v-8.5h-9v7.3Z" /></svg>;
 }
 
-export function ClaudeIcon({ className, size = 12 }: IconProps) {
-  return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><path d="M11 2h2v6.2l3.9-4.8 1.5 1.3-3.9 4.8 5.9-1.9.6 1.9-5.9 1.9 5.9 1.9-.6 1.9-5.9-1.9 3.9 4.8-1.5 1.3-3.9-4.8V22h-2v-6.2l-3.9 4.8-1.5-1.3 3.9-4.8-5.9 1.9-.6-1.9L9.4 12 3.5 10.1l.6-1.9 5.9 1.9-3.9-4.8 1.5-1.3L11 8.2V2Z" /></svg>;
+/** Another product's mark as its brand kit draws it, unaltered: in the text's colour where the kit allows one colour,
+ *  in its own where it does not (Claude's). Hidden from assistive tech: its name is always said beside it. */
+/** `scale` evens out the marks whose kit drawing keeps its clear space inside it: drawn that much larger, the space
+ *  spills out of the box, and the marks sit at one size beside each other. */
+function logo(source: string, scale = 1) {
+  const inset = ((scale - 1) / 2) * -100;
+  const svg = source.replace("<svg ", `<svg width="${scale * 100}%" height="${scale * 100}%" style="margin:${inset}%" `);
+  return function Logo({ className, size = 12 }: IconProps) {
+    return <span className={className ? "ui-logo " + className : "ui-logo"} style={{ display: "inline-block", flex: "none", width: size, height: size, lineHeight: 0 }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />;
+  };
 }
 
-export function CodexIcon({ className, size = 12 }: IconProps) {
-  return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="m8 9 3 3-3 3M13 15h3" /></svg>;
+export const ClaudeIcon = logo(claudeLogo);
+/** Codex has no mark of its own for integrations: it wears OpenAI's. */
+export const CodexIcon = logo(codexLogo, 1.6);
+export const CursorIcon = logo(cursorLogo);
+export const OpenAILogo = logo(openAiLogo, 1.6);
+export const ElevenLabsLogo = logo(elevenLabsLogo, 2);
+
+/** A provider's mark by its catalogue id; none for a provider without one here. */
+export function ProviderLogo({ provider, size = 20 }: { provider: string; size?: number }) {
+  if (provider === "openai") return <OpenAILogo size={size} />;
+  if (provider === "elevenlabs") return <ElevenLabsLogo size={size} />;
+  return null;
 }
 
 /** The brand mark (from the Sidevoice brand kit): four bars in the text colour, and the fourth, the
@@ -113,11 +137,6 @@ export function PlatformIcon({ platform, size = 12 }: { platform: string; size?:
 }
 
 export const HARNESS_NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
-
-/** Cursor: a plain cube, drawn in the same line style as the others rather than its mark. */
-export function CursorIcon({ className, size = 12 }: IconProps) {
-  return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M12 2.5 20.5 7.25v9.5L12 21.5l-8.5-4.75v-9.5Z" /><path d="M3.5 7.25 12 12l8.5-4.75M12 12v9.5" /></svg>;
-}
 
 export function HarnessIcon({ harness, size = 12 }: { harness: string; size?: number }) {
   if (harness === "claude") return <ClaudeIcon size={size} />;
