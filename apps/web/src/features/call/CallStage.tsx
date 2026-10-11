@@ -116,14 +116,13 @@ export function CallStage() {
       <header className="stage-title" translate="no">
         <h2 title={stage.title}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
-        <VoiceModels place="title" />
       </header>
       <div className="stage-tile" data-mood={stage.mood} style={avatarTone(spec) as CSSProperties}>
         <div className="stage-name" translate="no">
           <h2 title={stage.title}>{stage.title}</h2>
           {stage.row?.machine && <span>{stage.row.machine}</span>}
-          <VoiceModels place="title" />
         </div>
+        <VoiceModels />
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
           {stage.mood === "working" && <p className="stage-activity" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
@@ -135,7 +134,6 @@ export function CallStage() {
             {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
             <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
           </span>}
-          <VoiceModels place="tile" />
         </div>
         <PersonTurn conversation={conversation} t={t} />
         {narrow && <TranscriptToggle floating />}

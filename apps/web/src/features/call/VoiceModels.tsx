@@ -1,6 +1,5 @@
 import { TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { useVariant } from "../../lib/variants";
 import { useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
 import { useModelState } from "../settings/ModelSetup";
@@ -8,16 +7,10 @@ import { callTranslator, type CallTranslate } from "./call-i18n";
 import type { CallMessageKey } from "./messages/en";
 
 /* The models this device's voice runs the call with: what turns the person's speech into text, and what speaks the
- * agent's replies — each its model's id as its catalogue names it, and where it runs (this device, or a provider). They
- * are the settings the voice is given (voiceSettingsHere); the voice reports no model of its own. Where they show is a
- * design to compare (VARIANTS `voice-models`): in the stage tile's foot across from the agent's badge (A), as chips in
- * the call bar (B), or beside the conversation's name (C). */
-export const VOICE_MODELS_PLACE = ["tile", "bar", "title"] as const;
-export type VoiceModelsPlace = (typeof VOICE_MODELS_PLACE)[number];
-
-export function useVoiceModelsPlace() {
-  return useVariant("voice-models", VOICE_MODELS_PLACE);
-}
+ * agent's replies — each its model's id as its catalogue names it, and in a tooltip where it runs (this device, or a
+ * provider) and whether it is ready. They sit in the stage tile's top-right corner, one under the other, across from
+ * the conversation's name; the agent's badge keeps the tile's foot. They are the settings the voice is given
+ * (voiceSettingsHere); the voice reports no model of its own. */
 
 type Slot = { id: string; where: string; state: string };
 
@@ -46,27 +39,17 @@ function Details({ stt, tts, t }: { stt: Slot | null; tts: Slot | null; t: CallT
   return <span className="voice-models-details">{line(t("voiceModels.stt"), stt)}{line(t("voiceModels.tts"), tts)}</span>;
 }
 
-/** The two models where `place` puts them, when that is the place the variant chose; nothing before any is chosen. */
-export function VoiceModels({ place }: { place: VoiceModelsPlace }) {
+/** The two models, stacked; nothing before any is chosen. */
+export function VoiceModels() {
   const t = callTranslator();
-  const chosen = useVoiceModelsPlace();
   const { stt, tts } = useSlots(t);
-  if (chosen !== place || (!stt && !tts)) return null;
+  if (!stt && !tts) return null;
   const label = t("voiceModels.label", { stt: stt?.id ?? t("voiceModels.none"), tts: tts?.id ?? t("voiceModels.none") });
   const details = <Details stt={stt} tts={tts} t={t} />;
-  if (place === "bar") return (
-    <span className="voice-models voice-models--bar" role="group" aria-label={label}>
-      {stt && <Tooltip content={details}><span className="voice-chip" tabIndex={0}><TranscriptionIcon size={14} /><span translate="no">{stt.id}</span></span></Tooltip>}
-      {tts && <Tooltip content={details}><span className="voice-chip" tabIndex={0}><VoicesIcon size={14} /><span translate="no">{tts.id}</span></span></Tooltip>}
-    </span>
-  );
   return (
-    <Tooltip content={details}>
-      <span className={"voice-models voice-models--" + place + (place === "tile" ? " stage-tag" : "")} tabIndex={0} aria-label={label} translate="no">
-        {stt && <><TranscriptionIcon size={12} /><span>{stt.id}</span></>}
-        {stt && tts && <span className="voice-models-sep" aria-hidden="true">·</span>}
-        {tts && <><VoicesIcon size={12} /><span>{tts.id}</span></>}
-      </span>
-    </Tooltip>
+    <div className="voice-models" role="group" aria-label={label} translate="no">
+      {stt && <Tooltip content={details}><span className="voice-chip" tabIndex={0} aria-label={t("voiceModels.stt") + ": " + stt.id}><TranscriptionIcon size={12} /><span>{stt.id}</span></span></Tooltip>}
+      {tts && <Tooltip content={details}><span className="voice-chip" tabIndex={0} aria-label={t("voiceModels.tts") + ": " + tts.id}><VoicesIcon size={12} /><span>{tts.id}</span></span></Tooltip>}
+    </div>
   );
 }
