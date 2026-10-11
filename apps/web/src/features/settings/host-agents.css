@@ -35,8 +35,6 @@
 .host-agent-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); padding: var(--sv-space-3) 14px; border: 1px solid color-mix(in srgb, var(--sv-danger) 30%, transparent); border-radius: var(--sv-radius-md); background: var(--sv-danger-soft); color: var(--sv-text); }
 .host-agent-problem p { margin: 0; line-height: 1.45; }
 .host-agent-tab-label { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
-/* Agents waiting to be connected: a mustard dot wherever the machine is named. */
-.host-agent-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-inline-start: var(--sv-space-1-5); border-radius: 50%; background: var(--sv-voice); }
 @media (max-width: 550px) {
   .host-agent-main { gap: var(--sv-space-2); padding: var(--sv-space-3) var(--sv-space-4); }
   .host-agent-problem { align-items: flex-start; flex-direction: column; }

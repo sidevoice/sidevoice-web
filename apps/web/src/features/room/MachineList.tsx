@@ -78,7 +78,7 @@ export function MachineNav({ current }: { current: boolean }) {
             <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
             <span className="machine-nav-name">{copy.name}</span>
             {machine.local && copy.name !== t("hosts.thisComputer") && <span className="machine-nav-local">{t("hosts.thisComputerTag")}</span>}
-            {notice(machine) && <Badge tone="warning" className="ui-nav-badge">{t("agents.notice")}</Badge>}
+            {notice(machine) && <Badge tone="accent" className="ui-nav-badge">{t("agents.notice")}</Badge>}
           </button>
         );
       })}
@@ -152,7 +152,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {notice && <Badge tone="warning">{t("agents.notice")}</Badge>}
+        {notice && <Badge tone="accent">{t("agents.notice")}</Badge>}
         {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
       </header>
