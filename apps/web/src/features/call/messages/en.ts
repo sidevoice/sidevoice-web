@@ -36,6 +36,7 @@ export const en = {
   "stage.cancelTurn": "Cancel sending",
 
   "toolbar.micLevel": "Microphone level",
+  "stage.effort": "{effort} effort",
   "toolbar.skip": "Skip what is playing",
 
   "transcript.show": "Show transcript",

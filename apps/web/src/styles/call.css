@@ -23,7 +23,7 @@
 .trigger-caret { flex:none;display:none }
 .live-dot { flex:none;width:7px;height:7px;border-radius:50%;background:var(--sv-state-idle) }
 .live-dot[data-live] { background:var(--sv-state-in-call);box-shadow:0 0 0 3px color-mix(in srgb, var(--sv-state-in-call) 18%, transparent) }
-.header-conversations { display:none }
+.header-conversations,.conversations-grab { display:none }
 .header-settings { flex:none;margin-left:auto }
 .header-settings #settings-open { position:relative;width:42px;height:42px;padding:0;border:1px solid var(--sv-border);border-radius:12px;background:var(--sv-surface-raised) }
 .header-settings #settings-open:hover { background:#333d49 }
@@ -85,11 +85,11 @@
 .stage-tile[data-mood=speaking] { border-color:var(--sv-selected-border);box-shadow:0 0 0 3px color-mix(in srgb, var(--sv-primary) 22%, transparent) }
 .stage-agent { width:min(46%,260px,34dvh);aspect-ratio:1 }
 /* The conversation's name, in the tile's top corner as a call names whoever is on screen. */
-.stage-name { position:absolute;z-index:2;top:14px;left:16px;max-width:calc(100% - 32px);display:flex;align-items:baseline;gap:8px;padding:5px 12px;border-radius:var(--sv-radius-pill);background:color-mix(in srgb, var(--sv-bg) 70%, transparent);backdrop-filter:blur(6px);white-space:nowrap;overflow:hidden }
-.stage-name strong { min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600 }
-.stage-name span { flex:none;color:var(--sv-muted);font-size:12px }
-@media (max-width:899px) { .stage-name { display:none } .stage-top { top:16px } }
-.stage-top { position:absolute;z-index:2;top:56px;left:16px;right:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;pointer-events:none }
+.stage-name { position:absolute;z-index:2;top:14px;left:16px;max-width:min(60%,calc(100% - 32px));display:grid;gap:1px;padding:6px 12px;border-radius:12px;background:color-mix(in srgb, var(--sv-bg) 70%, transparent);backdrop-filter:blur(6px) }
+.stage-name h2 { margin:0;font-size:14px;font-weight:600;line-height:1.35;text-transform:none;letter-spacing:0;color:var(--sv-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.stage-name span { color:var(--sv-muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+
+.stage-top { position:absolute;z-index:2;top:80px;left:16px;right:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;pointer-events:none }
 .stage-top>* { grid-area:1/1;align-self:start }
 .speech-bubble { min-width:0;padding:10px 14px;border-radius:16px;background:var(--sv-primary-soft);color:var(--sv-on-primary);line-height:1.45;box-shadow:0 8px 24px rgb(0 0 0 / 35%);overflow-wrap:anywhere }
 .speech-bubble::after { content:"";position:absolute;bottom:-8px;border:9px solid transparent;border-bottom:0;border-top-color:var(--sv-primary-soft) }
@@ -103,27 +103,17 @@
 .stage-bubble .karaoke-text[data-playback=playing]:not([data-progress]) { color:color-mix(in srgb, var(--sv-on-primary) 70%, var(--sv-primary-soft));opacity:1 }
 .stage-activity { display:inline-flex;align-items:center;gap:8px;max-width:100%;margin:0;padding:6px 14px;border:1px dashed color-mix(in srgb, var(--sv-voice) 45%, transparent);border-radius:var(--sv-radius-pill);background:color-mix(in srgb, var(--sv-bg) 80%, transparent);color:var(--sv-voice);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
 .stage-spinner { flex:none;width:11px;height:11px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sv-spin .8s linear infinite }
-.stage-tags { position:absolute;z-index:2;left:12px;bottom:12px;display:flex;gap:6px;max-width:calc(100% - 150px) }
+.stage-tags { position:absolute;z-index:2;left:12px;bottom:12px;display:flex;gap:6px;max-width:40% }
 .stage-tag { display:inline-flex;align-items:center;gap:5px;min-width:0;padding:3px 9px;border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill);background:color-mix(in srgb, var(--sv-bg) 75%, transparent);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px) }
-.stage-pip { position:absolute;z-index:3;right:16px;bottom:16px;width:112px;height:140px;display:grid;place-items:center;border:1px solid var(--sv-border);border-radius:20px;
-  background:radial-gradient(circle at 50% 70%, color-mix(in srgb, var(--av-color) 22%, transparent), var(--av-bg) 72%);box-shadow:0 10px 30px rgb(0 0 0 / 45%);transition:border-color .2s }
-.stage-pip[data-speaking] { border-color:var(--sv-selected-border) }
-.stage-pip .sv-avatar { width:80px;height:80px }
-.stage-pip .stage-tag { position:absolute;left:8px;bottom:8px }
-.pip-bubble { position:absolute;right:0;bottom:calc(100% + 10px);width:max-content;max-width:min(70vw,300px,calc(100cqw - 32px));padding:9px 12px;font-size:14px }
-.pip-bubble::after { right:28px }
-.pip-bubble .voice-wave { width:10rem;height:1.9rem;color:var(--sv-on-primary) }
-.pip-bubble .cancel-input { color:color-mix(in srgb, var(--sv-danger) 75%, black) }
+/* What the person is saying, at the bottom middle of the stage while they say it. */
+.person-bubble { position:absolute;z-index:3;left:50%;bottom:16px;width:max-content;max-width:min(80%,420px);padding:9px 12px;font-size:14px;transform:translateX(-50%);display:flex;align-items:center;gap:10px }
+.person-bubble .voice-wave { width:10rem;height:1.9rem;color:var(--sv-on-primary) }
+.person-bubble .cancel-input { color:color-mix(in srgb, var(--sv-danger) 75%, black) }
 /* The room's errors, above the stage now that the transcript is out of the way (#error is the runtime's id). */
 #error.stage-error { flex:none;margin:0;padding:8px 14px;border:1px solid #7d4a45;border-radius:14px;background:#2a1d1c;color:#f2c6bd;font-size:12px;line-height:1.45 }
 #error.stage-error[hidden] { display:none }
 .stage-empty { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;color:var(--sv-muted);text-align:center }
 .stage-empty p { margin:0;line-height:1.5 }
-@container stage (min-width:560px) {
-  .stage-pip { width:200px;height:150px }
-  .stage-pip .sv-avatar { width:104px;height:104px }
-  .stage-tags { max-width:calc(100% - 240px) }
-}
 @container stage (max-width:480px) {
   .stage-bubble { font-size:16px }
 }
@@ -162,14 +152,17 @@
   .room-header { gap:6px;padding:0 10px 0 6px }
   .room-header .brand + .conversation-trigger { margin-left:0 }
   .room-header .brand + .conversation-trigger::before { display:none }
-  .room-header .brand { position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0 }
-  .conversation-trigger .trigger-avatar { display:none }
-  .trigger-caret { display:block }
-  .header-conversations { display:flex;align-items:center;gap:2px;flex:none }
+  .room-header .brand { font-size:18px }
+  .room-header .brand svg { width:26px;height:26px }
+  .room-header .conversation-trigger { display:none }
+  .header-conversations { display:flex;align-items:center;gap:2px;flex:none;margin-left:auto }
+  .header-conversations + .header-settings { margin-left:6px }
+  /* The handle the whole list comes down from. */
+  .conversations-grab { display:grid;place-items:center;flex:none;width:100%;height:18px;margin:0;padding:0;border:0;border-radius:0;background:transparent;touch-action:none;cursor:grab }
+  .conversations-grab i { width:40px;height:4px;border-radius:2px;background:#4a5360 }
   .header-avatar { position:relative;width:40px;height:40px;padding:3px;border:0;border-radius:50%;background:transparent }
   .header-avatar .conversation-avatar { width:34px;height:34px }
   .header-avatar .state-dot { width:11px;height:11px }
-  .header-more { display:inline-flex;align-items:center;gap:2px;height:30px;min-width:40px;margin-left:2px;padding:0 8px;border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill);background:var(--sv-surface-raised);color:var(--sv-muted);font-size:12px;font-variant-numeric:tabular-nums }
 
   #root > .room-shell > main.call-layout { flex-direction:column }
   /* The conversations drop from the header as a panel over the dimmed call. */

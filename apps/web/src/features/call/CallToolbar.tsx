@@ -1,7 +1,6 @@
 import { useRef, type SyntheticEvent } from "react";
 import { JoinStatus } from "./JoinStatus";
 import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
-import { CapabilityColumn, EngineColumn, LightsSummary } from "../conversation/StatusColumns";
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon, TranscriptIcon } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
@@ -44,15 +43,12 @@ function CallMenu() {
   );
 }
 
-/* The bar's three parts: what this call has switched on at the left edge, the controls island in the
- * middle — the microphone, skip, the call, and ⋮ —, and at the right edge what listens, speaks and thinks, and the
- * transcript's button. Facts at the sides, the call's actions in the middle. */
+/* The call's controls in the middle — the microphone, skip, the call, and ⋮ — and the transcript's button at the
+ * right edge. */
 export function CallToolbar() {
   const t = callTranslator();
   return (
     <footer className="call-bar">
-      <CapabilityColumn />
-      <LightsSummary />
       <div className="controls" id="call-controls">
         <JoinStatus />
         <div className="call-actions">
@@ -66,7 +62,6 @@ export function CallToolbar() {
         </div>
       </div>
       <div className="call-bar-end">
-        <EngineColumn />
         <TranscriptToggle />
       </div>
     </footer>

@@ -223,6 +223,7 @@ export function participantsView(s) {
         return { threadId: p.thread_id, title: p.title, selected: p.thread_id === selected, available: !!p.available, switching: s.switching,
             unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
             machine: p.machine?.host || null, machineId: p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
+            model: p.engine?.model ? shortModel(p.engine.model) : null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }

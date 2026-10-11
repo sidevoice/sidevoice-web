@@ -64,6 +64,9 @@ export interface ParticipantView {
   machineId?: string | null;
   /** The harness the conversation runs in ("claude", "codex"), shown as its icon; null when unknown. */
   harness?: string | null;
+  /** The agent's model, short ("Opus 5"), and its thinking effort ("high"), as the harness reports them; null when not. */
+  model?: string | null;
+  effort?: string | null;
   /** How that harness is reached, when the room says it (Cursor: its editor card, its CLI under persist, or
    *  listening only); null against a room that does not. */
   route?: string | null;

@@ -13,7 +13,7 @@ test("a model name is said the way a person says it, and one we cannot read is s
   expect(shortModel(null)).toBe("");
 });
 
-test("what a conversation thinks with reaches the models panel, shortened — and not the conversation's own row, which says the harness instead", () => {
+test("what a conversation thinks with reaches the models panel, shortened, and each conversation's own row carries it too", () => {
   const store = createRoomSessionStore();
   store.patch({
     roomBinding: { thread_id: "t-1", binding_id: "b-1", title: "Sidevoice" },
@@ -23,7 +23,7 @@ test("what a conversation thinks with reaches the models panel, shortened — an
       { thread_id: "t-3", title: "Sin modelo", available: true },
     ],
   });
-  expect(store.getState().participants.every((row) => !("model" in row))).toBe(true);
+  expect(store.getState().participants.map((row) => row.model)).toEqual(["Fable 5.1", "GPT-5.6 Terra", null]);
   const thinks = store.getState().enginePanel.find((row) => row.id === "agent")!;
   expect(thinks.label).toBe("LLM");
   expect(thinks.value).toBe("Fable 5.1");
