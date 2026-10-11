@@ -14,6 +14,7 @@ import {
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
 import { avatarColor } from "../features/avatar/bicho-draw";
+import { StageBackdrop, useSceneScale } from "../features/avatar/StageScene";
 import { CharacterAvatar, type AvatarSize } from "../features/avatar/CharacterAvatar";
 import { callTranslator } from "../features/call/call-i18n";
 import { conversationTranslator } from "../features/conversation/conversation-i18n";
@@ -148,8 +149,11 @@ function PhonePanel() {
 function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" | "working" | "waiting" | "listening"; compact?: boolean; phone?: boolean }) {
   const t = callTranslator();
   const spec = avatarFor("sidevoice-web");
+  const sceneRef = useSceneScale();
   return (
-    <div className="pt-stage" data-compact={compact || undefined} style={{ "--pt-tone": avatarColor(spec) } as CSSProperties}>
+    <div ref={sceneRef} className="pt-stage" data-compact={compact || undefined} style={{ "--pt-tone": avatarColor(spec) } as CSSProperties}>
+      {/* The bicho's backdrop, as the room's stage draws it (StageScene), behind the pattern. */}
+      <div className="stage-scene"><StageBackdrop seed="sidevoice-web" tone={avatarColor(spec)} /></div>
       <div className="pt-stage-name"><h3>sidevoice-web</h3><span>MacBook Pro</span></div>
       <div className="pt-stage-top">
         {mood === "speaking" && <div className="pt-bubble pt-bubble--agent">

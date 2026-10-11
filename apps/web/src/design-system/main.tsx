@@ -5,6 +5,7 @@ import { DesignSystemPage } from "./DesignSystemPage";
 // and their colours (styles/tokens.css, before the design tokens so those win).
 import "../styles/tokens.css";
 import "../styles/call.css";
+import "../styles/bichos.css";
 import "../styles/theme.css";
 import "../components/ui/ui.css";
 import "../features/settings/model-prepare.css";

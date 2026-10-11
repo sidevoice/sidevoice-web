@@ -260,3 +260,8 @@
 /* The transcript's button in the tile's corner (the room's TranscriptEntry), a dot when something is unread. */
 .pt-transcript { position: absolute; right: var(--sv-space-3); bottom: var(--sv-space-3); width: 44px; height: 44px; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
 .pt-transcript-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
+
+/* The stage pattern wears the bicho's backdrop behind everything else in it (the room's StageScene). */
+.pt-stage { isolation: isolate; }
+.pt-stage > .stage-scene { z-index: -1; }
+.pt-stage .pt-stage-name { padding: 6px 12px; border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); }

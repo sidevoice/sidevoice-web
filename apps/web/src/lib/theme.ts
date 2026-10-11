@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 /* Which theme the page wears: the person's choice (`light`, `dark`), else the system's, followed as it changes. The
  * tokens (styles/theme.css) read it from `data-theme` on the root. The choice is this device's (Settings → General),
  * applied at once. */
@@ -44,4 +45,15 @@ export function setThemePreference(preference: ThemePreference) {
 /** At start: the saved choice, or the system's. */
 export function startPageTheme() {
   stopFollowing = applyTheme(readThemePreference());
+}
+
+/** The theme the page wears now (its data-theme), following every change: for what draws in a theme's own colours
+ *  rather than through the tokens (the bichos' backdrops). */
+export function usePageTheme(): "light" | "dark" {
+  const read = () => (document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+  return useSyncExternalStore((notify) => {
+    const observer = new MutationObserver(notify);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, read, () => "light");
 }

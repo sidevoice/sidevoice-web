@@ -1,5 +1,6 @@
 import "../styles/tokens.css";
 import "../styles/call.css";
+import "../styles/bichos.css";
 import "../styles/theme.css";
 import "../components/ui/ui.css";
 import "../styles/app.css";
