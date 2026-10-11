@@ -310,12 +310,8 @@ function WizardWhere() {
     <WizardFrame step={0} title={t("wizard.title.where")} footer={<Button variant="primary">{t("wizard.continue")}</Button>}>
       <p>{t("wizard.where.body")}</p>
       <div className="pt-choices" role="radiogroup" aria-label={t("wizard.title.where")}>
-        <ChoiceCard selected={choice === "local"} onSelect={() => setChoice("local")}><MachinesIcon size={20} /><strong>{t("wizard.choice.local")}</strong></ChoiceCard>
-        <ChoiceCard selected={choice === "remote"} onSelect={() => setChoice("remote")}><ConnectorIcon size={20} /><strong>{t("wizard.choice.remote")}</strong></ChoiceCard>
-      </div>
-      <div className="pt-detected">
-        <p className="pt-detected-label">{t("wizard.detected")}</p>
-        <div className="pt-chips"><Badge><HarnessIcon harness="claude" size={12} />Claude Code</Badge><Badge><HarnessIcon harness="codex" size={12} />Codex</Badge></div>
+        <ChoiceCard selected={choice === "local"} onSelect={() => setChoice("local")}><MachinesIcon size={20} /><strong>{t("wizard.choice.local")}</strong><span className="pt-choice-note">{t("wizard.choice.localNote")}</span></ChoiceCard>
+        <ChoiceCard selected={choice === "remote"} onSelect={() => setChoice("remote")}><ConnectorIcon size={20} /><strong>{t("wizard.choice.remote")}</strong><span className="pt-choice-note">{t("wizard.choice.remoteNote")}</span></ChoiceCard>
       </div>
     </WizardFrame>
   );

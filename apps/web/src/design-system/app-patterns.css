@@ -191,6 +191,7 @@
 .pt-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--sv-space-3); }
 .pt-choices .ui-card { display: grid; gap: var(--sv-space-2); justify-items: start; }
 .pt-choices .ui-card > svg { color: var(--sv-accent-text); }
+.pt-choice-note { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
 .pt-detected { display: grid; gap: var(--sv-space-2); }
 .pt-detected-label { margin: 0; font-size: var(--sv-font-sm); font-weight: 600; }
 .pt-chips { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); }

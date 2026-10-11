@@ -86,7 +86,6 @@ export interface LocalHostBridge {
   pairRoom?(url: string, code: string): Promise<unknown>;
   install?(onProgress?: (event: LocalHostInstallProgress) => void): LocalHostInstallOperation;
   cancel?(job: string): Promise<boolean>;
-  agents?(): Promise<{ agents: unknown[]; scanned_at: string }>;
   update?(): Promise<LocalHostStatus>;
   version?(): Promise<LocalHostVersion>;
 }

@@ -31,9 +31,6 @@ interface OnboardingValue {
   canHostAgents: boolean;
   localReady: boolean;
   remoteReady: boolean;
-  localAgents: { id: string; label: string; version: string | null }[];
-  localAgentsLoading: boolean;
-  localAgentsScanned: boolean;
   /** Whether the voice settings being edited for `task` are the ones the person tried. */
   tried(task: "stt" | "tts"): boolean;
   openWizard(step?: OnboardingStep): void;
@@ -50,7 +47,6 @@ interface OnboardingValue {
   markTried(task: "stt" | "tts"): Promise<boolean>;
   defer(): Promise<void>;
   complete(): Promise<boolean>;
-  rescanLocalAgents(): Promise<void>;
 }
 
 const Context = createContext<OnboardingValue | null>(null);
@@ -99,9 +95,6 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const [error, setError] = useState<ErrorKey | null>(initial.error as ErrorKey | null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<OnboardingStep>("W0");
-  const [localAgents, setLocalAgents] = useState<OnboardingValue["localAgents"]>([]);
-  const [localAgentsLoading, setLocalAgentsLoading] = useState(false);
-  const [localAgentsScanned, setLocalAgentsScanned] = useState(false);
   const recordRef = useRef(initial.record);
   const writes = useRef(Promise.resolve());
   const decided = useRef(false);
@@ -143,29 +136,9 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     setOpen(true);
   }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, live, persist, resume, startAt]);
 
-  const rescanLocalAgents = useCallback(async () => {
-    const bridge = localHostBridge();
-    if (!bridge?.agents) { setLocalAgentsScanned(true); return; }
-    setLocalAgentsLoading(true);
-    try {
-      const result = await bridge.agents();
-      setLocalAgents((Array.isArray(result?.agents) ? result.agents : []).flatMap((row) => {
-        const item = (row && typeof row === "object" ? row : {}) as Record<string, unknown>;
-        const id = typeof item.id === "string" ? item.id : "";
-        const label = typeof item.label === "string" ? item.label : id;
-        return id ? [{ id, label, version: typeof item.version === "string" ? item.version : null }] : [];
-      }));
-    } catch { setLocalAgents([]); }
-    finally { setLocalAgentsLoading(false); setLocalAgentsScanned(true); }
-  }, []);
-
-  useEffect(() => {
-    if (open && step === "W1" && canHostAgents && !localAgentsScanned && !localAgentsLoading) void rescanLocalAgents();
-  }, [open, step, canHostAgents, localAgentsScanned, localAgentsLoading, rescanLocalAgents]);
-
   const draft = room.facts.voiceDraft ?? room.facts.voiceSettings;
   const value: OnboardingValue = {
-    ready, record, error, open, step, canHostAgents, localAgents, localAgentsLoading, localAgentsScanned,
+    ready, record, error, open, step, canHostAgents,
     path: canHostAgents ? record.choice : "remote",
     localReady: live.localReady,
     remoteReady: live.remoteReady,
@@ -202,7 +175,6 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
       if (saved) setOpen(false);
       return saved;
     },
-    rescanLocalAgents,
   };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
