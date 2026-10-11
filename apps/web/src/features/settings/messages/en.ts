@@ -269,8 +269,8 @@ export const en = {
   "voice.patience.normal": "Normal",
   "voice.patience.calm": "Calm: long pauses are part of the turn",
   "voice.endOfTurn": "End of turn",
-  "voice.endOfTurn.silence": "Silence",
-  "voice.endOfTurn.smart": "Smart (Smart Turn)",
+  "voice.endOfTurn.silence": "Silence (a pause, as long as Patience says)",
+  "voice.endOfTurn.smart": "Smart (hears when you have finished)",
   "voice.endOfTurn.none": "No end-of-turn model runs on this device yet: a turn ends with silence.",
   "voice.restartNote": "During a call, changing a source, a model or the end of turn restarts the voice for a moment: what you are saying is dropped and the reply playing stops. The language, voice, speed and patience apply without a cut.",
   "voice.catalog.noKey": "needs your key (Providers)",
@@ -513,6 +513,10 @@ export const en = {
   "runtime.device.cores": "{n} cores",
   "settings.section.notReady": "Not ready",
   "runtime.advanced": "Advanced: how it runs",
+  // The smart end of turn's model (TurnChoices).
+  "settings.save.waitTurn": "The end-of-turn model isn't ready yet.",
+  "voice.endOfTurn.model": "End-of-turn model",
+  "voice.endOfTurn.modelHint": "A small model that hears when you have finished, rather than waiting out a silence.",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

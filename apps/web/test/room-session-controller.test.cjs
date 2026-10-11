@@ -1114,7 +1114,8 @@ test('Saved voice settings are checked by the voice, kept on this device, and th
  s.run("window.sidevoiceActions.editVoice({stt:{catalog:'openai'},patience:'calm'})");
  assert.deepEqual(plain(s.run('voiceDraft.stt')),{catalog:'openai',model:'gpt-4o-transcribe',language:s.run('voiceSettings.stt.language')},'another source takes its first model');
  await s.run("saveSettings()");
- assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),plain(s.run('voiceDraft')));
+ // As this device can take them: no end-of-turn model here, so the smart end of turn is silence.
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),{...plain(s.run('voiceDraft')),end_of_turn:'silence'});
  const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
  assert.deepEqual([kept.stt.catalog,kept.stt.model,kept.patience],['openai','gpt-4o-transcribe','calm']);
  assert.equal(s.run('voiceSettings.stt.model'),'gpt-4o-transcribe');

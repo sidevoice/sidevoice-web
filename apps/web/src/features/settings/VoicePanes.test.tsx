@@ -76,7 +76,7 @@ test("the voice and the speed range are the model's; smart-turn says why it cann
   expect([speed.min, speed.max]).toEqual(["0.5", "2"]);
   fireEvent.change(document.getElementById("tts-voice")!, { target: { value: "ef_dora" } });
   expect(actions.editVoice).toHaveBeenCalledWith({ tts: { voice: "ef_dora" } });
-  expect(options("voice-end-of-turn")[1].disabled).toBe(true);
+  expect(options("voice-end-of-turn")[0].disabled).toBe(true);
   expect(screen.getByText(/No end-of-turn model runs on this device yet/)).toBeInTheDocument();
   cleanup();
   // A model that takes no speed has no slider.

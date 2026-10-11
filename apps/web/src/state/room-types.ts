@@ -186,7 +186,7 @@ export interface SidevoiceActions {
    *  that work become this device's. Rejects with a sentence and the failure's `code`. */
   tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean }): Promise<{ text?: string }>;
   /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
-  installVoiceModel?(task: "stt" | "tts"): Promise<void>;
+  installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
   cancelVoiceInstall?(): void;
   /** Stops the try in progress, which then rejects `trial-cancelled`. */

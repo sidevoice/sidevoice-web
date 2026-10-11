@@ -12,7 +12,7 @@ import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-langua
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
@@ -1159,7 +1159,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}
   const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
-  await next.setSettings(state.voiceSettings);
+  await next.setSettings(voiceSettingsHere(state.voiceSettings,state.voiceCatalogue.catalogs));
   // A hang-up while the settings were taken leaves this join: nothing of it may start the microphone after it.
   if(epoch!==connectEpoch)return;
   await next.start();
@@ -1301,7 +1301,7 @@ function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.vo
 async function saveVoiceSettings(){
  const draft=state.voiceDraft;if(!draft||JSON.stringify(draft)===JSON.stringify(state.voiceSettings))return;
  const host=await voiceHost().catch(()=>null);
- if(host)await host.setSettings(draft);
+ if(host)await host.setSettings(voiceSettingsHere(draft,state.voiceCatalogue.catalogs));
  writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
@@ -1310,7 +1310,7 @@ let voiceTry=null;
 async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
  if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
  voiceTry?.abort();const abort=voiceTry=new AbortController();
- const settings=state.voiceDraft||state.voiceSettings;
+ const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
  try{
   const host=await voiceHost();
   const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal})}
@@ -1325,7 +1325,9 @@ function cancelVoiceTry(){voiceTry?.abort()}
 // slot names, else its recommended one), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
 let voiceInstall=null;
 async function installVoiceModel(task){
- const slot=(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
+ // The end of turn has no slot: its model is this device's end-of-turn model.
+ const turn=task==='end-of-turn'?endOfTurnModel(state.voiceCatalogue.catalogs):null;
+ const slot=turn?{catalog:'local',model:turn.id}:(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
  const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
  const build=(slot.build&&model?.builds?.find(b=>b.id===slot.build))??model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
  voiceInstall?.abort();const abort=voiceInstall=new AbortController();

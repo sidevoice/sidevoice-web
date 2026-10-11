@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import type { DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
+import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { PrepareStatus } from "./ModelPrepare";
 
@@ -12,11 +12,13 @@ import type { PrepareStatus } from "./ModelPrepare";
 export type Task = "stt" | "tts";
 
 /** Where the slot's model stands: not on this device yet (with its download size), being installed, failed, ready. */
-export function useModelState(task: Task, draft: Settings | null) {
+export function useModelState(task: Task | "end-of-turn", draft: Settings | null) {
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
   const install = useRoomStore((state) => state.facts.voiceInstall);
-  const slot = draft?.[task];
+  // The end of turn has no slot of its own: its model is this device's end-of-turn model, when it is the smart one.
+  const turnModel = task === "end-of-turn" && draft?.end_of_turn === "smart-turn" ? endOfTurnModel(catalogs) : null;
+  const slot = task === "end-of-turn" ? (turnModel ? { catalog: "local", model: turnModel.id, build: undefined as string | undefined } : undefined) : draft?.[task];
   const model = slot ? catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
   const local = slot?.catalog === "local";
   // The build it runs as: the one chosen (Settings, "How it runs"), else the engine's recommended one.
@@ -66,7 +68,7 @@ export function sizeText(bytes: number | null, language = document.documentEleme
 }
 
 /** The download of the slot's model: started, cancelled. */
-export const downloadModel = (task: Task) => void window.sidevoiceActions?.installVoiceModel?.(task);
+export const downloadModel = (task: Task | "end-of-turn") => void window.sidevoiceActions?.installVoiceModel?.(task);
 export const cancelDownload = () => window.sidevoiceActions?.cancelVoiceInstall?.();
 
 type TryState = { phase: "idle" | "running" | "done" | "failed"; text: string; error: string };

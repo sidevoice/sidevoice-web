@@ -187,6 +187,9 @@ export function TurnChoices({ draft }: { draft: Settings }) {
     { value: "calm", label: "voice.patience.calmShort", hint: "voice.patience.calm" },
   ];
   const current = patience.find((option) => option.value === draft.patience) ?? patience[1];
+  // Smart where its model runs here; silence where it does not (voiceSettingsHere), whatever was kept.
+  const smart = draft.end_of_turn === "smart-turn" && choices.endOfTurn.smartTurn;
+  const turn = useModelState("end-of-turn", draft);
   return (
     <Group title={t("settings.call.turn")}>
       <Row label={t("voice.patience")} description={t(current.hint)}>
@@ -194,11 +197,15 @@ export function TurnChoices({ draft }: { draft: Settings }) {
           items={patience.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
       <Row label={t("voice.endOfTurn")} description={choices.endOfTurn.note ? noteText(t, choices.endOfTurn.note) : t("voice.endOfTurn.hint")} htmlFor="voice-end-of-turn">
-        <NativeSelect id="voice-end-of-turn" value={draft.end_of_turn} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
+        <NativeSelect id="voice-end-of-turn" value={smart ? "smart-turn" : "silence"} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
+          <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn}>{t("voice.endOfTurn.smart")}</option>
           <option value="silence">{t("voice.endOfTurn.silence")}</option>
-          <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn && draft.end_of_turn !== "smart-turn"}>{t("voice.endOfTurn.smart")}</option>
         </NativeSelect>
       </Row>
+      {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
+        <ModelPrepare id="turn-model-card" actionIds="turn-model" status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
+          onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
+      </Row>}
     </Group>
   );
 }
@@ -221,8 +228,9 @@ export function useVoiceReadiness() {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const stt = useModelState("stt", draft);
   const tts = useModelState("tts", draft);
+  const turn = useModelState("end-of-turn", draft);
   const waits = (model: ModelState) => !!model.model && !model.ready;
-  return { stt: waits(stt), tts: waits(tts) };
+  return { stt: waits(stt), tts: waits(tts), turn: waits(turn) };
 }
 
 /** A slot's pane in Settings: the catalogue loading or failed, else the slot. */

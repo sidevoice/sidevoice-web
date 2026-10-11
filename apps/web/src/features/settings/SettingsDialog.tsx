@@ -124,8 +124,8 @@ export function SettingsDialog() {
   const waits = useVoiceReadiness();
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
   const show = (section: string) => store?.patch({ settingsSection: section });
-  const blocked = waits.stt || waits.tts;
-  const reason = waits.stt ? t("settings.save.waitTranscription") : waits.tts ? t("settings.save.waitVoice") : "";
+  const blocked = waits.stt || waits.tts || waits.turn;
+  const reason = waits.stt ? t("settings.save.waitTranscription") : waits.tts ? t("settings.save.waitVoice") : waits.turn ? t("settings.save.waitTurn") : "";
   return (
     <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" aria-labelledby="settings-title">
       <OverlayPortalProvider container={dialog}>
@@ -134,14 +134,14 @@ export function SettingsDialog() {
             <p id="settings-error" className="settings-error" role="alert" />
             {blocked && <p className="ui-dialog-reason" id="settings-save-reason">{reason}</p>}
             <Button type="submit" form="language-form" variant="primary" disabled={blocked} blockedBy="settings-save-reason"
-              onBlocked={() => show(waits.stt ? "transcription" : "voice")}>{t("settings.save")}</Button>
+              onBlocked={() => show(waits.stt ? "transcription" : waits.tts ? "voice" : "call")}>{t("settings.save")}</Button>
           </>}>
           <form id="language-form" className="settings-layout">
             <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
               {SECTIONS.map((section) => <button key={section.id} type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
                 aria-current={section.id === current ? "page" : undefined} onClick={() => show(section.id)}>
                 {section.icon}<span>{t(section.label)}</span>
-                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
+                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>)}
             </nav>
             <div className="settings-content">

@@ -39,7 +39,8 @@ export function defaultVoiceSettings() {
     stt: { catalog: LOCAL_CATALOG, model: 'whisper-base', language: null },
     tts: { catalog: LOCAL_CATALOG, model: 'kokoro-82m-v1.0', voice: null, speed: SPEED.normal },
     patience: 'normal',
-    end_of_turn: 'silence',
+    // The model that hears when you have finished, where it runs; silence where it does not (voiceSettingsHere).
+    end_of_turn: 'smart-turn',
     idle_unload_minutes: 10,
   };
 }
@@ -192,6 +193,26 @@ function slotChoices(catalogs, capability, slot) {
   const model = models.find((candidate) => candidate.id === slot.model) ?? null;
   if (!model && slot.model) options.unshift({ id: slot.model, group: null, disabled: false, note: { key: 'voice.model.missing' } });
   return { sources, options, model };
+}
+
+/**
+ * This device's end-of-turn model: the first of the local catalogue's that runs here, or none.
+ * @param {CatalogView[]} catalogs
+ */
+export function endOfTurnModel(catalogs) {
+  return offered(catalogs.find((catalog) => catalog.id === LOCAL_CATALOG), 'end-of-turn').find(runs) ?? null;
+}
+
+/**
+ * `settings` as this device can take them: the smart end of turn where no end-of-turn model runs here is silence. With
+ * no catalogues read yet, as they are.
+ * @param {DeviceVoiceSettings} settings
+ * @param {CatalogView[]} catalogs
+ * @returns {DeviceVoiceSettings}
+ */
+export function voiceSettingsHere(settings, catalogs) {
+  if (settings.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs)) return settings;
+  return { ...settings, end_of_turn: 'silence' };
 }
 
 /**

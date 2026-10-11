@@ -271,8 +271,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "voice.patience.normal": "Normal",
   "voice.patience.calm": "Tranquila: las pausas largas son parte del turno",
   "voice.endOfTurn": "Fin del turno",
-  "voice.endOfTurn.silence": "Silencio",
-  "voice.endOfTurn.smart": "Inteligente (Smart Turn)",
+  "voice.endOfTurn.silence": "Silencio (una pausa, tan larga como diga la Paciencia)",
+  "voice.endOfTurn.smart": "Inteligente (oye cuándo has terminado)",
   "voice.endOfTurn.none": "Aún no hay un modelo de fin de turno que funcione en este dispositivo: el turno termina con el silencio.",
   "voice.restartNote": "Durante una llamada, cambiar un origen, un modelo o el fin del turno reinicia la voz un momento: lo que estés diciendo se descarta y la respuesta que suena se corta. El idioma, la voz, la velocidad y la paciencia se aplican sin cortar.",
   "voice.catalog.noKey": "necesita tu clave (Proveedores)",
@@ -515,4 +515,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "runtime.device.cores": "{n} núcleos",
   "settings.section.notReady": "No listo",
   "runtime.advanced": "Avanzado: cómo se ejecuta",
+  // The smart end of turn's model (TurnChoices).
+  "settings.save.waitTurn": "El modelo de fin de turno aún no está listo.",
+  "voice.endOfTurn.model": "Modelo de fin de turno",
+  "voice.endOfTurn.modelHint": "Un modelo pequeño que oye cuándo has terminado, en vez de esperar a un silencio.",
 };
