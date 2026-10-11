@@ -12,6 +12,7 @@ import { MachineList } from "../room/MachineList";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { Alert } from "../../components/ui/Alert";
+import { catalogueShown } from "./ModelSetup";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
@@ -64,7 +65,7 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslat
  *  a call (this device's, applied at once). */
 function CallSettings({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
-  const ready = useRoomStore((state) => state.facts.voiceCatalogue.state === "ready");
+  const ready = useRoomStore((state) => catalogueShown(state.facts.voiceCatalogue));
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
   const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));

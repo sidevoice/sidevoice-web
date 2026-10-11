@@ -210,3 +210,11 @@ test("how a model runs folds under it: each build with what it runs on and its s
   fireEvent.click(options[1].querySelector("input")!);
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { build: "whisper-base/int8" } });
 });
+
+test("catalogues read again after a download keep the pane as it is: nothing empties and redraws under the person", () => {
+  const { store } = renderPane("voice");
+  const card = document.getElementById("stt-model-card");
+  act(() => store.patch({ voiceCatalogue: { state: "loading", catalogs, error: "" } }));
+  expect(document.getElementById("stt-model-card")).toBe(card);
+  expect(screen.queryByText("Loading the call's voice settings…")).toBeNull();
+});

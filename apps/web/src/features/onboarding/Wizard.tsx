@@ -12,7 +12,7 @@ import { ConnectorSteps } from "../pairing/ConnectorSteps";
 import { PairingCodeForm } from "../pairing/PairingDialog";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices } from "../settings/VoiceSettings";
-import { TryResult, useModelState, useVoiceTry, type ModelState } from "../settings/ModelSetup";
+import { TryResult, useModelState, useVoiceTry, type ModelState, catalogueShown } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
@@ -88,7 +88,7 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
   return <section className="wizard-stage-step">
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
-      : catalogue.state !== "ready" || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
+      : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
         : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} setup /> : <SpeechChoices draft={draft} setup />}</div>}
     {task === "tts" && <Field className="wizard-sample" label={t("wizard.sample")} aside={t("wizard.sampleCount", { count: stage.sample.length, max: SAMPLE_MAX })}>
       <Textarea id="wizard-sample" minRows={2} maxRows={4} maxLength={SAMPLE_MAX} value={stage.sample} placeholder={t("wizard.samplePlaceholder")}

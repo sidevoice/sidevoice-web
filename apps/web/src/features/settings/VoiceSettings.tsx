@@ -13,7 +13,7 @@ import type { HostMessageKey } from "./messages/en";
 import { ProviderKey } from "./ProviderKeys";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
-import { cancelDownload, downloadModel, TryResult, useModelState, useVoiceTry, type ModelState } from "./ModelSetup";
+import { cancelDownload, catalogueShown, downloadModel, TryResult, useModelState, useVoiceTry, type ModelState } from "./ModelSetup";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -231,8 +231,8 @@ export function SlotPane({ task }: { task: Task }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   return <>
-    {catalogue.state === "loading" || catalogue.state === "idle" ? <p className="muted" role="status">{t("voice.loading")}</p> : null}
+    {!catalogueShown(catalogue) && (catalogue.state === "loading" || catalogue.state === "idle") ? <p className="muted" role="status">{t("voice.loading")}</p> : null}
     {catalogue.state === "failed" ? <Alert tone="danger" title={catalogue.error} action={<Button id={task + "-catalogue-retry"} size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /> : null}
-    {catalogue.state === "ready" && draft ? (task === "stt" ? <TranscriptionChoices draft={draft} /> : <SpeechChoices draft={draft} />) : null}
+    {catalogueShown(catalogue) && draft ? (task === "stt" ? <TranscriptionChoices draft={draft} /> : <SpeechChoices draft={draft} />) : null}
   </>;
 }

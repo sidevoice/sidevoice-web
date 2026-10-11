@@ -52,6 +52,12 @@ export function useModelState(task: Task, draft: Settings | null) {
 
 export type ModelState = ReturnType<typeof useModelState>;
 
+/** Whether the catalogues can be shown: read, or being read again with the last ones still there — a download that
+ *  ends reads them again, and the page must not empty and redraw itself under the person meanwhile. */
+export function catalogueShown(catalogue: { state: string; catalogs: unknown[] }) {
+  return catalogue.state === "ready" || (catalogue.state === "loading" && catalogue.catalogs.length > 0);
+}
+
 /** Bytes as people read them: MB below a gigabyte, else GB. */
 export function sizeText(bytes: number | null, language = document.documentElement.lang || "en") {
   if (!bytes) return "";

@@ -11,6 +11,7 @@ import { CheckIcon, ExternalLinkIcon, MoreIcon, ProviderLogo, WarningIcon } from
 import { remoteProviders } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
+import { catalogueShown } from "./ModelSetup";
 import type { HostMessageKey } from "./messages/en";
 
 /* The remote providers, one row each, as good apps show a connected account: its mark and name, whether it is
@@ -203,12 +204,12 @@ export function ProviderKeys() {
         : <div id="provider-keys-where" role="note"><Alert tone="warning" title={t("keys.browserTitle")}>{t("keys.browser")}</Alert></div>}
       {/* The providers are the engine's remote catalogues: while they load, or when they could not be read, it says so
           rather than listing none. */}
-      {catalogue.state === "loading" || catalogue.state === "idle" ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
+      {!catalogueShown(catalogue) && (catalogue.state === "loading" || catalogue.state === "idle") ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
       {catalogue.state === "failed" ? (
         <div id="provider-keys-failed" role="alert"><Alert tone="danger" title={catalogue.error}
           action={<Button id="provider-keys-retry" size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /></div>
       ) : null}
-      {catalogue.state === "ready" ? (providers.length
+      {catalogueShown(catalogue) ? (providers.length
         ? <Group>{providers.map((provider) => <ProviderRow key={provider.id} provider={provider.id} name={provider.name}
             catalog={catalogue.catalogs.find((catalog) => catalog.id === provider.id)} inUse={uses(provider.id)} />)}</Group>
         : <p className="muted" id="provider-keys-none">{t("keys.none")}</p>) : null}
