@@ -150,18 +150,24 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
   </section>;
 }
 
-/** The voice steps' footer: the try, recommended (Cancel while it runs), and Continue, which waits only for the model to
- *  be ready — made ready in its own block above (ModelPrepare), as in Settings — and never for a try. */
-function StageAction({ task, model, running, disabled, onTry, onCancelTry, onContinue, t }: {
-  task: "stt" | "tts"; model: ModelState; running: boolean; disabled: boolean;
+/** The voice steps' footer. Once the model is ready — made ready in its own block above (ModelPrepare), as in Settings
+ *  — trying it is the main action and going on without it the other; once it worked, Continue is. Trying stays
+ *  optional: nothing waits for it but the model. */
+function StageAction({ task, model, running, tried, disabled, onTry, onCancelTry, onContinue, t }: {
+  task: "stt" | "tts"; model: ModelState; running: boolean; tried: boolean; disabled: boolean;
   onTry(): void; onCancelTry(): void; onContinue(): void; t: HostTranslate;
 }) {
   const waiting = !model.model || !model.ready;
+  const tryLabel = task === "stt" ? t("wizard.speak") : t("wizard.listen");
   return <>
     {waiting && <p className="ui-dialog-reason" id="wizard-stage-reason">{t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")}</p>}
-    {running ? <Button type="button" variant="secondary" id="wizard-try" onClick={onCancelTry}>{t("wizard.cancelTrial")}</Button>
-      : <Button type="button" variant="secondary" id="wizard-try" disabled={disabled || waiting} onClick={onTry}>{task === "stt" ? t("wizard.speak") : t("wizard.listen")}</Button>}
-    <Button type="button" variant="primary" id="wizard-stage-action" disabled={waiting || running} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onContinue}>{t("wizard.continue")}</Button>
+    {tried && !running
+      ? <Button type="button" variant="primary" id="wizard-stage-action" disabled={waiting} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onContinue}>{t("wizard.continue")}</Button>
+      : <>
+        {running ? <Button type="button" variant="secondary" id="wizard-try-cancel" onClick={onCancelTry}>{t("wizard.cancelTrial")}</Button>
+          : <Button type="button" variant="secondary" id="wizard-stage-action" disabled={waiting} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onContinue}>{t("wizard.continueWithoutTrying")}</Button>}
+        <Button type="button" variant="primary" id="wizard-try" loading={running} disabled={disabled || waiting || running} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onTry}>{tryLabel}</Button>
+      </>}
   </>;
 }
 
@@ -376,7 +382,7 @@ export function Wizard() {
       {shown === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {shown === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
-      {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"}
+      {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
         disabled={!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim())}
         onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
       {step === "W5" && <Button type="button" variant="primary" id="wizard-turn-continue" disabled={turnWaits} onClick={() => void finishTurn()}>{t("wizard.continue")}</Button>}

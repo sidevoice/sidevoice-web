@@ -3,6 +3,10 @@
  * sentence they hear. No room, no agent, no conversation: a try opens the voice, waits for its one result and stops it,
  * whatever happens. A try is cancellable, bounded in time, and fails by a stable code. */
 
+/** How long a try's phases took, in ms (null where the voice did not say). Transcription: `ready_ms`, `audio_ms`,
+ * `endpoint_silence_ms`, `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
+ * @typedef {{ ready_ms: number | null, audio_ms?: number | null, endpoint_silence_ms?: number | null, recognition_ms?: number | null, first_sound_ms?: number | null }} TrialTimings */
+
 /** A failure of a try itself: `trial-silence` (nothing usable heard in time), `trial-cancelled`, `trial-not-heard`. */
 function trialError(code, detail) {
   return Object.assign(new Error(code), { code }, detail ? { detail } : {});
@@ -24,24 +28,30 @@ function bounded(promise, { signal, timeoutMs }) {
  * words is the result. A turn with none (a cough, a merge) is not one; an error of the voice ends the try with it.
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
- * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void}} [options]
+ * `onTimings`, once heard: how long the voice took to be ready, and the turn's own (the speech, the pause waited for,
+ * the recognition).
+ * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState } = {}) {
+export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState, onTimings } = {}) {
   const stops = [];
+  let readyMs = null;
   try {
     await voice.setSettings(settings);
     const heard = new Promise((resolve, reject) => {
       stops.push(voice.onTurn((turn) => {
         const text = turn.phase === 'finished' ? String(turn.text ?? '').trim() : '';
-        if (text) resolve(text);
+        if (!text) return;
+        onTimings?.({ ready_ms: readyMs, audio_ms: turn.timings?.audio_ms ?? null, endpoint_silence_ms: turn.timings?.endpoint_silence_ms ?? null, recognition_ms: turn.timings?.recognition_ms ?? null });
+        resolve(text);
       }));
       stops.push(voice.onError(reject));
     });
     // Its failure before the voice even listens is the start's to report; this one must not go unheard.
     heard.catch(() => {});
     if (onState) stops.push(voice.onState(onState));
-    return await bounded(voice.start().then(() => heard), { signal, timeoutMs });
+    const starting = performance.now();
+    return await bounded(voice.start().then(() => { readyMs = Math.round(performance.now() - starting); return heard; }), { signal, timeoutMs });
   } finally {
     for (const stop of stops) stop();
     await voice.stop().catch(() => {});
@@ -54,17 +64,23 @@ export async function tryTranscription(voice, settings, { signal, timeoutMs = 20
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * @param {string} text
- * @param {{language?: string | null, signal?: AbortSignal, timeoutMs?: number}} [options]
+ * `onTimings`, once heard: how long the voice took to be ready, and from asking it to speak to its first sound.
+ * @param {{language?: string | null, signal?: AbortSignal, timeoutMs?: number, onTimings?: (timings: TrialTimings) => void}} [options]
  */
-export async function tryVoice(voice, settings, text, { language = null, signal, timeoutMs = 60000 } = {}) {
+export async function tryVoice(voice, settings, text, { language = null, signal, timeoutMs = 60000, onTimings } = {}) {
   let saying = null;
+  let readyMs = null, firstSoundMs = null;
   try {
     await voice.setSettings(settings);
+    const starting = performance.now();
     const outcome = await bounded(voice.start().then(() => {
+      readyMs = Math.round(performance.now() - starting);
+      const asked = performance.now();
       saying = voice.say(text, language ? { language } : undefined);
+      saying.onEvent?.((event) => { if (event.type === 'playing' && firstSoundMs === null) firstSoundMs = Math.round(performance.now() - asked); });
       return saying.outcome;
     }), { signal, timeoutMs });
-    if (outcome.status === 'heard') return outcome;
+    if (outcome.status === 'heard') { onTimings?.({ ready_ms: readyMs, first_sound_ms: firstSoundMs }); return outcome; }
     throw outcome.reason === 'failed' ? trialError(outcome.code || 'trial-not-heard') : trialError('trial-not-heard', outcome.reason);
   } catch (error) {
     saying?.cancel();

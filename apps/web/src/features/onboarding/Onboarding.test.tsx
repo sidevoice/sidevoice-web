@@ -27,7 +27,7 @@ beforeEach(() => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
     openPairing: vi.fn(), chooseMachine: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
-    tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?" }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
+    tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
@@ -87,10 +87,16 @@ test("transcription and voice are this device's: trying them is recommended, and
   await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", { keep: true });
   expect(document.getElementById("stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  // Tried: Continue is the main action now, and how quick it was is said in a line.
+  expect(stageAction()).toHaveTextContent(/^Continue$/);
+  expect(stageAction()).toHaveClass("ui-button--primary");
+  expect(document.getElementById("stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(document.getElementById("stt-timing")).not.toHaveTextContent("smaller model");
   await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("Set up voice");
-  // Not tried: Continue goes on all the same.
+  // Not tried: going on without it is offered all the same.
+  expect(stageAction()).toHaveTextContent("Continue without trying");
   expect(stageAction()).not.toHaveAttribute("aria-disabled");
   await act(async () => { fireEvent.click(stageAction()); });
 
@@ -149,7 +155,7 @@ test("a model not on this device is downloaded first, in its block as in Setting
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
   expect(document.getElementById("stt-model-card")).toHaveTextContent(/Not downloaded\s*148 MB/);
-  expect(tryButton()).toBeDisabled();
+  expect(tryButton()).toHaveAttribute("aria-disabled", "true");
   expect(stageAction()).toHaveAttribute("aria-disabled", "true");
   expect(stageAction()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
   expect(document.getElementById("stt-language")).toBeNull();

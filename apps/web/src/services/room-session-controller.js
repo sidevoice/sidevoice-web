@@ -1375,8 +1375,11 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
  try{
   const host=await voiceHost();
-  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal})}
-   :(await tryVoice(host,settings,text,{language,signal:abort.signal}),{});
+  // What each phase took, for the try to say how quick it was.
+  let timings=null;const onTimings=value=>{timings=value};
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,onTimings})}
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings}),{});
+  result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
  }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}

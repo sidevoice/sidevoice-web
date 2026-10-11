@@ -76,3 +76,27 @@ test("a sentence said through the settings, in its language, heard to its end; c
   await expect(tryVoice(fakeVoice({ outcome: { status: "not-played", reason: "failed", code: "credential-missing" } }) as unknown as Voice, SETTINGS as never, "Hola"))
     .rejects.toMatchObject({ code: "credential-missing" });
 });
+
+test("a try says how long each phase took, once it is heard", async () => {
+
+  const turns: Array<(turn: unknown) => void> = [];
+  const voice = {
+    setSettings: async () => {}, start: async () => {}, stop: async () => {},
+    onTurn: (listener: (turn: unknown) => void) => { turns.push(listener); return () => {}; }, onError: () => () => {}, onState: () => () => {},
+    say: () => {
+      const events: Array<(event: { type: string }) => void> = [];
+      setTimeout(() => events.forEach((listener) => listener({ type: "playing" })), 0);
+      return { onEvent: (listener: (event: { type: string }) => void) => events.push(listener), outcome: new Promise((done) => setTimeout(() => done({ status: "heard" }), 5)), cancel() {} };
+    },
+  };
+  const heard: unknown[] = [];
+  const text = tryTranscription(voice as never, {} as never, { onTimings: (timings: unknown) => heard.push(timings) });
+  await new Promise((done) => setTimeout(done, 0));
+  turns[0]({ phase: "finished", text: "hola", timings: { audio_ms: 1200, endpoint_silence_ms: 600, recognition_ms: 300 } });
+  expect(await text).toBe("hola");
+  expect(heard[0]).toMatchObject({ audio_ms: 1200, endpoint_silence_ms: 600, recognition_ms: 300 });
+  expect(typeof (heard[0] as { ready_ms: number }).ready_ms).toBe("number");
+  const said: unknown[] = [];
+  await tryVoice(voice as never, {} as never, "hola", { onTimings: (timings: unknown) => said.push(timings) });
+  expect(typeof (said[0] as { first_sound_ms: number }).first_sound_ms).toBe("number");
+});

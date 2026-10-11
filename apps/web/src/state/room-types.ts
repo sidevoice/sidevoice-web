@@ -191,7 +191,8 @@ export interface SidevoiceActions {
   closePairing(): void;
   /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
    *  that work become this device's. Rejects with a sentence and the failure's `code`. */
-  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean }): Promise<{ text?: string }>;
+  /** A try's result, with how long each phase took (voice-trial.js's TrialTimings). */
+  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean }): Promise<{ text?: string; timings?: TrialTimings | null }>;
   /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
   installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
@@ -212,4 +213,14 @@ export interface SidevoiceActions {
   revokeLocalHostDevice?(id: string): Promise<void>;
   machineDevices?(fp: string): Promise<HostDeviceView[]>;
   revokeMachineDevice?(fp: string, id: string): Promise<void>;
+}
+
+/** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the
+ *  speech, the pause waited for and the recognition; the voice's readiness and its first sound. */
+export interface TrialTimings {
+  ready_ms: number | null;
+  audio_ms?: number | null;
+  endpoint_silence_ms?: number | null;
+  recognition_ms?: number | null;
+  first_sound_ms?: number | null;
 }

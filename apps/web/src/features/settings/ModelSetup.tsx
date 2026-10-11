@@ -4,6 +4,9 @@ import { Button } from "../../components/ui/Button";
 import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { PrepareStatus } from "./ModelPrepare";
+import { InfoTip } from "../../components/ui/InfoTip";
+import type { TrialTimings } from "../../state/room-types";
+import type { HostMessageKey } from "./messages/en";
 
 /* A voice slot's chosen model made ready, the same in Settings and in the first-run setup: one of this device's
  * catalogue is downloaded first when it is not on disk (its size said, with progress and cancel), then checked; a
@@ -71,7 +74,7 @@ export function sizeText(bytes: number | null, language = document.documentEleme
 export const downloadModel = (task: Task | "end-of-turn") => void window.sidevoiceActions?.installVoiceModel?.(task);
 export const cancelDownload = () => window.sidevoiceActions?.cancelVoiceInstall?.();
 
-type TryState = { phase: "idle" | "running" | "done" | "failed"; text: string; error: string };
+type TryState = { phase: "idle" | "running" | "done" | "failed"; text: string; error: string; timings?: TrialTimings | null };
 
 /** A real try of the settings being edited for \`task\` (the controller's \`tryVoiceSettings\`): \`keep\` makes settings that
  *  work this device's (the setup); \`onTried\` hears each success. A changed setting clears it; leaving stops it. */
@@ -86,7 +89,7 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
     setTrial({ phase: "running", text: "", error: "" });
     try {
       const result = await window.sidevoiceActions!.tryVoiceSettings!(task, { ...options, keep });
-      setTrial({ phase: "done", text: result.text ?? "", error: "" });
+      setTrial({ phase: "done", text: result.text ?? "", error: "", timings: result.timings ?? null });
       onTried?.(task);
     } catch (error) {
       setTrial({ phase: (error as { code?: string }).code === "trial-cancelled" ? "idle" : "failed", text: "", error: (error as Error).message });
@@ -95,11 +98,35 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
   return { trial, run, cancel: () => window.sidevoiceActions?.cancelVoiceTry?.() };
 }
 
-/** What a try shows: listening or playing, the words heard, why it failed. */
+/** Past these, a try is slow for this device: transcribing what was said, or the first sound of a sentence. */
+const SLOW_MS = { stt: 1500, tts: 1500 } as const;
+
+const seconds = (ms: number) => new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(ms / 1000);
+
+/** After a try, one plain line with the time that matters ("Transcribed in 0.4 s", "Starts speaking in 0.3 s"), a
+ *  smaller model suggested when that is slow for this device, and every phase in its tooltip. */
+export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimings; t: HostTranslate }) {
+  const key = task === "stt" ? timings.recognition_ms : timings.first_sound_ms;
+  if (key == null) return null;
+  const slow = key > SLOW_MS[task];
+  const phases: [HostMessageKey, number | null | undefined][] = task === "stt"
+    ? [["try.phase.ready", timings.ready_ms], ["try.phase.speech", timings.audio_ms], ["try.phase.pause", timings.endpoint_silence_ms], ["try.phase.recognition", timings.recognition_ms]]
+    : [["try.phase.ready", timings.ready_ms], ["try.phase.firstSound", timings.first_sound_ms]];
+  return <p className="voice-try-timing" data-slow={slow || undefined} id={task + "-timing"}>
+    <span>{t(task === "stt" ? "try.timing.stt" : "try.timing.tts", { s: seconds(key) })}</span>
+    {slow && <span className="voice-try-slow">{t("try.slow")}</span>}
+    <InfoTip label={t("try.timing.details")}>
+      <span className="voice-try-phases">{phases.filter(([, ms]) => ms != null).map(([label, ms]) => <span key={label}>{t(label, { s: seconds(ms!) })}</span>)}</span>
+    </InfoTip>
+  </p>;
+}
+
+/** What a try shows: listening or playing, the words heard, how quick it was, why it failed. */
 export function TryResult({ task, trial, t }: { task: Task; trial: TryState; t: HostTranslate }) {
   return <div className="voice-try-result" aria-live="polite">
     {trial.phase === "running" && <p className="muted" role="status">{t(task === "stt" ? "wizard.listening" : "wizard.playing")}</p>}
     {trial.phase === "done" && task === "stt" && <div className="wizard-heard"><span className="muted">{t("wizard.transcript")}</span><p className="speech-bubble" id={task + "-heard"}>{trial.text}</p></div>}
+    {trial.phase === "done" && trial.timings && <TryTiming task={task} timings={trial.timings} t={t} />}
     {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
   </div>;
 }
