@@ -35,6 +35,8 @@ export function initialSessionFacts() {
         speechLanguage: 'en', inApp: false,
         // Whether this browser refuses the page any storage (site data blocked), found once at start.
         storageBlocked: false,
+        // A model of this device being installed for a voice slot, how far it has got, or why it failed.
+        voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
         voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, providerKeys: {},

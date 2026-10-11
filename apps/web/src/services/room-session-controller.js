@@ -1301,7 +1301,7 @@ async function saveVoiceSettings(){
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
 // one, since it would take that call's voice. Settings that work are this device's from then on.
 let voiceTry=null;
-async function tryVoiceSettings(task,{text='',language=null}={}){
+async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
  if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  const settings=state.voiceDraft||state.voiceSettings;
@@ -1309,12 +1309,30 @@ async function tryVoiceSettings(task,{text='',language=null}={}){
   const host=await voiceHost();
   const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal})}
    :(await tryVoice(host,settings,text,{language,signal:abort.signal}),{});
-  writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings});
+  if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
  }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
  finally{if(voiceTry===abort)voiceTry=null}
 }
 function cancelVoiceTry(){voiceTry?.abort()}
+// A model of this device's catalogue the slot names but that is not on disk: installed on this device (its recommended
+// build), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
+let voiceInstall=null;
+async function installVoiceModel(task){
+ const slot=(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
+ const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
+ const build=model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
+ voiceInstall?.abort();const abort=voiceInstall=new AbortController();
+ const at=fraction=>roomStore.patch({voiceInstall:{task,model:slot.model,state:'running',fraction,error:''}});
+ at(null);
+ try{
+  const models=await modelCatalogs();
+  await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
+  roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
+ }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,error:voiceErrorText(error)}})}
+ finally{if(voiceInstall===abort)voiceInstall=null}
+}
+function cancelVoiceInstall(){voiceInstall?.abort()}
 // A key changes what a provider lists: its catalogue is read again with it.
 async function saveProviderKey(provider,key){
  let models;
@@ -1384,6 +1402,8 @@ window.sidevoiceActions={
  },
  tryVoiceSettings,
  cancelVoiceTry,
+ installVoiceModel,
+ cancelVoiceInstall,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,

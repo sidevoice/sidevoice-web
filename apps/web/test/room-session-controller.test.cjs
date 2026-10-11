@@ -1389,3 +1389,32 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  s.run('state.connecting=true');
  await assert.rejects(s.run("window.sidevoiceActions.tryVoiceSettings('stt')"),{code:'trial-in-call'});
 });
+
+// ----- a model of this device installed for a voice slot -----
+test('A model the slot names but that is not on this device installs, its progress in the store, and the catalogues are read again',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[{id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],installed:false,recommendedBuild:'kokoro/q8',
+  builds:[{id:'kokoro/q8',backend:'transformers-js',precision:'q8',downloadBytes:92e6,memoryMb:300,available:true,reasons:[],installed:false}]}]}];
+ const engine=fakeEngine(catalogs),progress=[];let finish,fail;
+ engine.install=(model,{build,engine:backend,onProgress,signal})=>{engine.calls.push(['install',model,build,backend]);signal.addEventListener('abort',()=>fail(Object.assign(Error('x'),{code:'install-cancelled'})));
+  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;resolve()};fail=reject})};
+ withVoice(s,fakeVoice(),engine);
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'kokoro-82m-v1.0'}})");
+ const installing=s.run("window.sidevoiceActions.installVoiceModel('tts')");await settleSoon();
+ assert.deepEqual(plain(s.run('state.voiceInstall')),{task:'tts',model:'kokoro-82m-v1.0',state:'running',fraction:null,error:''});
+ finish();await installing;await settleSoon();
+ assert.deepEqual(engine.calls.find(([name])=>name==='install'),['install','kokoro-82m-v1.0','kokoro/q8','transformers-js'],'its recommended build, by its engine');
+ assert.equal(plain(progress[0]).fraction,0.5);
+ assert.equal(s.run('state.voiceInstall'),null,'done: nothing left in progress');
+ assert.equal(s.run("voiceCatalogue.catalogs[0].models[0].installed"),true,'the catalogue says it is here now');
+ // A cancel leaves nothing behind; a failure says why.
+ catalogs[0].models[0].installed=false;
+ const cancelled=s.run("window.sidevoiceActions.installVoiceModel('tts')");await settleSoon();
+ s.run('window.sidevoiceActions.cancelVoiceInstall()');await cancelled;
+ assert.equal(s.run('state.voiceInstall'),null);
+ engine.install=async()=>{throw Object.assign(Error('net'),{code:'download-failed'})};
+ await s.run("window.sidevoiceActions.installVoiceModel('tts')");
+ assert.equal(s.run('state.voiceInstall.state'),'failed');
+ assert.match(s.run('state.voiceInstall.error'),/download-failed/);
+});

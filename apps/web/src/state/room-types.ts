@@ -176,7 +176,11 @@ export interface SidevoiceActions {
   closePairing(): void;
   /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
    *  that work become this device's. Rejects with a sentence and the failure's `code`. */
-  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null }): Promise<{ text?: string }>;
+  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean }): Promise<{ text?: string }>;
+  /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
+  installVoiceModel?(task: "stt" | "tts"): Promise<void>;
+  /** Cancels that install: nothing of it is kept. */
+  cancelVoiceInstall?(): void;
   /** Stops the try in progress, which then rejects `trial-cancelled`. */
   cancelVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */
