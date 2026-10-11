@@ -1,6 +1,5 @@
-import { useRef, type SyntheticEvent } from "react";
 import { Button } from "../../components/ui/Button";
-import { ChevronIcon, HARNESS_NAMES, MoreIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ChevronIcon, HARNESS_NAMES, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ParticipantView } from "../../state/room-types";
@@ -13,9 +12,10 @@ import { selectInCall, useStageConversation } from "../call/stage-view";
 import { actionableHostFingerprints } from "../../services/host-agents";
 import { hostTranslator } from "../settings/host-i18n";
 
-/* The mark, the conversation on the stage, and the secondary actions behind ⋯. On a phone the brand gives its room
- * to the other conversations: two of them at most beside the title — those waiting for you, then those working —
- * and a pill with how many there are. Any of them, or the title, brings the conversations panel down. */
+/* The mark and Settings. The conversation on the stage is named on the stage itself; on a phone, where the
+ * conversations have no column, the brand gives its room to them instead: the one on the stage, two others at most —
+ * those waiting for you, then those working — and a pill with how many there are. Any of them brings the
+ * conversations panel down. */
 export function RoomHeader() {
   const t = callTranslator();
   return (
@@ -23,7 +23,7 @@ export function RoomHeader() {
       <h1 className="brand"><SidevoiceMark /> <span className="brand-name">Sidevoice</span></h1>
       <ConversationTrigger t={t} />
       <HeaderConversations t={t} />
-      <HeaderMenu t={t} />
+      <SettingsButton t={t} />
     </header>
   );
 }
@@ -75,16 +75,7 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   );
 }
 
-/* The secondary actions. Its id and class are the runtime's: it binds the statistics and settings dialogs to these
- * buttons, closes the menu when the statistics open, and closes it on a click outside or Escape (`.call-menu`).
- * However it closes, focus that was in it, or went nowhere, goes back to ⋯; focus a dialog took stays there. */
-function returnFocus(event: SyntheticEvent<HTMLDetailsElement>) {
-  const menu = event.currentTarget;
-  const now = document.activeElement;
-  if (!menu.open && (!now || now === document.body || menu.contains(now))) menu.querySelector("summary")?.focus();
-}
-
-/** The paired machines with agents waiting to be connected: the menu shows a dot, and Settings opens at their agents. */
+/** The paired machines with agents waiting to be connected: the gear shows a dot, and Settings opens at their agents. */
 function usePendingAgentHosts() {
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const pairings = useRoomStore((state) => state.facts.pairings);
@@ -92,28 +83,21 @@ function usePendingAgentHosts() {
   return actionableHostFingerprints(hostAgents, active);
 }
 
-function HeaderMenu({ t }: { t: CallTranslate }) {
-  const menu = useRef<HTMLDetailsElement>(null);
+/* The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
+ * onClick it resets the element's handler on every render), so its wrapper hears it. With agents waiting, Settings
+ * then opens at theirs. */
+function SettingsButton({ t }: { t: CallTranslate }) {
   const hosts = hostTranslator();
   const pending = usePendingAgentHosts();
   const notice = pending.length > 0;
+  const label = notice ? hosts("agents.gear.pending") : t("header.settings");
   return (
-    <details id="call-menu" className="call-menu header-menu" ref={menu} onToggle={returnFocus}>
-      <summary aria-label={notice ? hosts("agents.gear.pending") : t("header.menu")} title={notice ? hosts("agents.gear.pending") : t("header.menu")}>
-        <MoreIcon size={20} />{notice && <span className="settings-notice-dot" aria-hidden="true" />}
-      </summary>
-      {/* The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
-          onClick it resets the element's handler on every render), so the panel hears it. With agents waiting,
-          Settings then opens at theirs. */}
-      <div className="header-menu-panel" onClick={(event) => {
-        if (menu.current) menu.current.open = false;
-        if (notice && (event.target as Element).closest("#settings-open")) window.sidevoiceActions?.openAgentSettings?.(pending.length === 1 ? pending[0] : null);
-      }}>
-        <Button id="stats-open" variant="ghost" size="compact">{t("header.stats")}</Button>
-        <Button id="settings-open" variant="ghost" size="compact">
-          {t("header.settings")}{notice && <span className="settings-notice-dot" aria-hidden="true" />}
-        </Button>
-      </div>
-    </details>
+    <span className="header-settings" onClick={() => {
+      if (notice) window.sidevoiceActions?.openAgentSettings?.(pending.length === 1 ? pending[0] : null);
+    }}>
+      <Button id="settings-open" variant="ghost" size="icon" aria-label={label} title={label}>
+        <SettingsIcon size={20} />{notice && <span className="settings-notice-dot" aria-hidden="true" />}
+      </Button>
+    </span>
   );
 }

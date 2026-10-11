@@ -155,6 +155,8 @@ export interface PairingPromptView {
 
 export interface SidevoiceActions {
   cancelInput(): Promise<void>;
+  /** Stops the reply sounding now on this device; the reply stays written and what is queued after it plays on. */
+  skipReply(): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
   editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]>; tts?: Partial<DeviceVoiceSettings["tts"]>; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"] }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */

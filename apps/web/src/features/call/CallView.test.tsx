@@ -171,11 +171,11 @@ test("the desktop sidebar collapses to a rail and expands, and a reload keeps th
   expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBe("0");
 });
 
-test("the header's ⋯ menu holds the secondary actions under the runtime's ids", async () => {
+test("the header holds Settings, and the call bar's ⋯ the statistics, under the runtime's ids", async () => {
   room();
-  expect(document.querySelector("#call-menu #stats-open")).toHaveTextContent("Connection statistics");
-  expect(document.querySelector("#call-menu #settings-open")).toHaveTextContent("Settings");
-  expect(document.querySelector(".call-bar #call-menu")).toBeNull();
+  expect(document.querySelector(".room-header #settings-open")).toHaveAccessibleName("Settings");
+  expect(document.querySelector(".call-bar #call-menu #stats-open")).toHaveTextContent("Connection statistics");
+  expect(document.querySelector(".room-header #call-menu")).toBeNull();
 });
 
 test("out of a call the room's binding is not a call: no conversation is in call, and the header's dot is not live", () => {

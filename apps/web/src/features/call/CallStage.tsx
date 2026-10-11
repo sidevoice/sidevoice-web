@@ -121,6 +121,10 @@ export function CallStage() {
     <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
       <div className="stage-tile" data-mood={stage.mood} style={avatarTone(spec) as CSSProperties}>
+        <div className="stage-name" translate="no">
+          <strong>{stage.title}</strong>
+          {stage.row?.machine && <span>{stage.row.machine}</span>}
+        </div>
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
           {stage.mood === "working" && <p className="stage-activity" role="status"><i className="stage-spinner" aria-hidden="true" />{t("stage.working")}</p>}

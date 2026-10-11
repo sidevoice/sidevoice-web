@@ -7,7 +7,10 @@
 
 /* ---------- the header ---------- */
 .room-header { height:var(--sv-header-height);display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 14px 0 20px }
-.room-header .brand { flex:none;height:28px;margin:0;font-size:16px }
+.room-header .brand { flex:none;height:36px;margin:0;font-size:21px;font-weight:650;letter-spacing:-.01em }
+.room-header .brand svg { width:30px;height:30px }
+/* The conversation on the stage is named on the stage (CallStage); the header names it only on a phone. */
+@media (min-width:900px) { .room-header .conversation-trigger { display:none } }
 .room-header .brand + .conversation-trigger { position:relative;margin-left:12px }
 .room-header .brand + .conversation-trigger::before { content:"";position:absolute;left:-12px;top:6px;bottom:6px;border-left:1px solid var(--sv-border) }
 .conversation-trigger { display:flex;align-items:center;gap:10px;flex:1;min-width:0;margin:0;padding:6px 8px;border:1px solid transparent;border-radius:12px;background:transparent;color:inherit;text-align:left }
@@ -21,14 +24,10 @@
 .live-dot { flex:none;width:7px;height:7px;border-radius:50%;background:var(--sv-state-idle) }
 .live-dot[data-live] { background:var(--sv-state-in-call);box-shadow:0 0 0 3px color-mix(in srgb, var(--sv-state-in-call) 18%, transparent) }
 .header-conversations { display:none }
-.header-menu { position:relative;flex:none;margin:0 0 0 auto;font-size:inherit;color:inherit }
-.header-menu summary { width:40px;height:40px;display:grid;place-items:center;list-style:none;border:1px solid var(--sv-border);border-radius:12px;background:var(--sv-surface-raised);cursor:pointer }
-.header-menu summary::-webkit-details-marker { display:none }
-.header-menu summary:hover,.header-menu[open] summary { background:#333d49 }
-.header-menu summary:focus-visible { outline:2px solid var(--sv-primary);outline-offset:3px }
-.header-menu-panel { position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:14rem;padding:6px;border:1px solid var(--sv-border);border-radius:14px;background:var(--sv-surface);box-shadow:0 18px 50px rgb(0 0 0 / 50%) }
-.header-menu-panel .ui-button { display:flex;justify-content:flex-start;width:100%;padding:10px 12px;border:0;border-radius:10px;background:transparent;font-size:13px;text-align:left }
-.header-menu-panel .ui-button:hover { background:var(--sv-surface-raised) }
+.header-settings { flex:none;margin-left:auto }
+.header-settings #settings-open { position:relative;width:42px;height:42px;padding:0;border:1px solid var(--sv-border);border-radius:12px;background:var(--sv-surface-raised) }
+.header-settings #settings-open:hover { background:#333d49 }
+.header-settings .settings-notice-dot { position:absolute;top:6px;right:6px }
 
 /* ---------- the conversations: a column, a rail, or a phone's panel ---------- */
 #root .conversation-sidebar { display:flex;flex-direction:column;flex:none;width:288px;min-height:0;padding:12px 10px;overflow:hidden auto;background:transparent;border:0;border-right:1px solid var(--sv-border);border-radius:0;transition:width .26s cubic-bezier(.3,.7,.2,1) }
@@ -85,7 +84,12 @@
   background:radial-gradient(circle at 50% 62%, color-mix(in srgb, var(--av-color, var(--sv-primary)) 14%, transparent), transparent 60%), var(--sv-surface);transition:border-color .2s,box-shadow .2s }
 .stage-tile[data-mood=speaking] { border-color:var(--sv-selected-border);box-shadow:0 0 0 3px color-mix(in srgb, var(--sv-primary) 22%, transparent) }
 .stage-agent { width:min(46%,260px,34dvh);aspect-ratio:1 }
-.stage-top { position:absolute;z-index:2;top:16px;left:16px;right:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;pointer-events:none }
+/* The conversation's name, in the tile's top corner as a call names whoever is on screen. */
+.stage-name { position:absolute;z-index:2;top:14px;left:16px;max-width:calc(100% - 32px);display:flex;align-items:baseline;gap:8px;padding:5px 12px;border-radius:var(--sv-radius-pill);background:color-mix(in srgb, var(--sv-bg) 70%, transparent);backdrop-filter:blur(6px);white-space:nowrap;overflow:hidden }
+.stage-name strong { min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600 }
+.stage-name span { flex:none;color:var(--sv-muted);font-size:12px }
+@media (max-width:899px) { .stage-name { display:none } .stage-top { top:16px } }
+.stage-top { position:absolute;z-index:2;top:56px;left:16px;right:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;pointer-events:none }
 .stage-top>* { grid-area:1/1;align-self:start }
 .speech-bubble { min-width:0;padding:10px 14px;border-radius:16px;background:var(--sv-primary-soft);color:var(--sv-on-primary);line-height:1.45;box-shadow:0 8px 24px rgb(0 0 0 / 35%);overflow-wrap:anywhere }
 .speech-bubble::after { content:"";position:absolute;bottom:-8px;border:9px solid transparent;border-bottom:0;border-top-color:var(--sv-primary-soft) }
@@ -128,7 +132,18 @@
 }
 @keyframes sv-spin { to { transform:rotate(360deg) } }
 
-/* ---------- the call bar's transcript button ---------- */
+/* ---------- the call bar: ⋯ beside the call, the transcript's button at the right edge ---------- */
+.call-bar .call-bar-end { grid-column:3;grid-row:1;justify-self:end;display:flex;align-items:center;gap:10px }
+.call-bar #skip-reply { width:52px;height:56px;padding:0;border:0;border-radius:26px;background:#303134;color:#e8eaed }
+.call-bar #skip-reply:not(:disabled):hover { background:#414245 }
+.call-menu { position:relative;margin:0;color:#e8eaed }
+.call-menu summary { width:44px;height:56px;border-radius:26px;display:grid;place-items:center;list-style:none;background:#303134;cursor:pointer }
+.call-menu summary::-webkit-details-marker { display:none }
+.call-menu summary:hover,.call-menu[open] summary { background:#414245 }
+.call-menu summary:focus-visible { outline:2px solid var(--sv-primary);outline-offset:3px }
+.call-menu-panel { position:absolute;left:50%;bottom:calc(100% + 14px);z-index:25;width:240px;max-width:calc(100vw - 30px);padding:6px;border:1px solid var(--sv-border);border-radius:14px;background:var(--sv-surface);box-shadow:0 12px 28px rgb(0 0 0 / 50%);transform:translateX(-50%) }
+.call-menu-panel .ui-button { display:flex;justify-content:flex-start;width:100%;padding:12px;border:0;border-radius:10px;background:transparent;font-size:13px;text-align:left }
+.call-menu-panel .ui-button:hover { background:var(--sv-surface-raised) }
 .call-bar .transcript-toggle { width:52px;height:56px;padding:0;border:0;border-radius:26px;background:#303134;color:#e8eaed }
 .call-bar .transcript-toggle:hover { background:#414245 }
 .call-bar .transcript-toggle[aria-expanded=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }

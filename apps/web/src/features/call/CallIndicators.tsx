@@ -1,6 +1,7 @@
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import { CallIcon, HangupIcon, MicrophoneIcon } from "../../components/ui/Icons";
+import { CallIcon, HangupIcon, MicrophoneIcon, SkipIcon } from "../../components/ui/Icons";
+import { callTranslator } from "./call-i18n";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
@@ -14,6 +15,19 @@ export function ScreenLock() {
       <i className="screen-lock-dot" aria-hidden="true" />
       <span id="screen-lock-text" className="sr-only">{lock.state ? lock.note : ""}</span>
     </span>
+  );
+}
+
+/* Skip what is sounding without saying anything: speaking over a reply to stop it also sends a message. Only this
+ * device skips; the reply stays written. */
+export function SkipButton() {
+  const t = callTranslator();
+  const playing = useRoomStore((state) => state.facts.botLive);
+  return (
+    <Button id="skip-reply" variant="ghost" disabled={!playing} aria-label={t("toolbar.skip")} title={t("toolbar.skip")}
+      onClick={() => window.sidevoiceActions?.skipReply()}>
+      <SkipIcon size={24} />
+    </Button>
   );
 }
 

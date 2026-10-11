@@ -322,7 +322,7 @@ function sayReply(reply){
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
   // From `playing` to `done` the reply is being said: where the voice is in it lights its words.
-  if(event.type==='playing'){state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
+  if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
   else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
   else if(event.type==='done'){
    replies.delete(reply.utterance_id);
@@ -331,6 +331,9 @@ function sayReply(reply){
   }
  });
 }
+// Skipping what sounds now, without saying anything: only this device stops hearing it, the reply stays written, and
+// what is queued after it plays on.
+function skipReply(){for(const said of replies.values())if(said.playing){said.saying.cancel();return}}
 // The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
 function withdrawReplies(d){
  if(d.session_id!==state.sessionId)return;
@@ -1379,6 +1382,7 @@ async function saveSettings(){
 $('language-form').onsubmit=e=>{e.preventDefault();$('settings-error').textContent='';saveSettings().catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)})};
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
+ skipReply,
  editVoice,
  saveProviderKey,
  loadVoiceCatalogue,

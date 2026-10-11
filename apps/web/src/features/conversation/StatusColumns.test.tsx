@@ -16,8 +16,10 @@ test("the call bar carries the lights at its left edge and the models at its rig
   const bar = document.querySelector("footer.call-bar")!;
   expect(bar.firstElementChild!.id).toBe("capability-column");
   // On a phone the models wait behind the button in this slot; on a laptop the slot is just the list.
-  expect(bar.lastElementChild!.className).toBe("engine-slot");
+  expect(bar.lastElementChild!.className).toBe("call-bar-end");
+  expect(bar.lastElementChild!.firstElementChild!.className).toBe("engine-slot");
   expect(bar.lastElementChild!.querySelector("#engine-column")).not.toBeNull();
+  expect(bar.lastElementChild!.lastElementChild!.id).toBe("transcript-toggle");
   act(() => {
     // The room went away: the voice goes on, and its light says what it says is sent when the room is back.
     store.patch({ ws: null, reconnecting: true, screenLock: { state: "on", note: "" },
