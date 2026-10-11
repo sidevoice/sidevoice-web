@@ -34,6 +34,20 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     node.style.overflowY = node.scrollHeight > height ? "auto" : "hidden";
   }, [minRows, maxRows]);
   useLayoutEffect(fit, [fit, value]);
+  // Measured while hidden (a closed panel, display none) it has no width and no height to go by; measured again
+  // whenever its width changes — shown, a panel sliding in, a window resized — it never sits at a stale height.
+  useLayoutEffect(() => {
+    const node = own.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    let width = node.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (node.clientWidth === width) return;
+      width = node.clientWidth;
+      fit();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [fit]);
   return <textarea ref={setRef} rows={minRows} value={value} className={cn("ui-textarea", className)} aria-invalid={invalid || undefined}
     onInput={(event) => { fit(); onInput?.(event); }} {...props} />;
 });
