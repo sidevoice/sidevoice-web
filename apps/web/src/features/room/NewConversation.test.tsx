@@ -19,8 +19,10 @@ test("the button opens a small panel that says why and quotes the message, with 
   expect(panel).toHaveAttribute("role", "dialog");
   expect(panel).toHaveTextContent("isn't possible yet");
   expect(panel).toHaveTextContent("Tell your agent to connect");
-  expect(panel.querySelector("blockquote")).toHaveTextContent("Connect to Sidevoice (use its voice_connect tool)");
-  expect(panel.querySelector("button[aria-label='Copy the message for your agent']")).toBeInTheDocument();
+  // A phrase to say, so a Quote (not a Snippet, which is for a terminal), with its copy button and nothing under it.
+  expect(panel.querySelector(".ui-quote blockquote")).toHaveTextContent("Connect to Sidevoice (use its voice_connect tool)");
+  expect(panel.querySelector(".ui-snippet")).toBeNull();
+  expect(panel.querySelector(".ui-quote button[aria-label='Copy the message for your agent']")).toBeInTheDocument();
 });
 
 test("in the rail it is a + with its name for those who cannot see it", () => {
