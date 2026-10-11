@@ -218,7 +218,7 @@ export function DeleteUnusedChoice() {
           label: value == null ? t("settings.advanced.never") : t("settings.advanced.days", { n: value }) }))} />
     </Row>
     {pending && <div className="provider-remove downloaded-unused-confirm" role="group" aria-label={t("settings.advanced.deleteUnused")}>
-      <p>{t("settings.advanced.deleteUnusedNow", { count: pending.ids.length, size })}</p>
+      <p>{pending.ids.length === 1 ? t("settings.advanced.deleteUnusedNowOne", { size }) : t("settings.advanced.deleteUnusedNow", { count: pending.ids.length, size })}</p>
       <div className="provider-key-actions">
         <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => setPending(null)}>{t("hosts.cancel")}</Button>
         <Button variant="danger" size="sm" onClick={() => { void window.sidevoiceActions?.setDeleteUnusedModels?.(pending.days); setPending(null); }}>{t("settings.advanced.deleteUnusedYes")}</Button>

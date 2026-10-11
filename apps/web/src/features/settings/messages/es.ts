@@ -550,6 +550,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "settings.advanced.deleteAllYes": "Borrar {count} modelos",
   "settings.advanced.deleteAllPartial": "Borrados {done} de {count}. {model} está en marcha ahora; prueba de nuevo tras la llamada.",
   "settings.advanced.deleteUnusedNow": "Esto borra {count} modelos ahora y libera {size}. Después, ocurre solo.",
+  "settings.advanced.deleteUnusedNowOne": "Esto borra 1 modelo ahora y libera {size}. Después, ocurre solo.",
   "settings.advanced.deleteUnusedYes": "Borrar y activar",
   "settings.advanced.usedToday": "usado hoy",
   "settings.advanced.usedDaysAgo": "usado por última vez hace {n} días",

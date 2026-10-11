@@ -150,6 +150,8 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
   const t = hostTranslator();
   // Renaming the machine on this device: the name being typed, or null.
   const [naming, setNaming] = useState<string | null>(null);
+  // Not a form: Settings is one, and a form inside it would submit the page.
+  const saveAlias = () => { window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming?.trim() || null); setNaming(null); };
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const agents = useRef<HTMLElement>(null);
@@ -161,12 +163,12 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          {naming !== null ? <form className="host-rename" onSubmit={(event) => { event.preventDefault(); window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming.trim() || null); setNaming(null); }}>
+          {naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
               <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
-                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } }} />
-              <Button type="submit" size="sm" variant="primary">{t("hosts.devices.renameSave")}</Button>
+                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } if (event.key === "Enter") { event.preventDefault(); saveAlias(); } }} />
+              <Button size="sm" variant="primary" onClick={saveAlias}>{t("hosts.devices.renameSave")}</Button>
               <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
-            </form>
+            </div>
             : <h3 className="host-name">{copy.name}
               {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: copy.name })} title={t("hosts.rename", { machine: copy.name })}
                 onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
@@ -243,7 +245,8 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
   const state = serviceState(status);
-  const calls = details.calls ?? 0;
+  // Unknown is not none: Stop asks unless the service says no call is on.
+  const calls = details.calls;
   const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
   if (status.state === "running") {
     if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart"), variant: "secondary" });
@@ -303,7 +306,7 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
           come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
       {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
-      {status.failure && failed && (
+      {status.failure && failed && (details.attempts !== undefined || !!failureAt) && (
         <div className="host-failure-details">
           {details.attempts !== undefined && <p>{t("hosts.failureAttempts", { attempts: details.attempts, limit: details.limit ? ` of ${details.limit}` : "" })}</p>}
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
@@ -326,7 +329,7 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
         </div>
         : (buttons.length > 0 || failed) && <div className="host-action-list host-status-actions">
           {buttons.map(({ action, label, variant }) => <Button key={action} size="sm" variant={variant} tone={action === "stop" ? "danger" : undefined} loading={busy === action} disabled={!!busy && busy !== action}
-            onClick={() => action === "stop" && calls > 0 ? setConfirmStop(true) : void run(action)}>{label}</Button>)}
+            onClick={() => action === "stop" && calls !== 0 ? setConfirmStop(true) : void run(action)}>{label}</Button>)}
           {failed && hasMethod("revealLog") && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
           {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
         </div>}
