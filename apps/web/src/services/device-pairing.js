@@ -115,9 +115,10 @@ export function machineAddress(text) {
 const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.';
 
 // ----- the code -----
-/** What a pasted code says, or why it cannot be used, in one sentence the person can act on. The code may
- *  arrive wrapped over lines or inside the sentence it was sent in: the `SV1.` token is found either way. */
-export function decodePairingCode(code, now = Date.now(), { address = null } = {}) {
+/** A pasted code's payload, checked for its shape only: whether the addresses it names can be used from here, and
+ *  whether it is still valid, are for its readers to judge. The code may arrive wrapped over lines or inside the
+ *  sentence it was sent in: the `SV1.` token is found either way. */
+function readPairingCode(code) {
     const raw = String(code ?? ''), compact = raw.replace(/\s+/g, '');
     if (!compact) throw pairingError('Pega el código que te dio la máquina.');
     const text = /^SV1\.[A-Za-z0-9_-]+$/.test(compact) ? compact : raw.match(/SV1\.[A-Za-z0-9_-]+/)?.[0];
@@ -134,6 +135,12 @@ export function decodePairingCode(code, now = Date.now(), { address = null } = {
         !urlList || urlList.includes(null) || room === undefined || (room && !room.url) ||
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
         throw pairingError(DAMAGED);
+    return { fp, host, urls: urlList, room, secret, exp };
+}
+const EXPIRED = 'Este código ya caducó: duran 10 minutos. Pide uno nuevo.';
+/** What a pasted code says, or why it cannot be used, in one sentence the person can act on. */
+export function decodePairingCode(code, now = Date.now(), { address = null } = {}) {
+    const { fp, host, urls: urlList, room, secret, exp } = readPairingCode(code);
     if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
     // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
     // left with none cannot be used from here.
@@ -142,8 +149,24 @@ export function decodePairingCode(code, now = Date.now(), { address = null } = {
     // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
     // address is probed.
     if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
-    if (exp * 1000 <= now) throw pairingError('Este código ya caducó: duran 10 minutos. Pide uno nuevo.');
+    if (exp * 1000 <= now) throw pairingError(EXPIRED);
     return { v: 1, fp, host: host || null, urls: secureUrls, rv: secureRoom, secret, exp };
+}
+/** What a code says as it is pasted, before anything is sent anywhere: whose it is (`host`), until when (`exp`, in
+ *  seconds), whether it tells another device where its machine is (`reachable`: an https address other than loopback,
+ *  or a room), and the private-network addresses it lists over plain http, as host:port (`plain`) — which pairing
+ *  reaches only typed, and only once the person agrees (`insecure`). Throws as `decodePairingCode` does for a code that
+ *  cannot be used wherever its machine is. */
+export function previewPairingCode(code, now = Date.now()) {
+    const { host, urls, room, exp } = readPairingCode(code);
+    if (urls.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
+    if (exp * 1000 <= now) throw pairingError(EXPIRED);
+    const away = urls.map(url => new URL(url)).filter(url => !LOOPBACK.has(url.hostname));
+    return {
+        host: host || null, exp,
+        reachable: away.some(url => url.protocol === 'https:') || !!(room && secureBase(room.url)),
+        plain: away.filter(url => url.protocol === 'http:' && privateHost(url.hostname)).map(url => url.host),
+    };
 }
 
 // ----- the node's identity -----

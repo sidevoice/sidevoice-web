@@ -331,10 +331,10 @@ function WizardPair() {
   const t = hostTranslator();
   return (
     <WizardFrame step={1} title={t("wizard.title.pair")} footer={<><Button variant="ghost" tone="neutral" className="pt-back">{t("wizard.back")}</Button><Button variant="primary">{t("pairing.connect")}</Button></>}>
-      <p>{t("wizard.pairIntro")}</p>
+      <p>{t("pairing.intro")}</p>
       <ol className="pt-steps">
-        <li><p>{t("noMachine.stepInstall")}</p><CommandBlock command={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} /></li>
-        <li><p>{t("noMachine.stepPair")}</p><CommandBlock command={CONNECTOR_PAIR_DEVICE} label={t("noMachine.copyPairCommand")} /></li>
+        <li><p>{t("pairing.stepInstall")}</p><CommandBlock command={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} /></li>
+        <li><p>{t("pairing.stepPair")}</p><CommandBlock command={CONNECTOR_PAIR_DEVICE} label={t("noMachine.copyPairCommand")} /></li>
       </ol>
       <PairingForm />
     </WizardFrame>
