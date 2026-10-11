@@ -38,3 +38,16 @@ test("the call bar says what the session facts say, and asks the runtime to act"
   expect(toggleMic).toHaveBeenCalledTimes(1);
   expect(toggleCall).toHaveBeenCalledTimes(1);
 });
+
+test("a microphone the system or another app holds is said where the microphone is; the person's own mute is not that", () => {
+  const store = toolbar();
+  const silent = "Your microphone isn't sending sound — another app may be using it";
+  act(() => store.patch({ ws: {}, sessionId: "s", micEnabled: true, voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "muted" } } as never));
+  expect(screen.getByRole("status")).toHaveTextContent(silent);
+  expect(document.getElementById("mute")).toHaveAttribute("title", silent);
+  // Muted by the person: their own mute, nothing more to say.
+  act(() => store.patch({ micEnabled: false } as never));
+  expect(screen.queryByText(silent)).toBeNull();
+  act(() => store.patch({ micEnabled: true, voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "live" } } as never));
+  expect(screen.queryByText(silent)).toBeNull();
+});

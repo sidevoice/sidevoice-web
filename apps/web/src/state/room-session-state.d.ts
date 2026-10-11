@@ -4,6 +4,9 @@ export type NodeReach = '' | 'ok' | 'unpaired' | 'revoked' | 'offline' | 'away';
 /** Where the call's voice is, as it reports it. */
 export interface VoiceState {
  listening: 'idle' | 'muted' | 'listening' | 'speaking'; recognising: number; playback: 'idle' | 'synthesizing' | 'playing';
+ /** Whether the microphone gives audio (@sidevoice/voice 0.3.1): `muted` while its device gives none — another app or the
+  *  system holds it — which is not the person's own mute. */
+ microphone?: 'live' | 'muted';
 }
 export interface SessionFacts {
  ws: unknown; sessionId: string | null; roomRevision: number; roomInfo: Record<string, unknown> | null;

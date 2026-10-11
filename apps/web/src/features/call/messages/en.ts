@@ -97,6 +97,7 @@ export const en = {
   "devices.error.outputUnselectable": "The speaker cannot be chosen here: it plays through the system's default.",
   "devices.error.outputFailed": "That speaker could not be used; it plays through the one before.",
   "devices.error.other": "That device could not be chosen.",
+  "mic.silent": "Your microphone isn't sending sound — another app may be using it",
 } as const;
 
 export type CallMessageKey = keyof typeof en;

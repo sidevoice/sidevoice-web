@@ -1,6 +1,6 @@
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon } from "../../components/ui/Icons";
+import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
 import { callTranslator } from "./call-i18n";
 import { cn } from "../../lib/cn";
 
@@ -39,10 +39,20 @@ function MicWave() {
   return <span className="mic-wave" aria-hidden="true"><i /><i /><i /><i /></span>;
 }
 
+/** The microphone gives no sound though the person has not muted it: its device is held elsewhere (another app, the
+ *  system), as the voice reports it (microphone "muted"). */
+export function useMicSilent() {
+  const t = callTranslator();
+  const silent = useRoomStore((state) => !!state.facts.ws && state.mic.enabled && state.facts.voiceState?.microphone === "muted");
+  return silent ? t("mic.silent") : null;
+}
+
 export function MuteButton() {
   const mic = useRoomStore((state) => state.mic);
+  const silent = useMicSilent();
   return (
-    <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label} title={mic.title}
+    <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label} title={silent ?? mic.title}
+      aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
       aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts="Meta+D Control+D"
       onClick={() => window.sidevoiceActions?.toggleMic()}>
       <MicWave />
@@ -63,5 +73,9 @@ export function CallButton() {
 
 export function MicControl({ children }: { children: React.ReactNode }) {
   const mic = useRoomStore((state) => state.mic);
-  return <div id="mic-control" className="mic-control" data-muted={String(!mic.enabled)}>{children}</div>;
+  const silent = useMicSilent();
+  return <div id="mic-control" className="mic-control" data-muted={String(!mic.enabled)} data-silent={silent ? true : undefined}>
+    {silent && <span className="mic-silent-note" role="status"><WarningIcon size={14} />{silent}</span>}
+    {children}
+  </div>;
 }

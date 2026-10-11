@@ -97,4 +97,5 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "devices.error.outputUnselectable": "Aquí no se puede elegir el altavoz: suena por el predeterminado del sistema.",
   "devices.error.outputFailed": "No se pudo usar ese altavoz; sigue sonando por el de antes.",
   "devices.error.other": "No se pudo elegir ese dispositivo.",
+  "mic.silent": "Tu micrófono no está enviando sonido: puede que otra app lo esté usando",
 };
