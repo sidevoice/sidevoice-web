@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/sidevoice/sidevoice-web/compare/v0.2.1...v0.3.0) (2026-10-11)
+
+
+### Features
+
+* Add per-host agent setup in Machines ([#43](https://github.com/sidevoice/sidevoice-web/issues/43)) ([e7ebd66](https://github.com/sidevoice/sidevoice-web/commit/e7ebd665fd66da8c3987c90e1f944d8bf2680852)), closes [#39](https://github.com/sidevoice/sidevoice-web/issues/39)
+
+
+### Bug Fixes
+
+* **web:** a browser that blocks site data says so, and the voice never shows a bare error number ([#73](https://github.com/sidevoice/sidevoice-web/issues/73)) ([094605b](https://github.com/sidevoice/sidevoice-web/commit/094605bc9b4c9dd92b42891e82e236fe9eb6bfe8))
+* **web:** Settings opens from the header menu again ([#76](https://github.com/sidevoice/sidevoice-web/issues/76)) ([2d5bee0](https://github.com/sidevoice/sidevoice-web/commit/2d5bee01196784645cef01b00066ce6f05761b14))
+
 ## [0.2.1](https://github.com/sidevoice/sidevoice-web/compare/v0.2.0...v0.2.1) (2026-10-10)
 
 
