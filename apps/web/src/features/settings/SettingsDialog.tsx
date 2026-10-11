@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, CallSettingsIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { NativeSelect } from "../../components/ui/NativeSelect";
@@ -115,6 +115,18 @@ function AdvancedSettings({ t }: { t: HostTranslate }) {
   </Section>;
 }
 
+/** "Saved", for a moment after a setting is kept: settings apply as they change, with no Save to press. */
+function SavedNote({ at, t }: { at: number; t: HostTranslate }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!at) return;
+    setShown(true);
+    const timer = window.setTimeout(() => setShown(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [at]);
+  return <span className="settings-saved" role="status">{shown ? <><CheckIcon size={14} />{t("settings.saved")}</> : null}</span>;
+}
+
 function Pane({ id, current, children }: { id: string; current: string; children: ReactNode }) {
   // A section that fails to draw says so in its own place; the other sections, and Save, stay.
   return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
@@ -125,21 +137,16 @@ export function SettingsDialog() {
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
   const waits = useVoiceReadiness();
+  const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
   const show = (section: string) => store?.patch({ settingsSection: section });
-  const blocked = waits.stt || waits.tts || waits.turn;
-  const reason = waits.stt ? t("settings.save.waitTranscription") : waits.tts ? t("settings.save.waitVoice") : waits.turn ? t("settings.save.waitTurn") : "";
   return (
     <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" aria-labelledby="settings-title">
       <OverlayPortalProvider container={dialog}>
         <DialogSurface titleId="settings-title" closeId="settings-close" closeable flush closeLabel={t("settings.close")}
           title={t("settings.title")}
-          footer={<>
-            <p id="settings-error" className="settings-error" role="alert" />
-            {blocked && <p className="ui-dialog-reason" id="settings-save-reason">{reason}</p>}
-            <Button type="submit" form="language-form" variant="primary" disabled={blocked} blockedBy="settings-save-reason"
-              onBlocked={() => show(waits.stt ? "transcription" : waits.tts ? "voice" : "call")}>{t("settings.save")}</Button>
-          </>}>
+>
+          {/* No Save: every setting applies as it changes; what fails says so here. */}
           <form id="language-form" className="settings-layout">
             <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
               {SECTIONS.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
@@ -153,6 +160,7 @@ export function SettingsDialog() {
               </Fragment>)}
             </nav>
             <div className="settings-content">
+              <p id="settings-error" className="settings-error" role="alert" />
               <div className="settings-column">
                 <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>

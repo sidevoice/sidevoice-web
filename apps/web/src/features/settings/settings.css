@@ -110,3 +110,8 @@
   .provider-card-key, .provider-card-problem { padding-inline-start: 0; }
   .provider-card > .provider-key, .provider-card > .provider-remove { margin-inline-start: 0; }
 }
+
+/* "Saved", beside the title for a moment; the error line at the content's head. */
+.settings-saved { display: inline-flex; align-items: center; gap: var(--sv-space-1); margin-inline-start: var(--sv-space-3); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); vertical-align: middle; }
+.settings-content > .settings-error { margin: var(--sv-space-3) var(--sv-space-10) 0; }
+.settings-saved svg { color: var(--sv-positive); }

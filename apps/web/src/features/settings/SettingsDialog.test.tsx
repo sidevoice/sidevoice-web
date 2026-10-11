@@ -46,20 +46,17 @@ test("the sections are General, Transcription, Voice, Call, Providers, Machines 
   expect(screen.getByRole("radiogroup", { name: "Thinking sound" })).toBeInTheDocument();
 });
 
-test("Save waits while the chosen model is not on this device, says why, and takes the person to it", () => {
-  const store = open("whisper-small");
-  const save = screen.getByRole("button", { name: "Save changes" });
-  expect(save).toHaveAttribute("aria-disabled", "true");
-  expect(save).toHaveAccessibleDescription("The transcription model isn't ready yet.");
-  fireEvent.click(save);
-  expect(store.getState().facts.settingsSection).toBe("transcription");
+test("no Save: a model chosen that is not here says the one in use stays until it is ready", () => {
+  open("whisper-small");
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  fireEvent.click(document.getElementById("settings-transcription")!);
+  expect(document.getElementById("stt-model-card")).toHaveTextContent("Will switch when ready: whisper-base stays in use until then.");
 });
 
-test("Save is free once every chosen model is ready", () => {
+test("a chosen model already in use says nothing about switching", () => {
   open("whisper-base");
-  const save = screen.getByRole("button", { name: "Save changes" });
-  expect(save).not.toHaveAttribute("aria-disabled");
-  expect(save).not.toBeDisabled();
+  fireEvent.click(document.getElementById("settings-transcription")!);
+  expect(document.getElementById("stt-model-card")).not.toHaveTextContent("Will switch when ready");
 });
 
 test("the thinking sound and the screen are this device's, applied at once", () => {

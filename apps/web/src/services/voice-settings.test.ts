@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, remoteProviders, voiceChoices, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
@@ -104,4 +104,14 @@ test("a build chosen is the model's: another model, or Automatic, drops it", () 
   expect(editVoiceSettings(settings, { stt: { language: "es" } }, CATALOGS).stt.build).toBe("whisper-base/q8");
   expect(editVoiceSettings(settings, { stt: { model: "moonshine-tiny" } }, CATALOGS).stt).not.toHaveProperty("build");
   expect(editVoiceSettings(settings, { stt: { build: null } } as never, CATALOGS).stt).not.toHaveProperty("build");
+});
+
+test("a model chosen before it is here waits: the one in use stays, the rest of the change applies, and it switches once ready", () => {
+  const saved = defaultVoiceSettings();
+  const draft = { ...saved, stt: { catalog: "local", model: "moonshine-tiny", language: "en" }, patience: "calm" as const };
+  const notHere = CATALOGS.map((catalog) => catalog.id === "local" ? { ...catalog, models: catalog.models.map((model) => model.id === "moonshine-tiny" ? { ...model, installed: false, builds: [build("moonshine-tiny/int8")] } : model) } : catalog) as CatalogView[];
+  expect(readyVoiceSettings(draft, saved, notHere)).toEqual({ ...saved, patience: "calm" });
+  expect(readyVoiceSettings(draft, saved, CATALOGS).stt).toEqual(draft.stt);
+  // The same model takes its other changes at once.
+  expect(readyVoiceSettings({ ...saved, stt: { ...saved.stt, language: "es" } }, saved, []).stt.language).toBe("es");
 });

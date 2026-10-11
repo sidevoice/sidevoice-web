@@ -1077,7 +1077,7 @@ test('The room\'s withdrawals cancel what it names, and each reply\'s end goes t
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
- await s.run("$('ui-language').value='en';saveSettings()");
+ await s.run("$('ui-language').value='en';saveLanguage()");
  assert.deepEqual(sent.filter(m=>m.type==='voice-settings').map(m=>Object.keys(m.data).sort()),[['session_id','ui_language']]);
 });
 
@@ -1107,13 +1107,13 @@ test('Opening the settings reads the engine\'s catalogues and which providers ha
  assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false},'one key per remote catalogue');
  assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
 });
-test('Saved voice settings are checked by the voice, kept on this device, and the next call starts with them',async()=>{
+test('Voice settings apply as they change: checked by the voice, kept on this device, and the next call starts with them',async()=>{
  const {s,voice,engine,asked}=settingsPage();
  await engine.setCredential('openai','sk-1');
  s.run("$('settings-open').onclick()");await settleSoon();
  s.run("window.sidevoiceActions.editVoice({stt:{catalog:'openai'},patience:'calm'})");
  assert.deepEqual(plain(s.run('voiceDraft.stt')),{catalog:'openai',model:'gpt-4o-transcribe',language:s.run('voiceSettings.stt.language')},'another source takes its first model');
- await s.run("saveSettings()");
+ await s.run("applying");
  // As this device can take them: no end-of-turn model here, so the smart end of turn is silence.
  assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),{...plain(s.run('voiceDraft')),end_of_turn:'silence'});
  const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
@@ -1125,8 +1125,9 @@ test('Settings the voice refuses are not kept, and the reason is said with the p
  const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'credential-missing',detail:'invalid_api_key'})}});
  s.run("$('settings-open').onclick()");await settleSoon();
  const before=plain(s.run('voiceSettings'));
- s.run("window.sidevoiceActions.editVoice({tts:{catalog:'elevenlabs',model:'eleven_flash_v2_5'}})");
- s.run("$('language-form').onsubmit({preventDefault(){}})");await settleSoon();
+ // A change that is ready at once (a model still to come waits, and never reaches the voice).
+ s.run("window.sidevoiceActions.editVoice({patience:'calm'})");
+ await s.run("applying");await settleSoon();
  assert.match(s.run("$('settings-error').textContent"),/Falta la clave del proveedor.*invalid_api_key/);
  assert.deepEqual(plain(s.run('voiceSettings')),before);
  assert.equal(s.run("localStorage.getItem('sidevoice.voice-settings')"),null);
@@ -1155,7 +1156,7 @@ test('A page with no voice keeps its settings unchecked and says why it cannot k
  assert.equal(s.run('voiceCatalogue.state'),'failed');
  assert.match(s.run('voiceCatalogue.error'),/aún no está disponible/);
  s.run("window.sidevoiceActions.editVoice({patience:'fast'})");
- await s.run('saveSettings()');
+ await s.run('applying');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).patience,'fast');
  await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),/aún no está disponible/);
 });
@@ -1433,4 +1434,19 @@ test('A model the slot names but that is not on this device installs, its progre
  await s.run("window.sidevoiceActions.installVoiceModel('tts')");
  assert.equal(s.run('state.voiceInstall.state'),'failed');
  assert.match(s.run('state.voiceInstall.error'),/download-failed/);
+});
+
+test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{
+ const notHere=CATALOGS.map(c=>c.id==='local'?{...c,models:[...c.models,{id:'whisper-small',family:'whisper',capabilities:['stt'],languages:['es'],voices:[],installed:false,builds:[build('whisper-small/int8',{installed:false})]}]}:c);
+ const s=setup({strictDOM:true});
+ const engine={...fakeEngine(notHere),install:async model=>{const m=notHere[0].models.find(x=>x.id===model);m.installed=true;m.builds=m.builds.map(b=>({...b,installed:true}))}};
+ withVoice(s,fakeVoice(),engine);
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({})});s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({stt:{model:'whisper-small'},patience:'calm'})");await s.run('applying');
+ assert.equal(s.run('voiceSettings.stt.model'),'whisper-base','the one in use stays');
+ assert.equal(s.run('voiceSettings.patience'),'calm','the rest applies at once');
+ assert.equal(s.run('voiceDraft.stt.model'),'whisper-small','the choice waits');
+ await s.run("window.sidevoiceActions.installVoiceModel('stt')");await s.run('applying');await settleSoon();
+ assert.equal(s.run('voiceSettings.stt.model'),'whisper-small','switched once it is here');
 });

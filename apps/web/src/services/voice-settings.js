@@ -261,3 +261,44 @@ export function voiceChoices(catalogs, settings, languages = []) {
 export function remoteProviders(catalogs) {
   return catalogs.filter((catalog) => catalog.id !== LOCAL_CATALOG).map((catalog) => ({ id: catalog.id, name: catalog.name ?? catalog.id }));
 }
+
+/**
+ * Whether what `settings` chose for `task` can be used now: a provider's model its catalogue lists, or one of this
+ * device's that is on disk (the build chosen, else any). The end of turn is ready when it is silence, or its model is.
+ * @param {DeviceVoiceSettings} settings
+ * @param {'stt' | 'tts' | 'end-of-turn'} task
+ * @param {CatalogView[]} catalogs
+ */
+export function modelReady(settings, task, catalogs) {
+  if (task === 'end-of-turn') {
+    if (settings.end_of_turn !== 'smart-turn') return true;
+    const model = endOfTurnModel(catalogs, settings.turn_model);
+    return !!model && (model.installed === true || !!model.builds?.some((build) => build.installed));
+  }
+  const slot = settings[task];
+  const model = catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model);
+  if (!model) return false;
+  if (slot.catalog !== LOCAL_CATALOG) return true;
+  const chosen = slot.build ? model.builds?.find((build) => build.id === slot.build) : null;
+  return chosen ? chosen.installed : model.installed === true || !!model.builds?.some((build) => build.installed);
+}
+
+/**
+ * The settings in use when `draft` is what was chosen and `saved` what is in use: each choice that is ready now, and
+ * for one that is not (a model still to download), what is in use — it switches once it is ready.
+ * @param {DeviceVoiceSettings} draft
+ * @param {DeviceVoiceSettings} saved
+ * @param {CatalogView[]} catalogs
+ */
+export function readyVoiceSettings(draft, saved, catalogs) {
+  // The same model as in use takes its other changes (language, voice, speed) at once, ready or not.
+  const same = (task) => draft[task].catalog === saved[task].catalog && draft[task].model === saved[task].model;
+  const turnReady = (draft.end_of_turn === saved.end_of_turn && draft.turn_model === saved.turn_model) || modelReady(draft, 'end-of-turn', catalogs);
+  return {
+    ...draft,
+    stt: same('stt') || modelReady(draft, 'stt', catalogs) ? draft.stt : saved.stt,
+    tts: same('tts') || modelReady(draft, 'tts', catalogs) ? draft.tts : saved.tts,
+    end_of_turn: turnReady ? draft.end_of_turn : saved.end_of_turn,
+    ...(turnReady ? {} : { turn_model: saved.turn_model }),
+  };
+}

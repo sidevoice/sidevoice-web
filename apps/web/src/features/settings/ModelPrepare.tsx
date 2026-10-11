@@ -13,12 +13,14 @@ import "./model-prepare.css";
  * fetched), downloading (how far, and cancel), being checked and loaded, ready, failed (why, and retry), or a
  * provider's model without its key. The status area keeps its height across states, so nothing below it jumps.
  *
- * It only draws a state; what moves it on is the caller's. A download is an act on this device, not part of what Save
- * keeps; but while the block is not ready, the caller's Save or Continue stays blocked (`Button`'s `blockedBy`). */
+ * It only draws a state; what moves it on is the caller's. In Settings a model chosen before it is ready waits, the one in
+ * use staying (`pending` says so) and switching once it is; the first-run setup's Continue waits for it. */
 
 export type PrepareStatus = "absent" | "downloading" | "verifying" | "loading" | "ready" | "failed" | "needs-key";
 
 export interface ModelPrepareProps {
+  /** A line under the status: here, that the model in use stays until this one is ready ("Will switch when ready"). */
+  pending?: string;
   /** None while no model is chosen (or the chosen one is not listed): the pickers and their note alone. */
   status: PrepareStatus | null;
   /** The model's name, for what is said about it. */
@@ -44,7 +46,7 @@ export interface ModelPrepareProps {
   actionIds?: string;
 }
 
-export function ModelPrepare({ status, model, pickers, meta, size = null, fraction = null, error, readyAction, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, status, model, pickers, meta, size = null, fraction = null, error, readyAction, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = hostTranslator();
   const hintId = useId();
@@ -89,6 +91,7 @@ export function ModelPrepare({ status, model, pickers, meta, size = null, fracti
         {status === "failed" && <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })}
           action={<Button size="sm" id={actionId("retry")} onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>}
       </div>}
+      {pending && status !== "ready" && <p className="model-prepare-pending" role="status">{pending}</p>}
     </div>
   );
 }

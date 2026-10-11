@@ -18,8 +18,9 @@ import { cancelDownload, catalogueShown, downloadModel, TryResult, useModelState
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
  * its own options once it is ready (the language heard; the voice and its speed). When a turn ends is Advanced's. The
- * choices are the engine's catalogues; what cannot be chosen is listed greyed out, with why. Save keeps them, and waits
- * until every chosen model is ready (`useVoiceReadiness`). The first-run setup shows the same, with `setup`. */
+ * choices are the engine's catalogues; what cannot be chosen is listed greyed out, with why. Each choice applies as it is
+ * made; a model not ready yet waits while the one in use stays (`useVoiceReadiness` says which wait). The first-run
+ * setup shows the same, with `setup`, and its Continue waits for them. */
 
 function languageName(tag: string) {
   try {
@@ -109,6 +110,10 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   const choices = useChoices(draft);
   const slot = choices[task];
   const model = useModelState(task, draft);
+  // A model chosen that is not here yet waits; the one in use stays until it is ready, then it switches.
+  const inUse = useRoomStore((state) => state.facts.voiceSettings?.[task]);
+  const pending = !setup && inUse && (inUse.catalog !== draft[task].catalog || inUse.model !== draft[task].model)
+    ? t("voice.prepare.willSwitch", { model: inUse.model }) : undefined;
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const { trial, run, cancel } = useVoiceTry(setup ? null : task, { keep: false });
   // In the setup a provider that only lacks its key can be chosen, and asks for it below.
@@ -135,7 +140,7 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
         ? <Row label={provider.name ?? provider.id} block><ProviderKey provider={provider.id} name={provider.name ?? provider.id} t={t} /></Row>
         : null)}
       <Row label={t("voice.model")} block>
-        <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
+        <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
           readyAction={tryButton || undefined} onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)}
           onAddKey={() => window.sidevoiceActions?.showSettingsSection?.("providers")} />
@@ -192,6 +197,9 @@ export function TurnChoices({ draft }: { draft: Settings }) {
   const turn = useModelState("end-of-turn", draft);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const turnModels = useMemo(() => endOfTurnModels(catalogs), [catalogs]);
+  const saved = useRoomStore((state) => state.facts.voiceSettings);
+  const turnPending = saved && (saved.end_of_turn !== "smart-turn" || saved.turn_model !== draft.turn_model)
+    ? t(saved.end_of_turn === "smart-turn" ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: saved.turn_model ?? "" }) : undefined;
   return (
     <Group title={t("settings.call.turn")}>
       <Row label={t("voice.patience")} description={t(current.hint)}>
@@ -205,7 +213,7 @@ export function TurnChoices({ draft }: { draft: Settings }) {
         </NativeSelect>
       </Row>
       {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
-        <ModelPrepare id="turn-model-card" actionIds="turn-model" status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
+        <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
           pickers={(locked) => <Field label={t("voice.model")}>
             {/* Just the models: one today, more later; no families, sizes or runtime here. */}
             <NativeSelect id="turn-model" value={turn.model!.id} disabled={locked} onChange={(event) => edit({ turn_model: event.target.value })}>

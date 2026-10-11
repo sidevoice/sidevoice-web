@@ -203,7 +203,7 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
     <Specimen title="Alert"><Alerts /></Specimen>
     <Specimen title="Section · Group · Row · Choice card" note="Settings: a section, its groups as cards, rows label-left and control-right; stacked when narrow."><Cards /></Specimen>
     <Specimen title="Progress"><ProgressBar value={0.66} label="Example progress" /><ProgressBar value={null} label="Example indeterminate progress" /></Specimen>
-    <Specimen title="Model · prepare" note="One block wherever a model is chosen, onboarding and Settings alike. Every state below; Save waits for ‘ready’."><Prepare /></Specimen>
+    <Specimen title="Model · prepare" note="One block wherever a model is chosen, onboarding and Settings alike. Every state below. In Settings the one in use stays until a new one is ready (no Save); the setup's Continue waits for it."><Prepare /></Specimen>
     <Specimen title="Dialog · page shell" note="A head, a body that alone scrolls, a footer in sight. Full screen below 600px."><Dialogs onOpen={onOpen} /></Specimen>
   </div>;
 }
@@ -214,9 +214,9 @@ const NAV = [
   { value: "machines", label: "Machines", icon: <MachinesIcon /> }, { value: "advanced", label: "Advanced", icon: <AdvancedIcon /> },
 ];
 
-/** The full-screen page, as Settings will wear it: Save blocked until the chosen model is ready, and saying why. */
+/** The full-screen page, as Settings wears it: no Save, each setting applies as it changes; a model still to come says
+ *  the one in use stays until it is ready. */
 function SettingsExample({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const reasonId = useId();
   const [status, setStatus] = useState<PrepareStatus>("absent");
   const [fraction, setFraction] = useState(0);
   useEffect(() => {
@@ -227,12 +227,8 @@ function SettingsExample({ open, onClose }: { open: boolean; onClose: () => void
     }), 250);
     return () => clearInterval(timer);
   }, [status]);
-  const ready = status === "ready";
   return (
-    <Dialog open={open} layout="page" titleId="ds-page-title" title="Settings" onClose={onClose} flush
-      footer={<>{!ready && <p className="ui-dialog-reason" id={reasonId}>The transcription model isn't ready yet.</p>}
-        <Button variant="ghost" tone="neutral" onClick={onClose}>Discard changes</Button>
-        <Button variant="primary" disabled={!ready} blockedBy={reasonId} onBlocked={() => document.getElementById("ds-prepare")?.scrollIntoView({ block: "center" })} onClick={onClose}>Save changes</Button></>}>
+    <Dialog open={open} layout="page" titleId="ds-page-title" title="Settings" onClose={onClose} flush>
       <div className="ds-settings">
         <nav className="ui-nav ds-settings-nav" aria-label="Settings sections">
           {NAV.map((item) => <button key={item.value} type="button" className="ui-nav-item" aria-current={item.value === "transcription" ? "page" : undefined}>
@@ -243,7 +239,7 @@ function SettingsExample({ open, onClose }: { open: boolean; onClose: () => void
             <Group>
               <Row label="Runs on"><Segmented size="sm" label="Runs on" value="local" onChange={() => {}} items={[{ value: "local", label: "This device" }, { value: "provider", label: "Provider" }]} /></Row>
               <Row label="Model" description="Pick a family, then one of its models." block>
-                <ModelPrepare id="ds-prepare" status={status} model="whisper-small" size={466e6} fraction={fraction} meta="English, Spanish and 4 more · good accuracy, fast"
+                <ModelPrepare id="ds-prepare" pending="Will switch when ready: whisper-base stays in use until then." status={status} model="whisper-small" size={466e6} fraction={fraction} meta="English, Spanish and 4 more · good accuracy, fast"
                   pickers={(locked) => <Pickers locked={locked} />} onDownload={() => { setFraction(0); setStatus("downloading"); }} onCancel={() => setStatus("absent")}
                   readyAction={<Button size="sm">Try it</Button>} />
               </Row>

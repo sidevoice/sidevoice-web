@@ -12,7 +12,7 @@ import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-langua
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
@@ -1299,16 +1299,31 @@ function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
- try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)})}
+ try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)});
+  // A model chosen while it was not here yet is put in use once it is.
+  if(state.voiceDraft)void applyVoiceSettings()}
  catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
 }
-function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)})}
+// Settings apply as they change (there is no Save): the draft is what was chosen, and what of it is ready is put in use
+// at once; a model still to download waits in the draft, the one in use stays, and it switches once it is ready (the
+// catalogues read again after its install). A download cancelled or failed leaves the one in use as it was.
+function editVoice(patch){
+ roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)});
+ void applyVoiceSettings();
+}
+let applying=Promise.resolve();
+function applyVoiceSettings(){
+ applying=applying.then(saveVoiceSettings).catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)});
+ return applying;
+}
 // The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
 async function saveVoiceSettings(){
- const draft=state.voiceDraft;if(!draft||JSON.stringify(draft)===JSON.stringify(state.voiceSettings))return;
+ const draft=state.voiceDraft,saved=state.voiceSettings;if(!draft||!saved)return;
+ const next=readyVoiceSettings(draft,saved,state.voiceCatalogue.catalogs);
+ if(JSON.stringify(next)===JSON.stringify(saved))return;
  const host=await voiceHost().catch(()=>null);
- if(host)await host.setSettings(voiceSettingsHere(draft,state.voiceCatalogue.catalogs));
- writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
+ if(host)await host.setSettings(voiceSettingsHere(next,state.voiceCatalogue.catalogs));
+ writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now()});$('settings-error').textContent='';
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
 // one, since it would take that call's voice. Settings that work are this device's from then on.
@@ -1394,7 +1409,8 @@ $('settings-open').onclick=()=>{try{
  // Every opening reads each paired machine's agents again.
  scanPairedAgents(true);
  if(nodeBase==null)settingsSection('machines');
- roomStore.patch({voiceDraft:state.voiceSettings});void loadVoiceCatalogue();
+ // What was chosen and is still on its way stays chosen across openings.
+ roomStore.patch({voiceDraft:state.voiceDraft||state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
  // Empty is Automatic: the system's language, followed as it is rather than kept.
  $('ui-language').value=storedPreferences().ui_language||'';
@@ -1404,8 +1420,9 @@ $('settings-open').onclick=()=>{try{
 // Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
 // (no machine yet) or on an agent waiting to be connected.
 function settingsSection(name){roomStore.patch({settingsSection:name})}
-$('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value||systemPreferences().ui_language);
-$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings()});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
+$('ui-language').onchange=()=>saveLanguage();
+$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();$('ui-language').value='';saveLanguage();
+ roomStore.patch({voiceDraft:defaultVoiceSettings()});void applyVoiceSettings();$('reset-settings-note').textContent='Restablecido a los valores por defecto.'};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
 // says. Only the settings of today's shape are read back.
@@ -1415,17 +1432,17 @@ function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]]))}
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))))}catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
-// The interface's language is this device's: saved here, said to the call in progress, applied at once.
-async function saveSettings(){
- await saveVoiceSettings();
+// The interface's language is this device's: saved here as it is chosen, said to the call in progress, applied at once.
+function saveLanguage(){
  // Automatic keeps no language: the system's is read again at each start.
  const chosen=$('ui-language').value;
  storePreferences(chosen?{ui_language:chosen}:{});
  const p={...systemPreferences(),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
- $('language-settings').close();state.liveNote='Preferencias guardadas';
+ roomStore.patch({settingsSavedAt:Date.now()});
 }
-$('language-form').onsubmit=e=>{e.preventDefault();$('settings-error').textContent='';saveSettings().catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)})};
+// Nothing to submit: every setting applies as it changes. Enter in a field submits nothing.
+$('language-form').onsubmit=e=>e.preventDefault();
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
  skipReply,

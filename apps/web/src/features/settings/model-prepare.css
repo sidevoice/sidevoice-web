@@ -34,3 +34,6 @@
 .model-runtime-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); font-size: var(--sv-font-sm); font-weight: 600; }
 .model-runtime-detail, .model-runtime-why { font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
 .model-runtime-why { color: var(--sv-warning); }
+
+/* The model in use stays until this one is ready (there is no Save: it switches by itself). */
+.model-prepare-pending { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
