@@ -154,10 +154,15 @@ body,
 .settings-dialog[open] {
   display:grid;
   grid-template-rows:auto minmax(0,1fr) auto;
-  width:min(60rem,calc(100vw - 2rem));
-  height:min(52rem,calc(100dvh - 2rem));
+  /* Settings are a screen of their own, not a box over the room. */
+  width:100vw;
+  height:100dvh;
+  max-width:none;
   max-height:none;
+  margin:0;
   padding:0;
+  border:0;
+  border-radius:0;
   overflow:hidden;
 }
 .settings-dialog>#language-form { min-height:0;height:100%;overflow:hidden }
@@ -190,7 +195,6 @@ body,
 .settings-dialog .model-info { flex:none }
 
 @media (max-width:700px) {
-  .settings-dialog[open] { width:calc(100vw - 1rem);height:calc(100dvh - 1rem) }
   .settings-dialog .settings-layout { display:flex;flex-direction:column }
   .settings-dialog .settings-nav { display:flex;flex:none;flex-wrap:wrap;gap:.35rem;overflow:visible;scrollbar-width:auto }
   .settings-dialog .settings-nav .ui-button { flex:1 1 calc(33.333% - .35rem);width:auto;min-width:0;white-space:normal;margin:0;padding:.65rem .75rem }
@@ -446,3 +450,19 @@ body,
 .connector-steps p { margin:.1rem 0 .4rem;line-height:1.45 }
 .connector-steps .setup-command-note { min-height:1.2em;margin:.25rem 0 0;font-size:.8rem }
 .pairing-form .pairing-hint { display:block;margin-top:.3rem;font-size:.78rem;line-height:1.4 }
+
+/* Settings are a screen of their own (the id outranks room.css's older box), their content in a readable column. */
+#language-settings.settings-dialog[open] { inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;border-radius:0 }
+.settings-dialog .settings-content > section { max-width:46rem }
+.settings-dialog .settings-content h3 { margin:1.4rem 0 .6rem;font-size:1.05rem }
+.settings-dialog .settings-content > section > h3:first-child,.settings-machines .machines > h3:first-child { margin-top:.4rem }
+/* The machines' list titles its pane like the others. */
+.settings-machines .machines { margin-top:0;font-size:inherit }
+.settings-machines .machines > h3 { font-size:1.05rem;text-transform:none;letter-spacing:0;color:var(--sv-text) }
+.settings-machines .machines > h3 svg { display:none }
+.settings-reset { margin-top:.4rem }
+.settings-build { margin-top:2rem }
+/* A model's download is a button you can hit. */
+.settings-dialog [id$="-model-download"] { padding:.55rem 1rem;font-size:.85rem }
+.settings-dialog .settings-content { padding-top:1.25rem }
+.settings-machines #pair-device-open { width:auto;margin-top:.9rem;padding:.6rem 1rem;border:1px solid var(--sv-border);background:var(--sv-surface-raised);font-size:.85rem }

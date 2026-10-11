@@ -5,15 +5,24 @@ import { ProviderKeys } from "./ProviderKeys";
 import { MachineList } from "../room/MachineList";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
+import { hostTranslator } from "./host-i18n";
 
 function GeneralSettings() {
+  const t = hostTranslator();
   return <section id="pane-general" aria-labelledby="settings-general">
-    <h3>Idioma de la interfaz</h3><label>Idioma<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label><p className="muted">Cambia los textos de la web.</p><p className="muted">La configuración se guarda en este dispositivo; la sala no conserva ninguna copia. Cada dispositivo tiene la suya.</p><Button id="reset-settings" variant="ghost">Restablecer toda la configuración de este dispositivo</Button><p className="muted" id="reset-settings-note" role="status" /><p className="muted">Compilación <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p>
+    <h3>{t("settings.general.language")}</h3>
+    <label>{t("settings.general.languageLabel")}<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label>
+    <p className="muted">{t("settings.general.languageHint")}</p>
+    <h3>{t("settings.general.device")}</h3>
+    <p className="muted">{t("settings.general.deviceHint")}</p>
+    <Button id="reset-settings" variant="danger" size="compact" className="settings-reset">{t("settings.general.reset")}</Button>
+    <p className="muted" id="reset-settings-note" role="status" />
+    <p className="muted settings-build">{t("settings.general.build")} <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p>
   </section>;
 }
 
 function MachineSettings() {
-  return <section id="pane-machines" aria-labelledby="settings-machines" hidden><MachineList /></section>;
+  return <section id="pane-machines" aria-labelledby="settings-machines" hidden className="settings-machines"><MachineList /></section>;
 }
 
 export function SettingsDialog() {
