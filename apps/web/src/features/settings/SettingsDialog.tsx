@@ -4,7 +4,7 @@ import { OverlayPortalProvider } from "../../components/ui/Tooltip";
 import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select } from "../../components/ui/Select";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -46,10 +46,13 @@ export function Appearance({ t }: { t: HostTranslate }) {
 }
 
 function GeneralSettings({ t }: { t: HostTranslate }) {
+  // The runtime keeps it (saved as it is chosen, said to the call); this shows it and asks for a change.
+  const language = useRoomStore((state) => state.facts.uiLanguage);
   return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
     <Group>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
-        <NativeSelect id="ui-language" defaultValue=""><option value="">{t("settings.general.languageAuto")}</option><option value="es">Español</option><option value="en">English</option></NativeSelect>
+        <Select id="ui-language" value={language} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
+          options={[{ value: "", label: t("settings.general.languageAuto") }, { value: "es", label: "Español" }, { value: "en", label: "English" }]} />
       </Row>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
     </Group>

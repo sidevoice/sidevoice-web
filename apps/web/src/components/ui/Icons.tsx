@@ -38,6 +38,9 @@ export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
 /** Puts away what dropped from above: a phone's conversations panel. */
 export const CloseUpIcon = mark(ChevronUp, 18);
+/** More of a list above, or below, what it shows: a select's long list. */
+export const MoreAboveIcon = mark(ChevronUp, 14);
+export const MoreBelowIcon = mark(ChevronDown, 14);
 export const SidebarCollapseIcon = mark(PanelLeftClose, 18);
 export const SidebarExpandIcon = mark(PanelLeftOpen, 18);
 export const MoreIcon = mark(MoreHorizontal, 18);

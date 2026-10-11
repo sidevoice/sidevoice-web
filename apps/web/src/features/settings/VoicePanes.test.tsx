@@ -8,6 +8,7 @@ import { createRoomStore, installRoomBridge, RoomStoreContext, useRoomStore } fr
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { SidevoiceActions } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
+import { chooseOption, listOptions } from "../../test/select";
 
 afterEach(cleanup);
 
@@ -47,37 +48,35 @@ function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {})
   return { store, actions };
 }
 
-const options = (id: string) => [...(document.getElementById(id) as HTMLSelectElement).options];
-
 test("a slot's source comes first: this device, then each provider; one without its key says so, and asks for it right there", () => {
   const { actions } = renderPane("voice");
-  expect(options("stt-source").map((option) => [option.value, option.textContent, option.disabled])).toEqual([
-    ["local", "On this device", false],
-    ["elevenlabs", "ElevenLabs", false],
-    ["openai", "OpenAI — needs your key", false],
+  expect(listOptions("stt-source").map((option) => [option.value, option.label, option.disabled, option.detail])).toEqual([
+    ["local", "On this device", false, ""],
+    ["elevenlabs", "ElevenLabs", false, ""],
+    ["openai", "OpenAI", false, "needs your key"],
   ]);
-  fireEvent.change(document.getElementById("stt-source")!, { target: { value: "elevenlabs" } });
+  chooseOption("stt-source", "elevenlabs");
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { catalog: "elevenlabs" } });
 });
 
 test("then the source's models, this device's family first and then a model of it, one that does not run here disabled with why", () => {
   const { actions } = renderPane("voice");
-  expect(options("stt-family").map((option) => [option.value, option.textContent])).toEqual([["whisper", "Whisper"], ["moonshine", "Moonshine"]]);
-  expect(options("stt-model").map((option) => option.value)).toEqual(["whisper-base", "whisper-large"]);
-  fireEvent.change(document.getElementById("stt-family")!, { target: { value: "moonshine" } });
+  expect(listOptions("stt-family").map((option) => [option.value, option.label])).toEqual([["whisper", "Whisper"], ["moonshine", "Moonshine"]]);
+  expect(listOptions("stt-model").map((option) => option.value)).toEqual(["whisper-base", "whisper-large"]);
+  chooseOption("stt-family", "moonshine");
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "moonshine-tiny" } });
-  const large = options("stt-model").find((option) => option.value === "whisper-large")!;
+  const large = listOptions("stt-model").find((option) => option.value === "whisper-large")!;
   expect(large.disabled).toBe(true);
-  expect(large.textContent).toBe("whisper-large — does not run here: it does not fit in this device's memory");
+  expect([large.label, large.detail]).toEqual(["whisper-large", "does not run here: it does not fit in this device's memory"]);
 });
 
 test("the voice and the speed range are the model's; smart-turn says why it cannot be chosen; a change says it restarts the voice", () => {
   const { actions } = renderPane("voice");
   const speed = document.getElementById("tts-speed") as HTMLInputElement;
   expect([speed.min, speed.max]).toEqual(["0.5", "2"]);
-  fireEvent.change(document.getElementById("tts-voice")!, { target: { value: "ef_dora" } });
+  chooseOption("tts-voice", "ef_dora");
   expect(actions.editVoice).toHaveBeenCalledWith({ tts: { voice: "ef_dora" } });
-  expect(options("voice-end-of-turn")[0].disabled).toBe(true);
+  expect(listOptions("voice-end-of-turn")[0].disabled).toBe(true);
   expect(screen.getByText(/No end-of-turn model runs on this device yet/)).toBeInTheDocument();
   cleanup();
   // A model that takes no speed has no slider.
@@ -163,7 +162,9 @@ test("the providers are the catalogues: while they load it says so, and when the
 test("a catalogue its storage was refused to says the browser blocks site data", () => {
   const blocked = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, status: { stale: false, reason: { code: "storage-blocked", params: {} } }, models: [] } : catalog) as CatalogView[];
   renderPane("voice", { voiceCatalogue: { state: "ready", catalogs: blocked, error: "" } });
-  expect(options("stt-source")[0].textContent).toMatch(/On this device — This browser is blocking site data for this page/);
+  const local = listOptions("stt-source")[0];
+  expect(local.label).toBe("On this device");
+  expect(local.detail).toMatch(/^This browser is blocking site data for this page/);
 });
 
 test("a browser that blocks site data is said once, on top, while it does", () => {
@@ -192,7 +193,7 @@ test("while it downloads the card shows how far it has got, and the download can
   expect(card).toHaveTextContent("Downloading… 40%");
   expect(card.querySelector("[role=progressbar]")).toHaveAttribute("aria-valuenow", "40");
   // While it downloads, the model cannot be changed under it.
-  expect((document.getElementById("tts-model") as HTMLSelectElement).disabled).toBe(true);
+  expect(document.getElementById("tts-model")).toBeDisabled();
   fireEvent.click(document.getElementById("tts-model-cancel")!);
   expect(actions.cancelVoiceInstall).toHaveBeenCalled();
   cleanup();
@@ -203,7 +204,7 @@ test("while it downloads the card shows how far it has got, and the download can
 test("once it is here its voices appear, and it can be tried without saving; a provider's model needs no download", async () => {
   const { actions } = renderPane("voice");
   expect(document.getElementById("tts-model-card")).toHaveTextContent("Ready");
-  expect(options("tts-voice").map((option) => option.value)).toEqual(["", "ef_dora"]);
+  expect(listOptions("tts-voice").map((option) => [option.value, option.label, option.detail])).toEqual([["", "Automatic (the model's own)", ""], ["ef_dora", "ef_dora", "Spanish"]]);
   await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ keep: false }));
   cleanup();
@@ -237,8 +238,8 @@ test("the smart end of turn has its model chosen like the others — just the mo
   const withTurn = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models,
     local("smart-turn-v3.2", "smart-turn", ["end-of-turn"], { installed: false, recommendedBuild: "smart-turn-v3.2/int8", builds: [build("smart-turn-v3.2/int8", { downloadBytes: 9e6, installed: false })] })] } : catalog) as CatalogView[];
   const { actions } = renderPane("voice", { voiceCatalogue: { state: "ready", catalogs: withTurn, error: "" } });
-  expect(options("voice-end-of-turn")[0]).toHaveTextContent("Smart");
-  expect(options("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
+  expect(listOptions("voice-end-of-turn")[0].label).toMatch(/^Smart/);
+  expect(listOptions("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
   expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
   fireEvent.click(document.getElementById("turn-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select } from "../../components/ui/Select";
 import { Row } from "../../components/ui/Card";
 import { LOCAL_CATALOG } from "../../services/model-catalogs.js";
 import { DELETE_UNUSED_DAYS, modelPurposes, type ModelPurpose } from "../../services/model-housekeeping.js";
@@ -113,11 +113,10 @@ export function DeleteUnusedChoice() {
   if (!removable) return null;
   return (
     <Row label={t("settings.advanced.deleteUnused")} description={t("settings.advanced.deleteUnusedHint")} htmlFor="delete-unused-models">
-      <NativeSelect id="delete-unused-models" value={days == null ? "" : String(days)}
-        onChange={(event) => void window.sidevoiceActions?.setDeleteUnusedModels?.(event.target.value ? Number(event.target.value) : null)}>
-        {DELETE_UNUSED_DAYS.map((value) => <option key={String(value)} value={value == null ? "" : String(value)}>
-          {value == null ? t("settings.advanced.never") : t("settings.advanced.days", { n: value })}</option>)}
-      </NativeSelect>
+      <Select id="delete-unused-models" value={days == null ? "" : String(days)}
+        onValueChange={(value) => void window.sidevoiceActions?.setDeleteUnusedModels?.(value ? Number(value) : null)}
+        options={DELETE_UNUSED_DAYS.map((value) => ({ value: value == null ? "" : String(value),
+          label: value == null ? t("settings.advanced.never") : t("settings.advanced.days", { n: value }) }))} />
     </Row>
   );
 }

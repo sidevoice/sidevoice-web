@@ -13,7 +13,7 @@ import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
 import { Appearance } from "../settings/SettingsDialog";
 import { Group, Row } from "../../components/ui/Card";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select } from "../../components/ui/Select";
 import { TryResult, useModelState, useVoiceTry, type ModelState, catalogueShown } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { hostStatusText } from "../settings/local-host-status";
@@ -66,19 +66,17 @@ function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHos
 function BasicsStep({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [language, setLanguage] = useState(() => window.sidevoiceActions?.interfaceLanguage?.() ?? "");
+  // Each language in its own name, as language pickers have them.
+  const languages = [{ value: "", label: t("wizard.languageAuto") }, { value: "es", label: "Español" }, { value: "en", label: "English" }];
   return <section className="wizard-basics">
     <p>{t("wizard.basics.body")}</p>
     <Group>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
       <Row label={t("wizard.basics.uiLanguage")} htmlFor="wizard-ui-language">
-        <NativeSelect id="wizard-ui-language" value={language} onChange={(event) => { setLanguage(event.target.value); window.sidevoiceActions?.setInterfaceLanguage?.(event.target.value); }}>
-          <option value="">{t("wizard.languageAuto")}</option><option value="es">Español</option><option value="en">English</option>
-        </NativeSelect>
+        <Select id="wizard-ui-language" value={language} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
       </Row>
       <Row label={t("wizard.basics.speech")} description={t("wizard.basics.speechHint")} htmlFor="wizard-speech-language">
-        <NativeSelect id="wizard-speech-language" value={draft?.stt.language ?? ""} onChange={(event) => window.sidevoiceActions?.editVoice({ stt: { language: event.target.value || null } })}>
-          <option value="">{t("wizard.languageAuto")}</option><option value="es">Español</option><option value="en">English</option>
-        </NativeSelect>
+        <Select id="wizard-speech-language" value={draft?.stt.language ?? ""} onValueChange={(next) => window.sidevoiceActions?.editVoice({ stt: { language: next || null } })} options={languages} />
       </Row>
     </Group>
   </section>;

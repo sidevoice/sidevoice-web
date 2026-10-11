@@ -1077,7 +1077,7 @@ test('The room\'s withdrawals cancel what it names, and each reply\'s end goes t
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
- await s.run("$('ui-language').value='en';saveLanguage()");
+ await s.run("saveLanguage('en')");
  assert.deepEqual(sent.filter(m=>m.type==='voice-settings').map(m=>Object.keys(m.data).sort()),[['session_id','ui_language']]);
 });
 
