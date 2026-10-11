@@ -448,8 +448,11 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
         {visibleDevices.map((device) => (
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
-              <strong>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
-              {(device.kind === "local" || device.current) && <Badge tone="accent">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</Badge>}
+              {/* The name and, on the same line, whether it is this device: the name gives way (an ellipsis), the tag never. */}
+              <span className="host-device-title">
+                <strong title={device.name || undefined}>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
+                {(device.kind === "local" || device.current) && device.name && <Badge tone="accent">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</Badge>}
+              </span>
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
