@@ -42,7 +42,7 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
   return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
     <Group>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
-        <NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect>
+        <NativeSelect id="ui-language" defaultValue=""><option value="">{t("settings.general.languageAuto")}</option><option value="es">Español</option><option value="en">English</option></NativeSelect>
       </Row>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
     </Group>

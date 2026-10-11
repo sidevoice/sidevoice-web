@@ -27,13 +27,13 @@ export const END_OF_TURN = ['silence', 'smart-turn'];
 export const SPEED = { normal: 1, step: 0.05 };
 
 /**
- * What a call starts with when the person chose nothing, in `language`.
- * @param {string | null | undefined} language
+ * What a call starts with when the person chose nothing: this device's models, the language heard detected rather than
+ * assumed (`null`), the model's own voice at the normal pace.
  * @returns {DeviceVoiceSettings}
  */
-export function defaultVoiceSettings(language) {
+export function defaultVoiceSettings() {
   return {
-    stt: { catalog: LOCAL_CATALOG, model: 'whisper-base', language: language || null },
+    stt: { catalog: LOCAL_CATALOG, model: 'whisper-base', language: null },
     tts: { catalog: LOCAL_CATALOG, model: 'kokoro-82m-v1.0', voice: null, speed: SPEED.normal },
     patience: 'normal',
     end_of_turn: 'silence',
@@ -71,13 +71,12 @@ export function normaliseVoiceSettings(value, defaults) {
 }
 
 /**
- * The settings this device keeps, or the defaults for `language`.
+ * The settings this device keeps, or the defaults.
  * @param {Storage | null | undefined} storage
- * @param {string | null | undefined} language
  * @returns {DeviceVoiceSettings}
  */
-export function readVoiceSettings(storage, language) {
-  const defaults = defaultVoiceSettings(language);
+export function readVoiceSettings(storage) {
+  const defaults = defaultVoiceSettings();
   try {
     const stored = JSON.parse(storage?.getItem(VOICE_SETTINGS_KEY) || 'null');
     return stored && typeof stored === 'object' ? normaliseVoiceSettings(stored, defaults) : defaults;

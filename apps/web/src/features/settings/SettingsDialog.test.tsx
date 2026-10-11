@@ -21,7 +21,7 @@ const catalogs = [{ id: "local", name: null, status: { stale: false }, models: [
 
 function open(draftModel: string) {
   const store = createRoomStore();
-  const settings = defaultVoiceSettings("es");
+  const settings = defaultVoiceSettings();
   act(() => store.patch({ voiceSettings: settings, voiceDraft: { ...settings, stt: { ...settings.stt, model: draftModel } },
     voiceCatalogue: { state: "ready", catalogs, error: "" }, settingsSection: "general" }));
   window.sidevoiceActions = { editVoice: vi.fn(), installVoiceModel: vi.fn(), loadVoiceCatalogue: vi.fn() } as unknown as SidevoiceActions;

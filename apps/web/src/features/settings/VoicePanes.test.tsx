@@ -36,7 +36,7 @@ const catalogs = [
 
 function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {}) {
   const store = createRoomStore();
-  store.patch({ voiceSettings: defaultVoiceSettings("es"), voiceCatalogue: { state: "ready", catalogs, error: "" }, providerKeys: { openai: false, elevenlabs: true }, ...facts });
+  store.patch({ voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs, error: "" }, providerKeys: { openai: false, elevenlabs: true }, ...facts });
   installRoomBridge(store);
   const actions = { editVoice: vi.fn(), saveProviderKey: vi.fn().mockResolvedValue(undefined), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(), tryVoiceSettings: vi.fn().mockResolvedValue({}), cancelVoiceTry: vi.fn() };
@@ -80,7 +80,7 @@ test("the voice and the speed range are the model's; smart-turn says why it cann
   expect(screen.getByText(/No end-of-turn model runs on this device yet/)).toBeInTheDocument();
   cleanup();
   // A model that takes no speed has no slider.
-  renderPane("voice", { voiceSettings: { ...defaultVoiceSettings("es"), tts: { catalog: "local", model: "piper", voice: null, speed: 1 } } });
+  renderPane("voice", { voiceSettings: { ...defaultVoiceSettings(), tts: { catalog: "local", model: "piper", voice: null, speed: 1 } } });
   expect(document.getElementById("tts-speed")).toBeNull();
 });
 
@@ -145,7 +145,7 @@ test("a browser that blocks site data is said once, on top, while it does", () =
   expect(screen.getByRole("alert")).toHaveTextContent("This browser is blocking site data for this page. Allow it");
 });
 
-const withVoiceModel = (model: string, catalog = "local") => ({ ...defaultVoiceSettings("es"), tts: { catalog, model, voice: null, speed: 1 } });
+const withVoiceModel = (model: string, catalog = "local") => ({ ...defaultVoiceSettings(), tts: { catalog, model, voice: null, speed: 1 } });
 
 test("a model not on this device offers its download with its size; its voices wait until it is here", () => {
   const { actions } = renderPane("voice", { voiceSettings: withVoiceModel("piper-es") });
@@ -178,7 +178,7 @@ test("once it is here its voices appear, and it can be tried without saving; a p
   await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ keep: false }));
   cleanup();
-  renderPane("voice", { voiceSettings: { ...defaultVoiceSettings("es"), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
+  renderPane("voice", { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
   expect(document.getElementById("stt-model-card")).toHaveTextContent("No download needed");
   expect(document.getElementById("stt-language")).toBeInTheDocument();
 });

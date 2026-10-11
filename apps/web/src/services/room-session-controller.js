@@ -1343,7 +1343,7 @@ async function saveProviderKey(provider,key){
  const catalogs=await models.catalogs().catch(()=>null);
  if(catalogs)roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
-roomStore.patch({voiceSettings:readVoiceSettings(pageStorage(),state.speechLanguage)});
+roomStore.patch({voiceSettings:readVoiceSettings(pageStorage())});
 
 $('settings-open').onclick=()=>{try{
  // Every opening reads each paired machine's agents again.
@@ -1351,15 +1351,16 @@ $('settings-open').onclick=()=>{try{
  if(nodeBase==null)settingsSection('machines');
  roomStore.patch({voiceDraft:state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
- $('ui-language').value=p.ui_language;
+ // Empty is Automatic: the system's language, followed as it is rather than kept.
+ $('ui-language').value=storedPreferences().ui_language||'';
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 // Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
 // (no machine yet) or on an agent waiting to be connected.
 function settingsSection(name){roomStore.patch({settingsSection:name})}
-$('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
-$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings(state.speechLanguage)});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
+$('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value||systemPreferences().ui_language);
+$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings()});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
 // says. Only the settings of today's shape are read back.
@@ -1372,8 +1373,10 @@ function devicePreferences(){return {...systemPreferences(),...storedPreferences
 // The interface's language is this device's: saved here, said to the call in progress, applied at once.
 async function saveSettings(){
  await saveVoiceSettings();
- const p={...devicePreferences(),ui_language:$('ui-language').value||devicePreferences().ui_language};
- storePreferences(p);window.roomI18n?.setLanguage(p.ui_language);
+ // Automatic keeps no language: the system's is read again at each start.
+ const chosen=$('ui-language').value;
+ storePreferences(chosen?{ui_language:chosen}:{});
+ const p={...systemPreferences(),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
  $('language-settings').close();state.liveNote='Preferencias guardadas';
 }

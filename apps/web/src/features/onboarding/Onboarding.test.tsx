@@ -34,7 +34,7 @@ afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); });
 
 function room() {
   const store = createRoomStore();
-  act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: defaultVoiceSettings("es"), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
   render(<App store={store} />);
   return store;
 }
@@ -67,7 +67,7 @@ test("transcription and voice are this device's, each tried for real before Cont
   expect(document.getElementById("stt-heard")).toHaveTextContent("hola, ¿me oyes?");
   expect(stageAction()).toHaveTextContent("Continue");
   // Another model is another setting: it is tried again before going on.
-  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings("es"), stt: { catalog: "local", model: "moonshine-tiny", language: null } } }));
+  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "moonshine-tiny", language: null } } }));
   await waitFor(() => expect(stageAction()).toHaveTextContent("Speak"));
   await act(async () => { fireEvent.click(stageAction()); });
   fireEvent.click(stageAction());
