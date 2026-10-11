@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { COPY_FEEDBACK_MS, Quote, Snippet } from "./Snippet";
+import { COPY_FAILED_MS, COPY_FEEDBACK_MS, Quote, Snippet } from "./Snippet";
 
 const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 function clipboard(writeText?: (text: string) => Promise<void>) {
@@ -49,21 +49,47 @@ test("copied, the button itself turns into a check and says so out of sight, the
   expect(screen.getByRole("status")).toHaveTextContent("");
 });
 
-test("when the clipboard refuses, or there is none, the same button says to select the text, for as long", async () => {
-  clipboard(vi.fn(async () => { throw new Error("denied"); }));
-  render(<Quote text="Connect to Sidevoice" label="Copy the message" />);
-  const button = screen.getByRole("button", { name: "Copy the message" });
-  await click("Copy the message");
-  expect(button).toHaveAttribute("data-state", "failed");
-  expect(screen.getByRole("status")).toHaveTextContent("Couldn’t copy — select the text");
-  act(() => { vi.advanceTimersByTime(COPY_FEEDBACK_MS); });
-  expect(button).not.toHaveAttribute("data-state");
-  expect(screen.getByRole("status")).toHaveTextContent("");
+/** The older way to copy (a hidden field and execCommand), answering `works`; jsdom has none of its own. */
+function legacy(works: boolean) {
+  const execCommand = vi.fn((_command: string) => works);
+  Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+  onTestFinished(() => { Reflect.deleteProperty(document, "execCommand"); });
+  return execCommand;
+}
 
+test("without the clipboard API (a page over plain http) the older way copies, and the button says Copied", async () => {
   clipboard();
-  await click("Copy the message");
-  expect(button).toHaveAttribute("data-state", "failed");
-  expect(screen.getByRole("status")).toHaveTextContent("Couldn’t copy — select the text");
+  const execCommand = legacy(true);
+  render(<Snippet text="npx sidevoice@latest install" label="Copy setup command" />);
+  await click("Copy setup command");
+  expect(execCommand).toHaveBeenCalledWith("copy");
+  // Its hidden field goes once it has copied.
+  expect(document.querySelector("textarea")).toBeNull();
+  expect(screen.getByRole("button", { name: "Copy setup command" })).toHaveAttribute("data-state", "copied");
+  expect(screen.getByRole("status")).toHaveTextContent(/^Copied$/);
+});
+
+test("when neither way copies, the text is selected and Select and copy shows by the button, for longer", async () => {
+  for (const refuse of [() => clipboard(vi.fn(async () => { throw new Error("denied"); })), () => clipboard()]) {
+    refuse();
+    legacy(false);
+    const view = render(<Quote text="Connect to Sidevoice" label="Copy the message" />);
+    const button = screen.getByRole("button", { name: "Copy the message" });
+    await click("Copy the message");
+    expect(button).toHaveAttribute("data-state", "failed");
+    expect(window.getSelection()?.toString()).toBe("Connect to Sidevoice");
+    // In words by the button, on a phone too, and the same said to a screen reader.
+    expect(document.querySelector(".ui-copy-failed")).toHaveTextContent("Select and copy");
+    expect(screen.getByRole("status")).toHaveTextContent("Select and copy");
+    act(() => { vi.advanceTimersByTime(COPY_FEEDBACK_MS); });
+    expect(button).toHaveAttribute("data-state", "failed");
+    act(() => { vi.advanceTimersByTime(COPY_FAILED_MS - COPY_FEEDBACK_MS); });
+    expect(button).not.toHaveAttribute("data-state");
+    expect(document.querySelector(".ui-copy-failed")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("");
+    view.unmount();
+    window.getSelection()?.removeAllRanges();
+  }
 });
 
 test("a second copy before the first has gone shows its own result for the whole time again", async () => {
