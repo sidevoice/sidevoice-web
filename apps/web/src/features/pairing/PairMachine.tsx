@@ -84,7 +84,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
   const [address, setAddress] = useState("");
   // The address field, once asked for: "Use a different address", or a machine the code's own addresses did not reach.
   const [addressAsked, setAddressAsked] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Connecting: over https (Connect), or without encryption once the person agreed (its own button).
+  const [busy, setBusy] = useState<"https" | "insecure" | null>(null);
   const [fieldError, setFieldError] = useState<{ field: "code" | "address"; key: HostMessageKey } | null>(null);
   const [alert, setAlert] = useState<{ kind: AlertKind; key?: HostMessageKey; host: string; address: string } | null>(null);
   const [connected, setConnected] = useState("");
@@ -98,6 +99,9 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
   const codeField = useRef<HTMLTextAreaElement>(null);
   const addressField = useRef<HTMLInputElement>(null);
   const alertBox = useRef<HTMLDivElement>(null);
+  const warningTitle = useRef<HTMLSpanElement>(null);
+  const connectButton = useRef<HTMLButtonElement>(null);
+  const refocusConnect = useRef(false);
 
   const preview = useMemo(() => readCode(code, now), [code, now]);
   const recognised = preview !== null;
@@ -111,6 +115,10 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
   useEffect(() => { if (fieldError) (fieldError.field === "code" ? codeField : addressField).current?.focus(); }, [fieldError]);
   // The form scrolls inside its dialog and Connect stays in the footer: what came of it is brought into sight.
   useEffect(() => { if (alert) alertBox.current?.scrollIntoView?.({ block: "nearest" }); }, [alert]);
+  // Asked to agree to no encryption, the person is taken to what it means, not to the button: the next Tab reaches it.
+  useEffect(() => { if (alert?.kind === "httpPrivate" && !busy) warningTitle.current?.focus(); }, [alert, busy]);
+  // That button gone with what replaced the warning, the focus goes back to Connect.
+  useEffect(() => { if (!busy && refocusConnect.current) { refocusConnect.current = false; connectButton.current?.focus(); } }, [busy]);
 
   // The address is asked for only when the code does not say where another device finds the machine: then it is needed.
   const needsAddress = !!preview && !preview.reachable;
@@ -122,6 +130,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
     setCode(next);
     setNow(at);
     setConnected("");
+    // Agreeing to no encryption is for the code and the address it was asked about, and no other.
+    if (alert?.kind === "httpPrivate") setAlert(null);
     setHeard(seen ? t("pairing.recognised", { host: named(seen.host, t), minutes: minutesLeft(seen, at) }) : "");
     // A code that lists its machine only over plain http on a private network starts the address there: the https
     // attempt, and what follows when only plain http answers, go to an address typed.
@@ -137,6 +147,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
     // The person writes host:port; an https:// pasted with it is said already.
     setAddress(next.replace(/^\s*https:\/\//i, ""));
     if (fieldError?.field === "address") setFieldError(null);
+    if (alert?.kind === "httpPrivate") setAlert(null);
   }
 
   function refuse(why: Failure, host: string, typed: string) {
@@ -163,20 +174,41 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
     if (typed) {
       try { machineAddress(typed); } catch (reason) { refuse(failure(reason), host, typed); return; }
     }
-    setBusy(true);
+    await redeem(seen, typed, false);
+  }
+
+  /** The code redeemed at the address typed (if any): over https, or — `insecure`, the person agreed — over plain http
+   *  to that private address. Agreeing keeps the warning in sight until something else replaces it; nothing is kept on
+   *  a failure. */
+  async function redeem(seen: PairingCodePreview, typed: string, insecure: boolean) {
+    const host = named(seen.host, t);
+    setBusy(insecure ? "insecure" : "https");
     setFieldError(null);
-    setAlert(null);
+    if (!insecure) setAlert(null);
     try {
       const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
-      const result = await window.sidevoiceActions?.pairDevice(code, name, typed);
+      const result = insecure ? await window.sidevoiceActions?.pairDevice(code, name, typed, { insecure: true })
+        : await window.sidevoiceActions?.pairDevice(code, name, typed);
       setCode("");
       setHeard("");
-      setConnected(t("pairing.connected", { host: named(result?.host ?? seen.host, t) }));
+      setAlert(null);
+      setConnected(t(insecure ? "pairing.connectedInsecure" : "pairing.connected", { host: named(result?.host ?? seen.host, t) }));
     } catch (reason) {
-      refuse(failure(reason), host, typed);
+      const why = failure(reason);
+      if (insecure && !("field" in why)) refocusConnect.current = true;
+      // Not reached without encryption either: the machine is named, not the https address.
+      refuse(why, host, insecure ? "" : typed);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
+  }
+
+  /** Connect without encryption: Connect's attempt again, to the same address, once the person agreed. */
+  function agree() {
+    if (busy || alert?.kind !== "httpPrivate") return;
+    let seen: PairingCodePreview;
+    try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason), "", ""); return; }
+    void redeem(seen, alert.address, true);
   }
 
   // Enter in the code connects; a code never needs a new line.
@@ -191,7 +223,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
     switch (alert.kind) {
       case "expired": return <Alert tone="danger" live title={t("pairing.expired")} action={<CopyCommand />} />;
       case "unreachable": return <Alert tone="danger" live title={alert.address ? t("pairing.unreachableTyped", { address: alert.address }) : t("pairing.unreachable", { host: alert.host })} />;
-      case "httpPrivate": return <Alert tone="warning" live title={t("pairing.httpPrivate")} />;
+      // Not an alert that interrupts: the focus is brought to it.
+      case "httpPrivate": return <Alert tone="warning" className="pairing-consent" title={<span ref={warningTitle} tabIndex={-1}>{t("pairing.httpPrivate")}</span>}>
+        <Button variant="secondary" className="pairing-insecure" loading={busy === "insecure"} onClick={agree}>
+          {t(busy === "insecure" ? "pairing.connectingInsecure" : "pairing.connectInsecure")}
+        </Button>
+      </Alert>;
       case "httpOnly": return <Alert tone="danger" live title={upperFirst(t("pairing.httpOnly", { host: alert.host }))} />;
       case "httpBlocked": return <Alert tone="warning" live title={t("pairing.httpBlocked")} />;
       case "said": return <Alert tone="danger" live title={t(alert.key ?? "pairing.unreachable")} />;
@@ -199,15 +236,16 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
   }
 
   const formId = `${idPrefix}-form`, howId = `${idPrefix}-how`;
-  const connect = <Button type="submit" form={formId} variant="primary" loading={busy}>{t("pairing.connect")}</Button>;
-  const status = busy ? t("pairing.connectingTo", { host: named(preview?.host, t) }) : connected;
+  // Connect only ever tries https: no encryption is never the default, nor what Enter does.
+  const connect = <Button ref={connectButton} type="submit" form={formId} variant="primary" loading={busy === "https"} disabled={busy === "insecure"}>{t("pairing.connect")}</Button>;
+  const status = busy === "https" ? t("pairing.connectingTo", { host: named(preview?.host, t) }) : busy ? "" : connected;
   const form = (
-    <form id={formId} className="pairing-form" onSubmit={submit} aria-busy={busy} noValidate>
+    <form id={formId} className="pairing-form" onSubmit={submit} aria-busy={!!busy} noValidate>
       <p className="pairing-intro">{t("pairing.intro")}</p>
       <Field label={t("pairing.code")} error={fieldError?.field === "code" ? t(fieldError.key) : undefined}
         hint={preview ? <span className="pairing-recognised"><CheckIcon size={14} />{t("pairing.recognised", { host: named(preview.host, t), minutes: minutesLeft(preview, now) })}</span> : undefined}>
         <Textarea ref={codeField} id={`${idPrefix}-code`} className="pairing-code" minRows={rows} maxRows={6} value={code} placeholder={t("pairing.codePlaceholder")}
-          readOnly={busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
+          readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
           onChange={(event) => changeCode(event.currentTarget.value)} onKeyDown={enterSubmits} />
       </Field>
       <p className="sr-only" role="status">{heard}</p>
@@ -223,7 +261,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
             error={fieldError?.field === "address" ? t(fieldError.key) : undefined}
             hint={needsAddress && !preview?.plain.length && fieldError?.field !== "address" ? t("pairing.addressNeeded") : undefined}>
             <Input ref={addressField} id={`${idPrefix}-address`} type="text" inputMode="url" value={address} placeholder={t("pairing.addressPlaceholder")}
-              required={needsAddress} readOnly={busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
+              required={needsAddress} readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
               onChange={(event) => changeAddress(event.currentTarget.value)} />
           </Field>
         : recognised && <Button variant="ghost" size="sm" className="pairing-other-address" onClick={() => { focusAddress.current = true; setAddressAsked(true); }}>

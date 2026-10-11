@@ -237,3 +237,62 @@ test("split: the machine's column comes first, beside the form on a wide screen,
   // In DOM order, the machine's column and then the form: stacked so on a narrow screen.
   expect(side.compareDocumentPosition(code()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
+
+test("a machine on a private network that answers only without encryption is reached so once the person agrees", async () => {
+  let finish!: (value: unknown) => void;
+  const pairDevice = vi.fn().mockRejectedValueOnce(new Error("pairing-http-private")).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  dialog(pairDevice);
+  const pasted = pairingCode({ urls: ["http://127.0.0.1:8765", "http://192.168.1.20:8765"] });
+  paste(pasted);
+  submit().focus();
+  await connect();
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8765");
+  const warning = document.querySelector<HTMLElement>(".pairing-consent")!;
+  expect(warning).toHaveAttribute("data-tone", "warning");
+  expect(warning).toHaveTextContent("This machine only answers without encryption. Anyone on this network could read the pairing code and this device's access token.");
+  // The focus is brought to what it means, not to the button; the next Tab reaches it.
+  expect(document.activeElement).toBe(within(warning).getByText(/^This machine only answers without encryption/));
+  expect(document.activeElement).toHaveAttribute("tabindex", "-1");
+  const agree = within(warning).getByRole("button", { name: "Connect without encryption" });
+  await act(async () => { agree.click(); });
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8765", { insecure: true });
+  // Only this button is busy, saying so; Connect waits, the fields are read-only, and the warning stays.
+  expect(agree).toHaveAttribute("aria-busy", "true");
+  expect(agree).toHaveTextContent("Connecting without encryption…");
+  expect(submit().disabled).toBe(true);
+  expect(submit()).not.toHaveAttribute("aria-busy");
+  expect(submit().form).toHaveAttribute("aria-busy", "true");
+  expect(code().readOnly).toBe(true);
+  expect(address().readOnly).toBe(true);
+  expect(warning).toBeInTheDocument();
+  await act(async () => { finish({ host: "nuc" }); });
+  expect(screen.getByText("Connected to “nuc” without encryption.")).toHaveAttribute("role", "status");
+  expect(document.querySelector(".pairing-consent")).toBeNull();
+});
+
+test("agreeing holds for that code and address only, Connect and Enter never go without encryption, and a failure replaces the warning", async () => {
+  const pairDevice = vi.fn().mockRejectedValue(new Error("pairing-http-private"));
+  dialog(pairDevice);
+  paste(pairingCode({ urls: ["http://127.0.0.1:8765", "http://192.168.1.20:8765"] }));
+  await connect();
+  expect(document.querySelector(".pairing-consent")).not.toBeNull();
+  // Connect, or Enter, again: https again.
+  await connect();
+  await act(async () => { fireEvent.keyDown(code(), { key: "Enter" }); });
+  expect(pairDevice).toHaveBeenCalledTimes(3);
+  expect(pairDevice.mock.calls.every((call) => call.length === 3)).toBe(true);
+  // Another address, or another code, and the warning is gone.
+  fireEvent.change(address(), { target: { value: "192.168.1.21:8765" } });
+  expect(document.querySelector(".pairing-consent")).toBeNull();
+  await connect();
+  paste(pairingCode({ urls: ["http://192.168.1.20:8765"], host: "other" }));
+  expect(document.querySelector(".pairing-consent")).toBeNull();
+  // Agreed to, and failing: what failed replaces the warning, and the focus goes back to Connect.
+  await connect();
+  pairDevice.mockRejectedValueOnce(new Error("No se pudo llegar a «other» para emparejar. Vuelve a intentarlo."));
+  await act(async () => { screen.getByRole("button", { name: "Connect without encryption" }).click(); });
+  expect(pairDevice).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), "192.168.1.21:8765", { insecure: true });
+  expect(document.querySelector(".pairing-consent")).toBeNull();
+  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach “other”. Check it's running and on your network, or enter its address.");
+  expect(document.activeElement).toBe(submit());
+});

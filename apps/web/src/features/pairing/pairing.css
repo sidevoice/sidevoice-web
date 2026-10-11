@@ -43,6 +43,13 @@
 /* Saying nothing, it takes no room, and is still there to say what comes. */
 .pairing-status:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .pairing-alert:empty { display: none; }
+/* Agreeing to no encryption: the button under the warning's words, the whole width on a phone and in the form's column
+ * (split); busy, its words stay in sight beside the spinner. */
+.pairing-consent .ui-alert-body { margin-top: var(--sv-space-3); }
+.pairing-insecure[data-loading] .ui-button-content { visibility: visible; }
+.pairing-insecure[data-loading] .ui-spinner { position: static; flex: none; margin: 0; }
+.pair-machine[data-layout="split"] .pairing-insecure { width: 100%; }
+@media (max-width: 599px) { .pairing-insecure { width: 100%; min-height: 44px; } }
 .pairing-form-actions { display: flex; justify-content: flex-end; }
 /* The form's Connect, sent to a footer from the form: laid out there as if it were the footer's own. */
 .pairing-submit { display: contents; }
