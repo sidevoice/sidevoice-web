@@ -304,3 +304,21 @@ test("the row's actions: doing it by hand, and Connect or Disconnect, are button
   expect(actions()).toEqual(["I’ll do it myself"]);
 });
 
+test("an entry an older Sidevoice set up says so, with the why in its (i), and Update rewrites it where the connector can", async () => {
+  const store = createRoomStore();
+  const hostAgentAction = vi.fn(async () => {});
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction });
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "outdated", actionable: false })]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  expect(row()).toHaveTextContent("Set up by an older Sidevoice");
+  expect(within(row()).getByRole("button", { name: "About Codex’s status" })).toBeInTheDocument();
+  const update = within(row()).getByRole("button", { name: "Update Codex’s Sidevoice entry" });
+  expect(update).toHaveTextContent("Update");
+  await act(async () => { fireEvent.click(update); });
+  expect(hostAgentAction).toHaveBeenCalledWith("fp", "codex", "connect");
+  // A connector that can't rewrite it leaves it to be done by hand.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "outdated", actionable: false, can: { connect: true, update: false, disconnect: true } })]) } }));
+  expect(within(row()).queryByRole("button", { name: /^Update / })).toBeNull();
+  expect(within(row()).getByRole("button", { name: "I’ll do it myself" })).toBeInTheDocument();
+});

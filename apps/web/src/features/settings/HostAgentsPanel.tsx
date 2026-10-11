@@ -144,6 +144,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   const connected = agent.registration === "connected";
+  const outdated = agent.registration === "outdated";
   // The confirm goes: the focus goes back to Disconnect (after Remove, to the row's action as it now stands).
   const action = useRef<HTMLButtonElement>(null);
   const cancelConfirm = () => { setConfirming(false); requestAnimationFrame(() => action.current?.focus()); };
@@ -177,9 +178,10 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
               <Button ref={action} variant="ghost" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
                 onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
             </Tooltip>
-            : !readOnly && (agent.registration === "outdated" ? can.update ?? can.connect : can.connect) && <Tooltip content={t(agent.registration === "outdated" ? "agents.hint.update" : "agents.hint.connect", { agent: agent.label })}>
-              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t("agents.connectNamed", { agent: agent.label })}
-                onClick={() => run("connect")}>{t("agents.connect")}</Button>
+            // An entry an older Sidevoice made reads Update, as its (i) says; the connector's connect rewrites it.
+            : !readOnly && (outdated ? can.update ?? can.connect : can.connect) && <Tooltip content={t(outdated ? "agents.hint.update" : "agents.hint.connect", { agent: agent.label })}>
+              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t(outdated ? "agents.updateNamed" : "agents.connectNamed", { agent: agent.label })}
+                onClick={() => run("connect")}>{t(outdated ? "agents.update" : "agents.connect")}</Button>
             </Tooltip>}
         </span>
       </div>

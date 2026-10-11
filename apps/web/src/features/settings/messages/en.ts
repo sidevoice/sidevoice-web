@@ -273,6 +273,7 @@ export const en = {
   "agents.hint.connect": "Sidevoice adds itself to {agent}’s MCP servers for you.",
   "agents.hint.update": "Sidevoice rewrites the entry an older version added in {agent}’s MCP servers.",
   "agents.update": "Update",
+  "agents.updateNamed": "Update {agent}’s Sidevoice entry",
   "agents.hint.disconnect": "Sidevoice removes itself from {agent}’s MCP servers for you.",
   "agents.hint.byHand": "Shows the command or configuration to add Sidevoice to {agent} yourself.",
   "agents.hint.replaceByHand": "Shows how to replace {agent}’s other Sidevoice entry yourself.",

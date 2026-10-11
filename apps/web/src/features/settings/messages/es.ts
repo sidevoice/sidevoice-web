@@ -275,6 +275,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "agents.hint.connect": "Sidevoice se añade a los servidores MCP de {agent} por ti.",
   "agents.hint.update": "Sidevoice reescribe la entrada que añadió una versión anterior en los servidores MCP de {agent}.",
   "agents.update": "Actualizar",
+  "agents.updateNamed": "Actualizar la entrada de Sidevoice de {agent}",
   "agents.hint.disconnect": "Sidevoice se quita de los servidores MCP de {agent} por ti.",
   "agents.hint.byHand": "Muestra el comando o la configuración para añadir Sidevoice a {agent} tú mismo.",
   "agents.hint.replaceByHand": "Muestra cómo sustituir tú mismo la otra entrada de Sidevoice en {agent}.",
