@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
-import { ONBOARDING_STORAGE_KEY } from "../../services/onboarding-state";
+import { ONBOARDING_STORAGE_KEY, trialKey } from "../../services/onboarding-state";
 import { localHostInstallController } from "../../services/local-host-install";
 import type { SidevoiceActions } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
@@ -191,4 +191,26 @@ test("preparing this computer never offers Prepare again: the install, then wait
     pairingInUse: "fp-local", node: "fp-local", nodeReach: "ok" }));
   expect(screen.getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
   act(() => localHostInstallController.clear());
+});
+
+// Chosen on this device: the default settings' transcription and voice.
+const CHOSEN = { stt: trialKey(defaultVoiceSettings().stt)!, tts: trialKey(defaultVoiceSettings().tts)! };
+
+test("the setup decides where it resumes only once this device's voice settings are known, not on the machines alone", () => {
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: CHOSEN }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  paired(store);
+  render(<App store={store} />);
+  expect(document.querySelector("#wizard[open]")).toBeNull();
+  act(() => store.patch({ voiceSettings: defaultVoiceSettings() }));
+  expect(title()).toHaveTextContent("When your turn ends");
+});
+
+test("a machine that answers after the setup opened moves it on to where it stands, past what was already chosen", () => {
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: CHOSEN }));
+  const store = room();
+  expect(title()).toHaveTextContent("Connect to your machine");
+  paired(store);
+  expect(title()).toHaveTextContent("When your turn ends");
 });
