@@ -13,14 +13,15 @@ export interface Feature {
   introducedIn: number;
   title: HostMessageKey;
   line: HostMessageKey;
-  /** The Settings section that sets it up. */
+  /** The Settings section that sets it up, and the control there (its id) to bring into view and point at. */
   section: string;
+  control: string;
   achieved(room: RoomViewState): boolean;
 }
 
 export const FEATURES: Feature[] = [
-  { id: "end-of-turn-smart", introducedIn: 2, title: "whatsNew.endOfTurn.title", line: "whatsNew.endOfTurn.line", section: "call",
+  { id: "end-of-turn-smart", introducedIn: 2, title: "whatsNew.endOfTurn.title", line: "whatsNew.endOfTurn.line", section: "call", control: "voice-end-of-turn",
     achieved: (room) => room.facts.voiceSettings?.end_of_turn === "smart-turn" },
-  { id: "speech-language", introducedIn: 2, title: "whatsNew.speechLanguage.title", line: "whatsNew.speechLanguage.line", section: "transcription",
+  { id: "speech-language", introducedIn: 2, title: "whatsNew.speechLanguage.title", line: "whatsNew.speechLanguage.line", section: "transcription", control: "stt-language",
     achieved: (room) => !!room.facts.voiceSettings?.stt.language },
 ];

@@ -29,6 +29,8 @@ export interface SessionFacts {
   settingsSection: string;
   /** When a setting was last kept (there is no Save: each applies as it changes), for a moment's "Saved". */
   settingsSavedAt: number;
+  /** A control in Settings to bring into view and point at, by its id (what's new's Set up); cleared once done. */
+  settingsFocus: string | null;
   /** A newer build of this page the room serves, held while a call is on (the updates' list says so). */
   webUpdate: string | null;
   /** The machine whose page Settings → Machines shows (MachineNav); null is the first. */

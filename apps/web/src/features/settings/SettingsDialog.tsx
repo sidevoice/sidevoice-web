@@ -138,6 +138,25 @@ export function SettingsDialog() {
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
   const waits = useVoiceReadiness();
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
+  const focus = useRoomStore((state) => state.facts.settingsFocus);
+  // A control asked for (what's new's Set up): in view, focused, and lit for a moment, once its section is drawn.
+  useEffect(() => {
+    if (!focus) return;
+    let tries = 0;
+    const find = () => {
+      const control = document.getElementById(focus);
+      if (!control && ++tries < 20) { timer = window.setTimeout(find, 100); return; }
+      store?.patch({ settingsFocus: null });
+      if (!control) return;
+      const row = control.closest(".ui-row") ?? control;
+      row.scrollIntoView?.({ block: "center" });
+      control.focus({ preventScroll: true });
+      row.classList.add("settings-highlight");
+      window.setTimeout(() => row.classList.remove("settings-highlight"), 2400);
+    };
+    let timer = window.setTimeout(find, 0);
+    return () => window.clearTimeout(timer);
+  }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
   const show = (section: string) => store?.patch({ settingsSection: section });
   return (
