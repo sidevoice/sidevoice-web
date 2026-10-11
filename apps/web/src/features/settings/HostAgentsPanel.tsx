@@ -3,8 +3,8 @@ import { Button, type ButtonProps } from "../../components/ui/Button";
 import { SplitButton } from "../../components/ui/SplitButton";
 import { useVariant } from "../../lib/variants";
 import { cn } from "../../lib/cn";
-import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
-import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, MoreIcon, RefreshIcon } from "../../components/ui/Icons";
+import { DropdownMenuItem } from "../../components/ui/DropdownMenu";
+import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
@@ -113,7 +113,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     return () => window.clearTimeout(timer);
   }, [justConnected]);
 
-  const actions = useVariant("agent-actions", ["menu", "split"] as const);
+  const actions = useVariant("agent-actions", ["split", "original"] as const);
   const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
@@ -149,16 +149,18 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
             role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
         </span>
-        {/* One action: Connect or Disconnect (an agent connected by hand only, or to another server, opens how to); the
-            others in a menu — a ⋯ beside it, or a chevron joined to it (variant "agent-actions"). */}
+        {/* Variant "agent-actions": one action — Connect or Disconnect (an agent connected by hand only, or to another
+            server, opens how to) — with the others behind a chevron joined to it; or, as the list first had them, every
+            action a button on the row, connecting by hand among them. */}
         <span className="host-agent-actions">
-          {main && (actions === "split" ? <SplitButton {...main} menuLabel={more} items={menu} /> : <>
-            <Button {...main} />
-            {menu.length > 0 && <DropdownMenu label={more}
-              trigger={<Button variant="ghost" tone="neutral" size="icon-sm" aria-label={more} disabled={!!busy}><MoreIcon size={16} /></Button>}>
-              {menu}
-            </DropdownMenu>}
-          </>)}
+          {actions === "split" ? main && <SplitButton {...main} menuLabel={more} items={menu} />
+            : agent.registration === "connected" ? main && <Button {...main} variant="ghost" />
+              : <>
+                {hasManualInstructions && <Button variant="ghost" size="sm" disabled={!!busy} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
+                  {t(agent.registration === "foreign" ? "agents.foreign.manual.toggle" : "agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
+                </Button>}
+                {!readOnly && !manualOnly && main && <Button {...main} />}
+              </>}
         </span>
       </div>
       {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}>

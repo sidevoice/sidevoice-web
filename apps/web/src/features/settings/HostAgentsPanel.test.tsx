@@ -279,3 +279,15 @@ test("an agent Sidevoice can connect keeps connecting by hand in its menu", () =
   fireEvent.click(screen.getByText("Connect by hand"));
   expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument();
 });
+
+test("the original row actions: connecting by hand and Connect are both buttons on the row", () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "agent-actions": "original" }));
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  act(() => store.patch({ hostAgents: { fp: ready() } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = document.querySelector(".host-agent-row") as HTMLElement;
+  expect([...row.querySelectorAll(".host-agent-actions button")].map((button) => button.textContent)).toEqual(["I’ll do it myself", "Connect"]);
+  fireEvent.click(within(row).getByText("I’ll do it myself"));
+  expect(row).toHaveTextContent("/opt/sidevoice/bin/connector mcp --stdio");
+});
