@@ -63,20 +63,34 @@ function renderShot(shot: Shot) {
   setTimeout(async () => {
     await shot.after?.(document);
     if (shot.pairRefusal) {
+      // A code for the NUC, valid for ten minutes, where the shot says it lists the machine; an address typed when it
+      // says one; then Connect.
       const field = document.getElementById("device-pairing-code") as HTMLTextAreaElement | null;
-      const address = document.getElementById("device-pairing-address") as HTMLInputElement | null;
-      if (address) {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(address, shot.pairRefusal === "address-insecure" ? "http://192.168.1.20:8765" : "https://nuc.example");
-        address.dispatchEvent(new Event("input", { bubbles: true }));
+      if (!field) return;
+      type(field, sampleCode(shot.pairUrls ?? ["https://nuc.example:8765"]));
+      await drawn();
+      if (shot.pairAddress) {
+        document.querySelector<HTMLButtonElement>("#device-pairing .pairing-other-address")?.click();
+        await drawn();
+        const address = document.getElementById("device-pairing-address") as HTMLInputElement | null;
+        if (address) type(address, shot.pairAddress);
+        await drawn();
       }
-      if (field) {
-        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "SV1.EXAMPLE-CODE");
-        field.dispatchEvent(new Event("input", { bubbles: true }));
-        (field.form?.querySelector("button[type=submit]") as HTMLButtonElement | null)?.click()
-          ?? field.form?.requestSubmit();
-      }
+      field.form?.requestSubmit();
     }
   }, 300);
+}
+
+/** What a person typing puts in a field, as React hears it. */
+function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), "value")!.set!.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+const drawn = () => new Promise((resolve) => setTimeout(resolve, 50));
+/** A pairing code as `sidevoice pair-device` prints it, for the NUC at `urls`, valid for ten minutes. */
+function sampleCode(urls: string[]) {
+  const payload = { v: 1, fp: "A".repeat(43), host: "NUC", urls, rv: null, secret: "c2VjcmV0", exp: Math.floor(Date.now() / 1000) + 600 };
+  return "SV1." + btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 const VIEWS = { phone: { width: 390, height: 844, scale: 0.42 }, desktop: { width: 1280, height: 800, scale: 0.3 } } as const;

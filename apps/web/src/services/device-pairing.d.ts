@@ -77,6 +77,16 @@ export const PAIRING_HTTP_PRIVATE: "pairing-http-private";
 export const PAIRING_HTTP_BLOCKED: "pairing-http-blocked";
 export function machineAddress(text: string): string | null;
 export function decodePairingCode(code: string, now?: number, options?: { address?: string | null }): PairingCodePayload;
+/** What a code says as it is pasted (device-pairing.js): whose, until when, whether another device can tell where its
+ *  machine is, and its private-network addresses over plain http as host:port. */
+export interface PairingCodePreview {
+  host: string | null;
+  /** Seconds since the epoch. */
+  exp: number;
+  reachable: boolean;
+  plain: string[];
+}
+export function previewPairingCode(code: string, now?: number): PairingCodePreview;
 export function fingerprintOf(spki: Uint8Array | ArrayBuffer, subtle?: SubtleCrypto): Promise<string>;
 export function newNonce(random?: (bytes: Uint8Array) => Uint8Array): string;
 export function verifyIdentitySignature(proof: { publicKey: string; nonce: string; signature: string }, subtle?: SubtleCrypto): Promise<boolean>;
