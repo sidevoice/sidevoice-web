@@ -65,7 +65,8 @@ export function Dialog({ id, open, layout = "dialog", size = "md", className, on
   }, [node, open]);
   return (
     <dialog ref={setNode} id={id} className={cn("ui-dialog", className)} data-layout={layout} data-size={size} aria-labelledby={surface.titleId}
-      onCancel={(event) => { event.preventDefault(); onClose?.(); }}>
+      // Its Escape is its own: React would carry the cancel on to a dialog it sits in (Settings, the first-run setup).
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); onClose?.(); }}>
       <OverlayPortalProvider container={node}>
         {open && <DialogSurface {...surface} onClose={onClose} />}
       </OverlayPortalProvider>
