@@ -148,7 +148,8 @@ test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", (
 test("a foreign Codex row exposes its host-provided replacement command and Copy without automatic actions", async () => {
   const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
     "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
-  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: { command: replacement, file: null, snippet: null } });
+  // Replacing is the connector's `manual.replace` steps for the harness.
+  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: null, manual: { replace: [{ command: replacement, file: null, snippet: null }] } });
   const store = createRoomStore();
   const hostAgentAction = vi.fn(async () => {});
   const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
