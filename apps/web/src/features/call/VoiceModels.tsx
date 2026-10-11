@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useRoomStore } from "../../state/room-store";
@@ -12,11 +13,13 @@ import type { CallMessageKey } from "./messages/en";
  * the conversation's name; the agent's badge keeps the tile's foot. They are the settings the voice is given
  * (voiceSettingsHere); the voice reports no model of its own. */
 
-type Slot = { id: string; where: string; state: string };
+/** A model's slot as the badge says it; `attention` when something must be done or waited for before it works. */
+type Slot = { id: string; where: string; state: string; attention: boolean };
 
 function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const keys = useRoomStore((state) => state.facts.providerKeys);
   const settings = saved ? voiceSettingsHere(saved, catalogs) : null;
   const stt = useModelState("stt", settings);
   const tts = useModelState("tts", settings);
@@ -24,10 +27,13 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
     const chosen = settings?.[task];
     if (!chosen?.model) return null;
     const provider = catalogs.find((catalog) => catalog.id === chosen.catalog)?.name ?? chosen.catalog;
+    // A provider's model with no key is the key's to fix, whatever else its catalogue says.
+    const status = chosen.catalog !== "local" && keys[chosen.catalog] === false ? "needsKey" : model.status ?? "unavailable";
     return {
       id: chosen.model,
       where: chosen.catalog === "local" ? t("voiceModels.here") : t("voiceModels.provider", { provider }),
-      state: t(("voiceModels.state." + (model.status ?? "unavailable")) as CallMessageKey),
+      state: t(("voiceModels.state." + status) as CallMessageKey),
+      attention: status !== "ready",
     };
   };
   return { stt: slot("stt", stt), tts: slot("tts", tts) };
@@ -39,6 +45,19 @@ function Details({ stt, tts, t }: { stt: Slot | null; tts: Slot | null; t: CallT
   return <span className="voice-models-details">{line(t("voiceModels.stt"), stt)}{line(t("voiceModels.tts"), tts)}</span>;
 }
 
+/** One model: quiet while it is ready (full contrast on hover or focus), and saying its state in words, in the
+ *  attention style, while it is not. */
+function Chip({ slot, label, icon, details }: { slot: Slot; label: string; icon: ReactNode; details: ReactNode }) {
+  return (
+    <Tooltip content={details}>
+      <span className="voice-chip" data-attention={slot.attention || undefined} tabIndex={0}
+        aria-label={label + ": " + slot.id + (slot.attention ? ", " + slot.state : "")}>
+        {icon}<span>{slot.id}</span>{slot.attention && <span className="voice-chip-state">{slot.state}</span>}
+      </span>
+    </Tooltip>
+  );
+}
+
 /** The two models, stacked; nothing before any is chosen. */
 export function VoiceModels() {
   const t = callTranslator();
@@ -48,8 +67,8 @@ export function VoiceModels() {
   const details = <Details stt={stt} tts={tts} t={t} />;
   return (
     <div className="voice-models" role="group" aria-label={label} translate="no">
-      {stt && <Tooltip content={details}><span className="voice-chip" tabIndex={0} aria-label={t("voiceModels.stt") + ": " + stt.id}><TranscriptionIcon size={12} /><span>{stt.id}</span></span></Tooltip>}
-      {tts && <Tooltip content={details}><span className="voice-chip" tabIndex={0} aria-label={t("voiceModels.tts") + ": " + tts.id}><VoicesIcon size={12} /><span>{tts.id}</span></span></Tooltip>}
+      {stt && <Chip slot={stt} label={t("voiceModels.stt")} icon={<TranscriptionIcon size={12} />} details={details} />}
+      {tts && <Chip slot={tts} label={t("voiceModels.tts")} icon={<VoicesIcon size={12} />} details={details} />}
     </div>
   );
 }

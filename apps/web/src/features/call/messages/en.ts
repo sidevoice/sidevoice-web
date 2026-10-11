@@ -59,6 +59,7 @@ export const en = {
   "voiceModels.state.absent": "not downloaded",
   "voiceModels.state.failed": "download failed",
   "voiceModels.state.unavailable": "not available now",
+  "voiceModels.state.needsKey": "needs a key",
 } as const;
 
 export type CallMessageKey = keyof typeof en;

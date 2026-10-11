@@ -182,10 +182,21 @@
 /* The call's voice models (VoiceModels): the tile's top-right corner, one under the other, small; the conversation's
  * name holds the top-left and the agent's badge the foot. */
 .voice-models { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; justify-items: end; gap: var(--sv-space-1); max-width: min(40%, 14rem); }
-.voice-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1); max-width: 100%; height: 24px; padding: 0 var(--sv-space-2); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill);
-  background: color-mix(in srgb, var(--sv-surface) 80%, transparent); color: var(--sv-text-muted); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); white-space: nowrap; }
+/* Quiet while ready: no fill, a faint edge, the muted text colour (AA on the tile) and a softer icon; full contrast on
+ * hover or focus. Not ready, the attention style, its state in words. */
+.voice-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1); max-width: 100%; height: 24px; padding: 0 var(--sv-space-2);
+  border: 1px solid color-mix(in srgb, var(--sv-border) 60%, transparent); border-radius: var(--sv-radius-pill); background: transparent;
+  color: var(--sv-text-muted); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-medium); white-space: nowrap;
+  transition: color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), border-color var(--sv-dur-fast) var(--sv-ease); }
 .voice-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.voice-chip svg { flex: none; }
+.voice-chip svg { flex: none; opacity: .7; }
+.voice-chip:is(:hover, :focus-visible) { border-color: var(--sv-border); background: var(--sv-surface); color: var(--sv-text); }
+.voice-chip:is(:hover, :focus-visible) svg { opacity: 1; }
+.voice-chip[data-attention] { border-color: color-mix(in srgb, var(--sv-warning) 45%, transparent); background: var(--sv-warning-soft); color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
+.voice-chip[data-attention] svg { opacity: 1; color: var(--sv-warning); }
+.voice-chip-state { flex: none; color: var(--sv-text); }
+.voice-chip-state::before { content: "·"; margin-inline-end: var(--sv-space-1); color: var(--sv-text-muted); }
+@media (prefers-reduced-motion: reduce) { .voice-chip { transition: none; } }
 .voice-chip:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .voice-models-details { display: grid; gap: 2px; }
 .voice-models-line b { font-weight: var(--sv-weight-semibold); }

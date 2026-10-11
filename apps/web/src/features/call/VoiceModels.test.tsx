@@ -28,3 +28,14 @@ test("speech to text over text to speech, each its model's id, said in full for 
   const group = screen.getByRole("group", { name: "Your voice: whisper-base turns speech to text, eleven_flash_v2_5 speaks" });
   expect([...group.querySelectorAll(".voice-chip")].map((chip) => chip.getAttribute("aria-label"))).toEqual(["Speech to text: whisper-base", "Text to speech: eleven_flash_v2_5"]);
 });
+
+test("quiet while ready; a model that needs something says so in words, in the attention style", () => {
+  shown({ ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } });
+  const [stt, tts] = [...document.querySelectorAll(".voice-chip")];
+  expect(stt).toHaveAttribute("data-attention");
+  expect(stt).toHaveAccessibleName("Speech to text: whisper-small, not available now");
+  expect(tts).toHaveAttribute("data-attention");
+  cleanup();
+  shown();
+  expect(document.querySelector(".voice-chip")).not.toHaveAttribute("data-attention");
+});
