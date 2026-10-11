@@ -2,7 +2,9 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
+import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
+import type { HostMessageKey } from "../settings/messages/en";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
@@ -157,8 +159,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
       </header>
       {machine.local && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
-        <h4 id={"host-status-" + machine.id}>{t("hosts.section.service")}</h4>
-        <LocalHostStatusPanel status={status} />
+        <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} />
       </section>}
       <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
@@ -190,7 +191,20 @@ function ForgetMachine({ fp, name }: { fp: string; name: string }) {
   );
 }
 
-function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
+/** Where this computer's service stands, as one word and its dot. */
+function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } {
+  switch (status.state) {
+    case "running": return { tone: "positive", label: "hosts.state.running" };
+    case "starting": case "installing": case "backoff": return { tone: "warning", label: "hosts.state.starting" };
+    case "failed": case "service-failed": case "refused": case "incompatible": return { tone: "danger", label: "hosts.state.failed" };
+    default: return { tone: "neutral", label: "hosts.state.stopped" };
+  }
+}
+
+/* This computer's service as a status card: its state with its dot, first; its version and active calls as compact facts;
+ * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
+ * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
+function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; titleId: string }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -199,21 +213,23 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
-  const buttons: { action: LocalHostAction; label: string }[] = [];
+  const state = serviceState(status);
+  const calls = details.calls ?? 0;
+  const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
   if (status.state === "running") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart") });
-    if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart"), variant: "secondary" });
+    if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop"), variant: "ghost" });
   } else if (status.state === "not-installed") {
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.startAtLogin") });
+    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.start"), variant: "primary" });
   } else if (status.state === "stopped-by-person") {
-    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start") });
+    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start"), variant: "primary" });
   } else if (status.state === "backoff" || status.state === "failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
   } else if (status.state === "service-failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry") });
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.reinstall") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
+    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.reinstall"), variant: "secondary" });
   } else if (status.state === "refused") {
-    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect") });
+    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect"), variant: "primary" });
   }
   const installed = status.installed ?? (status.service !== "none" && status.service !== undefined);
   const loginAction: LocalHostAction | null = status.state === "absent" || (!installed && status.state === "not-installed") ? null
@@ -232,33 +248,46 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   }
   const cause = status.failure ? hostCause(status, t) : "";
   const failureAt = dateText(details.failure?.at);
+  const failed = status.state === "failed" || status.state === "service-failed";
   return (
-    <div className="host-status-panel" data-state={status.state}>
-      <p className="host-status-summary" role="status">{statusMessage}</p>
-      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at login it would not
-          come back by itself either. Only this computer's machine has this panel: a remote one is never stopped from here. */}
+    <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
+      <div className="host-status-head">
+        <h4 id={titleId}>{t("hosts.section.service")}</h4>
+        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
+      </div>
+      {/* The facts, compact; then what the state means where it says more than its word. */}
+      <dl className="host-status-facts">
+        {details.core?.version && <div><dt>{t("hosts.fact.version")}</dt><dd>{details.core.version}</dd></div>}
+        {details.calls !== undefined && <div><dt>{t("hosts.fact.calls")}</dt><dd>{calls}</dd></div>}
+      </dl>
+      {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
+      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
+          come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
       {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}
-      {details.core?.version && <p className="muted">{t("hosts.version", { version: details.core.version })}</p>}
-      {details.calls !== undefined && <p className="muted">{t("hosts.calls", { calls: details.calls })}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
-      {status.failure && (status.state === "failed" || status.state === "service-failed") && (
+      {status.failure && failed && (
         <div className="host-failure-details">
           {details.attempts !== undefined && <p>{t("hosts.failureAttempts", { attempts: details.attempts, limit: details.limit ? ` of ${details.limit}` : "" })}</p>}
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
         </div>
       )}
-      <div className="host-action-list">
-        {buttons.map(({ action, label }) => action !== "stop" || !confirmStop ? <Button key={action} variant={action === "stop" ? "ghost" : "primary"} disabled={!!busy}
-          onClick={() => action === "stop" ? setConfirmStop(true) : void run(action)}>{busy === action ? t("hosts.working") : label}</Button> : null)}
-        {confirmStop && <span className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
-          <span>{t("hosts.stopConfirm")}</span>
-          <Button variant="danger" disabled={!!busy} onClick={() => void run("stop")}>{busy === "stop" ? t("hosts.working") : t("hosts.stop")}</Button>
-          <Button variant="ghost" disabled={!!busy} onClick={() => setConfirmStop(false)}>{t("hosts.cancel")}</Button>
-        </span>}
-        {loginAction && <Button variant="ghost" disabled={!!busy} onClick={() => void run(loginAction)}>{installed ? t("hosts.stopAtLogin") : t("hosts.startAtLogin")}</Button>}
-        {(status.state === "failed" || status.state === "service-failed") && hasMethod("revealLog") && <Button variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
-        {(status.state === "failed" || status.state === "service-failed") && typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
-      </div>
+      {loginAction && <label className="host-status-login">
+        <span><span className="host-status-login-label">{t("hosts.startAtSignIn")}</span><span className="muted">{t("hosts.startAtSignInHint")}</span></span>
+        <Switch checked={installed} disabled={!!busy} aria-label={t("hosts.startAtSignIn")} onChange={() => void run(loginAction)} />
+      </label>}
+      {confirmStop ? <div className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
+          <p>{t("hosts.stopConfirm")}</p>
+          <span className="host-action-list">
+            <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={!!busy} onClick={() => setConfirmStop(false)}>{t("hosts.cancel")}</Button>
+            <Button variant="danger" size="sm" loading={busy === "stop"} onClick={() => void run("stop")}>{t("hosts.stop")}</Button>
+          </span>
+        </div>
+        : (buttons.length > 0 || failed) && <div className="host-action-list host-status-actions">
+          {buttons.map(({ action, label, variant }) => <Button key={action} size="sm" variant={variant} tone={action === "stop" ? "danger" : undefined} loading={busy === action} disabled={!!busy && busy !== action}
+            onClick={() => action === "stop" && calls > 0 ? setConfirmStop(true) : void run(action)}>{label}</Button>)}
+          {failed && hasMethod("revealLog") && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
+          {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
+        </div>}
       {note && <p className="muted" role="status">{note}</p>}
       <LocalHostUpdateControl status={status} />
     </div>
