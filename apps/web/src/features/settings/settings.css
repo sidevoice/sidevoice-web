@@ -71,3 +71,14 @@
 }
 /* A section whose chosen model is not ready says so in the nav, in words. */
 .ui-nav-badge { margin-inline-start: auto; }
+
+/* Settings headed by the room's own header (VARIANTS settings-header B): the brand where it always is, Settings after it
+ * as a breadcrumb, the head the room header's height and gutters, so nothing moves as Settings opens. */
+.settings-page[data-header="app"] .ui-dialog-head { min-height: var(--sv-header-height); padding: 0 var(--sv-space-4) 0 var(--sv-space-5); }
+.settings-crumb { display: inline-flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.settings-crumb svg { flex: none; color: var(--sv-accent-text); }
+.settings-crumb-brand { font-size: var(--sv-font-lg); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.settings-crumb-sep { color: var(--sv-text-subtle); font-weight: 400; }
+.settings-page[data-header="app"] .ui-dialog-title { font-size: var(--sv-font-lg); line-height: 1.5rem; }
+.settings-page[data-header="app"] .ui-dialog-title > .settings-crumb > span:last-child { font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+@media (max-width: 767px) { .settings-page[data-header="app"] .ui-dialog-head { padding: 0 var(--sv-space-2) 0 var(--sv-space-4); } }

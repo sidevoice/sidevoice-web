@@ -389,6 +389,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "voice.prepare.announceReady": "{model} está listo",
   // Settings as a screen of sections (SettingsDialog), and its voice slots.
   "settings.title": "Configuración",
+  "settings.close": "Cerrar la configuración y volver a la sala",
   "settings.sections": "Secciones de la configuración",
   "settings.section.general": "General",
   "settings.section.transcription": "Transcripción",

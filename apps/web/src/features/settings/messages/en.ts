@@ -387,6 +387,7 @@ export const en = {
   "voice.prepare.announceReady": "{model} is ready",
   // Settings as a screen of sections (SettingsDialog), and its voice slots.
   "settings.title": "Settings",
+  "settings.close": "Close Settings and return to the room",
   "settings.sections": "Settings sections",
   "settings.section.general": "General",
   "settings.section.transcription": "Transcription",
