@@ -70,6 +70,8 @@ async function installHarness(page) {
   await page.addInitScript((hostPairing) => {
     localStorage.setItem("sidevoice.pairings", JSON.stringify({ in_use: hostPairing.fp, pairings: [hostPairing] }));
     localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {} }));
+    // Machines in the list layout (VARIANTS machines B): these follow a machine from its row to its page and back.
+    localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "b" }));
     window.__SIDEVOICE_TARGET__ = window.location.origin;
   }, pairing);
   return fake;
