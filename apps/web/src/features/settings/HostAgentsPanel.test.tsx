@@ -87,7 +87,7 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
   expect(screen.getByRole("heading", { name: /^NUC/ })).toBeInTheDocument();
   expect(screen.getByText("Not checked yet")).toBeInTheDocument();
-  expect(screen.getByRole("tab", { name: /^Agents/ })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("heading", { name: "Agents" })).toBeInTheDocument();
   expect(screen.getByText("Cursor")).toBeInTheDocument();
 });
 
@@ -215,12 +215,12 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
     act(() => store.patch({ hostAgents: { fp: ready([connected]) } }));
     expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
     expect(row).toHaveTextContent("Codex is ready for new conversations.");
-    expect(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/  })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/ })).toBeInTheDocument();
     expect(hostAgentAction).not.toHaveBeenCalled();
 
     act(() => { vi.advanceTimersByTime(5000); });
     expect(row).not.toHaveTextContent("Codex is ready for new conversations.");
-    fireEvent.click(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/  }));
+    fireEvent.click(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/ }));
     expect(hostAgentAction).not.toHaveBeenCalledWith("fp", "codex", "disconnect");
     expect(within(row).getByRole("group", { name: /^Disconnect .* from Sidevoice$/ })).toHaveTextContent("MCP servers");
     fireEvent.click(within(row).getByRole("button", { name: /^Remove from / }));

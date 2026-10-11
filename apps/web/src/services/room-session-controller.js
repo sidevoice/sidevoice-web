@@ -624,15 +624,21 @@ function openAgentSettings(fp){
  settingsSection('machines');
  roomStore.patch({settingsAgentRequest:{fp,id:++settingsAgentRequestId}});
 }
-async function localHostDevices(){
- const data=await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json();
+function deviceRows(data){
  const rows=Array.isArray(data)?data:Array.isArray(data?.devices)?data.devices:[];
  return rows.filter(row=>row&&(typeof row.device_id==='string'||typeof row.id==='string')).map(row=>({device_id:row.device_id||row.id,name:row.name||null,kind:row.kind||'code',current:!!row.current,
   created_at:row.created_at??row.created??null,last_seen_at:row.last_seen_at??row.last_seen??null}));
 }
+async function localHostDevices(){
+ return deviceRows(await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json());
+}
 async function revokeLocalHostDevice(id){
  await localHostApi('/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}});
 }
+// Any paired machine's devices, asked of it with this device's own pairing: every paired device may list them and
+// revoke another (never itself: that is forgetting the machine).
+async function machineDevices(fp){return deviceRows(await hostApi(fp,'/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'}))}
+async function revokeMachineDevice(fp,id){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}})}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
 function callProtocols(){const token=pairingInUse(pairings)?.token;if(!token)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+token]}
 async function reselectRemembered(){
@@ -1451,6 +1457,8 @@ window.sidevoiceActions={
  pairDevice,
  localHostDevices,
  revokeLocalHostDevice,
+ machineDevices,
+ revokeMachineDevice,
  openPairing:()=>openPairing(),
  closePairing,
 };

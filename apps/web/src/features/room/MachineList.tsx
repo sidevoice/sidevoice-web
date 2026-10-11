@@ -5,7 +5,6 @@ import { Badge } from "../../components/ui/Badge";
 import { Group, Section } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
 import { NativeSelect } from "../../components/ui/NativeSelect";
-import { Tabs } from "../../components/ui/Tabs";
 import { useVariant } from "../../lib/variants";
 import "./machines.css";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion, type LocalPairingCode } from "../../services/desktop-host";
@@ -47,19 +46,18 @@ export function MachineList() {
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [selected, setSelected] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<HostTab>("status");
   const localMachine = machines.find((machine) => machine.local) ?? null;
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
   const selectedMachine = selected ? machines.find((machine) => machine.id === selected) ?? null : null;
   const notice = (machine: MachineView) => !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
     hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
-  const open = (machine: MachineView, tab: HostTab) => { setSelectedTab(tab); setSelected(machine.id); };
+  const open = (machine: MachineView) => setSelected(machine.id);
 
   useEffect(() => {
     if (!agentRequest) return;
     if (!agentRequest.fp) { setSelected(null);return; }
     const machine = machines.find((entry) => entry.pairingId === agentRequest.fp);
-    if (machine) { setSelected(machine.id);setSelectedTab("agents"); }
+    if (machine) setSelected(machine.id);
   }, [agentRequest, machines]);
 
   const add = <Button id="pair-device-open" variant={layout === "a" ? "secondary" : "primary"} onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</Button>;
@@ -73,7 +71,7 @@ export function MachineList() {
       <Section id="machines" title={t("hosts.title")} description={t("hosts.description")}>
         <div className="machine-picker">
           {machines.length > 0 && <Field label={t("hosts.pick")}>
-            <NativeSelect id="machine-pick" value={shown?.id ?? ""} onChange={(event) => { setSelectedTab("status"); setSelected(event.target.value); }}>
+            <NativeSelect id="machine-pick" value={shown?.id ?? ""} onChange={(event) => setSelected(event.target.value)}>
               {machines.map((machine) => { const name = machineCopy(machine, status, t).name; return <option key={machine.id} value={machine.id}>{name}{machine.inUse ? " · " + t("hosts.inUse") : ""}{notice(machine) ? " · " + t("agents.notice") : ""}</option>; })}
             </NativeSelect>
           </Field>}
@@ -81,14 +79,14 @@ export function MachineList() {
         </div>
         {machines.length === 0 && <p className="muted">{t("hosts.none")}</p>}
         {shown && copy && <div className="machine-row machine-row--shown" data-state={shown.state} data-in-use={shown.inUse || undefined} data-local={shown.local || undefined}>
-          <HostDetail machine={shown} copy={copy} notice={notice(shown)} initialTab={selected ? selectedTab : shown.local ? "status" : "agents"} />
+          <HostDetail machine={shown} copy={copy} notice={notice(shown)} />
         </div>}
         {footer}
       </Section>
     );
   }
 
-  if (selectedMachine) return <HostDetail machine={selectedMachine} copy={machineCopy(selectedMachine, status, t)} notice={notice(selectedMachine)} initialTab={selectedTab} onBack={() => setSelected(null)} />;
+  if (selectedMachine) return <HostDetail machine={selectedMachine} copy={machineCopy(selectedMachine, status, t)} notice={notice(selectedMachine)} onBack={() => setSelected(null)} />;
 
   return (
     <Section id="machines" title={t("hosts.title")} description={t("hosts.description")} actions={add}>
@@ -97,7 +95,7 @@ export function MachineList() {
           const copy = machineCopy(machine, status, t);
           return (
             <div className="ui-row machine-row" key={machine.id} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined} data-agent-notice={notice(machine) || undefined}>
-              <button type="button" className="machine-open" aria-label={machine.local ? t("hosts.open", { machine: copy.name }) : t("agents.review", { machine: copy.name })} onClick={() => open(machine, machine.local ? "status" : "agents")}>
+              <button type="button" className="machine-open" aria-label={machine.local ? t("hosts.open", { machine: copy.name }) : t("agents.review", { machine: copy.name })} onClick={() => open(machine)}>
                 <span className="machine-icon" aria-hidden="true"><MachinesIcon size={18} /></span>
                 <span className="machine-copy">
                   <span className="machine-name">{copy.name}{machine.inUse && <Badge tone="accent">{t("hosts.inUse")}</Badge>}{notice(machine) && <Badge tone="warning">{t("agents.notice")}</Badge>}</span>
@@ -119,17 +117,26 @@ export function MachineList() {
   );
 }
 
-type HostTab = "status" | "devices" | "agents";
+/** Where this device reaches a machine, as its page says it. */
+function reachText(machine: MachineView, t: HostTranslate) {
+  if (machine.local) return "";
+  if (machine.reach === "direct") return t("hosts.reach.direct");
+  if (machine.reach === "room") return t("hosts.reach.room");
+  if (machine.reach === "away" || machine.reach === "offline" || machine.reach === "revoked") return t("hosts.reach.none");
+  return "";
+}
 
-/** A machine's own page: what it is and whether it answers, then its tabs — this computer's service and devices, and
- *  any machine's agents. With `onBack`, a page reached from the list (B); without, the picker's (A). */
-function HostDetail({ machine, copy, notice, initialTab, onBack }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; initialTab: HostTab; onBack?: () => void }) {
+/** A machine's own page, everything about it at once: whether it answers and how, this computer's service (the local
+ *  one), its agents, the devices paired with it and pairing another, and forgetting it. With `onBack`, a page reached
+ *  from the list (B); without, the picker's (A). */
+function HostDetail({ machine, copy, notice, onBack }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; onBack?: () => void }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
-  const [tab, setTab] = useState<HostTab>(initialTab);
-  useEffect(() => { setTab(initialTab); }, [initialTab, machine.id]);
-  const tabs = machine.local ? ["status", "devices", "agents"] as const : ["agents"] as const;
-  const shown = (tabs as readonly HostTab[]).includes(tab) ? tab : tabs[0];
+  const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
+  const agents = useRef<HTMLElement>(null);
+  // Asked for its agents (a new agent waiting): its agents in view.
+  useEffect(() => { if (agentRequest?.fp && agentRequest.fp === machine.pairingId) agents.current?.scrollIntoView?.({ block: "start" }); }, [agentRequest, machine.pairingId]);
+  const reach = reachText(machine, t);
   return (
     <section className="host-detail" aria-labelledby="host-detail-title">
       {onBack && <Button variant="ghost" tone="neutral" size="sm" className="host-back" onClick={onBack}><ChevronIcon size={16} className="host-back-icon" />{t("hosts.pageBack")}</Button>}
@@ -137,20 +144,43 @@ function HostDetail({ machine, copy, notice, initialTab, onBack }: { machine: Ma
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
           <h3 id="host-detail-title">{copy.name}</h3>
-          <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle].filter(Boolean).join(" · ")}</p>
+          <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
         {notice && <Badge tone="warning">{t("agents.notice")}</Badge>}
-        {!onBack && !machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
+        {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
       </header>
-      {<Tabs className="host-tabs" label={t("hosts.title")} value={shown} onChange={setTab} idPrefix={"host-" + machine.id}
-        items={tabs.map((name) => ({ value: name, label: <span className="host-agent-tab-label">{t(name === "agents" ? "agents.tab" : `hosts.tab.${name}` as "hosts.tab.status" | "hosts.tab.devices")}{name === "agents" && notice && <Badge tone="warning">{t("agents.notice")}</Badge>}</span> }))} />}
-      <div className="host-panel" role="tabpanel" id={`host-${machine.id}-panel-${shown}`} aria-labelledby={`host-${machine.id}-tab-${shown}`}>
-        {shown === "agents" ? <HostAgentsPanel fp={machine.pairingId ?? null} />
-          : shown === "status" && machine.local ? <LocalHostStatusPanel status={status} />
-            : machine.local ? <LocalHostDevicesPanel machine={machine} /> : null}
-      </div>
+      {machine.local && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
+        <h4 id={"host-status-" + machine.id}>{t("hosts.section.service")}</h4>
+        <LocalHostStatusPanel status={status} />
+      </section>}
+      <section className="host-section" ref={agents}>
+        <HostAgentsPanel fp={machine.pairingId ?? null} />
+      </section>
+      <section className="host-section">
+        <MachineDevicesPanel machine={machine} name={copy.name} />
+      </section>
+      {!machine.local && machine.pairingId && <ForgetMachine fp={machine.pairingId} name={copy.name} />}
+    </section>
+  );
+}
+
+/** Forgetting a machine on this device: its pairing dropped here, and the machine asked to revoke it. */
+function ForgetMachine({ fp, name }: { fp: string; name: string }) {
+  const t = hostTranslator();
+  const [asking, setAsking] = useState(false);
+  return (
+    <section className="host-section host-forget">
+      <h4>{t("hosts.section.thisDevice")}</h4>
+      {asking ? <div className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
+        <span className="muted">{t("hosts.confirmForget")}</span>
+        <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(fp)}>{t("hosts.forgetConfirm")}</Button>
+        <Button variant="ghost" size="sm" autoFocus onClick={() => setAsking(false)}>{t("hosts.cancel")}</Button>
+      </div> : <div className="host-forget-row">
+        <p className="muted">{t("hosts.forgetHint", { machine: name })}</p>
+        <Button variant="ghost" tone="danger" size="sm" onClick={() => setAsking(true)}>{t("hosts.forget", { machine: name })}</Button>
+      </div>}
     </section>
   );
 }
@@ -308,7 +338,7 @@ function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
   );
 }
 
-function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
+function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: string }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [devices, setDevices] = useState<HostDeviceView[]>([]);
@@ -329,9 +359,12 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
   const pairingEpoch = useRef(0);
   const roomEpoch = useRef(0);
   const bridge = localHostBridge();
-  const canPairDevices = typeof bridge?.pairingCode === "function";
-  const canPairRoom = typeof bridge?.pairRoom === "function";
-  const usable = status.reachable === true && machine.selectable === true;
+  const local = !!machine.local;
+  const canPairDevices = local && typeof bridge?.pairingCode === "function";
+  const canPairRoom = local && typeof bridge?.pairRoom === "function";
+  const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
+  const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
+  const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
   const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
   const visiblePairing = usable && pairingFor === pairingKey ? pairing : null;
@@ -339,10 +372,9 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
   async function refresh() {
     const epoch = ++deviceEpoch.current;
     if (!usable) { setError(true);setDevices([]);return; }
-    const action = window.sidevoiceActions?.localHostDevices;
-    if (!action) { setError(true);return; }
+    if (!(local ? window.sidevoiceActions?.localHostDevices : window.sidevoiceActions?.machineDevices)) { setError(true);return; }
     setLoading(true);setError(false);
-    try { const next = await action();if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)} }
+    try { const next = await list() ?? [];if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)} }
     catch { if (deviceEpoch.current === epoch && usable) setError(true); }
     finally { if (deviceEpoch.current === epoch) setLoading(false); }
   }
@@ -362,15 +394,14 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
     void refresh();
   }, [usable, machine.pairingId]);
   async function revoke(id: string) {
-    const action = window.sidevoiceActions?.revokeLocalHostDevice;
-    if (!usable || !action) return;
+    if (!usable || !(local ? window.sidevoiceActions?.revokeLocalHostDevice : window.sidevoiceActions?.revokeMachineDevice)) return;
     const epoch = ++deviceEpoch.current;
     setLoading(true);setError(false);
     try {
-      await action(id);
+      await drop(id);
       if (deviceEpoch.current !== epoch || !usable) return;
       setConfirmId(null);setDeviceNote(t("hosts.devices.revoked"));
-      const next = await window.sidevoiceActions?.localHostDevices?.() ?? [];
+      const next = await list() ?? [];
       if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)}
     }
     catch { if (deviceEpoch.current === epoch && usable) setError(true); }
@@ -407,20 +438,25 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
               <strong>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
-              {(device.kind === "local" || device.current) && <span className="muted">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</span>}
+              {(device.kind === "local" || device.current) && <Badge tone="accent">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</Badge>}
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
-            {usable && device.kind !== "local" && (confirmId === device.device_id ? (
+            {usable && device.kind !== "local" && !device.current && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>
-                <Button variant="danger" size="sm" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke")}</Button>
+                <Button variant="danger" size="sm" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>
                 <Button variant="ghost" size="sm" disabled={loading} onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
               </span>
             ) : <Button variant="ghost" size="sm" disabled={loading} onClick={() => setConfirmId(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>)}
           </li>
         ))}
       </ul>
+      {!local && <section className="pair-another-device">
+        <h4>{t("hosts.devices.pairAnother")}</h4>
+        <p className="muted">{t("hosts.devices.pairOnMachine", { machine: name })}</p>
+        <code className="pair-device-command">npx @sidevoice/uplink pair-device</code>
+      </section>}
       {canPairDevices && <section className="pair-another-device">
         <h4>{t("hosts.devices.pairAnother")}</h4>
         {!visiblePairing && <Button disabled={!usable} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>}

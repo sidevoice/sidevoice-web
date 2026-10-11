@@ -62,6 +62,7 @@ async function installHarness(page) {
       return respond(route, listing({ connected: true }));
     }
     if (pathname.startsWith("/api/host/agents/")) return respond(route, listing());
+    if (pathname === "/api/device/devices") return respond(route, { devices: [{ id: "device-e2e", name: "This browser", current: true }, { id: "device-phone", name: "Phone" }] });
     if (pathname.startsWith("/api/")) return respond(route, {});
     return route.continue();
   });
@@ -97,9 +98,11 @@ async function openAgents(page) {
   await expect(open).toBeVisible();
   await open.click();
   await expect(page.getByRole("heading", { name: "E2E Host" })).toBeVisible();
-  const tab = page.getByRole("tab", { name: "Agents" });
-  await expect(tab).toHaveAttribute("aria-selected", "true");
-  return tab;
+  // Every part of the machine on its page, its agents among them.
+  const agents = page.getByRole("heading", { name: "Agents", exact: true });
+  await expect(agents).toBeVisible();
+  await expect(page.getByText("Phone", { exact: true })).toBeVisible();
+  return agents;
 }
 
 async function expectInsideViewport(locator, width, height) {
@@ -144,7 +147,6 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
   await reviewAgents.click();
   await expect(page.getByRole("heading", { name: "E2E Host" })).toBeVisible();
   await expectInsideViewport(agents, 320, 568);
-  await expect(agents).toHaveAttribute("aria-selected", "true");
   const replace = page.getByRole("button", { name: "Replace manually" });
   await expectInsideViewport(replace, 320, 568);
   await replace.click();
@@ -166,5 +168,5 @@ test("a machine that revokes this device loses its Agents actions and asks for p
   await pairingDialog.getByRole("button", { name: "Close pairing" }).click();
   await page.getByRole("button", { name: "Back to machines" }).click();
   await expect(page.locator(".machine-row[data-state='revoked']")).toContainText("E2E Host");
-  await expect(page.getByRole("tab", { name: "Agents" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Agents", exact: true })).toHaveCount(0);
 });

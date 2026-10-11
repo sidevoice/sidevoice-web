@@ -203,4 +203,6 @@ export interface SidevoiceActions {
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;
+  machineDevices?(fp: string): Promise<HostDeviceView[]>;
+  revokeMachineDevice?(fp: string, id: string): Promise<void>;
 }

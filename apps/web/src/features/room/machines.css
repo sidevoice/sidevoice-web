@@ -29,7 +29,12 @@
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
 .host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
-.host-panel { min-width: 0; }
+/* Its sections one under another, each headed, a rule between them: everything a machine has, none behind a tab. */
+.host-section { display: grid; gap: var(--sv-space-3); min-width: 0; padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); scroll-margin-top: var(--sv-space-4); }
+.host-section > h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
+.host-forget-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); flex-wrap: wrap; }
+.host-forget-row p, .host-forget .device-revoke-confirm .muted { flex: 1 1 18rem; margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.pair-device-command { padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font-size: var(--sv-font-sm); user-select: all; -webkit-user-select: all; }
 
 /* This computer's service: what it says, its figures, and its actions; stopping asks first. */
 .host-status-panel, .host-devices-panel { display: grid; gap: var(--sv-space-3); min-width: 0; }
