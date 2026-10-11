@@ -83,8 +83,9 @@ async function installHarness(page) {
 async function openMachines(page, width, height) {
   await page.setViewportSize({ width, height });
   await page.waitForFunction(() => !!window.sidevoiceActions);
-  await page.locator("#call-menu > summary").click();
-  await page.locator("#settings-open").click();
+  // A phone reaches Settings at the foot of the conversations its header's chevron drops.
+  await page.locator(".conversations-toggle").click();
+  await page.locator("#conversations .sidebar-settings").click();
   const dialog = page.locator("#language-settings");
   await expect(dialog).toBeVisible();
   expect(await dialog.evaluate((element) => element.matches(":modal"))).toBe(true);
