@@ -598,12 +598,44 @@ async function forgetMachine(fp){
  keepPairings(localHostSelected&&!localPairing&&!wasInUse?{...remaining,inUse:pairings.inUse}:remaining);
  if(wasInUse){const next=pairingInUse(pairings);settleBase(null,next?'':'unpaired',next);if(next)void locate({move:true})}
  if(pairing.revoked)return;
- try{
-  const place=known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?{base:known}
-   :await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
-  if(place)await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
- }catch{}
+ // Gone from here at once; the machine is told now if it answers, else whenever it does (pendingRevokes).
+ const told=await revokeOn(pairing,known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?known:null);
+ if(!told)keepPendingRevoke(pairing);
 }
+// A forgotten machine that could not be told: its token is still good there until it is. What is needed to tell it is
+// kept (this device's storage, as the pairing was) and tried again — on start, and every few minutes — until it hears.
+const PENDING_REVOKES_KEY='sidevoice.pending-revokes';
+function pendingRevokes(){try{const kept=JSON.parse(pageStorage()?.getItem(PENDING_REVOKES_KEY)||'[]');return Array.isArray(kept)?kept.filter(p=>p&&typeof p.fp==='string'&&typeof p.token==='string'&&typeof p.device_id==='string'):[]}catch{return []}}
+function writePendingRevokes(list){try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}}
+function keepPendingRevoke(pairing){
+ const {fp,device_id,token,urls,rv,public_key,host,insecure}=pairing;
+ writePendingRevokes([...pendingRevokes().filter(p=>p.fp!==fp),{fp,device_id,token,urls,rv,public_key,host,...(insecure?{insecure}:{})}]);
+}
+/** Tells a machine this device is gone (its token revoked there), at an address that proves it is that machine. */
+async function revokeOn(pairing,knownBase=null){
+ try{
+  const place=knownBase?{base:knownBase}:await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+  if(!place)return false;
+  const response=await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
+  // Gone there already (401/404) is as good as told.
+  return response.ok||response.status===401||response.status===404;
+ }catch{return false}
+}
+let revokingPending=false;
+async function retryPendingRevokes(){
+ if(revokingPending)return;revokingPending=true;
+ try{
+  const left=[];
+  for(const pending of pendingRevokes()){
+   // Paired again since: nothing to revoke.
+   if(pairings.list.some(p=>p.fp===pending.fp))continue;
+   if(!await revokeOn(pending))left.push(pending);
+  }
+  writePendingRevokes(left);
+ }finally{revokingPending=false}
+}
+// (Never holding a process open where timers can: the runtime's tests.)
+if(typeof setInterval==='function'){setTimeout(()=>void retryPendingRevokes(),5000)?.unref?.();setInterval(()=>void retryPendingRevokes(),5*60*1000)?.unref?.()}
 async function localHostApi(path,options={}){
  const pairing=localPairing;
  if(!pairing||!pairing.urls[0])throw Error('local-host-unavailable');

@@ -3,6 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon, WarningIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
+import { currentDeviceName } from "../../state/device-name";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Switch } from "../../components/ui/Switch";
@@ -437,12 +438,14 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const local = !!machine.local;
   const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
-  const ownName = useRoomStore((state) => state.facts.deviceName);
-  const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name
-    || t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice");
+  // This device by the name it has here (its setting, else its default), however the machine last heard it.
+  useRoomStore((state) => state.facts.deviceName);
+  const ownName = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name || t("hosts.devices.thisDevice");
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
-  const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
+  // A machine's own Sidevoice (paired with itself) is never listed: on this computer's page that is this device itself.
+  const visibleDevices = usable && devicesFor === pairingKey ? devices.filter((device) => device.kind !== "local") : [];
 
   async function refresh() {
     const epoch = ++deviceEpoch.current;
@@ -488,6 +491,14 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
       {usable && loading && <p className="muted" role="status">{t("hosts.working")}</p>}
       {/* The list is read once as the page opens; reading it again is offered only when that failed. */}
       {!usable && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
+      {/* Not answering, its list cannot show this device's row: forgetting it is offered here, the machine told when it is
+          back (the controller keeps what it needs to). */}
+      {!usable && !local && machine.pairingId && (confirmId === "forget" ? <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
+          <span className="muted">{t("hosts.confirmForgetOffline", { machine: name })}</span>
+          <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
+          <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
+        </span>
+        : <div className="host-forget-row"><Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId("forget")}>{t("hosts.forget", { machine: name })}</Button></div>)}
       {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.unavailable")}
         action={<Button size="sm" onClick={() => void refresh()}>{t("hosts.retry")}</Button>} />}
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
@@ -500,17 +511,14 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
               <span className="host-device-title">
                 {/* This device by the name it has now (General's), however the machine last heard it. */}
                 <strong title={shownName(device)}>{shownName(device)}</strong>
-                {/* This device; or, in another machine's list, that machine's own Sidevoice (paired with itself), which is
-                    not revocable from here. */}
-                {(device.kind === "local" || device.current) && <Badge tone="accent">{t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</Badge>}
-                {device.kind === "local" && !local && <InfoTip label={t("hosts.devices.thisMachineInfoLabel")}>{t("hosts.devices.thisMachineInfo")}</InfoTip>}
+                {device.current && <Badge tone="accent">{t("hosts.devices.thisDevice")}</Badge>}
               </span>
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
             {device.current && !local && machine.pairingId && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
-                <span className="muted">{t("hosts.confirmForget")}</span>
+                <span className="muted">{machine.state === "connected" ? t("hosts.confirmForget") : t("hosts.confirmForgetOffline", { machine: name })}</span>
                 <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
                 <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
               </span>

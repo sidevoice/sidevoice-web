@@ -307,7 +307,8 @@ export function deviceName(nav = globalThis.navigator) {
     const text = String(nav?.userAgent || '') + ' ' + String(nav?.userAgentData?.platform || nav?.platform || '');
     const where = /iPhone/.test(text) ? 'iPhone' : /iPad/.test(text) ? 'iPad' : /Android/.test(text) ? 'Android'
         : /Mac/.test(text) ? 'Mac' : /Win/.test(text) ? 'Windows' : /CrOS/.test(text) ? 'ChromeOS' : /Linux/.test(text) ? 'Linux' : '';
-    return where ? 'Sidevoice en ' + where : 'Sidevoice';
+    const browser = /Edg\//.test(text) ? 'Edge' : /Firefox\/|FxiOS/.test(text) ? 'Firefox' : /CriOS|Chrome\//.test(text) ? 'Chrome' : /Safari\//.test(text) ? 'Safari' : 'Browser';
+    return where ? browser + ' on ' + where : 'Sidevoice';
 }
 
 // ----- the pairings this device keeps -----
