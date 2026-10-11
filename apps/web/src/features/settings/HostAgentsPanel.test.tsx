@@ -177,7 +177,7 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
     const foreignRow = screen.getByText("Connected to a different MCP server").closest("li");
     expect(foreignRow).not.toBeNull();
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Connect" })).toBeNull();
-    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Disconnect" })).toBeNull();
+    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Not now" })).toBeNull();
 
     fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Replace manually" }));
@@ -215,12 +215,15 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
     act(() => store.patch({ hostAgents: { fp: ready([connected]) } }));
     expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
     expect(row).toHaveTextContent("Codex is ready for new conversations.");
-    expect(within(row).getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/  })).toBeInTheDocument();
     expect(hostAgentAction).not.toHaveBeenCalled();
 
     act(() => { vi.advanceTimersByTime(5000); });
     expect(row).not.toHaveTextContent("Codex is ready for new conversations.");
-    fireEvent.click(within(row).getByRole("button", { name: "Disconnect" }));
+    fireEvent.click(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/  }));
+    expect(hostAgentAction).not.toHaveBeenCalledWith("fp", "codex", "disconnect");
+    expect(within(row).getByRole("group", { name: /^Disconnect .* from Sidevoice$/ })).toHaveTextContent("MCP servers");
+    fireEvent.click(within(row).getByRole("button", { name: /^Remove from / }));
     expect(hostAgentAction).toHaveBeenCalledWith("fp", "codex", "disconnect");
 
     const disconnected = known("codex", { registration: "not-connected", actionable: false });

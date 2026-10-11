@@ -73,6 +73,9 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const busy = rowState?.busy[agent.id];
   const error = rowState?.actionErrors[agent.id];
   const [open, setOpen] = useState(false);
+  // Disconnecting asks first, saying what it does: Sidevoice taken out of the agent's MCP servers (the connector runs
+  // `claude mcp remove`, `codex mcp remove`, or edits Cursor's mcp.json); its new sessions then have no voice tools.
+  const [confirming, setConfirming] = useState(false);
   const [justConnected, setJustConnected] = useState(false);
   const previous = useRef(agent.registration);
   const manualOnly = agent.connect === "manual";
@@ -115,7 +118,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         </span>
         <span className="host-agent-actions">
           {busy ? <span className="muted" role="status">{t(`agents.busy.${busy}` as HostMessageKey)}</span>
-            : agent.registration === "connected" ? <Button variant="ghost" size="sm" onClick={() => run("disconnect")}>{t("agents.disconnect")}</Button>
+            : agent.registration === "connected" ? !confirming && <Button variant="ghost" size="sm" aria-label={t("agents.disconnectNamed", { agent: agent.label })} onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
               : agent.registration === "foreign" ? hasManualInstructions && <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
                 {open ? t("agents.close") : t("agents.foreign.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
               </Button>
@@ -128,6 +131,13 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
               </>}
         </span>
       </div>
+      {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}>
+        <p>{t("agents.disconnectConfirm", { agent: agent.label })}</p>
+        <span className="host-agent-confirm-actions">
+          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => setConfirming(false)}>{t("hosts.cancel")}</Button>
+          <Button variant="danger" size="sm" onClick={() => { setConfirming(false); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
+        </span>
+      </div>}
       {open && (agent.registration === "not-connected" || agent.registration === "foreign") &&
         <Instructions agent={agent} fp={fp} id={panelId} onClose={() => setOpen(false)} />}
     </li>
