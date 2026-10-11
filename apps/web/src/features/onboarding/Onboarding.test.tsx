@@ -12,6 +12,11 @@ import { VARIANTS_KEY } from "../../lib/variants";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
+/** The whole App rendered and taken through several steps: about a second on its own, and several times that with the
+ *  rest of the suite on a busy machine — past vitest's five seconds (2026-10-11, load 25 on 8 cores). Only the tests
+ *  seen to run that close get it. */
+const WHOLE_APP_MS = 15_000;
+
 /* The first-run setup over the real room, in a browser: the basics, then (no agents here) pairing another machine, this
  * device's transcription and voice (trying them is suggested, not required; the actions stand in for the voice), when a
  * turn ends, and it enters only once its completion is stored. */
@@ -132,7 +137,7 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(kept.completed_at).toBeGreaterThan(0);
   expect(kept.trials.tts).toBeUndefined();
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
-});
+}, WHOLE_APP_MS);
 
 test("a failed try says why and keeps the step; a completion that is not stored keeps Ready, with Retry", async () => {
   const store = room();
@@ -154,7 +159,7 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   setItem.mockRestore();
   await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Retry" })); });
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
-});
+}, WHOLE_APP_MS);
 
 /** A try that runs until the test ends it, and what the page asked it to tell as it goes. */
 function pendingTry() {
@@ -336,4 +341,4 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
     expect(document.querySelector("#wizard[open]")).toBe(wizard);
     expect(deferred()).toBeNull();
   } finally { localStorage.removeItem(VARIANTS_KEY); }
-});
+}, WHOLE_APP_MS);

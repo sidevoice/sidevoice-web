@@ -9,6 +9,11 @@ import { markSetUp } from "../../test/onboarding";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
+/** The whole App rendered and taken through several steps: about a second on its own, and several times that with the
+ *  rest of the suite on a busy machine — past vitest's five seconds (2026-10-11, load 25 on 8 cores). Only the tests
+ *  seen to run that close get it. */
+const WHOLE_APP_MS = 15_000;
+
 const REPLY = "Okay. I'll start with the login and then look at the cart tests. I'll tell you as soon as I have something.";
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
   ({ thread_id, title, available: true, reach: { state: "listening" }, machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
@@ -92,7 +97,7 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   // Out of the call the agent is idle.
   patch(store, { ws: null });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
-});
+}, WHOLE_APP_MS);
 
 test("the person has no picture on the stage, only a bubble of their own while they speak", async () => {
   const store = room();
@@ -210,7 +215,7 @@ test("a phone's header avatars switch the call at a tap, and the chevron brings 
   await act(async () => { fireEvent.click(chevron()); });
   await act(async () => { fireEvent.keyDown(document, { key: "Escape" }); });
   expect(sidebar).not.toHaveAttribute("data-open");
-});
+}, WHOLE_APP_MS);
 
 test("the transcript opens and closes from the call bar, and is inert while closed", async () => {
   room();
