@@ -113,6 +113,7 @@ function renameMachine(fp,name){
 async function setDeviceName(name){
  const text=String(name||'').trim().slice(0,60);
  try{if(text)pageStorage()?.setItem('sidevoice.deviceName',text);else pageStorage()?.removeItem('sidevoice.deviceName')}catch{}
+ roomStore.patch({deviceName:text||null});
  if(!text)return 0;
  const asked=pairings.list.filter(p=>!p.revoked&&p.device_id).map(p=>p.local
   ?renameLocalHostDevice(p.device_id,text):renameMachineDevice(p.fp,p.device_id,text));

@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
 import { InfoTip } from "../../components/ui/InfoTip";
+import { Tooltip } from "../../components/ui/Tooltip";
 import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -173,8 +174,12 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
-          onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
+        {/* Talking to this machine from now on: not offered for the one in use; said why when it cannot answer. */}
+        {!machine.inUse && machine.selectable !== false && <Tooltip content={copy.reachable ? t("hosts.useHint", { machine: copy.name }) : t("hosts.useUnreachable", { machine: copy.name })}>
+          <Button variant="secondary" size="sm" disabled={!copy.reachable} blockedBy={copy.reachable ? undefined : "host-use-reason-" + machine.id}
+            onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useThis")}</Button>
+        </Tooltip>}
+        {!copy.reachable && <span id={"host-use-reason-" + machine.id} className="sr-only">{t("hosts.useUnreachable", { machine: copy.name })}</span>}
       </header>
       {machine.local && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
         <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} />
@@ -185,26 +190,6 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <section className="host-section">
         <MachineDevicesPanel machine={machine} name={copy.name} />
       </section>
-      {!machine.local && machine.pairingId && <ForgetMachine fp={machine.pairingId} name={copy.name} />}
-    </section>
-  );
-}
-
-/** Forgetting a machine on this device: its pairing dropped here, and the machine asked to revoke it. */
-function ForgetMachine({ fp, name }: { fp: string; name: string }) {
-  const t = hostTranslator();
-  const [asking, setAsking] = useState(false);
-  return (
-    <section className="host-section host-forget">
-      <h4>{t("hosts.section.thisDevice")}</h4>
-      {asking ? <div className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
-        <span className="muted">{t("hosts.confirmForget")}</span>
-        <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(fp)}>{t("hosts.forgetConfirm")}</Button>
-        <Button variant="ghost" size="sm" autoFocus onClick={() => setAsking(false)}>{t("hosts.cancel")}</Button>
-      </div> : <div className="host-forget-row">
-        <p className="muted">{t("hosts.forgetHint", { machine: name })}</p>
-        <Button variant="ghost" tone="danger" size="sm" onClick={() => setAsking(true)}>{t("hosts.forget", { machine: name })}</Button>
-      </div>}
     </section>
   );
 }
@@ -421,22 +406,9 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const local = !!machine.local;
   const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
-  // Renaming a device is the machine's to keep (its device list): asked of it with this device's pairing.
-  const rename = (id: string, name: string) => local ? window.sidevoiceActions?.renameLocalHostDevice?.(id, name) : window.sidevoiceActions?.renameMachineDevice?.(machine.pairingId!, id, name);
-  const canRename = !!(local ? window.sidevoiceActions?.renameLocalHostDevice : window.sidevoiceActions?.renameMachineDevice);
-  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
-  async function saveName() {
-    if (!renaming) return;
-    const name = renaming.name.trim().slice(0, 60);
-    if (!name) { setRenaming(null); return; }
-    setLoading(true);
-    try {
-      await rename(renaming.id, name);
-      setDevices((rows) => rows.map((row) => row.device_id === renaming.id ? { ...row, name } : row));
-      setRenaming(null);
-    } catch { setDeviceNote(t("hosts.devices.renameFailed")); }
-    finally { setLoading(false); }
-  }
+  const ownName = useRoomStore((state) => state.facts.deviceName);
+  const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name
+    || t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice");
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
   const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
@@ -494,25 +466,26 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
               {/* The name and, on the same line, whether it is this device: the name gives way (an ellipsis), the tag never. */}
-              {renaming?.id === device.device_id ? <form className="host-device-rename" onSubmit={(event) => { event.preventDefault(); void saveName(); }}>
-                  <Input aria-label={t("hosts.devices.renameLabel")} value={renaming.name} maxLength={60} autoFocus disabled={loading}
-                    onChange={(event) => setRenaming({ id: device.device_id, name: event.target.value })}
-                    onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setRenaming(null); } }} />
-                  <Button type="submit" size="sm" variant="primary" loading={loading}>{t("hosts.devices.renameSave")}</Button>
-                  <Button size="sm" variant="ghost" tone="neutral" disabled={loading} onClick={() => setRenaming(null)}>{t("hosts.cancel")}</Button>
-                </form>
-                : <span className="host-device-title">
-                  <strong title={device.name || undefined}>{device.name || t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</strong>
-                  {/* This device; or, in another machine's list, that machine's own Sidevoice (paired with itself), which is
-                      not revocable from here. */}
-                  {(device.kind === "local" || device.current) && device.name && <Badge tone="accent">{t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</Badge>}
-                  {device.kind === "local" && !local && <InfoTip label={t("hosts.devices.thisMachineInfoLabel")}>{t("hosts.devices.thisMachineInfo")}</InfoTip>}
-                  {usable && canRename && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-device-rename-open" aria-label={t("hosts.devices.rename", { device: device.name || device.device_id })}
-                    title={t("hosts.devices.rename", { device: device.name || device.device_id })} onClick={() => setRenaming({ id: device.device_id, name: device.name || "" })}><EditIcon size={14} /></Button>}
-                </span>}
+              <span className="host-device-title">
+                {/* This device by the name it has now (General's), however the machine last heard it. */}
+                <strong title={shownName(device)}>{shownName(device)}</strong>
+                {/* This device; or, in another machine's list, that machine's own Sidevoice (paired with itself), which is
+                    not revocable from here. */}
+                {(device.kind === "local" || device.current) && <Badge tone="accent">{t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</Badge>}
+                {device.kind === "local" && !local && <InfoTip label={t("hosts.devices.thisMachineInfoLabel")}>{t("hosts.devices.thisMachineInfo")}</InfoTip>}
+              </span>
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
+            {device.current && !local && machine.pairingId && (confirmId === device.device_id ? (
+              <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
+                <span className="muted">{t("hosts.confirmForget")}</span>
+                <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
+                <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
+              </span>
+            ) : <Tooltip content={t("hosts.forgetHint", { machine: name })}>
+              <Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId(device.device_id)}>{t("hosts.forget", { machine: name })}</Button>
+            </Tooltip>)}
             {usable && device.kind !== "local" && !device.current && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>

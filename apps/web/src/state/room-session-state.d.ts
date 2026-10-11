@@ -60,6 +60,8 @@ export interface SessionFacts {
  modelsRemovable: boolean;
  /** How long a downloaded model not used is kept, in days; null: forever (model-housekeeping.js). */
  deleteUnusedDays: number | null;
+ /** This device's name as the person set it (General, the setup), for its own row in machines' lists; null until set. */
+ deviceName: string | null;
  providerKeys: Record<string, boolean | null>;
  /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
  storageBlocked: boolean;
