@@ -77,6 +77,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.version": "Versión {version}",
   "hosts.calls": "Llamadas activas: {calls}",
   "hosts.devices.empty": "No hay dispositivos emparejados con esta máquina.",
+  "hosts.devices.emptyOthers": "No hay otros dispositivos emparejados con este ordenador.",
   "hosts.devices.thisDevice": "Este dispositivo",
   "hosts.devices.created": "Emparejado {date}",
   "hosts.devices.lastSeen": "Última conexión {date}",

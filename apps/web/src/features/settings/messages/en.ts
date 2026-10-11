@@ -75,6 +75,7 @@ export const en = {
   "hosts.version": "Version {version}",
   "hosts.calls": "Active calls: {calls}",
   "hosts.devices.empty": "No devices are paired with this machine.",
+  "hosts.devices.emptyOthers": "No other devices are paired with this computer.",
   "hosts.devices.thisDevice": "This device",
   "hosts.devices.created": "Paired {date}",
   "hosts.devices.lastSeen": "Last seen {date}",
