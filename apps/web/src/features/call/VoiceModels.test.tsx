@@ -17,7 +17,7 @@ const catalogs = [
   { id: "elevenlabs", name: "ElevenLabs", status: { stale: false }, models: [{ id: "eleven_flash_v2_5", capabilities: ["tts"], languages: [], voices: [] }] },
 ] as unknown as CatalogView[];
 
-function shown(settings = { ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } }) {
+function shown(settings: ReturnType<typeof defaultVoiceSettings> = { ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } }) {
   const store = createRoomStore();
   act(() => store.patch({ voiceSettings: settings, voiceCatalogue: { state: "ready", catalogs, error: "" } }));
   render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
@@ -38,4 +38,12 @@ test("quiet while ready; a model that needs something says so in words, in the a
   cleanup();
   shown();
   expect(document.querySelector(".voice-chip")).not.toHaveAttribute("data-attention");
+});
+
+test("before the catalogue is read, a badge claims nothing about its model: quiet, no state", () => {
+  const store = createRoomStore();
+  act(() => store.patch({ voiceSettings: defaultVoiceSettings() }));
+  render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
+  expect([...document.querySelectorAll(".voice-chip")].map((chip) => chip.hasAttribute("data-attention"))).toEqual([false, false]);
+  expect(document.querySelector(".voice-chip-state")).toBeNull();
 });

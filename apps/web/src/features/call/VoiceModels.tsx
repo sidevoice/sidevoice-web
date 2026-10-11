@@ -20,6 +20,9 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
+  // The catalogue is read when Settings opens or a model installs: until then nothing is known of a model's state,
+  // and the badge claims nothing.
+  const known = useRoomStore((state) => state.facts.voiceCatalogue.state === "ready");
   const settings = saved ? voiceSettingsHere(saved, catalogs) : null;
   const stt = useModelState("stt", settings);
   const tts = useModelState("tts", settings);
@@ -28,12 +31,12 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null } {
     if (!chosen?.model) return null;
     const provider = catalogs.find((catalog) => catalog.id === chosen.catalog)?.name ?? chosen.catalog;
     // A provider's model with no key is the key's to fix, whatever else its catalogue says.
-    const status = chosen.catalog !== "local" && keys[chosen.catalog] === false ? "needsKey" : model.status ?? "unavailable";
+    const status = !known ? "unknown" : chosen.catalog !== "local" && keys[chosen.catalog] === false ? "needsKey" : model.status ?? "unavailable";
     return {
       id: chosen.model,
       where: chosen.catalog === "local" ? t("voiceModels.here") : t("voiceModels.provider", { provider }),
       state: t(("voiceModels.state." + status) as CallMessageKey),
-      attention: status !== "ready",
+      attention: status !== "ready" && status !== "unknown",
     };
   };
   return { stt: slot("stt", stt), tts: slot("tts", tts) };
