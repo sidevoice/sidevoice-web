@@ -198,7 +198,7 @@ function type(rig: Rig, shade: (c: string) => string, o: Out) {
       <rect x="${n(60 - lw - 3)}" y="${n(bot - 2)}" width="${n(lw * 2 + 6)}" height="3.6" rx="1.6" fill="${shade("#aab2c2")}" ${ink(2.2)}/>`;
   // Bits of code fly out of the lid's corners, outwards (`--wk-gx`), clear of the face; staggered, so a still frame (reduced
   // motion) shows them apart.
-  const glyphs = ([["</>", -1], ["{ }", 1], [";", -1], ["#", 1]] as const).map(([g, side], i) => `<text class="wk-glyph" style="--wk-gx:${side * 7}px;animation-delay:${n(0.5 + i * 0.45 - 1.8)}s" x="${n(60 + side * (lw + 1 + (i > 1 ? 4 : 0)))}" y="${n(top + 3 - (i > 1 ? 8 : 0))}">${g.replace("<", "&lt;").replace(">", "&gt;")}</text>`).join("");
+  const glyphs = ([["</>", -1], ["{ }", 1], [";", -1], ["#", 1]] as const).map(([g, side], i) => `<text class="wk-glyph" style="--wk-gx:${side * 15}px;animation-delay:${n(0.5 + i * 0.45 - 1.8)}s" x="${n(60 + side * (lw + 5 + (i > 1 ? 5 : 0)))}" y="${n(top + 6 - (i > 1 ? 5 : 0))}">${g.replace("<", "&lt;").replace(">", "&gt;")}</text>`).join("");
   o.front += prop("type", glow + lid, "wk-ground keep-small", lift);
   if (o.fine) o.front += prop("type", glyphs, "", lift);
 }

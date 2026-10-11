@@ -373,7 +373,7 @@ const BASE_CSS = `
     @keyframes wk-tap-r-back { from { transform: rotate(calc(var(--wk-type-r) * -1)) } to { transform: rotate(calc(-7deg - var(--wk-type-r))) } }
     @keyframes wk-tap-l-back { from { transform: rotate(calc(var(--wk-type-l) * -1)) } to { transform: rotate(calc(7deg - var(--wk-type-l))) } }
     @keyframes wk-screen { 0%,100% { transform: translate(-1.4px,2.6px) } 50% { transform: translate(1.4px,2.6px) } }
-    @keyframes wk-glyph { 0% { opacity: 0; transform: translate(0,2px) scale(.6) } 18%,70% { opacity: 1 } 100% { opacity: 0; transform: translate(var(--wk-gx),-16px) scale(1.05) } }
+    @keyframes wk-glyph { 0% { opacity: 0; transform: translate(0,2px) scale(.6) } 18%,70% { opacity: 1 } 100% { opacity: 0; transform: translate(var(--wk-gx),-7px) scale(1.05) } }
     @keyframes wk-glow { from { opacity: .22 } to { opacity: .4 } }
     @keyframes wk-spark { 0% { opacity: 1; transform: translate(0,0) } 30% { opacity: 0; transform: translate(var(--wk-sx), var(--wk-sy)) } 100% { opacity: 0 } }
     ${[0, 1, 2].map((i) => { const a = n(i * 33.333); return `@keyframes wk-nail-${i} { 0%, ${a}% { opacity: 0; transform: translate(var(--wk-fx), var(--wk-fy)) rotate(0) } ${n(a + 0.5)}% { opacity: 1 } ${n(a + 5)}% { transform: translate(calc(var(--wk-fx) * .5), calc(var(--wk-fy) - 12px)) rotate(-300deg) } ${n(a + 10)}%, 88% { opacity: 1; transform: translate(0,0) rotate(-720deg) } 96%, 100% { opacity: 0; transform: translate(0,2px) rotate(-720deg) } }`; }).join("\n    ")}

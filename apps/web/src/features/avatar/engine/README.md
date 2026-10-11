@@ -24,7 +24,7 @@ The app talks to the engine only through `features/avatar/` (`bicho-draw.ts`, `C
 | `src/bichos/rig.ts` | `bichos/rig.ts` | verbatim | 54908db76cd4 |
 | `src/bichos/seed.ts` | `bichos/seed.ts` | verbatim | 1ae48bbc6c59 |
 | `src/bichos/spec.ts` | `bichos/spec.ts` | patched | 271f45fde528 |
-| `src/bichos/work.ts` | `bichos/work.ts` | verbatim | 2c3bbd88d215 |
+| `src/bichos/work.ts` | `bichos/work.ts` | verbatim | f2ec96ba7691 |
 | `src/parts/b01-bodies.ts` | `parts/b01-bodies.ts` | verbatim | 9e126be196bc |
 | `src/parts/b02-sprouts.ts` | `parts/b02-sprouts.ts` | verbatim | 2e3c2dd54fd2 |
 | `src/parts/b03-faces.ts` | `parts/b03-faces.ts` | verbatim | fd73f6dc6a74 |
@@ -47,5 +47,5 @@ The app talks to the engine only through `features/avatar/` (`bicho-draw.ts`, `C
 | `src/parts/core-species.ts` | `parts/core-species.ts` | patched | 9a452d0918af |
 | `src/parts/core-tops.ts` | `parts/core-tops.ts` | verbatim | 8bbc0692655f |
 | `src/styles/mascots.ts` | `styles/mascots.ts` | generated | 26c81db48518 |
-| `src/styles/bichos.ts` | `styles/bichos.ts` | generated | def918cd3ac0 |
+| `src/styles/bichos.ts` | `styles/bichos.ts` | generated | 26107e78ebea |
 | `src/styles/logos.ts` | (into `styles/mascots.ts`: `SIDEVOICE_24` only) | generated | 723f18517c7f |
