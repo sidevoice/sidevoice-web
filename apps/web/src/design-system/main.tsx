@@ -9,7 +9,6 @@ import "../styles/theme.css";
 import "../components/ui/ui.css";
 import "../features/settings/model-prepare.css";
 import "./app-patterns.css";
-import "./theme-options.css";
 import "./design-system.css";
 
 /* The design system, on a page of its own (design-system.html, served by the dev server only): every shared component

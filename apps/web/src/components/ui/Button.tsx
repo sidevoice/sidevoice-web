@@ -2,7 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type MouseEvent } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 
-/* The one button: a pill, its content — a label, an icon, both — always centred. One primary per region (a dialog's
+/* The one button (soft solid, ui.css), its content — a label, an icon, both — always centred. One primary per region (a dialog's
  * footer, a page's, a step); the rest secondary or ghost. A loading button keeps its width and shows a spinner over
  * its hidden label, so nothing around it moves. */
 const buttonVariants = cva("ui-button", {

@@ -113,59 +113,34 @@
   --sv-shadow-sm: 0 1px 2px rgb(42 26 64 / 5%), 0 8px 20px -14px rgb(42 26 64 / 22%);
   --sv-shadow-md: 0 2px 6px rgb(42 26 64 / 6%), 0 16px 34px rgb(42 26 64 / 14%);
   --sv-shadow-lg: 0 8px 24px rgb(42 26 64 / 10%), 0 30px 70px -30px rgb(42 26 64 / 50%);
+  /* Buttons: a 1px inner highlight on fills, a hairline raise, and the secondary's own fill. */
+  --sv-button-highlight: rgb(255 255 255 / 16%);
+  --sv-button-raise: 0 1px 2px rgb(42 26 64 / 10%);
+  --sv-button-secondary-bg: #ffffff; --sv-button-secondary-hover: #f7f4fb; --sv-button-secondary-active: #efe9f6; --sv-button-border: #d6cce3;
 }
 
-/* Dark keeps the brand: lila on noche-tinted neutrals, never a grey-blue. Elevation is lighter surfaces and borders;
- * shadows only lift what floats. */
+/* Dark (Grafito): untinted greys and near-white text, so the brand's lila and mostaza are the only colours on screen.
+ * Elevation is lighter surfaces and borders; shadows only lift what floats. */
 [data-theme="dark"] {
   color-scheme: dark;
-  --sv-bg: #15121b;
-  --sv-bg-subtle: #1b1723;
-  --sv-bg-sunken: #100d15;
-  --sv-surface: #211c2b;
-  --sv-surface-raised: #2a2437;
-  --sv-input-bg: #191522;
-  --sv-hover: rgb(201 182 236 / 8%);
-  --sv-pressed: rgb(201 182 236 / 13%);
-  --sv-border: #352d44;
-  --sv-border-strong: #7f7196;
-  --sv-text: #f1ecf7;
-  --sv-text-muted: #bcb3cb;
-  --sv-text-subtle: #9d93ae;
-  --sv-accent: #c9b6ec;
-  --sv-on-accent: #2a1a40;
-  --sv-accent-hover: #d9cbf3;
-  --sv-accent-active: #e6dcf8;
-  --sv-accent-soft: #382c4d;
-  --sv-accent-soft-hover: #433558;
-  --sv-accent-text: #d6c7f3;
-  --sv-focus: #c9b6ec;
-  --sv-positive: #74d3a6;
-  --sv-positive-soft: #1b3329;
-  --sv-warning: #f5a35c;
-  --sv-warning-soft: #3b2614;
-  --sv-danger: #ffb4ab;
-  --sv-danger-soft: #43201e;
-  --sv-danger-fill: #c8352b;
-  --sv-danger-fill-hover: #b02c23;
-  --sv-on-danger-fill: #ffffff;
-  --sv-voice: #e0a82e;
-  --sv-on-voice: #2a1a40;
-  --sv-voice-soft: #372c14;
-  --sv-voice-text: #ecbe5c;
-  --sv-disabled-bg: #262130;
-  --sv-disabled-text: #6f6780;
-  --sv-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23bcb3cb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  --sv-scrim: rgb(5 3 8 / 65%);
-  --sv-tooltip-bg: #ece4f7;
-  --sv-tooltip-text: #2a1a40;
-  --sv-bubble-agent: #241e30;
-  --sv-bubble-self: #2b2519;
-  --sv-stage-bg: radial-gradient(ellipse at 12% 0%, rgb(201 182 236 / 12%) 0, transparent 50%), linear-gradient(145deg, #1e1829, #1d1a21);
-  --sv-shadow-xs: 0 1px 2px rgb(0 0 0 / 40%);
-  --sv-shadow-sm: none;
-  --sv-shadow-md: 0 16px 34px rgb(0 0 0 / 45%);
-  --sv-shadow-lg: 0 30px 80px rgb(0 0 0 / 60%);
+  --sv-bg: #0f0f11; --sv-bg-subtle: #141416; --sv-bg-sunken: #0a0a0b; --sv-surface: #18181b; --sv-surface-raised: #212125; --sv-input-bg: #131315;
+  --sv-hover: rgb(255 255 255 / 6%); --sv-pressed: rgb(255 255 255 / 10%); --sv-border: #2b2b30; --sv-border-strong: #77777f;
+  --sv-text: #fafafa; --sv-text-muted: #b8b8c0; --sv-text-subtle: #93939c;
+  --sv-accent: #c9b6ec; --sv-on-accent: #2a1a40; --sv-accent-hover: #d7c8f3; --sv-accent-active: #e3d9f7;
+  --sv-accent-soft: #2f2741; --sv-accent-soft-hover: #3a3050; --sv-accent-text: #cdbbf0; --sv-focus: #c9b6ec;
+  --sv-positive: #74d3a6; --sv-positive-soft: #14271e; --sv-warning: #f5a35c; --sv-warning-soft: #2e1f10;
+  --sv-danger: #ffb4ab; --sv-danger-soft: #3a1a18; --sv-danger-fill: #d0382d; --sv-danger-fill-hover: #b52e25; --sv-on-danger-fill: #ffffff;
+  --sv-voice: #e0a82e; --sv-on-voice: #2a1a40; --sv-voice-soft: #2d2412; --sv-voice-text: #ecbe5c;
+  --sv-disabled-bg: #26262b; --sv-disabled-text: #73737c;
+  --sv-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8b8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --sv-scrim: rgb(0 0 0 / 70%); --sv-tooltip-bg: #fafafa; --sv-tooltip-text: #18181b; --sv-bubble-agent: #1e1b26; --sv-bubble-self: #24211b;
+  --sv-stage-bg: radial-gradient(ellipse at 12% 0%, rgb(201 182 236 / 14%) 0, transparent 50%), linear-gradient(145deg, #161518, #111113);
+  --sv-shadow-xs: 0 1px 2px rgb(0 0 0 / 60%); --sv-shadow-sm: none; --sv-shadow-md: 0 16px 34px rgb(0 0 0 / 55%); --sv-shadow-lg: 0 30px 80px rgb(0 0 0 / 70%);
+  /* Buttons: a 1px inner highlight on fills, a hairline raise, and the secondary's own fill. */
+  --sv-button-highlight: rgb(255 255 255 / 12%);
+  --sv-button-raise: 0 1px 2px rgb(0 0 0 / 45%);
+  --sv-button-secondary-bg: rgb(255 255 255 / 6%); --sv-button-secondary-hover: rgb(255 255 255 / 10%);
+  --sv-button-secondary-active: rgb(255 255 255 / 14%); --sv-button-border: rgb(255 255 255 / 14%);
 }
 
 /* What every themed box inherits: the theme's text, in the brand's type. */

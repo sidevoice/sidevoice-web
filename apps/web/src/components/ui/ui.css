@@ -1,41 +1,50 @@
 /* The shared components (components/ui), on the design tokens (styles/theme.css) alone. */
 
-/* ----- Button: a pill; its content always centred. No lift on hover: colour only. */
+/* ----- Button: soft solid. 10px corners like the fields beside it, medium weight, an inner highlight and a hairline
+ * raise on fills, a neutral secondary, a 2% shrink on press. Content always centred. Hover only where there is a
+ * pointer, so it never sticks on touch. */
 .ui-button {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--sv-space-2);
-  min-width: 0; height: var(--sv-control-md); padding: 0 18px; margin: 0;
-  border: 1px solid transparent; border-radius: var(--sv-radius-pill);
-  font: var(--sv-weight-semibold) var(--sv-font-md) / 1 var(--sv-font-sans); white-space: nowrap; text-align: center; text-decoration: none;
+  min-width: 0; height: var(--sv-control-md); padding: 0 var(--sv-space-4); margin: 0;
+  border: 1px solid transparent; border-radius: var(--sv-radius-md); background: transparent; box-shadow: none;
+  font: var(--sv-weight-medium) var(--sv-font-md) / 1 var(--sv-font-sans); letter-spacing: -.005em; white-space: nowrap; text-align: center; text-decoration: none;
   cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--sv-dur-fast) var(--sv-ease), border-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease);
+  transition: background-color var(--sv-dur-fast) var(--sv-ease), border-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease),
+    box-shadow var(--sv-dur-fast) var(--sv-ease), transform var(--sv-dur-fast) var(--sv-ease);
 }
 .ui-button-content { display: inline-flex; align-items: center; justify-content: center; gap: inherit; min-width: 0; }
 .ui-button svg { flex: none; width: 18px; height: 18px; }
 .ui-button:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.ui-button--primary { background: var(--sv-accent); border-color: var(--sv-accent); color: var(--sv-on-accent); }
-.ui-button--primary:hover { background: var(--sv-accent-hover); border-color: var(--sv-accent-hover); }
-.ui-button--primary:active { background: var(--sv-accent-active); border-color: var(--sv-accent-active); }
-.ui-button--secondary { background: var(--sv-surface); border-color: var(--sv-border-strong); color: var(--sv-accent-text); }
-.ui-button--secondary:hover { background: var(--sv-accent-soft); border-color: var(--sv-accent); }
-.ui-button--secondary:active { background: var(--sv-accent-soft-hover); }
-.ui-button--ghost { background: transparent; color: var(--sv-accent-text); }
-.ui-button--ghost:hover { background: var(--sv-accent-soft); }
-.ui-button--ghost:active { background: var(--sv-accent-soft-hover); }
+.ui-button--primary { background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: inset 0 1px 0 var(--sv-button-highlight), var(--sv-button-raise); }
+.ui-button--secondary { background: var(--sv-button-secondary-bg); border-color: var(--sv-button-border); color: var(--sv-text); box-shadow: inset 0 1px 0 var(--sv-button-highlight), var(--sv-button-raise); }
+.ui-button--ghost { color: var(--sv-accent-text); }
 .ui-button--ghost.ui-button--neutral { color: var(--sv-text-muted); }
-.ui-button--ghost.ui-button--neutral:hover { background: var(--sv-hover); color: var(--sv-text); }
-.ui-button--ghost.ui-button--neutral:active { background: var(--sv-pressed); }
 .ui-button--ghost.ui-button--danger-text { color: var(--sv-danger); }
-.ui-button--ghost.ui-button--danger-text:hover { background: var(--sv-danger-soft); }
-.ui-button--danger { background: var(--sv-danger-fill); border-color: var(--sv-danger-fill); color: var(--sv-on-danger-fill); }
-.ui-button--danger:hover { background: var(--sv-danger-fill-hover); border-color: var(--sv-danger-fill-hover); }
-/* Disabled says so in its colours, never by fading: no hover, no press. */
-.ui-button:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: var(--sv-disabled-bg); border-color: var(--sv-disabled-bg); color: var(--sv-disabled-text); cursor: not-allowed; }
+.ui-button--danger { background: var(--sv-danger-fill); color: var(--sv-on-danger-fill); box-shadow: inset 0 1px 0 var(--sv-button-highlight), var(--sv-button-raise); }
+@media (hover: hover) {
+  .ui-button--primary:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-accent-hover); }
+  .ui-button--secondary:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-button-secondary-hover); }
+  .ui-button--ghost:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-accent-soft); }
+  .ui-button--ghost.ui-button--neutral:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-hover); color: var(--sv-text); }
+  .ui-button--ghost.ui-button--danger-text:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-danger-soft); }
+  .ui-button--danger:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-danger-fill-hover); }
+}
+.ui-button:not(:disabled, [aria-disabled="true"]):active { transform: scale(.98); }
+.ui-button--primary:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-accent-active); }
+.ui-button--secondary:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-button-secondary-active); }
+.ui-button--ghost:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-accent-soft-hover); }
+.ui-button--ghost.ui-button--neutral:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-pressed); color: var(--sv-text); }
+.ui-button--ghost.ui-button--danger-text:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-danger-soft); }
+.ui-button--danger:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-danger-fill-hover); }
+@media (prefers-reduced-motion: reduce) { .ui-button:active { transform: none !important; } }
+/* Disabled says so in its colours, never by fading: no hover, no press, no raise. */
+.ui-button:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: var(--sv-disabled-bg); border-color: var(--sv-disabled-bg); color: var(--sv-disabled-text); box-shadow: none; cursor: not-allowed; }
 .ui-button--ghost:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: transparent; border-color: transparent; }
 .ui-button[data-loading] { cursor: progress; }
 .ui-button[data-loading] .ui-button-content { visibility: hidden; }
-.ui-button--sm { height: var(--sv-control-sm); padding: 0 14px; font-size: var(--sv-font-sm); gap: var(--sv-space-1-5); }
+.ui-button--sm { height: var(--sv-control-sm); padding: 0 var(--sv-space-3); gap: var(--sv-space-1-5); border-radius: var(--sv-radius-sm); font-size: var(--sv-font-sm); }
 .ui-button--sm svg { width: 16px; height: 16px; }
-.ui-button--lg { height: var(--sv-control-lg); padding: 0 var(--sv-space-6); font-size: 1rem; }
+.ui-button--lg { height: var(--sv-control-lg); padding: 0 var(--sv-space-5); border-radius: var(--sv-radius-lg); font-size: 1rem; }
 .ui-button--lg svg { width: 20px; height: 20px; }
 .ui-button--icon { width: var(--sv-control-md); padding: 0; }
 .ui-button--icon.ui-button--sm { width: var(--sv-control-sm); }
@@ -229,3 +238,4 @@
   .ui-dialog-foot > .ui-button { flex: 1 1 0; }
   .ui-dialog-reason { flex: 1 0 100%; }
 }
+

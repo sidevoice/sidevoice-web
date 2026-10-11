@@ -196,7 +196,7 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
   return <div className="ds-showcase">
     <Specimen title="Colour" note="Semantic tokens; components never use a raw colour. Mustard is the other voice, nothing else."><Palette /></Specimen>
     <Specimen title="Type" note="DM Sans, the landing's typeface. 15px body; nothing under 12px; sentence case."><Type /></Specimen>
-    <Specimen title="Button" note="Three styles to compare (Buttons A/B/C above). Content always centred; one primary per region; loading keeps the width."><Buttons /></Specimen>
+    <Specimen title="Button" note="Soft solid: 10px corners like the fields, a light raise on fills, a small press. Content always centred; one primary per region; loading keeps the width."><Buttons /></Specimen>
     <Specimen title="Field · Input · Select · Textarea" note="Label, control, error, hint. Textareas grow and are never resized by hand."><Fields /></Specimen>
     <Specimen title="Tabs · Segmented · Switch" note="Tabs for views, Segmented for one value of a few, Switch for a boolean."><Navigation /></Specimen>
     <Specimen title="Badge"><Badges /></Specimen>
@@ -258,9 +258,7 @@ function SettingsExample({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-/** What the page shows, kept in its address so a view can be shared: `?section=patterns&dark=b&buttons=c`. */
-type Choice = "a" | "b" | "c";
-const CHOICES: { value: Choice; label: string }[] = [{ value: "a", label: "A" }, { value: "b", label: "B" }, { value: "c", label: "C" }];
+/** What the page shows, kept in its address so a view can be shared: `?section=patterns&theme=dark`. */
 function useQueryState<Value extends string>(name: string, fallback: Value, allowed: readonly Value[]) {
   const read = () => { const value = new URLSearchParams(location.search).get(name) as Value | null; return value && allowed.includes(value) ? value : fallback; };
   const [value, setValue] = useState<Value>(read);
@@ -276,14 +274,8 @@ function useQueryState<Value extends string>(name: string, fallback: Value, allo
 export function DesignSystemPage() {
   const [view, setView] = useQueryState<View>("theme", "both", ["both", "light", "dark"]);
   const [section, setSection] = useQueryState<"components" | "patterns">("section", "components", ["components", "patterns"]);
-  const [dark, setDark] = useQueryState<Choice>("dark", "a", ["a", "b", "c"]);
-  const [buttons, setButtons] = useQueryState<Choice>("buttons", "a", ["a", "b", "c"]);
   const [open, setOpen] = useState<"dialog" | "page" | null>(null);
   useEffect(() => applyTheme(view === "both" ? "system" : view), [view]);
-  useEffect(() => {
-    document.documentElement.dataset.dark = dark;
-    document.documentElement.dataset.buttons = buttons;
-  }, [dark, buttons]);
   const columns: ("light" | "dark")[] = view === "both" ? ["light", "dark"] : [view];
   return <div className="ds-page">
     <header className="ds-top">
@@ -291,13 +283,11 @@ export function DesignSystemPage() {
       <Tabs className="ds-sections" label="Section" value={section} onChange={setSection} items={[{ value: "components", label: "Components" }, { value: "patterns", label: "App patterns" }]} />
       <div className="ds-controls">
         <div className="ds-control"><span>Theme</span><Segmented size="sm" label="Theme" value={view} onChange={setView} items={[{ value: "both", label: "Both" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} /></div>
-        <div className="ds-control"><span>Dark</span><Segmented size="sm" label="Dark direction" value={dark} onChange={setDark} items={CHOICES} /></div>
-        <div className="ds-control"><span>Buttons</span><Segmented size="sm" label="Button style" value={buttons} onChange={setButtons} items={CHOICES} /></div>
       </div>
     </header>
     <div className="ds-columns" data-count={columns.length}>
       {columns.map((theme) => <div className="ds-column" data-theme={theme} key={theme}>
-        <p className="ds-column-label">{theme === "light" ? "Light" : `Dark ${dark.toUpperCase()}`} · Buttons {buttons.toUpperCase()}</p>
+        <p className="ds-column-label">{theme === "light" ? "Light" : "Dark"}</p>
         {section === "components" ? <Showcase onOpen={setOpen} /> : <AppPatterns />}
       </div>)}
     </div>
