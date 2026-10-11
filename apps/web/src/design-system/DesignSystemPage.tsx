@@ -196,7 +196,7 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
   return <div className="ds-showcase">
     <Specimen title="Colour" note="Semantic tokens; components never use a raw colour. Mustard is the other voice, nothing else."><Palette /></Specimen>
     <Specimen title="Type" note="DM Sans, the landing's typeface. 15px body; nothing under 12px; sentence case."><Type /></Specimen>
-    <Specimen title="Button" note="A pill; content always centred; one primary per region; colour-only hover; loading keeps the width."><Buttons /></Specimen>
+    <Specimen title="Button" note="Three styles to compare (Buttons A/B/C above). Content always centred; one primary per region; loading keeps the width."><Buttons /></Specimen>
     <Specimen title="Field · Input · Select · Textarea" note="Label, control, error, hint. Textareas grow and are never resized by hand."><Fields /></Specimen>
     <Specimen title="Tabs · Segmented · Switch" note="Tabs for views, Segmented for one value of a few, Switch for a boolean."><Navigation /></Specimen>
     <Specimen title="Badge"><Badges /></Specimen>
