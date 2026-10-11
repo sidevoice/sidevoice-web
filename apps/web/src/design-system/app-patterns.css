@@ -154,11 +154,12 @@
 .pt-message .pt-avatar { width: 32px; height: 32px; }
 .pt-avatar-spacer { flex: none; width: 32px; }
 .pt-chat { max-width: min(80%, 34rem); padding: 10px 14px 6px; border-radius: var(--sv-radius-xl); background: var(--sv-bubble-agent); color: var(--sv-text); }
-.pt-chat[data-role="assistant"][data-first] { border-top-left-radius: var(--sv-radius-xs); }
-.pt-chat[data-role="user"] { background: var(--sv-bubble-self); border-top-right-radius: var(--sv-radius-xs); }
+.pt-chat[data-role="assistant"][data-last] { border-bottom-left-radius: var(--sv-radius-xs); }
+.pt-chat[data-role="user"] { background: var(--sv-bubble-self); }
+.pt-chat[data-role="user"][data-last] { border-bottom-right-radius: var(--sv-radius-xs); }
+.pt-message { align-items: flex-end; }
 .pt-chat[data-interrupted] { box-shadow: inset 3px 0 0 var(--sv-voice); }
 .pt-chat p { margin: 0; font-size: 1rem; line-height: 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pt-chat-sender { display: block; margin-bottom: 2px; font-size: var(--sv-font-xs); font-weight: 650; color: var(--sv-accent-text); }
 .pt-chat-meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-1); min-height: 20px; font-size: var(--sv-font-xs); color: var(--sv-text-subtle); }
 .pt-listen { width: 22px; height: 22px; }
 .pt-receipt { display: inline-flex; color: var(--sv-text-subtle); }
@@ -213,16 +214,21 @@
 .pt-machine-head span { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 .pt-machine-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
 .pt-machine-line { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
-.pt-machine-row { cursor: pointer; }
+.pt-machine-row { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.pt-machine-row + .pt-machine-row { border-top: 1px solid var(--sv-border); }
+.pt-machine-row:first-child { border-radius: var(--sv-radius-xl) var(--sv-radius-xl) 0 0; } .pt-machine-row:last-child { border-radius: 0 0 var(--sv-radius-xl) var(--sv-radius-xl); }
+.pt-machine-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.pt-machine-row .ui-row-label { display: flex; align-items: center; gap: var(--sv-space-2); }
+.pt-machine-row .ui-row-text { display: grid; }
 .pt-machine-row:hover { background: var(--sv-hover); }
 .pt-machine-row .ui-row-control { gap: var(--sv-space-3); }
 .pt-chevron-right { transform: rotate(-90deg); color: var(--sv-text-subtle); }
 .pt-confirm { display: inline-flex; flex-wrap: wrap; gap: var(--sv-space-2); justify-content: flex-end; }
 .pt-row-note { padding: 0 var(--sv-space-5) var(--sv-space-4); }
-.pt-code { display: flex; align-items: center; gap: var(--sv-space-2); padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
-.pt-code output { flex: 1; font: 600 1.125rem / 1.75rem var(--sv-font-mono); letter-spacing: .06em; }
+.pt-pair-code { display: grid; justify-items: start; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
+.pt-code { display: block; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font: 600 1.375rem / 1.75rem var(--sv-font-mono); letter-spacing: .08em; user-select: all; -webkit-user-select: all; cursor: text; }
 .pt-provider-name { display: inline-flex; align-items: center; gap: var(--sv-space-3); }
-.pt-provider-logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--sv-radius-sm); background: var(--sv-text); color: var(--sv-bg); font-size: var(--sv-font-sm); font-weight: 700; }
+.pt-provider-logo { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-sm); background: var(--sv-surface); color: var(--sv-text); }
 .pt-key-form { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-3); }
 .pt-key-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
 .pt-version { font-weight: 400; color: var(--sv-text-subtle); }

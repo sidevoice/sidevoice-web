@@ -8,7 +8,7 @@ import { Field } from "../components/ui/Field";
 import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
-  AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, CopyIcon, HangupIcon, HarnessIcon, IntegrationsIcon,
+  AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, CopyIcon, HangupIcon, HarnessIcon, ProviderLogo,
   ListenAgainIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
   SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
@@ -18,6 +18,7 @@ import { callTranslator } from "../features/call/call-i18n";
 import { conversationTranslator } from "../features/conversation/conversation-i18n";
 import { hostTranslator } from "../features/settings/host-i18n";
 import { ModelPrepare } from "../features/settings/ModelPrepare";
+import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/connector-commands";
 
 /* The app's whole vocabulary drawn with the design system: every surface of the room, the call, the transcript, the
  * first-run setup, pairing and Settings, as the system would draw it. These are pictures, not the app: they take no
@@ -194,12 +195,11 @@ function CallBar({ joined = false, muted = false, menu = false, transcript = fal
 
 // ---------------------------------------------------------------- the transcript
 
-function Message({ role, text, time, first = true, interrupted = false, read = false, replay = false }: { role: "assistant" | "user"; text: string; time: string; first?: boolean; interrupted?: boolean; read?: boolean; replay?: boolean }) {
+function Message({ role, text, time, last = true, interrupted = false, read = false, replay = false }: { role: "assistant" | "user"; text: string; time: string; last?: boolean; interrupted?: boolean; read?: boolean; replay?: boolean }) {
   return (
-    <div className="pt-message" data-role={role}>
-      {role === "assistant" && (first ? <Avatar id="sidevoice-web" mood="idle" /> : <span className="pt-avatar-spacer" />)}
-      <article className="pt-chat" data-role={role} data-first={first || undefined} data-interrupted={interrupted || undefined}>
-        {first && role === "assistant" && <span className="pt-chat-sender">sidevoice-web</span>}
+    <div className="pt-message" data-role={role} data-last={last || undefined}>
+      {role === "assistant" && (last ? <Avatar id="sidevoice-web" mood="idle" /> : <span className="pt-avatar-spacer" />)}
+      <article className="pt-chat" data-role={role} data-last={last || undefined} data-interrupted={interrupted || undefined}>
         <p>{text}</p>
         <div className="pt-chat-meta">
           <time>{time}</time>
@@ -224,8 +224,8 @@ function Transcript({ phone = false }: { phone?: boolean }) {
       <div className="pt-messages">
         <p className="pt-day">Today</p>
         <Message role="user" text="Can you make the dark theme a little warmer?" time="11:02" read />
-        <Message role="assistant" text="Sure. I'll try three directions and put them side by side on the design system page." time="11:02" replay />
-        <Message role="assistant" first={false} text="The first is near-black with a brighter lila." time="11:03" interrupted />
+        <Message role="assistant" last={false} text="Sure. I'll try three directions and put them side by side on the design system page." time="11:02" replay />
+        <Message role="assistant" text="The first is near-black with a brighter lila." time="11:03" interrupted />
         <Message role="user" text="Perfect, and the buttons too." time="11:04" />
         <Button size="sm" variant="secondary" className="pt-new-messages">2 new messages</Button>
       </div>
@@ -309,8 +309,8 @@ function WizardPair() {
     <WizardFrame step={1} title={t("wizard.title.pair")} footer={<><Button variant="ghost" tone="neutral" className="pt-back">{t("wizard.back")}</Button><Button variant="primary">{t("pairing.connect")}</Button></>}>
       <p>{t("wizard.pairIntro")}</p>
       <ol className="pt-steps">
-        <li><p>{t("noMachine.stepInstall")}</p><CommandBlock command="curl -fsSL https://sidevoice.ai/install | sh" label={t("noMachine.copyCommand")} /></li>
-        <li><p>{t("noMachine.stepPair")}</p><CommandBlock command="sidevoice pair-device" label={t("noMachine.copyPairCommand")} /></li>
+        <li><p>{t("noMachine.stepInstall")}</p><CommandBlock command={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} /></li>
+        <li><p>{t("noMachine.stepPair")}</p><CommandBlock command={CONNECTOR_PAIR_DEVICE} label={t("noMachine.copyPairCommand")} /></li>
       </ol>
       <PairingForm />
     </WizardFrame>
@@ -337,6 +337,21 @@ function SetupPending() {
 
 // ---------------------------------------------------------------- Settings
 
+/** A machine gives a device its pairing code: a button makes it, then the code shows, selected whole on a tap. */
+function PairAnotherDevice() {
+  const t = hostTranslator();
+  const [code, setCode] = useState(false);
+  return (
+    <Row label={t("hosts.devices.pairAnother")} description={code ? undefined : "Make a one-time code here, then enter it on the device."} block={code}>
+      {code ? <div className="pt-pair-code">
+        <output className="pt-code" aria-label="Pairing code">SV1.8F42-K7QD</output>
+        <p className="pt-hint">{t("hosts.devices.codeExpires", { minutes: 10 })}</p>
+        <Button variant="ghost" tone="neutral" size="sm" onClick={() => setCode(false)}>Done</Button>
+      </div> : <Button onClick={() => setCode(true)}>{t("hosts.devices.generateCode")}</Button>}
+    </Row>
+  );
+}
+
 function MachineDetail() {
   const t = hostTranslator();
   const [confirm, setConfirm] = useState(false);
@@ -359,13 +374,7 @@ function MachineDetail() {
       <Group title={t("hosts.tab.devices")}>
         <Row label="Pixel 8" description={`${t("hosts.devices.created", { date: "3 Oct" })} · ${t("hosts.devices.lastSeen", { date: "today" })}`}><Button variant="ghost" tone="danger" size="sm">Revoke</Button></Row>
         <Row label={<>iPad <Badge>{t("hosts.devices.thisDevice")}</Badge></>} description={t("hosts.devices.created", { date: "1 Oct" })} />
-        <Row label={t("hosts.devices.pairAnother")} block>
-          <div className="pt-code">
-            <output>SV1.8F42-K7QD</output>
-            <Button variant="ghost" tone="neutral" size="sm"><CopyIcon />{t("hosts.devices.copyCode")}</Button>
-          </div>
-          <p className="pt-hint">{t("hosts.devices.codeExpires", { minutes: 10 })}</p>
-        </Row>
+        <PairAnotherDevice />
       </Group>
     </div>
   );
@@ -373,24 +382,24 @@ function MachineDetail() {
 
 function MachinesList() {
   const machines = [
-    { name: "MacBook Pro", platform: "macos", status: <Badge tone="positive" dot>Online</Badge>, note: "This computer · 2 agents" },
+    { name: "MacBook Pro", platform: "macos", status: <Badge tone="positive" dot>Online</Badge>, note: "This computer · 2 agents", here: true },
     { name: "NUC del salón", platform: "linux", status: <Badge tone="positive" dot>Online</Badge>, note: "192.168.1.20 · 1 agent" },
     { name: "Office iMac", platform: "macos", status: <Badge tone="danger" dot>Unreachable</Badge>, note: "Last seen yesterday" },
   ];
   return (
-    <Group>
-      {machines.map((machine) => <div className="ui-row pt-machine-row" key={machine.name}>
-        <div className="pt-machine-line"><span className="pt-machine-icon"><PlatformIcon platform={machine.platform} size={18} /></span>
-          <div className="ui-row-text"><span className="ui-row-label">{machine.name}</span><p className="ui-row-description">{machine.note}</p></div></div>
-        <div className="ui-row-control">{machine.status}<ChevronIcon size={16} className="pt-chevron-right" /></div>
-      </div>)}
-    </Group>
+    <Section title="Machines" description="The computers where your agents run. Sidevoice talks to them; each can be opened to see its agents and devices."
+      actions={<Button variant="primary"><AddIcon />Add a machine</Button>}>
+      <Group>
+        {machines.map((machine) => <button type="button" className="ui-row pt-machine-row" key={machine.name}>
+          <span className="pt-machine-line"><span className="pt-machine-icon"><PlatformIcon platform={machine.platform} size={18} /></span>
+            <span className="ui-row-text"><span className="ui-row-label">{machine.name}{machine.here && <Badge>This computer</Badge>}</span><span className="ui-row-description">{machine.note}</span></span></span>
+          <span className="ui-row-control">{machine.status}<ChevronIcon size={16} className="pt-chevron-right" /></span>
+        </button>)}
+      </Group>
+    </Section>
   );
 }
 
-function ProviderLogo({ name }: { name: string }) {
-  return <span className="pt-provider-logo" data-provider={name.toLowerCase()} aria-hidden>{name[0]}</span>;
-}
 
 function Providers() {
   const t = hostTranslator();
@@ -398,8 +407,8 @@ function Providers() {
     <Section title={t("keys.title")} description={t("keys.intro")}>
       <Alert tone="warning" title="Kept in this browser">{t("keys.browser").split(". ")[0]}.</Alert>
       <Group>
-        <Row label={<span className="pt-provider-name"><ProviderLogo name="OpenAI" />OpenAI</span>} description="Transcription and voice"><Badge tone="positive" dot>{t("keys.kept")}</Badge></Row>
-        <Row label={<span className="pt-provider-name"><ProviderLogo name="ElevenLabs" />ElevenLabs</span>} description="Voice" block>
+        <Row label={<span className="pt-provider-name"><span className="pt-provider-logo"><ProviderLogo provider="openai" /></span>OpenAI</span>} description="Transcription and voice"><Badge tone="positive" dot>{t("keys.kept")}</Badge></Row>
+        <Row label={<span className="pt-provider-name"><span className="pt-provider-logo"><ProviderLogo provider="elevenlabs" /></span>ElevenLabs</span>} description="Voice" block>
           <div className="pt-key-form">
             <Field label={t("keys.label", { provider: "ElevenLabs" })} aside={<Badge>{t("keys.missing")}</Badge>}><Input type="password" placeholder={t("keys.placeholder.new")} /></Field>
             <div className="pt-key-actions"><Button variant="ghost" tone="neutral" size="sm" disabled>{t("keys.remove")}</Button><Button size="sm">{t("keys.save")}</Button></div>
@@ -478,7 +487,7 @@ function EmptyStates() {
       <div className="pt-empty pt-card-empty">
         <span className="pt-empty-icon"><MachinesIcon size={28} /></span>
         <h3>{t("noMachine.title")}</h3><p>{t("noMachine.body")}</p>
-        <div className="pt-empty-actions"><Button variant="primary"><AddIcon />{t("noMachine.connect")}</Button><Button variant="ghost">{t("localInstall.cta")}</Button></div>
+        <div className="pt-empty-actions"><Button variant="primary">{t("localInstall.cta")}</Button><Button variant="secondary"><AddIcon />{t("noMachine.connect")}</Button></div>
       </div>
       <div className="pt-two">
         <div className="pt-empty pt-empty--small"><p>{c("sidebar.empty")}</p></div>
@@ -548,18 +557,18 @@ export function AppPatterns() {
         <Frame className="pt-frame--dialog">
           <DialogSurface titleId="pt-pair-title" title="Connect to a machine" onClose={() => {}} footer={<><Button variant="ghost" tone="neutral">Cancel</Button><Button variant="primary" loading>Connect</Button></>}>
             <ol className="pt-steps">
-              <li><p>On the machine where your agents run, install Sidevoice from a terminal:</p><CommandBlock command="curl -fsSL https://sidevoice.ai/install | sh" label="Copy setup command" /></li>
+              <li><p>On the machine where your agents run, install Sidevoice from a terminal:</p><CommandBlock command={CONNECTOR_INSTALL} label="Copy setup command" /></li>
               <li><p>Then get a pairing code there and paste it below with the machine's address:</p></li>
             </ol>
             <PairingForm error />
           </DialogSurface>
         </Frame>
       </Pattern>
-      <Pattern title="Settings · machines" note="The list, then a machine's own page: its state and actions (stop asks first), its paired devices, and a code to pair another. The two layouts to compare (A/B) come in stage 2.">
+      <Pattern title="Settings · machines" note="The machines, with adding one always in sight; then a machine's own page: its state and actions (stop asks first), its paired devices, and a code to pair another. The A/B layouts are switchable in the app (VARIANTS).">
         <MachinesList />
         <MachineDetail />
       </Pattern>
-      <Pattern title="Settings · providers" note="Each provider with its mark, whether its key is kept, and the key's field. The marks here are placeholders: the providers' own logos come in stage 2.">
+      <Pattern title="Settings · providers" note="Each provider with its own mark (from its brand kit), whether its key is kept, and the key's field.">
         <Providers />
       </Pattern>
       <Pattern title="Settings · agents on a machine" note="Connected, new (connect or not now), and one to connect by hand with its command.">
