@@ -264,6 +264,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "agents.outdated": "Configurado por un Sidevoice anterior",
   "agents.outdated.info": "{agent} aún tiene la entrada que añadió una versión anterior de Sidevoice. Conectar la actualiza a esta versión.",
   "agents.statusInfo": "Sobre el estado de {agent}",
+  "agents.invalid": "Sus ajustes MCP no se pueden leer",
+  "agents.invalid.info": "El archivo de ajustes MCP de {agent} {file} tiene un error, así que Sidevoice no puede añadirse sin arriesgar tus otras entradas. Arregla el archivo (o quítalo) y vuelve a buscar.",
   "agents.foreign.manual.toggle": "Reemplazar a mano",
   "agents.notConnected": "Sin conectar",
   "agents.connectNamed": "Conectar {agent} a Sidevoice",

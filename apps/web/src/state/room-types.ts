@@ -101,8 +101,9 @@ export interface DetectedAgent {
   present: boolean;
   version: string | null;
   /** `foreign`: the agent's MCP configuration already has an entry named "sidevoice" that Sidevoice did not add (made by
-   *  hand or by another tool) — never touched. `outdated`: Sidevoice's own entry, from an older version — Connect updates it. */
-  registration: "connected" | "not-connected" | "foreign" | "outdated" | "unknown";
+   *  hand or by another tool) — never touched. `outdated`: Sidevoice's own entry, from an older version — Connect updates it.
+   *  `invalid`: the agent's MCP configuration file cannot be read (broken JSON/TOML): nothing is changed until it is fixed. */
+  registration: "connected" | "not-connected" | "foreign" | "outdated" | "invalid" | "unknown";
   connect: "auto" | "manual";
   dismissed?: boolean;
   actionable?: boolean;

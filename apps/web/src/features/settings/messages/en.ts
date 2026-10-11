@@ -262,6 +262,8 @@ export const en = {
   "agents.outdated": "Set up by an older Sidevoice",
   "agents.outdated.info": "{agent} still has the entry an older version of Sidevoice added. Connect updates it to this version.",
   "agents.statusInfo": "About {agent}’s status",
+  "agents.invalid": "Its MCP settings can’t be read",
+  "agents.invalid.info": "{agent}’s MCP settings file {file} has an error, so Sidevoice can’t add itself without risking your other entries. Fix the file (or remove it), then search again.",
   "agents.foreign.manual.toggle": "Replace manually",
   "agents.notConnected": "Not connected",
   "agents.connectNamed": "Connect {agent} to Sidevoice",
