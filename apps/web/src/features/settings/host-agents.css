@@ -45,3 +45,5 @@
 .host-agent-status-line { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
 .host-agent-status-line .host-agent-status { min-width: 0; }
 .host-agent-status-line .ui-infotip { flex: none; }
+.host-agent-steps { display: grid; gap: var(--sv-space-3); margin: 0; padding-inline-start: var(--sv-space-5); }
+.host-agent-steps > li { display: grid; gap: var(--sv-space-1); min-width: 0; }
