@@ -91,7 +91,7 @@ export function ConversationSidebar() {
       <aside id="conversations" ref={panel} className="conversation-sidebar" data-collapsed={rail || undefined} data-open={open || undefined}
         role={modal ? "dialog" : undefined} aria-modal={modal || undefined} aria-label={t("sidebar.title")}>
         <div className="sidebar-head">
-          <h2>{t("sidebar.title")}</h2>
+          <h2><ConversationsIcon />{t("sidebar.title")}</h2>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
             aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")} title={rail ? t("sidebar.expand") : t("sidebar.collapse")}
             onClick={toggle}>

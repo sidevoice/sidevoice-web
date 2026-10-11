@@ -26,7 +26,8 @@
 /* ----- the conversations: a column on a desktop */
 .conversation-sidebar { --dot-ring: var(--sv-bg-subtle); display: flex; flex-direction: column; gap: var(--sv-space-4); flex: none; width: 288px; min-height: 0; padding: var(--sv-space-3); overflow: hidden auto; border-right: 1px solid var(--sv-border); background: var(--sv-bg-subtle); transition: width var(--sv-dur-slow) var(--sv-ease); }
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); flex: none; min-height: 32px; padding-inline-start: var(--sv-space-2); }
-.sidebar-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-head h2 svg { flex: none; width: 16px; height: 16px; }
 .conversation-sidebar .sidebar-close { display: none; }
 .sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
