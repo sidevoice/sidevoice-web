@@ -1,45 +1,39 @@
-.host-agents { display:flex;flex-direction:column;gap:.55rem;min-width:0 }
-.host-agents-heading,.host-agent-main,.host-agent-other-head { display:flex;align-items:center;gap:.65rem;min-width:0 }
-.host-agents-heading { justify-content:space-between }
-.host-agents-heading h4 { margin:.1rem 0;font-size:1rem }
-.host-agents-scanned { margin:0;font-size:.75rem;min-height:1em }
-.host-agent-rows { list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.45rem }
-.host-agent-row,.host-agent-other { border:1px solid var(--sv-border);border-radius:.7rem;background:var(--sv-surface);min-width:0 }
-.host-agent-row { overflow:hidden }
-.host-agent-row[data-open] { border-color:#536578 }
-.host-agent-main,.host-agent-other-head { padding:.65rem .7rem }
-.host-agent-icon { display:grid;place-items:center;flex:none;width:1.6rem;height:1.6rem;color:var(--sv-primary-soft) }
-.host-agent-copy { display:flex;flex:1;flex-direction:column;gap:.12rem;min-width:0;overflow-wrap:anywhere }
-.host-agent-name { display:flex;align-items:center;flex-wrap:wrap;gap:.3rem }
-.host-agent-badge { display:inline-flex;align-items:center;margin-inline-start:.25rem;padding:.08rem .42rem;border-radius:999px;background:#594b27;color:#f4cf76;font-size:.68rem;font-weight:650 }
-.host-agent-status { color:var(--sv-primary-soft);font-size:.75rem }
-.host-agent-ok { color:#79d6a6 }
-.host-agent-error,.host-agent-problem { color:#f0afa6 }
-.host-agent-actions { display:flex;flex:none;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.3rem }
-.host-agent-chevron-up { transform:rotate(180deg) }
-.host-agent-howto { display:flex;flex-direction:column;gap:.35rem;border-top:1px solid var(--sv-border);padding:.7rem .8rem .8rem;margin:0 .7rem .25rem;min-width:0 }
-.host-agent-howto p { margin:.1rem 0;line-height:1.45 }
-.host-agent-howto-label { color:#aebac7;font-size:.72rem;font-weight:650 }
-.host-agent-code { display:flex;align-items:flex-start;gap:.4rem;min-width:0;padding:.55rem;border:1px solid var(--sv-border);border-radius:.5rem;background:#11171d }
-.host-agent-code pre { flex:1;min-width:0;max-height:16rem;overflow:auto;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font: .75rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;user-select:text }
-.host-agent-code button { flex:none;display:flex;align-items:center;gap:.3rem }
-.host-agent-other { margin-top:.55rem;border-style:dashed }
-.host-agent-other-head .ui-button { flex:none }
-.host-agent-problem { display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.7rem;border:1px solid #734b4b;border-radius:.7rem;background:#251d20 }
-.host-agent-problem p { margin:0;line-height:1.45 }
-.host-agent-tab-label { display:inline-flex;align-items:center;gap:.45rem }
-.host-agent-dot { display:inline-block;flex:none;width:.48rem;height:.48rem;border-radius:50%;background:#e0a640;box-shadow:0 0 0 2px #e0a64022 }
-/* Agents waiting on a paired machine: a dot on the header menu's trigger, and beside its Settings entry. */
-#call-menu > summary { position:relative }
-#call-menu > summary .settings-notice-dot { position:absolute;top:.15rem;right:.15rem;width:.62rem;height:.62rem;border:2px solid #222a34;border-radius:50%;background:#e0a640 }
-#settings-open .settings-notice-dot { display:inline-block;width:.5rem;height:.5rem;margin-left:.45rem;border-radius:50%;background:#e0a640;vertical-align:middle }
-.machine-row[data-agent-notice] { border-color:#786432 }
-@media(max-width:550px) {
-  .host-agent-main,.host-agent-other-head { align-items:flex-start;flex-wrap:wrap }
-  .host-agent-actions { margin-inline-start:2.25rem;justify-content:flex-start;width:calc(100% - 2.25rem) }
-  .host-agent-copy { flex-basis:calc(100% - 2.4rem) }
-  .host-agent-other-head .host-agent-copy { flex-basis:calc(100% - 2.4rem) }
-  .host-agent-other-head>.ui-button { margin-inline-start:2.2rem }
-  .host-agent-problem { align-items:flex-start;flex-direction:column }
+/* A machine's coding agents (HostAgentsPanel): one row each — its mark, name and version, where it stands, and what can
+ * be done — with the instructions to connect one by hand opening under its row. */
+.host-agents { display: grid; gap: var(--sv-space-3); min-width: 0; }
+.host-agents-heading, .host-agent-main, .host-agent-other-head { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.host-agents-heading { justify-content: space-between; }
+.host-agents-heading h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
+.host-agents-scanned { margin: 0; min-height: 1em; font-size: var(--sv-font-xs); color: var(--sv-text-subtle); }
+.host-agent-rows { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); overflow: hidden; }
+.host-agent-row { min-width: 0; }
+.host-agent-row + .host-agent-row { border-top: 1px solid var(--sv-border); }
+.host-agent-main, .host-agent-other-head { padding: 14px var(--sv-space-5); }
+.host-agent-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
+.host-agent-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.host-agent-name { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-1-5); font-weight: 600; }
+.host-agent-name .muted { font-weight: 400; color: var(--sv-text-subtle); }
+.host-agent-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: 600; }
+.host-agent-status { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.host-agent-ok { color: var(--sv-positive); }
+.host-agent-error { color: var(--sv-danger); }
+.host-agent-actions { display: flex; flex: none; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--sv-space-2); }
+.host-agent-chevron-up { transform: rotate(180deg); }
+.host-agent-howto { display: grid; gap: var(--sv-space-2); min-width: 0; margin: 0 var(--sv-space-5) var(--sv-space-4); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.host-agent-howto p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-agent-howto-label { font-weight: 600; color: var(--sv-text-muted); }
+.host-agent-code { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
+.host-agent-code pre { flex: 1; min-width: 0; max-height: 16rem; margin: 0; padding: 6px 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: var(--sv-font-sm) / 1.5 var(--sv-font-mono); color: var(--sv-text); user-select: text; }
+.host-agent-code .ui-button { flex: none; }
+.host-agent-other { border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-xl); }
+.host-agent-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); padding: var(--sv-space-3) 14px; border: 1px solid color-mix(in srgb, var(--sv-danger) 30%, transparent); border-radius: var(--sv-radius-md); background: var(--sv-danger-soft); color: var(--sv-text); }
+.host-agent-problem p { margin: 0; line-height: 1.45; }
+.host-agent-tab-label { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
+/* Agents waiting to be connected: a mustard dot wherever the machine is named. */
+.host-agent-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-inline-start: var(--sv-space-1-5); border-radius: 50%; background: var(--sv-voice); }
+@media (max-width: 550px) {
+  .host-agent-main, .host-agent-other-head { align-items: flex-start; flex-wrap: wrap; }
+  .host-agent-actions { justify-content: flex-start; width: 100%; padding-inline-start: 48px; }
+  .host-agent-copy { flex-basis: calc(100% - 48px); }
+  .host-agent-problem { align-items: flex-start; flex-direction: column; }
 }
-@media(prefers-reduced-motion:reduce) { .host-agent-chevron-up { transition:none } }

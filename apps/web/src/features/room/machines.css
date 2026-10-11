@@ -1,0 +1,68 @@
+/* Settings → Machines (MachineList): the machines, with adding one in sight, and a machine's page — its state, its
+ * tabs, this computer's service and devices. Its two layouts are the preview's VARIANTS `machines` A/B. */
+
+/* A: the picker, with "Add a machine" beside it; the chosen machine's page below. */
+.machine-picker { display: flex; align-items: flex-end; gap: var(--sv-space-3); }
+.machine-picker .ui-field { flex: 1; max-width: 26rem; }
+.machine-row--shown { display: block; padding: var(--sv-space-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); }
+
+/* B: the list. A row opens its machine; Use switches to it. */
+.machine-row { display: flex; align-items: center; gap: var(--sv-space-3); padding: 0 var(--sv-space-4) 0 0; }
+.machine-row:not(.machine-row--shown):hover { background: var(--sv-hover); }
+.ui-group-card > .machine-row:first-child { border-radius: var(--sv-radius-xl) var(--sv-radius-xl) 0 0; }
+.ui-group-card > .machine-row:last-child { border-radius: 0 0 var(--sv-radius-xl) var(--sv-radius-xl); }
+.ui-group-card > .machine-row:only-child { border-radius: var(--sv-radius-xl); }
+.machine-open { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; min-height: 64px; padding: var(--sv-space-3) 0 var(--sv-space-3) var(--sv-space-5); border: 0; border-radius: inherit; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.machine-open:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.machine-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); color: var(--sv-text-muted); }
+.machine-copy { display: grid; gap: 2px; min-width: 0; }
+.machine-name { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.machine-brief { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.machine-actions { display: flex; align-items: center; gap: var(--sv-space-3); flex: none; }
+.machine-chevron { color: var(--sv-text-subtle); transform: rotate(-90deg); }
+
+/* A machine's page. */
+.host-detail { display: grid; gap: var(--sv-space-5); min-width: 0; }
+.host-back { justify-self: start; margin-inline-start: calc(-1 * var(--sv-space-3)); }
+.host-back-icon { transform: rotate(90deg); }
+.host-detail-header { display: flex; align-items: center; gap: var(--sv-space-3); flex-wrap: wrap; }
+.host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
+.host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
+.host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
+.host-panel { min-width: 0; }
+
+/* This computer's service: what it says, its figures, and its actions; stopping asks first. */
+.host-status-panel, .host-devices-panel { display: grid; gap: var(--sv-space-3); min-width: 0; }
+.host-status-panel p, .host-devices-panel p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-status-summary { font-size: var(--sv-font-md) !important; font-weight: 600; }
+.host-status-panel[data-state="failed"] .host-status-summary, .host-status-panel[data-state="service-failed"] .host-status-summary { color: var(--sv-danger); }
+.host-failure-details { padding: var(--sv-space-3) 14px; border-radius: var(--sv-radius-md); background: var(--sv-danger-soft); }
+.host-action-list { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
+.host-stop-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); width: 100%; padding: var(--sv-space-3) 14px; border: 1px solid color-mix(in srgb, var(--sv-warning) 30%, transparent); border-radius: var(--sv-radius-md); background: var(--sv-warning-soft); }
+.host-stop-confirm > span { flex: 1 1 14rem; font-size: var(--sv-font-sm); }
+.host-update-control { display: grid; justify-items: start; gap: var(--sv-space-2); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.host-update-guidance { color: var(--sv-text-muted); }
+
+/* This computer's devices, and a code to pair another: made on a button, then shown to be selected whole. */
+.host-devices-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
+.host-devices-head h4, .pair-another-device h4, .room-pair-form h5 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
+.host-device-list { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); }
+.host-device-list:empty { display: none; }
+.host-device-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); flex-wrap: wrap; min-height: 56px; padding: var(--sv-space-3) var(--sv-space-5); }
+.host-device-row + .host-device-row { border-top: 1px solid var(--sv-border); }
+.host-device-copy { display: grid; gap: 2px; min-width: 0; }
+.host-device-copy .muted { font-size: var(--sv-font-sm); }
+.device-revoke-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
+.pair-another-device, .room-pair-form { display: grid; justify-items: start; gap: var(--sv-space-3); padding-top: var(--sv-space-4); border-top: 1px solid var(--sv-border); }
+.local-pairing-code { display: grid; justify-items: start; gap: var(--sv-space-2); }
+.pairing-code { display: block; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font: 600 1.375rem / 1.75rem var(--sv-font-mono); letter-spacing: .08em; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
+.room-pair-form label { display: grid; gap: var(--sv-space-1-5); width: 100%; font-size: var(--sv-font-sm); font-weight: 600; }
+.room-pair-form input { height: var(--sv-control-md); padding: 0 var(--sv-space-3); border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-md); background: var(--sv-input-bg); color: var(--sv-text); font: var(--sv-weight-regular) var(--sv-font-md) var(--sv-font-sans); }
+.local-install-entry--machines { margin-top: var(--sv-space-2); }
+
+@media (max-width: 640px) {
+  .machine-picker { flex-direction: column; align-items: stretch; }
+  .machine-picker .ui-field { max-width: none; }
+  .machine-row { flex-wrap: wrap; padding: 0 0 var(--sv-space-3); }
+  .machine-actions { padding-inline-start: 68px; }
+}

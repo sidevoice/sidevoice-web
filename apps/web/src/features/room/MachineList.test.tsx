@@ -1,4 +1,4 @@
-import { expect, test, vi } from "vitest";
+import { expect, test, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MachineList } from "./MachineList";
 import { NoMachineScreen } from "../pairing/NoMachineScreen";
@@ -10,6 +10,10 @@ import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
+
+// Machines in the list layout (VARIANTS machines B): these follow a machine from its row to its page.
+beforeEach(() => { localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "b" })); });
+afterEach(() => { localStorage.removeItem("sidevoice.variants"); });
 
 const paired = (extra: Partial<PairingSummary> = {}): PairingSummary => ({
   fp: "fp-nuc", host: "NUC", urls: ["https://nuc.example"], rv: { url: "https://room.example", node: "nuc-1" },
@@ -507,4 +511,20 @@ test("a reachable local core stays Connected when its service state is not runni
   render(<RoomProvider store={store}><MachineList /><LocalHostBanner /></RoomProvider>);
   expect(document.querySelector(".machine-row")?.textContent).toMatch(/Connected/);
   expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
+});
+
+test("layout A: a picker of machines, the one in use shown below it, and Add a machine beside the picker", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "a" }));
+  const done = actions();
+  room([local, paired()], { pairingInUse: "fp-nuc", remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  const picker = document.getElementById("machine-pick") as HTMLSelectElement;
+  expect([...picker.options].map((option) => option.textContent)).toEqual(["MacBook", "NUC · In use"]);
+  expect(screen.getByRole("heading", { name: "NUC" })).toBeInTheDocument();
+  await act(async () => { screen.getByRole("button", { name: "Add a machine" }).click(); });
+  expect(done.openPairing).toHaveBeenCalledOnce();
+  await act(async () => { fireEvent.change(picker, { target: { value: picker.options[0].value } }); });
+  expect(screen.getByRole("heading", { name: "MacBook" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Status" })).toBeInTheDocument();
+  await act(async () => { screen.getByRole("button", { name: "Use MacBook" }).click(); });
+  expect(done.chooseMachine).toHaveBeenCalledWith("fp-local");
 });

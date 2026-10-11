@@ -1,4 +1,4 @@
-import { expect, test, vi } from "vitest";
+import { expect, test, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HostAgentsPanel } from "./HostAgentsPanel";
 import { RoomHeader } from "../room/RoomHeader";
@@ -9,6 +9,10 @@ import type { HostAgentsState } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
+
+// Machines in the list layout (VARIANTS machines B): these follow a machine from its row to its page.
+beforeEach(() => { localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "b" })); });
+afterEach(() => { localStorage.removeItem("sidevoice.variants"); });
 
 const known = (id = "codex", changes: Record<string, unknown> = {}) => ({
   id, label: id === "codex" ? "Codex" : id, present: true, version: "0.157.0", registration: "not-connected" as const,
