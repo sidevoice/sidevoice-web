@@ -30,6 +30,12 @@
 .wizard-title:focus { outline: none; }
 
 .wizard-body { display: grid; align-content: start; gap: var(--sv-space-4); flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sv-space-1) var(--sv-space-6) var(--sv-space-6); }
+/* A new step slides in from the side it came from (Continue: the right; Back: the left), once, in 200 ms; under reduced
+   motion it is simply there. */
+.wizard-body[data-travel] { animation: wizard-step-in 200ms var(--sv-ease) both; }
+.wizard-body[data-travel="back"] { --wizard-from: -16px; }
+@keyframes wizard-step-in { from { opacity: 0; transform: translateX(var(--wizard-from, 16px)); } }
+@media (prefers-reduced-motion: reduce) { .wizard-body[data-travel] { animation: none; } }
 .wizard-body > section { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .wizard-body > section > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .wizard-loading { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
@@ -59,9 +65,8 @@
 .wizard-trial > .ui-button { justify-self: start; }
 
 
-/* ----- Ready (ReadyStep): the mark arriving, the title, what was set up, what to tell an agent; Enter in the footer.
-   Two designs (variant "ready"): A in the setup's frame, its last bar mustard; B on the stage, the frame stepped back.
-   Only transform and opacity move (B's ring and highlighter excepted); nothing arrives later than half a second;
+/* ----- Ready (ReadyStep): the mark arriving, the title, what was set up, what to tell an agent; Enter in the footer —
+   in the setup's frame, its last bar mustard. Only transform and opacity move; nothing arrives later than half a second;
    Enter, Back and the phrase never move. Under reduced motion all of it shows as it ends. */
 .wizard-ready { display: grid; gap: var(--sv-space-6); min-width: 0; }
 .wizard-ready-hero { display: grid; justify-items: center; gap: var(--sv-space-4); text-align: center; }
@@ -100,59 +105,25 @@
 .wizard-actions .wizard-enter svg { transition: transform var(--sv-dur-fast) var(--sv-ease); }
 @media (hover: hover) { .wizard-actions .wizard-enter:hover svg { transform: translateX(2px); } }
 
-/* A: the setup's frame; the stepper's last bar mustard, drawn in; recap as four tiles, then the phrase under a rule. */
-[data-ready="a"] .wizard-steps li:last-child { background: var(--sv-voice); transform-origin: left; animation: wizard-ready-draw 400ms var(--sv-ease) 300ms both; }
+/* The stepper's last bar mustard, drawn in; the mark in a halo; recap as four tiles, then the phrase under a rule. */
+[data-ready] .wizard-steps li:last-child { background: var(--sv-voice); transform-origin: left; animation: wizard-ready-draw 400ms var(--sv-ease) 300ms both; }
 @keyframes wizard-ready-draw { from { transform: scaleX(0); } }
-.wizard-ready[data-variant="a"] .wizard-ready-mark { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(closest-side, var(--sv-accent-soft), transparent); animation: wizard-ready-halo 400ms var(--sv-ease) both; }
-[data-theme="dark"] .wizard-ready[data-variant="a"] .wizard-ready-mark { background: radial-gradient(closest-side, color-mix(in srgb, var(--sv-accent) 18%, transparent), transparent); }
+.wizard-ready .wizard-ready-mark { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(closest-side, var(--sv-accent-soft), transparent); animation: wizard-ready-halo 400ms var(--sv-ease) both; }
+[data-theme="dark"] .wizard-ready .wizard-ready-mark { background: radial-gradient(closest-side, color-mix(in srgb, var(--sv-accent) 18%, transparent), transparent); }
 @keyframes wizard-ready-halo { from { transform: scale(.85); opacity: 0; } }
-.wizard-ready[data-variant="a"] .wizard-recap-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.wizard-ready[data-variant="a"] .wizard-recap-row { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
-[data-theme="dark"] .wizard-ready[data-variant="a"] .wizard-recap-row { background: var(--sv-surface); }
-.wizard-ready[data-variant="a"] .wizard-ready-connect { padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); }
-
-/* B: on the stage — no stepper, no footer rule; the brand tile, the mustard highlighter, a recap card, the phrase on
-   mustard; Enter a pill with its arrow in a disc. */
-.wizard-dialog[data-ready="b"] { background: var(--sv-stage-bg); }
-[data-ready="b"] .wizard-actions { border-top: 0; background: transparent; }
-[data-ready="b"] .wizard-body { mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sv-space-6)), transparent); }
-.wizard-ready[data-variant="b"] { justify-self: center; width: min(30rem, 100%); }
-.wizard-ready[data-variant="b"] .wizard-ready-mark { width: 80px; height: 80px; border-radius: var(--sv-radius-xl); background: var(--sv-accent); color: var(--sv-accent-soft); box-shadow: var(--sv-shadow-md);
-  animation: wizard-ready-pop-tile 420ms var(--sv-ease) both, wizard-ready-ring 700ms ease-out 300ms both; }
-[data-theme="dark"] .wizard-ready[data-variant="b"] .wizard-ready-mark { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
-.wizard-ready[data-variant="b"] .wizard-ready-mark rect { animation: none; }
-.wizard-ready[data-variant="b"] .wizard-ready-mark rect:nth-child(4) { animation: wizard-ready-speak 900ms ease-in-out 420ms both; }
-@keyframes wizard-ready-pop-tile { 0% { transform: scale(.7); opacity: 0; } 70% { transform: scale(1.04); opacity: 1; } }
-@keyframes wizard-ready-ring { from { box-shadow: var(--sv-shadow-md), 0 0 0 0 color-mix(in srgb, var(--sv-accent) 28%, transparent); } to { box-shadow: var(--sv-shadow-md), 0 0 0 14px transparent; } }
-@keyframes wizard-ready-speak { 25% { transform: scaleY(.5); } 50% { transform: scaleY(1.15); } 75% { transform: scaleY(.75); } }
-.wizard-ready[data-variant="b"] .wizard-ready-talk { background: linear-gradient(color-mix(in srgb, var(--sv-voice) 45%, transparent), color-mix(in srgb, var(--sv-voice) 45%, transparent)) left bottom / 100% .28em no-repeat;
-  animation: wizard-ready-highlight 400ms var(--sv-ease) 450ms both; }
-@keyframes wizard-ready-highlight { from { background-size: 0% .28em; } }
-.wizard-ready[data-variant="b"] .wizard-recap-title { margin: 0; font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); letter-spacing: .04em; text-transform: uppercase; color: var(--sv-text-subtle); }
-.wizard-ready[data-variant="b"] .wizard-recap-list { gap: 0; padding: 0 var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); }
-[data-theme="dark"] .wizard-ready[data-variant="b"] .wizard-recap-list { background: var(--sv-surface-raised); }
-.wizard-ready[data-variant="b"] .wizard-recap-row { grid-template-columns: 20px auto minmax(0, 1fr) 20px; grid-template-areas: "icon label value check"; min-height: 44px; padding: var(--sv-space-2) 0; }
-.wizard-ready[data-variant="b"] .wizard-recap-row + .wizard-recap-row { border-top: 1px solid var(--sv-border); }
-.wizard-ready[data-variant="b"] .wizard-recap-icon { width: 20px; height: 20px; background: none; }
-.wizard-ready[data-variant="b"] .wizard-recap-row dd { text-align: end; }
-.wizard-ready[data-variant="b"] .wizard-recap-check { width: 20px; height: 20px; }
-.wizard-ready[data-variant="b"] .wizard-recap-check svg { width: 14px; height: 14px; }
-.wizard-ready[data-variant="b"] .wizard-ready-connect { padding: var(--sv-space-4); border: 1px solid color-mix(in srgb, var(--sv-voice) 35%, var(--sv-border)); border-left: 4px solid var(--sv-voice); border-radius: var(--sv-radius-xl); background: var(--sv-voice-soft); }
-.wizard-ready[data-variant="b"] .ui-snippet { background: var(--sv-surface); }
-[data-ready="b"] .wizard-actions .wizard-enter { flex: 1 1 auto; gap: var(--sv-space-3); padding-inline: var(--sv-space-5) var(--sv-space-2); border-radius: var(--sv-radius-pill); }
-[data-ready="b"] .wizard-actions .wizard-enter svg { box-sizing: content-box; width: 16px; height: 16px; padding: 6px; border-radius: 50%; background: var(--sv-voice); color: var(--sv-on-voice); }
-[data-theme="dark"] [data-ready="b"] .wizard-actions .wizard-enter svg { background: var(--sv-on-accent); color: var(--sv-voice); }
+.wizard-ready .wizard-recap-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wizard-ready .wizard-recap-row { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+[data-theme="dark"] .wizard-ready .wizard-recap-row { background: var(--sv-surface); }
+.wizard-ready .wizard-ready-connect { padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); }
 
 @media (max-width: 599px), (max-height: 520px) {
   .wizard-ready .wizard-ready-title { font-size: var(--sv-font-xl); line-height: 1.625rem; }
-  .wizard-ready[data-variant="a"] .wizard-ready-mark { width: 72px; height: 72px; }
-  .wizard-ready[data-variant="a"] .wizard-ready-mark svg { width: 48px; height: 48px; }
-  .wizard-ready[data-variant="a"] .wizard-recap-list { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); }
-  .wizard-ready[data-variant="a"] .wizard-recap-row { min-height: 48px; border: 0; border-radius: 0; background: none; }
-  [data-theme="dark"] .wizard-ready[data-variant="a"] .wizard-recap-row { background: none; }
-  .wizard-ready[data-variant="a"] .wizard-recap-row + .wizard-recap-row { border-top: 1px solid var(--sv-border); }
-  .wizard-ready[data-variant="b"] .wizard-ready-mark { width: 64px; height: 64px; }
-  .wizard-ready[data-variant="b"] .wizard-ready-mark svg { width: 40px; height: 40px; }
+  .wizard-ready .wizard-ready-mark { width: 72px; height: 72px; }
+  .wizard-ready .wizard-ready-mark svg { width: 48px; height: 48px; }
+  .wizard-ready .wizard-recap-list { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); }
+  .wizard-ready .wizard-recap-row { min-height: 48px; border: 0; border-radius: 0; background: none; }
+  [data-theme="dark"] .wizard-ready .wizard-recap-row { background: none; }
+  .wizard-ready .wizard-recap-row + .wizard-recap-row { border-top: 1px solid var(--sv-border); }
 }
 @media (max-height: 520px) { .wizard-ready-mark { display: none !important; } }
 @media (prefers-reduced-motion: reduce) {

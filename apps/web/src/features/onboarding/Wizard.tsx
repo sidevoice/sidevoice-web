@@ -20,7 +20,6 @@ import { hostStatusText } from "../settings/local-host-status";
 import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
 import { ReadyStep } from "./ReadyStep";
-import { useVariant } from "../../lib/variants";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
 import type { OnboardingStep } from "../../services/onboarding-state";
@@ -48,6 +47,9 @@ const TITLES: Record<OnboardingStep, HostMessageKey> = {
 };
 
 const SAMPLE_MAX = 200;
+
+/** The steps in the order they come, for the side a new one slides in from. */
+const ORDER: OnboardingStep[] = ["W0", "W1", "W2", "W2r", "W3", "W4", "W4v", "W5", "W6"];
 
 function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean): OnboardingStep | null {
   if (step === "W1") return "W0";
@@ -182,7 +184,6 @@ export function Wizard() {
   const hostFailed = hostStatus.state === "failed" || hostStatus.state === "service-failed";
   const prepare = () => { setPreparing(true); localHostInstallController.start("no-machine"); };
   const { step } = onboarding;
-  const readyVariant = useVariant("ready", ["a", "b"] as const);
   const stageTask = step === "W4" ? "stt" : step === "W4v" ? "tts" : null;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const trial = useVoiceTry(stageTask, { onTried: (task) => void onboarding.markTried(task) });
@@ -207,7 +208,11 @@ export function Wizard() {
     if (onboarding.open && !element.open) typeof element.showModal === "function" ? element.showModal() : element.setAttribute("open", "");
     if (!onboarding.open && element.open) typeof element.close === "function" ? element.close() : element.removeAttribute("open");
   }, [onboarding.open]);
+  // A new step is seen to arrive: its body starts at the top (drawn anew), slides in from the side it came from, and its
+  // title takes the focus, so a screen reader says it. The direction is the steps' order.
   useEffect(() => { if (onboarding.open) title.current?.focus(); }, [onboarding.open, step]);
+  const travel = useRef<{ step: OnboardingStep; direction: "forward" | "back" | null }>({ step, direction: null });
+  if (travel.current.step !== step) travel.current = { step, direction: ORDER.indexOf(step) < ORDER.indexOf(travel.current.step) ? "back" : "forward" };
 
   // A machine prepared or paired while its step is step moves the setup on by itself, to where it then stands (a
   // machine that answers after the setup opened leaves the steps already done behind).
@@ -283,16 +288,16 @@ export function Wizard() {
   </>;
 
   const ready = step === "W6";
-  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready ? readyVariant : undefined}
+  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
     // Escape puts the setup off, except once it is done: Ready only goes on.
     onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}>
     <header className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
       {step !== "W6" && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </header>
-    {!(ready && readyVariant === "b") && <Stepper current={current} t={t} />}
+    <Stepper current={current} t={t} />
     {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[step])}</h2>}
-    <div className="wizard-body">
+    <div className="wizard-body" key={step} data-travel={travel.current.direction ?? undefined}>
       {error && !ready && <Alert tone="danger" live title={error} />}
       {step === "W1" && <section>
         <p>{t("wizard.where.body")}</p>
@@ -315,7 +320,7 @@ export function Wizard() {
       {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep t={t} />}
-      {ready && <ReadyStep variant={readyVariant} path={onboarding.path} machineName={remoteName} title={title} t={t} />}
+      {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
       {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
     <footer className="wizard-actions">

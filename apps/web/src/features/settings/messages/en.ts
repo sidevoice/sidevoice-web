@@ -325,8 +325,6 @@ export const en = {
   "wizard.title.stt": "Set up transcription",
   "wizard.title.tts": "Set up voice",
   "wizard.title.ready": "You’re all set — talk to your agents",
-  "wizard.ready.titleLead": "You’re all set —",
-  "wizard.ready.titleTalk": "talk to your agents",
   "wizard.recap.title": "Your setup",
   "wizard.recap.here": "This computer",
   "wizard.recap.smart": "Smart",

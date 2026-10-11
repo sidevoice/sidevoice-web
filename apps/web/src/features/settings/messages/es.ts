@@ -327,8 +327,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "wizard.title.stt": "Configura la transcripción",
   "wizard.title.tts": "Configura la voz",
   "wizard.title.ready": "Todo listo — habla con tus agentes",
-  "wizard.ready.titleLead": "Todo listo —",
-  "wizard.ready.titleTalk": "habla con tus agentes",
   "wizard.recap.title": "Tu configuración",
   "wizard.recap.here": "Este ordenador",
   "wizard.recap.smart": "Inteligente",
