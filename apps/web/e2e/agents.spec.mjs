@@ -119,7 +119,8 @@ async function expectInsideViewport(locator, width, height) {
 test("a machine's Agents at phone widths: a foreign one replaced by hand, a connect that fails then works, the device's token on each", async ({ page }) => {
   const fake = await installHarness(page);
   await page.goto("/voice/");
-  await expect(page.getByRole("heading", { name: "Sidevoice" })).toBeVisible();
+  // The room is up: its heading is there (a phone shows it to a screen reader only, a desktop at the column's head).
+  await expect(page.locator("h1.brand")).toBeAttached();
 
   await openMachines(page, 390, 844);
   const agents = await openAgents(page);
