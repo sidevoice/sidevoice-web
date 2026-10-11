@@ -61,7 +61,7 @@ test("NoMachine keeps remote pairing available while local preparation reports b
   expect(install).toHaveBeenCalledOnce();
   expect(agents).not.toHaveBeenCalled();
   await act(async () => { report({ step: "download", done: 1_572_864, total: 3_145_728 }); });
-  expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("max", "3145728");
+  expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("aria-valuenow", "50");
   expect(screen.getByText("1.5 of 3 MB")).toBeInTheDocument();
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect to a machine" })); });

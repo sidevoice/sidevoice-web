@@ -119,20 +119,23 @@ test("put off, the setup leaves one action that resumes it where it stands", asy
   expect(title()).toHaveTextContent("Set up transcription");
 });
 
-test("a model not on this device is downloaded first: the footer offers its download, then the try once it is here", async () => {
+test("a model not on this device is downloaded first, in its block as in Settings; the footer's try waits for it, saying why", async () => {
   const store = room();
   const absent = CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id === "whisper-base"
     ? { ...model, installed: false, recommendedBuild: "whisper-base/int8", builds: [{ id: "whisper-base/int8", available: true, reasons: [], installed: false, downloadBytes: 148e6 }] } : model) }));
   act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: absent as unknown as CatalogView[], error: "" } }));
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
-  expect(stageAction()).toHaveTextContent("Download (148 MB)");
+  expect(document.getElementById("stt-model-card")).toHaveTextContent(/Not downloaded\s*148 MB/);
+  expect(stageAction()).toHaveTextContent("Speak");
+  expect(stageAction()).toHaveAttribute("aria-disabled", "true");
+  expect(stageAction()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
   expect(document.getElementById("stt-language")).toBeNull();
-  fireEvent.click(stageAction());
+  fireEvent.click(document.getElementById("stt-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("stt");
   act(() => store.patch({ voiceInstall: { task: "stt", model: "whisper-base", state: "running", fraction: 0.5, error: "" } }));
-  expect(stageAction()).toHaveTextContent("Cancel download");
-  fireEvent.click(stageAction());
+  expect(document.getElementById("stt-model-card")).toHaveTextContent("Downloading… 50%");
+  fireEvent.click(document.getElementById("stt-model-cancel")!);
   expect(actions.cancelVoiceInstall).toHaveBeenCalled();
   act(() => store.patch({ voiceInstall: null, voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
   expect(stageAction()).toHaveTextContent("Speak");

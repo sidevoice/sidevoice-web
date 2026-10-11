@@ -15,7 +15,8 @@ function dialog(pairDevice: (code: string, name: string) => Promise<unknown>) {
   return { store, closePairing, element: () => document.getElementById("device-pairing") as HTMLDialogElement };
 }
 const code = () => screen.getByRole("textbox", { name: "Pairing code" }) as HTMLTextAreaElement;
-const submit = () => document.querySelector(".pairing-form button[type=submit]") as HTMLButtonElement;
+// Connect sits in the dialog's footer, submitting the form through its `form` attribute.
+const submit = () => document.querySelector("#device-pairing button[type=submit][form]") as HTMLButtonElement;
 const address = () => screen.getByRole("textbox", { name: /^Machine address/ }) as HTMLInputElement;
 
 test("it opens when asked with remote setup guidance before the code, and no device name field", () => {

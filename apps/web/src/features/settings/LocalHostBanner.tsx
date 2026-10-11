@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { RefreshIcon } from "../../components/ui/Icons";
 import type { LocalHostAction } from "./local-host-status";
 import { canRunLocalHostAction, hostStatusText, runLocalHostAction } from "./local-host-status";
 import { hostTranslator } from "./host-i18n";
 import { useRoomStore } from "../../state/room-store";
+import "./banners.css";
 
 export function LocalHostBanner() {
   const t = hostTranslator();
@@ -27,9 +30,11 @@ export function LocalHostBanner() {
     finally { setBusy(false); }
   }
   return (
-    <aside className="local-host-banner" role="status">
-      <span>{t("noMachine.retryBanner", { cause })}{error ? ` ${t("hosts.actionFailed")}` : ""}</span>
-      {available && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void retry()}>{t("hosts.retry")}</Button>}
+    <aside className="room-banner local-host-banner" role="status">
+      <Alert tone="danger" title={t("noMachine.retryBanner", { cause })}
+        action={available ? <Button size="sm" loading={busy} onClick={() => void retry()}><RefreshIcon />{t("hosts.retry")}</Button> : undefined}>
+        {error ? t("hosts.actionFailed") : undefined}
+      </Alert>
     </aside>
   );
 }

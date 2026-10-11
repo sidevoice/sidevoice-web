@@ -1,5 +1,8 @@
 import { useState, useSyncExternalStore } from "react";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { ProgressBar } from "../../components/ui/ProgressBar";
+import { cn } from "../../lib/cn";
 import { localHostBridge, type LocalHostInstallProgress } from "../../services/desktop-host";
 import {
   isVisibleLocalHostInstall,
@@ -9,6 +12,7 @@ import {
 import { hostTranslator } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
 import { localHostBridgeErrorText } from "../settings/local-host-status";
+import "./pairing.css";
 
 const stepKeys: Record<string, HostMessageKey> = {
   download: "localInstall.step.download",
@@ -23,6 +27,15 @@ const stepKeys: Record<string, HostMessageKey> = {
 
 function formatMegabytes(bytes: number) {
   return new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
+}
+
+/** Whether a screen may offer to prepare this computer: `supported` when this app can (the desktop app's install),
+ *  `offered` while no preparation is on screen either — its panel then stands where the offer was. For screens that
+ *  place the offer among their own actions (the no-machine screen, the first-run setup's footer). */
+export function useLocalInstallOffer(controller: LocalHostInstallController = localHostInstallController) {
+  const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+  const supported = typeof localHostBridge()?.install === "function";
+  return { supported, offered: supported && !isVisibleLocalHostInstall(snapshot) };
 }
 
 export function LocalHostInstallEntry({
@@ -81,7 +94,7 @@ export function LocalHostInstallEntry({
   const mappedStep = displayStep ? stepKeys[displayStep] ?? "localInstall.step.unknown" : null;
 
   return (
-    <div className={`local-install-entry ${className}`.trim()}>
+    <div className={cn("local-install-entry", className)}>
       {showCta && !attemptActive && (
         <div className="local-install-cta">
           <Button variant="primary" onClick={start}>{t("localInstall.cta")}</Button>
@@ -89,33 +102,35 @@ export function LocalHostInstallEntry({
         </div>
       )}
       {showingAttempt && (
-        <section className="local-install-panel" aria-labelledby="local-install-title" aria-live="polite">
-          <h4 id="local-install-title">{t("localInstall.panelTitle")}</h4>
+        <section className="local-install-panel" aria-labelledby="local-install-title" aria-live="polite" data-phase={snapshot.phase}>
+          <div className="local-install-head">
+            {snapshot.phase === "installing" && <span className="ui-spinner ui-spinner--inline" aria-hidden />}
+            <h4 id="local-install-title">{t("localInstall.panelTitle")}</h4>
+          </div>
           {snapshot.phase === "installing" && <>
             <p className="local-install-status" role="status">{t("localInstall.preparing")}</p>
             {mappedStep && <p className="muted">{t(mappedStep)}</p>}
-            {byteProgress && <>
-              <progress aria-label={t("localInstall.progressLabel")} max={progress!.total!} value={Math.min(progress!.done!, progress!.total!)} />
+            {byteProgress && <div className="local-install-progress">
+              <ProgressBar label={t("localInstall.progressLabel")} value={Math.min(progress!.done!, progress!.total!) / Math.max(1, progress!.total!)} />
               <p className="muted">{t("localInstall.progressBytes", {
                 done: formatMegabytes(progress!.done!), total: formatMegabytes(progress!.total!),
               })}</p>
-            </>}
+            </div>}
             {snapshot.cancelling && <p className="muted" role="status">{t("localInstall.cancelling")}</p>}
             {snapshot.cancelState === "too-late" && <p className="muted" role="status">{t("localInstall.cancelTooLate")}</p>}
             {snapshot.cancelState === "failed" && <p className="muted" role="status">{t("localInstall.cancelFailed")}</p>}
           </>}
-          {snapshot.phase === "failed" && <div className="local-install-error" role="alert">
-            <p>{errorMessage}</p>
-            {mappedStep && <p className="muted">{t("hosts.failureStep", { step: t(mappedStep) })}</p>}
-          </div>}
+          {snapshot.phase === "failed" && <Alert tone="danger" live className="local-install-error" title={errorMessage}>
+            {mappedStep ? t("hosts.failureStep", { step: t(mappedStep) }) : undefined}
+          </Alert>}
           {snapshot.phase === "cancelled" && <p className="local-install-status" role="status">{t("localInstall.cancelled")}</p>}
           {snapshot.phase === "succeeded" && <p className="local-install-status" role="status">{t("localInstall.selecting")}</p>}
           <div className="local-install-actions">
-            {snapshot.phase === "installing" && snapshot.cancellable && <Button variant="ghost" disabled={snapshot.cancelling}
+            {snapshot.phase === "installing" && snapshot.cancellable && <Button variant="ghost" tone="neutral" size="sm" disabled={snapshot.cancelling}
               onClick={() => void controller.cancel()}>{t("localInstall.cancel")}</Button>}
-            {(snapshot.phase === "failed" || snapshot.phase === "cancelled") && <Button variant="primary" onClick={start}>{t("localInstall.retry")}</Button>}
-            {snapshot.phase === "failed" && <Button variant="ghost" onClick={() => void copyDetails()}>{t("localInstall.copyDetails")}</Button>}
-            <Button variant="ghost" onClick={() => void connectAnotherMachine()}>{t("localInstall.connectAnother")}</Button>
+            {(snapshot.phase === "failed" || snapshot.phase === "cancelled") && <Button variant="primary" size="sm" onClick={start}>{t("localInstall.retry")}</Button>}
+            {snapshot.phase === "failed" && <Button size="sm" onClick={() => void copyDetails()}>{t("localInstall.copyDetails")}</Button>}
+            <Button variant="ghost" size="sm" onClick={() => void connectAnotherMachine()}>{t("localInstall.connectAnother")}</Button>
           </div>
           {note && <p className="muted" role="status">{note}</p>}
         </section>

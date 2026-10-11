@@ -1,0 +1,62 @@
+/* Pairing a machine and preparing this one: the two numbered commands with their copy buttons, the pairing form and
+ * its dialog, this computer's preparation (its offer and its progress), and the screen with no machine yet. Shared
+ * by the first-run setup, the room and Settings → Machines, wherever these components are used. */
+
+/* ----- the commands to run on the other machine, as numbered steps */
+.connector-steps { display: grid; gap: var(--sv-space-4); margin: 0; padding: 0; list-style: none; counter-reset: connector-step; }
+.connector-steps > li { position: relative; display: grid; gap: var(--sv-space-2); min-width: 0; padding-inline-start: 36px; counter-increment: connector-step; }
+.connector-steps > li::before {
+  content: counter(connector-step); position: absolute; inset-inline-start: 0; top: 0; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold);
+}
+.connector-steps > li > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
+.command-block { display: grid; min-width: 0; }
+.setup-command { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
+.setup-command code { flex: 1; min-width: 0; overflow-x: auto; font: var(--sv-font-sm) / 1.25rem var(--sv-font-mono); white-space: nowrap; color: var(--sv-text); scrollbar-width: thin; }
+.command-note { display: flex; align-items: center; gap: var(--sv-space-1); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.command-note:not(:empty) { margin-top: var(--sv-space-1-5); }
+.command-note[data-copied] { color: var(--sv-positive); }
+
+/* ----- the pairing form, and the dialog around it */
+.pairing-form { display: grid; gap: var(--sv-space-4); min-width: 0; }
+.ui-textarea.pairing-code { font-family: var(--sv-font-mono); font-size: var(--sv-font-sm); line-height: 1.25rem; word-break: break-all; }
+.pairing-error:empty { display: none; }
+.pairing-form-actions { display: flex; justify-content: flex-end; }
+.remote-setup-guidance { display: grid; gap: var(--sv-space-3); }
+.remote-setup-guidance h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+/* The form's Connect, sent to a footer from the form: laid out there as if it were the footer's own. */
+.pairing-submit { display: contents; }
+@media (max-width: 599px) { .ui-dialog-foot > .pairing-submit > .ui-button { flex: 1 1 0; } }
+
+/* ----- this computer's preparation: the offer, then its progress */
+.local-install-entry { min-width: 0; }
+.local-install-cta { display: grid; justify-items: start; gap: var(--sv-space-1-5); }
+.local-install-cta p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.local-install-panel { display: grid; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); text-align: start; }
+.local-install-head { display: flex; align-items: center; gap: var(--sv-space-2); }
+.local-install-head .ui-spinner { color: var(--sv-accent-text); }
+.local-install-panel h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.local-install-panel p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.local-install-panel .local-install-status { color: var(--sv-text); }
+.local-install-progress { display: grid; gap: var(--sv-space-1-5); margin-top: var(--sv-space-1); }
+.local-install-progress p { font-variant-numeric: tabular-nums; }
+.local-install-panel .local-install-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
+/* In the room, under the header, while a preparation started from the no-machine screen goes on. */
+.local-install-entry--room { flex: none; padding: var(--sv-space-2) var(--sv-space-4); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
+.local-install-entry--room .local-install-panel { max-width: 42rem; margin: 0 auto; padding: var(--sv-space-3) var(--sv-space-4); }
+
+/* ----- the screen with no machine yet: an empty state on the stage's ground */
+.no-machine-screen {
+  display: grid; justify-items: center; align-content: start; gap: var(--sv-space-2); width: min(40rem, calc(100% - 2 * var(--sv-space-4))); max-height: calc(100% - 2 * var(--sv-space-4));
+  margin: auto; padding: var(--sv-space-10) var(--sv-space-6); overflow: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
+}
+.no-machine-icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--sv-radius-xl); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.no-machine-screen h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
+.no-machine-screen > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.no-machine-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sv-space-2); margin-top: var(--sv-space-3); }
+.no-machine-screen > .no-machine-hint { max-width: 46ch; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.no-machine-screen > .local-install-entry { justify-self: stretch; margin-top: var(--sv-space-4); }
+@media (max-width: 599px) {
+  .no-machine-screen { padding: var(--sv-space-8) var(--sv-space-4); }
+  .no-machine-actions { display: grid; justify-self: stretch; justify-content: stretch; }
+}
