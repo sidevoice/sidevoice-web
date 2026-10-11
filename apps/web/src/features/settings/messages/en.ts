@@ -552,6 +552,7 @@ export const en = {
   "settings.advanced.deleteAllYes": "Delete {count} models",
   "settings.advanced.deleteAllPartial": "Deleted {done} of {count}. {model} is running right now; try again after the call.",
   "settings.advanced.deleteUnusedNow": "This deletes {count} models now and frees {size}. After that, it happens on its own.",
+  "settings.advanced.deleteUnusedNowOne": "This deletes 1 model now and frees {size}. After that, it happens on its own.",
   "settings.advanced.deleteUnusedYes": "Delete and turn on",
   "settings.advanced.usedToday": "used today",
   "settings.advanced.usedDaysAgo": "last used {n} days ago",
