@@ -98,7 +98,10 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
   await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
 
-  expect(title()).toHaveTextContent("Ready");
+  expect(title()).toHaveTextContent("You’re all set — talk to your agents");
+  // What was set up, read from what the steps wrote, and what to tell an agent.
+  expect(document.querySelector(".wizard-recap-list")).toHaveTextContent("Transcription");
+  expect(document.querySelector(".wizard-ready blockquote")).toHaveTextContent("voice_connect");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
   const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);
   expect(kept.completed_at).toBeGreaterThan(0);
@@ -119,7 +122,7 @@ test("a failed try says why and keeps the step; a completion that is not stored 
 
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key) => { if (key === ONBOARDING_STORAGE_KEY) throw new DOMException("blocked", "SecurityError"); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
-  expect(title()).toHaveTextContent("Ready");
+  expect(title()).toHaveTextContent("You’re all set — talk to your agents");
   expect(screen.getByRole("alert")).toHaveTextContent("Setup progress was not saved");
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
   setItem.mockRestore();

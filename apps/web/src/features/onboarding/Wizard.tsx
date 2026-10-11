@@ -3,7 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
-import { CheckIcon, ChevronIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ArrowRightIcon, CheckIcon, ChevronIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
@@ -19,6 +19,7 @@ import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { hostStatusText } from "../settings/local-host-status";
 import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
+import { ReadyStep } from "./ReadyStep";
 import { useVariant } from "../../lib/variants";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
@@ -208,6 +209,7 @@ export function Wizard() {
   // Two designs of where the agents are, for the operator to compare: separate steps (this computer prepared, then its
   // agents; or another machine paired), or one step whose two choices open in place with all of it.
   const cards = useVariant("where", ["steps", "cards"] as const) === "cards" && onboarding.canHostAgents;
+  const readyVariant = useVariant("ready", ["a", "b"] as const);
   const shown: OnboardingStep = cards && (step === "W2" || step === "W3" || step === "W2r") ? "W1" : step;
   const stageTask = step === "W4" ? "stt" : step === "W4v" ? "tts" : null;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -328,16 +330,18 @@ export function Wizard() {
     {(!pairingInUse || (agents?.status === "ready" && agents.value?.agents.length === 0)) && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
   </>;
 
-  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title"
-    onCancel={(event) => { event.preventDefault(); void onboarding.defer(); }}>
+  const ready = shown === "W6";
+  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={shown} data-ready={ready ? readyVariant : undefined}
+    // Escape puts the setup off, except once it is done: Ready only goes on.
+    onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}>
     <header className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
       {step !== "W6" && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </header>
-    <Stepper groups={groups} current={current} t={t} />
-    <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[shown])}</h2>
+    {!(ready && readyVariant === "b") && <Stepper groups={groups} current={current} t={t} />}
+    {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[shown])}</h2>}
     <div className="wizard-body">
-      {error && <Alert tone="danger" live title={error} />}
+      {error && !ready && <Alert tone="danger" live title={error} />}
       {shown === "W1" && !cards && <section>
         <p>{t("wizard.where.body")}</p>
         <div className="wizard-choices" role="radiogroup" aria-label={t("wizard.title.where")}>
@@ -375,7 +379,8 @@ export function Wizard() {
       {shown === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep t={t} />}
-      {step === "W6" && <section><p>{t("wizard.readyBody")}</p></section>}
+      {ready && <ReadyStep variant={readyVariant} path={onboarding.path} machineName={remoteName} title={title} t={t} />}
+      {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
     <footer className="wizard-actions">
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
@@ -389,8 +394,8 @@ export function Wizard() {
         disabled={!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim())}
         onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
       {step === "W5" && <Button type="button" variant="primary" id="wizard-turn-continue" disabled={turnWaits} onClick={() => void finishTurn()}>{t("wizard.continue")}</Button>}
-      {step === "W6" && <Button type="button" variant="primary" disabled={completing} onClick={() => void complete()}>
-        {error ? t("wizard.retryCompletion") : t("wizard.enter")}
+      {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>
+        {error ? t("wizard.retryCompletion") : t("wizard.enter")}<ArrowRightIcon />
       </Button>}
     </footer>
   </dialog>;
