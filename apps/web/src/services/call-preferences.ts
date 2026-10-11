@@ -10,8 +10,9 @@ export interface CallPreferences {
 
 export const CALL_PREFERENCES_KEY = "sidevoice.call-preferences";
 const CHANGED = "sidevoice-call-preferences";
-/** By default the sound plays when the screen is off — the call goes on in a pocket, a car — and the screen stays on. */
-export const DEFAULT_CALL_PREFERENCES: CallPreferences = { presence: "hidden", keepAwake: true };
+/** By default the sound plays when the screen is off — the call goes on in a pocket, a car — and the screen turns off
+ *  as the device says; it is kept on only when chosen. */
+export const DEFAULT_CALL_PREFERENCES: CallPreferences = { presence: "hidden", keepAwake: false };
 
 export function readCallPreferences(): CallPreferences {
   try {

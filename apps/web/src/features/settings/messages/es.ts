@@ -396,7 +396,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "settings.section.providers": "Proveedores",
   "settings.section.machines": "Máquinas",
   "settings.section.advanced": "Avanzado",
-  "settings.section.waiting": "Un modelo de aquí aún no está listo",
+  "settings.section.waiting": "Un modelo elegido aquí aún no está en este dispositivo: Guardar lo espera.",
   "settings.general.description": "Cómo se ve Sidevoice y en qué idioma te habla en este dispositivo.",
   "settings.appearance": "Apariencia",
   "settings.appearance.hint": "Se aplica al momento, en este dispositivo.",
@@ -513,4 +513,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "runtime.device.noGpu": "sin tarjeta gráfica que el navegador pueda usar",
   "runtime.device.memory": "unos {gb} GB de memoria",
   "runtime.device.cores": "{n} núcleos",
+  "settings.section.notReady": "No listo",
+  "runtime.advanced": "Avanzado: cómo se ejecuta",
 };

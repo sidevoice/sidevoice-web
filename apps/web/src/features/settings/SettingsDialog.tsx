@@ -3,6 +3,7 @@ import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
 import { AdvancedIcon, CallSettingsIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
@@ -11,8 +12,8 @@ import { readThemePreference, setThemePreference, type ThemePreference } from ".
 import { MachineList } from "../room/MachineList";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
-import { Alert } from "../../components/ui/Alert";
 import { catalogueShown } from "./ModelSetup";
+import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
@@ -140,7 +141,7 @@ export function SettingsDialog() {
               {SECTIONS.map((section) => <button key={section.id} type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
                 aria-current={section.id === current ? "page" : undefined} onClick={() => show(section.id)}>
                 {section.icon}<span>{t(section.label)}</span>
-                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts)) && <span className="ui-nav-dirty" title={t("settings.section.waiting")} />}
+                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>)}
             </nav>
             <div className="settings-content">

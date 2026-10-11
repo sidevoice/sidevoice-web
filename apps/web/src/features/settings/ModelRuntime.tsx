@@ -64,7 +64,7 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   return (
     <div className="model-runtime">
       <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
-        <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.title")}
+        <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
         <span className="model-runtime-summary">{state.build ? describe(state.build) : ""}</span>
       </button>
       {open && <div className="model-runtime-panel" id={panel}>

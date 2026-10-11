@@ -394,7 +394,7 @@ export const en = {
   "settings.section.providers": "Providers",
   "settings.section.machines": "Machines",
   "settings.section.advanced": "Advanced",
-  "settings.section.waiting": "A model here is not ready yet",
+  "settings.section.waiting": "A model chosen here is not on this device yet: Save waits for it.",
   "settings.general.description": "How Sidevoice looks and speaks to you on this device.",
   "settings.appearance": "Appearance",
   "settings.appearance.hint": "Applied at once, on this device.",
@@ -511,6 +511,8 @@ export const en = {
   "runtime.device.noGpu": "no graphics card the browser can use",
   "runtime.device.memory": "about {gb} GB of memory",
   "runtime.device.cores": "{n} cores",
+  "settings.section.notReady": "Not ready",
+  "runtime.advanced": "Advanced: how it runs",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

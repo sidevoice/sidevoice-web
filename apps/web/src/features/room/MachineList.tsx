@@ -100,7 +100,7 @@ export function MachineList() {
               <button type="button" className="machine-open" aria-label={machine.local ? t("hosts.open", { machine: copy.name }) : t("agents.review", { machine: copy.name })} onClick={() => open(machine, machine.local ? "status" : "agents")}>
                 <span className="machine-icon" aria-hidden="true"><MachinesIcon size={18} /></span>
                 <span className="machine-copy">
-                  <span className="machine-name">{copy.name}{machine.inUse && <Badge tone="accent">{t("hosts.inUse")}</Badge>}{notice(machine) && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</span>
+                  <span className="machine-name">{copy.name}{machine.inUse && <Badge tone="accent">{t("hosts.inUse")}</Badge>}{notice(machine) && <Badge tone="warning">{t("agents.notice")}</Badge>}</span>
                   <span className="machine-brief">{copy.subtitle}</span>
                 </span>
               </button>
@@ -136,15 +136,16 @@ function HostDetail({ machine, copy, notice, initialTab, onBack }: { machine: Ma
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          <h3 id="host-detail-title">{copy.name}{notice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</h3>
+          <h3 id="host-detail-title">{copy.name}</h3>
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
+        {notice && <Badge tone="warning">{t("agents.notice")}</Badge>}
         {!onBack && !machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
       </header>
       {<Tabs className="host-tabs" label={t("hosts.title")} value={shown} onChange={setTab} idPrefix={"host-" + machine.id}
-        items={tabs.map((name) => ({ value: name, label: <span className="host-agent-tab-label">{t(name === "agents" ? "agents.tab" : `hosts.tab.${name}` as "hosts.tab.status" | "hosts.tab.devices")}{name === "agents" && notice && <span className="host-agent-dot" aria-label={t("agents.notice")} />}</span> }))} />}
+        items={tabs.map((name) => ({ value: name, label: <span className="host-agent-tab-label">{t(name === "agents" ? "agents.tab" : `hosts.tab.${name}` as "hosts.tab.status" | "hosts.tab.devices")}{name === "agents" && notice && <Badge tone="warning">{t("agents.notice")}</Badge>}</span> }))} />}
       <div className="host-panel" role="tabpanel" id={`host-${machine.id}-panel-${shown}`} aria-labelledby={`host-${machine.id}-tab-${shown}`}>
         {shown === "agents" ? <HostAgentsPanel fp={machine.pairingId ?? null} />
           : shown === "status" && machine.local ? <LocalHostStatusPanel status={status} />

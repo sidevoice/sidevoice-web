@@ -69,3 +69,5 @@
   .provider-row-actions { width: 100%; padding-inline-start: 48px; }
   .provider-row > .provider-key, .provider-remove { margin-inline-start: 0; }
 }
+/* A section whose chosen model is not ready says so in the nav, in words. */
+.ui-nav-badge { margin-inline-start: auto; }
