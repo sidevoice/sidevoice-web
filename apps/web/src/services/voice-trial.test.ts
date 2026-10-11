@@ -100,3 +100,29 @@ test("a try says how long each phase took, once it is heard", async () => {
   await tryVoice(voice as never, {} as never, "hola", { onTimings: (timings: unknown) => said.push(timings) });
   expect(typeof (said[0] as { first_sound_ms: number }).first_sound_ms).toBe("number");
 });
+
+test("while it runs a try tells how it goes: the voice listening and the microphone's level; the part of the sentence sounding", async () => {
+  const voice = fakeVoice();
+  voice.on.level = new Set();
+  const listening = { ...voice, onLevel: (listener: (value: unknown) => void) => { voice.on.level.add(listener); return () => voice.on.level.delete(listener); } };
+  const told: unknown[] = [];
+  const heard = tryTranscription(listening as unknown as Voice, SETTINGS as never, { onListening: () => told.push("listening"), onLevel: (level: number) => told.push(level) });
+  await vi.waitFor(() => expect(told).toEqual(["listening"]));
+  voice.emit("level", 0.4);
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
+  await heard;
+  expect(told).toEqual(["listening", 0.4]);
+  // Let go with the rest once heard.
+  expect(voice.on.level.size).toBe(0);
+
+  const steps: Array<(event: unknown) => void> = [];
+  const said = { ...fakeVoice(), say: () => ({ id: "s1", cancel() {}, onEvent: (listener: (event: unknown) => void) => steps.push(listener),
+    outcome: new Promise((done) => setTimeout(() => {
+      for (const event of [{ type: "playing" }, { type: "progress", sounding: [0, 4], heard_chars: 0 }, { type: "progress", sounding: null, heard_chars: 4 }]) steps.forEach((listener) => listener(event));
+      done({ status: "heard" });
+    }, 0)) }) };
+  const progress: unknown[] = [];
+  await tryVoice(said as unknown as Voice, SETTINGS as never, "Hola", { onProgress: (step: unknown) => progress.push(step) });
+  // The first sound is the start of it.
+  expect(progress).toEqual([{ sounding: null, heard_chars: 0 }, { sounding: [0, 4], heard_chars: 0 }, { sounding: null, heard_chars: 4 }]);
+});

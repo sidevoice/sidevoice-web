@@ -5,7 +5,7 @@ import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import { ONBOARDING_STORAGE_KEY, trialKey } from "../../services/onboarding-state";
 import { localHostInstallController } from "../../services/local-host-install";
-import type { SidevoiceActions } from "../../state/room-types";
+import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { chooseOption, selectedValue } from "../../test/select";
 import { VARIANTS_KEY } from "../../lib/variants";
@@ -34,7 +34,7 @@ beforeEach(() => {
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); });
+afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); });
 
 function room() {
   const store = createRoomStore();
@@ -45,6 +45,8 @@ function room() {
 const title = () => screen.getByRole("heading", { level: 2 });
 const stageAction = () => document.getElementById("wizard-stage-action") as HTMLButtonElement;
 const tryButton = () => document.getElementById("wizard-try") as HTMLButtonElement;
+// Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
+const card = (task: "stt" | "tts") => document.querySelector("#wizard #" + task + "-model-card")!;
 const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], pairingInUse: NUC.fp, node: NUC.fp, nodeReach: "ok", rendezvous: "node" }));
 
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
@@ -86,15 +88,20 @@ test("transcription and voice are this device's: trying them is recommended, and
   // Source first, then the model, as in Settings → Voice.
   expect(selectedValue("stt-source")).toBe("local");
   expect(tryButton()).toHaveTextContent("Speak");
-  expect(document.querySelector(".wizard-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  // The try is the model's: its hint in its block, and the block offers no second Speak beside the footer's.
+  expect(card("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  expect(document.getElementById("wizard-try-again")).toBeNull();
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", { keep: true });
-  expect(document.getElementById("stt-heard")).toHaveTextContent("hola, ¿me oyes?");
-  // Tried: Continue is the main action now, and how quick it was is said in a line.
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
+  expect(card("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  // Tried: Continue is the main action now, and how quick it was is said in a line, in the block.
   expect(stageAction()).toHaveTextContent(/^Continue$/);
   expect(stageAction()).toHaveClass("ui-button--primary");
-  expect(document.getElementById("stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
-  expect(document.getElementById("stt-timing")).not.toHaveTextContent("smaller model");
+  expect(card("stt").querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(card("stt").querySelector("#stt-timing")).not.toHaveTextContent("smaller model");
+  // Trying it again is the block's.
+  expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
+  expect(document.querySelector(".model-try-hint")).toBeNull();
   await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("Set up voice");
@@ -124,6 +131,7 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
   await act(async () => { fireEvent.click(tryButton()); });
   expect(screen.getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
+  expect(card("stt")).toContainElement(screen.getByRole("alert"));
   expect(title()).toHaveTextContent("Set up transcription");
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(stageAction()); });
@@ -137,6 +145,69 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   setItem.mockRestore();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
+});
+
+/** A try that runs until the test ends it, and what the page asked it to tell as it goes. */
+function pendingTry() {
+  const running: { told: TrialProgress; finish(result: unknown): void } = { told: {}, finish: () => {} };
+  actions.tryVoiceSettings.mockImplementation((_task: string, options: TrialProgress) => {
+    running.told = options;
+    return new Promise((resolve) => { running.finish = resolve; });
+  });
+  return running;
+}
+
+test("try-result card: the voice's try is all in its block — the sentence edited there, lit as it is heard, then how quick and Listen again", async () => {
+  const store = room();
+  paired(store);
+  await act(async () => { fireEvent.click(stageAction()); });
+  expect(title()).toHaveTextContent("Set up voice");
+  // The sentence to hear is the block's, where it is then heard.
+  const sample = card("tts").querySelector("#wizard-sample") as HTMLTextAreaElement;
+  expect(sample).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  fireEvent.change(sample, { target: { value: "Hola, qué tal." } });
+  const running = pendingTry();
+  await act(async () => { fireEvent.click(tryButton()); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
+  expect(card("tts")).toHaveTextContent("Getting ready…");
+  // Playing: the sentence in the field's place, lit up to what was heard; Stop is the block's too.
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 5, to: 5 }); });
+  expect(card("tts").querySelector("#wizard-sample")).toBeNull();
+  expect(card("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hola,$/);
+  expect(card("tts").querySelector(".model-try-unsaid")).toHaveTextContent("qué tal.");
+  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Stop");
+  await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
+  expect(card("tts").querySelector("#tts-timing")).toHaveTextContent("Starts speaking in 0.3 s");
+  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Listen again");
+  expect(card("tts").querySelector("#wizard-sample")).toHaveValue("Hola, qué tal.");
+  expect(stageAction()).toHaveTextContent(/^Continue$/);
+});
+
+test("try-result dialog: the footer's Speak opens the try's dialog — listening, then what was heard; its Escape is its own, and the block keeps a line", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "try-result": "dialog" }));
+  const store = room();
+  paired(store);
+  const running = pendingTry();
+  await act(async () => { fireEvent.click(tryButton()); });
+  const dialog = document.querySelector("#wizard #stt-try-dialog")!;
+  expect(dialog).toHaveAttribute("open");
+  expect(dialog).toHaveTextContent("Try transcription");
+  act(() => running.told.onListening!());
+  expect(dialog).toHaveTextContent("Listening… say a short sentence");
+  expect(dialog.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  await act(async () => { running.finish({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }); });
+  expect(dialog.querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  expect(dialog.querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  // Escape closes the try's dialog alone: the setup is not put off, and stays on its step.
+  await act(async () => { fireEvent(dialog, new Event("cancel", { cancelable: true })); });
+  expect(dialog).not.toHaveAttribute("open");
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at).toBeFalsy();
+  expect(title()).toHaveTextContent("Set up transcription");
+  // The block keeps how it went in a line, and offers it again; the footer goes on.
+  expect(card("stt").querySelector(".model-try-summary")).toHaveTextContent("hola, ¿me oyes? · Transcribed in 0.4 s");
+  expect(document.querySelector("#wizard #stt-heard")).toBeNull();
+  expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
+  expect(stageAction()).toHaveTextContent(/^Continue$/);
 });
 
 test("put off, the setup leaves one action that resumes it where it stands", async () => {
