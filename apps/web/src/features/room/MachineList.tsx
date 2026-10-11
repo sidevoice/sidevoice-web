@@ -3,6 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Card";
+import { Dialog } from "../../components/ui/Dialog";
 import "./machines.css";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion, type LocalPairingCode } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
@@ -76,6 +77,7 @@ export function MachineNav({ current }: { current: boolean }) {
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
             <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
             <span className="machine-nav-name">{copy.name}</span>
+            {machine.local && copy.name !== t("hosts.thisComputer") && <span className="machine-nav-local">{t("hosts.thisComputerTag")}</span>}
             {notice(machine) && <Badge tone="warning" className="ui-nav-badge">{t("agents.notice")}</Badge>}
           </button>
         );
@@ -233,6 +235,9 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   return (
     <div className="host-status-panel" data-state={status.state}>
       <p className="host-status-summary" role="status">{statusMessage}</p>
+      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at login it would not
+          come back by itself either. Only this computer's machine has this panel: a remote one is never stopped from here. */}
+      {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}
       {details.core?.version && <p className="muted">{t("hosts.version", { version: details.core.version })}</p>}
       {details.calls !== undefined && <p className="muted">{t("hosts.calls", { calls: details.calls })}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
@@ -341,6 +346,17 @@ function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
   );
 }
 
+/** A code's time left, by the second; at none, it is gone and another is to be made. */
+function CodeExpiry({ seconds, t, onExpired }: { seconds: number; t: HostTranslate; onExpired(): void }) {
+  const [until] = useState(() => Date.now() + seconds * 1000);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
+  const left = Math.max(0, Math.round((until - now) / 1000));
+  useEffect(() => { if (left === 0) onExpired(); }, [left]); // eslint-disable-line react-hooks/exhaustive-deps
+  const time = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  return <p className="muted pair-device-expiry">{t("hosts.devices.codeExpiresIn", { time })}</p>;
+}
+
 function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: string }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
@@ -353,6 +369,9 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const [pairingFor, setPairingFor] = useState<string | null>(null);
   const [pairingError, setPairingError] = useState(false);
   const [deviceNote, setDeviceNote] = useState("");
+  const [pairOpen, setPairOpen] = useState(false);
+  // Closed, a code is let go: a new one is made the next time.
+  const closePair = () => { setPairOpen(false); pairingEpoch.current++; setPairing(null); setPairingFor(null); setPairingError(false); };
   const deviceEpoch = useRef(0);
   const pairingEpoch = useRef(0);
   const bridge = localHostBridge();
@@ -438,25 +457,34 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           </li>
         ))}
       </ul>
-      {!local && <section className="pair-another-device">
-        <h4>{t("hosts.devices.pairAnother")}</h4>
-        <p className="muted">{t("hosts.devices.pairOnMachine", { machine: name })}</p>
-        <code className="pair-device-command">npx @sidevoice/uplink pair-device</code>
+      {/* Pairing another device is its own small dialog: create the code there, see it and its time left, close. On a
+          remote machine the code is made on the machine itself, and the dialog says how. */}
+      {(canPairDevices || !local) && <section className="pair-another-device">
+        <Button variant="secondary" disabled={local && !usable} onClick={() => setPairOpen(true)}><AddIcon />{t("hosts.devices.pairAnother")}</Button>
       </section>}
-      {canPairDevices && <section className="pair-another-device">
-        <h4>{t("hosts.devices.pairAnother")}</h4>
-        {!visiblePairing && <Button disabled={!usable} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>}
-        {usable && pairingError && <p role="alert">{t("hosts.devices.codeFailed")}</p>}
-        {visiblePairing && <div className="local-pairing-code" role="status">
-          <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
-          {/* Selected whole on a tap or a click, so copying it is one gesture: no button of its own. */}
-          <output className="issued-pairing-code" aria-label={t("hosts.devices.codeSelect")}>{visiblePairing.code}</output>
-          <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(visiblePairing.expires_in / 60) })}</p>
+      <Dialog open={pairOpen} size="sm" titleId={"pair-device-title-" + machine.id} title={t("hosts.devices.pairAnother")} closeable closeLabel={t("hosts.devices.close")}
+        onClose={closePair} footer={<Button variant={visiblePairing ? "primary" : "ghost"} tone={visiblePairing ? undefined : "neutral"} onClick={closePair}>{t(visiblePairing ? "hosts.devices.done" : "hosts.cancel")}</Button>}>
+        {!local ? <div className="pair-device-dialog">
+          <p>{t("hosts.devices.pairOnMachine", { machine: name })}</p>
+          <code className="pair-device-command">npx @sidevoice/uplink pair-device</code>
+        </div> : <div className="pair-device-dialog">
+          {!visiblePairing && <>
+            <p>{t("hosts.devices.pairIntro")}</p>
+            <Button variant="primary" disabled={!usable} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>
+          </>}
+          {usable && pairingError && <p role="alert">{t("hosts.devices.codeFailed")}</p>}
+          {visiblePairing && <div className="local-pairing-code" role="status">
+            <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
+            {/* Selected whole on a tap or a click, so copying it is one gesture: no button of its own. */}
+            <output className="issued-pairing-code" aria-label={t("hosts.devices.codeSelect")}>{visiblePairing.code}</output>
+            <CodeExpiry seconds={visiblePairing.expires_in} t={t} onExpired={() => { setPairing(null); setPairingFor(null); }} />
+          </div>}
+          {/* "Connect this machine to a room" (a local-only machine joined to a room by its address and the room's pairing
+              code, through the desktop bridge's `pairRoom`) was on the machine page: taken out of Settings until the relay
+              ships as a feature. Machines reached through a room keep working; only that form went (the hosts.devices.room*
+              messages remain). */}
         </div>}
-        {/* "Connect this machine to a room" (a local-only machine joined to a room by its address and the room's pairing
-            code, through the desktop bridge's `pairRoom`) was here: taken out of Settings until the relay ships as a feature.
-            Machines reached through a room keep working; only this form went (the hosts.devices.room* messages remain). */}
-      </section>}
+      </Dialog>
     </div>
   );
 }

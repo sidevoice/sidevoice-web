@@ -571,4 +571,11 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "voice.endOfTurn.info": "Inteligente: tras una pausa corta Sidevoice pregunta al modelo si has terminado —a los 0,6 s (Rápida), 0,9 s (Normal) o 1,3 s (Tranquila)— y termina el turno igualmente a los 2,5 s, 3,0 s o 4,0 s. Silencio: el turno termina tras 2,0 s, 2,5 s o 3,5 s sin voz.",
   "voice.patience.infoLabel": "Sobre la paciencia",
   "voice.patience.info": "Cuánto puede durar una pausa antes de que termine tu turno. Con Silencio: 2,0 s (Rápida), 2,5 s (Normal), 3,5 s (Tranquila). Con Inteligente: se pregunta al modelo a los 0,6, 0,9 o 1,3 s, y el turno termina igualmente a los 2,5, 3,0 o 4,0 s.",
+  "hosts.devices.close": "Cerrar",
+  "hosts.devices.done": "Hecho",
+  "hosts.devices.pairIntro": "Crea aquí un código de un solo uso y escríbelo en el dispositivo que emparejas.",
+  "hosts.devices.codeExpiresIn": "Caduca en {time}. Compártelo solo con el dispositivo que emparejas.",
+  "hosts.thisComputerTag": "Este ordenador",
+  "hosts.stoppedNote": "Sidevoice está detenido en este ordenador. Inícialo aquí, o se iniciará al volver a entrar en la sesión.",
+  "hosts.stoppedNoLoginNote": "Sidevoice está detenido en este ordenador y no se inicia al entrar en la sesión. Inícialo aquí cuando lo necesites.",
 };

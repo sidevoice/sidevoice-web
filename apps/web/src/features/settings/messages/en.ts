@@ -569,6 +569,13 @@ export const en = {
   "voice.endOfTurn.info": "Smart: after a short pause Sidevoice asks the model whether you have finished — after 0.6 s (Fast), 0.9 s (Normal) or 1.3 s (Calm) — and ends the turn anyway at 2.5 s, 3.0 s or 4.0 s. Silence: the turn ends after 2.0 s, 2.5 s or 3.5 s without speech.",
   "voice.patience.infoLabel": "About patience",
   "voice.patience.info": "How long a pause can last before your turn ends. With Silence: 2.0 s (Fast), 2.5 s (Normal), 3.5 s (Calm). With Smart: the model is asked after 0.6, 0.9 or 1.3 s, and the turn ends anyway at 2.5, 3.0 or 4.0 s.",
+  "hosts.devices.close": "Close",
+  "hosts.devices.done": "Done",
+  "hosts.devices.pairIntro": "Create a one-time code here, then enter it on the device you are pairing.",
+  "hosts.devices.codeExpiresIn": "Expires in {time}. Share it only with the device you are pairing.",
+  "hosts.thisComputerTag": "This computer",
+  "hosts.stoppedNote": "Sidevoice is stopped on this computer. Start it here, or it starts again when you next sign in.",
+  "hosts.stoppedNoLoginNote": "Sidevoice is stopped on this computer and does not start when you sign in. Start it here when you need it.",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

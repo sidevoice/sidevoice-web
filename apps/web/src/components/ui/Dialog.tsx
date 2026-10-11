@@ -59,8 +59,9 @@ export function Dialog({ id, open, layout = "dialog", size = "md", className, on
   const [node, setNode] = useState<HTMLDialogElement | null>(null);
   useEffect(() => {
     if (!node) return;
-    if (open && !node.open) node.showModal();
-    if (!open && node.open) node.close();
+    // Where a browser has no modal dialog (an old engine, a test's DOM), it is shown open all the same.
+    if (open && !node.open) typeof node.showModal === "function" ? node.showModal() : node.setAttribute("open", "");
+    if (!open && node.open) typeof node.close === "function" ? node.close() : node.removeAttribute("open");
   }, [node, open]);
   return (
     <dialog ref={setNode} id={id} className={cn("ui-dialog", className)} data-layout={layout} data-size={size} aria-labelledby={surface.titleId}

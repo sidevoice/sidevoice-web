@@ -93,3 +93,10 @@
   .machines-inline .machine-nav { display: flex; flex-wrap: wrap; gap: var(--sv-space-1); margin: 0; }
   .machines-inline .ui-nav-item--sub { width: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); padding-inline: var(--sv-space-3); }
 }
+
+/* Pairing another device, in its own small dialog: the code large and selectable, its time left under it. */
+.pair-device-dialog { display: grid; justify-items: start; gap: var(--sv-space-3); }
+.pair-device-dialog p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.pair-device-expiry { font-variant-numeric: tabular-nums; }
+/* This computer's own machine, marked in the list. */
+.machine-nav-local { flex: none; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1.125rem; }
