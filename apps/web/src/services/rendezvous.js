@@ -44,7 +44,7 @@ export function targetAnswers(target, injected = globalThis.window?.__SIDEVOICE_
 /** A conversation, a call, a setting the node applies, this device's own pairing, the model catalogue it serves:
  *  everything the node owns, and every one of them with this device's token. */
 export function isNodePath(path) {
-    return /^\/api\/(?:presentation|device|models)(?:[/?]|$)/.test(path);
+    return /^\/api\/(?:presentation|device|models|host)(?:[/?]|$)/.test(path);
 }
 /** The address of one request. `null` when it belongs to a node and this page has none to ask. */
 export function routeUrl(path, target, nodeBase) {

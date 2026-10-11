@@ -10,6 +10,8 @@ import { callTranslator, type CallTranslate } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
 import { headerConversations, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
+import { actionableHostFingerprints } from "../../services/host-agents";
+import { hostTranslator } from "../settings/host-i18n";
 
 /* The mark, the conversation on the stage, and the secondary actions behind ⋯. On a phone the brand gives its room
  * to the other conversations: two of them at most beside the title — those waiting for you, then those working —
@@ -82,14 +84,31 @@ function returnFocus(event: SyntheticEvent<HTMLDetailsElement>) {
   if (!menu.open && (!now || now === document.body || menu.contains(now))) menu.querySelector("summary")?.focus();
 }
 
+/** The paired machines with agents waiting to be connected: the menu shows a dot, and Settings opens at their agents. */
+function usePendingAgentHosts() {
+  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
+  const pairings = useRoomStore((state) => state.facts.pairings);
+  const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
+  return actionableHostFingerprints(hostAgents, active);
+}
+
 function HeaderMenu({ t }: { t: CallTranslate }) {
   const menu = useRef<HTMLDetailsElement>(null);
+  const hosts = hostTranslator();
+  const pending = usePendingAgentHosts();
+  const notice = pending.length > 0;
   return (
     <details id="call-menu" className="call-menu header-menu" ref={menu} onToggle={returnFocus}>
-      <summary aria-label={t("header.menu")} title={t("header.menu")}><MoreIcon size={20} /></summary>
+      <summary aria-label={notice ? hosts("agents.gear.pending") : t("header.menu")} title={notice ? hosts("agents.gear.pending") : t("header.menu")}>
+        <MoreIcon size={20} />{notice && <span className="settings-notice-dot" aria-hidden="true" />}
+      </summary>
       <div className="header-menu-panel" onClick={() => { if (menu.current) menu.current.open = false; }}>
         <Button id="stats-open" variant="ghost" size="compact">{t("header.stats")}</Button>
-        <Button id="settings-open" variant="ghost" size="compact">{t("header.settings")}</Button>
+        {/* The runtime opens the dialog from this button; with agents waiting it opens at theirs. */}
+        <Button id="settings-open" variant="ghost" size="compact"
+          onClick={() => { if (notice) window.sidevoiceActions?.openAgentSettings?.(pending.length === 1 ? pending[0] : null); }}>
+          {t("header.settings")}{notice && <span className="settings-notice-dot" aria-hidden="true" />}
+        </Button>
       </div>
     </details>
   );

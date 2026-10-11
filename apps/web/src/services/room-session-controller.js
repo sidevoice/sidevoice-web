@@ -2,6 +2,7 @@ import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
+import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {failureCode} from './failure-code.js';
@@ -94,11 +95,12 @@ function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSu
 function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
 function keepPairings(next){
  const keepUnavailableLocal=localHostSelected&&!localPairing&&next.inUse===pairings.inUse;
- const projected=projectPairings(next,localPairing);
+ const previous=pairings,projected=projectPairings(next,localPairing);
  if(keepUnavailableLocal)projected.inUse=pairings.inUse;
  const moved=projected.inUse!==pairings.inUse;
  localHostSelected=localPairing?projected.inUse===localPairing.fp:localHostSelected&&projected.inUse===pairings.inUse;
  pairings=projected;storedPairingState.inUse=projected.inUse;storedPairingState.list=projected.list.filter(p=>!p.local);
+ discardChangedHostAgents(previous,projected);
  persistPairingProjection()
 }
 function setLocalPairing(value){
@@ -117,11 +119,12 @@ function setLocalPairing(value){
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
  storedPairingState.inUse=projected.inUse;
+ discardChangedHostAgents(previous,projected);
  persistPairingProjection();
  // An unreachable report invalidates the app-owned per-launch proxy immediately. Never keep its URL or
  // session secret around to be reused after native starts a new core.
  if(wasSelected&&!next)settleBase(null,'away',null);
- else if(next&&localHostSelected)void locate({move:true,fresh:true});
+ else if(next){hostAgentBases.set(next.fp,next.urls[0]);if(localHostSelected)void locate({move:true,fresh:true})}
  // A stale code pairing for the same fingerprint is removed from storage, then revoked at an address which
  // proves itself as that host. The app-owned local pairing always remains the one in the machine list.
  for(const pairing of duplicates)void revokePairingCopy(pairing);
@@ -454,7 +457,8 @@ function refreshMachines(){roomStore.patch({machinesAt:Date.now()});void locate(
  * proved itself is trusted for a few minutes. A call in progress is never moved by it
  * — changing machine is a hang-up, and the person's to make. A reconnecting call (`hold`) keeps the address it
  * had while that one's proof is recent: the machine may be restarting, and the socket is the better probe. */
-const verified=new Map();
+const verified=new Map(),hostAgentBases=new Map();
+let settingsAgentRequestId=0;
 let locateAsked=0,locateApplied=0,targetAbout=null,reachFailure='',doubted=null;
 async function locate({move=!(state.ws||state.connecting||state.reconnecting),fresh=false,hold=false}={}){
  if(!move)return;
@@ -486,7 +490,7 @@ async function locate({move=!(state.ws||state.connecting||state.reconnecting),fr
  locateApplied=asked;
  // The page follows the build of whoever serves it: a room serving this page says which.
  if(target===''&&targetAbout?.kind==='room')followServedBuild(targetAbout.build);
- if(found){verified.set(found.base,Date.now());setRemoteHostStatus(pairing.fp,'connected');if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
+ if(found){verified.set(found.base,Date.now());hostAgentBases.set(pairing.fp,found.base);setRemoteHostStatus(pairing.fp,'connected');if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
  if(hold&&state.node===pairing.fp&&recent(nodeBase))return;
  setRemoteHostStatus(pairing.fp,'offline');
  settleBase(null,reach,pairing);
@@ -528,6 +532,7 @@ async function pairDevice(code,name){
  }
  const inCall=!!(state.ws||state.connecting||state.reconnecting),use=!inCall||pairings.inUse===pairing.fp;
  keepPairings(withPairing(pairings,pairing,{use}));
+ void hostAgentsController.load(pairing.fp);
  verified.set(base.base,Date.now());
  if(use&&!inCall)settleBase(base,'ok',pairing);
  closePairing();
@@ -556,6 +561,60 @@ async function localHostApi(path,options={}){
  const response=await fetch(pairing.urls[0]+path,withToken({...options,redirect:'error'},pairing.token));
  if(!response.ok)throw Error('local-host-request-failed');
  return response;
+}
+async function hostApi(fp,path,options={}){
+ const pairing=pairings.list.find(item=>item.fp===fp);
+ if(!pairing||pairing.revoked)throw Object.assign(Error('unreachable'),{key:'unreachable'});
+ let base=pairing.local?pairing.urls[0]:hostAgentBases.get(fp);
+ if(base==null||!pairing.local&&Date.now()-(verified.get(base)||0)>=VERIFIED_FOR_MS){
+  if(pairing.local)base=pairing.urls[0];
+  else{
+   let place=null;
+   try{place=await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch})}catch{}
+   if(!place)throw Object.assign(Error('unreachable'),{key:'unreachable'});
+   base=place.base;verified.set(base,Date.now());hostAgentBases.set(fp,base);setRemoteHostStatus(fp,'connected');
+  }
+ }
+ // The page's own origin is a valid, empty prefix. Keep it distinct from a missing base so a node
+ // served by this page can be proved and its authenticated API can use root-relative paths.
+ if(typeof base!=='string')throw Object.assign(Error('unreachable'),{key:'unreachable'});
+ const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),23000);
+ let response;
+ try{response=await fetch(base+path,withToken({...options,signal:abort.signal,redirect:'error'},pairing.token))}
+ catch(error){throw Object.assign(Error('unreachable'),{key:error?.name==='AbortError'?'timeout':'unreachable'})}
+ finally{clearTimeout(timer)}
+ let data=null;
+ try{data=await response.json()}catch{}
+ if(response.status===401){pairingRefused(fp);throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ if(!response.ok){
+  const failure=data?.error&&typeof data.error==='object'?data.error:data;
+  const key=typeof failure?.key==='string'&&/^[a-z0-9._-]+$/.test(failure.key)?failure.key:response.status===503?'no-connector':'request-failed';
+  const params=failure?.params&&typeof failure.params==='object'?Object.fromEntries(Object.entries(failure.params).filter(([,value])=>typeof value==='string'||typeof value==='number'&&Number.isFinite(value))):undefined;
+  throw Object.assign(Error(key),{key,params});
+ }
+ return data;
+}
+function hostAgentState(fp){return state.hostAgents[fp]}
+function setHostAgentState(fp,next){roomStore.patch({hostAgents:{...state.hostAgents,[fp]:next}})}
+const hostAgentsController=createHostAgentsController({request:hostApi,
+ hasHost:fp=>pairings.list.some(pairing=>pairing.fp===fp&&!pairing.revoked),getState:hostAgentState,setState:setHostAgentState,
+ removeState:fp=>{const next={...state.hostAgents};delete next[fp];roomStore.patch({hostAgents:next})}});
+function discardHostAgents(fp){
+ hostAgentsController.invalidate(fp);
+ hostAgentBases.delete(fp);
+}
+function discardChangedHostAgents(previous,next){
+ for(const old of previous.list){
+  const current=next.list.find(pairing=>pairing.fp===old.fp);
+  if(!current||current.revoked||current.token!==old.token)discardHostAgents(old.fp);
+ }
+}
+function scanPairedAgents(rescan=false){
+ for(const pairing of pairings.list)if(!pairing.revoked)void hostAgentsController.load(pairing.fp,{rescan});
+}
+function openAgentSettings(fp){
+ settingsSection('machines');
+ roomStore.patch({settingsAgentRequest:{fp,id:++settingsAgentRequestId}});
 }
 async function localHostDevices(){
  const data=await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json();
@@ -1247,6 +1306,8 @@ async function saveProviderKey(provider,key){
 roomStore.patch({voiceSettings:readVoiceSettings(pageStorage(),state.speechLanguage)});
 
 $('settings-open').onclick=()=>{try{
+ // Every opening reads each paired machine's agents again.
+ scanPairedAgents(true);
  if(nodeBase==null)settingsSection('machines');
  roomStore.patch({voiceDraft:state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
@@ -1302,6 +1363,9 @@ window.sidevoiceActions={
   }
   await refresh();await refreshPeople();await refreshHistory()
  },
+ loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
+ hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
+ openAgentSettings,
  // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
  // away, inside the person's own tap. The choice is this device's, kept for next time.
  chooseMachine(id){
@@ -1395,6 +1459,7 @@ window.addEventListener('beforeunload',()=>{keepTicket(true);state.ws?.close();v
 window.roomI18n?.setLanguage(devicePreferences().ui_language);
 function startInitialLocate(){
  publishPairings();
+ scanPairedAgents();
  void locate().finally(()=>window.roomI18n?.setLanguage(devicePreferences().ui_language));
 }
 // A normal browser has no native projection to wait for, so keep its existing first locate timing. The desktop

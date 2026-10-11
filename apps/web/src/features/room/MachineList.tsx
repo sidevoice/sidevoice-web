@@ -7,6 +7,8 @@ import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator } from "../settings/host-i18n";
+import { HostAgentsPanel } from "../settings/HostAgentsPanel";
+import { actionableAgent } from "../../services/host-agents";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -18,13 +20,23 @@ function dateText(value: string | number | null | undefined) {
 export function MachineList() {
   const t = hostTranslator();
   const machines = useRoomStore((state) => state.machines);
+  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
+  const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<"status" | "devices" | "agents">("status");
   const localMachine = machines.find((machine) => machine.local) ?? null;
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
-  const selectedMachine = selected ? machines.find((machine) => machine.id === selected && machine.local) ?? null : null;
+  const selectedMachine = selected ? machines.find((machine) => machine.id === selected) ?? null : null;
 
-  if (selectedMachine && localMachine) return <HostDetail machine={selectedMachine} onBack={() => setSelected(null)} />;
+  useEffect(() => {
+    if (!agentRequest) return;
+    if (!agentRequest.fp) { setSelected(null);return; }
+    const machine = machines.find((entry) => entry.pairingId === agentRequest.fp);
+    if (machine) { setSelected(machine.id);setSelectedTab("agents"); }
+  }, [agentRequest, machines]);
+
+  if (selectedMachine) return <HostDetail machine={selectedMachine} initialTab={selectedTab} onBack={() => setSelected(null)} />;
 
   return (
     <div className="machines" id="machines">
@@ -33,24 +45,28 @@ export function MachineList() {
       <div className="machine-list">
         {machines.map((machine) => {
           const machineName = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
+          const notice = !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
+            hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
           const subtitle = machine.local
             ? machine.selectable && status.reachable === true ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
             : machine.state === "checking" ? t("hosts.checking")
               : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
               ? t("hosts.remoteNoResponse") : t("hosts.connected");
           return (
-            <div className="machine-row" key={machine.id} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined}>
+            <div className="machine-row" key={machine.id} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined} data-agent-notice={notice || undefined}>
               <div className="machine-summary">
                 <span className="machine-state" data-state={machine.state} aria-hidden="true"><span className="dot" /></span>
                 <span className="machine-copy">
-                  <span className="machine-name">{machineName}</span>
+                  <span className="machine-name">{machineName}{notice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</span>
                   <span className="machine-brief muted">{[machine.inUse ? t("hosts.inUse") : "", subtitle].filter(Boolean).join(" · ")}</span>
                 </span>
                 <span className="machine-actions">
                   {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
                     onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.use", { machine: machineName })}</Button>}
                   {machine.local && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
-                    onClick={() => setSelected(machine.id)}>{t("hosts.open", { machine: machineName })}</Button>}
+                    onClick={() => {setSelectedTab("status");setSelected(machine.id)}}>{t("hosts.open", { machine: machineName })}</Button>}
+                  {!!machine.pairingId && <Button variant="ghost" size="compact" className="machine-action host-agent-tab-label" aria-label={t("agents.review", { machine: machineName })}
+                    onClick={() => {setSelectedTab("agents");setSelected(machine.id)}}>{t("agents.tab")}{notice && <span className="host-agent-dot" aria-label={t("agents.notice")} />}</Button>}
                 </span>
               </div>
             </div>
@@ -65,21 +81,29 @@ export function MachineList() {
   );
 }
 
-function HostDetail({ machine, onBack }: { machine: MachineView; onBack: () => void }) {
+function HostDetail({ machine, initialTab, onBack }: { machine: MachineView; initialTab: "status" | "devices" | "agents"; onBack: () => void }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
-  const [tab, setTab] = useState<"status" | "devices">("status");
+  const hostAgents = useRoomStore((state) => machine.pairingId ? state.facts.hostAgents[machine.pairingId] : undefined);
+  const notice = hostAgents?.status === "ready" && hostAgents.value?.agents.some(actionableAgent) === true;
+  const [tab, setTab] = useState<"status" | "devices" | "agents">(initialTab);
+  useEffect(() => { setTab(initialTab); }, [initialTab, machine.id]);
+  const tabs = machine.local ? ["status", "devices", "agents"] as const : ["agents"] as const;
   return (
     <section className="host-detail" aria-labelledby="host-detail-title">
       <Button variant="ghost" size="compact" onClick={onBack}>{t("hosts.pageBack")}</Button>
       <header className="host-detail-header">
-        <div><h3 id="host-detail-title">{machine.host || t("hosts.unnamed")}</h3><p className="muted">{t("hosts.thisComputer")}</p></div>
+        <div><h3 id="host-detail-title">{machine.host || t("hosts.unnamed")}{notice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</h3><p className="muted">{machine.local ? t("hosts.thisComputer") : machine.state === "checking" ? t("hosts.checking")
+          : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed" ? t("hosts.remoteNoResponse") : t("hosts.connected")}</p></div>
       </header>
       <div className="host-tabs" role="tablist" aria-label={t("hosts.title")}>
-        <Button variant="ghost" role="tab" aria-selected={tab === "status"} onClick={() => setTab("status")}>{t("hosts.tab.status")}</Button>
-        <Button variant="ghost" role="tab" aria-selected={tab === "devices"} onClick={() => setTab("devices")}>{t("hosts.tab.devices")}</Button>
+        {tabs.map((name) => <Button key={name} variant="ghost" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>
+          <span className="host-agent-tab-label">{t(name === "agents" ? "agents.tab" : `hosts.tab.${name}` as "hosts.tab.status" | "hosts.tab.devices")}{name === "agents" && notice && <span className="host-agent-dot" aria-label={t("agents.notice")} />}</span>
+        </Button>)}
       </div>
-      {tab === "status" ? <LocalHostStatusPanel status={status} /> : <LocalHostDevicesPanel machine={machine} />}
+      {tab === "agents" ? <HostAgentsPanel fp={machine.pairingId ?? null} />
+        : tab === "status" && machine.local ? <LocalHostStatusPanel status={status} />
+          : machine.local ? <LocalHostDevicesPanel machine={machine} /> : null}
     </section>
   );
 }

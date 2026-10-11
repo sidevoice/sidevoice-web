@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
+ const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -652,8 +652,8 @@ test('The native local pairing is projected before selection validation and uses
  assert.equal(snapshot.facts.nodeReach,'ok');
  assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
  assert.equal(JSON.stringify(snapshot.machines.map(machine=>[machine.id,machine.local])),JSON.stringify([['local-host',true],[PAIRED.fp,false]]));
- assert.equal(asked.some(([url])=>url.includes('/api/device/identity?nonce=')),false,'native already verified the identity over its local socket');
- assert.ok(asked.every(([url])=>url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy');
+ assert.equal(asked.some(([url])=>url.startsWith('http://127.0.0.1:43127/')&&url.includes('/api/device/identity?nonce=')),false,'native already verified the local identity over its peer-checked socket');
+ assert.ok(asked.every(([url,options])=>!options.headers?.Authorization||url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy; other paired hosts may receive unauthenticated identity probes');
  const saved=JSON.parse(s.saved['sidevoice.pairings']);
  assert.equal(saved.in_use,'fp-local');
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
@@ -798,6 +798,7 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  const mac=await fakeNode('macbook'),pc=await fakeNode('linux'),squatter=await fakeNode('squatter');
  const s=setup({stored:{in_use:mac.fp,pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
  const net=network({at:{'':mac,'http://10.0.0.9:8768':squatter}});s.context.fetch=net.get;
+ s.run(`roomStore.patch({hostAgents:{[${JSON.stringify(mac.fp)}]:{status:'ready',value:{agents:[{id:'codex',present:true,registration:'not-connected',actionable:true}],scanned_at:1},error:null,busy:{},actionErrors:{}}}})`);
  // The one in use, at the address that proved itself a moment ago.
  await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(mac.fp)})`);
  const revoke=net.asked.find(r=>r.method==='DELETE');
@@ -806,6 +807,7 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  assert.deepEqual(stored(s).pairings.map(p=>p.fp),[pc.fp]);
  assert.equal(stored(s).in_use,pc.fp,'the one left is the one in use');
  assert.equal(s.run('roomStore.getState().machines.length'),1);
+ assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(mac.fp)}]`),undefined,'forgetting a host clears its connector state');
  // The other one's only address answers as somebody else: forgotten here, and its token sent nowhere.
  net.asked.length=0;
  await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(pc.fp)})`);
@@ -1340,4 +1342,32 @@ test('Storage the browser refuses is found once at start and said on top',async(
  assert.equal(s.run('roomStore.getState().facts.storageBlocked'),false,'a browser that keeps site data');
  const probe=await s.run('probeSiteStorage')({localStorage:()=>{throw {name:'SecurityError',code:18}},indexedDB:null,storage:null});
  assert.deepEqual(plain(probe),{blocked:true,refused:[{store:'localStorage',code:'SecurityError'}]});
+});
+
+test('the Agents API accepts and reuses a proved same-origin empty base',async()=>{
+ const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
+ const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];
+ s.context.location.origin='http://127.0.0.1:8768';
+ s.context.fetch=async(url,init={})=>{
+  if(String(url).startsWith('/api/host/agents')){
+   agentRequests.push({url:String(url),init});
+   return {ok:true,status:200,json:async()=>({agents:[],scanned_at:1})};
+  }
+  return net.get(String(url),init);
+ };
+
+ await s.run('locate({move:true,fresh:true})');
+ assert.equal(s.run(`hostAgentBases.get(${JSON.stringify(node.fp)})`),'','rendezvous identifies the page origin as the paired host');
+ const identityProofs=net.asked.filter(request=>request.url.includes('/api/device/identity?nonce=')).length;
+
+ await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
+ await s.run(`window.sidevoiceActions.loadHostAgents(${JSON.stringify(node.fp)},{rescan:true})`);
+
+ assert.equal(agentRequests.length,2,'each scan reaches the node through its authenticated same-origin API');
+ assert.deepEqual(agentRequests.map(request=>request.url),['/api/host/agents?rescan=1','/api/host/agents?rescan=1']);
+ assert.ok(agentRequests.every(request=>request.init.headers.Authorization==='Bearer tok-1'));
+ const identities=net.asked.filter(request=>request.url.includes('/api/device/identity?nonce='));
+ assert.equal(identities.length,identityProofs,'both scans reuse the previously proved empty base');
+ assert.ok(identities.every(request=>request.auth===null),'identity proof remains unauthenticated');
+ assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
 });

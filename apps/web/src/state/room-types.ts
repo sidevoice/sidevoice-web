@@ -91,6 +91,43 @@ export interface MachineView {
   pairedLabel: string;
 }
 
+/** A host's view of one supported coding agent. Instructions always come from that host's connector. */
+export interface DetectedAgent {
+  id: string;
+  label: string;
+  present: boolean;
+  version: string | null;
+  registration: "connected" | "not-connected" | "foreign" | "unknown";
+  connect: "auto" | "manual";
+  dismissed?: boolean;
+  actionable?: boolean;
+  instructions?: { command?: string; snippet?: string; file?: string | null } | null;
+}
+
+export interface HostAgentsListing {
+  agents: DetectedAgent[];
+  scanned_at: string | number;
+  custom?: { command: string; snippet: string; version?: string | null } | null;
+}
+
+export interface HostAgentError {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
+export interface HostAgentsState {
+  status: "idle" | "loading" | "ready" | "failed";
+  value: HostAgentsListing | null;
+  error: HostAgentError | null;
+  busy: Record<string, "connect" | "disconnect" | "dismiss">;
+  actionErrors: Record<string, { key: string; params?: Record<string, string | number> }>;
+}
+
+export interface SettingsAgentRequest {
+  fp: string | null;
+  id: number;
+}
+
 export interface HostDeviceView {
   device_id: string;
   name?: string | null;
@@ -137,6 +174,12 @@ export interface SidevoiceActions {
   pairDevice(code: string, name: string): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
+  /** Read a paired machine's host-owned coding agent state. */
+  loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
+  /** Connect, disconnect, or dismiss an agent on the identified machine. */
+  hostAgentAction?(fp: string, id: string, action: "connect" | "disconnect" | "dismiss"): Promise<void>;
+  /** Open Settings → Machines at that machine's agents (all machines when null). */
+  openAgentSettings?(fp: string | null): void;
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;
