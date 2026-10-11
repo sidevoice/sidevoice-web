@@ -255,14 +255,16 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
     if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.start"), variant: "primary" });
   } else if (status.state === "stopped-by-person") {
     if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start"), variant: "primary" });
-  } else if (status.state === "backoff" || status.state === "failed") {
+  } else if (status.state === "backoff") {
     if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
-  } else if (status.state === "service-failed") {
+  } else if (status.state === "failed" || status.state === "service-failed") {
     if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.reinstall"), variant: "secondary" });
   } else if (status.state === "refused") {
     if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect"), variant: "primary" });
   }
+  // Any failure has the repair path too, whatever the system's service says of itself: reinstalling.
+  if (["failed", "service-failed", "refused", "incompatible"].includes(status.state) && hasMethod("serviceInstall"))
+    buttons.push({ action: "serviceInstall", label: t("hosts.reinstall"), variant: "secondary" });
   const installed = status.installed ?? (status.service !== "none" && status.service !== undefined);
   const loginAction: LocalHostAction | null = status.state === "absent" || (!installed && status.state === "not-installed") ? null
     : installed ? hasMethod("serviceUninstall") ? "serviceUninstall" : null
@@ -272,7 +274,8 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
     setBusy(action);setNote("");
     try { await runLocalHostAction(action);if (action === "stop") setConfirmStop(false); }
     catch { setNote(t("hosts.actionFailed")); }
-    finally { setBusy(null); }
+    // Its buttons change with the state: the focus goes back to the card's title rather than to the page.
+    finally { setBusy(null); requestAnimationFrame(() => document.getElementById(titleId)?.focus()); }
   }
   const bridge = localHostBridge();
   const canSetLogin = typeof bridge?.setStartAtLogin === "function";
@@ -293,7 +296,7 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
-        <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
+        <h4 id={titleId} tabIndex={-1}>{t("hosts.serviceOn", { machine: name })}</h4>
         <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
@@ -323,7 +326,7 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
       {confirmStop ? <div className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
           <p>{t("hosts.stopConfirm")}</p>
           <span className="host-action-list">
-            <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={!!busy} onClick={() => setConfirmStop(false)}>{t("hosts.cancel")}</Button>
+            <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={!!busy} onClick={() => { setConfirmStop(false); requestAnimationFrame(() => document.getElementById(titleId)?.focus()); }}>{t("hosts.cancel")}</Button>
             <Button variant="danger" size="sm" loading={busy === "stop"} onClick={() => void run("stop")}>{t("hosts.stop")}</Button>
           </span>
         </div>

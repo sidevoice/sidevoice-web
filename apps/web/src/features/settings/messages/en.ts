@@ -547,6 +547,7 @@ export const en = {
   "settings.advanced.deleteAllConfirm": "Delete {count} models not in use and free {size}? Each downloads again if you choose it.",
   "settings.advanced.deleteAllYes": "Delete {count} models",
   "settings.advanced.deleteAllPartial": "Deleted {done} of {count}. {model} is running right now; try again after the call.",
+  "settings.advanced.deleteAllFailed": "Deleted {done} of {count}. {model} couldn’t be deleted: {reason}",
   "settings.advanced.deleteUnusedNow": "This deletes {count} models now and frees {size}. After that, it happens on its own.",
   "settings.advanced.deleteUnusedNowOne": "This deletes 1 model now and frees {size}. After that, it happens on its own.",
   "settings.advanced.deleteUnusedYes": "Delete and turn on",

@@ -549,6 +549,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "settings.advanced.deleteAllConfirm": "¿Borrar {count} modelos sin usar y liberar {size}? Cada uno se descarga de nuevo si lo eliges.",
   "settings.advanced.deleteAllYes": "Borrar {count} modelos",
   "settings.advanced.deleteAllPartial": "Borrados {done} de {count}. {model} está en marcha ahora; prueba de nuevo tras la llamada.",
+  "settings.advanced.deleteAllFailed": "Borrados {done} de {count}. {model} no se pudo borrar: {reason}",
   "settings.advanced.deleteUnusedNow": "Esto borra {count} modelos ahora y libera {size}. Después, ocurre solo.",
   "settings.advanced.deleteUnusedNowOne": "Esto borra 1 modelo ahora y libera {size}. Después, ocurre solo.",
   "settings.advanced.deleteUnusedYes": "Borrar y activar",
