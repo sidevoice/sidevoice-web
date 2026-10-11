@@ -100,6 +100,7 @@ test("dialog: Connect opens a small dialog with its field focused; Test and save
   expect(card("openai")).toHaveAttribute("data-state", "connected");
   expect(card("openai").querySelector(".provider-card-masked")).toHaveTextContent("••••7f3a");
   expect(within(card("openai")).getByRole("status")).toHaveTextContent("OpenAI connected.");
+  await settle();
   expect(document.activeElement).toBe(within(card("openai")).getByRole("button", { name: "More for OpenAI" }));
 });
 
@@ -124,13 +125,14 @@ test("dialog: while the provider is asked nothing calls it off — the field is 
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-test("dialog: Escape (the dialog's cancel) closes it and gives the focus back to Connect", () => {
+test("dialog: Escape (the dialog's cancel) closes it and gives the focus back to Connect", async () => {
   renderKeys();
   const connect = screen.getByRole("button", { name: "Connect OpenAI" });
   connect.focus();
   fireEvent.click(connect);
   fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
   expect(screen.queryByRole("dialog")).toBeNull();
+  await settle();
   expect(document.activeElement).toBe(connect);
 });
 
@@ -195,6 +197,7 @@ test("dialog: the menu replaces the key (naming the one it replaces) and removes
   expect(document.activeElement).toBe(within(replace).getByLabelText("API key"));
   fireEvent.click(within(replace).getByRole("button", { name: "Cancel" }));
   expect(screen.queryByRole("dialog")).toBeNull();
+  await settle();
   expect(document.activeElement).toBe(within(card("elevenlabs")).getByRole("button", { name: "More for ElevenLabs" }));
 
   await chooseFromMenu("elevenlabs", "ElevenLabs", "Remove");
@@ -229,6 +232,7 @@ test("row: Connect turns the card's line and button into one row — the key's b
   // Escape stays in the row: Settings, the dialog around it, isn't closed by it.
   expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(false);
   expect(within(card("openai")).queryByRole("group", { name: "Connect OpenAI" })).toBeNull();
+  await settle();
   expect(document.activeElement).toBe(within(card("openai")).getByRole("button", { name: "Connect OpenAI" }));
 
   fireEvent.click(within(card("openai")).getByRole("button", { name: "Connect OpenAI" }));
@@ -242,6 +246,7 @@ test("row: Connect turns the card's line and button into one row — the key's b
   await act(async () => { fireEvent.click(within(card("openai")).getByRole("button", { name: "Test and save" })); });
   expect(card("openai")).toHaveAttribute("data-state", "connected");
   expect(card("openai").querySelector(".provider-card-purpose")).toHaveTextContent("Transcription and voices");
+  await settle();
   expect(document.activeElement).toBe(within(card("openai")).getByRole("button", { name: "More for OpenAI" }));
 });
 
@@ -265,6 +270,7 @@ test("row: while the provider is asked the row stays — × off, Escape kept —
   expect(document.activeElement).toBe(within(question).getByRole("button", { name: "Cancel" }));
   await act(async () => { fireEvent.click(within(question).getByRole("button", { name: "Remove" })); });
   expect(actions.saveProviderKey).toHaveBeenCalledWith("elevenlabs", null);
+  await settle();
   expect(document.activeElement).toBe(within(card("elevenlabs")).getByRole("button", { name: "Connect ElevenLabs" }));
 });
 
@@ -300,6 +306,7 @@ test("popover: Connect opens a popover by it; while the provider is asked, Escap
   // Not testing: Escape closes it, and the menu has the focus back.
   fireEvent.keyDown(within(replace).getByLabelText("API key"), { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
+  await settle();
   expect(document.activeElement).toBe(within(card("elevenlabs")).getByRole("button", { name: "More for ElevenLabs" }));
 });
 

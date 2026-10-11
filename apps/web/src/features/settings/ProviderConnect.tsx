@@ -327,15 +327,19 @@ export function openerState(variant: ProviderConnect, open: boolean) {
 }
 
 /** Focus back on what opened something once it has closed — the opener as it is drawn then (`target`) — unless focus
- *  went somewhere else meanwhile (a click outside a popover): only when what had it is gone. */
+ *  went somewhere else meanwhile (a click outside a popover): only when what had it is gone. Looked at on the next
+ *  tick: a popover leaves the page a render after it closes. */
 export function useFocusBack(target: () => HTMLElement | null) {
   const [asked, setAsked] = useState(0);
   const to = useRef(target);
   to.current = target;
   useEffect(() => {
     if (!asked) return;
-    const active = document.activeElement;
-    if (!active || active === document.body) to.current()?.focus();
+    const timer = window.setTimeout(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body) to.current()?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [asked]);
   return () => setAsked((count) => count + 1);
 }
