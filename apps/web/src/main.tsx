@@ -7,6 +7,7 @@ import "./styles/tokens.css";
 import "./styles/room.css";
 import "./styles/react.css";
 import "./styles/call.css";
+import "./styles/bichos.css";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.

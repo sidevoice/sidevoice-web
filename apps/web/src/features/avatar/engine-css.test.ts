@@ -36,3 +36,10 @@ test("styles/bichos.css is the engine's, as scripts/sync-bichos.mjs last wrote i
   expect(file).toContain(`${BICHOS_SCOPE}[data-unread] .bang`);
   expect(file).toContain(".backdrop .bd-mount { display: none }");
 });
+
+test("the stylesheet loads after the app's own avatar rules, and nothing of an avatar moves under reduced motion", () => {
+  const main = readFileSync(resolve(process.cwd(), "src/main.tsx"), "utf8");
+  expect(main.indexOf('"./styles/bichos.css"')).toBeGreaterThan(main.indexOf('"./styles/call.css"'));
+  const call = readFileSync(resolve(process.cwd(), "src/styles/call.css"), "utf8");
+  expect(call).toMatch(/\.sv-avatar\[data-style=bichos\] \{ --bx-sv:var\(--sv-primary\);--bx-sv-face:var\(--sv-on-primary\)/);
+});

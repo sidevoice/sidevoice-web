@@ -4,11 +4,13 @@ import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { avatarFor, avatarTone, PERSON_AVATAR } from "../avatar/avatar-spec";
+import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
+import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
-import { callTranslator, type CallTranslate } from "./call-i18n";
-import { personMood } from "./conversation-state";
+import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
+import { moodText, personMood } from "./conversation-state";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 
@@ -16,7 +18,10 @@ import { useStageConversation } from "./stage-view";
  * a time as the voice reaches it, the spoken words lit and the chunk before kept dim above. Between turns its
  * activity stands where the bubble was. The person is the picture-in-picture in the corner, with a bubble of their
  * own while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button
- * away (TranscriptPanel). */
+ * away (TranscriptPanel).
+ *
+ * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
+ * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
 
 /** The reply sounding now. Until its row says so the voice may already be playing it: then it is the oldest one
  *  waiting, since replies are said in order. */
@@ -75,7 +80,7 @@ function PersonPip({ inCall, speaking, conversation, t }: { inCall: boolean; spe
   }, [speaking]);
   const turn = !!(conversation.pendingText || conversation.pendingPhase);
   return (
-    <div className="stage-pip" data-speaking={speaking || undefined} style={avatarTone(PERSON_AVATAR) as CSSProperties}>
+    <div className="stage-pip" data-speaking={speaking || undefined} style={avatarTone(avatarColor(PERSON_AVATAR)) as CSSProperties}>
       {turn && (
         <div className="speech-bubble pip-bubble" translate="no">
           {conversation.pendingText ? <span>{latestWords(conversation.pendingText)}</span>
@@ -94,9 +99,14 @@ function BootError() {
   return <div id="error" className="stage-error" role="alert" hidden={!error}>{error}</div>;
 }
 
+function posterWords(t: CallTranslate): PosterWords {
+  return { title: t("stage.poster.title"), status: t("stage.poster.status"), fine: [t("stage.poster.fine1"), t("stage.poster.fine2"), t("stage.poster.fine3")] };
+}
+
 export function CallStage() {
   const t = callTranslator();
   const stage = useStageConversation();
+  const sceneRef = useSceneScale();
   const conversation = useRoomStore((state) => state.conversation);
   const userLive = useRoomStore((state) => state.facts.userLive);
   const showConversations = useCallLayout((state) => state.showConversations);
@@ -117,16 +127,22 @@ export function CallStage() {
     );
   }
   const spec = avatarFor(stage.threadId);
+  const tone = avatarColor(spec);
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
-      <div className="stage-tile" data-mood={stage.mood} style={avatarTone(spec) as CSSProperties}>
+      <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} style={avatarTone(tone) as CSSProperties}>
+        <div className="stage-scene">
+          <StageBackdrop seed={stage.threadId} tone={tone} />
+          {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={callLanguage()} />}
+          <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"}
+            mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
+          <StageDesk seed={stage.threadId} />
+        </div>
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
           {stage.mood === "working" && <p className="stage-activity" role="status"><i className="stage-spinner" aria-hidden="true" />{t("stage.working")}</p>}
         </div>
-        <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage"
-          mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agent", { title: stage.title })} />
         <div className="stage-tags">
           {harness && <span className="stage-tag">{stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}{harness}</span>}
         </div>
