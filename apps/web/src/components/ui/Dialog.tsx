@@ -1,4 +1,4 @@
-import { useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
+import { useEffect, useState, type PropsWithChildren, type ReactNode, type RefObject } from "react";
 import { cn } from "../../lib/cn";
 import { Button } from "./Button";
 import { CloseIcon } from "./Icons";
@@ -53,19 +53,27 @@ interface DialogProps extends SurfaceProps {
   layout?: "dialog" | "page";
   size?: "sm" | "md" | "lg";
   className?: string;
+  /** What takes the focus as it opens (the field to type in, a question's Cancel) rather than the first thing in it. */
+  initialFocus?: RefObject<HTMLElement | null>;
 }
 
-export function Dialog({ id, open, layout = "dialog", size = "md", className, onClose, ...surface }: DialogProps) {
+export function Dialog({ id, open, layout = "dialog", size = "md", className, onClose, initialFocus, ...surface }: DialogProps) {
   const [node, setNode] = useState<HTMLDialogElement | null>(null);
   useEffect(() => {
     if (!node) return;
     // Where a browser has no modal dialog (an old engine, a test's DOM), it is shown open all the same.
-    if (open && !node.open) typeof node.showModal === "function" ? node.showModal() : node.setAttribute("open", "");
+    if (open && !node.open) {
+      typeof node.showModal === "function" ? node.showModal() : node.setAttribute("open", "");
+      initialFocus?.current?.focus();
+    }
     if (!open && node.open) typeof node.close === "function" ? node.close() : node.removeAttribute("open");
-  }, [node, open]);
+  }, [node, open]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <dialog ref={setNode} id={id} className={cn("ui-dialog", className)} data-layout={layout} data-size={size} aria-labelledby={surface.titleId}
-      onCancel={(event) => { event.preventDefault(); onClose?.(); }}>
+      onCancel={(event) => { event.preventDefault(); onClose?.(); }}
+      // With no close (a step to finish, something under way that can't be called off), Escape is stopped at the key:
+      // a browser closes a modal anyway after a few cancelled Escapes.
+      onKeyDown={(event) => { if (event.key === "Escape" && !onClose) event.preventDefault(); }}>
       <OverlayPortalProvider container={node}>
         {open && <DialogSurface {...surface} onClose={onClose} />}
       </OverlayPortalProvider>
