@@ -5,9 +5,12 @@ import { useRoomStore } from "../../state/room-store";
 import { currentDeviceName } from "../../state/device-name";
 import { hostTranslator } from "../settings/host-i18n";
 import { ConnectorSteps } from "./ConnectorSteps";
+import { ADDRESS_INSECURE, ADDRESS_INVALID, decodePairingCode } from "../../services/device-pairing.js";
 
 function pairingError(reason: unknown, t: ReturnType<typeof hostTranslator>) {
   const message = reason instanceof Error ? reason.message : String(reason);
+  if (message === ADDRESS_INVALID) return t("pairing.addressInvalid");
+  if (message === ADDRESS_INSECURE) return t("pairing.addressInsecure");
   if (/Pega el código/.test(message)) return t("pairing.empty");
   if (/empieza por|incompleto o dañado/.test(message)) return t("pairing.invalid");
   if (/caduc|expired|already used|already been used/i.test(message)) return t("pairing.expired");
@@ -60,11 +63,24 @@ export function PairingDialog() {
   );
 }
 
-/** The pairing code field and its button: redeems a code the machine issued (`sidevoice pair-device`, or the agent).
- *  Used by the pairing dialog and, inline, by the first-run setup. */
+/** Where a code says its machine is, for the address field to start from: its first address another device could
+ *  reach (not this computer's loopback). Nothing when the code cannot be read yet. */
+function codeAddress(code: string): string {
+  try {
+    return decodePairingCode(code).urls.find((url) => !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/.test(url)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The pairing form: the machine's address and the code it issued (`sidevoice pair-device`, or the agent). Another
+ *  machine is not this one, so the page asks where it is: its address and port, over https. The code fills the
+ *  address in when it carries one. Used by the pairing dialog and, inline, by the first-run setup; this computer's
+ *  own machine pairs by itself and never comes here. */
 export function PairingCodeForm({ idPrefix = "device-pairing", autoFocus = false, rows = 4 }: { idPrefix?: string; autoFocus?: boolean; rows?: number }) {
   const t = hostTranslator();
   const [code, setCode] = useState("");
+  const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const codeField = useRef<HTMLTextAreaElement>(null);
@@ -72,11 +88,11 @@ export function PairingCodeForm({ idPrefix = "device-pairing", autoFocus = false
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || !code.trim()) return;
+    if (busy || !code.trim() || !address.trim()) return;
     setBusy(true);
     setError("");
     try {
-      await window.sidevoiceActions?.pairDevice(code, currentDeviceName((where) => t("pair.deviceName", { where })));
+      await window.sidevoiceActions?.pairDevice(code, currentDeviceName((where) => t("pair.deviceName", { where })), address);
       setCode("");
     } catch (reason) {
       setError(pairingError(reason, t));
@@ -87,12 +103,22 @@ export function PairingCodeForm({ idPrefix = "device-pairing", autoFocus = false
 
   return (
     <form className="pairing-form" onSubmit={submit} aria-busy={busy}>
+      <label>{t("pairing.address")}
+        <input id={`${idPrefix}-address`} type="text" inputMode="url" value={address} placeholder={t("pairing.addressPlaceholder")} required disabled={busy}
+          spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" aria-describedby={`${idPrefix}-address-hint`}
+          onChange={(event) => setAddress(event.currentTarget.value)} />
+        <span id={`${idPrefix}-address-hint`} className="muted pairing-hint">{t("pairing.addressHint")}</span>
+      </label>
       <label>{t("pairing.code")}
         <textarea ref={codeField} id={`${idPrefix}-code`} rows={rows} value={code} placeholder={t("pairing.codePlaceholder")} required disabled={busy}
-          spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" onChange={(event) => setCode(event.currentTarget.value)} />
+          spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" onChange={(event) => {
+            const next = event.currentTarget.value;
+            setCode(next);
+            if (!address.trim()) setAddress(codeAddress(next));
+          }} />
       </label>
       <p id={`${idPrefix}-error`} className="pairing-error" role="alert">{error}</p>
-      <Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pairing.connecting") : t("pairing.connect")}</Button>
+      <Button type="submit" variant="primary" disabled={busy || !code.trim() || !address.trim()}>{busy ? t("pairing.connecting") : t("pairing.connect")}</Button>
     </form>
   );
 }

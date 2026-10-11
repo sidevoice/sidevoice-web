@@ -16,6 +16,7 @@ function dialog(pairDevice: (code: string, name: string) => Promise<unknown>) {
 }
 const code = () => screen.getByRole("textbox", { name: "Pairing code" }) as HTMLTextAreaElement;
 const submit = () => document.querySelector(".pairing-form button[type=submit]") as HTMLButtonElement;
+const address = () => screen.getByRole("textbox", { name: /^Machine address/ }) as HTMLInputElement;
 
 test("it opens when asked with remote setup guidance before the code, and no device name field", () => {
   const { store, element } = dialog(vi.fn());
@@ -35,9 +36,10 @@ test("a code is redeemed without asking for a device name, and the dialog closes
   const pairDevice = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
   const { store, element } = dialog(pairDevice);
   act(() => { store.patch({ pairingOpen: true }); });
+  fireEvent.change(address(), { target: { value: "192.168.1.20:8765" } });
   fireEvent.change(code(), { target: { value: "SV1.abc" } });
   await act(async () => { fireEvent.submit(submit().form!); });
-  expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Kitchen iPad");
+  expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Kitchen iPad", "192.168.1.20:8765");
   expect(submit().textContent).toBe("Connecting…");
   expect(submit().disabled).toBe(true);
   expect(code().disabled).toBe(true);
@@ -58,9 +60,10 @@ test("the default pairing name follows the English UI language", async () => {
     const pairDevice = vi.fn().mockResolvedValue({ host: "Mac" });
     const { store } = dialog(pairDevice);
     act(() => { store.patch({ pairingOpen: true }); });
+    fireEvent.change(address(), { target: { value: "mac.example" } });
     fireEvent.change(code(), { target: { value: "SV1.abc" } });
     await act(async () => { fireEvent.submit(submit().form!); });
-    expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Sidevoice on iPhone");
+    expect(pairDevice).toHaveBeenCalledWith("SV1.abc", "Sidevoice on iPhone", "mac.example");
   } finally {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: previousName });
     if (previousHost) window.__sidevoiceDesktop = previousHost;
@@ -72,10 +75,12 @@ test("a code that does not work says why in an alert, and keeps what was pasted 
   const pairDevice = vi.fn().mockRejectedValue(new Error("Este código ya caducó: duran 10 minutos. Pide uno nuevo."));
   const { store, element } = dialog(pairDevice);
   act(() => { store.patch({ pairingOpen: true }); });
+  fireEvent.change(address(), { target: { value: "192.168.1.20:8765" } });
   fireEvent.change(code(), { target: { value: "SV1.old" } });
   await act(async () => { fireEvent.submit(submit().form!); });
   expect(screen.getByRole("alert")).toHaveTextContent("This code has expired or was already used. Ask the machine for a new code.");
   expect(code().value).toBe("SV1.old");
+  expect(address().value).toBe("192.168.1.20:8765");
   expect(submit().disabled).toBe(false);
   expect(element().open).toBe(true);
 });
@@ -86,4 +91,18 @@ test("closing it tells the page, which keeps working without a machine", async (
   await act(async () => { screen.getByRole("button", { name: "Close pairing" }).click(); });
   expect(closePairing).toHaveBeenCalled();
   expect(store.getState().pairing.open).toBe(false);
+});
+
+test("another machine is asked for by its address: the code fills it in when it carries one, and a plain http one is refused", async () => {
+  const payload = { v: 1, fp: "A".repeat(43), host: "nuc", urls: ["http://127.0.0.1:8765", "https://nuc.example:8765"], rv: null, secret: "s3cret", exp: 4_000_000_000 };
+  const pasted = "SV1." + Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const pairDevice = vi.fn().mockRejectedValue(new Error("address-insecure"));
+  const { store } = dialog(pairDevice);
+  act(() => { store.patch({ pairingOpen: true }); });
+  expect(submit().disabled).toBe(true);
+  fireEvent.change(code(), { target: { value: pasted } });
+  expect(address().value).toBe("https://nuc.example:8765");
+  fireEvent.change(address(), { target: { value: "http://192.168.1.20:8765" } });
+  await act(async () => { fireEvent.submit(submit().form!); });
+  expect(screen.getByRole("alert")).toHaveTextContent("Pairing only travels over HTTPS to another machine.");
 });

@@ -445,3 +445,4 @@ body,
 .connector-steps li + li { margin-top:.6rem }
 .connector-steps p { margin:.1rem 0 .4rem;line-height:1.45 }
 .connector-steps .setup-command-note { min-height:1.2em;margin:.25rem 0 0;font-size:.8rem }
+.pairing-form .pairing-hint { display:block;margin-top:.3rem;font-size:.78rem;line-height:1.4 }

@@ -527,10 +527,10 @@ function pairingRefused(fp,{call=false}={}){
  openPairing(reachFailure);
 }
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
-async function pairDevice(code,name){
+async function pairDevice(code,name,address=''){
  const about=await describeTarget();if(about)targetAbout=about;
  const t=hostTranslator(),defaultName=currentDeviceName(where=>t('pair.deviceName',{where}));
- const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,target,about,origin:location.origin,get:fetch});
+ const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
   closePairing();return {host:localPairing.host};

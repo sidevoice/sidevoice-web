@@ -176,7 +176,8 @@ export interface SidevoiceActions {
   /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */
   forgetMachine(id: string): Promise<void>;
   /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */
-  pairDevice(code: string, name: string): Promise<{ host: string | null }>;
+  /** Redeems a machine's pairing code; `address` is where the person says the machine is (host:port or a URL). */
+  pairDevice(code: string, name: string, address?: string): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
   /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings

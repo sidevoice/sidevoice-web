@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import {
-  base64ToBytes, bytesToBase64url, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven, pairingInUse,
+  base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven, pairingInUse,
   pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, usingPairing, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
 } from "./device-pairing.js";
@@ -210,6 +210,26 @@ test("redeeming: the secret goes only where the code's node proved itself, and t
   expect(base).toMatchObject({ base: "https://room.example/nodes/c-1", via: "room" });
   expect(pairing).toEqual({ fp: node.fp, public_key: node.public_key, host: "macbook", urls: ["http://127.0.0.1:8768"],
     rv: { url: "https://room.example", node: "c-1" }, device_id: "dev-1", token: "tok-1", paired_at: NOW / 1000 });
+});
+
+test("a typed address is https unless it says otherwise, and plain http only for this computer", () => {
+  const why = (text: string) => { try { return machineAddress(text); } catch (error) { return (error as Error).message; } };
+  expect(why("")).toBeNull();
+  expect(why(" 192.168.1.20:8765 ")).toBe("https://192.168.1.20:8765");
+  expect(why("https://mac.example/")).toBe("https://mac.example");
+  expect(why("http://127.0.0.1:8768")).toBe("http://127.0.0.1:8768");
+  expect(why("http://192.168.1.20:8765")).toBe("address-insecure");
+  expect(why("not an address at all")).toBe("address-invalid");
+});
+
+test("redeeming at a typed address: proven there first, the secret goes there, and the pairing keeps it", async () => {
+  const node = await fakeNode();
+  const get = network({ "https://192.168.1.20:8765": node });
+  // A code that only names this computer's loopback: from another device, only the typed address reaches the node.
+  const { pairing, base } = await redeemPairingCode(codeFor(payload(node, { rv: null })), { address: "192.168.1.20:8765", get, subtle, now: NOW });
+  expect(base).toMatchObject({ base: "https://192.168.1.20:8765", via: "direct" });
+  expect(node.secrets).toHaveLength(1);
+  expect(pairing.urls).toEqual(["https://192.168.1.20:8765", "http://127.0.0.1:8768"]);
 });
 
 test("redeeming follows no redirect: neither the proof nor the secret goes anywhere a redirect points", async () => {
