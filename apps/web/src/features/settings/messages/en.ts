@@ -367,6 +367,23 @@ export const en = {
   "voice.model.here": "On this device",
   "voice.try.speak": "Try it: speak",
   "voice.try.listen": "Try it: listen",
+  "voice.prepare.badge.absent": "Not downloaded",
+  "voice.prepare.badge.ready": "Ready",
+  "voice.prepare.badge.needsKey": "Needs an API key",
+  "voice.prepare.download": "Download",
+  "voice.prepare.cancel": "Cancel",
+  "voice.prepare.retry": "Retry",
+  "voice.prepare.addKey": "Add key",
+  "voice.prepare.downloading": "Downloading…",
+  "voice.prepare.downloadingAt": "Downloading… {percent}%",
+  "voice.prepare.progress": "{done} of {size}",
+  "voice.prepare.verifying": "Checking the model…",
+  "voice.prepare.loading": "Loading the model…",
+  "voice.prepare.onDevice": "{size} on this device",
+  "voice.prepare.noDownload": "No download needed",
+  "voice.prepare.failed": "Couldn't download {model}",
+  "voice.prepare.lockedHint": "Cancel the download to choose another model.",
+  "voice.prepare.announceReady": "{model} is ready",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

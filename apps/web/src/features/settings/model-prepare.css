@@ -1,0 +1,14 @@
+/* A chosen model made ready (ModelPrepare.tsx): the same block in the first-run setup and in Settings. */
+.model-prepare { display: grid; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
+.model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
+.model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+.model-prepare-working { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.model-prepare-state .ui-spinner { color: var(--sv-accent-text); }
+.model-prepare-progress { display: grid; gap: var(--sv-space-2); flex: 1; min-width: 0; }
+.model-prepare-progress-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sv-space-3); }
+.model-prepare-progress-line strong { font-size: var(--sv-font-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.model-prepare-alert { flex: 1; }
