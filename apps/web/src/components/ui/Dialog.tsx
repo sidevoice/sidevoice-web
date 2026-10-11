@@ -70,7 +70,9 @@ export function Dialog({ id, open, layout = "dialog", size = "md", className, on
   }, [node, open]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <dialog ref={setNode} id={id} className={cn("ui-dialog", className)} data-layout={layout} data-size={size} aria-labelledby={surface.titleId}
-      onCancel={(event) => { event.preventDefault(); onClose?.(); }}
+      // Its own: a cancel doesn't bubble, but React carries it up through a portal to a dialog this one is drawn from
+      // (the setup, which would put itself off).
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); onClose?.(); }}
       // With no close (a step to finish, something under way that can't be called off), Escape is stopped at the key:
       // a browser closes a modal anyway after a few cancelled Escapes.
       onKeyDown={(event) => { if (event.key === "Escape" && !onClose) event.preventDefault(); }}>
