@@ -82,13 +82,13 @@
   /* The header keeps its place above the scrim while the list is down, and until the scrim has faded after. */
   .room-header { position: relative; z-index: 1; gap: var(--sv-space-2); padding: 0 var(--sv-space-2) 0 var(--sv-space-4); transition: z-index 0s linear var(--sv-dur-base); }
   .room-header[data-list-down] { z-index: 32; transition: none; }
-  .room-header .brand svg { width: 20px; height: 20px; }
-  .room-header .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  /* No brand on a phone: the heading stays, for a screen reader only. */
+  .room-header .brand { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  /* Two other conversations at most, where the variant puts them: after the mark, in the middle, or by the gear. */
-  .header-conversations { display: flex; align-items: center; gap: var(--sv-space-1); flex: none; }
-  .room-header[data-avatars="centre"] .header-conversations { position: absolute; left: 50%; transform: translateX(-50%); }
-  .room-header[data-avatars="right"] .header-conversations { margin-inline-start: auto; }
+  /* The other conversations from the left, as many as fit, then the chevron with the count of the rest. */
+  .header-conversations { display: flex; align-items: center; gap: var(--sv-space-1); flex: 1; min-width: 0; }
+  .conversations-toggle { gap: 2px; padding-inline: var(--sv-space-2); }
+  .conversations-rest { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
   .header-avatar { display: grid; place-items: center; flex: none; margin: 0; padding: 2px; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .header-avatar .conversation-avatar { width: 34px; height: 34px; }
   .header-avatar:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 0; }
@@ -115,9 +115,9 @@
 .conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
 .sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 
-/* Settings at the conversations' foot, a desktop's column and a phone's dropped panel alike: the header's gear is never
- * shown (the runtime's button, pressed from the foot); the list ends with New conversation, and Settings holds the foot. */
-.room-header .header-settings { display: none; }
+/* Settings at a desktop's conversations' foot, the header's gear pressed from there; a phone keeps the gear at its
+ * header's right. The list ends with New conversation. */
+@media (min-width: 900px) { .room-header .header-settings { display: none; } }
 .sidebar-new { display: flex; justify-content: center; }
 .sidebar-settings { position: relative; justify-content: flex-start; }
 .conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
@@ -132,10 +132,4 @@
   .room-shell[data-layout="meet"] .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
   .room-shell[data-layout="meet"] .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }
   .room-shell[data-layout="meet"] .conversation-sidebar[data-collapsed] .sidebar-brand span { display: none; }
-}
-
-/* A phone without the brand (VARIANTS phone-brand): the heading stays, for a screen reader only. */
-@media (max-width: 899px) {
-  .room-header[data-brand="hidden"] .brand { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .room-header[data-brand="hidden"][data-avatars="left"] .header-conversations { margin-inline-start: 0; }
 }

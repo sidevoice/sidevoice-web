@@ -61,16 +61,18 @@ export function personMood({ inCall, speaking }: { inCall: boolean; speaking: bo
 
 const HEADER_RANK: Partial<Record<ConversationState, number>> = { waiting: 0, working: 1 };
 const HEADER_LIMIT = 2;
+/** With `everyone`, the others rank after those waiting and working: a header that has room shows them too. */
+const OTHERS_RANK = 2;
 
 /** A phone's header has room for two other conversations: those waiting for you first, then those working — the
  *  more unread first within each, the room's order otherwise. Idle ones, and the one on the stage, are not there;
  *  the pill beside them opens all of them. */
-export function headerConversations(rows: ParticipantView[], onStage: string | null, inCall: boolean): ParticipantView[] {
+export function headerConversations(rows: ParticipantView[], onStage: string | null, inCall: boolean, limit = HEADER_LIMIT, everyone = false): ParticipantView[] {
   return rows
-    .map((row, index) => ({ row, index, rank: HEADER_RANK[conversationState(row, inCall)] }))
+    .map((row, index) => ({ row, index, rank: HEADER_RANK[conversationState(row, inCall)] ?? (everyone ? OTHERS_RANK : undefined) }))
     .filter((entry): entry is { row: ParticipantView; index: number; rank: number } => entry.rank !== undefined && entry.row.threadId !== onStage)
     .sort((a, b) => a.rank - b.rank || b.row.unread - a.row.unread || a.index - b.index)
-    .slice(0, HEADER_LIMIT)
+    .slice(0, limit)
     .map((entry) => entry.row);
 }
 

@@ -132,9 +132,9 @@ export function ConversationSidebar() {
           {/* A new conversation follows the last one, in either layout. */}
           <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>
         </div>
-        {/* Settings holds the foot, a desktop's and a phone's dropped panel's; what joins it later (notifications…) opens
-            upward from here. */}
-        <div className="sidebar-foot"><SidebarSettings rail={rail && !narrow} onOpen={close} /></div>
+        {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
+            opens upward from here. */}
+        {!narrow && <div className="sidebar-foot"><SidebarSettings rail={rail} onOpen={close} /></div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>

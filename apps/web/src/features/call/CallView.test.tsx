@@ -108,20 +108,23 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
 });
 
-test("a phone's header avatars switch the call at a tap, and the handle brings the whole list down", async () => {
+test("a phone's header avatars switch the call at a tap, and the chevron brings the whole list down", async () => {
   viewport({ narrow: true });
   room();
   const others = [...document.querySelectorAll(".header-avatar")];
-  // Two at most: the one waiting for you, then the one working; the offline one waits behind the pill.
-  expect(others.map((button) => button.getAttribute("aria-label"))).toEqual([
-    "Review the nightly backups · Waiting for you", "Migrate the payments API · Working",
+  // From the left as many as fit (three on this phone): the one waiting for you, the one working, then the rest; none
+  // left over, so the chevron counts none.
+  expect(others.map((button) => button.getAttribute("aria-label")?.split(" · ")[0])).toEqual([
+    "Review the nightly backups", "Migrate the payments API", expect.any(String),
   ]);
+  expect(others[1].getAttribute("aria-label")).toBe("Migrate the payments API · Working");
+  expect(document.querySelector(".conversations-rest")).toBeNull();
   const sidebar = document.getElementById("conversations")!;
   // A tap on one moves the call to it, without the list.
   await act(async () => { fireEvent.click(others[0]); });
   expect(selectParticipant).toHaveBeenCalledWith("t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
-  // The whole list comes down from the handle under the header; picking one there switches too.
+  // The whole list comes down from the chevron after them; picking one there switches too.
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
   expect(sidebar).toHaveAttribute("data-open");
   await act(async () => { fireEvent.click(rowOf("Migrate the payments API")); });

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
-import { VARIANTS_KEY } from "../../lib/variants";
 import { createRoomStore } from "../../state/room-store";
 import { ConversationSidebar } from "./ConversationSidebar";
 import { RoomHeader } from "./RoomHeader";
@@ -31,28 +30,6 @@ beforeEach(() => {
   window.sidevoiceActions = { selectParticipant } as unknown as typeof window.sidevoiceActions;
 });
 afterEach(() => { delete window.sidevoiceActions; localStorage.clear(); });
-
-test("a phone header's avatars sit where the preview's variant says, after the mark unless it says otherwise", () => {
-  room();
-  expect(header()).toHaveAttribute("data-avatars", "left");
-  // The preview's panel writes the choice from another document: this one hears it as a storage event.
-  act(() => {
-    localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "header-avatars": "centre" }));
-    window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY }));
-  });
-  expect(header()).toHaveAttribute("data-avatars", "centre");
-  act(() => {
-    localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "header-avatars": "right" }));
-    window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY }));
-  });
-  expect(header()).toHaveAttribute("data-avatars", "right");
-  // A value it does not know is the default.
-  act(() => {
-    localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "header-avatars": "top" }));
-    window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY }));
-  });
-  expect(header()).toHaveAttribute("data-avatars", "left");
-});
 
 test("while the list is down the header stays above it, and an avatar there switches the call and puts the list away", async () => {
   room();
@@ -97,14 +74,7 @@ test("the chevron after the header's avatars drops the conversations and puts th
   expect(chevron).toHaveAttribute("aria-expanded", "true");
   act(() => { fireEvent.click(chevron); });
   expect(chevron).toHaveAttribute("aria-expanded", "false");
-  // No handle to drag, and Settings at the list's foot, not in the header.
+  // No handle to drag.
   expect(document.querySelector(".conversations-grab")).toBeNull();
-  expect(document.querySelector("#conversations .sidebar-foot .sidebar-settings")).toBeInTheDocument();
 });
 
-test("a phone may hide the brand (VARIANTS phone-brand), and the page keeps its heading", () => {
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "phone-brand": "hidden" }));
-  room();
-  expect(header()).toHaveAttribute("data-brand", "hidden");
-  expect(screen.getByRole("heading", { level: 1, name: "Sidevoice" })).toBeInTheDocument();
-});

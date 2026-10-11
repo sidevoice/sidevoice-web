@@ -1,7 +1,9 @@
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
-import { useVariant } from "../../lib/variants";
-import { useCallLayout } from "../../state/call-layout";
+import { useCallLayout, useMedia } from "../../state/call-layout";
+
+/** A phone wide enough for four of the other conversations in its header. */
+const ROOMY_PHONE_QUERY = "(min-width: 390px)";
 import { useRoomStore } from "../../state/room-store";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator, type CallTranslate } from "../call/call-i18n";
@@ -18,16 +20,10 @@ import "./room.css";
  * lit above the dimmed call while it is down. */
 export function RoomHeader() {
   const t = callTranslator();
-  // A design variant (lib/variants.ts): where a phone's header puts the other conversations — after the mark, in its
-  // middle, or by the gear.
-  const avatars = useVariant("header-avatars", ["left", "centre", "right"] as const);
-  // And whether a phone shows the brand at all: hidden, the room goes to the avatars and the chevron, and the brand
-  // stays the page heading for a screen reader.
-  const brand = useVariant("phone-brand", ["shown", "hidden"] as const);
   const listDown = useCallLayout((state) => state.conversationsOpen);
   return (
     <>
-      <header className="room-header" data-avatars={avatars} data-brand={brand} data-list-down={listDown || undefined}>
+      <header className="room-header" data-list-down={listDown || undefined}>
         <h1 className="brand"><SidevoiceMark size={22} /> <span className="brand-name">Sidevoice</span></h1>
         <HeaderConversations t={t} />
         <SettingsButton t={t} />
@@ -39,16 +35,16 @@ export function RoomHeader() {
 /** A phone's way to every conversation: the chevron after the header's avatars. A tap drops the conversations (by
  *  machine, a new one, and Settings at their foot) under the header and turns the chevron up; another tap, a tap
  *  outside or Escape puts them away. */
-function ConversationsToggle({ t }: { t: CallTranslate }) {
+function ConversationsToggle({ t, rest }: { t: CallTranslate; rest: number }) {
   const count = useRoomStore((state) => state.participants.length);
   const open = useCallLayout((state) => state.conversationsOpen);
   const openConversations = useCallLayout((state) => state.openConversations);
   const closeConversations = useCallLayout((state) => state.closeConversations);
   const label = t("header.allConversations", { n: count });
   return (
-    <Button variant="ghost" tone="neutral" size="icon-sm" className="conversations-toggle" aria-label={label} title={label}
+    <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} title={label}
       aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
-      <ChevronIcon size={18} />
+      {rest > 0 && <span className="conversations-rest" aria-hidden="true">+{rest}</span>}<ChevronIcon size={18} />
     </Button>
   );
 }
@@ -60,16 +56,20 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   const inCall = useRoomStore(selectInCall);
   const stage = useStageConversation();
   const closeConversations = useCallLayout((state) => state.closeConversations);
+  // As many as a phone's width has room for beside the gear: four, or three on the narrowest.
+  const roomy = useMedia(ROOMY_PHONE_QUERY);
+  const shown = headerConversations(participants, stage.threadId, inCall, roomy ? 4 : 3, true);
+  const rest = participants.filter((row) => row.threadId !== stage.threadId).length - shown.length;
   const label = (row: ParticipantView) => t("header.otherConversation", { title: row.title, state: stateText(row, inCall, t) });
   return (
     <div className="header-conversations">
-      {headerConversations(participants, stage.threadId, inCall).map((row) => (
+      {shown.map((row) => (
         <button type="button" key={row.threadId} className="header-avatar" aria-label={label(row)} title={label(row)}
           disabled={row.switching} onClick={() => { window.sidevoiceActions?.selectParticipant(row.threadId); closeConversations(); }}>
           <ConversationAvatar row={row} />
         </button>
       ))}
-      <ConversationsToggle t={t} />
+      <ConversationsToggle t={t} rest={rest} />
     </div>
   );
 }
@@ -88,7 +88,7 @@ export function openSettings() {
   document.getElementById("settings-open")?.click();
 }
 
-/* Never shown: Settings sits at the conversations' foot (a desktop's column, a phone's dropped panel), and presses this
+/* A phone's gear, at the header's right; on a desktop Settings sits at the conversations' foot, which presses this
  * button. The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
  * onClick it resets the element's handler on every render), so its wrapper hears it. With agents waiting, Settings
  * then opens at theirs. */

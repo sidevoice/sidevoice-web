@@ -66,6 +66,9 @@ test("a phone's header shows at most two others: waiting for you first, then wor
   const waiting = [row("w1"), row("w2", { unread: 3 }), row("w3", { unread: 1 })];
   expect(headerConversations(waiting, null, true).map((item) => item.threadId)).toEqual(["w2", "w3"]);
   expect(headerConversations([row("stage", { selected: true }), row("off", { reach: "holding" })], "stage", true)).toEqual([]);
+  // A header with room for more, and everyone: the idle ones after, up to the limit.
+  expect(headerConversations([...rows, row("off", { reach: "holding" })], "stage", true, 4, true).map((item) => item.threadId)).toEqual(["waits", "busy-1", "busy-2", "off"]);
+  expect(headerConversations([...rows, row("off", { reach: "holding" })], "stage", true, 3, true)).toHaveLength(3);
 });
 
 test("the state line says the state in words, with what is unread beside a conversation that is not in the call", () => {
