@@ -25,14 +25,14 @@ function CommandBlock({ command, copyLabel }: { command: string; copyLabel: stri
   );
 }
 
-/** Preparing another machine, in two numbered steps: install Sidevoice there, then get a pairing code from it (or from
- *  the agent) to paste in the form that follows. Shared by the first-run setup and the pairing dialog. */
-export function ConnectorSteps() {
+/** Preparing another machine: install Sidevoice there, then print a pairing code there to paste in the form beside it.
+ *  Numbered on their own; `numbered={false}` where they are already one numbered step of the pairing screen's. */
+export function ConnectorSteps({ numbered = true }: { numbered?: boolean }) {
   const t = hostTranslator();
   return (
-    <ol className="connector-steps">
-      <li><p>{t("noMachine.stepInstall")}</p><CommandBlock command={CONNECTOR_INSTALL} copyLabel={t("noMachine.copyCommand")} /></li>
-      <li><p>{t("noMachine.stepPair")}</p><CommandBlock command={CONNECTOR_PAIR_DEVICE} copyLabel={t("noMachine.copyPairCommand")} /></li>
+    <ol className="connector-steps" data-plain={numbered ? undefined : true}>
+      <li><p>{t("pairing.stepInstall")}</p><CommandBlock command={CONNECTOR_INSTALL} copyLabel={t("noMachine.copyCommand")} /></li>
+      <li><p>{t("pairing.stepPair")}</p><CommandBlock command={CONNECTOR_PAIR_DEVICE} copyLabel={t("noMachine.copyPairCommand")} /></li>
     </ol>
   );
 }

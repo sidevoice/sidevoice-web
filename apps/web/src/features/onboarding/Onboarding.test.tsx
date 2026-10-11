@@ -55,6 +55,9 @@ test("a browser starts by pairing another machine, shown how to prepare it, and 
   // The code is entered right here, not in another dialog on top.
   expect(document.getElementById("wizard-pairing-code")).toBeInTheDocument();
   expect(actions.openPairing).not.toHaveBeenCalled();
+  // How to get a code starts unfolded here, and Connect is the step's own action, in its footer.
+  expect(screen.getByRole("button", { name: "How do I get a code?" })).toHaveAttribute("aria-expanded", "true");
+  expect(document.querySelector("#wizard .wizard-actions button[type=submit][form=wizard-pairing-form]")).toHaveTextContent("Connect");
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
 });

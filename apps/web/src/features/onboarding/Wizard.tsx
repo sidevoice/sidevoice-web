@@ -7,8 +7,7 @@ import { ArrowRightIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../.
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
-import { ConnectorSteps } from "../pairing/ConnectorSteps";
-import { PairingCodeForm } from "../pairing/PairingDialog";
+import { PairMachine, usePairMachineLayout } from "../pairing/PairMachine";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
 import { Appearance } from "../settings/SettingsDialog";
@@ -289,7 +288,9 @@ export function Wizard() {
   </>;
 
   const ready = step === "W6";
-  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
+  // Connecting to another machine side by side (`split`) takes a wider setup on that step.
+  const pairLayout = usePairMachineLayout();
+  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined} data-pair-layout={pairLayout}
     // Escape puts the setup off, except once it is done: Ready only goes on.
     onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}
     // On Ready, Escape is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes. Closed
@@ -318,9 +319,7 @@ export function Wizard() {
       {step === "W0" && <BasicsStep t={t} />}
       {step === "W2" && <section className="wizard-prepare">{prepareBlock(true)}</section>}
       {step === "W2r" && <section>
-        <p>{t("wizard.pairIntro")}</p>
-        <ConnectorSteps />
-        <PairingCodeForm idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
+        <PairMachine idPrefix="wizard-pairing" rows={2} howOpen submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
