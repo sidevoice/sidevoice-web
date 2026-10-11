@@ -9,7 +9,7 @@ import {
   Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform,
+  Box, AudioWaveform, ArrowUp,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -61,6 +61,8 @@ export const DownloadsIcon = mark(Download, 18);
 export const ListenAgainIcon = mark(Play, 14);
 export const KeyboardIcon = mark(Keyboard, 20);
 export const TranscriptIcon = mark(MessageSquareText, 22);
+/** Sends what was written. */
+export const SendIcon = mark(ArrowUp, 18);
 
 // ----- a message's delivery, drawn like the play mark beside it so both sit on the time's line at one size
 export const SentIcon = mark(Check, 12);

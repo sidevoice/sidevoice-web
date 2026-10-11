@@ -165,8 +165,14 @@
 .pt-receipt { display: inline-flex; color: var(--sv-text-subtle); }
 .pt-receipt[data-read] { color: var(--sv-accent-text); }
 .pt-new-messages { position: sticky; bottom: 0; justify-self: center; box-shadow: var(--sv-shadow-md); }
-.pt-composer { display: flex; align-items: flex-end; gap: var(--sv-space-2); padding: var(--sv-space-3); border-top: 1px solid var(--sv-border); background: var(--sv-surface); }
-.pt-composer .ui-textarea { border-radius: var(--sv-radius-lg); }
+.pt-composer { padding: var(--sv-space-2) var(--sv-space-4) var(--sv-space-4); background: var(--sv-bg); }
+.pt-composer-field { display: flex; align-items: flex-end; gap: var(--sv-space-1); padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-4); border: 1px solid transparent; border-radius: 22px; background: var(--sv-bg-sunken); }
+[data-theme="dark"] .pt-composer-field { background: var(--sv-surface-raised); }
+.pt-composer-field:focus-within { border-color: var(--sv-focus); }
+.pt-composer-field .ui-textarea { flex: 1; padding: 7px 0; border: 0; border-radius: 0; background: transparent; line-height: 1.375rem; }
+.pt-composer-field .ui-textarea:focus { outline: none; }
+.pt-composer-send { border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }
+.pt-composer-send:disabled { background: var(--sv-disabled-bg); color: var(--sv-disabled-text); }
 
 /* ----- first-run setup */
 .pt-wizard { display: grid; gap: var(--sv-space-4); padding: var(--sv-space-5) var(--sv-space-6) 0; }

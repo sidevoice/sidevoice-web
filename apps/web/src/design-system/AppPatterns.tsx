@@ -10,7 +10,7 @@ import { Switch } from "../components/ui/Switch";
 import {
   AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, CopyIcon, HangupIcon, HarnessIcon, ProviderLogo,
   ListenAgainIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
-  SettingsIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
+  SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
 import { CharacterAvatar, type AvatarSize } from "../features/avatar/CharacterAvatar";
@@ -233,8 +233,10 @@ function Transcript({ phone = false }: { phone?: boolean }) {
         <Button size="sm" variant="secondary" className="pt-new-messages">2 new messages</Button>
       </div>
       <form className="pt-composer" onSubmit={(event) => event.preventDefault()}>
-        <Textarea minRows={1} maxRows={phone ? 5 : 8} value={text} onChange={(event) => setText(event.target.value)} placeholder={t("transcript.placeholder")} aria-label={t("transcript.message")} />
-        <Button type="submit" variant="primary" disabled={!text.trim()}>{t("transcript.send")}</Button>
+        <div className="pt-composer-field">
+          <Textarea minRows={1} maxRows={phone ? 5 : 8} value={text} onChange={(event) => setText(event.target.value)} placeholder={t("transcript.placeholder")} aria-label={t("transcript.message")} />
+          <Button type="submit" variant="ghost" size="icon-sm" className="pt-composer-send" disabled={!text.trim()} aria-label={t("transcript.sendLabel")}><SendIcon /></Button>
+        </div>
       </form>
     </section>
   );
@@ -547,7 +549,7 @@ export function AppPatterns() {
         <Frame className="pt-frame--tall"><CallBar joined muted menu /></Frame>
         <Phone label="Phone"><CallBar joined phone /></Phone>
       </Pattern>
-      <Pattern title="Transcript" note="Docked beside the call on a desktop, a sheet on a phone. The agent in lila, you in crema; time, read marks and listen again. The text box is always there, grows with what you write, and is never resized by hand.">
+      <Pattern title="Transcript" note="Docked beside the call on a desktop, a sheet on a phone. The agent in lila, you in crema; time, read marks and listen again. The text box is a rounded field pinned at the foot, Send an arrow inside it; it grows with what you write and is never resized by hand.">
         <Frame className="pt-frame--transcript"><Transcript /></Frame>
       </Pattern>
       <Pattern title="First-run setup" note="A fixed-height dialog (the whole screen on a phone): the step and its group, a five-part progress bar, the title, the step, and Back/Continue. Continue says why it waits.">

@@ -5,7 +5,7 @@ export const es: Partial<Record<ConversationMessageKey, string>> = {
   "transcript.title": "Transcripción",
   "transcript.close": "Cerrar la transcripción",
   "transcript.message": "Mensaje escrito",
-  "transcript.placeholder": "Escribe un mensaje…",
+  "transcript.placeholder": "Envía un mensaje",
   "transcript.send": "Enviar",
   "transcript.sendLabel": "Enviar mensaje",
 

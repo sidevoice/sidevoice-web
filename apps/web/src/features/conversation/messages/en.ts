@@ -4,7 +4,7 @@ export const en = {
   "transcript.title": "Transcript",
   "transcript.close": "Close transcript",
   "transcript.message": "Written message",
-  "transcript.placeholder": "Write a message…",
+  "transcript.placeholder": "Send a message",
   "transcript.send": "Send",
   "transcript.sendLabel": "Send message",
 

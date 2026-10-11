@@ -101,16 +101,23 @@
   }
 }
 
-/* ----- the text box, always there: one row empty, growing with the text (Textarea), as tall as Send at one row */
-.text-composer {
-  display: flex; flex: none; align-items: flex-end; gap: var(--sv-space-2); min-width: 0;
-  padding: var(--sv-space-3); border-top: 1px solid var(--sv-border); background: var(--sv-surface);
+/* ----- the text box, always there, as a call app's chat has it: a rounded field pinned at the panel's foot, set apart
+ * from the messages by space rather than a line, Send an icon inside its end, waiting for something to send. */
+.text-composer { flex: none; min-width: 0; padding: var(--sv-space-2) var(--sv-space-4) var(--sv-space-4); background: var(--sv-bg); }
+.composer-field {
+  display: flex; align-items: flex-end; gap: var(--sv-space-1); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-4);
+  border: 1px solid transparent; border-radius: 22px; background: var(--sv-bg-sunken); transition: border-color var(--sv-dur-fast) var(--sv-ease);
 }
-.text-composer .ui-textarea {
-  flex: 1; border-radius: var(--sv-radius-lg); line-height: 1.375rem;
-  padding-block: calc((var(--sv-control-md) - 2px - 1.375rem) / 2);
+[data-theme="dark"] .composer-field { background: var(--sv-surface-raised); }
+.composer-field:focus-within { border-color: var(--sv-focus); }
+.text-composer .composer-field .ui-textarea {
+  flex: 1; min-width: 0; padding: 7px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; line-height: 1.375rem;
 }
-.text-composer .ui-button { flex: none; }
+.text-composer .composer-field .ui-textarea:focus, .text-composer .composer-field .ui-textarea:focus-visible { outline: none; }
+.text-composer .composer-field .ui-textarea:disabled { background: transparent; }
+.text-composer .composer-send { flex: none; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); }
+.text-composer .composer-send:hover { background: var(--sv-accent-hover); }
+.text-composer .composer-send:is(:disabled, [data-empty]) { background: var(--sv-disabled-bg); border-color: transparent; color: var(--sv-disabled-text); pointer-events: none; }
 
 /* ----- a phone: the transcript rises from the bottom as a sheet over the dimmed call */
 @media (max-width: 899px) {
@@ -128,7 +135,7 @@
   .transcript-grab { display: block; flex: none; width: 36px; height: 4px; margin: var(--sv-space-2) auto 0; border-radius: 2px; background: var(--sv-border-strong); }
   .transcript-head { padding-top: var(--sv-space-2); }
   #messages { padding-inline: var(--sv-space-3); }
-  .text-composer { padding-bottom: max(var(--sv-space-3), env(safe-area-inset-bottom)); }
+  .text-composer { padding: var(--sv-space-2) var(--sv-space-3) max(var(--sv-space-3), env(safe-area-inset-bottom)); }
 }
 
 /* ----- the conversation's pieces, wherever they show (the call's stage shows the first two, at its own size and
