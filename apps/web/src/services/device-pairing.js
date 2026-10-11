@@ -68,19 +68,42 @@ function httpUrl(value) {
     } catch { return null; }
 }
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
-/** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback.
- *  A relative base is on `origin`, the page's own, and is judged by it. */
-export function secureBase(base, origin = '') {
+/** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback —
+ *  or, for a pairing the person agreed to keep unencrypted (`insecure`), to a private-network address. A relative base
+ *  is on `origin`, the page's own, and is judged by it. */
+export function secureBase(base, origin = '', { insecure = false } = {}) {
     try {
         const url = new URL(base, origin || undefined);
-        return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
+        return url.protocol === 'https:' || (url.protocol === 'http:' && (LOOPBACK.has(url.hostname) || (insecure && privateHost(url.hostname))));
     } catch { return false; }
+}
+/** A host only a private network reaches: 10/8, 172.16/12, 192.168/16, 100.64/10 (carrier-grade NAT, Tailscale),
+ *  loopback, IPv6 unique-local (fc00::/7) and loopback, and *.local names. Anything else is public. */
+export function privateHost(hostname) {
+    const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+    if (LOOPBACK.has(host) || LOOPBACK.has('[' + host + ']') || host === '::1') return true;
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.local\.?$/.test(host)) return true;
+    const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (v4) {
+        const [a, b] = [Number(v4[1]), Number(v4[2])];
+        if (v4.slice(1).some(part => Number(part) > 255)) return false;
+        return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    }
+    return host.includes(':') && /^f[cd][0-9a-f]{0,2}:/.test(host);
 }
 /** The address a person typed for a machine (`192.168.1.20:8765`, `https://mac.example`), as a base: https unless
  *  it says otherwise, and only one a pairing secret may travel to (`secureBase`). Empty is null: the code's own
  *  addresses are used. */
 export const ADDRESS_INVALID = 'address-invalid';
 export const ADDRESS_INSECURE = 'address-insecure';
+/** The machine at the address typed answers, but only over plain http: pairing never goes there (its secret would
+ *  travel unencrypted), and the person is told so rather than that it is unreachable. */
+export const PAIRING_HTTP_ONLY = 'pairing-http-only';
+/** The same, at a private-network address: pairing may go there unencrypted, once the person agrees (`insecure`). */
+export const PAIRING_HTTP_PRIVATE = 'pairing-http-private';
+/** HTTPS did not answer at a private address, and this page (served over https) may not ask over plain http at all: only
+ *  the desktop app or a page served over http could pair with a machine that answers only without encryption. */
+export const PAIRING_HTTP_BLOCKED = 'pairing-http-blocked';
 export function machineAddress(text) {
     const raw = String(text ?? '').trim();
     if (!raw) return null;
@@ -168,9 +191,11 @@ export async function proveIdentity(base, expected, { get = globalThis.fetch, su
  *  An address a secret or a token may not go to (`secureBase`) is no candidate, wherever it came from. */
 export function candidateBases(pairing, { target = '', about = null, origin = '' } = {}) {
     const list = [], seen = new Set();
+    // A pairing kept unencrypted by the person's choice reaches its own private addresses over plain http; no other does.
+    const insecure = pairing.insecure === true;
     const add = (base, via) => {
         const key = /^https?:\/\//.test(base) ? base : origin + base;
-        if (seen.has(key) || !secureBase(base, origin)) return;
+        if (seen.has(key) || !secureBase(base, origin, { insecure })) return;
         seen.add(key); list.push({ base, via });
     };
     const relay = room => room + '/nodes/' + encodeURIComponent(pairing.rv.node);
@@ -203,15 +228,24 @@ export async function firstProven(candidates, expected, deps = {}, started = new
 // ----- redeeming a code -----
 /** Pair this device with the node a code names, at the address the person typed if any: find an address that proves it is that node, hand it the
  *  one-time secret there and nowhere else, and keep the token only if the key it returns is the code's. */
-export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now() } = {}) {
+export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now(), insecure = false } = {}) {
     // The address the person typed comes first, and is kept with the pairing: it is where they know the machine is.
     // It is trusted no more than the code's own: the machine there proves it is the code's before the secret goes.
-    const typed = machineAddress(address);
+    // Agreed to (`insecure`), a private address is reached over plain http instead, and the pairing says so for good.
+    const secureTyped = machineAddress(address);
+    const plain = insecure && secureTyped && privateHost(new URL(secureTyped).hostname) ? secureTyped.replace(/^https:/, 'http:') : null;
+    const typed = plain ?? secureTyped;
     const decoded = decodePairingCode(code, now, { address: typed });
-    const payload = typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded;
+    const payload = { ...(typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded), ...(plain ? { insecure: true } : {}) };
     const crypto = webCrypto(subtle);
     const place = await firstProven(candidateBases(payload, { target, about, origin }), { fp: payload.fp }, { get, subtle: crypto });
     const called = payload.host ? '«' + payload.host + '»' : 'la máquina';
+    if (!place && secureTyped && !plain) {
+        const privateAddress = privateHost(new URL(secureTyped).hostname);
+        // Over https, this page may not ask over plain http at all (mixed content): say what would work.
+        if (privateAddress && /^https:/.test(origin || globalThis.location?.origin || '')) throw pairingError(PAIRING_HTTP_BLOCKED);
+        if (await answersPlainHttp(secureTyped, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
+    }
     if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.');
     let response, answer = null;
     try {
@@ -229,10 +263,22 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     if (fp !== payload.fp) throw pairingError('La máquina que respondió no es la del código. No se ha guardado nada.');
     return {
         pairing: { fp, public_key: node.public_key, host: node.host || payload.host, urls: payload.urls, rv: payload.rv,
-            device_id: answer.device_id, token: answer.token, paired_at: Math.floor(now / 1000) },
+            device_id: answer.device_id, token: answer.token, paired_at: Math.floor(now / 1000), ...(payload.insecure ? { insecure: true } : {}) },
         base: place,
     };
 }
+/** Whether the machine at `base` (https, as typed) answers at the same place over plain http — asked only to say why
+ *  it could not be reached; nothing is sent there. A page on https may not ask (mixed content): then it is not known. */
+async function answersPlainHttp(base, get) {
+    try {
+        const url = new URL(base);
+        if (url.protocol !== 'https:') return false;
+        url.protocol = 'http:';
+        const response = await patiently(get(url.origin + '/api/device/identity?nonce=probe', { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), 4000);
+        return !!response;
+    } catch { return false; }
+}
+
 /** What this device calls itself when it pairs, unless the person says otherwise. */
 export function deviceName(nav = globalThis.navigator) {
     const text = String(nav?.userAgent || '') + ' ' + String(nav?.userAgentData?.platform || nav?.platform || '');
@@ -294,5 +340,5 @@ export function pairingInUse(pairings) {
 /** A pairing as the interface may see it: everything but the token. */
 export function pairingSummary(p) {
     return { fp: p.fp, host: p.host || null, urls: [...(p.urls || [])], rv: p.rv ? { ...p.rv } : null, device_id: p.device_id,
-        paired_at: typeof p.paired_at === 'number' ? p.paired_at : null, revoked: !!p.revoked, local: !!p.local };
+        paired_at: typeof p.paired_at === 'number' ? p.paired_at : null, revoked: !!p.revoked, local: !!p.local, insecure: p.insecure === true };
 }
