@@ -1,7 +1,8 @@
 name: ci
 
 # Every pull request: the build, the tests, and the release packaging exactly as a release builds it
-# (`node scripts/release.mjs dist`), and the container image for both platforms, publishing nothing. What passes here
+# (`node scripts/release.mjs dist`), the container image for both platforms, and the browser e2e (apps/web/e2e),
+# publishing nothing. What passes here
 # is what merging publishes (release.yml).
 # RELEASING.md.
 on:
@@ -44,3 +45,26 @@ jobs:
           push: false
           provenance: false
           cache-from: type=gha,scope=web-image
+
+  e2e:
+    name: Browser e2e (Chromium, WebKit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/setup
+      # The static site as a deployment serves it, in real browsers: Settings → Machines → a machine's Agents.
+      - run: npm run build
+      - run: node scripts/assemble-static-web.mjs "$RUNNER_TEMP/site"
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run e2e -w @sidevoice/web
+        env:
+          SIDEVOICE_STATIC_SITE: ${{ runner.temp }}/site
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: browser-e2e
+          path: |
+            apps/web/test-results/playwright/
+            apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
