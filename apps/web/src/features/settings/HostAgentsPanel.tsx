@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/cn";
-import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { ChevronIcon, ConnectorIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { Snippet } from "../../components/ui/Snippet";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
@@ -34,28 +35,6 @@ function useRelativeTime(value: string | number | null | undefined): string {
   return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
 }
 
-function CodeBlock({ code }: { code: string }) {
-  const t = hostTranslator();
-  const [note, setNote] = useState("");
-  async function copy() {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard-unavailable");
-      await navigator.clipboard.writeText(code);
-      setNote(t("agents.copied"));
-    } catch {
-      setNote(t("agents.copyFailed"));
-    }
-  }
-  return (
-    <div className="host-agent-code">
-      <pre><code>{code}</code></pre>
-      <Button size="sm" variant="ghost" aria-label={t("agents.copy")} title={t("agents.copy")} onClick={() => void copy()}>
-        <CopyIcon size={15} />{note && <span role="status">{note}</span>}
-      </Button>
-    </div>
-  );
-}
-
 /** How to add Sidevoice to the agent by hand, or (`removing`) take it out; the list is read again meanwhile, so the row
  *  follows what was done. */
 function Instructions({ agent, fp, id, removing = false, onClose }: { agent: DetectedAgent; fp: string; id: string; removing?: boolean; onClose: () => void }) {
@@ -74,8 +53,8 @@ function Instructions({ agent, fp, id, removing = false, onClose }: { agent: Det
   return (
     <div className="host-agent-howto" id={id}>
       {!command && !snippet ? <p className="muted">{t("agents.manual.none")}</p> : <>
-        {command && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><CodeBlock code={command} /></>}
-        {snippet && <><p className="host-agent-howto-label">{how?.file ? t("agents.manual.file", { file: how.file }) : t("agents.manual.snippet")}</p><CodeBlock code={snippet} /></>}
+        {command && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><Snippet text={command} /></>}
+        {snippet && <><p className="host-agent-howto-label">{how?.file ? t("agents.manual.file", { file: how.file }) : t("agents.manual.snippet")}</p><Snippet text={snippet} /></>}
         <p className="muted" role="status">{t(removing ? "agents.manual.removeWaiting" : agent.registration === "foreign" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
         <Button variant="ghost" size="sm" onClick={onClose}>{t("agents.close")}</Button>
       </>}
@@ -193,8 +172,8 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
       </button>
       {open && <div className="host-agent-howto" id="host-agent-other-howto">
         <p className="muted">{t("agents.other.detail")}</p>
-        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><CodeBlock code={custom.command} /></>}
-        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><CodeBlock code={custom.snippet} /></>}
+        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><Snippet text={custom.command} /></>}
+        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><Snippet text={custom.snippet} /></>}
       </div>}
     </section>
   );
