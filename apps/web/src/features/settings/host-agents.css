@@ -45,3 +45,6 @@
 .host-agents-scanned[data-failed] { color: var(--sv-danger); }
 .host-agent-problem-quiet { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
 .host-agent-problem-quiet p { margin: 0; }
+.host-agent-status-line { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
+.host-agent-status-line .host-agent-status { min-width: 0; }
+.host-agent-status-line .ui-infotip { flex: none; }

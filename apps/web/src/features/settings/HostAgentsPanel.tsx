@@ -9,6 +9,7 @@ import { actionableAgent } from "../../services/host-agents";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { NewMark } from "../highlights/highlights";
+import { InfoTip } from "../../components/ui/InfoTip";
 import "./host-agents.css";
 
 function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): string {
@@ -116,11 +117,13 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
-  const status: { text: string; tone: "ok" | "error" | "muted" | "" } = errorText ? { text: errorText, tone: "error" }
+  const status: { text: string; tone: "ok" | "error" | "muted" | ""; info?: string } = errorText ? { text: errorText, tone: "error" }
     : busy ? { text: t(`agents.busy.${busy}` as HostMessageKey), tone: "muted" }
     : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
     : agent.registration === "connected" ? { text: t("agents.connected"), tone: "" }
-    : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted" }
+    // Short in the row; what it means and what to do, only in its (i).
+    : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted", info: t("agents.foreign.info", { agent: agent.label }) }
+    : agent.registration === "outdated" ? { text: t("agents.outdated"), tone: "muted", info: t("agents.outdated.info", { agent: agent.label }) }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   const connected = agent.registration === "connected";
@@ -139,8 +142,11 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           </span>
           {/* Always one status line under the name, so a row never changes height: what went wrong, else a moment of
               "ready" once connected, else where it stands. */}
-          <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
-            role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
+          <span className="host-agent-status-line">
+            <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
+              role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
+            {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
+          </span>
         </span>
         {/* Every action a button on the row, each with a hint: doing it by hand (add, replace, or take Sidevoice out), and
             Connect or Disconnect, which Sidevoice does itself. */}
