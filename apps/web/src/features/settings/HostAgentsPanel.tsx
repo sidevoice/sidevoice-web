@@ -28,7 +28,7 @@ function useRelativeTime(value: string | number | null | undefined): string {
   const at = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value).valueOf();
   if (Number.isNaN(at)) return "";
   const seconds = Math.round((at - Math.max(now, at)) / 1000);
-  const words = new Intl.RelativeTimeFormat(navigator.language, { numeric: "auto" });
+  const words = new Intl.RelativeTimeFormat(document.documentElement.lang || navigator.language, { numeric: "auto" });
   const minutes = Math.round(seconds / 60), hours = Math.round(seconds / 3600), days = Math.round(seconds / 86400);
   return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
 }
@@ -124,6 +124,9 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   const connected = agent.registration === "connected";
+  // The confirm goes: the focus goes back to Disconnect (after Remove, to the row's action as it now stands).
+  const action = useRef<HTMLButtonElement>(null);
+  const cancelConfirm = () => { setConfirming(false); requestAnimationFrame(() => action.current?.focus()); };
   // The hints say what each button does: Sidevoice doing it, or the person.
   const handHint = t(connected ? "agents.hint.removeByHand" : agent.registration === "foreign" ? "agents.hint.replaceByHand" : "agents.hint.byHand", { agent: agent.label });
   return (
@@ -148,20 +151,21 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             </Button>
           </Tooltip>}
           {connected ? <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
-              <Button variant="ghost" size="sm" loading={busy === "disconnect"} disabled={!!busy || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
+              <Button ref={action} variant="ghost" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
                 onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
             </Tooltip>
             : !readOnly && !manualOnly && <Tooltip content={t("agents.hint.connect", { agent: agent.label })}>
-              <Button variant="primary" size="sm" loading={busy === "connect"} disabled={!!busy} aria-label={t("agents.connectNamed", { agent: agent.label })}
+              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t("agents.connectNamed", { agent: agent.label })}
                 onClick={() => run("connect")}>{t("agents.connect")}</Button>
             </Tooltip>}
         </span>
       </div>
-      {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}>
+      {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}
+        onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConfirm(); } }}>
         <p>{t("agents.disconnectConfirm", { agent: agent.label })}</p>
         <span className="host-agent-confirm-actions">
-          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => setConfirming(false)}>{t("hosts.cancel")}</Button>
-          <Button variant="danger" size="sm" onClick={() => { setConfirming(false); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
+          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={cancelConfirm}>{t("hosts.cancel")}</Button>
+          <Button variant="danger" size="sm" onClick={() => { cancelConfirm(); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
         </span>
       </div>}
       {open && agent.registration !== "unknown" &&
@@ -205,26 +209,33 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   }, [fp]);
 
   if (!fp) return <div className="host-agent-problem" role="alert"><p>{t("agents.unreachable")}</p></div>;
-  if (listing?.status === "failed") return (
-    <div className="host-agent-problem" role="alert">
-      <p>{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
-      <Button size="sm" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
-    </div>
+  // A search that failed with nothing found before: the heading stays, and why, quietly, with searching again. With a
+  // list already shown (a rescan while connecting by hand blipped), the list stays and the header says it.
+  if (listing?.status === "failed" && !value) return (
+    <section className="host-agents" aria-labelledby="host-agents-title">
+      <div className="host-agents-heading"><h4 id="host-agents-title">{t("agents.heading")}</h4></div>
+      <div className="host-agent-problem-quiet">
+        <p className="muted">{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
+        <Button size="sm" variant="secondary" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
+      </div>
+    </section>
   );
   if (!value && (listing?.status === "loading" || !listing || listing.status === "idle")) return <p className="muted" role="status">{t("agents.scanning")}</p>;
 
   const rows = (value?.agents ?? []).filter((agent) => agent.present || agent.registration === "connected");
   const scanning = listing?.status === "loading";
+  const failed = listing?.status === "failed";
   return (
     <section className="host-agents" aria-labelledby="host-agents-title">
       {/* The heading, when the list was searched (in words, as time passes), and searching again as an icon. */}
       <div className="host-agents-heading">
         <h4 id="host-agents-title">{t("agents.heading")}</h4>
-        <span className="host-agents-scanned" role="status">{scanning ? t("agents.searching") : searchedAgo ? t("agents.searchedAgo", { time: searchedAgo }) : ""}</span>
+        {/* Not a live region: it changes every minute, and with each rescan while connecting by hand. */}
+        <span className="host-agents-scanned" data-failed={failed || undefined}>{scanning ? t("agents.searching") : failed ? t("agents.searchFailed") : searchedAgo ? t("agents.searchedAgo", { time: searchedAgo }) : ""}</span>
         <Tooltip content={t("agents.searchAgain")}>
-          <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("agents.searchAgain")} disabled={scanning}
+          <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("agents.searchAgain")} loading={scanning}
             onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>
-            {scanning ? <span className="ui-spinner ui-spinner--inline" aria-hidden /> : <RefreshIcon size={16} />}
+            <RefreshIcon size={16} />
           </Button>
         </Tooltip>
       </div>

@@ -39,6 +39,9 @@
   .host-agent-problem { align-items: flex-start; flex-direction: column; }
 }
 
-.host-agent-confirm { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-2); padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.host-agent-confirm { display: grid; gap: var(--sv-space-2); margin: 0 var(--sv-space-5) var(--sv-space-4); padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .host-agent-confirm p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .host-agent-confirm-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
+.host-agents-scanned[data-failed] { color: var(--sv-danger); }
+.host-agent-problem-quiet { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
+.host-agent-problem-quiet p { margin: 0; }

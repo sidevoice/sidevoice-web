@@ -284,7 +284,8 @@ export function Wizard() {
   const agentsBlock = <>
     <p>{t("wizard.agentsHere")}</p>
     {pairingInUse ? <HostAgentsPanel fp={pairingInUse} /> : null}
-    {(!pairingInUse || (agents?.status === "ready" && agents.value?.agents.length === 0)) && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
+    {/* With no machine in use, the list cannot say it; with one, the list says there are none. */}
+    {!pairingInUse && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
   </>;
 
   const ready = step === "W6";
