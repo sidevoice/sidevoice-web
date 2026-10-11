@@ -111,6 +111,11 @@ export function CallStage() {
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
+      {/* Named above the tile where the room has no header (VARIANTS layout "meet"), in place of the tile's own name. */}
+      <header className="stage-title" translate="no">
+        <h2 title={stage.title}>{stage.title}</h2>
+        {stage.row?.machine && <span>{stage.row.machine}</span>}
+      </header>
       <div className="stage-tile" data-mood={stage.mood} style={avatarTone(spec) as CSSProperties}>
         <div className="stage-name" translate="no">
           <h2 title={stage.title}>{stage.title}</h2>

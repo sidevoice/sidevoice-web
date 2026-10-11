@@ -126,3 +126,14 @@
 .sidebar-settings { position: relative; justify-content: flex-start; }
 .conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
 .sidebar-settings .settings-notice-dot { position: absolute; top: 8px; left: 26px; }
+
+/* The room without a header (VARIANTS layout "meet", a desktop): the conversations' column from the top, the brand at
+ * its head (the mark alone in the rail); the stage's conversation named above its tile, not on it. */
+.sidebar-brand { display: none; }
+@media (min-width: 900px) {
+  .room-shell[data-layout="meet"] > .room-header { display: none; }
+  .room-shell[data-layout="meet"] .sidebar-brand { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; min-height: 40px; padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
+  .room-shell[data-layout="meet"] .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
+  .room-shell[data-layout="meet"] .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }
+  .room-shell[data-layout="meet"] .conversation-sidebar[data-collapsed] .sidebar-brand span { display: none; }
+}

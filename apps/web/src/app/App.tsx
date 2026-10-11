@@ -20,6 +20,12 @@ import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner"
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
+import { useVariant } from "../lib/variants";
+
+/** How a desktop lays the room out (VARIANTS `layout`): a header across the top (current), or, as a video call app
+ *  does, no header: the conversations' column runs from the top with the brand at its head, and the stage's
+ *  conversation is named above its tile. A phone keeps its header either way. */
+export const ROOM_LAYOUT = ["header", "meet"] as const;
 
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
@@ -50,10 +56,11 @@ function RoomContent() {
     }
   }, [install.phase, machines]);
 
+  const layout = useVariant("layout", ROOM_LAYOUT);
   return (
     <>
       <StorageBlockedBanner />
-      <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
+      <div className="room-shell" data-layout={layout} hidden={setupPending} aria-hidden={setupPending || undefined}>
         <RoomHeader />
         <LocalHostBanner />
         {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
