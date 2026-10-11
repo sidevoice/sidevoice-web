@@ -1,20 +1,29 @@
-import { expect, test, vi, beforeEach, afterEach } from "vitest";
+import { expect, test, vi, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HostAgentsPanel } from "./HostAgentsPanel";
 import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import type { HostAgentsState } from "../../state/room-types";
+import type { DetectedAgent, HostAgentsState } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
 afterEach(() => { localStorage.removeItem("sidevoice.variants"); });
 
-const known = (id = "codex", changes: Record<string, unknown> = {}) => ({
-  id, label: id === "codex" ? "Codex" : id, present: true, version: "0.157.0", registration: "not-connected" as const,
-  connect: "auto" as const, instructions: { command: "/opt/sidevoice/bin/connector mcp --stdio", file: "~/.codex/config.toml", snippet: '[mcp_servers.sidevoice]\ncommand = "/opt/sidevoice/bin/connector"' },
+/** The connector's steps for Codex, as it writes them: connecting (a command, or the file's snippet), taking Sidevoice
+ *  out, and replacing another "sidevoice" entry (remove it, then connect). */
+const STEPS = {
+  connect: [{ command: "/opt/sidevoice/bin/connector mcp --stdio" }, { file: "~/.codex/config.toml", snippet: '[mcp_servers.sidevoice]\ncommand = "/opt/sidevoice/bin/connector"' }],
+  disconnect: [{ command: "codex mcp remove sidevoice" }],
+  replace: [{ command: "codex mcp remove sidevoice" }, { command: "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio" }],
+};
+
+/** An agent as the connector reports it: what it can do itself (`can`) and the steps to do each by hand (`manual`). */
+const known = (id = "codex", changes: Partial<DetectedAgent> = {}): DetectedAgent => ({
+  id, label: id === "codex" ? "Codex" : id, present: true, version: "0.157.0", registration: "not-connected",
+  connect: "auto", can: { connect: true, update: true, disconnect: true }, manual: STEPS,
   ...changes,
 });
 
@@ -26,21 +35,27 @@ const ready = (agents = [known()]): HostAgentsState => ({
 const pairing = (fp: string, host: string): PairingSummary => ({ fp, host, urls: [`https://${host.toLowerCase()}.example`], rv: null,
   device_id: `device-${fp}`, paired_at: 1_700_000_000, revoked: false });
 
+/** The steps shown in a row, each a block to copy, in order. */
+const steps = (row: HTMLElement) => [...row.querySelectorAll(".host-agent-steps .ui-snippet-text")].map((step) => step.textContent);
 
 function setActions(actions: Partial<NonNullable<typeof window.sidevoiceActions>>) {
   window.sidevoiceActions = actions as typeof window.sidevoiceActions;
 }
 
-test("P10 unreachable and no-connector states offer a retry", async () => {
+test("P10 a search that failed with nothing found keeps the heading, says why quietly, and offers Search again", async () => {
   for (const [error, copy] of [["unreachable", "This machine cannot be reached right now."], ["no-connector", "Sidevoice is not running on this machine."]] as const) {
     const store = createRoomStore();
     const loadHostAgents = vi.fn(async () => {});
     setActions({ loadHostAgents });
     act(() => store.patch({ hostAgents: { fp: { status: "failed", value: null, error: { key: error }, busy: {}, actionErrors: {} } } }));
     const view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-    expect(screen.getByRole("alert")).toHaveTextContent(copy);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check again" })); });
-    expect(loadHostAgents).toHaveBeenCalledWith("fp", { rescan: true });
+    expect(screen.getByRole("heading", { name: "Agents" })).toBeInTheDocument();
+    expect(document.querySelector(".host-agent-problem-quiet")).toHaveTextContent(copy);
+    expect(screen.queryByRole("alert")).toBeNull();
+    // Opening the panel searched once already; Search again searches once more.
+    loadHostAgents.mockClear();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Search again" })); });
+    expect(loadHostAgents).toHaveBeenCalledExactlyOnceWith("fp", { rescan: true });
     view.unmount();
   }
 });
@@ -53,13 +68,16 @@ test("manual instructions come from the selected host and trigger four-second wa
     const store = createRoomStore();
     const loadHostAgents = vi.fn(async () => {});
     setActions({ loadHostAgents, hostAgentAction: vi.fn(async () => {}) });
-    act(() => store.patch({ hostAgents: { "fp-a": ready([known("codex", { connect: "manual" })]) } }));
+    act(() => store.patch({ hostAgents: { "fp-a": ready([known("codex", { can: { connect: false, update: false, disconnect: true } })]) } }));
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp-a" /></RoomProvider>);
+    const row = document.querySelector(".host-agent-row") as HTMLElement;
 
-    // Connected by hand only: its one action opens how.
-    fireEvent.click(screen.getByText("I’ll do it myself"));
-    expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument();
-    expect(screen.getByText((_, element) => element?.tagName === "CODE" && element.textContent?.includes("[mcp_servers.sidevoice]"))).toBeInTheDocument();
+    // What the connector can't do itself is done by hand: no Connect, and the row says so.
+    expect(row).toHaveTextContent("Connect it manually");
+    expect(within(row).queryByRole("button", { name: "Connect Codex to Sidevoice" })).toBeNull();
+    fireEvent.click(within(row).getByText("I’ll do it myself"));
+    expect(steps(row)).toEqual(["/opt/sidevoice/bin/connector mcp --stdio", '[mcp_servers.sidevoice]\ncommand = "/opt/sidevoice/bin/connector"']);
+    expect(row).toHaveTextContent("File: ~/.codex/config.toml");
     fireEvent.click(screen.getByText("Don’t see yours? Connect it by hand"));
     expect(screen.getByText("sidevoice connector mcp")).toBeInTheDocument();
     act(() => { vi.advanceTimersByTime(4000); });
@@ -76,7 +94,7 @@ const settingsEntry = () => document.getElementById("settings-open") as HTMLButt
 
 const entry = (name: string) => document.querySelector<HTMLElement>(`.machines-inline .machine-entry[data-name="${name}"]`);
 
-test("P11 pending notice on the Settings entry routes to its host's Agents screen", async () => {
+test("P11 an agent new on a machine marks the gear, opens Settings at that machine's agents, and is marked New there", async () => {
   const store = createRoomStore();
   const host = pairing("fp-nuc", "NUC");
   const pending = ready([known("cursor", { actionable: true, label: "Cursor" })]);
@@ -86,14 +104,18 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   const gear = settingsEntry();
-  expect(gear).toHaveAttribute("aria-label", "New agents need attention. Open settings.");
+  expect(gear).toHaveAttribute("aria-label", "Settings, 1 new");
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
+  expect(entry("NUC")!.querySelector(".new-dot")).toHaveTextContent(", new");
   expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
   expect(document.getElementById("host-agents-title")).toHaveTextContent("Agents");
-  expect(screen.getByText("Cursor")).toBeInTheDocument();
+  // Cursor is connected by the connector itself (it edits Cursor's file): Connect, and "New" on the row.
+  const row = screen.getByText("Cursor").closest("li") as HTMLElement;
+  expect(within(row).getByText("New")).toBeInTheDocument();
+  expect(within(row).getByRole("button", { name: "Connect Cursor to Sidevoice" })).toBeInTheDocument();
 });
 
 test("the runtime's Settings handler on the menu entry survives the header's renders, and still opens at the agents", async () => {
@@ -116,7 +138,7 @@ test("the runtime's Settings handler on the menu entry survives the header's ren
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
 });
 
-test("multiple pending hosts leave an explicit translated choice in Machines", async () => {
+test("agents new on two machines: the gear counts them, Settings opens at the first, and each machine's entry has the dot", async () => {
   const store = createRoomStore();
   const hosts = [pairing("fp-nuc", "NUC"), pairing("fp-laptop", "Laptop")];
   const openAgentSettings = vi.fn((fp: string | null) => store.patch({ settingsAgentRequest: { fp, id: 2 } }));
@@ -125,11 +147,12 @@ test("multiple pending hosts leave an explicit translated choice in Machines", a
     hostAgents: { "fp-nuc": ready([known("cursor", { actionable: true })]), "fp-laptop": ready([known("claude", { actionable: true })]) } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
+  expect(settingsEntry()).toHaveAttribute("aria-label", "Settings, 2 new");
   await act(async () => { fireEvent.click(settingsEntry()); });
-  expect(openAgentSettings).toHaveBeenCalledWith(null);
-  // Each machine under Machines, both marked as having agents waiting.
-  expect(entry("NUC")).toHaveTextContent("New agent");
-  expect(entry("Laptop")).toHaveTextContent("New agent");
+  expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
+  // Each machine under Machines carries the dot, said in words to a screen reader.
+  expect(entry("NUC")!.querySelector(".new-dot")).toHaveTextContent(", new");
+  expect(entry("Laptop")!.querySelector(".new-dot")).toHaveTextContent(", new");
 });
 
 test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", () => {
@@ -145,10 +168,8 @@ test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", (
   }
 });
 
-test("a foreign Codex row exposes its host-provided replacement command and Copy without automatic actions", async () => {
-  const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
-    "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
-  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: { command: replacement, file: null, snippet: null } });
+test("a foreign Codex row is short, with the why in its (i), and replacing it by hand is the connector's steps, each to copy", async () => {
+  const foreign = known("codex", { registration: "foreign", actionable: false });
   const store = createRoomStore();
   const hostAgentAction = vi.fn(async () => {});
   const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
@@ -159,19 +180,17 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
   try {
     render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-    expect(screen.getByText("Connected to a different MCP server")).toBeInTheDocument();
-    const foreignRow = screen.getByText("Connected to a different MCP server").closest("li");
-    expect(foreignRow).not.toBeNull();
-    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Connect" })).toBeNull();
-    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
-    expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Not now" })).toBeNull();
+    const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+    expect(within(foreignRow).getByRole("button", { name: "About Codex’s status" })).toBeInTheDocument();
+    // Never touched by Sidevoice: no Connect, no Disconnect.
+    expect(within(foreignRow).queryByRole("button", { name: /^Connect / })).toBeNull();
+    expect(within(foreignRow).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
 
-    fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Replace manually" }));
-    expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp remove sidevoice");
-    expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio");
-    expect(foreignRow as HTMLElement).toHaveTextContent("after you replace the agent configuration");
-    await act(async () => { fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Copy" })); });
-    expect(writeText).toHaveBeenCalledWith(replacement);
+    fireEvent.click(within(foreignRow).getByRole("button", { name: "Replace manually" }));
+    expect(steps(foreignRow)).toEqual(["codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"]);
+    expect(foreignRow).toHaveTextContent("after you replace the agent configuration");
+    await act(async () => { fireEvent.click(within(foreignRow).getAllByRole("button", { name: "Copy" })[0]); });
+    expect(writeText).toHaveBeenCalledWith("codex mcp remove sidevoice");
     expect(hostAgentAction).not.toHaveBeenCalled();
   } finally {
     if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
@@ -181,9 +200,7 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
 
 test("foreign Codex manual replacement closes and confirms on connect, then stays closed after disconnect", () => {
   vi.useFakeTimers();
-  const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
-    "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
-  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: { command: replacement, file: null, snippet: null } });
+  const foreign = known("codex", { registration: "foreign", actionable: false });
   const store = createRoomStore();
   const hostAgentAction = vi.fn(async () => {});
   setActions({ hostAgentAction });
@@ -191,15 +208,15 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
   let view: ReturnType<typeof render> | undefined;
   try {
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-    const row = screen.getByText("Connected to a different MCP server").closest("li") as HTMLElement;
+    const row = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
     const reveal = within(row).getByRole("button", { name: "Replace manually" });
     fireEvent.click(reveal);
     expect(reveal).toHaveAttribute("aria-expanded", "true");
-    expect(row).toHaveTextContent("codex mcp remove sidevoice");
+    expect(row).toHaveTextContent("codex mcp add sidevoice");
 
-    const connected = known("codex", { registration: "connected", actionable: false, instructions: null });
+    const connected = known("codex", { registration: "connected", actionable: false });
     act(() => store.patch({ hostAgents: { fp: ready([connected]) } }));
-    expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
+    expect(row).not.toHaveTextContent("codex mcp add sidevoice");
     expect(row).toHaveTextContent("Codex is ready for new conversations");
     expect(within(row).getByRole("button", { name: /^Disconnect .* from Sidevoice$/ })).toBeInTheDocument();
     expect(hostAgentAction).not.toHaveBeenCalled();
@@ -215,7 +232,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
     const disconnected = known("codex", { registration: "not-connected", actionable: false });
     act(() => store.patch({ hostAgents: { fp: ready([disconnected]) } }));
     expect(within(row).getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
-    expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
+    expect(row).not.toHaveTextContent("codex mcp add sidevoice");
   } finally {
     view?.unmount();
     vi.useRealTimers();
@@ -223,7 +240,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
 });
 
 test("foreign rows without host instructions stay read-only while an automatic connection failure opens manual setup", async () => {
-  const foreign = known("claude", { registration: "foreign", actionable: false, instructions: null });
+  const foreign = known("claude", { registration: "foreign", actionable: false, manual: null });
   const store = createRoomStore();
   act(() => store.patch({
     hostAgents: {
@@ -236,10 +253,10 @@ test("foreign rows without host instructions stay read-only while an automatic c
   setActions({ hostAgentAction: vi.fn(async () => {}) });
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-  expect(screen.getByText("Connected to a different MCP server")).toBeInTheDocument();
-  const foreignRow = screen.getByText("Connected to a different MCP server").closest("li");
-  expect(foreignRow).not.toBeNull();
-  expect(within(foreignRow as HTMLElement).queryByRole("button")).toBeNull();
+  const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+  // Nothing to do on it here, only its (i) to say why.
+  expect(foreignRow.querySelectorAll(".host-agent-actions button")).toHaveLength(0);
+  expect(within(foreignRow).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["About claude’s status"]);
   await waitFor(() => expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument());
   expect(screen.getByRole("alert")).toHaveTextContent("Could not connect this agent.");
 });
@@ -265,15 +282,25 @@ test("a row is always its name and one status line: connecting turns that line t
   } finally { vi.useRealTimers(); }
 });
 
-
-test("the original row actions: connecting by hand and Connect are both buttons on the row", () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "agent-actions": "original" }));
+test("the row's actions: doing it by hand, and Connect or Disconnect, are buttons on the row, as the connector can", () => {
   const store = createRoomStore();
   setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
   act(() => store.patch({ hostAgents: { fp: ready() } }));
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-  const row = document.querySelector(".host-agent-row") as HTMLElement;
-  expect([...row.querySelectorAll(".host-agent-actions button")].map((button) => button.textContent)).toEqual(["I’ll do it myself", "Connect"]);
-  fireEvent.click(within(row).getByText("I’ll do it myself"));
-  expect(row).toHaveTextContent("/opt/sidevoice/bin/connector mcp --stdio");
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  const actions = () => [...row().querySelectorAll(".host-agent-actions button")].map((button) => button.textContent);
+  expect(actions()).toEqual(["I’ll do it myself", "Connect"]);
+  fireEvent.click(within(row()).getByText("I’ll do it myself"));
+  expect(steps(row())[0]).toBe("/opt/sidevoice/bin/connector mcp --stdio");
+
+  // Connected: taking Sidevoice out, by hand (its own steps) or by Disconnect.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "connected" })]) } }));
+  expect(actions()).toEqual(["I’ll do it myself", "Disconnect"]);
+  fireEvent.click(within(row()).getByText("I’ll do it myself"));
+  expect(steps(row())).toEqual(["codex mcp remove sidevoice"]);
+  expect(row()).toHaveTextContent("after you remove it");
+  // A connector that can't take it out itself leaves only the steps.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "connected", can: { connect: true, update: true, disconnect: false } })]) } }));
+  expect(actions()).toEqual(["I’ll do it myself"]);
 });
+
