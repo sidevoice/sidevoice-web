@@ -7,6 +7,9 @@
  * `endpoint_silence_ms`, `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
  * @typedef {{ ready_ms: number | null, audio_ms?: number | null, endpoint_silence_ms?: number | null, recognition_ms?: number | null, first_sound_ms?: number | null }} TrialTimings */
 
+/** A monotonic clock where there is one (pages, workers), else the wall clock. */
+const now = () => globalThis.performance?.now?.() ?? Date.now();
+
 /** A failure of a try itself: `trial-silence` (nothing usable heard in time), `trial-cancelled`, `trial-not-heard`. */
 function trialError(code, detail) {
   return Object.assign(new Error(code), { code }, detail ? { detail } : {});
@@ -50,8 +53,8 @@ export async function tryTranscription(voice, settings, { signal, timeoutMs = 20
     // Its failure before the voice even listens is the start's to report; this one must not go unheard.
     heard.catch(() => {});
     if (onState) stops.push(voice.onState(onState));
-    const starting = performance.now();
-    return await bounded(voice.start().then(() => { readyMs = Math.round(performance.now() - starting); return heard; }), { signal, timeoutMs });
+    const starting = now();
+    return await bounded(voice.start().then(() => { readyMs = Math.round(now() - starting); return heard; }), { signal, timeoutMs });
   } finally {
     for (const stop of stops) stop();
     await voice.stop().catch(() => {});
@@ -72,12 +75,12 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
   let readyMs = null, firstSoundMs = null;
   try {
     await voice.setSettings(settings);
-    const starting = performance.now();
+    const starting = now();
     const outcome = await bounded(voice.start().then(() => {
-      readyMs = Math.round(performance.now() - starting);
-      const asked = performance.now();
+      readyMs = Math.round(now() - starting);
+      const asked = now();
       saying = voice.say(text, language ? { language } : undefined);
-      saying.onEvent?.((event) => { if (event.type === 'playing' && firstSoundMs === null) firstSoundMs = Math.round(performance.now() - asked); });
+      saying.onEvent?.((event) => { if (event.type === 'playing' && firstSoundMs === null) firstSoundMs = Math.round(now() - asked); });
       return saying.outcome;
     }), { signal, timeoutMs });
     if (outcome.status === 'heard') { onTimings?.({ ready_ms: readyMs, first_sound_ms: firstSoundMs }); return outcome; }

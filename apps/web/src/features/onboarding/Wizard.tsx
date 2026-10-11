@@ -290,7 +290,11 @@ export function Wizard() {
   const ready = step === "W6";
   return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
     // Escape puts the setup off, except once it is done: Ready only goes on.
-    onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}>
+    onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}
+    // On Ready, Escape is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes. Closed
+    // without the setup asking for it, it is opened again.
+    onKeyDown={(event) => { if (ready && event.key === "Escape") event.preventDefault(); }}
+    onClose={() => { const element = dialog.current; if (onboarding.open && element && !element.open) element.showModal?.(); }}>
     <header className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
       {step !== "W6" && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}

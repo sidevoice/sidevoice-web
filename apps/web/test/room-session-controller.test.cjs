@@ -1397,7 +1397,9 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const tried=s.run("window.sidevoiceActions.tryVoiceSettings('stt')");
  await new Promise(resolve=>setTimeout(resolve,0));
  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
- assert.deepEqual(plain(await tried),{text:'hola'});
+ const result=plain(await tried);assert.equal(result.text,'hola');
+ // With how long its phases took (the fake voice says nothing of its recognition).
+ assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
  assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop'],'the voice is started for the try and stopped after it');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
