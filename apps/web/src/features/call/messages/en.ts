@@ -18,10 +18,11 @@ export const en = {
   "sidebar.options": "Options for {title}",
   "sidebar.closeConversation": "Close conversation",
   "sidebar.new": "New conversation",
-  "sidebar.newTitle": "Ask your agent to join",
+  "sidebar.newTitle": "Tell your agent to connect",
   "sidebar.newBody": "Starting a conversation from here isn't possible yet. In your agent's session, say:",
   "sidebar.newPhrase": "Connect to Sidevoice (use its voice_connect tool)",
   "sidebar.newCopy": "Copy the message for your agent",
+  "connect.body": "In your agent's session, say:",
 
   "state.inCall": "In call",
   "state.working": "Working",

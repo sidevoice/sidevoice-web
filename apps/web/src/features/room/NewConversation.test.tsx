@@ -18,6 +18,7 @@ test("the button opens a small panel that says why and quotes the message, with 
   const panel = document.querySelector(".ui-popover") as HTMLElement;
   expect(panel).toHaveAttribute("role", "dialog");
   expect(panel).toHaveTextContent("isn't possible yet");
+  expect(panel).toHaveTextContent("Tell your agent to connect");
   expect(panel.querySelector("blockquote")).toHaveTextContent("Connect to Sidevoice (use its voice_connect tool)");
   expect(panel.querySelector("button[aria-label='Copy the message for your agent']")).toBeInTheDocument();
 });
