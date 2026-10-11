@@ -6,7 +6,7 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical,
+  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info,
   PanelLeftClose, PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -68,6 +68,12 @@ export const VoicesIcon = mark(Speech, 16);
 export const TranscriptionIcon = mark(Captions, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);
 export const AdvancedIcon = mark(Wrench, 16);
+
+// ----- a state, said beside its words
+export const CheckIcon = mark(Check, 18);
+export const WarningIcon = mark(CircleAlert, 18);
+export const AddIcon = mark(Plus, 18);
+export const InfoIcon = mark(Info, 18);
 
 /* Drawn here, because they are somebody's mark and not a generic icon. */
 export function AppleIcon({ className, size = 12 }: IconProps) {

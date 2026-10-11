@@ -79,7 +79,7 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
     </label>}
     <div className="wizard-trial">
       <TryResult task={task} trial={trial} t={t} />
-      {onboarding.tried(task) && trial.phase !== "running" && <Button type="button" variant="ghost" size="compact" id="wizard-try-again" onClick={stage.again}>{t("wizard.trialAgain")}</Button>}
+      {onboarding.tried(task) && trial.phase !== "running" && <Button type="button" variant="ghost" size="sm" id="wizard-try-again" onClick={stage.again}>{t("wizard.trialAgain")}</Button>}
     </div>
   </section>;
 }
@@ -170,7 +170,7 @@ export function Wizard() {
     onCancel={(event) => { event.preventDefault(); void onboarding.defer(); }}>
     <div className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} /> {t("wizard.eyebrow")}</span>
-      {step !== "W6" && <Button type="button" variant="ghost" size="compact" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
+      {step !== "W6" && <Button type="button" variant="ghost" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </div>
     <ol className="wizard-steps" aria-label={t("wizard.progress")}>
       {GROUPS.map((group, index) => <li key={group.key} data-state={index < current ? "done" : index === current ? "current" : "next"}
@@ -197,7 +197,7 @@ export function Wizard() {
       {step === "W2" && <section>
         <p>{t("localInstall.description")}</p>
         <LocalHostInstallEntry showCta source="no-machine" holdSuccess className="wizard-install-entry" />
-        <Button type="button" variant="ghost" size="compact" onClick={() => void choosePath("remote")}>{t("wizard.installRemote")}</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => void choosePath("remote")}>{t("wizard.installRemote")}</Button>
       </section>}
       {step === "W2r" && <section>
         <p>{t("wizard.pairIntro")}</p>
@@ -212,7 +212,7 @@ export function Wizard() {
       {step === "W6" && <section><p>{t("wizard.readyBody")}</p></section>}
     </div>
     <div className="wizard-actions">
-      {back && <Button type="button" variant="default" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
+      {back && <Button type="button" variant="secondary" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}

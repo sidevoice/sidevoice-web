@@ -35,7 +35,7 @@ function CodeBlock({ code }: { code: string }) {
   return (
     <div className="host-agent-code">
       <pre><code>{code}</code></pre>
-      <Button size="compact" variant="ghost" aria-label={t("agents.copy")} title={t("agents.copy")} onClick={() => void copy()}>
+      <Button size="sm" variant="ghost" aria-label={t("agents.copy")} title={t("agents.copy")} onClick={() => void copy()}>
         <CopyIcon size={15} />{note && <span role="status">{note}</span>}
       </Button>
     </div>
@@ -61,7 +61,7 @@ function Instructions({ agent, fp, id, onClose }: { agent: DetectedAgent; fp: st
         {command && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><CodeBlock code={command} /></>}
         {snippet && <><p className="host-agent-howto-label">{how?.file ? t("agents.manual.file", { file: how.file }) : t("agents.manual.snippet")}</p><CodeBlock code={snippet} /></>}
         <p className="muted" role="status">{t(agent.registration === "foreign" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
-        <Button variant="ghost" size="compact" onClick={onClose}>{t("agents.close")}</Button>
+        <Button variant="ghost" size="sm" onClick={onClose}>{t("agents.close")}</Button>
       </>}
     </div>
   );
@@ -115,16 +115,16 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         </span>
         <span className="host-agent-actions">
           {busy ? <span className="muted" role="status">{t(`agents.busy.${busy}` as HostMessageKey)}</span>
-            : agent.registration === "connected" ? <Button variant="ghost" size="compact" onClick={() => run("disconnect")}>{t("agents.disconnect")}</Button>
-              : agent.registration === "foreign" ? hasManualInstructions && <Button variant="ghost" size="compact" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
+            : agent.registration === "connected" ? <Button variant="ghost" size="sm" onClick={() => run("disconnect")}>{t("agents.disconnect")}</Button>
+              : agent.registration === "foreign" ? hasManualInstructions && <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
                 {open ? t("agents.close") : t("agents.foreign.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
               </Button>
                 : readOnly ? null : <>
-                {isNew && <Button variant="ghost" size="compact" onClick={() => run("dismiss")}>{t("agents.notNow")}</Button>}
-                <Button variant="ghost" size="compact" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
+                {isNew && <Button variant="ghost" size="sm" onClick={() => run("dismiss")}>{t("agents.notNow")}</Button>}
+                <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
                   {t("agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
                 </Button>
-                {!manualOnly && <Button variant="primary" size="compact" onClick={() => run("connect")}>{t("agents.connect")}</Button>}
+                {!manualOnly && <Button variant="primary" size="sm" onClick={() => run("connect")}>{t("agents.connect")}</Button>}
               </>}
         </span>
       </div>
@@ -143,7 +143,7 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
       <div className="host-agent-other-head">
         <span className="host-agent-icon"><ConnectorIcon size={16} /></span>
             <span className="host-agent-copy"><strong>{t("agents.other.heading")}</strong>{custom.version && <span className="muted">{custom.version}</span>}<span className="muted">{t("agents.other.sub")}</span></span>
-        <Button size="compact" variant="ghost" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
           {open ? t("agents.close") : t("agents.other.open")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
         </Button>
       </div>
@@ -174,7 +174,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   if (listing?.status === "failed") return (
     <div className="host-agent-problem" role="alert">
       <p>{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
-      <Button size="compact" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
+      <Button size="sm" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
     </div>
   );
   if (!value && (listing?.status === "loading" || !listing || listing.status === "idle")) return <p className="muted" role="status">{t("agents.scanning")}</p>;
@@ -185,7 +185,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
     <section className="host-agents" aria-labelledby="host-agents-title">
       <div className="host-agents-heading">
         <h4 id="host-agents-title">{t("agents.heading")}</h4>
-        <Button variant="ghost" size="compact" disabled={listing?.status === "loading"}
+        <Button variant="ghost" size="sm" disabled={listing?.status === "loading"}
           onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>
           {listing?.status === "loading" ? t("agents.refreshing") : t("agents.refresh")}
         </Button>

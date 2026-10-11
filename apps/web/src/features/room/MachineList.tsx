@@ -61,11 +61,11 @@ export function MachineList() {
                   <span className="machine-brief muted">{[machine.inUse ? t("hosts.inUse") : "", subtitle].filter(Boolean).join(" · ")}</span>
                 </span>
                 <span className="machine-actions">
-                  {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
+                  {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="sm" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
                     onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.use", { machine: machineName })}</Button>}
-                  {machine.local && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
+                  {machine.local && <Button variant="ghost" size="sm" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
                     onClick={() => {setSelectedTab("status");setSelected(machine.id)}}>{t("hosts.open", { machine: machineName })}</Button>}
-                  {!!machine.pairingId && <Button variant="ghost" size="compact" className="machine-action host-agent-tab-label" aria-label={t("agents.review", { machine: machineName })}
+                  {!!machine.pairingId && <Button variant="ghost" size="sm" className="machine-action host-agent-tab-label" aria-label={t("agents.review", { machine: machineName })}
                     onClick={() => {setSelectedTab("agents");setSelected(machine.id)}}>{t("agents.tab")}{notice && <span className="host-agent-dot" aria-label={t("agents.notice")} />}</Button>}
                 </span>
               </div>
@@ -74,7 +74,7 @@ export function MachineList() {
         })}
       </div>
       <div className="pairing">
-        <Button id="pair-device-open" variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.add")}</Button>
+        <Button id="pair-device-open" variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.add")}</Button>
         <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />
       </div>
     </div>
@@ -91,7 +91,7 @@ function HostDetail({ machine, initialTab, onBack }: { machine: MachineView; ini
   const tabs = machine.local ? ["status", "devices", "agents"] as const : ["agents"] as const;
   return (
     <section className="host-detail" aria-labelledby="host-detail-title">
-      <Button variant="ghost" size="compact" onClick={onBack}>{t("hosts.pageBack")}</Button>
+      <Button variant="ghost" size="sm" onClick={onBack}>{t("hosts.pageBack")}</Button>
       <header className="host-detail-header">
         <div><h3 id="host-detail-title">{machine.host || t("hosts.unnamed")}{notice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</h3><p className="muted">{machine.local ? t("hosts.thisComputer") : machine.state === "checking" ? t("hosts.checking")
           : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed" ? t("hosts.remoteNoResponse") : t("hosts.connected")}</p></div>
@@ -355,7 +355,7 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
     <div className="host-devices-panel">
       <div className="host-devices-head">
         <h4>{t("hosts.tab.devices")}</h4>
-        {usable && <Button variant="ghost" size="compact" disabled={loading} onClick={() => void refresh()}>{t("hosts.retry")}</Button>}
+        {usable && <Button variant="ghost" size="sm" disabled={loading} onClick={() => void refresh()}>{t("hosts.retry")}</Button>}
       </div>
       {usable && loading && <p className="muted" role="status">{t("hosts.working")}</p>}
       {(!usable || error) && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
@@ -373,10 +373,10 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
             {usable && device.kind !== "local" && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>
-                <Button variant="danger" size="compact" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke")}</Button>
-                <Button variant="ghost" size="compact" disabled={loading} onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
+                <Button variant="danger" size="sm" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke")}</Button>
+                <Button variant="ghost" size="sm" disabled={loading} onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
               </span>
-            ) : <Button variant="ghost" size="compact" disabled={loading} onClick={() => setConfirmId(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>)}
+            ) : <Button variant="ghost" size="sm" disabled={loading} onClick={() => setConfirmId(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>)}
           </li>
         ))}
       </ul>
@@ -387,7 +387,7 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
         {visiblePairing && <div className="local-pairing-code" role="status">
           <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
           <output>{visiblePairing.code}</output>
-          {typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" size="compact" disabled={!usable} onClick={() => void copyPairingCode()}>{pairingCopied ? t("hosts.devices.codeCopied") : t("hosts.devices.copyCode")}</Button>}
+          {typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" size="sm" disabled={!usable} onClick={() => void copyPairingCode()}>{pairingCopied ? t("hosts.devices.codeCopied") : t("hosts.devices.copyCode")}</Button>}
           <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(visiblePairing.expires_in / 60) })}</p>
         </div>}
         {visiblePairing?.reach === "local-only" && <>

@@ -29,7 +29,7 @@ export function LocalHostBanner() {
   return (
     <aside className="local-host-banner" role="status">
       <span>{t("noMachine.retryBanner", { cause })}{error ? ` ${t("hosts.actionFailed")}` : ""}</span>
-      {available && <Button variant="ghost" size="compact" disabled={busy} onClick={() => void retry()}>{t("hosts.retry")}</Button>}
+      {available && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void retry()}>{t("hosts.retry")}</Button>}
     </aside>
   );
 }

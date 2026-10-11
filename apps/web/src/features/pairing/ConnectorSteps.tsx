@@ -15,7 +15,7 @@ function CommandRow({ command, copyLabel }: { command: string; copyLabel: string
   return (
     <>
       <div className="setup-command"><code>{command}</code>
-        <Button type="button" variant="ghost" size="compact" aria-label={copyLabel} title={copyLabel} onClick={() => void copy()}><CopyIcon size={15} /></Button>
+        <Button type="button" variant="ghost" size="sm" aria-label={copyLabel} title={copyLabel} onClick={() => void copy()}><CopyIcon size={15} /></Button>
       </div>
       <p className="muted setup-command-note" role="status">{note}</p>
     </>

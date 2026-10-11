@@ -15,7 +15,7 @@ function GeneralSettings() {
     <p className="muted">{t("settings.general.languageHint")}</p>
     <h3>{t("settings.general.device")}</h3>
     <p className="muted">{t("settings.general.deviceHint")}</p>
-    <Button id="reset-settings" variant="danger" size="compact" className="settings-reset">{t("settings.general.reset")}</Button>
+    <Button id="reset-settings" variant="danger" size="sm" className="settings-reset">{t("settings.general.reset")}</Button>
     <p className="muted" id="reset-settings-note" role="status" />
     <p className="muted settings-build">{t("settings.general.build")} <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p>
   </section>;

@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<PropsWithChildren<{ area: string }>
       <div className="panel-error" role="alert">
         <b>Esta parte de la sala falló.</b>
         <span>{this.state.message}</span>
-        <Button variant="primary" size="compact" onClick={() => location.reload()}>Recargar</Button>
+        <Button variant="primary" size="sm" onClick={() => location.reload()}>Recargar</Button>
       </div>
     );
   }

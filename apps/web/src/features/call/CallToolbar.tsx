@@ -38,7 +38,7 @@ function CallMenu() {
     <details id="call-menu" className="call-menu" ref={menu} onToggle={returnFocus}>
       <summary aria-label={t("header.menu")} title={t("header.menu")}><MoreVerticalIcon size={22} /></summary>
       <div className="call-menu-panel" onClick={() => { if (menu.current) menu.current.open = false; }}>
-        <Button id="stats-open" variant="ghost" size="compact">{t("header.stats")}</Button>
+        <Button id="stats-open" variant="ghost" size="sm">{t("header.stats")}</Button>
       </div>
     </details>
   );

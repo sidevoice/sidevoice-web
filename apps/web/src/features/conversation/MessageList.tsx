@@ -46,10 +46,10 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
         if (nearBottom.current) setShowNewMessages(false);
       }}>
         {groups.map((group) => <MessageGroup group={group} key={group.id} />)}
-        {(conversation.pendingText || conversation.pendingPhase) && <div className="message-group live-draft" data-role="user"><div className="chat-message-row"><article className="chat-bubble" data-role="user" data-position="only" data-draft="true" data-live={conversation.pendingText ? undefined : conversation.pendingPhase || undefined}>{conversation.pendingText ? <span>{conversation.pendingText}</span> : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}{conversation.pendingCancellable && <Button variant="ghost" size="compact" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>Cancelar envío</Button>}</article></div></div>}
+        {(conversation.pendingText || conversation.pendingPhase) && <div className="message-group live-draft" data-role="user"><div className="chat-message-row"><article className="chat-bubble" data-role="user" data-position="only" data-draft="true" data-live={conversation.pendingText ? undefined : conversation.pendingPhase || undefined}>{conversation.pendingText ? <span>{conversation.pendingText}</span> : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}{conversation.pendingCancellable && <Button variant="ghost" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>Cancelar envío</Button>}</article></div></div>}
         {conversation.working && <div className="message-group live-draft" data-role="assistant"><div className="chat-message-row"><article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label="La conversación está trabajando en tu mensaje"><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article></div></div>}
       </div>
-      {(showNewMessages || away) && <Button className="new-messages" size="compact" aria-label="Ir al final de la conversación" onClick={() => scrollToBottom()}>{showNewMessages ? "Nuevos mensajes ↓" : "Ir al final ↓"}</Button>}
+      {(showNewMessages || away) && <Button className="new-messages" size="sm" aria-label="Ir al final de la conversación" onClick={() => scrollToBottom()}>{showNewMessages ? "Nuevos mensajes ↓" : "Ir al final ↓"}</Button>}
     </div>
   );
 }

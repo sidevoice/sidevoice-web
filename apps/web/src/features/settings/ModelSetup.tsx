@@ -57,13 +57,13 @@ export function ModelCard({ task, state, actionsInFooter = false }: { task: Task
       {state.installing ? <>
         <p className="muted" role="status">{percent == null ? t("voice.model.downloading") : t("voice.model.downloadingAt", { percent })}</p>
         <progress max={1} value={state.fraction ?? undefined} aria-label={t("voice.model.downloading")} />
-        <Button type="button" variant="ghost" size="compact" id={task + "-model-cancel"} onClick={cancelDownload}>{t("voice.model.cancelDownload")}</Button>
+        <Button type="button" variant="ghost" size="sm" id={task + "-model-cancel"} onClick={cancelDownload}>{t("voice.model.cancelDownload")}</Button>
       </> : state.failure ? <>
         <p className="stage-try-error" role="alert">{state.failure}</p>
-        {!actionsInFooter && <Button type="button" size="compact" onClick={() => downloadModel(task)}>{t("voice.retry")}</Button>}
+        {!actionsInFooter && <Button type="button" size="sm" onClick={() => downloadModel(task)}>{t("voice.retry")}</Button>}
       </> : state.ready ? <p className="muted">{t("voice.model.here")}</p> : <>
         <p className="muted">{state.size ? t("voice.model.notHere", { size: sizeText(state.size) }) : t("voice.model.notHereUnknown")}</p>
-        {!actionsInFooter && <Button type="button" variant="primary" size="compact" id={task + "-model-download"} onClick={() => downloadModel(task)}>
+        {!actionsInFooter && <Button type="button" variant="primary" size="sm" id={task + "-model-download"} onClick={() => downloadModel(task)}>
           {state.size ? t("voice.model.download", { size: sizeText(state.size) }) : t("voice.model.downloadUnknown")}</Button>}
       </>}
     </div>
@@ -112,7 +112,7 @@ export function VoiceTry({ task, draft, ready }: { task: Task; draft: Settings; 
   const language = draft.stt.language || speechLanguage;
   const start = () => void run(task === "stt" ? {} : { text: t("wizard.sampleText"), language });
   return <div className="voice-try">
-    <Button type="button" size="compact" id={task + "-try"} disabled={!ready && trial.phase !== "running"} onClick={trial.phase === "running" ? cancel : start}>
+    <Button type="button" size="sm" id={task + "-try"} disabled={!ready && trial.phase !== "running"} onClick={trial.phase === "running" ? cancel : start}>
       {trial.phase === "running" ? t("wizard.cancelTrial") : t(task === "stt" ? "voice.try.speak" : "voice.try.listen")}
     </Button>
     <TryResult task={task} trial={trial} t={t} />
