@@ -130,7 +130,7 @@ test("a failed local host projected during setup returns to the normal room and 
   pane?.removeAttribute("hidden");
   dialog?.setAttribute("open", "");
   expect(document.querySelector(".machine-row[data-local='true']")).toHaveTextContent("This computer");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open This computer" })); });
+  // Machines (layout A, the default) shows the machine in use on its page: its Retry, beside the banner's.
   expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
 
   await act(async () => { rejectInstall({ key: "install.service", step: "service" }); await Promise.resolve(); });

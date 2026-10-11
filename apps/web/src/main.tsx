@@ -1,16 +1,17 @@
-import { createRoot } from "react-dom/client";
-import { App } from "./app/App";
-import { Button } from "./components/ui/Button";
-
-import "./i18n/room-i18n.js";
 // The avatars' palette (styles/tokens.css) and drawing (styles/call.css), then the design tokens, which win, the shared
-// components and the page; each feature brings its own CSS.
+// components and the page — before anything that imports a feature, so each feature's own CSS comes after them and
+// wins a tie against a shared component's.
 import "./styles/tokens.css";
 import "./styles/call.css";
 import "./styles/theme.css";
 import "./components/ui/ui.css";
 import "./styles/app.css";
-import { applyTheme } from "./lib/theme";
+import { createRoot } from "react-dom/client";
+import { App } from "./app/App";
+import { Button } from "./components/ui/Button";
+
+import "./i18n/room-i18n.js";
+import { startPageTheme } from "./lib/theme";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.
@@ -26,8 +27,8 @@ window.addEventListener("unhandledrejection", (event) => {
   report("unhandled-rejection", String(reason?.message ?? event.reason), reason?.stack);
 });
 
-// The theme follows the system until Settings says otherwise (lib/theme.ts).
-applyTheme("system");
+// The theme this device chose in Settings, else the system's (lib/theme.ts).
+startPageTheme();
 
 const root = createRoot(document.getElementById("root")!);
 

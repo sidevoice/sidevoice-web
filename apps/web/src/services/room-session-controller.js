@@ -1355,11 +1355,9 @@ $('settings-open').onclick=()=>{try{
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-function settingsSection(name){for(const section of ['general','voice','providers','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
-$('settings-general').onclick=()=>settingsSection('general');
-$('settings-voice').onclick=()=>settingsSection('voice');
-$('settings-providers').onclick=()=>settingsSection('providers');
-$('settings-machines').onclick=()=>settingsSection('machines');
+// Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
+// (no machine yet) or on an agent waiting to be connected.
+function settingsSection(name){roomStore.patch({settingsSection:name})}
 $('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
 $('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings(state.speechLanguage)});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
 $('settings-close').onclick=()=>$('language-settings').close();
@@ -1411,6 +1409,7 @@ window.sidevoiceActions={
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,
+ showSettingsSection:settingsSection,
  // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
  // away, inside the person's own tap. The choice is this device's, kept for next time.
  chooseMachine(id){

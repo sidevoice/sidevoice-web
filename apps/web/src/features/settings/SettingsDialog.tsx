@@ -1,44 +1,120 @@
-import { DialogFrame } from "../../components/ui/DialogFrame";
-import { GeneralIcon, IntegrationsIcon, MachinesIcon, VoicesIcon } from "../../components/ui/Icons";
-import { VoiceSettings } from "./VoiceSettings";
-import { ProviderKeys } from "./ProviderKeys";
-import { MachineList } from "../room/MachineList";
+import { useContext, useState, type ReactNode } from "react";
+import { DialogSurface } from "../../components/ui/Dialog";
+import { OverlayPortalProvider } from "../../components/ui/Tooltip";
+import { AdvancedIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
-import { hostTranslator } from "./host-i18n";
+import { Group, Row, Section } from "../../components/ui/Card";
+import { Segmented } from "../../components/ui/Tabs";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
+import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
+import { MachineList } from "../room/MachineList";
+import { ProviderKeys } from "./ProviderKeys";
+import { SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
+import { hostTranslator, type HostTranslate } from "./host-i18n";
+import type { HostMessageKey } from "./messages/en";
+import "./settings.css";
 
-function GeneralSettings() {
-  const t = hostTranslator();
-  return <section id="pane-general" aria-labelledby="settings-general">
-    <h3>{t("settings.general.language")}</h3>
-    <label>{t("settings.general.languageLabel")}<NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect></label>
-    <p className="muted">{t("settings.general.languageHint")}</p>
-    <h3>{t("settings.general.device")}</h3>
-    <p className="muted">{t("settings.general.deviceHint")}</p>
-    <Button id="reset-settings" variant="danger" size="sm" className="settings-reset">{t("settings.general.reset")}</Button>
-    <p className="muted" id="reset-settings-note" role="status" />
-    <p className="muted settings-build">{t("settings.general.build")} <code id="build-id">{(window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev"}</code></p>
-  </section>;
+/* Settings: a screen of their own, its sections beside its content (above it on a phone), and Save at the foot. The
+ * runtime opens and closes it by its ids (#language-settings, #settings-close) and saves it on the form's submit
+ * (#language-form); which section shows is the store's `settingsSection`, which the runtime also sets (no machine yet,
+ * an agent waiting). Save waits while a chosen model is not ready yet, and says so. */
+
+const SECTIONS: { id: string; label: HostMessageKey; icon: ReactNode }[] = [
+  { id: "general", label: "settings.section.general", icon: <GeneralIcon /> },
+  { id: "transcription", label: "settings.section.transcription", icon: <TranscriptionIcon /> },
+  { id: "voice", label: "settings.section.voice", icon: <VoicesIcon /> },
+  { id: "providers", label: "settings.section.providers", icon: <IntegrationsIcon /> },
+  { id: "machines", label: "settings.section.machines", icon: <MachinesIcon /> },
+  { id: "advanced", label: "settings.section.advanced", icon: <AdvancedIcon /> },
+];
+
+function Appearance({ t }: { t: HostTranslate }) {
+  const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
+  const choose = (next: ThemePreference) => { setTheme(next); setThemePreference(next); };
+  return <Segmented size="sm" label={t("settings.appearance")} value={theme} onChange={choose} items={[
+    { value: "system", label: t("settings.appearance.system") }, { value: "light", label: t("settings.appearance.light") }, { value: "dark", label: t("settings.appearance.dark") },
+  ]} />;
 }
 
-function MachineSettings() {
-  return <section id="pane-machines" aria-labelledby="settings-machines" hidden className="settings-machines"><MachineList /></section>;
+function GeneralSettings({ t }: { t: HostTranslate }) {
+  const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
+  return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
+    <Group>
+      <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
+        <NativeSelect id="ui-language" defaultValue="en"><option value="es">Español</option><option value="en">English</option></NativeSelect>
+      </Row>
+      <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
+    </Group>
+    <Group title={t("settings.general.device")}>
+      <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
+        <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>
+      </Row>
+      <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
+    </Group>
+  </Section>;
+}
+
+function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslate }) {
+  return <Section id={id} title={t(id === "transcription" ? "settings.section.transcription" : "settings.section.voice")}
+    description={t(id === "transcription" ? "settings.transcription.description" : "settings.voice.description")}>
+    <SlotPane task={id === "transcription" ? "stt" : "tts"} />
+  </Section>;
+}
+
+function AdvancedSettings({ t }: { t: HostTranslate }) {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const ready = useRoomStore((state) => state.facts.voiceCatalogue.state === "ready");
+  return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
+    {ready && draft ? <TurnChoices draft={draft} /> : <p className="muted" role="status">{t("voice.loading")}</p>}
+    <p className="muted settings-note">{t("voice.restartNote")}</p>
+  </Section>;
+}
+
+function Pane({ id, current, children }: { id: string; current: string; children: ReactNode }) {
+  return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}>{children}</div>;
 }
 
 export function SettingsDialog() {
+  const t = hostTranslator();
+  const store = useContext(RoomStoreContext);
+  const current = useRoomStore((state) => state.facts.settingsSection) || "general";
+  const waits = useVoiceReadiness();
+  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  const show = (section: string) => store?.patch({ settingsSection: section });
+  const blocked = waits.stt || waits.tts;
+  const reason = waits.stt ? t("settings.save.waitTranscription") : waits.tts ? t("settings.save.waitVoice") : "";
   return (
-    <DialogFrame id="language-settings" className="settings-dialog" labelledBy="settings-title" title="Configuración" closeId="settings-close" footer={<div className="settings-footer"><p id="settings-error" role="alert" /><Button type="submit" form="language-form" variant="primary">Guardar cambios</Button></div>}>
-      <form id="language-form">
-        <div className="settings-layout">
-          <nav className="settings-nav" aria-label="Secciones de configuración">
-            <Button variant="ghost" id="settings-general" aria-controls="pane-general" aria-pressed="true"><GeneralIcon /> General</Button>
-            <Button variant="ghost" id="settings-voice" aria-controls="pane-voice" aria-pressed="false"><VoicesIcon /> Voz</Button>
-            <Button variant="ghost" id="settings-providers" aria-controls="pane-providers" aria-pressed="false"><IntegrationsIcon /> Proveedores</Button>
-            <Button variant="ghost" id="settings-machines" aria-controls="pane-machines" aria-pressed="false"><MachinesIcon /> Máquinas</Button>
-          </nav>
-          <div className="settings-content"><GeneralSettings /><VoiceSettings /><ProviderKeys /><MachineSettings /></div>
-        </div>
-      </form>
-    </DialogFrame>
+    <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" aria-labelledby="settings-title">
+      <OverlayPortalProvider container={dialog}>
+        <DialogSurface titleId="settings-title" title={t("settings.title")} closeId="settings-close" closeable flush
+          footer={<>
+            <p id="settings-error" className="settings-error" role="alert" />
+            {blocked && <p className="ui-dialog-reason" id="settings-save-reason">{reason}</p>}
+            <Button type="submit" form="language-form" variant="primary" disabled={blocked} blockedBy="settings-save-reason"
+              onBlocked={() => show(waits.stt ? "transcription" : "voice")}>{t("settings.save")}</Button>
+          </>}>
+          <form id="language-form" className="settings-layout">
+            <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
+              {SECTIONS.map((section) => <button key={section.id} type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
+                aria-current={section.id === current ? "page" : undefined} onClick={() => show(section.id)}>
+                {section.icon}<span>{t(section.label)}</span>
+                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts)) && <span className="ui-nav-dirty" title={t("settings.section.waiting")} />}
+              </button>)}
+            </nav>
+            <div className="settings-content">
+              <div className="settings-column">
+                <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
+                <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
+                <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
+                <Pane id="providers" current={current}><ProviderKeys /></Pane>
+                <Pane id="machines" current={current}><MachineList /></Pane>
+                <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
+              </div>
+            </div>
+          </form>
+        </DialogSurface>
+      </OverlayPortalProvider>
+    </dialog>
   );
 }

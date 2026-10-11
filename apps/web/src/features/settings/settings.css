@@ -1,0 +1,42 @@
+/* Settings (SettingsDialog): a full-screen page — its sections beside the content on a desktop, a scrolling row of
+ * them above it on a phone — on the design system's dialog shell (components/ui/ui.css `.ui-dialog`). */
+
+.settings-page .ui-dialog-body--flush { display: flex; min-height: 0; }
+.settings-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; margin: 0; }
+.settings-nav { min-height: 0; padding: var(--sv-space-3); overflow: auto; border-inline-end: 1px solid var(--sv-border); background: var(--sv-bg-subtle); }
+.settings-content { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.settings-column { width: 100%; max-width: 760px; padding: var(--sv-space-8) var(--sv-space-10) var(--sv-space-12); }
+.settings-pane { min-width: 0; }
+.settings-note { margin-top: var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.settings-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.settings-error { margin: 0 auto 0 0; color: var(--sv-danger); font-size: var(--sv-font-sm); }
+.settings-error:empty { display: none; }
+.settings-page .ui-dialog-reason { margin-inline-start: auto; }
+.settings-error:not(:empty) + .ui-dialog-reason { margin-inline-start: 0; }
+#reset-settings-note:empty { display: none; }
+
+/* A provider: its mark beside its name; its key's field, and what saving said, before its actions. */
+.provider-name { display: inline-flex; align-items: center; gap: var(--sv-space-3); }
+.provider-mark { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-sm); background: var(--sv-surface); color: var(--sv-text); }
+.provider-mark:empty { display: none; }
+.provider-key { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-3); }
+.provider-key-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
+.provider-key-actions [role="status"] { margin: 0 auto 0 0; font-size: var(--sv-font-sm); }
+.provider-key-actions [role="status"]:empty { visibility: hidden; }
+
+/* A voice slot: the model's block under its row; a try's outcome under the block; the speed with its value. */
+.ui-row--block .model-prepare { margin-top: var(--sv-space-3); }
+.voice-try-result:empty { display: none; }
+.voice-try-result { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-3); font-size: var(--sv-font-sm); }
+.voice-try-result .speech-bubble { margin: var(--sv-space-1) 0 0; padding: var(--sv-space-2) var(--sv-space-3); border-radius: var(--sv-radius-lg); background: var(--sv-bubble-self); color: var(--sv-text); font-size: var(--sv-font-md); }
+.stage-try-error { color: var(--sv-danger); }
+.voice-speed { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
+.voice-speed input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
+.voice-speed output { min-width: 3.5em; font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
+
+@media (max-width: 767px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-nav { display: flex; gap: var(--sv-space-1); padding: var(--sv-space-2); overflow-x: auto; overflow-y: hidden; border-inline-end: 0; border-bottom: 1px solid var(--sv-border); scrollbar-width: none; }
+  .settings-nav .ui-nav-item { width: auto; flex: none; }
+  .settings-column { padding: var(--sv-space-5) var(--sv-space-4) var(--sv-space-8); }
+}

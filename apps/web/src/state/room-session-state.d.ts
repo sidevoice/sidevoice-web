@@ -25,6 +25,8 @@ export interface SessionFacts {
  pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number; machinesReady: boolean;
  /** Per-fingerprint host agent listings. A late response remains attached to its host. */
  hostAgents: Record<string, HostAgentsState>; settingsAgentRequest: SettingsAgentRequest | null;
+  /** The section Settings shows. */
+  settingsSection: string;
  localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number}>;
  /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */

@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
+import { Alert } from "../../components/ui/Alert";
+import { Field } from "../../components/ui/Field";
+import { Input } from "../../components/ui/Input";
+import { Group, Row, Section } from "../../components/ui/Card";
+import { ProviderLogo } from "../../components/ui/Icons";
 import { remoteProviders } from "../../services/voice-settings.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 
@@ -34,17 +40,21 @@ export function ProviderKey({ provider, name, t }: { provider: string; name: str
   };
   return (
     <div className="provider-key" data-provider={provider}>
-      <div className="provider-key-head"><strong>{name}</strong><span className="muted">{kept === true ? t("keys.kept") : kept === false ? t("keys.missing") : "—"}</span></div>
-      <label>{t("keys.label", { provider: name })}
-        <input id={"provider-key-" + provider} type="password" autoComplete="off" spellCheck={false} value={value} placeholder={kept ? t("keys.placeholder.replace") : t("keys.placeholder.new")} onChange={(event) => setValue(event.target.value)} />
-      </label>
+      <Field label={t("keys.label", { provider: name })} aside={<Badge tone={kept === true ? "positive" : "neutral"} dot={kept === true}>{kept === true ? t("keys.kept") : kept === false ? t("keys.missing") : "—"}</Badge>}>
+        <Input id={"provider-key-" + provider} type="password" autoComplete="off" spellCheck={false} value={value} placeholder={kept ? t("keys.placeholder.replace") : t("keys.placeholder.new")} onChange={(event) => setValue(event.target.value)} />
+      </Field>
       <div className="provider-key-actions">
-        <Button id={"provider-key-save-" + provider} disabled={busy || !value.trim()} onClick={() => void keep(value.trim())}>{t("keys.save")}</Button>
-        <Button id={"provider-key-remove-" + provider} variant="ghost" disabled={busy || kept !== true} onClick={() => void keep(null)}>{t("keys.remove")}</Button>
+        <p className="muted" role="status">{note}</p>
+        <Button id={"provider-key-remove-" + provider} variant="ghost" tone="neutral" size="sm" disabled={busy || kept !== true} onClick={() => void keep(null)}>{t("keys.remove")}</Button>
+        <Button id={"provider-key-save-" + provider} size="sm" disabled={busy || !value.trim()} loading={busy} onClick={() => void keep(value.trim())}>{t("keys.save")}</Button>
       </div>
-      <p className="muted" role="status">{note}</p>
     </div>
   );
+}
+
+/** A provider's name with its own mark, when it has one here. */
+export function ProviderName({ provider, name }: { provider: string; name: string }) {
+  return <span className="provider-name"><span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={18} /></span>{name}</span>;
 }
 
 export function ProviderKeys() {
@@ -53,21 +63,22 @@ export function ProviderKeys() {
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   const providers = remoteProviders(catalogue.catalogs);
   return (
-    <section id="pane-providers" aria-labelledby="settings-providers" hidden>
-      <h3>{t("keys.title")}</h3>
-      <p className="muted">{t("keys.intro")}</p>
+    <Section id="providers" title={t("keys.title")} description={t("keys.intro")}>
       {inApp
         ? <p className="muted" id="provider-keys-where">{t("keys.inApp")}</p>
-        : <p className="provider-keys-warning" id="provider-keys-where" role="note">{t("keys.browser")}</p>}
+        : <div id="provider-keys-where" role="note"><Alert tone="warning" title={t("keys.browserTitle")}>{t("keys.browser")}</Alert></div>}
       {/* The providers are the engine's remote catalogues: while they load, or when they could not be read, it says so
           rather than listing none. */}
       {catalogue.state === "loading" || catalogue.state === "idle" ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
       {catalogue.state === "failed" ? (
-        <p role="alert" className="voice-catalogue-error" id="provider-keys-failed">{catalogue.error} <Button id="provider-keys-retry" variant="ghost" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button></p>
+        <div id="provider-keys-failed" role="alert"><Alert tone="danger" title={catalogue.error}
+          action={<Button id="provider-keys-retry" size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /></div>
       ) : null}
       {catalogue.state === "ready" ? (providers.length
-        ? providers.map((provider) => <ProviderKey key={provider.id} provider={provider.id} name={provider.name} t={t} />)
+        ? <Group>{providers.map((provider) => <Row key={provider.id} label={<ProviderName provider={provider.id} name={provider.name} />} block>
+            <ProviderKey provider={provider.id} name={provider.name} t={t} />
+          </Row>)}</Group>
         : <p className="muted" id="provider-keys-none">{t("keys.none")}</p>) : null}
-    </section>
+    </Section>
   );
 }

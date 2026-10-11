@@ -3,17 +3,18 @@ import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import type { DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
+import type { PrepareStatus } from "./ModelPrepare";
 
-/* A voice slot's chosen model made ready, the same in Settings → Voice and in the first-run setup (prototype B): one
- * of this device's catalogue is downloaded first when it is not on disk (its size said, with progress and cancel); a
- * provider's needs no download, only its key. Once ready, its options show (its voices, language, speed) and it can be
- * tried for real. */
+/* A voice slot's chosen model made ready, the same in Settings and in the first-run setup: one of this device's
+ * catalogue is downloaded first when it is not on disk (its size said, with progress and cancel), then checked; a
+ * provider's needs no download, only its key. ModelPrepare draws where it stands; this says where that is. */
 
 export type Task = "stt" | "tts";
 
 /** Where the slot's model stands: not on this device yet (with its download size), being installed, failed, ready. */
 export function useModelState(task: Task, draft: Settings | null) {
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
   const install = useRoomStore((state) => state.facts.voiceInstall);
   const slot = draft?.[task];
   const model = slot ? catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
@@ -21,15 +22,26 @@ export function useModelState(task: Task, draft: Settings | null) {
   const installed = !!model && (!local || model.installed === true || !!model.builds?.some((build) => build.installed));
   const build = model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
+  const installing = mine?.state === "running";
+  const failure = mine?.state === "failed" ? mine.error : "";
+  const ready = !!model && installed;
+  // Downloaded in full, it is checked before the install ends; then the catalogues are read again to see it there.
+  const status: PrepareStatus | null = !model ? null
+    : installing ? ((mine?.fraction ?? 0) >= 1 ? "verifying" : "downloading")
+    : failure ? "failed"
+    : ready ? "ready"
+    : local && catalogueState === "loading" ? "loading"
+    : "absent";
   return {
+    status,
     model,
     local,
     /** Ready to use: a provider's listed model, or one of this device's that is on disk. */
-    ready: !!model && installed,
+    ready,
     size: build?.downloadBytes ?? null,
-    installing: mine?.state === "running",
-    fraction: mine?.state === "running" ? mine.fraction : null,
-    failure: mine?.state === "failed" ? mine.error : "",
+    installing,
+    fraction: installing ? mine!.fraction : null,
+    failure,
   };
 }
 
@@ -45,30 +57,6 @@ export function sizeText(bytes: number | null, language = document.documentEleme
 /** The download of the slot's model: started, cancelled. */
 export const downloadModel = (task: Task) => void window.sidevoiceActions?.installVoiceModel?.(task);
 export const cancelDownload = () => window.sidevoiceActions?.cancelVoiceInstall?.();
-
-/** The card under the model: what it takes to be ready and how far that has got. With \`actionsInFooter\` (the setup),
- *  its main action is the dialog's; otherwise it carries its own. */
-export function ModelCard({ task, state, actionsInFooter = false }: { task: Task; state: ModelState; actionsInFooter?: boolean }) {
-  const t = hostTranslator();
-  if (!state.model || !state.local) return null;
-  const percent = state.fraction == null ? null : Math.round(state.fraction * 100);
-  return (
-    <div className="model-card" id={task + "-model-card"} data-state={state.installing ? "installing" : state.failure ? "failed" : state.ready ? "ready" : "absent"}>
-      {state.installing ? <>
-        <p className="muted" role="status">{percent == null ? t("voice.model.downloading") : t("voice.model.downloadingAt", { percent })}</p>
-        <progress max={1} value={state.fraction ?? undefined} aria-label={t("voice.model.downloading")} />
-        <Button type="button" variant="ghost" size="sm" id={task + "-model-cancel"} onClick={cancelDownload}>{t("voice.model.cancelDownload")}</Button>
-      </> : state.failure ? <>
-        <p className="stage-try-error" role="alert">{state.failure}</p>
-        {!actionsInFooter && <Button type="button" size="sm" onClick={() => downloadModel(task)}>{t("voice.retry")}</Button>}
-      </> : state.ready ? <p className="muted">{t("voice.model.here")}</p> : <>
-        <p className="muted">{state.size ? t("voice.model.notHere", { size: sizeText(state.size) }) : t("voice.model.notHereUnknown")}</p>
-        {!actionsInFooter && <Button type="button" variant="primary" size="sm" id={task + "-model-download"} onClick={() => downloadModel(task)}>
-          {state.size ? t("voice.model.download", { size: sizeText(state.size) }) : t("voice.model.downloadUnknown")}</Button>}
-      </>}
-    </div>
-  );
-}
 
 type TryState = { phase: "idle" | "running" | "done" | "failed"; text: string; error: string };
 

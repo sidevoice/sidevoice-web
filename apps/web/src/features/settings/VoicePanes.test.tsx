@@ -1,14 +1,20 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { VoiceSettings } from "./VoiceSettings";
+import { SlotPane, TurnChoices } from "./VoiceSettings";
 import { ProviderKeys } from "./ProviderKeys";
 import { StorageBlockedBanner } from "./StorageBlockedBanner";
-import { createRoomStore, installRoomBridge, RoomStoreContext } from "../../state/room-store";
+import { createRoomStore, installRoomBridge, RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { SidevoiceActions } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 
 afterEach(cleanup);
+
+/** Settings' transcription, voice and advanced sections, as the voice is chosen in them. */
+function VoicePanes() {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  return <><SlotPane task="stt" /><SlotPane task="tts" />{draft && <TurnChoices draft={draft} />}</>;
+}
 
 /* The voice and providers panes, on the engine's catalogues; the interface speaks English here (the test's system). */
 
@@ -35,7 +41,7 @@ function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {})
   const actions = { editVoice: vi.fn(), saveProviderKey: vi.fn().mockResolvedValue(undefined), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(), tryVoiceSettings: vi.fn().mockResolvedValue({}), cancelVoiceTry: vi.fn() };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
-  render(<RoomStoreContext.Provider value={store}>{pane === "voice" ? <VoiceSettings /> : <ProviderKeys />}</RoomStoreContext.Provider>);
+  render(<RoomStoreContext.Provider value={store}>{pane === "voice" ? <VoicePanes /> : <ProviderKeys />}</RoomStoreContext.Provider>);
   for (const section of document.querySelectorAll("section")) section.hidden = false;
   return { store, actions };
 }
@@ -53,10 +59,12 @@ test("a slot's source comes first: this device, then each provider, one without 
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { catalog: "elevenlabs" } });
 });
 
-test("then the source's models, this device's by family, one that does not run here disabled with why", () => {
-  renderPane("voice");
-  const groups = [...document.getElementById("stt-model")!.querySelectorAll("optgroup")].map((group) => [group.label, [...group.querySelectorAll("option")].map((option) => option.value)]);
-  expect(groups).toEqual([["whisper", ["whisper-base", "whisper-large"]], ["moonshine", ["moonshine-tiny"]]]);
+test("then the source's models, this device's family first and then a model of it, one that does not run here disabled with why", () => {
+  const { actions } = renderPane("voice");
+  expect(options("stt-family").map((option) => [option.value, option.textContent])).toEqual([["whisper", "Whisper"], ["moonshine", "Moonshine"]]);
+  expect(options("stt-model").map((option) => option.value)).toEqual(["whisper-base", "whisper-large"]);
+  fireEvent.change(document.getElementById("stt-family")!, { target: { value: "moonshine" } });
+  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { model: "moonshine-tiny" } });
   const large = options("stt-model").find((option) => option.value === "whisper-large")!;
   expect(large.disabled).toBe(true);
   expect(large.textContent).toBe("whisper-large — does not run here: it does not fit in this device's memory");
@@ -69,8 +77,7 @@ test("the voice and the speed range are the model's; smart-turn says why it cann
   fireEvent.change(document.getElementById("tts-voice")!, { target: { value: "ef_dora" } });
   expect(actions.editVoice).toHaveBeenCalledWith({ tts: { voice: "ef_dora" } });
   expect(options("voice-end-of-turn")[1].disabled).toBe(true);
-  expect(document.getElementById("end-of-turn-note")).toHaveTextContent("No end-of-turn model runs on this device yet");
-  expect(screen.getByText(/restarts the voice for a moment/)).toBeInTheDocument();
+  expect(screen.getByText(/No end-of-turn model runs on this device yet/)).toBeInTheDocument();
   cleanup();
   // A model that takes no speed has no slider.
   renderPane("voice", { voiceSettings: { ...defaultVoiceSettings("es"), tts: { catalog: "local", model: "piper", voice: null, speed: 1 } } });
@@ -79,9 +86,9 @@ test("the voice and the speed range are the model's; smart-turn says why it cann
 
 test("catalogues the engine could not give say why and can be asked again", () => {
   const { actions } = renderPane("voice", { voiceCatalogue: { state: "failed", catalogs: [], error: "The call's voice is not available yet." } });
-  expect(screen.getByRole("alert")).toHaveTextContent("not available yet");
+  expect(screen.getAllByText(/not available yet/)).toHaveLength(2);
   expect(document.getElementById("stt-model")).toBeNull();
-  fireEvent.click(document.getElementById("voice-catalogue-retry")!);
+  fireEvent.click(document.getElementById("stt-catalogue-retry")!);
   expect(actions.loadVoiceCatalogue).toHaveBeenCalled();
 });
 
@@ -142,7 +149,7 @@ const withVoiceModel = (model: string, catalog = "local") => ({ ...defaultVoiceS
 
 test("a model not on this device offers its download with its size; its voices wait until it is here", () => {
   const { actions } = renderPane("voice", { voiceSettings: withVoiceModel("piper-es") });
-  expect(document.getElementById("tts-model-card")).toHaveTextContent("Not on this device yet · 63 MB to download");
+  expect(document.getElementById("tts-model-card")).toHaveTextContent(/Not downloaded\s*63 MB/);
   expect(document.getElementById("tts-voice")).toBeNull();
   expect(document.getElementById("tts-try")).toBeNull();
   fireEvent.click(document.getElementById("tts-model-download")!);
@@ -154,7 +161,9 @@ test("while it downloads the card shows how far it has got, and the download can
     voiceInstall: { task: "tts", model: "piper-es", state: "running", fraction: 0.4, error: "" } });
   const card = document.getElementById("tts-model-card")!;
   expect(card).toHaveTextContent("Downloading… 40%");
-  expect((card.querySelector("progress") as HTMLProgressElement).value).toBe(0.4);
+  expect(card.querySelector("[role=progressbar]")).toHaveAttribute("aria-valuenow", "40");
+  // While it downloads, the model cannot be changed under it.
+  expect((document.getElementById("tts-model") as HTMLSelectElement).disabled).toBe(true);
   fireEvent.click(document.getElementById("tts-model-cancel")!);
   expect(actions.cancelVoiceInstall).toHaveBeenCalled();
   cleanup();
@@ -164,12 +173,12 @@ test("while it downloads the card shows how far it has got, and the download can
 
 test("once it is here its voices appear, and it can be tried without saving; a provider's model needs no download", async () => {
   const { actions } = renderPane("voice");
-  expect(document.getElementById("tts-model-card")).toHaveTextContent("On this device");
+  expect(document.getElementById("tts-model-card")).toHaveTextContent("Ready");
   expect(options("tts-voice").map((option) => option.value)).toEqual(["", "ef_dora"]);
   await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ keep: false }));
   cleanup();
   renderPane("voice", { voiceSettings: { ...defaultVoiceSettings("es"), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null } } });
-  expect(document.getElementById("stt-model-card")).toBeNull();
+  expect(document.getElementById("stt-model-card")).toHaveTextContent("No download needed");
   expect(document.getElementById("stt-language")).toBeInTheDocument();
 });

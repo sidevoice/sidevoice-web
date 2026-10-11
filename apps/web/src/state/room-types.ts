@@ -195,6 +195,8 @@ export interface SidevoiceActions {
   hostAgentAction?(fp: string, id: string, action: "connect" | "disconnect" | "dismiss"): Promise<void>;
   /** Open Settings → Machines at that machine's agents (all machines when null). */
   openAgentSettings?(fp: string | null): void;
+  /** Shows a section of Settings: general, transcription, voice, providers, machines, advanced. */
+  showSettingsSection?(section: string): void;
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;

@@ -6,6 +6,7 @@ import { ProgressBar } from "../../components/ui/ProgressBar";
 import { DownloadsIcon } from "../../components/ui/Icons";
 import { hostTranslator } from "./host-i18n";
 import { sizeText } from "./ModelSetup";
+import "./model-prepare.css";
 
 /* A chosen model made ready on this device, the same block wherever a model is chosen (the first-run setup, Settings):
  * the pickers on top, a line about the choice, then where it stands — to download (its size, said before anything is
@@ -18,7 +19,8 @@ import { sizeText } from "./ModelSetup";
 export type PrepareStatus = "absent" | "downloading" | "verifying" | "loading" | "ready" | "failed" | "needs-key";
 
 export interface ModelPrepareProps {
-  status: PrepareStatus;
+  /** None while no model is chosen (or the chosen one is not listed): the pickers and their note alone. */
+  status: PrepareStatus | null;
   /** The model's name, for what is said about it. */
   model: string;
   /** The family and model pickers; disabled by the block while a download runs. */
@@ -38,9 +40,12 @@ export interface ModelPrepareProps {
   onRetry?: () => void;
   onAddKey?: () => void;
   id?: string;
+  /** Its actions' ids: `<prefix>-download`, `-cancel`, `-retry`. */
+  actionIds?: string;
 }
 
-export function ModelPrepare({ status, model, pickers, meta, size = null, fraction = null, error, readyAction, onDownload, onCancel, onRetry, onAddKey, id }: ModelPrepareProps) {
+export function ModelPrepare({ status, model, pickers, meta, size = null, fraction = null, error, readyAction, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
+  const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = hostTranslator();
   const hintId = useId();
   const sized = size ? sizeText(size) : "";
@@ -51,10 +56,10 @@ export function ModelPrepare({ status, model, pickers, meta, size = null, fracti
       {pickers && <div className="model-prepare-pickers" aria-describedby={locked ? hintId : undefined}>{pickers(locked)}</div>}
       {locked && pickers && <p className="model-prepare-meta" id={hintId}>{t("voice.prepare.lockedHint")}</p>}
       {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
-      <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
+      {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
           <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{sized && <span className="model-prepare-note">{sized}</span>}</div>
-          <Button size="sm" onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>
+          <Button size="sm" id={actionId("download")} onClick={onDownload}><DownloadsIcon />{t("voice.prepare.download")}</Button>
         </>}
         {status === "downloading" && <>
           <div className="model-prepare-progress">
@@ -64,7 +69,7 @@ export function ModelPrepare({ status, model, pickers, meta, size = null, fracti
             </div>
             <ProgressBar value={fraction} label={t("voice.prepare.downloading")} />
           </div>
-          <Button size="sm" variant="ghost" tone="neutral" onClick={onCancel}>{t("voice.prepare.cancel")}</Button>
+          <Button size="sm" variant="ghost" tone="neutral" id={actionId("cancel")} onClick={onCancel}>{t("voice.prepare.cancel")}</Button>
         </>}
         {(status === "verifying" || status === "loading") && <div className="model-prepare-state">
           <span className="ui-spinner ui-spinner--inline" aria-hidden />
@@ -82,8 +87,8 @@ export function ModelPrepare({ status, model, pickers, meta, size = null, fracti
           <Button size="sm" variant="ghost" onClick={onAddKey}>{t("voice.prepare.addKey")}</Button>
         </>}
         {status === "failed" && <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })}
-          action={<Button size="sm" onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>}
-      </div>
+          action={<Button size="sm" id={actionId("retry")} onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>}
+      </div>}
     </div>
   );
 }
