@@ -1321,13 +1321,13 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
  finally{if(voiceTry===abort)voiceTry=null}
 }
 function cancelVoiceTry(){voiceTry?.abort()}
-// A model of this device's catalogue the slot names but that is not on disk: installed on this device (its recommended
-// build), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
+// A model of this device's catalogue the slot names but that is not on disk: installed on this device (the build the
+// slot names, else its recommended one), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
 let voiceInstall=null;
 async function installVoiceModel(task){
  const slot=(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
  const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
- const build=model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
+ const build=(slot.build&&model?.builds?.find(b=>b.id===slot.build))??model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
  voiceInstall?.abort();const abort=voiceInstall=new AbortController();
  const at=fraction=>roomStore.patch({voiceInstall:{task,model:slot.model,state:'running',fraction,error:''}});
  at(null);

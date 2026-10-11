@@ -12,6 +12,7 @@ import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ProviderKey } from "./ProviderKeys";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
+import { ModelRuntime } from "./ModelRuntime";
 import { cancelDownload, downloadModel, TryResult, useModelState, useVoiceTry, type ModelState } from "./ModelSetup";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
@@ -138,6 +139,7 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
           readyAction={tryButton || undefined} onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)}
           onAddKey={() => window.sidevoiceActions?.showSettingsSection?.("providers")} />
+        <ModelRuntime task={task} state={model} locked={model.installing} />
         {!setup && <TryResult task={task} trial={trial} t={t} />}
       </Row>
       {model.ready && task === "stt" && <Row label={t("voice.language")} description={t("voice.language.hint")} htmlFor="stt-language">

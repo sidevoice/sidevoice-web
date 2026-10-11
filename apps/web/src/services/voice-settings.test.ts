@@ -98,3 +98,10 @@ test("a kept model its catalogue no longer lists stays chosen and says so; smart
 test("the remote providers are the remote catalogues", () => {
   expect(remoteProviders(CATALOGS)).toEqual([{ id: "elevenlabs", name: "ElevenLabs" }, { id: "openai", name: "OpenAI" }]);
 });
+
+test("a build chosen is the model's: another model, or Automatic, drops it", () => {
+  const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: null, build: "whisper-base/q8" } };
+  expect(editVoiceSettings(settings, { stt: { language: "es" } }, CATALOGS).stt.build).toBe("whisper-base/q8");
+  expect(editVoiceSettings(settings, { stt: { model: "moonshine-tiny" } }, CATALOGS).stt).not.toHaveProperty("build");
+  expect(editVoiceSettings(settings, { stt: { build: null } } as never, CATALOGS).stt).not.toHaveProperty("build");
+});

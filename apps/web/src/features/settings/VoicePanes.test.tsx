@@ -197,3 +197,16 @@ test("once it is here its voices appear, and it can be tried without saving; a p
   expect(document.getElementById("stt-model-card")).toHaveTextContent("No download needed");
   expect(document.getElementById("stt-language")).toBeInTheDocument();
 });
+
+test("how a model runs folds under it: each build with what it runs on and its sizes, Automatic the engine's own", () => {
+  const { actions } = renderPane("voice");
+  const toggle = document.querySelector("#stt-model-card ~ .model-runtime .model-runtime-toggle") as HTMLButtonElement;
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(toggle);
+  const options = [...document.querySelectorAll(".model-runtime-option")].slice(0, 2);
+  expect(options[0]).toHaveTextContent("Automatic (recommended)");
+  expect(options[0].querySelector("input")).toBeChecked();
+  expect(options[1]).toHaveTextContent("Sherpa-ONNX · int8 · processor");
+  fireEvent.click(options[1].querySelector("input")!);
+  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { build: "whisper-base/int8" } });
+});

@@ -22,7 +22,7 @@ export const VAD_OPTIONS = { threshold: 0.6, minSilenceMs: 200, minSpeechMs: 400
 
 type Capability = ModelInfo["capabilities"][number];
 /** A slot's model as the settings name it. */
-interface ModelChoice { catalog: string; model: string }
+interface ModelChoice { catalog: string; model: string; build?: string }
 
 /** A refusal with a code, and what a provider said when it is the one refusing. */
 export function voiceRefusal(code: string, message = code, detail?: string): Error & { code: string; detail?: string } {
@@ -37,8 +37,9 @@ function asRefusal(error: unknown): Error {
 
 /** `choice` as the settings hold it, or null when it does not name a catalogue and a model. */
 function choiceOf(slot: VoiceSettings["stt"] | VoiceSettings["tts"]): ModelChoice | null {
-  const { catalog, model } = slot as Partial<ModelChoice>;
-  return typeof catalog === "string" && catalog && typeof model === "string" && model ? { catalog, model } : null;
+  const { catalog, model, build } = slot as Partial<ModelChoice>;
+  return typeof catalog === "string" && catalog && typeof model === "string" && model
+    ? { catalog, model, ...(typeof build === "string" && build ? { build } : {}) } : null;
 }
 
 /** Whether a local model can run here: a build of it is available. */
@@ -117,7 +118,10 @@ export interface VoiceSourceOptions {
 /** The page's source of models for `createVoiceHost`, over `engine`. */
 export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSourceOptions = {}): VoiceModelSource {
   const progress = (model: string) => (value: Progress) => onProgress?.(model, value);
-  const load = (choice: ModelChoice) => (catalogOf(engine, choice.catalog).load(choice.model, progress(choice.model)) as Promise<Model>)
+  // A build the person chose (Settings, "How it runs") is loaded as such; else the engine picks one installed that runs.
+  const load = (choice: ModelChoice) => ((choice.build && choice.catalog === "local"
+    ? engine.load(choice.model, choice.build, progress(choice.model))
+    : catalogOf(engine, choice.catalog).load(choice.model, progress(choice.model))) as Promise<Model>)
     .catch((error: unknown) => { throw asRefusal(error); });
   return {
     async models(settings: VoiceSettings): Promise<VoiceModels> {

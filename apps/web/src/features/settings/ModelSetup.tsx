@@ -19,8 +19,10 @@ export function useModelState(task: Task, draft: Settings | null) {
   const slot = draft?.[task];
   const model = slot ? catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
   const local = slot?.catalog === "local";
-  const installed = !!model && (!local || model.installed === true || !!model.builds?.some((build) => build.installed));
-  const build = model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
+  // The build it runs as: the one chosen (Settings, "How it runs"), else the engine's recommended one.
+  const chosen = slot?.build ? model?.builds?.find((candidate) => candidate.id === slot.build) : undefined;
+  const build = chosen ?? model?.builds?.find((candidate) => candidate.id === model.recommendedBuild) ?? model?.builds?.find((candidate) => candidate.available);
+  const installed = !!model && (!local || (chosen ? chosen.installed : model.installed === true || !!model.builds?.some((candidate) => candidate.installed)));
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
   const installing = mine?.state === "running";
   const failure = mine?.state === "failed" ? mine.error : "";
@@ -39,6 +41,9 @@ export function useModelState(task: Task, draft: Settings | null) {
     /** Ready to use: a provider's listed model, or one of this device's that is on disk. */
     ready,
     size: build?.downloadBytes ?? null,
+    /** The build it runs as, and whether it was chosen rather than the engine's. */
+    build: build ?? null,
+    buildChosen: !!chosen,
     installing,
     fraction: installing ? mine!.fraction : null,
     failure,

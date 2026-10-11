@@ -495,6 +495,22 @@ export const en = {
   "keys.why.unreachable": "{provider} couldn't be reached from here; the key may be fine.",
   "keys.why.unreadable": "This device couldn't read the saved key.",
   "keys.why.problem": "{provider} reported a problem with the key.",
+  // How a model runs (ModelRuntime).
+  "runtime.title": "How it runs",
+  "runtime.auto": "Automatic (recommended)",
+  "runtime.autoHint": "The engine picks the best build for this device.",
+  "runtime.recommended": "Recommended",
+  "runtime.onDisk": "On this device",
+  "runtime.sizes": "{download} download · {memory} in memory",
+  "runtime.notHere": "Doesn't run here: {reasons}",
+  "runtime.on.gpu": "graphics card (WebGPU)",
+  "runtime.on.cpu": "processor",
+  "runtime.on.apple": "Apple silicon",
+  "runtime.device": "This device: {what}",
+  "runtime.device.gpu": "graphics card available to the browser",
+  "runtime.device.noGpu": "no graphics card the browser can use",
+  "runtime.device.memory": "about {gb} GB of memory",
+  "runtime.device.cores": "{n} cores",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

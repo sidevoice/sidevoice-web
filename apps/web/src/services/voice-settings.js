@@ -10,8 +10,8 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
  * @typedef {import('./model-catalogs.js').CatalogView} CatalogView
  * @typedef {import('./model-catalogs.js').CatalogModel} CatalogModel
  * @typedef {{
- *   stt: {catalog: string, model: string, language: string | null},
- *   tts: {catalog: string, model: string, voice: string | null, speed: number},
+ *   stt: {catalog: string, model: string, language: string | null, build?: string},
+ *   tts: {catalog: string, model: string, voice: string | null, speed: number, build?: string},
  *   patience: NonNullable<VoiceSettings['patience']>,
  *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
  *   idle_unload_minutes: number,
@@ -62,12 +62,14 @@ export function normaliseVoiceSettings(value, defaults) {
       catalog: sttNamed ? stt.catalog : defaults.stt.catalog,
       model: sttNamed ? stt.model : defaults.stt.model,
       language: stt.language === null ? null : text(stt.language) ?? defaults.stt.language,
+      ...(sttNamed && text(stt.build) ? { build: stt.build } : {}),
     },
     tts: {
       catalog: ttsNamed ? tts.catalog : defaults.tts.catalog,
       model: ttsNamed ? tts.model : defaults.tts.model,
       voice: ttsNamed ? text(tts.voice) : null,
       speed: Number.isFinite(speed) && speed > 0 ? speed : defaults.tts.speed,
+      ...(ttsNamed && text(tts.build) ? { build: tts.build } : {}),
     },
     patience: PATIENCE.includes(value?.patience) ? value.patience : defaults.patience,
     end_of_turn: END_OF_TURN.includes(value?.end_of_turn) ? value.end_of_turn : defaults.end_of_turn,
@@ -120,6 +122,10 @@ export function editVoiceSettings(settings, patch, catalogs = []) {
       const first = offered(catalogs.find((catalog) => catalog.id === slot.catalog), capability).find((model) => runs(model));
       slot.model = first?.id ?? '';
     }
+  }
+  // A build is one model's: another model, or none asked for, is the engine's own choice again.
+  for (const [slot, before, asked] of [[stt, settings.stt, patch.stt], [tts, settings.tts, patch.tts]]) {
+    if (slot.catalog !== before.catalog || slot.model !== before.model || (asked && 'build' in asked && !asked.build)) delete slot.build;
   }
   if (stt.catalog !== settings.stt.catalog || stt.model !== settings.stt.model) {
     const languages = findModel(catalogs, stt.catalog, stt.model)?.languages ?? [];
