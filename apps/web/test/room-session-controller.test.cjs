@@ -1554,8 +1554,14 @@ test('A machine that refuses this device while merely watched says so in its row
  await s.run("refreshPeople('fp-pc')");
  assert.equal(s.run('roomStore.getState().machines.find(m=>m.id===\'fp-pc\').state'),'revoked');
  assert.ok(s.run('state.ws'),'the call on the Mac goes on');
- assert.equal(s.run('roomStore.getState().pairing.open'),false,'nobody busy with another machine is asked for a code');
+ assert.equal(s.run('roomStore.getState().pairing.open'),false,'met while merely watching it: nobody is asked for a code');
  assert.deepEqual(plain(s.run('roomStore.getState().participants').map(row=>[row.threadId,row.reach])),[['fp-mac|a','listening'],['fp-pc|p','offline']]);
+ // The person's own act on that machine's page is answered: a new code is asked for, about that machine.
+ s.run("pairings={list:pairings.list.map(p=>p.fp==='fp-pc'?{...p,revoked:false}:p)};hostAgentBases.set('fp-pc','https://pc.example');verified.set('https://pc.example',Date.now())");
+ await assert.rejects(s.run("hostApi('fp-pc','/api/host/agents')"));
+ assert.equal(s.run('roomStore.getState().pairing.open'),true);
+ assert.match(s.run('roomStore.getState().pairing.note'),/«pc» ya no reconoce este dispositivo/);
+ assert.ok(s.run('state.ws'),'and the call on the Mac still goes on');
  s.run('disconnect()');
 });
 test('A join goes to the machine of the conversation looked at, and a ticket kept for another machine is not used there',async()=>{

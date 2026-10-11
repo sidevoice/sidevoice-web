@@ -628,18 +628,20 @@ function callBeat(){if(state.callNode==null)return;void refresh();void refreshHi
 /* ----- pairing this device with a machine (`device-pairing.js`) ----- */
 function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
 function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
-// A machine no longer knows this device's token: the pairing is kept, saying so, and its conversations with it. Only
-// when that machine is the call's does the call end, and a new code is asked for: a machine refusing while it is merely
-// watched says so in its row, and asks nothing of a person who is busy with another.
+// A machine no longer knows this device's token: the pairing is kept, saying so, and its conversations with it. When it
+// is the call's machine the call ends. A new code is asked for only when the refusal answers something the person did
+// on that machine — the call, or an action on its page (`asked`): one the page met while merely watching it says so in
+// its row, and asks nothing of a person who may be busy with another.
 // `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
-function pairingRefused(fp,{call=false,token=null}={}){
+function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
  keepPairings(revokedPairing(pairings,fp));
  settleLink(fp,null,'revoked');
- if(fp!==state.callNode||!(call||inCallNow()))return;
- const text=reachNote(state);
- disconnect();
- reachFailure={text,node:fp};failJoin(text);
+ const onCall=fp===state.callNode&&(call||inCallNow());
+ if(!onCall&&!asked)return;
+ // Said of the machine that refused, whichever one the call is on.
+ const text=reachNote({...roomStore.getState().facts,callNode:fp});
+ if(onCall){disconnect();reachFailure={text,node:fp};failJoin(text)}
  openPairing(text);
 }
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
@@ -740,7 +742,8 @@ async function hostApi(fp,path,options={}){
  finally{clearTimeout(timer)}
  let data=null;
  try{data=await response.json()}catch{}
- if(response.status===401){pairingRefused(fp,{token:pairing.token});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ // Asked of the machine from its page — its agents, its devices, its card: the person's own act on it.
+ if(response.status===401){pairingRefused(fp,{token:pairing.token,asked:true});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
  if(!response.ok){
   const failure=data?.error&&typeof data.error==='object'?data.error:data;
   const key=typeof failure?.key==='string'&&/^[a-z0-9._-]+$/.test(failure.key)?failure.key:response.status===503?'no-connector':'request-failed';
