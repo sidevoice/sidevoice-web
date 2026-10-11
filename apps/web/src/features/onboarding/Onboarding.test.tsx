@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
@@ -42,7 +42,10 @@ function room() {
   render(<App store={store} />);
   return store;
 }
-const title = () => screen.getByRole("heading", { level: 2 });
+// Asked of the setup alone: Settings is drawn under it, and a role query over the whole page costs a third of a second
+// each under jsdom — enough, a few times over, to run a test past its time on a busy machine.
+const wizard = () => within(document.getElementById("wizard")!);
+const title = () => wizard().getByRole("heading", { level: 2 });
 const stageAction = () => document.getElementById("wizard-stage-action") as HTMLButtonElement;
 const tryButton = () => document.getElementById("wizard-try") as HTMLButtonElement;
 // Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
@@ -123,8 +126,8 @@ test("transcription and voice are this device's: trying them is recommended, and
   // What was set up, read from what the steps wrote, and what to tell an agent.
   expect(document.querySelector(".wizard-recap-list")).toHaveTextContent("Transcription");
   expect(document.querySelector(".wizard-ready .ui-quote blockquote")).toHaveTextContent("voice_connect");
-  expect(screen.getByRole("button", { name: "Copy the message for your agent" })).toHaveClass("ui-copy-button");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
+  expect(wizard().getByRole("button", { name: "Copy the message for your agent" })).toHaveClass("ui-copy-button");
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
   const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);
   expect(kept.completed_at).toBeGreaterThan(0);
   expect(kept.trials.tts).toBeUndefined();
@@ -136,20 +139,20 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   paired(store);
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(screen.getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
-  expect(card("stt")).toContainElement(screen.getByRole("alert"));
+  expect(wizard().getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
+  expect(card("stt")).toContainElement(wizard().getByRole("alert"));
   expect(title()).toHaveTextContent("Set up transcription");
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
 
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key) => { if (key === ONBOARDING_STORAGE_KEY) throw new DOMException("blocked", "SecurityError"); });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
   expect(title()).toHaveTextContent("You’re all set — talk to your agents");
-  expect(screen.getByRole("alert")).toHaveTextContent("Setup progress was not saved");
+  expect(wizard().getByRole("alert")).toHaveTextContent("Setup progress was not saved");
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
   setItem.mockRestore();
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Retry" })); });
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
 });
 
