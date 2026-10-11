@@ -1,6 +1,6 @@
 import * as DropdownPrimitive from "@radix-ui/react-dropdown-menu";
-import type { ReactNode } from "react";
-import { useOverlayPortal } from "./Tooltip";
+import { useRef, useState, type ReactNode } from "react";
+import { overlayContainer, useOverlayPortal } from "./Tooltip";
 
 interface DropdownMenuProps {
   label: string;
@@ -9,11 +9,14 @@ interface DropdownMenuProps {
 }
 
 export function DropdownMenu({ label, trigger, children }: DropdownMenuProps) {
-  const portalContainer = useOverlayPortal();
+  const provided = useOverlayPortal();
+  // Its own open state, so it renders as it opens and finds where it is drawn (overlayContainer) from its trigger.
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLButtonElement>(null);
   return (
-    <DropdownPrimitive.Root>
-      <DropdownPrimitive.Trigger asChild aria-label={label}>{trigger}</DropdownPrimitive.Trigger>
-      <DropdownPrimitive.Portal container={portalContainer ?? undefined}>
+    <DropdownPrimitive.Root open={open} onOpenChange={setOpen}>
+      <DropdownPrimitive.Trigger asChild aria-label={label} ref={anchor}>{trigger}</DropdownPrimitive.Trigger>
+      <DropdownPrimitive.Portal container={overlayContainer(provided, anchor.current)}>
         <DropdownPrimitive.Content className="ui-dropdown" sideOffset={8} collisionPadding={12} aria-label={label}>
           {children}
         </DropdownPrimitive.Content>
