@@ -18,6 +18,12 @@ export interface Shot {
   desktop?: Record<string, unknown>;
   /** What is pressed once the page is drawn. */
   after?: (doc: Document) => void | Promise<void>;
+  /** The setup's record over the base's (a device set up on this release). */
+  record?: Partial<OnboardingRecord>;
+  /** The variants this shot shows (VARIANTS). */
+  variants?: Record<string, string>;
+  /** The desktop app's updater's answer, where it offers one. */
+  updater?: { available: boolean; version?: string; required?: boolean };
   /** A pairing code's redemption, for the pairing shots: its refusal, in the controller's words. */
   pairRefusal?: string;
   views?: ("phone" | "desktop")[];
@@ -127,5 +133,14 @@ export const JOURNEYS: Journey[] = [
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], pairingInUse: LAPTOP.fp, node: LAPTOP.fp, nodeReach: "away" }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], pairingInUse: NUC.fp, nodeReach: "revoked" }, after: openSettings("machines") },
     { id: "s-advanced", caption: "Advanced: memory when idle, the downloaded models, reset, the build.", facts: { modelsRemovable: true }, after: openSettings("advanced") },
+  ] },
+  { id: "updates", title: "Updates and what's new", note: "What wants updating, behind one quiet entry; what a release added, shown once, never the setup again.", shots: [
+    { id: "u-web", caption: "A new version of the page while in a call: Reload waits for the call to end.", facts: { webUpdate: "b2" } },
+    { id: "u-several", caption: "Several at once: the desktop app, the page, this computer's machine; one entry with their count.", facts: { webUpdate: "b2", pairings: [THIS, NUC], localHostStatus: running },
+      updater: { available: true, version: "0.5.0" }, desktop: { ...localBridge(running), version: { bridge: 1, bundled: { version: "0.5.0" }, installed: { version: "0.4.0" }, core_api: 1, update: "available" } } },
+    { id: "u-phone-panel", caption: "On a phone, variant B: in the dropped panel, a dot on the chevron.", facts: { webUpdate: "b2" }, variants: { "updates-entry": "panel" }, views: ["phone"] },
+    { id: "whats-new", caption: "What's new for someone set up on an earlier release: only what needs them, with Set up.", record: { baseline_release: 0 },
+      facts: { voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } } },
+    { id: "whats-new-panel", caption: "What's new, variant B: a section of the updates' list.", record: { baseline_release: 0 }, variants: { "whats-new": "panel" } },
   ] },
 ];

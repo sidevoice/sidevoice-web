@@ -22,7 +22,8 @@ document.documentElement.dataset.theme = theme;
 document.documentElement.style.colorScheme = theme;
 const root = createRoot(document.getElementById("root")!);
 
-const DONE = { basics_done: true, choice: "remote" as const, agents_done: true, turn_done: true, completed_at: 1 };
+// Set up on this release: no news to show, unless a shot says otherwise.
+const DONE = { basics_done: true, choice: "remote" as const, agents_done: true, turn_done: true, completed_at: 1, baseline_release: 2 };
 const noop = () => undefined;
 const later = () => Promise.resolve(undefined);
 
@@ -30,16 +31,24 @@ const later = () => Promise.resolve(undefined);
 function renderShot(shot: Shot) {
   document.documentElement.dataset.shot = "";
   const memory = new Map<string, string>();
-  const record = shot.setup ? { ...emptyOnboardingRecord(), ...shot.setup.record } : { ...emptyOnboardingRecord(), ...DONE };
+  const record = shot.setup ? { ...emptyOnboardingRecord(), ...shot.setup.record } : { ...emptyOnboardingRecord(), ...DONE, ...shot.record };
   memory.set("sidevoice.onboarding", JSON.stringify(record));
   const repository = createOnboardingRepository({ getItem: (key) => memory.get(key) ?? null, setItem: (key, value) => void memory.set(key, value) });
+  // The variants this shot shows, read by this frame alone: the frames share one storage, and each shows its own.
+  const getItem = Storage.prototype.getItem;
+  Storage.prototype.getItem = function (key: string) {
+    return this === localStorage && key === "sidevoice.variants" ? JSON.stringify(shot.variants ?? {}) : getItem.call(this, key);
+  };
+  if (shot.updater) (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { updater: { status: async () => shot.updater, restart: later } } };
   if (shot.desktop) {
     const status = shot.desktop.state as Record<string, unknown>;
-    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { localHost: {
+    const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};
+    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { ...host, localHost: {
       state: async () => status, subscribe: () => noop, pairing: async () => null, install: () => Object.assign(new Promise(noop), { job: "j" }),
       start: later, stop: later, restart: later, serviceInstall: later, serviceUninstall: later, agents: async () => ({ agents: [
         { id: "claude-code", label: "Claude Code", version: "2.4" }, { id: "codex", label: "Codex", version: "0.157" }] }),
       ...(shot.desktop.pairingCode ? { pairingCode: async () => ({ code: "SV1.7KQ2-M9XA", expires_in: 600, reach: "direct" }) } : {}),
+      ...(shot.desktop.version ? { version: async () => shot.desktop!.version, update: later } : {}),
     } } };
   }
   // The actions the runtime would bind: here they do nothing, and a pairing code is refused as the shot says.
