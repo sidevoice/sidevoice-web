@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { conversationTranslator } from "./conversation-i18n";
+import "./transcript.css";
 
 /* The bubble of the turn being recorded is the microphone itself: a canvas that pulls the meter's analyser
  * once per animation frame and paints its own pixels. React renders this element once per phase, never per
@@ -11,10 +13,10 @@ const FLOOR = 2; // a silent column is still a line, never a gap
 
 export type WaveformPhase = "listening" | "transcribing";
 
-const LABELS: Record<WaveformPhase, { aria: string; title: string }> = {
-  listening: { aria: "Escuchando", title: "Escuchando…" },
-  transcribing: { aria: "Transcribiendo tu intervención", title: "Transcribiendo…" },
-};
+const LABELS = {
+  listening: { aria: "wave.listening", title: "wave.listeningTitle" },
+  transcribing: { aria: "wave.transcribing", title: "wave.transcribingTitle" },
+} as const;
 
 /** The same 60 dB window the call meter uses (`measureMic`), so bubble and meter agree on how loud this is. */
 export function waveColumn(samples: Float32Array): number {
@@ -117,7 +119,8 @@ export function VoiceWaveform({ phase }: { phase: WaveformPhase }) {
     return () => { stop(); observer.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, [phase, reduced]);
 
-  const label = LABELS[phase];
+  const t = conversationTranslator();
+  const label = { aria: t(LABELS[phase].aria), title: t(LABELS[phase].title) };
   if (reduced) return <span className="voice-bars" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
   return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><canvas ref={canvas} aria-hidden="true" /></span>;
 }

@@ -324,9 +324,12 @@ test("the phone sheet keeps Tab inside, and steps aside for a dialog opened over
   const toggle = screen.getByRole("button", { name: "Show transcript" });
   toggle.focus();
   await act(async () => { fireEvent.click(toggle); });
+  // In the room the runtime enables the text box, the sheet's last stop: from its first, Shift+Tab wraps to it.
+  const box = document.getElementById("text-message") as HTMLTextAreaElement;
+  box.disabled = false;
   const close = screen.getByRole("button", { name: "Close transcript" });
-  expect(fireEvent.keyDown(close, { key: "Tab" })).toBe(false);
-  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Write a message" }));
+  expect(fireEvent.keyDown(close, { key: "Tab", shiftKey: true })).toBe(false);
+  expect(document.activeElement).toBe(box);
   // The runtime opens its pairing dialog over the sheet: Tab is the dialog's now.
   const dialog = document.createElement("dialog");
   const inside = document.createElement("button");
