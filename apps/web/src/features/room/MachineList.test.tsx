@@ -64,12 +64,19 @@ test("the local host is first, remote rows say Connected without revealing a rou
   expect(done.chooseMachine).toHaveBeenCalledWith("fp-nuc");
 });
 
-test("an unreachable remote machine only says No response, and can still be forgotten", () => {
-  actions();
+test("an unreachable remote machine only says No response, and can still be forgotten from this device's row", () => {
+  const done = { ...actions(), machineDevices: vi.fn(), forgetMachine: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { pairingInUse: "fp-nuc", node: "fp-nuc", nodeReach: "away" });
   expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toMatch(/No response/);
   expect(screen.queryByRole("button", { name: /Retry NUC/ })).toBeNull();
-  expect(screen.getByRole("button", { name: /Forget NUC/ })).toBeInTheDocument();
+  // Its list can't be read, but this device knows it is paired: its own row, with Forget, which never waits on the machine.
+  expect(done.machineDevices).not.toHaveBeenCalled();
+  const row = document.querySelector(".host-device-row") as HTMLElement;
+  expect(within(row).getByText("This device")).toBeInTheDocument();
+  fireEvent.click(within(row).getByRole("button", { name: "Forget NUC" }));
+  fireEvent.click(within(row).getByRole("button", { name: "Yes, forget" }));
+  expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
 });
 
 test("the Machines footer offers local setup only when no local host is projected, and keeps remote pairing", async () => {
@@ -493,6 +500,22 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
   fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
   expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
+});
+
+test("a devices list that couldn't be read offers Retry, and keeps this device's Forget meanwhile", async () => {
+  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "Chrome on Mac", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" }];
+  const machineDevices = vi.fn().mockRejectedValueOnce(new Error("unreachable")).mockResolvedValue(devices);
+  const done = { ...actions(), machineDevices, loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([paired()], { pairingInUse: "fp-nuc", node: "fp-nuc", nodeReach: "ok",
+    remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  const retry = await screen.findByRole("button", { name: "Retry" });
+  expect(screen.getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(retry); });
+  await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
+  expect(machineDevices).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Forget NUC" })).toHaveLength(1);
 });
 
 test("the machines are entries under Machines, Add a machine last; an entry shows its machine's whole page", async () => {

@@ -14,6 +14,7 @@ import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type 
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
+import { currentDeviceName } from "../../state/device-name";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
@@ -437,6 +438,12 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
   const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
+  // This device's own row comes from the machine's list. While that list can't be read (the machine not answering, or
+  // reading it failed), this device still knows it is paired and lists itself: forgetting a machine never waits on it.
+  const unread = !local && !!machine.pairingId && (!usable || (error && !loading));
+  const rows: HostDeviceView[] = unread
+    ? [{ device_id: "this-device", name: currentDeviceName((_, params) => t("pair.deviceNameBrowser", params)), current: true }]
+    : visibleDevices;
 
   async function refresh() {
     const epoch = ++deviceEpoch.current;
@@ -487,7 +494,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
       {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t("hosts.devices.empty")}</p>}
       <ul className="host-device-list">
-        {visibleDevices.map((device) => (
+        {rows.map((device) => (
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
               {/* The name and, on the same line, whether it is this device: the name gives way (an ellipsis), the tag never. */}
