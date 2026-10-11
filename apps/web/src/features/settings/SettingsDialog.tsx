@@ -20,6 +20,7 @@ import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
+import { ErrorBoundary } from "../../app/ErrorBoundary";
 import "./settings.css";
 
 /* Settings: a screen of their own, its sections beside its content (above it on a phone), and Save at the foot. The
@@ -116,7 +117,8 @@ function AdvancedSettings({ t }: { t: HostTranslate }) {
 }
 
 function Pane({ id, current, children }: { id: string; current: string; children: ReactNode }) {
-  return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}>{children}</div>;
+  // A section that fails to draw says so in its own place; the other sections, and Save, stay.
+  return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
 }
 
 /** How Settings is headed (VARIANTS `settings-header`): its own header (A), or the room's kept in place, the brand where
