@@ -1450,3 +1450,14 @@ test('A model chosen before it is on this device waits: the one in use stays, an
  await s.run("window.sidevoiceActions.installVoiceModel('stt')");await s.run('applying');await settleSoon();
  assert.equal(s.run('voiceSettings.stt.model'),'whisper-small','switched once it is here');
 });
+
+test('The first answer from the room asks for the conversations at once, not on their slower beat',async()=>{
+ const s=setup();const asked=[];
+ s.context.fetch=async path=>{asked.push(String(path));return {ok:true,json:async()=>path.includes('/participants')
+  ?{participants:[{thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'},engine:{model:'claude-opus-5-5',effort:'high'}}]}
+  :{binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'},room:{revision:1},clients:[],call:null}}};
+ s.run("nodeBase=''");
+ await s.run('refresh')();await settleSoon();
+ assert.ok(asked.some(path=>path.includes('/api/presentation/participants')),'asked with the first answer');
+ assert.equal(s.run('people[0].engine.model'),'claude-opus-5-5');
+});

@@ -407,6 +407,9 @@ async function refresh(){if(nodeBase==null)return;const asked=++refreshAsked,ses
  applyMicState();
  // The page follows the build of whoever serves it: this answer's only when the node itself served the page.
  if(target===''&&nodeBase==='')followServedBuild(d.room?.web_build);
+ // The conversations (and each one's model and effort) come on a slower beat: the first answer asks for them at once, so
+ // the stage is whole from the start rather than six seconds later.
+ if(!peopleAnswered)void refreshPeople();
 }catch{state.liveNote='Servidor no disponible'}}
 async function refreshHistory() { try {
     const data = await api(roomQuery('/api/presentation/history'));
@@ -458,7 +461,8 @@ async function selectOnlyListeningConversation(){
  await select(listening[0].thread_id);return true;
 }
 // An answer from the machine this page has just left describes nobody it can talk to.
-async function refreshPeople(){const base=nodeBase;try{const data=await api(roomQuery('/api/presentation/participants'));if(base!==nodeBase)return;state.people=data.participants;await reselectRemembered()||await selectOnlyListeningConversation()}catch{}finally{refreshMachines()}}
+let peopleAnswered=false;
+async function refreshPeople(){const base=nodeBase;try{const data=await api(roomQuery('/api/presentation/participants'));if(base!==nodeBase||!Array.isArray(data?.participants))return;peopleAnswered=true;state.people=data.participants;await reselectRemembered()||await selectOnlyListeningConversation()}catch{}finally{refreshMachines()}}
 // Where the machine in use answers rides the conversations' beat, and so does the clock the rows read.
 function refreshMachines(){roomStore.patch({machinesAt:Date.now()});void locate()}
 /* Which address the machine in use answers at is asked when it matters: on load, on the beat while there is
