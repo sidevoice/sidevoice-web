@@ -2,7 +2,7 @@ const fs=require("node:fs"),test=require("node:test"),assert=require("node:asser
 const css=fs.readFileSync(__dirname+"/../src/styles/react.css","utf8").replace(/\s+/g," ");
 
 test("the chat width is contained at every layout boundary",()=>{
- assert.match(css,/#root > main \{[^}]*max-width: 100%;[^}]*min-width: 0;/);
+ assert.match(css,/#root > .room-shell > main \{[^}]*max-width: 100%;[^}]*min-width: 0;/);
  assert.match(css,/\.transcript \{[^}]*max-width:100%;min-width:0/);
  assert.match(css,/\.message-viewport-wrap>#messages \{[^}]*max-width:100%;min-width:0;[^}]*overflow-x:hidden/);
  assert.match(css,/\.message-group \{[^}]*max-width:100%;min-width:0/);
@@ -19,15 +19,15 @@ function rule(text,selector){const at=text.indexOf(selector+" {");assert.ok(at>=
 
 test("the call view is laid out in call.css alone, and on a phone the conversations and the transcript leave the row",()=>{
  // react.css used to place the columns from a selector that named the root and therefore always won.
- assert.doesNotMatch(css,/@media \(max-width: 750px\)[\s\S]*?#root > main \{[^}]*grid-template-columns/);
+ assert.doesNotMatch(css,/@media \(max-width: 750px\)[\s\S]*?#root > .room-shell > main \{[^}]*grid-template-columns/);
  assert.doesNotMatch(roomCss,/grid-template-columns:62px/);
  // A phone: the conversations drop from the header only while open, and the transcript rises as a sheet.
  assert.match(rule(narrow,"#root .conversation-sidebar"),/position:fixed/);
  assert.match(rule(narrow,"#root .conversation-sidebar"),/visibility:hidden/);
  assert.match(rule(narrow,"#root .conversation-sidebar[data-open]"),/visibility:visible/);
- assert.match(rule(narrow,"#root > main.call-layout > .transcript,#root > main.call-layout > .transcript:not([data-open])"),/position:fixed/);
+ assert.match(rule(narrow,"#root > .room-shell > main.call-layout > .transcript,#root > .room-shell > main.call-layout > .transcript:not([data-open])"),/position:fixed/);
  // A desktop: a closed transcript takes no room beside the stage.
- assert.match(rule(callCss,"#root > main.call-layout > .transcript:not([data-open])"),/display:none/);
+ assert.match(rule(callCss,"#root > .room-shell > main.call-layout > .transcript:not([data-open])"),/display:none/);
 });
 
 test("nothing of an avatar moves under reduced motion",()=>{
