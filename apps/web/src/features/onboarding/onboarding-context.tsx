@@ -12,6 +12,7 @@ import {
   type OnboardingStorageError,
 } from "../../services/onboarding-state";
 import { RoomStoreContext, useRoomStore, type RoomViewState } from "../../state/room-store";
+import { RELEASE } from "../whats-new/catalogue";
 
 /* The first-run setup over the real room: the basics (W0: appearance, languages), where the agents run (W1), this
  * computer prepared (W2) and its agents connected (W3), or another machine paired (W2r), transcription (W4) and voice
@@ -43,6 +44,8 @@ interface OnboardingValue {
   markTurnDone(): Promise<boolean>;
   /** Records that the person went on with the settings being edited for `task`, tried or not. */
   markChosen(task: "stt" | "tts"): Promise<boolean>;
+  /** What's new: the person's answer for each feature shown. */
+  markFeatures(ids: string[], state: "seen" | "done" | "later"): Promise<boolean>;
   /** Records that the settings being edited for `task` worked. */
   markTried(task: "stt" | "tts"): Promise<boolean>;
   defer(): Promise<void>;
@@ -51,6 +54,9 @@ interface OnboardingValue {
 }
 
 const Context = createContext<OnboardingValue | null>(null);
+
+/** The setup, where there is one above (a pane drawn on its own has none). */
+export function useOnboardingIfAny() { return useContext(Context); }
 
 export function useOnboarding() {
   const value = useContext(Context);
@@ -172,6 +178,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     markAgentsDone: () => persist({ agents_done: true }),
     markBasicsDone: () => persist({ basics_done: true }),
     markTurnDone: () => persist({ turn_done: true }),
+    markFeatures: (ids, state) => persist({ features: Object.fromEntries(ids.map((id) => [id, { state, at: Date.now() }])) }),
     markChosen(task) {
       const key = draft ? trialKey(draft[task]) : null;
       return key ? persist({ chosen: { [task]: key } }) : Promise.resolve(false);
@@ -188,7 +195,8 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     async complete() {
       const now = resume(recordRef.current, liveFacts(roomStore.getState()));
       if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
-      const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null });
+      // Set up on this release: what it already has is not news to the person.
+      const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });
       if (saved) setOpen(false);
       return saved;
     },

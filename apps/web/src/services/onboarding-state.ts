@@ -22,9 +22,14 @@ export interface OnboardingRecord {
   trials: Partial<Record<OnboardingTask, string>>;
   /** Per voice slot, the key of the settings the person went on with, tried or not: a changed one is asked again. */
   chosen: Partial<Record<OnboardingTask, string>>;
+  /** The release this device was set up on (`RELEASE`, features/whats-new): what came after it is new to the person. */
+  baseline_release: number;
+  /** What's new, per feature: seen (Got it), done (Set up), or put off (Later), and when. */
+  features: Record<string, { state: "seen" | "done" | "later"; at: number }>;
 }
 
-export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials" | "chosen">> & {
+export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials" | "chosen" | "features">> & {
+  features?: Record<string, { state: "seen" | "done" | "later"; at: number }>;
   trials?: Partial<Record<OnboardingTask, string | null>>;
   chosen?: Partial<Record<OnboardingTask, string | null>>;
 };
@@ -32,7 +37,7 @@ export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials
 export const ONBOARDING_STORAGE_KEY = "sidevoice.onboarding";
 
 export const emptyOnboardingRecord = (): OnboardingRecord => ({
-  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
 });
 
 export class OnboardingStorageError extends Error {
@@ -43,6 +48,16 @@ export class OnboardingStorageError extends Error {
 }
 
 const timestamp = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+function features(value: unknown): OnboardingRecord["features"] {
+  const kept: OnboardingRecord["features"] = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return kept;
+  for (const [id, entry] of Object.entries(value as Record<string, unknown>)) {
+    const item = entry as { state?: unknown; at?: unknown } | null;
+    if (item && (item.state === "seen" || item.state === "done" || item.state === "later") && typeof item.at === "number") kept[id] = { state: item.state, at: item.at };
+  }
+  return kept;
+}
 
 /** `value` as a record, field by field; anything else is the empty record. */
 export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
@@ -65,6 +80,8 @@ export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
     completed_at: timestamp(input.completed_at),
     trials,
     chosen: keys(input.chosen),
+    baseline_release: typeof input.baseline_release === "number" && input.baseline_release > 0 ? input.baseline_release : 0,
+    features: features(input.features),
   };
 }
 
@@ -79,7 +96,8 @@ export function mergeOnboardingRecord(record: OnboardingRecord, update: Onboardi
     }
     return next;
   };
-  return normalizeOnboardingRecord({ ...record, ...update, trials: merged(record.trials, update.trials), chosen: merged(record.chosen, update.chosen) });
+  return normalizeOnboardingRecord({ ...record, ...update, trials: merged(record.trials, update.trials), chosen: merged(record.chosen, update.chosen),
+    features: { ...record.features, ...update.features } });
 }
 
 /** The key of a voice slot's settings as tried: its fields in a fixed order, so the same choice keys the same. */

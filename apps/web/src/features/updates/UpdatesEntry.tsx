@@ -7,6 +7,7 @@ import { useVariant } from "../../lib/variants";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { appUpdater, updateLater, useUpdates, type UpdateItem } from "./useUpdates";
+import { WhatsNewList, useWhatsNew, useWhatsNewPlace } from "../whats-new/WhatsNew";
 import "./updates.css";
 
 /* The updates waiting, behind one quiet entry with their count: on a desktop at the conversations' foot, above
@@ -61,17 +62,28 @@ function UpdatesList({ items, inCall, t }: { items: UpdateItem[]; inCall: boolea
 export function UpdatesEntry({ compact = false, side = "top" }: { compact?: boolean; side?: "top" | "bottom" }) {
   const t = hostTranslator();
   const { items, inCall } = useUpdates();
-  if (!items.length) return null;
-  const label = t("updates.entry", { n: items.length });
+  const news = useWhatsNew();
+  const newHere = useWhatsNewPlace() === "panel" ? news.items : [];
+  const count = items.length + newHere.length;
+  if (!count) return null;
+  const label = t("updates.entry", { n: count });
   const trigger = compact
     ? <Button variant="ghost" tone="neutral" size="icon" className="updates-entry updates-entry--icon" aria-label={label} title={label} aria-haspopup="dialog">
-      <DownloadsIcon size={20} /><span className="updates-count" aria-hidden="true">{items.length}</span></Button>
+      <DownloadsIcon size={20} /><span className="updates-count" aria-hidden="true">{count}</span></Button>
     : <Button variant="ghost" tone="neutral" block className="updates-entry" aria-label={label} aria-haspopup="dialog">
-      <DownloadsIcon size={18} /><span>{t("updates.title")}</span><Badge tone="accent" className="updates-badge">{items.length}</Badge></Button>;
+      <DownloadsIcon size={18} /><span>{t("updates.title")}</span><Badge tone="accent" className="updates-badge">{count}</Badge></Button>;
   return <Popover trigger={trigger} label={t("updates.title")} side={side} align="start">
-    <div className="updates-panel"><h3>{t("updates.title")}</h3><UpdatesList items={items} inCall={inCall} t={t} /></div>
+    <div className="updates-panel">
+      {items.length > 0 && <><h3>{t("updates.title")}</h3><UpdatesList items={items} inCall={inCall} t={t} /></>}
+      {newHere.length > 0 && <><h3>{t("whatsNew.title")}</h3><WhatsNewList items={newHere} t={t} onSetUp={news.setUp} />
+        <Button variant="ghost" tone="neutral" size="sm" onClick={() => news.mark("seen", newHere.map((item) => item.id))}>{t("whatsNew.gotIt")}</Button></>}
+    </div>
   </Popover>;
 }
 
 /** Whether something waits: a phone's chevron wears a dot for it where the updates live in its panel. */
-export function useUpdatesWaiting() { return useUpdates().items.length > 0; }
+export function useUpdatesWaiting() {
+  const updates = useUpdates().items.length;
+  const news = useWhatsNew().items.length;
+  return updates + (useWhatsNewPlace() === "panel" ? news : 0) > 0;
+}

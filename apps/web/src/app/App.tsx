@@ -11,6 +11,7 @@ import { CallToolbar } from "../features/call/CallToolbar";
 import { PresenceSound } from "../features/call/PresenceSound";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
+import { WhatsNew } from "../features/whats-new/WhatsNew";
 import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
@@ -75,6 +76,7 @@ function RoomContent() {
         {!noMachine && <PresenceSound />}
         <ConnectionStatsDialog />
         <SettingsDialog />
+        {!setupPending && <WhatsNew />}
       </div>
       {setupPending && onboarding.ready && !onboarding.open && <main className="setup-main"><SetupPending /></main>}
       {onboarding.ready && <Wizard />}
