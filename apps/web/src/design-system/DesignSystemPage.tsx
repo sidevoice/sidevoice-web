@@ -13,6 +13,7 @@ import { Switch } from "../components/ui/Switch";
 import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
 import { ModelPrepare, type PrepareStatus } from "../features/settings/ModelPrepare";
 import { applyTheme } from "../lib/theme";
+import { AppPatterns } from "./AppPatterns";
 
 /* A reference page, not part of the product: its own words name the components, in English, for whoever builds with
  * them. Every word a component says itself comes from its bundle, as in the app. */
@@ -257,20 +258,47 @@ function SettingsExample({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
+/** What the page shows, kept in its address so a view can be shared: `?section=patterns&dark=b&buttons=c`. */
+type Choice = "a" | "b" | "c";
+const CHOICES: { value: Choice; label: string }[] = [{ value: "a", label: "A" }, { value: "b", label: "B" }, { value: "c", label: "C" }];
+function useQueryState<Value extends string>(name: string, fallback: Value, allowed: readonly Value[]) {
+  const read = () => { const value = new URLSearchParams(location.search).get(name) as Value | null; return value && allowed.includes(value) ? value : fallback; };
+  const [value, setValue] = useState<Value>(read);
+  const set = (next: Value) => {
+    const params = new URLSearchParams(location.search);
+    params.set(name, next);
+    history.replaceState(null, "", location.pathname + "?" + params.toString());
+    setValue(next);
+  };
+  return [value, set] as const;
+}
+
 export function DesignSystemPage() {
-  const [view, setView] = useState<View>("both");
+  const [view, setView] = useQueryState<View>("theme", "both", ["both", "light", "dark"]);
+  const [section, setSection] = useQueryState<"components" | "patterns">("section", "components", ["components", "patterns"]);
+  const [dark, setDark] = useQueryState<Choice>("dark", "a", ["a", "b", "c"]);
+  const [buttons, setButtons] = useQueryState<Choice>("buttons", "a", ["a", "b", "c"]);
   const [open, setOpen] = useState<"dialog" | "page" | null>(null);
   useEffect(() => applyTheme(view === "both" ? "system" : view), [view]);
+  useEffect(() => {
+    document.documentElement.dataset.dark = dark;
+    document.documentElement.dataset.buttons = buttons;
+  }, [dark, buttons]);
   const columns: ("light" | "dark")[] = view === "both" ? ["light", "dark"] : [view];
   return <div className="ds-page">
     <header className="ds-top">
       <div className="ds-brand"><SidevoiceMark size={24} /><span>Sidevoice</span><Badge tone="accent">Design system</Badge></div>
-      <Segmented size="sm" label="Theme" value={view} onChange={setView} items={[{ value: "both", label: "Side by side" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+      <Tabs className="ds-sections" label="Section" value={section} onChange={setSection} items={[{ value: "components", label: "Components" }, { value: "patterns", label: "App patterns" }]} />
+      <div className="ds-controls">
+        <div className="ds-control"><span>Theme</span><Segmented size="sm" label="Theme" value={view} onChange={setView} items={[{ value: "both", label: "Both" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} /></div>
+        <div className="ds-control"><span>Dark</span><Segmented size="sm" label="Dark direction" value={dark} onChange={setDark} items={CHOICES} /></div>
+        <div className="ds-control"><span>Buttons</span><Segmented size="sm" label="Button style" value={buttons} onChange={setButtons} items={CHOICES} /></div>
+      </div>
     </header>
     <div className="ds-columns" data-count={columns.length}>
       {columns.map((theme) => <div className="ds-column" data-theme={theme} key={theme}>
-        <p className="ds-column-label">{theme === "light" ? "Light" : "Dark"}</p>
-        <Showcase onOpen={setOpen} />
+        <p className="ds-column-label">{theme === "light" ? "Light" : `Dark ${dark.toUpperCase()}`} · Buttons {buttons.toUpperCase()}</p>
+        {section === "components" ? <Showcase onOpen={setOpen} /> : <AppPatterns />}
       </div>)}
     </div>
     <Dialog open={open === "dialog"} layout="dialog" titleId="ds-dialog-title" eyebrow="Office iMac" title="Rename machine" onClose={() => setOpen(null)}

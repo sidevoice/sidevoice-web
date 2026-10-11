@@ -46,3 +46,7 @@ html, body { margin: 0; min-height: 100%; background: var(--sv-bg-subtle); }
   .ds-brand > span { display: none; }
   .ds-grid-2 { grid-template-columns: minmax(0, 1fr); }
 }
+.ds-top { flex-wrap: wrap; row-gap: var(--sv-space-2); }
+.ds-sections { border-bottom: 0; }
+.ds-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-4); }
+.ds-control { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xs); font-weight: 600; color: var(--sv-text-muted); }
