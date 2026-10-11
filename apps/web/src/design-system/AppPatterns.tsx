@@ -454,7 +454,7 @@ function HostAgents() {
       </div>
       <div className="ui-row pt-agent">
         <div className="pt-machine-line"><span className="pt-machine-icon"><HarnessIcon harness="codex" size={18} /></span>
-          <div className="ui-row-text"><span className="ui-row-label">Codex <span className="pt-version">0.48</span> <Badge tone="accent">{t("agents.new")}</Badge></span><p className="ui-row-description">Not connected yet</p></div></div>
+          <div className="ui-row-text"><span className="ui-row-label">Codex <span className="pt-version">0.48</span> <Badge tone="accent">{t("highlights.new")}</Badge></span><p className="ui-row-description">Not connected yet</p></div></div>
         <div className="ui-row-control pt-confirm"><Button variant="ghost" tone="neutral" size="sm">{t("agents.notNow")}</Button><Button variant="primary" size="sm">{t("agents.connect")}</Button></div>
       </div>
       <div className="ui-row ui-row--block pt-agent">

@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
+import { useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -13,7 +14,7 @@ import { conversationState, machineGroups, stateText } from "../call/conversatio
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
-import { openSettings, usePendingAgentHosts } from "./RoomHeader";
+import { openAtHighlight, openSettings } from "./RoomHeader";
 import { hostTranslator } from "../settings/host-i18n";
 import { UpdatesEntry, useUpdatesEntry } from "../updates/UpdatesEntry";
 import "./room.css";
@@ -144,15 +145,16 @@ export function ConversationSidebar() {
   );
 }
 
-/** Settings at the conversations' foot: named beside the list, a gear in the rail; its dot when agents wait. */
+/** Settings at the conversations' foot: named beside the list, a gear in the rail; its dot when something is new. */
 function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
   const t = callTranslator();
   const hosts = hostTranslator();
-  const notice = usePendingAgentHosts().length > 0;
-  const label = notice ? hosts("agents.gear.pending") : t("header.settings");
+  const store = useContext(RoomStoreContext);
+  const news = useHighlights();
+  const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
-    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); }}>
-      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}{notice && <span className="settings-notice-dot" aria-hidden="true" />}
+    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); openAtHighlight(news, store); }}>
+      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}{news.length > 0 && <span className="settings-notice-dot" aria-hidden="true" />}
     </Button>
   );
 }

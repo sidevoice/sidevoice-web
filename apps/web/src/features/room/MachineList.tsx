@@ -12,7 +12,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
-import { actionableAgent } from "../../services/host-agents";
+import { NewDot, useHighlights } from "../highlights/highlights";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -46,10 +46,10 @@ function machineState(machine: MachineView, copy: ReturnType<typeof machineCopy>
     : machine.state === "checking" ? { tone: "neutral", label: t("hosts.checking") } : { tone: "danger", label: t("hosts.unavailable") };
 }
 
+/** Whether something new (an agent it found) is under a machine: its entry's dot. */
 function useNotice() {
-  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
-  return (machine: MachineView) => !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
-    hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
+  const news = useHighlights();
+  return (machine: MachineView) => !!machine.pairingId && news.some((item) => item.machine === machine.pairingId);
 }
 
 /** The machine shown: the one chosen, else the first. */
@@ -79,7 +79,7 @@ export function MachineNav({ current }: { current: boolean }) {
             <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
             <span className="machine-nav-name">{copy.name}</span>
             {machine.local && copy.name !== t("hosts.thisComputer") && <span className="machine-nav-local">{t("hosts.thisComputerTag")}</span>}
-            {notice(machine) && <Badge tone="accent" className="ui-nav-badge">{t("agents.notice")}</Badge>}
+            {notice(machine) && <NewDot label={t("highlights.navNew")} />}
           </button>
         );
       })}
@@ -153,7 +153,6 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {notice && <Badge tone="accent">{t("agents.notice")}</Badge>}
         {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
       </header>

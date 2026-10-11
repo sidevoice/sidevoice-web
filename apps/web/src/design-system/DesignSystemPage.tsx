@@ -11,6 +11,7 @@ import { ProgressBar } from "../components/ui/ProgressBar";
 import { Segmented, Tabs } from "../components/ui/Tabs";
 import { Switch } from "../components/ui/Switch";
 import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
+import { NewDot } from "../features/highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "../features/settings/ModelPrepare";
 import { applyTheme } from "../lib/theme";
 import { AppPatterns } from "./AppPatterns";
@@ -122,6 +123,21 @@ function Badges() {
   </div>;
 }
 
+/* "New" (features/highlights): information, never a warning. A dot (accent) on each thing that leads to it — the gear,
+ * the Settings section, the machine — and the word "New" on the thing itself, which seeing clears (half of it in view
+ * for a second); the dots above go once nothing new is under them. It goes on its own two weeks after first shown; at
+ * most three at once. Rules: only for what is genuinely new to this person or needs nothing but a look — never
+ * marketing or tips; what needs an action (a model to download, a key) uses the attention style (amber) and clears only
+ * when resolved; the dot is never the only cue: containers say ", new" to screen readers, the gear its count. */
+function NewHighlights() {
+  return <div className="ds-row">
+    <span className="ds-row"><SettingsIcon size={20} /><NewDot label=", new" /></span>
+    <span className="ui-nav-item" style={{ width: 200 }}>Machines<NewDot label=", new" /></span>
+    <span>Codex <Badge tone="accent">New</Badge></span>
+    <Badge tone="warning" dot>Needs a key</Badge>
+  </div>;
+}
+
 function Alerts() {
   return <div className="ds-stack">
     <Alert title="Storage is blocked" tone="warning">This browser won't keep settings. Allow site data to keep them.</Alert>
@@ -200,6 +216,7 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
     <Specimen title="Field · Input · Select · Textarea" note="Label, control, error, hint. Textareas grow and are never resized by hand."><Fields /></Specimen>
     <Specimen title="Tabs · Segmented · Switch" note="Tabs for views, Segmented for one value of a few, Switch for a boolean."><Navigation /></Specimen>
     <Specimen title="Badge"><Badges /></Specimen>
+    <Specimen title="New (highlights)"><NewHighlights /></Specimen>
     <Specimen title="Alert"><Alerts /></Specimen>
     <Specimen title="Section · Group · Row · Choice card" note="Settings: a section, its groups as cards, rows label-left and control-right; stacked when narrow."><Cards /></Specimen>
     <Specimen title="Progress"><ProgressBar value={0.66} label="Example progress" /><ProgressBar value={null} label="Example indeterminate progress" /></Specimen>

@@ -5,13 +5,14 @@ import { UpdatesEntry, useUpdatesEntry, useUpdatesWaiting } from "../updates/Upd
 
 /** A phone wide enough for four of the other conversations in its header. */
 const ROOMY_PHONE_QUERY = "(min-width: 390px)";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore, type RoomStore } from "../../state/room-store";
+import { useContext } from "react";
+import { useHighlights, type Highlight as NewThing } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator, type CallTranslate } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
 import { headerConversations, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
-import { actionableHostFingerprints } from "../../services/host-agents";
 import { hostTranslator } from "../settings/host-i18n";
 import "./room.css";
 
@@ -82,12 +83,14 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   );
 }
 
-/** The paired machines with agents waiting to be connected: the gear shows a dot, and Settings opens at their agents. */
-export function usePendingAgentHosts() {
-  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
-  const pairings = useRoomStore((state) => state.facts.pairings);
-  const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
-  return actionableHostFingerprints(hostAgents, active);
+
+/** Settings, opened at what is new first: a machine's agents (its own way in), else the section of a new setting —
+ *  after Settings' own opening, which picks a section of its own. Nothing new, as it opens. */
+export function openAtHighlight(news: NewThing[], store: RoomStore | null) {
+  const first = news[0];
+  if (!first) return;
+  if (first.machine) window.sidevoiceActions?.openAgentSettings?.(first.machine);
+  else queueMicrotask(() => store?.patch({ settingsSection: first.section }));
 }
 
 /** Settings from the conversations' foot, where it sits on a desktop: the header's own button, which the runtime opens
@@ -102,15 +105,13 @@ export function openSettings() {
  * then opens at theirs. */
 function SettingsButton({ t }: { t: CallTranslate }) {
   const hosts = hostTranslator();
-  const pending = usePendingAgentHosts();
-  const notice = pending.length > 0;
-  const label = notice ? hosts("agents.gear.pending") : t("header.settings");
+  const store = useContext(RoomStoreContext);
+  const news = useHighlights();
+  const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
-    <span className="header-settings" onClick={() => {
-      if (notice) window.sidevoiceActions?.openAgentSettings?.(pending.length === 1 ? pending[0] : null);
-    }}>
+    <span className="header-settings" onClick={() => openAtHighlight(news, store)}>
       <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label}>
-        <SettingsIcon size={20} />{notice && <span className="settings-notice-dot" aria-hidden="true" />}
+        <SettingsIcon size={20} />{news.length > 0 && <span className="settings-notice-dot" aria-hidden="true" />}
       </Button>
     </span>
   );

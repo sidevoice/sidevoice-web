@@ -13,7 +13,6 @@
 .host-agent-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .host-agent-name { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; overflow: hidden; white-space: nowrap; font-weight: 600; }
 .host-agent-name .muted { font-weight: 400; color: var(--sv-text-subtle); }
-.host-agent-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: 600; }
 /* One line, always: a row keeps its height whatever it says (the whole of it in its title). */
 .host-agent-status { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; transition: color var(--sv-dur-fast, .15s) var(--sv-ease, ease); }
 .host-agent-ok { color: var(--sv-positive); }

@@ -8,6 +8,7 @@ import { useRoomStore } from "../../state/room-store";
 import { actionableAgent } from "../../services/host-agents";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
+import { NewMark } from "../highlights/highlights";
 import "./host-agents.css";
 
 function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): string {
@@ -131,7 +132,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         <span className="host-agent-icon">{agent.id === "other" ? <ConnectorIcon size={16} /> : <HarnessIcon harness={agent.id} size={18} />}</span>
         <span className="host-agent-copy">
           <span className="host-agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}
-            {isNew && <span className="host-agent-badge">{t("agents.new")}</span>}
+            <NewMark id={`agent:${fp}:${agent.id}`} />
           </span>
           {/* Always one status line under the name, so a row never changes height: what went wrong, else a moment of
               "ready" once connected, else where it stands. */}

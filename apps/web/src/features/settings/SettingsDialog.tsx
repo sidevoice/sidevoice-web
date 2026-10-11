@@ -14,6 +14,7 @@ import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
+import { NewDot, useHighlights } from "../highlights/highlights";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
@@ -141,6 +142,7 @@ export function SettingsDialog() {
   const machine = useRoomStore((state) => state.facts.machinesView?.machine ?? null);
   useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [current, machine]);
   const waits = useVoiceReadiness();
+  const news = useHighlights();
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
   // A control asked for (what's new's Set up): in view, focused, and lit for a moment, once its section is drawn.
@@ -176,6 +178,7 @@ export function SettingsDialog() {
                 aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
                 onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                 {section.icon}<span>{t(section.label)}</span>
+                {news.some((item) => item.section === section.id) && <NewDot label={t("highlights.navNew")} />}
                 {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>
               {/* Each machine under Machines, and Add a machine after them. */}
