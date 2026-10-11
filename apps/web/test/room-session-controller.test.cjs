@@ -1409,6 +1409,25 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  await assert.rejects(s.run("window.sidevoiceActions.tryVoiceSettings('stt')"),{code:'trial-in-call'});
 });
 
+test('A try tells whoever shows it how it goes: the voice listening and the microphone\'s level, the part of the sentence sounding in the page\'s offsets',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const told=[];s.context.told=told;
+ const listened=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false,onListening:()=>told.push('listening'),onLevel:level=>told.push(level)})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ voice.emit('level',0.5);voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+ await listened;
+ assert.deepEqual([...told],['listening',0.5]);
+ // The voice counts characters as Unicode does; the page indexes the sentence as JavaScript does (the 👋 is two).
+ const say=voice.say;voice.say=(text,options)=>{const handle=say(text,options);handle.outcome=new Promise(resolve=>{handle.finish=resolve});return handle};
+ told.length=0;
+ const said=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'¡Hola 👋! Qué tal.',keep:false,onProgress:range=>told.push(range)})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ const handle=voice.said.at(-1);
+ handle.step({type:'playing'});handle.step({type:'progress',sounding:[9,17],heard_chars:9});handle.step({type:'progress',sounding:null,heard_chars:17});
+ handle.finish({status:'heard'});await said;
+ assert.deepEqual(plain(told),[{from:0,to:0},{from:10,to:18},{from:18,to:18}]);
+});
+
 // ----- a model of this device installed for a voice slot -----
 test('A model the slot names but that is not on this device installs, its progress in the store, and the catalogues are read again',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');

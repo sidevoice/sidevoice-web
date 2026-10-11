@@ -174,12 +174,6 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {/* Talking to this machine from now on: not offered for the one in use; said why when it cannot answer. */}
-        {!machine.inUse && machine.selectable !== false && <Tooltip content={copy.reachable ? t("hosts.useHint", { machine: copy.name }) : t("hosts.useUnreachable", { machine: copy.name })}>
-          <Button variant="secondary" size="sm" disabled={!copy.reachable} blockedBy={copy.reachable ? undefined : "host-use-reason-" + machine.id}
-            onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useThis")}</Button>
-        </Tooltip>}
-        {!copy.reachable && <span id={"host-use-reason-" + machine.id} className="sr-only">{t("hosts.useUnreachable", { machine: copy.name })}</span>}
       </header>
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>

@@ -78,6 +78,15 @@ test("a device that asks for less motion gets the bars back and no canvas", asyn
   expect(readWaveform).not.toHaveBeenCalled();
 });
 
+test("a level of its own (a voice try, with no call) is read each frame instead of the call's analyser", async () => {
+  const readWaveform = microphone(0.3);
+  const level = vi.fn(() => 0.6);
+  render(<VoiceWaveform phase="listening" level={level} />);
+  await frames();
+  expect(level.mock.calls.length).toBeGreaterThan(0);
+  expect(readWaveform).not.toHaveBeenCalled();
+});
+
 test("a call with no microphone captured draws without reading anything", async () => {
   const { container } = render(<VoiceWaveform phase="listening" />);
   await frames();
