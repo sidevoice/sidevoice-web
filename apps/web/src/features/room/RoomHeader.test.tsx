@@ -101,3 +101,10 @@ test("the chevron after the header's avatars drops the conversations and puts th
   expect(document.querySelector(".conversations-grab")).toBeNull();
   expect(document.querySelector("#conversations .sidebar-foot .sidebar-settings")).toBeInTheDocument();
 });
+
+test("a phone may hide the brand (VARIANTS phone-brand), and the page keeps its heading", () => {
+  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "phone-brand": "hidden" }));
+  room();
+  expect(header()).toHaveAttribute("data-brand", "hidden");
+  expect(screen.getByRole("heading", { level: 1, name: "Sidevoice" })).toBeInTheDocument();
+});

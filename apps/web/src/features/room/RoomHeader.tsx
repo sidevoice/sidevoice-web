@@ -21,10 +21,13 @@ export function RoomHeader() {
   // A design variant (lib/variants.ts): where a phone's header puts the other conversations — after the mark, in its
   // middle, or by the gear.
   const avatars = useVariant("header-avatars", ["left", "centre", "right"] as const);
+  // And whether a phone shows the brand at all: hidden, the room goes to the avatars and the chevron, and the brand
+  // stays the page heading for a screen reader.
+  const brand = useVariant("phone-brand", ["shown", "hidden"] as const);
   const listDown = useCallLayout((state) => state.conversationsOpen);
   return (
     <>
-      <header className="room-header" data-avatars={avatars} data-list-down={listDown || undefined}>
+      <header className="room-header" data-avatars={avatars} data-brand={brand} data-list-down={listDown || undefined}>
         <h1 className="brand"><SidevoiceMark size={22} /> <span className="brand-name">Sidevoice</span></h1>
         <HeaderConversations t={t} />
         <SettingsButton t={t} />

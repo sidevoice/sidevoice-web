@@ -133,3 +133,9 @@
   .room-shell[data-layout="meet"] .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }
   .room-shell[data-layout="meet"] .conversation-sidebar[data-collapsed] .sidebar-brand span { display: none; }
 }
+
+/* A phone without the brand (VARIANTS phone-brand): the heading stays, for a screen reader only. */
+@media (max-width: 899px) {
+  .room-header[data-brand="hidden"] .brand { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .room-header[data-brand="hidden"][data-avatars="left"] .header-conversations { margin-inline-start: 0; }
+}
