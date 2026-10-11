@@ -74,14 +74,17 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
   expect(stageAgent()).toHaveAttribute("data-desk");
-  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|juggle|read|stir|type)$/);
+  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|read|type)$/);
   expect(stageAgent().querySelector(".cogs")).toBeInTheDocument();
+  expect(stageAgent()).not.toHaveAttribute("data-idle");
 
   // With nothing to do and its turn over, it rests: waiting for you is idle now.
   patch(store, { harness: { "t-login": false } });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
   expect(stageAgent()).not.toHaveAttribute("data-work");
   expect(stageAgent()).not.toHaveAttribute("data-desk");
+  // Resting goes in steps, quiet first, then its pastimes.
+  expect(stageAgent()).toHaveAttribute("data-idle", "quiet");
   expect(document.querySelector(".stage-activity")).toBeNull();
 
   // Out of the call the agent is idle, and so is the person.
@@ -94,16 +97,22 @@ test("the person is the picture-in-picture, with a bubble of their own while the
   const store = room();
   const pip = () => document.querySelector(".stage-pip .sv-avatar")!;
   expect(pip()).toHaveAttribute("data-avatar-state", "present");
-  // The person is a bicho too: their own, calm and attentive while present.
-  expect(pip()).toHaveAttribute("data-mood", "waiting");
+  // The person is a bicho too: their own, awake and quiet while present.
+  expect(pip()).toHaveAttribute("data-mood", "idle");
+  expect(pip()).toHaveAttribute("data-idle", "quiet");
   expect(pip()).toHaveAttribute("data-mouth", "level");
   expect(document.querySelector(".pip-bubble")).toBeNull();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
   expect(pip()).toHaveAttribute("data-avatar-state", "speaking");
   expect(document.querySelector(".pip-bubble")).toHaveTextContent("Split it into two commits.");
-  // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
+  // The agent listens to the person meanwhile, and goes on listening while it is transcribed. It starts with a startle
+  // out of its rest (data-enter, a moment), dropping what it had in hand.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
+  expect(stageAgent()).toHaveAttribute("data-enter", "idle");
+  expect(stageAgent()).toHaveAttribute("data-idle", "quiet");
+  await waitFor(() => expect(stageAgent()).not.toHaveAttribute("data-enter"));
+  expect(stageAgent()).not.toHaveAttribute("data-idle");
   patch(store, { userLive: false, pendingPhase: "transcribing" });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   await act(async () => { screen.getByRole("button", { name: "Cancel sending" }).click(); });
@@ -120,6 +129,9 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([dot("Review the nightly backups"), mood("Review the nightly backups")]).toEqual(["waiting", "idle"]);
   expect([dot("Plan the week"), mood("Plan the week")]).toEqual(["idle", "offline"]);
   expect(rowOf("Plan the week").querySelector(".sv-avatar")).toHaveAttribute("data-offline");
+  // Offline sleeps: no pastimes. A resting one goes in steps.
+  expect(rowOf("Plan the week").querySelector(".sv-avatar")).not.toHaveAttribute("data-idle");
+  expect(rowOf("Review the nightly backups").querySelector(".sv-avatar")).toHaveAttribute("data-idle", "quiet");
   expect(rowOf("Plan the week").querySelector(".sv-avatar")).toHaveAttribute("data-size", "sidebar");
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");

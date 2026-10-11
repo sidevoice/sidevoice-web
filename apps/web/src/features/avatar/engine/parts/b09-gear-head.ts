@@ -621,6 +621,7 @@ export default batch({
   ],
 
   css: `
+    /* asleep = idle without a pastime (the mascots', the frozen figures') or the nap: the quiet pose and the pastimes stay awake */
     /* clips: the face of the clip, over the brows */
     .b09-clip path { stroke: #1b1428; stroke-width: 2.2; stroke-linejoin: round }
     .b09-clip .b09-fold { fill: none; stroke: color-mix(in oklab, var(--bx-spot), #1b1428 45%); stroke-width: 1.3; stroke-linecap: round }
@@ -649,7 +650,7 @@ export default batch({
     .b09-temple { fill: none; stroke: #1b1428; stroke-width: 2.4; stroke-linecap: round }
     .b09-shades { transition: transform .3s cubic-bezier(.3,1.4,.5,1) }
     &[data-mood=speaking][data-beat=a] .b09-shades { animation: bx-brow-a .34s ease-out }
-    &[data-mood=idle] .b09-shades { transform: translateY(var(--b09-up)) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .b09-shades { transform: translateY(var(--b09-up)) }
     &[data-mood=waiting] .b09-shades { transform: translateY(2.5px) }
 
     /* monocle and goggles */

@@ -1,9 +1,10 @@
 import { hash, n, rng, uid, type Drawn, type Size } from "../core";
 import { shade } from "../styles/mascots";
-import { INK, LAYER, mirrorPath, outlineLoops, type Anchor, type Ctx, type Drawing, type Eye, type Face, type Lod, type Piece, type Spec } from "./kit";
+import { INK, LAYER, flatten, mirrorPath, outlineLoops, type Anchor, type Ctx, type Drawing, type Eye, type Face, type Lod, type Piece, type Pt, type Spec } from "./kit";
 import { REF, defaultShine, place, rigOf, type Placement } from "./rig";
 import { BODIES, asMatchable, bodyOf, hides, matches, slotOf, type Entry } from "./registry";
 import { colorsOf, present, traitsOf } from "./spec";
+import { idleProps } from "./idle";
 import { workProps } from "./work";
 
 /* A spec → SVG markup. Parts run in slot order (so a top's eye stalks exist before the eyes, and the eyes before the
@@ -26,23 +27,133 @@ function cog(cx: number, cy: number, r: number, teeth: number) {
   return `M${pts.join("L")}Z`;
 }
 
-const COGS = `<g class="prop-work cogs keep-small">
-        <g class="cog cog-big"><path d="${cog(99, 21, 11, 8)}"/><circle cx="99" cy="21" r="3.6"/></g>
-        <g class="cog cog-small"><path d="${cog(111.5, 36.5, 7, 6)}"/><circle cx="111.5" cy="36.5" r="2.4"/></g>
-      </g>
-      <g class="prop-work puffs"><circle cx="22" cy="98" r="4"/><circle cx="16" cy="92" r="2.6"/><circle cx="100" cy="98" r="3.4"/></g>`;
+/* ---------- the shared cues, placed beside the figure's real silhouette ----------
+ * The mood cues every figure shares (mascots too) sit next to the figure, never on it: the cog pair (working, at every
+ * size but the rail), the "!" (unread, a badge in the sidebar and the rail), the listening cue (sound waves flowing into
+ * the side of the head; a badge at the rail), the zz, and the startle burst over the head (entering listening). Where
+ * they go comes from the figure's profile: for every row of the 120 box, the leftmost and rightmost x any piece with an
+ * outline reaches, ink included. Big ears, tall tops, wide bodies and the mascots' marks push them out of the way. */
 
-/** The mood props every figure shares (mascots too): cogs and puffs, the "!" bubble, the zz. */
-export const PROPS = `${COGS}
-      <g class="prop-wait bang"><rect x="94" y="6" width="18" height="24" rx="6"/><text x="103" y="25" text-anchor="middle">!</text></g>
-      <g class="prop-idle zz"><text x="96" y="24">z</text><text x="104" y="16" class="z2">z</text></g>`;
+/** The figure row by row: `L[y + PROFILE_TOP]` and `R[…]` are the leftmost and rightmost x it reaches at row y. */
+export interface Profile { L: Float64Array; R: Float64Array; top: number }
+const PROFILE_TOP = 30, PROFILE_ROWS = 170;
+
+/** The profile of some shapes: polylines in the 120 box, each with the half width of its ink (a fill's outline or a line). */
+export function profileOf(shapes: { loops: Pt[][]; r: number }[]): Profile {
+  const L = new Float64Array(PROFILE_ROWS).fill(Infinity), R = new Float64Array(PROFILE_ROWS).fill(-Infinity);
+  let top = Infinity;
+  const mark = (x: number, y: number, r: number) => {
+    for (let row = Math.max(0, Math.floor(y - r) + PROFILE_TOP), end = Math.min(PROFILE_ROWS - 1, Math.ceil(y + r) + PROFILE_TOP); row <= end; row += 1) {
+      if (x - r < L[row]) L[row] = x - r;
+      if (x + r > R[row]) R[row] = x + r;
+    }
+    top = Math.min(top, y - r);
+  };
+  for (const { loops, r } of shapes) for (const loop of loops) for (let i = 0; i < loop.length; i += 1) {
+    const [x, y] = loop[i];
+    mark(x, y, r);
+    if (!i) continue;
+    const [px, py] = loop[i - 1], steps = Math.ceil(Math.hypot(x - px, y - py) / 1.5);
+    for (let k = 1; k < steps; k += 1) mark(px + ((x - px) * k) / steps, py + ((y - py) * k) / steps, r);
+  }
+  return { L, R, top: Number.isFinite(top) ? top : 40 };
+}
+
+const rowOf = (y: number) => Math.round(y) + PROFILE_TOP;
+/** True when a circle on the right (`side` 1) or the left (-1) keeps `gap` clear of the figure. */
+function clearCircle(p: Profile, cx: number, cy: number, r: number, side: 1 | -1, gap: number) {
+  for (let y = Math.ceil(cy - r); y <= Math.floor(cy + r); y += 1) {
+    const row = rowOf(y);
+    if (row < 0 || row >= PROFILE_ROWS) continue;
+    const w = Math.sqrt(Math.max(0, r * r - (y - cy) * (y - cy)));
+    if (side === 1 ? cx - w < p.R[row] + gap : cx + w > p.L[row] - gap) return false;
+  }
+  return true;
+}
+/** The rightmost (`side` 1) or leftmost x of the figure over rows y0…y1. */
+function edge(p: Profile, y0: number, y1: number, side: 1 | -1) {
+  let e = side === 1 ? -Infinity : Infinity;
+  for (let y = Math.floor(y0); y <= Math.ceil(y1); y += 1) {
+    const row = rowOf(y);
+    if (row >= 0 && row < PROFILE_ROWS) e = side === 1 ? Math.max(e, p.R[row]) : Math.min(e, p.L[row]);
+  }
+  return e;
+}
+
+/** A cluster of circles ([dx, dy, r] round a centre) near `at`: the first of a few spots up and outwards from it, then
+ * smaller, that keeps clear of the figure; the default spot if none does (a crowded corner wins over leaving the box). */
+function spotFor(p: Profile, at: Pt, circles: [number, number, number][], side: 1 | -1, scales = [1, 0.86, 0.74], mirror = side === -1): [number, number, number] {
+  const m = mirror ? -1 : 1;
+  for (const k of scales) for (let step = 0; step <= 8; step += 1) for (let up = 0; up <= step; up += 1) {
+    const x = at[0] + side * (step - up) * 2.5, y = at[1] - up * 2.5;
+    if (circles.every(([dx, dy, r]) => clearCircle(p, x + m * dx * k, y + dy * k, (r + 1.5) * k, side, 2.5))) return [n(x), n(y), k];
+  }
+  return [at[0], at[1], scales[0]];
+}
+
+/** Where the cues go for one figure at one size. */
+export interface Spots {
+  /** The big cog's centre and the pair's scale; the small cog sits at (12.5, 15.5) from it. */
+  cogs: [number, number, number];
+  /** The cog pair's shift to the other corner, for while the "!" holds this one (unread over working). */
+  alt: [number, number];
+  /** The "!" bubble's middle and scale. */
+  bang: [number, number, number];
+  /** The listening waves' middle, their scale, and their turn (degrees) so that they flow in towards the head. */
+  ear: [number, number, number, number];
+  /** The top of the figure over its middle: the startle burst's centre sits under it. */
+  top: number;
+}
+
+const COG_PAIR: [number, number, number][] = [[0, 0, 11], [12.5, 15.5, 7]];
+const WAVE_DISC: [number, number, number][] = [[3, 0, 13]];
+const BANG: [number, number, number][] = [[0, -5, 9], [0, 5, 9]];
+
+/** The cues' spots for a figure with profile `p`, its eyes on `eyeY`. Small sizes put the "!" (and the listening badge)
+ * in the top-right corner as a badge, overhanging the box a little, wherever the figure is. */
+export function spotsOf(p: Profile, eyeY: number, size: Size): Spots {
+  // The other corner keeps the pair's shape and size (CSS only shifts it): the small cog stays on the big one's right.
+  const cogs = spotFor(p, [99, 21], COG_PAIR, 1), left = spotFor(p, [12, 21], COG_PAIR, -1, [cogs[2]], false);
+  const alt: [number, number] = [n(left[0] - cogs[0]), n(left[1] - cogs[1])];
+  const bang: [number, number, number] = size === "stage" ? spotFor(p, [103, 18], BANG, 1) : size === "sidebar" ? [106.5, 16.5, 1.55] : [107, 18, 1.9];
+  // The listening waves (stage) take the corner the cogs take (they never show together), a little lower, a size up,
+  // and turn to flow in towards the head. The small sizes show a badge in the "!" corner instead.
+  const k = 1.05, [ex, ey, ek] = spotFor(p, [100, 30], WAVE_DISC.map(([x, y, r]) => [x, y, r * k] as [number, number, number]), 1);
+  const ear: [number, number, number, number] = [ex, ey, n(ek * k), n((Math.atan2(ey - (eyeY - 4), ex - 60) * 180) / Math.PI)];
+  return { cogs, alt, bang, ear, top: n(Math.max(-6, p.top)) };
+}
+
+/** The listening waves round their middle: three copies of one arc that travel in on the same path (towards -x, turned
+ * to face the head), shrinking and fading, a third of a cycle apart so they stay evenly spaced. Each also carries the
+ * spot it holds in a still frame (reduced motion), spread out like "(((". */
+const ARC = "M3.5 7Q-3.5 0 3.5 -7";
+const WAVES = [0, 1, 2].map((i) => `<g class="listen-w" style="animation-delay:${n(-i * 0.6)}s;transform:translateX(${-6 + i * 8}px) scale(${n(0.75 + i * 0.2)})"><path class="ink" d="${ARC}"/><path class="tone" d="${ARC}"/></g>`).join("");
+/** The listening badge (sidebar and rail): a little bubble with two arcs. */
+const EAR_BADGE = `<rect x="-9" y="-12" width="18" height="24" rx="6"/><path d="M-1 -5Q-5 0 -1 5M4 -7.5Q-2 0 4 7.5"/>`;
+
+/** The mood props, placed: the cog pair and the puffs (working), the "!" (unread), the zz (asleep), the listening cue,
+ * and the startle burst (entering listening). */
+export function props(s: Spots, size: Size): string {
+  const [cx, cy, ck] = s.cogs, [bx, by, bk] = s.bang, [ex, ey, ek, ea] = s.ear, at = (x: number, y: number, k = 1) => `translate(${n(x)} ${n(y)})${k !== 1 ? ` scale(${n(k)})` : ""}`;
+  const burst = [-56, -28, 0, 28, 56].map((a) => { const r = (a * Math.PI) / 180, s0 = Math.sin(r), c0 = Math.cos(r); return `M${n(s0 * 15)} ${n(-c0 * 15)}L${n(s0 * 23)} ${n(-c0 * 23)}`; }).join("");
+  return `<g class="prop-work cogs keep-small" style="--cogs-alt:${s.alt[0]}px ${s.alt[1]}px"><g transform="${at(cx, cy, ck)}">
+        <g class="cog cog-big"><path d="${cog(0, 0, 11, 8)}"/><circle r="3.6"/></g>
+        <g class="cog cog-small"><path d="${cog(12.5, 15.5, 7, 6)}"/><circle cx="12.5" cy="15.5" r="2.4"/></g>
+      </g></g>
+      <g class="prop-work puffs"><circle cx="22" cy="98" r="4"/><circle cx="16" cy="92" r="2.6"/><circle cx="100" cy="98" r="3.4"/></g>
+      <g transform="${at(bx, by, bk)}"><g class="prop-wait bang"><rect x="-9" y="-12" width="18" height="24" rx="6"/><text y="7" text-anchor="middle">!</text></g></g>
+      <g transform="${at(bx - 7, by + 6)}"><g class="prop-idle zz"><text>z</text><text x="8" y="-8" class="z2">z</text></g></g>
+      ${size !== "stage" ? `<g transform="${at(bx, by, bk)}"><g class="prop-listen listen-badge badge">${EAR_BADGE}</g></g>`
+        : `<g transform="${at(ex, ey, ek)} rotate(${ea})"><g class="prop-listen listen keep-small">${WAVES}</g></g>`}
+      ${size === "stage" ? `<g transform="${at(60, s.top + 21)}"><g class="enter-burst"><path d="${burst}"/></g></g>` : ""}`;
+}
 
 const FIXED: Record<string, string> = { pink: "#f6a9bb", ink: INK };
 const ROLES = new Set(["body", "belly", "dark", "spot", "horn", "gold", "pink", "ink"]);
 
 /** A group a piece sits in, and its pivot (none: the group's CSS sets it). */
 interface Grp { g: string; o?: [number, number] }
-interface Laid { p: Piece; layer: number; seq: number; t: string; gs: Grp[] }
+interface Laid { p: Piece; layer: number; seq: number; t: string; gs: Grp[]; map?: (x: number, y: number) => [number, number] }
 interface Over { html: string; layer: number; seq: number }
 
 const visible = (lod: Lod | undefined, size: Size) => !(lod === 1 && size === "rail") && !(lod === 2 && size !== "stage");
@@ -140,7 +251,7 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
       };
       for (const p0 of d.pieces ?? []) {
         const p = mirrored ? { ...p0, d: mirrorPath(p0.d) } : p0;
-        laid.push({ p: { ...p, ink: p.ink ?? e.ink }, layer: p.layer ?? layer, seq: e.seq, t: pl?.t ?? "", gs: groupsOf(p0) });
+        laid.push({ p: { ...p, ink: p.ink ?? e.ink }, layer: p.layer ?? layer, seq: e.seq, t: pl?.t ?? "", gs: groupsOf(p0), map: pl?.map });
       }
       // A riding part's markup rides with its pieces (eyewear on moving eye stalks); other parts' markup stays put.
       const ride: Grp | undefined = rides && inherit?.g ? { g: inherit.g, o: inherit.o } : undefined;
@@ -235,23 +346,30 @@ export function renderSpec(spec: Spec, size: Size): Drawn {
   const eyeRide: Grp | undefined = rig.at.eyes.g ? { g: rig.at.eyes.g, o: rig.at.eyes.o } : undefined;
   // The working styles' props (shown by the root's `data-work`) and the arm angles their keyframes read (work.ts).
   const work = workProps(spec, rig, size, gradient);
+  // The idle pastimes' props (shown by the root's `data-idle`) and the arm angles their keyframes read (idle.ts).
+  const idle = idleProps(spec, rig, size, gradient, ctx.eyes);
   const defs =[...gradients.values()].join("") + (clipped ? `<clipPath id="${id}clip"><path d="${rig.outline}"/></clipPath>` : "");
+  // The figure's silhouette (every merged piece drawn at this size, ink included), for where the cues go.
+  const profile = profileOf(shown.filter(isMerged).map((l) => {
+    const loops = flatten(l.p.d);
+    return { loops: l.map ? loops.map((loop) => loop.map(([x, y]) => l.map!(x, y))) : loops, r: l.p.w ? (l.p.w + 7) / 2 : 3.5 };
+  }));
 
-  const html = `<svg viewBox="0 0 120 120" aria-hidden="true" style="--bx-body:${colors.body};--bx-belly:${colors.belly};--bx-dark:${colors.dark};--bx-spot:${colors.spot};--bx-horn:#fff3d6;--bx-gold:#f5c242${work.vars}" data-kind="${body.id}">
+  const html = `<svg viewBox="0 0 120 120" aria-hidden="true" style="--bx-body:${colors.body};--bx-belly:${colors.belly};--bx-dark:${colors.dark};--bx-spot:${colors.spot};--bx-horn:#fff3d6;--bx-gold:#f5c242${work.vars}${idle.vars}" data-kind="${body.id}">
       <defs>${defs}</defs>
       <ellipse class="ground" cx="${n(rig.at.ground.x)}" cy="${rig.at.ground.y}" rx="${n(shadow.rx ?? rig.half * 0.85)}" ry="${n(shadow.ry ?? 4.5)}"${shadow.opacity !== undefined ? ` opacity="${n(shadow.opacity)}"` : ""}/>
       <g class="fig"><g class="squash">
-        <g class="outline">${outlineHtml}</g>
+        ${work.under}<g class="outline">${outlineHtml}</g>
         <g class="fills">${fillsHtml}</g>
         ${innerHtml}
         ${glossUnder ? "" : gloss}
         <g class="brows">${inGroup(face.brows, eyeRide)}</g>
         <g class="eyes">${inGroup(face.eyes, eyeRide)}</g><g class="eyes-closed">${inGroup(face.closed, eyeRide)}</g>${noseHtml}
         <g class="m-rest">${face.mouthRest}</g><g class="m-open">${face.mouthOpen}</g>
-        ${over.map((o) => o.html).join("")}${work.html}
+        ${over.map((o) => o.html).join("")}${work.html}${idle.html}
         <path class="sweat prop-work" d="M92 38 Q97 45 92 48 Q87 45 92 38Z"/>
       </g></g>
-      ${PROPS}
+      ${props(spotsOf(profile, rig.eyeY, size), size)}
     </svg>`;
   return { html, traits: traitsOf(spec), tone: colors.body };
 }

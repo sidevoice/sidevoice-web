@@ -1,69 +1,102 @@
 import { n, type Size } from "../core";
-import { INK, add, clamp, mul, outlineLoops, rad, spanAt, sub, topAt, unit, type Eye, type Pt, type Rig, type Spec } from "./kit";
+import { INK, add, clamp, mul, rad, spanAt, sub, topAt, unit, type Eye, type Pt, type Rig, type Spec } from "./kit";
 import { present } from "./spec";
 
-/* Idle pastimes ("reposo"): what a bicho does on its own while nothing is going on. Idle shows no state signal, only a
- * cute activity. The pastime is not part of the bicho: the client picks one at random when the bicho goes idle
- * (`nextIdle`) and swaps it for another every 20–40 s while it stays idle (`idleTurn`). It sets the choice on the
- * avatar's root as `data-idle`; IDLE_CSS keys each pastime's keyframes on it, for the shared groups every part already
- * joins (squash, arms, `.look`, brows, ears, tops, legs, tail, claws), and pops each pastime's props in and out.
+/* Idle ("reposo"): what a bicho does on its own while nothing is going on. Idle shows no state signal. Most of the time
+ * it is quiet: standing, breathing, blinking, now and then looking around. From time to time it takes up ONE pastime,
+ * which lasts its own while and ends, back to quiet: quiet for 4–10 s → a pastime (weighted, never the same twice in a
+ * row) for its own duration → quiet → … The style is not part of the bicho: the client walks these steps (`nextIdle`,
+ * timings in `IDLE_DEFS`) and sets the current one on the avatar's root as `data-idle`; IDLE_CSS keys each style's
+ * keyframes on it, for the shared groups every part already joins (squash, arms, `.look`, brows, ears, tops, legs, tail,
+ * claws), and pops each pastime's props in and out.
  *
- *   juggle   three balls go round over the head, from the left hand to the right; the eyes follow them
- *   soup     a little cauldron of soup in front, stirred with a ladle; it bubbles and steams
- *   water    a watering can in the right hand tips over a potted sprout beside it, which perks up (a heart)
- *   fish     a tiny rod held out over a puddle beside it; the float bobs, and now and then a fish leaps
- *   bubbles  soap bubbles blown off a wand held beside the face (or straight from the mouth, without hands)
- *   music    a boombox on the floor beside it; it grooves to the beat (sway, arms, feet, ears), notes float up
- *   stretch  a big stretch, arms up, and a yawn (eyes squint, never shut); then a wiggle
- *   nap      the old idle: eyes shut, zz, a slow breath. An occasional pastime now, no longer the default
+ *   quiet    the default: still, a slow breath, the blink, an occasional look around; no props (4–10 s)
+ *   stretch  a big stretch, arms up, and a yawn (eyes squint, never shut), then a wiggle; once (~3 s)
+ *   water    a watering can in the right hand tips over a potted sprout beside it, which perks up (a heart); once (~5 s)
+ *   juggle   three balls go round over the head, from the left hand to the right; the eyes follow them (10–20 s)
+ *   soup     a little cauldron of soup on the floor at its lower right, stirred with a ladle; bubbles, steam (10–20 s)
+ *   fish     a tiny rod held out over a puddle beside it; the float bobs, now and then a fish leaps (12–20 s)
+ *   bubbles  soap bubbles blown off a wand held beside the face (without hands, puffed out beside the cheek) (10–18 s)
+ *   music    a boombox on the floor beside it; it grooves to the beat (sway, arms, feet, ears), notes float up (10–20 s)
+ *   nap      the old idle: eyes shut, zz, a slow breath; the longest, and rarer (30–60 s)
+ *
+ * The medium pastimes loop for their spell; the stretch and the watering play once (`oneShot`: one pass, holding the
+ * last frame) and their spell is just long enough for it.
  *
  * Juggle, soup, water and fish need a hand in each arm, free: a bicho without hands (armless, fins, flippers, claws,
  * tentacles, leaves), or one holding something, gets the others (`idlesFor`). Bubbles draws its wand only on free
  * hands. Frozen figures (`v3:`, `monstruo:`) and the mascots get no `data-idle`: they keep the old sleep.
  *
- * Every pastime but the nap is awake: the eyes are open (`.eyes`, never `.eyes-closed`), the colour is full, the ears
+ * Everything but the nap is awake: the eyes are open (`.eyes`, never `.eyes-closed`), the colour is full, the ears
  * and tops stand, the zz are gone. Props are stage-only, except the big cue of each pastime (`keep-small`, so the
- * sidebar still reads it); the rail draws none and holds still. Nothing touches the face: props stay under the mouth or
- * beside the head (measured on the real outline and the real eyes), and what floats away floats outwards. With reduced
- * motion each pastime is a still pose with its props showing. There is no desk in idle. */
+ * sidebar still reads it); the rail draws none and holds still. Nothing touches the face: props stand on the floor or
+ * beside the head, measured on the real outline, the real eyes and the mouth's corner, and what floats away floats
+ * outwards. With reduced motion each pastime is a still pose with its props showing. There is no desk in idle. */
 
-export const IDLE_STYLES = ["juggle", "soup", "water", "fish", "bubbles", "music", "stretch", "nap"] as const;
+export const IDLE_STYLES = ["quiet", "juggle", "soup", "water", "fish", "bubbles", "music", "stretch", "nap"] as const;
 export type Idle = (typeof IDLE_STYLES)[number];
 
 /** Spanish labels, for pickers. */
 export const IDLE_LABELS: Record<Idle, string> = {
-  juggle: "malabares", soup: "sopa", water: "regar", fish: "pescar", bubbles: "pompas", music: "música", stretch: "estirarse", nap: "siesta",
+  quiet: "tranquilo", juggle: "malabares", soup: "sopa", water: "regar", fish: "pescar", bubbles: "pompas", music: "música", stretch: "estirarse", nap: "siesta",
 };
 
-/** How long a bicho keeps one pastime before it moves on to another, in ms. */
-export const IDLE_TURN = { min: 20_000, max: 40_000 } as const;
+/** A style's timing: how long one spell of it lasts (`duration`, [min, max] ms, picked at random), and whether its
+ * animation plays once and holds its last frame (`oneShot`: the stretch, the watering) instead of looping for the
+ * spell. `weight`: how often it comes up against the other pastimes (1 by default; quiet is never picked, it comes
+ * between them). */
+export interface IdleDef { id: Idle; duration: readonly [number, number]; oneShot?: boolean; weight?: number }
+
+export const IDLE_DEFS: Record<Idle, IdleDef> = {
+  quiet: { id: "quiet", duration: [4_000, 10_000] },
+  stretch: { id: "stretch", duration: [3_000, 3_500], oneShot: true },
+  water: { id: "water", duration: [4_500, 6_000], oneShot: true },
+  juggle: { id: "juggle", duration: [10_000, 20_000] },
+  soup: { id: "soup", duration: [10_000, 20_000] },
+  fish: { id: "fish", duration: [12_000, 20_000] },
+  bubbles: { id: "bubbles", duration: [10_000, 18_000] },
+  music: { id: "music", duration: [10_000, 20_000] },
+  nap: { id: "nap", duration: [30_000, 60_000], weight: 0.5 },
+};
 
 /** The pastimes whose props are held in both hands. */
 const IN_HAND: readonly Idle[] = ["juggle", "soup", "water", "fish"];
 
-/** How often a pastime comes up against the others (1 by default): the nap is occasional. */
-const IDLE_WEIGHT: Partial<Record<Idle, number>> = { nap: 0.4 };
-
-/** The pastimes that suit a bicho: all of them with free hands, the hands-free ones otherwise. */
+/** The styles that suit a bicho: quiet and every pastime with free hands, quiet and the hands-free ones otherwise. */
 export function idlesFor(spec: Spec): Idle[] {
   const parts = present(spec);
   const hands = parts.some((e) => e.slot === "arms" && e.tags?.includes("hand")) && !parts.some((e) => e.slot === "held");
   return IDLE_STYLES.filter((w) => hands || !IN_HAND.includes(w));
 }
 
-/** A random pastime from `pool` (weighted: the nap is rarer), never `prev`, so a swap always changes pastime. Going
- * idle: `nextIdle(null, pool)`. */
-export function nextIdle(prev?: string | null, pool: readonly Idle[] = IDLE_STYLES, random: () => number = Math.random): Idle {
-  const options = pool.filter((w) => w !== prev);
-  if (!options.length) return pool[0] ?? "nap";
-  const weight = (w: Idle) => IDLE_WEIGHT[w] ?? 1;
-  let r = random() * options.reduce((s, w) => s + weight(w), 0);
-  for (const w of options) if ((r -= weight(w)) < 0) return w;
-  return options[options.length - 1];
-}
+/** How long one spell of `idle` lasts this time, in ms (a random pick in its `duration`). */
+export const idleTurn = (idle: Idle = "quiet", random: () => number = Math.random) => {
+  const [lo, hi] = IDLE_DEFS[idle].duration;
+  return Math.round(lo + random() * (hi - lo));
+};
 
-/** How long to keep the current pastime before the next swap, in ms. */
-export const idleTurn = (random: () => number = Math.random) => IDLE_TURN.min + random() * (IDLE_TURN.max - IDLE_TURN.min);
+/** One step of idle: the style to show (`data-idle`) and for how long (ms). `last` is the last pastime played, so the
+ * next one differs. */
+export interface IdleStep { idle: Idle; ms: number; last: Idle | null }
+
+/** The next step of idle. Going idle (`prev` null) and after every pastime: quiet, for 4–10 s. After quiet: a pastime
+ * from `pool` (weighted: the nap is rarer), never the one played last (unless it is the only one), for its own
+ * duration. A pool with no pastime stays quiet. The client shows `step.idle` for `step.ms`, then asks again:
+ *
+ *   let step = nextIdle(null, pool);              // quiet
+ *   …after step.ms: step = nextIdle(step, pool);  // a pastime, then quiet, then another pastime, … */
+export function nextIdle(prev: IdleStep | null, pool: readonly Idle[] = IDLE_STYLES, random: () => number = Math.random): IdleStep {
+  const last = prev ? (prev.idle === "quiet" ? prev.last : prev.idle) : null;
+  const quiet = (): IdleStep => ({ idle: "quiet", ms: idleTurn("quiet", random), last });
+  if (!prev || prev.idle !== "quiet") return quiet();
+  const pastimes = pool.filter((w) => w !== "quiet"), fresh = pastimes.filter((w) => w !== last);
+  const options = fresh.length ? fresh : pastimes;
+  if (!options.length) return quiet();
+  const weight = (w: Idle) => IDLE_DEFS[w].weight ?? 1;
+  let r = random() * options.reduce((s, w) => s + weight(w), 0), pick = options[options.length - 1];
+  for (const w of options) if ((r -= weight(w)) < 0) { pick = w; break; }
+  return { idle: pick, ms: idleTurn(pick, random), last: pick };
+}
 
 /* ---------- geometry ---------- */
 
@@ -130,8 +163,8 @@ const armVars = (o: Out, name: string, a: number) => o.vars.push(`--idl-${name}-
 
 /** Juggle: three balls go round the head on a circle through both hands, from the left hand over the top to the right
  * one, where each is caught and passed back (it shrinks into the hand and pops out of the other). The circle's centre
- * is as low as keeps every eye (and the brow room over it) inside, and the arc over the head when it fits, so the balls
- * hug the head on any body. The static turns spread the balls over the arc, for reduced motion. */
+ * is as low as keeps every eye (and the brow room over it) inside, and the arc a little over the head when it fits, so
+ * the balls fly just over the head on any body. The static turns spread the balls over the arc, for reduced motion. */
 function juggle(rig: Rig, o: Out, eyes: Eye[]) {
   const l = rig.at.handL, r = rig.at.handR;
   if (!l || !r) return;
@@ -140,7 +173,7 @@ function juggle(rig: Rig, o: Out, eyes: Eye[]) {
   const fits = (cy: number, clearHead: boolean, sides: boolean) => {
     const R = radius(cy);
     if (cy - R - ball < 2 || (sides && (mx - R - ball < 1 || mx + R + ball > 119))) return false;
-    if (eyes.some((e) => Math.hypot(e.x - mx, e.y - cy) + e.r + 5 + ball > R)) return false;
+    if (eyes.some((e) => Math.hypot(e.x - mx, e.y - cy) + e.r + 7 + ball > R)) return false;
     if (!clearHead) return true;
     const a0 = deg(Math.atan2(yh - cy, -dx)), sweep = 180 + 2 * deg(Math.atan2(yh - cy, dx));
     for (let t = 0; t <= 1; t += 0.05) {
@@ -164,21 +197,27 @@ function juggle(rig: Rig, o: Out, eyes: Eye[]) {
   o.front += prop("juggle", html, "keep-small");
 }
 
-/** Soup: a little cauldron on the floor in front, to the right, its rim under the mouth, full of tomato soup with bits
- * in it; a ladle held high in the right hand stirs it round. The ladle is drawn where it sits with the arm at its
- * stirring angle, turned back into the arm's rest frame (the CSS turns the arm). Bubbles pop on the soup, and steam
- * curls up its right side, away from the face. */
+/** Soup: a little cauldron on the floor in front of the bicho's lower right, out from under the mouth (its rim starts
+ * right of the mouth's corner, so no mouth, however deep, meets it), full of tomato soup with bits in it; a ladle held
+ * high in the right hand stirs it round. The ladle is drawn where it sits with the arm at its stirring angle, turned
+ * back into the arm's rest frame (the CSS turns the arm). Bubbles pop on the soup, and steam curls up its right side,
+ * away from the face. */
 function soup(rig: Rig, shade: (c: string) => string, o: Out, eyes: Eye[]) {
   if (!rig.at.handR) return;
-  const G = rig.at.ground.y, pw = clamp(rig.half - 12, 12, 17), cx = 60 + clamp(rig.half * 0.3, 7, 13);
-  // The rim (its fat ink included) sits clear under the resting smile, which reaches about 6 under the mouth line.
-  const yR = Math.max(G - 16.5, rig.mouthY + 13), ph = G - 1.5 - yR;
+  const G = rig.at.ground.y, pw = clamp(rig.half - 14, 11, 14), yR = Math.min(Math.max(G - 16.5, rig.mouthY + 10), G - 10), ph = G - 1.5 - yR;
+  // A mouth that hangs lower than the cast's (a big beak: its `chin` is past the open D's 14.5) gets a little more room.
+  const cx = Math.min(rig.at.mouth.x + (rig.at.chin.y > rig.mouthY + 18 ? 20 : 16) + pw, 113 - pw);
   const { o: pivot, hand } = armR(rig);
-  const dip: Pt = [cx + pw * 0.25, yR + 1];
-  // The smallest raise that holds the hand well over the rim, and out to the right of where the ladle dips, so the
-  // ladle goes in steeply from above.
+  // The smallest raise that holds the hand over the rim, so the ladle goes in steeply from above; never so high that
+  // the hand comes near an eye. The ladle dips in under the hand, a little in from it.
   let lift = -15;
-  for (let a = -15; a >= -100; a -= 5) { lift = a; const g = turn(hand, pivot, a); if (g[1] <= yR - 15 && g[0] >= dip[0] + 8) break; }
+  for (let a = -15; a >= -80; a -= 5) {
+    const g = turn(hand, pivot, a);
+    if (eyes.some((e) => Math.hypot(g[0] - e.x, g[1] - e.y) < e.r + 10)) break;
+    lift = a;
+    if (g[1] <= yR - 14) break;
+  }
+  const dip: Pt = [clamp(turn(hand, pivot, lift)[0] - 8, cx - pw * 0.4, cx + pw * 0.35), yR + 1];
   o.vars.push(`--idl-stir:${lift}deg`);
   const grip = turn(hand, pivot, lift), u = unit(sub(dip, grip)), back = (p: Pt) => turn(p, pivot, -lift);
   const a = back(add(grip, mul(u, -4))), z = back(add(dip, mul(u, 1))), bowl = add(dip, mul(u, 3));
@@ -286,11 +325,11 @@ function fish(rig: Rig, shade: (c: string) => string, o: Out) {
 
 /** Bubbles: soap bubbles drift up and out to the right, wobbling, and pop. With free hands they come off a wand held
  * up beside the face (its ring just clear of the head's outline, at the mouth's height), and the mouth purses to blow
- * (CSS); without, they come straight from the mouth's corner, heading out sideways before they rise. */
+ * (CSS); without, they appear just beside the cheek, where the pursed mouth blows them. */
 function bubbles(rig: Rig, o: Out) {
   const m = rig.at.mouth, s = spanAt(rig, m.y - 4), edge = s ? s[1] : 60 + rig.half, rr = 4.8;
   // Without hands the bubbles come out just beside the cheek, where the pursed mouth blows them: never over the face.
-  let from: Pt = [Math.min(edge + 4, 110), m.y - 3];
+  let from: Pt = [Math.min(edge + 7, 110), m.y - 3];
   if (o.hands && rig.at.handR) {
     const ring: Pt = [Math.min(edge + rr + 2.5, 110), m.y - 4];
     const { o: pivot, hand } = armR(rig), lift = clamp(reach(rig, add(ring, [2, 13])), -90, 60), grip = turn(hand, pivot, lift);
@@ -301,13 +340,16 @@ function bubbles(rig: Rig, o: Out) {
     o.arm += onArm(rig, prop("bubbles", wand, "keep-small"));
     from = ring;
   }
-  // They rise up the head's side, drifting outwards (never back over the head), wobbling on the way.
+  // They rise up the head's side, drifting outwards (never back over the head), wobbling on the way: each drifts out at
+  // least as far as keeps it clear of the head's real outline at every step of its path (`idl-float`'s keyframes).
+  const path = [[0.12, 0.04, 0.7], [0.45, 0.28, 1.06], [0.75, 0.6, 1.05], [1, 1, 1]] as const;
+  const clear = (r: number, by: number) => Math.max(...path.map(([fx, fy, s]) => ((spanAt(rig, from[1] + by * fy)?.[1] ?? 0) + 1.5 + r * s - from[0]) / fx));
   const room = 117 - from[0], up = clamp(rig.u, 0.9, 1.15);
   const trips = ([[0.5, -44, 7], [0.95, -28, 4.6], [0.2, -58, 5.6], [0.75, -52, 3.8], [0.6, -36, 5]] as const);
   const html = trips.map(([fx, dy, r], i) => {
-    const bx = Math.max(2, room * fx - r), by = Math.max(dy * up, 4 + r - from[1]), f = 0.25 + 0.15 * i;
+    const by = Math.max(dy * up, 4 + r - from[1]), bx = Math.min(Math.max(2, room * fx - r, clear(r, by)), 118 - r - from[0]), [sx, sy] = path[[1, 2, 3, 3, 2][i]];
     // Born one after another while the mouth blows (12–34% of the bar, after the .5 s hop), static spread for reduced motion.
-    const style = `--idl-bx:${n(bx)}px;--idl-by:${n(by)}px;animation-delay:${n(0.86 + i * 0.15)}s;transform:translate(${n(bx * f)}px,${n(by * f)}px)`;
+    const style = `--idl-bx:${n(bx)}px;--idl-by:${n(by)}px;animation-delay:${n(0.86 + i * 0.15)}s;transform:translate(${n(bx * sx)}px,${n(by * sy)}px)`;
     const glint = `M${n(from[0] - r * 0.62)} ${n(from[1] - r * 0.05)}A${n(r * 0.62)} ${n(r * 0.62)} 0 0 1 ${n(from[0] - r * 0.05)} ${n(from[1] - r * 0.62)}`;
     return `<g class="idl-bubble" style="${style}"><circle ${centre(from)} r="${r}" fill="#c8f3ff" fill-opacity=".38" stroke="${INK}" stroke-width="1.6"/><circle ${centre(from)} r="${n(r - 1.3)}" fill="none" stroke="#9fe7ff" stroke-width="1.1" stroke-opacity=".9"/>
         <path d="${glint}" fill="none" stroke="#fff" stroke-width="${n(Math.min(1.8, r * 0.34))}" stroke-linecap="round"/><circle cx="${n(from[0] + r * 0.4)}" cy="${n(from[1] + r * 0.35)}" r="${n(r * 0.14)}" fill="#ffc2e0"/></g>`;
@@ -390,14 +432,14 @@ const I = (idle: Idle) => `&[data-mood=idle][data-idle=${idle}]`;
 const HOP = "bx-bounce .5s cubic-bezier(.3,1.6,.5,1)";
 
 export const IDLE_CSS = `
-    /* idle pastimes (src/bichos/idle.ts). The client sets data-idle on the root when the bicho goes idle and swaps it
-       every 20–40 s; a root without it (the mascots, the frozen v3:/monstruo: figures) keeps the old sleep, untouched.
-       On every change the old props pop out and the new ones pop in. Arm angles come from the renderer (--idl-*), and
-       the rail gets none, so its arms stay at rest. */
+    /* idle (src/bichos/idle.ts). The client sets data-idle on the root while the bicho is idle: quiet, then now and then
+       one pastime for its own while, then quiet again. A root without it (the mascots, the frozen v3:/monstruo: figures)
+       keeps the old sleep, untouched. On every change the old props pop out and the new ones pop in. Arm angles come
+       from the renderer (--idl-*), and the rail gets none, so its arms stay at rest. */
     &:not([data-idle]) .idl-props { display: none }
     .idl { opacity: 0; transform: scale(.3); transform-box: fill-box; transform-origin: 50% 50%; transition: opacity .16s ease-in, transform .2s ease-in }
     .idl-ground { transform-origin: 50% 100% }
-    ${IDLE_STYLES.filter((s) => s !== "nap" && s !== "stretch").map((s) => `&[data-idle=${s}] .idl-${s}`).join(", ")} { opacity: 1; transform: none; transition: none; animation: idl-in .45s cubic-bezier(.3,1.6,.5,1) .12s backwards }
+    ${IDLE_STYLES.filter((s) => s !== "quiet" && s !== "nap" && s !== "stretch").map((s) => `&[data-idle=${s}] .idl-${s}`).join(", ")} { opacity: 1; transform: none; transition: none; animation: idl-in .45s cubic-bezier(.3,1.6,.5,1) .12s backwards }
 
     /* awake: eyes open, full colour, ears and tops up, legs straight, no zz */
     ${AWAKE} .eyes { display: inline }
@@ -405,6 +447,10 @@ export const IDLE_CSS = `
     ${AWAKE} .squash { transform: none; filter: none; animation: ${HOP} }
     ${AWAKE} :is(.pg-ear-l, .pg-ear-r, .pg-sprout, .pg-sprout-l, .pg-sprout-r, .pg-hang-l, .pg-hang-r, .pg-leg-a, .pg-leg-b) { transform: none }
     ${AWAKE} .pg-tail { animation-duration: 3s }
+
+    /* quiet (the default): it settles, then stands breathing slowly, blinks, and now and then looks around */
+    ${I("quiet")} .squash { animation: bx-settle .5s ease-out, idl-breathe 3.6s ease-in-out .5s infinite }
+    ${I("quiet")} .look { animation: idl-look 9s ease-in-out 1.5s infinite }
 
     /* juggle: each ball goes round on its circle (its delay inline) and is passed back hand to hand; the hands toss in
        turn, the eyes follow */
@@ -426,16 +472,17 @@ export const IDLE_CSS = `
     ${I("soup")} .idl-pop { animation: idl-pop 1.8s ease-out infinite }
     ${I("soup")} .idl-steam { animation: idl-steam 2.6s ease-out infinite }
 
-    /* water: the can tips and pours, drops fall, the sprout perks up and a heart rises; a lean towards it, eyes on it */
-    ${I("water")} .squash { animation: ${HOP}, idl-lean 3.6s ease-in-out .5s infinite }
+    /* water (once): the can tips and pours, drops fall, the sprout perks up and a heart rises; a lean towards it, eyes
+       on it. One pass, holding its last frame (the can upright) until the spell ends */
+    ${I("water")} .squash { animation: ${HOP}, idl-lean 3.6s ease-in-out .5s 1 forwards }
     ${I("water")} .pg-arm-r { transform: rotate(var(--idl-water)) }
-    ${I("water")} .idl-tilt { transform: rotate(var(--idl-tip)); animation: idl-pour 3.6s ease-in-out .5s infinite }
+    ${I("water")} .idl-tilt { transform: rotate(var(--idl-tip)); animation: idl-pour 3.6s ease-in-out .5s 1 both }
     ${I("water")} .look { transform: translate(2.2px,2px) }
-    ${I("water")} .idl-rain { animation: idl-rain 3.6s linear .5s infinite }
+    ${I("water")} .idl-rain { animation: idl-rain 3.6s linear .5s 1 both }
     ${I("water")} .idl-drop { animation: idl-drop .66s ease-in infinite }
-    ${I("water")} .idl-grow { animation: idl-grow 3.6s ease-in-out .5s infinite }
+    ${I("water")} .idl-grow { animation: idl-grow 3.6s ease-in-out .5s 1 both }
     .idl-heart { opacity: 0; transform-box: fill-box; transform-origin: 50% 100% }
-    ${I("water")} .idl-heart { animation: idl-heart 3.6s ease-out .5s infinite }
+    ${I("water")} .idl-heart { animation: idl-heart 3.6s ease-out .5s 1 both }
 
     /* fish: patient, eyes on the float; it bobs and dips, rings spread, a fish leaps (the eyes jump to it) */
     ${I("fish")} .squash { animation: ${HOP}, idl-breathe 3.4s ease-in-out .5s infinite }
@@ -475,16 +522,17 @@ export const IDLE_CSS = `
     .idl-note { transform-box: fill-box; transform-origin: 50% 100% }
     ${I("music")} .idl-note { animation: idl-note 2.4s ease-out infinite }
 
-    /* stretch: arms up, tall, a yawn (eyes squint, never shut), then a wiggle; the still pose is the stretch */
-    ${I("stretch")} .squash { transform: scale(.97,1.05); animation: ${HOP}, idl-stretch 6s ease-in-out .5s infinite }
-    ${I("stretch")} .pg-arm-r { transform: rotate(var(--idl-up-r)); animation: idl-reach-r 6s ease-in-out .5s infinite }
-    ${I("stretch")} .pg-arm-l { transform: rotate(var(--idl-up-l)); animation: idl-reach-l 6s ease-in-out .5s infinite }
-    ${I("stretch")} .pg-claw-l { animation: idl-reach-l 6s ease-in-out .5s infinite; --idl-up-l: 18deg }
-    ${I("stretch")} .pg-claw-r { animation: idl-reach-r 6s ease-in-out .5s infinite; --idl-up-r: -18deg }
-    ${I("stretch")} .eyes { animation: idl-squint 6s ease-in-out .5s infinite }
-    ${I("stretch")} .brows { animation: idl-brows 6s ease-in-out .5s infinite }
-    ${I("stretch")} .m-open { animation: idl-yawn 6s ease-in-out .5s infinite }
-    ${I("stretch")} .m-rest { animation: idl-yawn-rest 6s ease-in-out .5s infinite }
+    /* stretch (once, 3 s): arms up, tall, a yawn (eyes squint, never shut), then a wiggle, back to rest and holding it
+       (forwards: the still pose underneath, for reduced motion, is the stretch itself) */
+    ${I("stretch")} .squash { transform: scale(.97,1.05); animation: idl-stretch 3s ease-in-out 1 both }
+    ${I("stretch")} .pg-arm-r { transform: rotate(var(--idl-up-r)); animation: idl-reach-r 3s ease-in-out 1 both }
+    ${I("stretch")} .pg-arm-l { transform: rotate(var(--idl-up-l)); animation: idl-reach-l 3s ease-in-out 1 both }
+    ${I("stretch")} .pg-claw-l { animation: idl-reach-l 3s ease-in-out 1 both; --idl-up-l: 18deg }
+    ${I("stretch")} .pg-claw-r { animation: idl-reach-r 3s ease-in-out 1 both; --idl-up-r: -18deg }
+    ${I("stretch")} .eyes { animation: idl-squint 3s ease-in-out 1 both }
+    ${I("stretch")} .brows { animation: idl-brows 3s ease-in-out 1 both }
+    ${I("stretch")} .m-open { animation: idl-yawn 3s ease-in-out 1 both }
+    ${I("stretch")} .m-rest { animation: idl-yawn-rest 3s ease-in-out 1 both }
 
     /* nap: the old sleep (base idle: eyes shut, grey, drooping, zz), breathing slowly */
     ${I("nap")} .squash { animation: idl-snooze 4.4s ease-in-out infinite }
@@ -531,5 +579,6 @@ export const IDLE_CSS = `
     @keyframes idl-brows { 0%,28%,52%,100% { opacity: 0; transform: translateY(0) } 34%,46% { opacity: 1; transform: translateY(-2px) } }
     @keyframes idl-yawn { 0%,30% { opacity: 0; transform: scale(.4,.3) } 34% { opacity: 1; transform: scale(.7,.6) } 41% { opacity: 1; transform: scale(1,1.08) } 47% { opacity: 1; transform: scale(.6,.5) } 50%,100% { opacity: 0; transform: scale(.4,.3) } }
     @keyframes idl-yawn-rest { 0%,30% { opacity: 1 } 34%,47% { opacity: 0 } 50%,100% { opacity: 1 } }
+    @keyframes idl-look { 0%,30%,52%,72%,100% { transform: translate(0,0) } 36%,46% { transform: translate(-2.4px,.4px) } 78%,88% { transform: translate(2.2px,-1px) } }
     @keyframes idl-snooze { 0%,100% { transform: scale(1.04,.95) } 50% { transform: scale(1.06,.935) } }
 `;

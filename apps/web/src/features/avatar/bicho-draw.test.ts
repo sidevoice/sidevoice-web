@@ -28,6 +28,8 @@ test("a conversation's bicho is the same drawing on every device; its tone tints
   expect(drawing.tone).toMatch(/^#[0-9a-f]{6}$/);
   // A bicho with free hands can take any working style; a small one draws only each style's big cue.
   expect(drawing.works).toEqual(expect.arrayContaining(["crank", "read", "type"]));
+  // Resting, it goes in idle steps: quiet, and the pastimes that suit it.
+  expect(drawing.idles).toEqual(expect.arrayContaining(["quiet", "bubbles", "music", "stretch", "nap"]));
   expect(engineSize("stage")).toBe("stage");
   expect(engineSize("small")).toBe("sidebar");
   expect(engineSize("pip")).toBe("sidebar");

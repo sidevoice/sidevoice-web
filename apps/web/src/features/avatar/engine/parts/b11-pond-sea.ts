@@ -583,10 +583,11 @@ export default batch({
   ],
 
   css: `
+    /* asleep = idle without a pastime (the mascots', the frozen figures') or the nap: the quiet pose and the pastimes stay awake */
     /* the spout bobs while talking and waiting, spurts while working, and settles low asleep */
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b11-spout { animation: bx-feel 2s ease-in-out infinite }
     &[data-mood=working] .pg-b11-spout { animation: bx-pulse .45s ease-in-out infinite }
-    &[data-mood=idle] .pg-b11-spout { transform: scale(.72) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b11-spout { transform: scale(.72) }
 
     /* jellyfish ribbons drift from the bell, faster while working */
     .pg-b11-ribbon { transform-box: fill-box; transform-origin: 50% 0 }

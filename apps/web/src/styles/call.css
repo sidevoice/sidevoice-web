@@ -186,11 +186,13 @@
 .sv-avatar svg { display:block;width:100%;height:100%;overflow:visible }
 /* The app is dark only: the engine's theme inks are the dark theme's (the Sidevoice mascot's lila and noche). */
 .sv-avatar[data-style=bichos] { --bx-sv:var(--sv-primary);--bx-sv-face:var(--sv-on-primary);--fg-dim:var(--sv-muted) }
-/* Props only in their mood, and only the big cue of each (.keep-small) on a small avatar. */
-.sv-avatar[data-style=bichos]:not([data-mood=working]) .prop-work,
+/* Props only in their mood (and through the entrance out of it, data-enter, so they can drop away), and on a small
+   avatar only the big cue of each (.keep-small: the cogs, the listening waves) or a badge (listening's). "waiting" is
+   the engine's older name for idle. */
+.sv-avatar[data-style=bichos]:not([data-mood=working],[data-enter=working]) .prop-work,
 .sv-avatar[data-style=bichos]:not([data-mood=listening]) .prop-listen,
-.sv-avatar[data-style=bichos]:not([data-mood=idle]) .prop-idle,
-.sv-avatar[data-style=bichos][data-size=sidebar] :is(.prop-work,.prop-listen,.prop-idle):not(.keep-small) { display:none }
+.sv-avatar[data-style=bichos]:not([data-mood=idle],[data-mood=waiting],[data-enter=idle]) .prop-idle,
+.sv-avatar[data-style=bichos][data-size=sidebar] :is(.prop-work,.prop-listen,.prop-idle):not(.keep-small,.badge) { display:none }
 /* The unread cue (data-unread): the "!" (.prop-wait, its old name) over idle and working, never while it speaks or
    listens; the engine turns it into a badge on a small avatar. */
 .sv-avatar[data-style=bichos]:not([data-unread]) .prop-wait,

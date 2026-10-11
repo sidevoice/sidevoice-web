@@ -41,12 +41,21 @@ export interface Mascot {
   shine: string;
   traits: string;
   tone: string;
+  /** The mark's silhouette, ink included, as a rough path in the 120 box: the shared cues (cogs, "!", the listening
+   * waves) keep clear of it. Measured from the drawing (see MASCOT_HULLS). */
+  hull?: string;
+  /** The eyes' line, where the listening waves come in. */
+  eyeY?: number;
 }
 
-/** A mascot by name: only Sidevoice's. */
+/** Sidevoice's mark at rest, ink included, and its eyes' line, [eyeY, hull]: the shared cues keep clear of it. */
+const SIDEVOICE_HULL: [number, string] = [56, "M57 12L57 13.5L52 16.5L50 22.5L50 28.5L39 31.5L34 34.5L32 40.5L21 43.5L16 46.5L14 52.5L14 67.5L16 73.5L21 76.5L32 79.5L34 85.5L39 88.5L50 91.5L50 97.5L52 103.5L57 106.5L57 108L63 108L63 106.5L67 103.5L69 100.5L70 97.5L70 91.5L81 88.5L85 85.5L87 82.5L88 79.5L99 76.5L103 73.5L105 70.5L106 67.5L106 52.5L105 49.5L103 46.5L99 43.5L88 40.5L87 37.5L85 34.5L81 31.5L70 28.5L70 22.5L69 19.5L67 16.5L63 13.5L63 12Z"];
+
+/** A mascot by name: only Sidevoice's, with the hull its cues are placed by. */
 export function mascot(kind: Harness, id: string): Mascot {
   if (kind !== "sidevoice") throw new Error(`[bichos] no mascot "${String(kind)}" ships`);
-  return sidevoice(id);
+  const [eyeY, hull] = SIDEVOICE_HULL;
+  return { ...sidevoice(id), hull, eyeY };
 }
 
 /** The Sidevoice mark as "la banda": the five bars of brand-resources' mark, placed with the same transform the other

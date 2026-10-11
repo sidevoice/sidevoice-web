@@ -3,44 +3,51 @@ import { INK, add, clamp, mul, rad, sub, unit, type Pt, type Rig, type Spec } fr
 import { present } from "./spec";
 
 /* Working styles: the tool a bicho has in its hands while it works. The style is not part of the bicho: the client
- * picks one at random when the bicho starts working (`nextWork`) and swaps it for another every 20–30 s while it keeps
- * working (`workTurn`), like picking up a different tool. It sets the choice on the avatar's root as `data-work`; the
+ * picks one at random when the bicho starts working (`nextWork`) and swaps it for another when its time is up
+ * (`workTurn(work)`: each style has its own range) while it keeps working, like picking up a different tool. It sets the choice on the avatar's root as `data-work`; the
  * shared CSS (styles/bichos.ts) keys each style's keyframes on it, for the shared groups (squash, arms, `.look`, brows)
- * every part already joins, and pops each style's props in and out.
+ * every part already joins, and pops each style's props in and out. The cog pair turns over the head in every style
+ * (render.ts places it): it is the "busy" cue at a glance, and the one the sidebar keeps. Each style also changes the
+ * scene a little, and what piles up clears again before it gets big:
  *
- *   crank   the classic: arms crank, cogs turn, puffs of effort (what a root without `data-work` shows)
- *   hammer  a hammer in the right hand winds up overhead and strikes an anvil; the body slams down on every hit
- *   juggle  three balls arc from hand to hand over the head; the eyes follow them
- *   read    a big open book held in front; the eyes scan the lines; a page turns now and then
- *   stir    a cauldron in front, stirred with a long paddle; bubbles rise
+ *   crank   the classic: arms crank, puffs of effort (what a root without `data-work` shows)
+ *   hammer  a hammer in the right hand winds up overhead and strikes an anvil; the body slams down on every hit, sparks
+ *           fly, and nails jump off and gather by the anvil
+ *   read    a big open book held in front; the eyes scan the lines; a page turns now and then, and finished pages fly
+ *           over its shoulder into a little pile behind it
  *   type    a little laptop in front, hands tapping at its sides; bits of code fly out (the one code-flavoured style)
  *
- * Hammer, juggle and stir need a hand in each arm, free: a bicho without hands, or one holding something, gets the
- * others (`worksFor`). Frozen figures (the `v3:` and `monstruo:` seeds) and the mascots get no `data-work`: they keep
- * the classic crank.
+ * The hammer needs a free hand on the right: a bicho without hands, or one holding something, gets the others
+ * (`worksFor`). Frozen figures (the `v3:` and `monstruo:` seeds) and the mascots get no `data-work`: they keep the
+ * classic crank. (Juggling and the cauldron moved to idle, as pastimes: idle.ts.)
  *
  * A desk in front (the stage scene's: the client sets `data-desk` on the root) covers the figure below `DESK_Y`, where
  * the props would stand. At stage size each prop also carries how far it steps up to rest on the desk top
  * (`--wk-lift`), the arms carry their angles to reach it there (`--wk-read-rd`/`-ld`, `--wk-type-rd`/`-ld`), and
  * the paddle comes in a second drawing for the raised cauldron; the CSS swaps them in under `data-desk`. */
 
-export const WORKS = ["crank", "hammer", "juggle", "read", "stir", "type"] as const;
+export const WORKS = ["crank", "hammer", "read", "type"] as const;
 export type Work = (typeof WORKS)[number];
 
 /** Spanish labels, for pickers. */
 export const WORK_LABELS: Record<Work, string> = {
-  crank: "manivela", hammer: "martillo", juggle: "malabares", read: "libro", stir: "caldero", type: "portátil",
+  crank: "manivela", hammer: "martillo", read: "libro", type: "portátil",
 };
 
-/** How long a bicho keeps one tool before it picks up another, in ms. */
+
+/** How long a bicho keeps one tool before it picks up another, in ms: the default, and each style's own (hammering
+ * comes in short bursts, reading goes on). */
 export const WORK_TURN = { min: 20_000, max: 30_000 } as const;
+export const WORK_DURATION: Record<Work, [number, number]> = {
+  crank: [15_000, 25_000], hammer: [8_000, 14_000], read: [20_000, 35_000], type: [15_000, 30_000],
+};
 
 /** A desk in front of the figure has its top edge on this line of the 120 box (the stage scene lays its desk out so):
  * the props rest on it, and the desk covers everything below it. */
 export const DESK_Y = 93.5;
 
 /** The styles whose props are held in the hands. */
-const IN_HAND: readonly Work[] = ["hammer", "juggle", "stir"];
+const IN_HAND: readonly Work[] = ["hammer"];
 
 /** The styles that suit a bicho: all of them with free hands, the hands-free ones otherwise. */
 export function worksFor(spec: Spec): Work[] {
@@ -56,20 +63,16 @@ export function nextWork(prev?: string | null, pool: readonly Work[] = WORKS, ra
   return options[Math.floor(random() * options.length)];
 }
 
-/** How long to keep the current tool before the next swap, in ms. */
-export const workTurn = (random: () => number = Math.random) => WORK_TURN.min + random() * (WORK_TURN.max - WORK_TURN.min);
+/** How long to keep `work` (the tool just picked up) before the next swap, in ms; the default range without one. */
+export const workTurn = (work?: Work, random: () => number = Math.random) => {
+  const [min, max] = work ? WORK_DURATION[work] : [WORK_TURN.min, WORK_TURN.max];
+  return min + random() * (max - min);
+};
 
 /* ---------- the props: one set per style the bicho suits, popped in and out by the CSS ---------- */
 
 const deg = (r: number) => (r * 180) / Math.PI;
 const P = (p: Pt) => `${n(p[0])} ${n(p[1])}`;
-/** A point as a circle's or ellipse's centre attributes. */
-const centre = (p: Pt) => `cx="${n(p[0])}" cy="${n(p[1])}"`;
-/** p turned by `a` degrees (clockwise on screen) about o. */
-function turn(p: Pt, o: Pt, a: number): Pt {
-  const c = Math.cos(rad(a)), s = Math.sin(rad(a)), d = sub(p, o);
-  return [o[0] + d[0] * c - d[1] * s, o[1] + d[0] * s + d[1] * c];
-}
 
 /** The right arm's pivot and hand at rest (a nub's hand, for arms that emit none). */
 function armR(rig: Rig): { o: Pt; hand: Pt } {
@@ -106,7 +109,7 @@ const ink = (w: number) => `stroke="${INK}" stroke-width="${w}" stroke-linejoin=
 
 /** `fine`: draw the stage-only bits too (the star, bubbles, code, the turning page); the sidebar hides them anyway.
  * `desk`: add what a desk in front needs (stage only, where the scene draws one). */
-interface Out { back: string; arm: string; front: string; vars: string[]; hold?: "l" | "r"; fine: boolean; desk: boolean }
+interface Out { under: string; back: string; arm: string; front: string; vars: string[]; hold?: "l" | "r"; fine: boolean; desk: boolean }
 
 /** A reach angle for both arms: the right one turns by `a`, the left one mirrors it; a hand that holds something stays
  * put (its angle is 0), so the item isn't tipped over. `desk`: the same reach to the prop on a desk (`-rd`/`-ld`). */
@@ -140,24 +143,17 @@ function hammer(rig: Rig, shade: (c: string) => string, o: Out) {
   // The tink: a star where the head meets the anvil, flashing on every hit.
   const c = add(strike, [-8, -2.5]), r = 5.2, star: string[] = [];
   for (let i = 0; i < 8; i += 1) { const a = rad(i * 45), q = i % 2 ? r * 0.4 : r; star.push(P(add(c, [Math.sin(a) * q, -Math.cos(a) * q]))); }
-  if (o.fine) o.front += prop("hammer", `<g class="wk-tink"><path d="M${star.join("L")}Z" fill="#fff6c2" ${ink(1.6)}/></g>`, "", deskLift(o, c[1] + 4));
-}
-
-/** Juggle: three balls thrown from hand to hand over the head. Each ball is drawn in the left hand; CSS moves it right
- * by `--wk-jdx` (linear) and up by `--wk-jh` (a parabola), so the arcs meet both hands on every body. The static
- * positions spread them out for reduced motion. */
-function juggle(rig: Rig, o: Out) {
-  const l = rig.at.handL, r = rig.at.handR;
-  if (!l || !r) return;
-  const start: Pt = [l.x, l.y - 6.5], dx = r.x - l.x, h = clamp(start[1] - (rig.top - 12), 34, 50);
-  o.vars.push(`--wk-jdx:${n(dx)}px`, `--wk-jh:${n(-h)}px`);
-  const balls = [["#ff6f91", 0, 0], ["#ffd23f", dx / 2, -h], ["#5ec8ff", dx, 0]] as const;
-  const html = balls.map(([c, sx, sy], i) => {
-    const delay = `animation-delay:${n(0.5 - i * 0.6)}s`;
-    return `<g class="wk-jx" transform="translate(${n(sx)} 0)" style="${delay}"><g class="wk-jy" transform="translate(0 ${n(sy)})" style="${delay}">
-        <circle ${centre(start)} r="5.6" fill="${c}" ${ink(2.2)}/><circle ${centre(add(start, [-1.9, -2]))} r="1.6" fill="#fff" opacity=".85"/></g></g>`;
+  if (!o.fine) return;
+  // Sparks burst from the star on every hit; nails jump off, one every other hit, and gather by the anvil (on the desk
+  // top when a desk is in) until they clear.
+  const sparks = [[-9, -6], [-2, -10], [7, -7]].map(([sx, sy]) => `<path class="wk-spark" style="--wk-sx:${sx}px;--wk-sy:${sy}px" d="M${P(c)}l${n(sx * 0.18)} ${n(sy * 0.18)}" stroke="#ffd23f" stroke-width="2.2" stroke-linecap="round"/>`).join("");
+  o.front += prop("hammer", `<g class="wk-tink"><path d="M${star.join("L")}Z" fill="#fff6c2" ${ink(1.6)}/></g>${sparks}`, "", deskLift(o, c[1] + 4));
+  const floor = ground - 1.2, nail = `<path d="M-3.4 0H3" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/><path d="M-3.4 0H3" stroke="#b9c2d0" stroke-width="1.2" stroke-linecap="round"/><path d="M-3.6 -1.9V1.9" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
+  const nails = ([[-15, 8], [12, -10], [-21, -4]] as const).map(([dx, tilt], i) => {
+    const at: Pt = [clamp(ax + dx * k, 6, 116), floor - i * 0.4];
+    return `<g class="wk-nail" style="--wk-fx:${n(strike[0] - at[0])}px;--wk-fy:${n(strike[1] - at[1])}px;animation-name:wk-nail-${i}"><g transform="translate(${P(at)}) rotate(${tilt})">${nail}</g></g>`;
   }).join("");
-  o.front += prop("juggle", html, "keep-small");
+  o.front += prop("hammer", nails, "", deskLift(o, ground));
 }
 
 /** Read: a big open book held low in front, pages towards us; the arms reach in behind its edges. One page (a copy of
@@ -175,48 +171,16 @@ function read(rig: Rig, shade: (c: string) => string, o: Out) {
   const cover = `<path fill="${shade("#4f6bed")}" ${ink(2.2)} d="M${n(x0 - 2.5)} ${n(yT + 2)}L${n(x0 - 2.5)} ${n(b + 1.8)}Q${n(60 - bw * 0.5)} ${n(b + 0.8)} 60 ${n(b + 4.4)}Q${n(60 + bw * 0.5)} ${n(b + 0.8)} ${n(120 - x0 + 2.5)} ${n(b + 1.8)}L${n(120 - x0 + 2.5)} ${n(yT + 2)}Z"/>`;
   const turning = !o.fine ? "" : `<g class="wk-page" style="transform-box:view-box;transform-origin:60px ${n(yT + H / 2)}px">${page(1)}</g>`;
   o.front += prop("read", `${cover}${page(-1)}${page(1)}${turning}<path d="M60 ${n(s)}V${n(b + 1.8)}" stroke="${INK}" stroke-width="1.6"/>`, "keep-small", lift);
-}
-
-/** Stir: a cauldron on the ground in front (a little to the right), stirred with a long paddle held high in the right
- * hand. The paddle is drawn where it sits with the arm at its stirring angle, turned back into the arm's rest frame (the
- * CSS turns the arm). On a desk the cauldron steps up and a shorter paddle dips into it from the same hand. */
-function stir(rig: Rig, shade: (c: string) => string, o: Out) {
-  if (!rig.at.handR) return;
-  const ground = rig.at.ground.y, pw = clamp(rig.half - 9, 15, 22), cx = 60 + rig.half * 0.12, yR = Math.max(ground - 18.5, rig.mouthY + 6), ph = ground - 1.5 - yR;
-  const { o: pivot, hand } = armR(rig), lift = -40;
-  o.vars.push(`--wk-stir:${lift}deg`);
-  const dip: Pt = [cx + pw * 0.42, yR + 1], up = deskLift(o, ground);
-  /** The paddle from the hand (the arm turned by `angle`) into the pot, dipping at `at`, drawn in the arm's rest frame. */
-  const paddleTo = (at: Pt, angle: number) => {
-    const grip = turn(hand, pivot, angle), back = (p: Pt) => P(turn(p, pivot, -angle));
-    const u = unit(sub(at, grip)), a = back(add(grip, mul(u, -6))), z = back(add(at, mul(u, 3))), bowl = add(at, mul(u, 5.5));
-    return `<path d="M${a}L${z}" stroke="${INK}" stroke-width="6.2" stroke-linecap="round"/>
-      <ellipse ${centre(turn(bowl, pivot, -angle))} rx="3.6" ry="2.6" transform="rotate(${n(deg(Math.atan2(u[1], u[0])) - angle)} ${back(bowl)})" fill="#d39a5c" ${ink(1.8)}/>
-      <path d="M${a}L${z}" stroke="#d39a5c" stroke-width="3.2" stroke-linecap="round"/>`;
-  };
-  let paddle = paddleTo(dip, lift);
-  if (up) {
-    // On a desk the pot rises to the hand: the arm lifts higher (`--wk-stir-d`), as far as keeps the paddle as steep as
-    // it is on the floor, so it still dips in from above instead of lying across the rim like a pan's handle.
-    const at: Pt = [dip[0], dip[1] + up], slope = (g: Pt, p: Pt) => Math.atan2(p[1] - g[1], p[0] - g[0]);
-    const want = slope(turn(hand, pivot, lift), dip);
-    let liftD = lift;
-    for (let a = lift; a >= -100; a -= 5) if (Math.abs(slope(turn(hand, pivot, a), at) - want) < Math.abs(slope(turn(hand, pivot, liftD), at) - want)) liftD = a;
-    o.vars.push(`--wk-stir-d:${liftD}deg`);
-    paddle = `<g class="wk-off-desk">${paddle}</g><g class="wk-on-desk">${paddleTo(at, liftD)}</g>`;
-  }
-  const X = (f: number) => n(cx + f);
-  o.back += prop("stir", `<ellipse cx="${n(cx)}" cy="${n(yR)}" rx="${n(pw - 1)}" ry="3.6" fill="#8fe36b" ${ink(2)}/>
-      <ellipse cx="${n(cx)}" cy="${n(yR)}" rx="${n(pw + 0.6)}" ry="4" fill="none" stroke="${INK}" stroke-width="5.4"/><ellipse cx="${n(cx)}" cy="${n(yR)}" rx="${n(pw + 0.6)}" ry="4" fill="none" stroke="#7a6f99" stroke-width="2.2"/>`, "wk-ground keep-small", up);
-  o.arm += onArm(rig, "R", prop("stir", `<g class="wk-paddle">${paddle}</g>`, "keep-small"));
-  const potD = `M${X(-pw - 0.6)} ${n(yR)}C${X(-pw - 3)} ${n(yR + ph * 0.8)} ${X(-pw * 0.55)} ${n(yR + ph)} ${X(0)} ${n(yR + ph)}C${X(pw * 0.55)} ${n(yR + ph)} ${X(pw + 3)} ${n(yR + ph * 0.8)} ${X(pw + 0.6)} ${n(yR)}A${n(pw + 0.6)} 4 0 0 1 ${X(-pw - 0.6)} ${n(yR)}Z`;
-  const feet = [-1, 1].map((sd) => `<ellipse cx="${X(sd * pw * 0.55)}" cy="${n(yR + ph - 0.5)}" rx="3.2" ry="2.4" fill="#3a3350" ${ink(2)}/>`).join("");
-  const rim = `M${X(-pw - 0.6)} ${n(yR)}A${n(pw + 0.6)} 4 0 0 0 ${X(pw + 0.6)} ${n(yR)}`;
-  const bubbles = ([[-0.5, 2.5], [-0.1, 1.8], [0.25, 2.9]] as const).map(([f, r], i) => `<circle class="wk-bubble" style="animation-delay:${n(0.5 + i * 0.5 - 1.5)}s" cx="${X(f * pw)}" cy="${n(yR - 1.5)}" r="${r}" fill="#c9f7ad" ${ink(1.5)}/>`).join("");
-  o.front += prop("stir", `${feet}<path d="${potD}" fill="${shade("#4c4266")}" ${ink(2.4)}/>
-      <path d="${rim}" fill="none" stroke="${INK}" stroke-width="5.4" stroke-linecap="round"/><path d="${rim}" fill="none" stroke="#7a6f99" stroke-width="2.2" stroke-linecap="round"/>
-      <path d="M${X(-pw + 2)} ${n(yR + 6)}Q${X(-pw + 1)} ${n(yR + ph * 0.6)} ${X(-pw * 0.6)} ${n(yR + ph * 0.8)}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>`, "wk-ground keep-small", up);
-  if (o.fine) o.front += prop("stir", bubbles, "", up);
+  if (!o.fine) return;
+  // Finished pages fly up from behind the head, over its left shoulder, and land on a little pile behind it on the floor
+  // (on the desk top when a desk is in); four of them, then the pile clears and it starts again.
+  const ground = rig.at.ground.y, from: Pt = [60, rig.top + 14], px = Math.max(9, 60 - rig.half - 8);
+  const sheets = [0, 1, 2, 3].map((i) => {
+    const at: Pt = [px + [0, 2.5, -1.5, 1][i], ground - 1.5 - i * 2.8];
+    return `<g class="wk-sheet" style="--wk-fx:${n(from[0] - at[0])}px;--wk-fy:${n(from[1] - at[1])}px;animation-name:wk-sheet-${i}"><g transform="translate(${P(at)}) rotate(${[-6, 5, -3, 8][i]})">
+        <rect x="-6.5" y="-7.5" width="13" height="15" rx="1.2" fill="#fffaf0" ${ink(1.6)}/><path d="M-3.8 -3.6H3.8M-3.8 0H3.8M-3.8 3.6H1.6" stroke="#cbc3d9" stroke-width="1.2" stroke-linecap="round"/></g></g>`;
+  }).join("");
+  o.under += prop("read", sheets, "", deskLift(o, ground));
 }
 
 /** Type: a little laptop on the ground in front, lid towards us (stickers on it, the screen's glow spilling over its top
@@ -240,19 +204,18 @@ function type(rig: Rig, shade: (c: string) => string, o: Out) {
 }
 
 /** The working props for every style this bicho suits, plus the CSS variables their keyframes read (arm angles that
- * reach the book, the paddle and the keys; the juggling arcs). The big props are `keep-small`, so the sidebar keeps
+ * reach the book and the keys; where the flying pages and nails come from). `under` goes under the body (the pile of
+ * pages behind it), the rest in front. The big props are `keep-small`, so the sidebar keeps
  * them as its cue; the fine bits are stage only; the rail draws none (it holds still). `shade` is the renderer's own
  * shade (lit top-left, deep rim), shared with the bicho's pieces. */
-export function workProps(spec: Spec, rig: Rig, size: Size, shade: (c: string) => string): { vars: string; html: string } {
-  if (size === "rail") return { vars: "", html: "" };
+export function workProps(spec: Spec, rig: Rig, size: Size, shade: (c: string) => string): { vars: string; html: string; under: string } {
+  if (size === "rail") return { vars: "", html: "", under: "" };
   const works = worksFor(spec);
   const held = present(spec).find((e) => e.slot === "held"), at = held?.at ?? held?.rides ?? "";
-  const o: Out = { back: "", arm: "", front: "", vars: [], hold: held ? (at.endsWith("L") ? "l" : "r") : undefined, fine: size === "stage", desk: size === "stage" };
+  const o: Out = { under: "", back: "", arm: "", front: "", vars: [], hold: held ? (at.endsWith("L") ? "l" : "r") : undefined, fine: size === "stage", desk: size === "stage" };
   if (works.includes("hammer")) hammer(rig, shade, o);
-  if (works.includes("juggle")) juggle(rig, o);
   if (works.includes("read")) read(rig, shade, o);
-  if (works.includes("stir")) stir(rig, shade, o);
   if (works.includes("type")) type(rig, shade, o);
   const html = o.back || o.arm || o.front ? `<g class="wk-props">${o.back}${o.arm}${o.front}</g>` : "";
-  return { vars: o.vars.map((v) => `;${v}`).join(""), html };
+  return { vars: o.vars.map((v) => `;${v}`).join(""), html, under: o.under ? `<g class="wk-props wk-under">${o.under}</g>` : "" };
 }

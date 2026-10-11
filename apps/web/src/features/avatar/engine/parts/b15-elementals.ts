@@ -750,19 +750,20 @@ export default batch({
   ],
 
   css: `
+    /* asleep = idle without a pastime (the mascots', the frozen figures') or the nap: the quiet pose and the pastimes stay awake */
     /* sheens on ice and crystal faces, translucent; the rime only shows asleep (frosting over) */
     .pg-b15-sheen { opacity: .38 }
     .pg-b15-rime { opacity: 0 }
-    &[data-mood=idle] .pg-b15-rime { opacity: .92 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-rime { opacity: .92 }
 
     /* glows (the lava cracks, the crater's pool and drip): they flicker while working, blink slowly while waiting and
        burn low asleep */
-    &[data-mood=idle] .pg-b15-glow { opacity: .42 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-glow { opacity: .42 }
     &[data-mood=working] .pg-b15-glow { animation: bx-bulb .5s steps(1) infinite }
     &[data-mood=waiting] .pg-b15-glow { animation: bx-bulb 1s steps(1) infinite }
 
     /* the wave laps while talking, churns while working, pops while waiting and lies down asleep */
-    &[data-mood=idle] .pg-b15-wave { transform: rotate(-7deg) scale(.94,.8) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-wave { transform: rotate(-7deg) scale(.94,.8) }
     &[data-mood=speaking] .pg-b15-wave { animation: bx-feel 2.2s ease-in-out infinite }
     &[data-mood=working] .pg-b15-wave { animation: bx-feel .5s ease-in-out infinite }
     &[data-mood=waiting] .pg-b15-wave { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite }
@@ -772,7 +773,7 @@ export default batch({
     &[data-mood=working] .pg-b15-grind-b { animation: bx-jitter .09s linear infinite alternate-reverse }
     &[data-mood=waiting] .pg-b15-grind-a { animation: bx-step .325s ease-in-out infinite alternate }
     &[data-mood=waiting] .pg-b15-grind-b { animation: bx-step .325s ease-in-out infinite alternate-reverse }
-    &[data-mood=idle] :is(.pg-b15-grind-a, .pg-b15-grind-b) { transform: translateY(1px) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) :is(.pg-b15-grind-a, .pg-b15-grind-b) { transform: translateY(1px) }
 
     /* crystals shimmer while working, twinkle while talking, pop while waiting */
     &[data-mood=speaking] .pg-b15-gem { animation: bx-twinkle 1.6s ease-in-out infinite }
@@ -781,13 +782,13 @@ export default batch({
 
     /* the swirl: it bobs while talking and waiting (it spins while working, the shared spin), and settles asleep */
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b15-swirl { animation: bx-feel 2s ease-in-out infinite }
-    &[data-mood=idle] .pg-b15-swirl { transform: translateY(4px) scale(.82) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-swirl { transform: translateY(4px) scale(.82) }
 
     /* the bolt crackles while working (a flicker and a shiver), twinkles while talking, pops while waiting, droops asleep */
     &[data-mood=speaking] .pg-b15-bolt { animation: bx-twinkle 1.1s ease-in-out infinite }
     &[data-mood=working] .pg-b15-bolt { animation: bx-bulb .3s steps(1) infinite, bx-jitter .08s linear infinite alternate }
     &[data-mood=waiting] .pg-b15-bolt { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite }
-    &[data-mood=idle] .pg-b15-bolt { transform: rotate(16deg) scale(.88) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-bolt { transform: rotate(16deg) scale(.88) }
 
     /* ice: it shivers while working and pops while waiting */
     &[data-mood=working] .pg-b15-ice { animation: bx-jitter .1s linear infinite alternate }
@@ -796,7 +797,7 @@ export default batch({
     /* the crater's bubble pops while working, bobs while waiting and is gone asleep */
     &[data-mood=working] .pg-b15-bubble { animation: bx-pop .6s cubic-bezier(.3,1.8,.5,1) infinite }
     &[data-mood=waiting] .pg-b15-bubble { animation: bx-feel 1.3s ease-in-out infinite }
-    &[data-mood=idle] .pg-b15-bubble { opacity: 0 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-bubble { opacity: 0 }
 
     /* the puddle's ripples breathe; the tornado's bands sway against each other, faster while working */
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b15-ripple { animation: bx-breathe 2s ease-in-out infinite }
@@ -810,32 +811,32 @@ export default batch({
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b15-gust-b { animation: bx-feel 1.6s ease-in-out infinite }
     &[data-mood=working] .pg-b15-gust-a { animation: bx-feel .4s ease-in-out infinite reverse }
     &[data-mood=working] .pg-b15-gust-b { animation: bx-feel .4s ease-in-out infinite }
-    &[data-mood=idle] :is(.pg-b15-gust-a, .pg-b15-gust-b) { opacity: 0 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) :is(.pg-b15-gust-a, .pg-b15-gust-b) { opacity: 0 }
 
     /* the ember on the tail's tip flickers while talking and working, pops while waiting and burns low asleep */
     &[data-mood=speaking] .pg-b15-ember { animation: bx-twinkle 1.1s ease-in-out infinite }
     &[data-mood=working] .pg-b15-ember { animation: bx-pulse .45s ease-in-out infinite }
     &[data-mood=waiting] .pg-b15-ember { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite }
-    &[data-mood=idle] .pg-b15-ember { transform: scale(.7) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-ember { transform: scale(.7) }
 
     /* crystals lose their shine asleep */
-    &[data-mood=idle] .pg-b15-gem .pg-b15-sheen { opacity: .14 }
-    &[data-mood=idle] .pg-b15-gem .pg-flick { opacity: 0 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-gem .pg-b15-sheen { opacity: .14 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-gem .pg-flick { opacity: 0 }
 
     /* the cloud bobs while talking and waiting and shivers while working */
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b15-cloud { animation: bx-feel 2.4s ease-in-out infinite }
     &[data-mood=working] .pg-b15-cloud { animation: bx-jitter .12s linear infinite alternate }
-    &[data-mood=idle] .pg-b15-cloud { transform: translateY(1.5px) scale(1,.92) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-cloud { transform: translateY(1.5px) scale(1,.92) }
 
     /* soot fuzz buzzes while working, puffs up while waiting and breathes asleep */
     &[data-mood=working] .pg-b15-fuzz { animation: bx-jitter .07s linear infinite alternate }
     &[data-mood=waiting] .pg-b15-fuzz { animation: bx-pulse .65s ease-in-out infinite }
-    &[data-mood=idle] .pg-b15-fuzz { animation: bx-breathe 4s ease-in-out infinite }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-fuzz { animation: bx-breathe 4s ease-in-out infinite }
 
     /* the will-o'-the-wisp bobs, flickers while working and burns low asleep */
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b15-wisp { animation: bx-feel 2s ease-in-out infinite }
     &[data-mood=working] .pg-b15-wisp { animation: bx-pulse .45s ease-in-out infinite }
-    &[data-mood=idle] .pg-b15-wisp { transform: scale(.7) translateY(3px); opacity: .7 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b15-wisp { transform: scale(.7) translateY(3px); opacity: .7 }
 
     /* particles (stage-only props, drawn by the parts): sparks crackle, chips and smoke and bubbles puff away, snow and
        leaves fall, sparkles twinkle, gusts blow */

@@ -703,9 +703,10 @@ export default batch({
   ],
 
   css: `
+    /* asleep = idle without a pastime (the mascots', the frozen figures') or the nap: the quiet pose and the pastimes stay awake */
     /* the flame flickers from its base: a quick twinkle while talking, a pulse while working, a pop while waiting, and
        it burns low asleep */
-    &[data-mood=idle] .pg-b12-flame { transform: scale(.86,.74) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b12-flame { transform: scale(.86,.74) }
     &[data-mood=speaking] .pg-b12-flame { animation: bx-twinkle 1.1s ease-in-out infinite }
     &[data-mood=working] .pg-b12-flame { animation: bx-pulse .45s ease-in-out infinite }
     &[data-mood=waiting] .pg-b12-flame { animation: bx-pop 1.3s cubic-bezier(.3,1.8,.5,1) infinite }
@@ -726,6 +727,6 @@ export default batch({
     /* the wisp sways from under the body, faster while working, and curls in asleep */
     &:is([data-mood=speaking], [data-mood=waiting]) .pg-b12-wisp { animation: bx-feel 2s ease-in-out infinite }
     &[data-mood=working] .pg-b12-wisp { animation: bx-feel .7s ease-in-out infinite }
-    &[data-mood=idle] .pg-b12-wisp { transform: rotate(-5deg) scale(.94) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b12-wisp { transform: rotate(-5deg) scale(.94) }
   `,
 });

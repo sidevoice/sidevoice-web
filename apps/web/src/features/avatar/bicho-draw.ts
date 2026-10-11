@@ -27,8 +27,8 @@ export interface Drawing {
   tone: string;
   /** The working styles it can take (work.ts): none for the mascot, which keeps the classic crank. */
   works: readonly Work[];
-  /** The idle pastimes it can take (idle.ts), once its drawing carries their props; none until then, and none for the
-   *  person or the mascot, who keep the old sleep. */
+  /** The idle steps it can take (idle.ts: quiet and the pastimes that suit it); none for the person or the mascot,
+   *  who keep the old sleep. */
   idles: readonly Idle[];
 }
 
@@ -54,13 +54,12 @@ export function personSpec(): Spec {
   return person;
 }
 
-const IDLE_PROPS = 'class="idl-props"';
 const CACHE_LIMIT = 400;
 const drawings = new Map<string, Drawing>();
 
 function drawFresh(spec: AvatarSpec, size: AvatarSize): Drawing {
   if (spec.kind === "mascot") {
-    const drawn = renderMascot(spec.mascot);
+    const drawn = renderMascot(spec.mascot, engineSize(size));
     return { html: drawn.html, tone: drawn.tone, works: [], idles: [] };
   }
   const figure = spec.kind === "person" ? personSpec() : bichoSpec(spec.seed);
@@ -69,7 +68,7 @@ function drawFresh(spec: AvatarSpec, size: AvatarSize): Drawing {
     html: drawn.html,
     tone: drawn.tone,
     works: spec.kind === "person" ? [] : worksFor(figure),
-    idles: spec.kind === "bicho" && drawn.html.includes(IDLE_PROPS) ? idlesFor(figure) : [],
+    idles: spec.kind === "bicho" ? idlesFor(figure) : [],
   };
 }
 

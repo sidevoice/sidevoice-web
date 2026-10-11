@@ -1,20 +1,23 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { WORK_TURN } from "./engine/bichos/work";
+import { IDLE_DEFS } from "./engine/bichos/idle";
+import { WORK_DURATION, type Work } from "./engine/bichos/work";
 import { holdRotation, rotationValue } from "./rotation";
 
 afterEach(() => { vi.useRealTimers(); });
 
-test("a conversation's copies share one tool in hand, swap it now and then, and drop it when they stop", () => {
+test("a conversation's copies share one tool in hand, keep it for that tool's own spell, then pick up another", () => {
   vi.useFakeTimers();
-  const pool = ["crank", "read", "type"] as const;
+  const pool = ["crank", "hammer", "read", "type"] as const;
   const releaseStage = holdRotation("work", "t-1", pool);
-  const first = rotationValue("work", "t-1");
+  const first = rotationValue("work", "t-1") as Work;
   expect(pool).toContain(first);
   // The sidebar's copy of the same conversation picks up the same tool.
   const releaseRow = holdRotation("work", "t-1", pool);
   expect(rotationValue("work", "t-1")).toBe(first);
-  // After a turn (20–30 s) it picks up another one, never the same.
-  vi.advanceTimersByTime(WORK_TURN.max + 1000);
+  // Still in hand just short of its shortest spell; another one once its longest is over, never the same.
+  vi.advanceTimersByTime(WORK_DURATION[first][0] - 600);
+  expect(rotationValue("work", "t-1")).toBe(first);
+  vi.advanceTimersByTime(WORK_DURATION[first][1] - WORK_DURATION[first][0] + 1200);
   const second = rotationValue("work", "t-1");
   expect(pool).toContain(second);
   expect(second).not.toBe(first);
@@ -24,12 +27,40 @@ test("a conversation's copies share one tool in hand, swap it now and then, and 
   expect(rotationValue("work", "t-1")).toBeUndefined();
 });
 
-test("work and rest are picked apart, from their own styles", () => {
-  const releaseWork = holdRotation("work", "t-2", ["hammer"]);
-  const releaseIdle = holdRotation("idle", "t-2", ["music"]);
-  expect(rotationValue("work", "t-2")).toBe("hammer");
-  expect(rotationValue("idle", "t-2")).toBe("music");
-  releaseWork();
-  releaseIdle();
+test("resting goes in steps: quiet for a few seconds, a pastime for its own spell, quiet again, then another pastime", () => {
+  vi.useFakeTimers();
+  const release = holdRotation("idle", "t-2", ["quiet", "music", "bubbles"]);
+  // Every step changes what it shows (a pastime never follows a pastime, nor quiet quiet): follow the changes, and
+  // check each step lasted within its own spell.
+  const seen: string[] = [rotationValue("idle", "t-2")!];
+  let since = 0;
+  for (let clock = 0; seen.length < 5 && clock < 200_000; clock += 250) {
+    vi.advanceTimersByTime(250);
+    const now = rotationValue("idle", "t-2")!;
+    if (now === seen[seen.length - 1]) continue;
+    const [lo, hi] = IDLE_DEFS[seen[seen.length - 1] as keyof typeof IDLE_DEFS].duration;
+    expect(clock + 250 - since).toBeGreaterThanOrEqual(lo);
+    expect(clock + 250 - since).toBeLessThanOrEqual(hi + 750);
+    since = clock + 250;
+    seen.push(now);
+  }
+  expect(seen[0]).toBe("quiet");
+  expect(seen[2]).toBe("quiet");
+  expect(seen[4]).toBe("quiet");
+  expect(["music", "bubbles"]).toContain(seen[1]);
+  expect(["music", "bubbles"]).toContain(seen[3]);
+  expect(seen[3]).not.toBe(seen[1]);
+  release();
   expect(rotationValue("idle", "t-2")).toBeUndefined();
+});
+
+test("a bicho with no pastime that suits it stays quiet; work and rest are picked apart", () => {
+  vi.useFakeTimers();
+  const releaseIdle = holdRotation("idle", "t-3", ["quiet"]);
+  const releaseWork = holdRotation("work", "t-3", ["read"]);
+  vi.advanceTimersByTime(25_000);
+  expect(rotationValue("idle", "t-3")).toBe("quiet");
+  expect(rotationValue("work", "t-3")).toBe("read");
+  releaseIdle();
+  releaseWork();
 });

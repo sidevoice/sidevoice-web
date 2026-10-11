@@ -699,6 +699,7 @@ export default batch({
   ],
 
   css: `
+    /* asleep = idle without a pastime (the mascots', the frozen figures') or the nap: the quiet pose and the pastimes stay awake */
     /* LED faces: one expression per mood (normal, busy while working, happy while waiting), dimmed when powered down */
     .b13-x-work, .b13-x-wait, .b13-m-wait { display: none }
     &:is([data-mood=working], [data-mood=waiting]) .b13-x-norm { display: none }
@@ -706,7 +707,7 @@ export default batch({
     &[data-mood=waiting] .b13-x-wait { display: inline }
     &[data-mood=waiting] .b13-m-norm { display: none }
     &[data-mood=waiting] .b13-m-wait { display: inline }
-    &[data-mood=idle] .b13-glow { opacity: .4 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .b13-glow { opacity: .4 }
     .b13-spin, .b13-step4, .b13-beat { transform-box: fill-box; transform-origin: 50% 50% }
     &[data-mood=working] .b13-spin { animation: bx-spin 1s linear infinite }
     &[data-mood=working] .b13-step4 { animation: bx-spin 1.2s steps(4) infinite }
@@ -720,17 +721,17 @@ export default batch({
     &[data-beat=b] .b13-eq-b { display: inline }
 
     /* the V antenna feels about; it droops when powered down */
-    &:not([data-mood=idle]) .pg-b13-rod-l { animation: bx-feel 2s ease-in-out infinite }
-    &:not([data-mood=idle]) .pg-b13-rod-r { animation: bx-feel 2s ease-in-out infinite reverse }
+    &:not([data-mood=idle]:is(:not([data-idle]), [data-idle=nap])) .pg-b13-rod-l { animation: bx-feel 2s ease-in-out infinite }
+    &:not([data-mood=idle]:is(:not([data-idle]), [data-idle=nap])) .pg-b13-rod-r { animation: bx-feel 2s ease-in-out infinite reverse }
     &[data-mood=working] :is(.pg-b13-rod-l, .pg-b13-rod-r) { animation-duration: .5s }
-    &[data-mood=idle] .pg-b13-rod-l { transform: rotate(-14deg) }
-    &[data-mood=idle] .pg-b13-rod-r { transform: rotate(14deg) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-rod-l { transform: rotate(-14deg) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-rod-r { transform: rotate(14deg) }
 
     /* the dish scans while working, ticks while waiting, nods while talking, droops when powered down */
     &[data-mood=speaking] .pg-b13-dish { animation: bx-feel 2.4s ease-in-out infinite }
     &[data-mood=working] .pg-b13-dish { animation: bx-sway 1.2s ease-in-out infinite }
     &[data-mood=waiting] .pg-b13-dish { animation: bx-tick 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
-    &[data-mood=idle] .pg-b13-dish { transform: rotate(-24deg) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-dish { transform: rotate(-24deg) }
 
     /* the rotor */
     &[data-mood=speaking] .pg-b13-rotor { animation: bx-spin 1.4s linear infinite }
@@ -741,12 +742,12 @@ export default batch({
     &[data-mood=speaking] .pg-b13-boing { animation: bx-sway 1.8s ease-in-out infinite }
     &[data-mood=working] .pg-b13-boing { animation: bx-jitter .08s linear infinite alternate }
     &[data-mood=waiting] .pg-b13-boing { animation: bx-bounce 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
-    &[data-mood=idle] .pg-b13-boing { transform: rotate(-20deg) scale(.96,.86) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-boing { transform: rotate(-20deg) scale(.96,.86) }
 
     /* the beacon: a quick cheerful flash with rays while waiting, a slow blink while working, dim when powered down */
     &[data-mood=working] .pg-b13-lamp { animation: bx-bulb 1s steps(1) infinite }
     &[data-mood=waiting] .pg-b13-lamp { animation: bx-bulb .4s steps(1) infinite }
-    &[data-mood=idle] .fills .pg-b13-lamp { opacity: .55 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .fills .pg-b13-lamp { opacity: .55 }
     .b13-rays { display: none; transform-box: fill-box; transform-origin: 50% 70% }
     &[data-mood=waiting] .b13-rays { display: inline; animation: bx-pulse .4s ease-in-out infinite }
 
@@ -754,8 +755,8 @@ export default batch({
     &[data-mood=speaking] .pg-b13-ear-l { animation: bx-feel 2s ease-in-out infinite }
     &[data-mood=speaking] .pg-b13-ear-r { animation: bx-feel 2s ease-in-out infinite reverse }
     &[data-mood=waiting] :is(.pg-b13-ear-l, .pg-b13-ear-r) { animation: bx-tick 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
-    &[data-mood=idle] .pg-b13-ear-l { transform: rotate(-20deg) }
-    &[data-mood=idle] .pg-b13-ear-r { transform: rotate(20deg) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-ear-l { transform: rotate(-20deg) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-ear-r { transform: rotate(20deg) }
 
     /* chimney smoke: puffs rise while working; one puff pops on each word (a different circle per beat, so it restarts) */
     .b13-smoke circle { fill: #fff; stroke: #1b1428; stroke-width: 1.6; opacity: 0; transform-box: fill-box; transform-origin: 50% 50% }
@@ -769,20 +770,20 @@ export default batch({
     .pg-b13-flame { transform-box: fill-box; transform-origin: 50% 0 }
     &[data-mood=speaking] .pg-b13-flame, &[data-mood=waiting] .pg-b13-flame { animation: bx-pulse .3s ease-in-out infinite }
     &[data-mood=working] .pg-b13-flame { animation: bx-pulse .16s ease-in-out infinite }
-    &[data-mood=idle] .pg-b13-flame { display: none }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) .pg-b13-flame { display: none }
 
     /* spring legs */
     &[data-mood=working] .pg-b13-spring-l { animation: bx-step .3s ease-in-out infinite alternate }
     &[data-mood=working] .pg-b13-spring-r { animation: bx-step .3s ease-in-out infinite alternate-reverse }
     &[data-mood=waiting] :is(.pg-b13-spring-l, .pg-b13-spring-r) { animation: bx-bounce 1.3s cubic-bezier(.3,1.6,.5,1) infinite }
-    &[data-mood=idle] :is(.pg-b13-spring-l, .pg-b13-spring-r) { transform: scaleY(.72) }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) :is(.pg-b13-spring-l, .pg-b13-spring-r) { transform: scaleY(.72) }
 
     /* panel lamps blink in turn while working, slowly while waiting, and go dark when powered down */
     &[data-mood=working] .pg-b13-lamp-1 { animation: bx-bulb .6s steps(1) infinite }
     &[data-mood=working] .pg-b13-lamp-2 { animation: bx-bulb .6s steps(1) infinite .2s }
     &[data-mood=working] .pg-b13-lamp-3 { animation: bx-bulb .6s steps(1) infinite .4s }
     &[data-mood=waiting] :is(.pg-b13-lamp-1, .pg-b13-lamp-3) { animation: bx-bulb 1.3s steps(1) infinite }
-    &[data-mood=idle] :is(.pg-b13-lamp-1, .pg-b13-lamp-2, .pg-b13-lamp-3) { opacity: .3 }
+    &[data-mood=idle]:is(:not([data-idle]), [data-idle=nap]) :is(.pg-b13-lamp-1, .pg-b13-lamp-2, .pg-b13-lamp-3) { opacity: .3 }
 
     /* the wind-up key */
     &[data-mood=speaking] .pg-b13-key { animation: bx-spin 4s linear infinite }
