@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { CallIcon, EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useVariant } from "../../lib/variants";
@@ -212,11 +212,10 @@ export function DeleteUnusedChoice() {
   const size = pending ? sizeText(models.filter((model) => pending.ids.includes(model.id)).reduce((sum, model) => sum + model.bytes, 0)) : "";
   return (<>
     <Row label={t("settings.advanced.deleteUnused")} description={t("settings.advanced.deleteUnusedHint")} htmlFor="delete-unused-models">
-      <NativeSelect id="delete-unused-models" value={days == null ? "" : String(days)}
-        onChange={(event) => choose(event.target.value ? Number(event.target.value) : null)}>
-        {DELETE_UNUSED_DAYS.map((value) => <option key={String(value)} value={value == null ? "" : String(value)}>
-          {value == null ? t("settings.advanced.never") : t("settings.advanced.days", { n: value })}</option>)}
-      </NativeSelect>
+      <Select id="delete-unused-models" value={days == null ? "" : String(days)}
+        onValueChange={(value) => choose(value ? Number(value) : null)}
+        options={DELETE_UNUSED_DAYS.map((value) => ({ value: value == null ? "" : String(value),
+          label: value == null ? t("settings.advanced.never") : t("settings.advanced.days", { n: value }) }))} />
     </Row>
     {pending && <div className="provider-remove downloaded-unused-confirm" role="group" aria-label={t("settings.advanced.deleteUnused")}>
       <p>{t("settings.advanced.deleteUnusedNow", { count: pending.ids.length, size })}</p>

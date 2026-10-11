@@ -33,7 +33,9 @@ export interface Pairing {
   insecure?: true;
 }
 /** A pairing as the interface may see it: no token. */
-export type PairingSummary = Omit<Pairing, "token" | "public_key" | "paired_at" | "revoked" | "insecure"> & { paired_at: number | null; revoked: boolean; local?: boolean; insecure?: boolean };
+export type PairingSummary = Omit<Pairing, "token" | "public_key" | "paired_at" | "revoked" | "insecure"> & { paired_at: number | null; revoked: boolean; local?: boolean; insecure?: boolean;
+  /** Renamed on this device: `host` is the person's name for it, `machine_host` the machine's own. */
+  alias?: boolean; machine_host?: string | null };
 export interface Pairings {
   inUse: string | null;
   list: Pairing[];

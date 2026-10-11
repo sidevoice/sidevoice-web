@@ -4,6 +4,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { SidevoiceActions } from "../../state/room-types";
 import { AudioDevicesBar } from "./AudioDevices";
+import { chooseOption, listOptions, selectedValue } from "../../test/select";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => { cleanup(); delete window.sidevoiceActions; });
@@ -19,20 +20,29 @@ function bar(facts: Record<string, unknown>) {
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
   const store = createRoomStore();
   act(() => store.patch(facts as never));
-  render(<RoomProvider store={store} runtime={false}><AudioDevicesBar id="audio-devices" open onClose={() => undefined} /></RoomProvider>);
-  return { actions, store };
+  const onClose = vi.fn();
+  render(<RoomProvider store={store} runtime={false}><AudioDevicesBar id="audio-devices" open onClose={onClose} /></RoomProvider>);
+  return { actions, store, onClose };
 }
 
 test("the microphone and the speaker, the system's default first, a device with no name yet numbered; a choice goes to the voice", async () => {
-  const { actions } = bar({ audioDevices: devices() });
+  const { actions, onClose } = bar({ audioDevices: devices() });
   expect(actions.refreshAudioDevices).toHaveBeenCalled();
-  const mic = screen.getByLabelText("Microphone") as HTMLSelectElement;
-  expect([...mic.options].map((option) => option.textContent)).toEqual(["System default", "Built-in", "Microphone 2"]);
-  expect(mic.value).toBe("mic-a");
-  await act(async () => { fireEvent.change(mic, { target: { value: "" } }); });
+  expect(screen.getByLabelText("Microphone")).toBe(document.getElementById("audio-input"));
+  expect(listOptions("audio-input").map((option) => option.label)).toEqual(["System default", "Built-in", "Microphone 2"]);
+  expect(selectedValue("audio-input")).toBe("mic-a");
+  // Picked as a tap would, then the choice is let to settle (it is async).
+  chooseOption("audio-input", "");
+  await act(async () => {});
   expect(actions.setAudioDevices).toHaveBeenCalledWith({ input: null });
-  await act(async () => { fireEvent.change(screen.getByLabelText("Speaker"), { target: { value: "out-a" } }); });
+  chooseOption("audio-output", "out-a");
+  await act(async () => {});
   expect(actions.setAudioDevices).toHaveBeenLastCalledWith({ output: "out-a" });
+  // Escape closes a list open in the bar, and the bar stays; with no list open, Escape closes the bar.
+  listOptions("audio-input");
+  expect(onClose).not.toHaveBeenCalled();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalled();
 });
 
 test("a speaker this platform cannot choose is disabled, saying why; a lost device is said until it is seen", () => {

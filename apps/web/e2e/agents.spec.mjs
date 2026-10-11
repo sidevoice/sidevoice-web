@@ -63,7 +63,7 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
   await expect(claudeRow.getByRole("alert")).toHaveText("Sidevoice is not running on this machine.");
   fake.connectMode = "success";
   await claudeRow.getByRole("button", { name: "Connect" }).click();
-  await expect(page.locator(".host-agent-row[data-registration='connected']")).toContainText("Connected to Sidevoice");
+  await expect(page.locator(".host-agent-row[data-registration='connected']")).toContainText(/Connected to Sidevoice|is ready for new conversations/);
   expect(fake.authorization.length).toBeGreaterThan(0);
   expect(fake.authorization.every((header) => header === "Bearer e2e-device-token")).toBe(true);
 
@@ -89,7 +89,7 @@ test("a machine that revokes this device loses its Agents actions and asks for p
   await openMachines(page, 390, 844);
   await openAgents(page);
   fake.hostMode = "revoked";
-  await page.getByRole("button", { name: "Check again" }).click();
+  await page.getByRole("button", { name: "Search again" }).click();
 
   const pairingDialog = page.getByRole("dialog", { name: "Connect to a machine" });
   await expect(pairingDialog).toBeVisible();

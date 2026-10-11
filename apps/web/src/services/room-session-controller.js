@@ -95,7 +95,30 @@ function saveLocalHostSelected(){try{if(localHostSelected)pairingStorage?.setIte
 // The local host is selected only when this page said so (LOCAL_HOST_SELECTION_KEY) and the app offers it.
 let localHostSelected=!!desktopLocalHost&&readLocalHostSelected();
 roomStore.patch({localHostAvailable:!!desktopLocalHost,localHostSelected});
-function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
+// What this device calls a machine, if the person renamed it here (a hostname they would rather not read): this
+// device's alone, shown everywhere here in place of the machine's own name, which stays as `machine_host`.
+const ALIASES_KEY='sidevoice.machine-aliases';
+function machineAliases(){try{const kept=JSON.parse(pageStorage()?.getItem(ALIASES_KEY)||'{}');return kept&&typeof kept==='object'&&!Array.isArray(kept)?kept:{}}catch{return {}}}
+function aliased(summary){const alias=machineAliases()[summary.fp];return typeof alias==='string'&&alias.trim()?{...summary,host:alias.trim(),machine_host:summary.host,alias:true}:summary}
+function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary).map(aliased),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
+/** Renames a machine on this device only; null goes back to the machine's own name. */
+function renameMachine(fp,name){
+ const next={...machineAliases()},text=typeof name==='string'?name.trim().slice(0,60):'';
+ if(text)next[fp]=text;else delete next[fp];
+ try{pageStorage()?.setItem(ALIASES_KEY,JSON.stringify(next))}catch{}
+ publishPairings();
+}
+/** This device's name, as machines list it: kept for the next pairing, and asked of each machine it is paired with now
+ *  (renaming this device in their lists). Resolves with how many could not be told. */
+async function setDeviceName(name){
+ const text=String(name||'').trim().slice(0,60);
+ try{if(text)pageStorage()?.setItem('sidevoice.deviceName',text);else pageStorage()?.removeItem('sidevoice.deviceName')}catch{}
+ if(!text)return 0;
+ const asked=pairings.list.filter(p=>!p.revoked&&p.device_id).map(p=>p.local
+  ?renameLocalHostDevice(p.device_id,text):renameMachineDevice(p.fp,p.device_id,text));
+ const results=await Promise.allSettled(asked);
+ return results.filter(r=>r.status==='rejected').length;
+}
 function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
 function keepPairings(next){
  const keepUnavailableLocal=localHostSelected&&!localPairing&&next.inUse===pairings.inUse;
@@ -538,7 +561,7 @@ function pairingRefused(fp,{call=false}={}){
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
 async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
- const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t(kind==='app'?'pair.deviceNameApp':'pair.deviceNameBrowser',params));
+ const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t('pair.deviceNameBrowser',params));
  const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch,insecure});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
@@ -1475,15 +1498,14 @@ $('settings-open').onclick=()=>{try{
  roomStore.patch({voiceDraft:state.voiceDraft||state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
  // Empty is Automatic: the system's language, followed as it is rather than kept.
- $('ui-language').value=storedPreferences().ui_language||'';
+ roomStore.patch({uiLanguage:storedPreferences().ui_language||''});
  $('settings-error').textContent='';
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 // Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
 // (no machine yet) or on an agent waiting to be connected.
 function settingsSection(name){roomStore.patch({settingsSection:name})}
-$('ui-language').onchange=()=>saveLanguage();
-$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();$('ui-language').value='';saveLanguage();
+$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();saveLanguage('');
  roomStore.patch({voiceDraft:defaultVoiceSettings()});void applyVoiceSettings();$('reset-settings-note').textContent='Restablecido a los valores por defecto.'};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
@@ -1494,14 +1516,14 @@ function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]]))}
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))))}catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
-// The interface's language is this device's: saved here as it is chosen, said to the call in progress, applied at once.
-function saveLanguage(){
+// The interface's language is this device's: saved here as it is chosen ('' is Automatic), said to the call in
+// progress, applied at once; Settings shows it from the store.
+function saveLanguage(chosen){
  // Automatic keeps no language: the system's is read again at each start.
- const chosen=$('ui-language').value;
  storePreferences(chosen?{ui_language:chosen}:{});
  const p={...systemPreferences(),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
- roomStore.patch({settingsSavedAt:Date.now()});
+ roomStore.patch({uiLanguage:chosen,settingsSavedAt:Date.now()});
 }
 // Nothing to submit: every setting applies as it changes. Enter in a field submits nothing.
 $('language-form').onsubmit=e=>e.preventDefault();
@@ -1520,7 +1542,7 @@ window.sidevoiceActions={
   const served=state.webUpdate;if(!served||state.ws||state.connecting||state.reconnecting)return;
   const query=new URLSearchParams(location.search);query.set('v',served);location.replace(location.pathname+'?'+query);
  },
- setInterfaceLanguage(value){$('ui-language').value=value||'';saveLanguage()},
+ setInterfaceLanguage(value){saveLanguage(value||'')},
  testProviderKey,
  loadVoiceCatalogue,
  replayReply,
@@ -1567,6 +1589,8 @@ window.sidevoiceActions={
  revokeLocalHostDevice,
  renameLocalHostDevice,
  renameMachineDevice,
+ renameMachine,
+ setDeviceName,
  machineDevices,
  revokeMachineDevice,
  openPairing:()=>openPairing(),
