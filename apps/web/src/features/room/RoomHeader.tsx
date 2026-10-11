@@ -102,11 +102,15 @@ function HeaderMenu({ t }: { t: CallTranslate }) {
       <summary aria-label={notice ? hosts("agents.gear.pending") : t("header.menu")} title={notice ? hosts("agents.gear.pending") : t("header.menu")}>
         <MoreIcon size={20} />{notice && <span className="settings-notice-dot" aria-hidden="true" />}
       </summary>
-      <div className="header-menu-panel" onClick={() => { if (menu.current) menu.current.open = false; }}>
+      {/* The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
+          onClick it resets the element's handler on every render), so the panel hears it. With agents waiting,
+          Settings then opens at theirs. */}
+      <div className="header-menu-panel" onClick={(event) => {
+        if (menu.current) menu.current.open = false;
+        if (notice && (event.target as Element).closest("#settings-open")) window.sidevoiceActions?.openAgentSettings?.(pending.length === 1 ? pending[0] : null);
+      }}>
         <Button id="stats-open" variant="ghost" size="compact">{t("header.stats")}</Button>
-        {/* The runtime opens the dialog from this button; with agents waiting it opens at theirs. */}
-        <Button id="settings-open" variant="ghost" size="compact"
-          onClick={() => { if (notice) window.sidevoiceActions?.openAgentSettings?.(pending.length === 1 ? pending[0] : null); }}>
+        <Button id="settings-open" variant="ghost" size="compact">
           {t("header.settings")}{notice && <span className="settings-notice-dot" aria-hidden="true" />}
         </Button>
       </div>
