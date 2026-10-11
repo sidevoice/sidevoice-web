@@ -1,82 +1,8 @@
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { installHarness } from "./harness.mjs";
 
 /* Settings → Machines → a machine's Agents, rendered in real browsers on the static site, with the paired machine
  * answered here: its identity proved with a real P-256 key, and its Agents API faked (salvaged from #48). */
-
-const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-const spki = publicKey.export({ type: "spki", format: "der" });
-const hostFingerprint = createHash("sha256").update(spki).digest("base64url");
-const pairing = {
-  fp: hostFingerprint,
-  public_key: spki.toString("base64"),
-  host: "E2E Host",
-  urls: ["http://127.0.0.1:4173"],
-  rv: null,
-  device_id: "device-e2e",
-  token: "e2e-device-token",
-  paired_at: 1_790_000_000,
-};
-
-const foreignCodex = {
-  id: "codex", label: "Codex", present: true, version: "1.0", registration: "foreign", connect: "manual", actionable: false,
-  instructions: { command: "codex mcp remove sidevoice", file: "~/.codex/config.toml", snippet: '[mcp_servers.sidevoice]\ncommand = "/opt/sidevoice/bin/connector"' },
-};
-const claude = (connected = false, actionable = true) => ({
-  id: "claude", label: "Claude Code", present: true, version: "1.0", registration: connected ? "connected" : "not-connected",
-  connect: "auto", actionable, instructions: { command: "claude mcp add sidevoice" },
-});
-const listing = ({ connected = false, actionable = true } = {}) => ({
-  agents: [foreignCodex, claude(connected, actionable)], scanned_at: "2026-10-02T12:00:00Z",
-});
-
-async function respond(route, value, status = 200) {
-  await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(value) });
-}
-
-/** The paired machine, answering at the page's own origin; what it was asked, and how it answers next. */
-async function installHarness(page) {
-  const fake = { scans: 0, hostMode: "normal", connectMode: "success", authorization: [] };
-  await page.route("**/api/**", async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const pathname = url.pathname;
-    if (pathname === "/api/rendezvous") return respond(route, { kind: "node", fingerprint: hostFingerprint });
-    if (pathname === "/api/device/identity") {
-      const nonce = url.searchParams.get("nonce") || "";
-      const signature = sign("sha256", Buffer.from(`sidevoice-node-identity:${nonce}`), { key: privateKey, dsaEncoding: "ieee-p1363" }).toString("base64url");
-      return respond(route, { public_key: pairing.public_key, signature });
-    }
-    if (pathname === "/api/presentation") return respond(route, { binding: null, call: null, room: { web_build: null } });
-    if (pathname === "/api/presentation/participants") return respond(route, { participants: [] });
-    if (pathname === "/api/presentation/history") return respond(route, { messages: [] });
-    if (pathname === "/api/host/agents") {
-      fake.authorization.push(request.headers().authorization || "");
-      if (fake.hostMode === "revoked") return respond(route, { detail: "pairing revoked" }, 401);
-      fake.scans++;
-      return respond(route, listing({ actionable: fake.scans >= 2 }));
-    }
-    if (pathname === "/api/host/agents/claude/connect") {
-      fake.authorization.push(request.headers().authorization || "");
-      if (fake.connectMode === "fail") return respond(route, { error: { key: "no-connector" } }, 503);
-      return respond(route, listing({ connected: true }));
-    }
-    if (pathname.startsWith("/api/host/agents/")) return respond(route, listing());
-    if (pathname === "/api/device/devices") return respond(route, { devices: [{ id: "device-e2e", name: "This browser", current: true }, { id: "device-phone", name: "Phone" }] });
-    if (pathname.startsWith("/api/")) return respond(route, {});
-    return route.continue();
-  });
-  // This device paired with that machine, its first setup finished (so the room shows, not the setup), and the page
-  // pointed at the machine: the static site's own origin.
-  await page.addInitScript((hostPairing) => {
-    localStorage.setItem("sidevoice.pairings", JSON.stringify({ in_use: hostPairing.fp, pairings: [hostPairing] }));
-    localStorage.setItem("sidevoice.onboarding", JSON.stringify({ version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {}, baseline_release: 2 }));
-    // Machines in the list layout (VARIANTS machines B): these follow a machine from its row to its page and back.
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "b" }));
-    window.__SIDEVOICE_TARGET__ = window.location.origin;
-  }, pairing);
-  return fake;
-}
 
 /** Settings, from the header's ⋯ menu, at Machines. The runtime loads after the page renders and wires the menu's
  *  Settings entry: it is waited for, as a person's first tap would be. */
