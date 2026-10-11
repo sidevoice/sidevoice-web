@@ -135,10 +135,6 @@
 .host-device-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .host-device-title .ui-badge { flex: none; }
 .host-device-copy { flex: 1 1 12rem; }
-.host-device-rename { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-width: 0; }
-.host-device-rename .ui-input { flex: 1 1 12rem; min-width: 0; }
-.host-device-rename-open { flex: none; opacity: .7; }
-.host-device-rename-open:hover, .host-device-rename-open:focus-visible { opacity: 1; }
 .host-name { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
 .host-rename { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
 .host-rename .ui-input { flex: 1 1 12rem; min-width: 0; }
