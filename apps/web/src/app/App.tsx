@@ -57,15 +57,19 @@ function RoomContent() {
         <LocalHostBanner />
         {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
           <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
-        {/* The call: the conversations, the stage, and the transcript when it is open (2026-10-10). */}
+        {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
         <main className={noMachine ? undefined : "call-layout"}>
           {noMachine ? <NoMachineScreen source="no-machine" /> : <>
             <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
-            <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
+            {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
+                the transcript run the screen's whole height beside them. */}
+            <div className="call-column">
+              <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
+              <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
+            </div>
             <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
           </>}
         </main>
-        {!noMachine && <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>}
         <ConnectionStatsDialog />
         <SettingsDialog />
       </div>

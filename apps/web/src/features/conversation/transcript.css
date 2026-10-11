@@ -159,3 +159,8 @@
   .voice-wave[data-phase="transcribing"] canvas { animation: none; opacity: .6; }
   .thinking-dots i { animation: none; opacity: .7; }
 }
+
+/* Nothing said yet: the panel says so instead of standing empty. */
+.messages-empty { display: grid; justify-items: center; align-content: center; gap: var(--sv-space-3); min-height: 60%; padding: var(--sv-space-8) var(--sv-space-6); text-align: center; color: var(--sv-text-muted); }
+.messages-empty svg { color: var(--sv-text-subtle); }
+.messages-empty p { max-width: 28ch; margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }

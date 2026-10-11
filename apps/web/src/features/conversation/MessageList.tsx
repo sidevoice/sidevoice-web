@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
-import { ChevronIcon } from "../../components/ui/Icons";
+import { ChevronIcon, TranscriptIcon } from "../../components/ui/Icons";
 import type { ConversationView } from "../../state/room-types";
 import { conversationTranslator, type ConversationTranslate } from "./conversation-i18n";
 import { groupMessages } from "./group-messages";
@@ -73,6 +73,8 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
         setAway(!nearBottom.current);
         if (nearBottom.current) setShowNewMessages(false);
       }}>
+        {!groups.length && !conversation.pendingText && !conversation.pendingPhase && !conversation.working &&
+          <div className="messages-empty"><TranscriptIcon size={28} /><p>{t("messages.empty")}</p></div>}
         {groups.map((group, index) => {
           // A run never spans two days (groupMessages), so a day's first run is where its name goes.
           const day = new Date(group.messages[0].time).toDateString();

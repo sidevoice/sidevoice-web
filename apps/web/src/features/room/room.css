@@ -98,7 +98,7 @@
   /* The handle the whole list comes down from: the header's lower edge. */
   .room-header:has(+ .conversations-grab) { border-bottom-color: transparent; }
   .room-header[data-list-down] { border-bottom-color: var(--sv-border); }
-  .conversations-grab { display: grid; place-items: center; flex: none; width: 100%; height: 16px; margin: 0; padding: 0 0 var(--sv-space-1); border: 0; border-bottom: 1px solid var(--sv-border); border-radius: 0; background: var(--sv-bg); touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent; }
+  .conversations-grab { display: grid; place-items: center; flex: none; width: 100%; height: 24px; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--sv-border); border-radius: 0; background: var(--sv-bg); touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent; }
   .conversations-grab i { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--sv-border-strong); }
   .conversations-grab:focus-visible { outline-offset: -2px; }
 

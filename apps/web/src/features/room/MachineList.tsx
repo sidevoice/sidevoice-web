@@ -427,7 +427,7 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
         {visiblePairing && <div className="local-pairing-code" role="status">
           <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
           {/* Selected whole on a tap or a click, so copying it is one gesture: no button of its own. */}
-          <output className="pairing-code" aria-label={t("hosts.devices.codeSelect")}>{visiblePairing.code}</output>
+          <output className="issued-pairing-code" aria-label={t("hosts.devices.codeSelect")}>{visiblePairing.code}</output>
           <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(visiblePairing.expires_in / 60) })}</p>
         </div>}
         {visiblePairing?.reach === "local-only" && <>

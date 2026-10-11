@@ -15,6 +15,7 @@ export const es: Partial<Record<ConversationMessageKey, string>> = {
   "messages.message": "{name}: {text}",
   "messages.interrupted": "{name}, interrumpida: {text}",
   "messages.today": "Hoy",
+  "messages.empty": "Aún no se ha dicho nada. Aquí aparecen lo que dices y las respuestas del agente.",
   "messages.yesterday": "Ayer",
   "messages.listenAgain": "Volver a escuchar",
   "messages.cancel": "Cancelar envío",

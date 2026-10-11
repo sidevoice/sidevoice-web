@@ -10,7 +10,7 @@ import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
 import { conversationState, machineGroups, stateText } from "../call/conversation-state";
-import { selectInCall } from "../call/stage-view";
+import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import "./room.css";
 
@@ -30,6 +30,8 @@ export const OPEN_CONVERSATIONS = "sidevoice-conversations-open";
  * list drops from it as a dialog over the dimmed call — choosing a conversation, the chevron, a tap outside or Escape
  * puts it away, and focus goes back to what opened it. */
 export function ConversationSidebar() {
+  // The conversation on the stage is the one marked in the list, whether or not the call has moved to it yet.
+  const onStage = useStageConversation().threadId;
   const t = callTranslator();
   const participants = useRoomStore((state) => state.participants);
   const inCall = useRoomStore(selectInCall);
@@ -102,7 +104,7 @@ export function ConversationSidebar() {
                 <h3 className="sidebar-group-label" aria-hidden={rail || undefined}><span translate="no">{machine}</span></h3>
                 <ConversationRows
                   className="sidebar-rows"
-                  rows={group.rows}
+                  rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}

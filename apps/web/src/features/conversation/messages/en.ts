@@ -14,6 +14,7 @@ export const en = {
   "messages.message": "{name}: {text}",
   "messages.interrupted": "{name}, interrupted: {text}",
   "messages.today": "Today",
+  "messages.empty": "Nothing said yet. What you say and the agent's replies appear here.",
   "messages.yesterday": "Yesterday",
   "messages.listenAgain": "Listen again",
   "messages.cancel": "Cancel sending",

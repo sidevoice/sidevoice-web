@@ -46,7 +46,7 @@
   font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; }
 
 /* The harness and model, at the tile's foot; they step aside while the person's bubble is up. */
-.stage-tags { position: absolute; z-index: 2; left: var(--stage-inset); bottom: var(--stage-inset); display: flex; gap: var(--sv-space-1-5); max-width: calc(100% - 2 * var(--stage-inset)); }
+.stage-tags { position: absolute; z-index: 2; left: 50%; bottom: var(--stage-inset); display: flex; justify-content: center; gap: var(--sv-space-1-5); max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); }
 .stage-tag { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; height: calc(var(--sv-space-6) + var(--sv-space-0-5)); padding: 0 var(--sv-space-3);
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: color-mix(in srgb, var(--sv-surface) 80%, transparent);
   font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); white-space: nowrap; color: var(--sv-text-muted); }
@@ -76,6 +76,8 @@
 .stage-tile .stage-transcript-toggle[aria-expanded="true"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 .stage-tile:has(.stage-transcript-toggle) .stage-tags { bottom: calc(var(--sv-space-3) + (var(--sv-control-md) - var(--sv-space-6) - var(--sv-space-0-5)) / 2);
   max-width: calc(100% - var(--stage-inset) - var(--sv-space-3) - var(--sv-control-md) - var(--sv-space-2)); }
+/* With the transcript's button in the corner the tag starts at the left, clear of it. */
+.stage-tile:has(.stage-transcript-toggle) .stage-tags { left: var(--stage-inset); transform: none; justify-content: flex-start; }
 .stage-tile:has(.stage-transcript-toggle) .person-bubble { right: calc(var(--sv-space-3) + var(--sv-control-md) + var(--sv-space-2));
   max-width: calc(100% - var(--stage-inset) - var(--sv-space-3) - var(--sv-control-md) - var(--sv-space-2)); }
 

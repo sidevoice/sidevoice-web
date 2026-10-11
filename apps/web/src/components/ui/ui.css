@@ -234,6 +234,7 @@
   .ui-dialog[data-layout="dialog"] .ui-dialog-surface { height: 100%; border: 0; border-radius: 0; box-shadow: none; }
   .ui-dialog-head { min-height: 56px; padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) var(--sv-space-4) var(--sv-space-3); }
   .ui-dialog-body { padding: 0 var(--sv-space-4) var(--sv-space-4); }
+  .ui-dialog-body--flush { padding: 0; }
   .ui-dialog-foot { flex-wrap: wrap; padding: var(--sv-space-3) var(--sv-space-4) calc(var(--sv-space-3) + env(safe-area-inset-bottom)); }
   .ui-dialog-foot > .ui-button { flex: 1 1 0; }
   .ui-dialog-reason { flex: 1 0 100%; }
