@@ -6,8 +6,10 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  AudioLines, Captions, Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Cpu, Ear, ExternalLink, Keyboard, KeyRound, MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info,
-  PanelLeftClose, PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Speech, Volume2, Wrench, X,
+  Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
+  MessageSquareText, MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
+  PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
+  Box, AudioWaveform,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -64,14 +66,18 @@ export const PendingIcon = mark(Clock3, 12);
 export const UncertainIcon = mark(CircleAlert, 12);
 
 // ----- what answers, when a row names it
-export const ModelsIcon = mark(Cpu, 16);
-export const ListensIcon = mark(Ear, 12);
-export const SpeaksIcon = mark(AudioLines, 12);
+// One object each, in one stroke: what you say going in is the microphone, the voice coming out its waveform, a model a
+// box you download — the same drawing wherever the meaning shows.
+export const ModelsIcon = mark(Box, 16);
+export const ListensIcon = mark(Mic, 12);
+export const SpeaksIcon = mark(AudioWaveform, 12);
 
 // ----- the settings, one mark per section
 export const GeneralIcon = mark(SlidersHorizontal, 16);
-export const VoicesIcon = mark(Speech, 16);
-export const TranscriptionIcon = mark(Captions, 16);
+export const VoicesIcon = mark(AudioWaveform, 16);
+export const TranscriptionIcon = mark(Mic, 16);
+/** The call's own behaviour: your turn, the sound while the agent works, the screen. */
+export const CallSettingsIcon = mark(Phone, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);
 export const AdvancedIcon = mark(Wrench, 16);
 
