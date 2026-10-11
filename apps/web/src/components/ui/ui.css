@@ -79,12 +79,19 @@
 .ui-input[aria-invalid="true"], .ui-select[aria-invalid="true"], .ui-textarea[aria-invalid="true"] { border-color: var(--sv-danger); }
 .ui-input:read-only:not(:disabled) { background-color: var(--sv-bg-subtle); border-color: var(--sv-border); }
 .ui-input:disabled, .ui-select:disabled, .ui-textarea:disabled { background-color: var(--sv-disabled-bg); border-color: var(--sv-border); color: var(--sv-disabled-text); cursor: not-allowed; }
-.ui-select {
-  appearance: none; -webkit-appearance: none; padding-inline-end: 36px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
-  background: var(--sv-input-bg) var(--sv-chevron) no-repeat right 12px center / 16px 16px;
-}
+/* The select's box: what is chosen (its icon, its label cut short), then the chevron, which turns while the list is open. */
+.ui-select { display: flex; align-items: center; gap: var(--sv-space-2); padding-inline-end: 10px; text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ui-select[data-state="open"] { border-color: var(--sv-focus); }
+/* Radix's value span, which takes no class of its own, fills the box up to the chevron. */
+.ui-select > span:first-child { flex: 1; min-width: 0; }
+.ui-select-value { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.ui-select-value-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-placeholder { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sv-text-subtle); }
+.ui-select-chevron { display: flex; flex: none; color: var(--sv-text-muted); transition: transform var(--sv-dur-fast) var(--sv-ease); }
+.ui-select[data-state="open"] .ui-select-chevron { transform: rotate(180deg); }
+.ui-select:disabled .ui-select-chevron, .ui-select:disabled .ui-select-placeholder { color: var(--sv-disabled-text); }
 .ui-control--sm { height: var(--sv-control-sm); padding-inline-start: 10px; font-size: var(--sv-font-sm); }
-.ui-select.ui-control--sm { padding-inline-end: 32px; background-position: right 10px center; background-size: 14px 14px; }
+.ui-select.ui-control--sm { padding-inline-end: var(--sv-space-2); gap: var(--sv-space-1-5); }
 @media (pointer: coarse) { .ui-input, .ui-select, .ui-textarea { font-size: 1rem; } }
 
 /* ----- Card, choice card, Section, Row, inline alert. */
@@ -246,6 +253,49 @@
 .ui-popover:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .ui-popover-title { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
 .ui-popover p { margin: 0; color: var(--sv-text-muted); }
+
+/* ----- Select's list: dropped from its box, at least as wide (wider for what its options say), up to 24rem tall and
+ * never past the screen's edge; it goes up when there is no room below. Pointing at an option and moving to it with
+ * the keyboard are one highlight; the chosen one has a check; a disabled one is greyed, with why under it. */
+.ui-select-content {
+  z-index: 90; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;
+  min-width: var(--radix-select-trigger-width); max-width: min(28rem, var(--radix-select-content-available-width, 28rem));
+  max-height: min(24rem, var(--radix-select-content-available-height, 24rem));
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface-raised); color: var(--sv-text); box-shadow: var(--sv-shadow-md);
+  font: var(--sv-weight-regular) var(--sv-font-md) / 1.375rem var(--sv-font-sans);
+  transform-origin: var(--radix-select-content-transform-origin); animation: ui-select-in var(--sv-dur-fast) var(--sv-ease);
+}
+.ui-select-content[data-side="top"] { animation-name: ui-select-in-up; }
+@keyframes ui-select-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes ui-select-in-up { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .ui-select-content { animation: none; } }
+.ui-select-viewport { padding: var(--sv-space-1-5); }
+.ui-select-item {
+  position: relative; display: flex; align-items: flex-start; gap: 10px; min-height: 36px; padding: 7px var(--sv-space-2) 7px 10px;
+  border-radius: var(--sv-radius-sm); color: var(--sv-text); outline: none; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.ui-select-item[data-highlighted] { background: var(--sv-accent-soft); }
+.ui-select-item[data-state="checked"] { font-weight: var(--sv-weight-medium); }
+.ui-select-item[data-disabled] { color: var(--sv-disabled-text); cursor: not-allowed; }
+.ui-select-item-text { display: grid; flex: 1; min-width: 0; }
+.ui-select-item-description, .ui-select-item-reason { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); line-height: 1.25rem; color: var(--sv-text-muted); }
+.ui-select-item[data-disabled] .ui-select-item-description { color: var(--sv-disabled-text); }
+/* Icon, badge and check sit on the label's line, however many lines follow it. */
+.ui-select-icon, .ui-select-item-badge, .ui-select-item-check { display: flex; flex: none; align-items: center; height: 1.375rem; }
+.ui-select-icon { color: var(--sv-text-muted); }
+.ui-select-icon > svg { width: 16px; height: 16px; }
+.ui-select-item[data-disabled] .ui-select-icon { color: var(--sv-disabled-text); }
+.ui-select-item-check { justify-content: center; width: 16px; color: var(--sv-accent-text); }
+.ui-select-label { padding: var(--sv-space-2) 10px var(--sv-space-1); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); line-height: 1rem; color: var(--sv-text-subtle); }
+.ui-select-separator { height: 1px; margin: var(--sv-space-1-5) calc(-1 * var(--sv-space-1-5)); background: var(--sv-border); }
+.ui-select-scroll { display: flex; flex: none; align-items: center; justify-content: center; height: 24px; color: var(--sv-text-muted); cursor: default; }
+.ui-select-content[data-size="sm"] { font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.ui-select-content[data-size="sm"] .ui-select-item { min-height: 32px; padding-block: 6px; }
+.ui-select-content[data-size="sm"] :is(.ui-select-icon, .ui-select-item-badge, .ui-select-item-check) { height: 1.25rem; }
+/* A finger's size where there is no mouse. */
+@media (pointer: coarse) {
+  .ui-select-item, .ui-select-content[data-size="sm"] .ui-select-item { min-height: 44px; padding-block: 11px; }
+}
 
 /* ----- Snippet · Quote: something to copy as it is (Snippet.tsx). A Snippet in monospace, wrapping, scrolling once
  * tall; a Quote between guillemets, as the landing quotes it. The text is selected whole on a tap or a click. */

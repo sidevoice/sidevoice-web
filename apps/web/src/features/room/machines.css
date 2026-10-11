@@ -131,3 +131,14 @@
 .host-device-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .host-device-title .ui-badge { flex: none; }
 .host-device-copy { flex: 1 1 12rem; }
+.host-device-rename { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.host-device-rename .ui-input { flex: 1 1 12rem; min-width: 0; }
+.host-device-rename-open { flex: none; opacity: .7; }
+.host-device-rename-open:hover, .host-device-rename-open:focus-visible { opacity: 1; }
+.host-name { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
+.host-rename { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
+.host-rename .ui-input { flex: 1 1 12rem; min-width: 0; }
+.host-rename-open { opacity: .7; }
+.host-rename-open:hover, .host-rename-open:focus-visible { opacity: 1; }
+.host-alias { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); }
+.device-name-note { display: block; margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); color: var(--sv-text-muted); }

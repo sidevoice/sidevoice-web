@@ -103,7 +103,7 @@ export function localHostBridge(): LocalHostBridge | null {
     typeof localHost.pairing === "function" ? localHost : null;
 }
 
-function desktopHost() {
+export function desktopHost() {
   return (globalThis.window as Window & { __sidevoiceDesktop?: { host?: Record<string, unknown> } } | undefined)
     ?.__sidevoiceDesktop?.host;
 }

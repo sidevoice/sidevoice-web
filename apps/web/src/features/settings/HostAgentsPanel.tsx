@@ -95,7 +95,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const [justConnected, setJustConnected] = useState(false);
   const previous = useRef(agent.registration);
   const manualOnly = agent.connect === "manual";
-  const readOnly = agent.registration === "foreign" || agent.registration === "unknown";
+  const readOnly = agent.registration === "foreign" || agent.registration === "invalid" || agent.registration === "unknown";
   const isNew = !readOnly && actionableAgent(agent);
   const hasManualInstructions = !!(agent.instructions?.command?.trim() || agent.instructions?.snippet?.trim());
   const panelId = `host-agent-howto-${fp.slice(0, 7)}-${agent.id}`;
@@ -124,6 +124,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     // Short in the row; what it means and what to do, only in its (i).
     : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted", info: t("agents.foreign.info", { agent: agent.label }) }
     : agent.registration === "outdated" ? { text: t("agents.outdated"), tone: "muted", info: t("agents.outdated.info", { agent: agent.label }) }
+    : agent.registration === "invalid" ? { text: t("agents.invalid"), tone: "error", info: t("agents.invalid.info", { agent: agent.label, file: agent.instructions?.file ?? "" }) }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   const connected = agent.registration === "connected";
@@ -144,7 +145,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
               "ready" once connected, else where it stands. */}
           <span className="host-agent-status-line">
             <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
-              role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
+              role={errorText ? "alert" : "status"} title={status.text}>{status.text}</span>
             {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
           </span>
         </span>

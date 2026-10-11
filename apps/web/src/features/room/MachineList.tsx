@@ -1,7 +1,9 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { Input } from "../../components/ui/Input";
+import { InfoTip } from "../../components/ui/InfoTip";
 import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -142,6 +144,8 @@ function reachText(machine: MachineView, t: HostTranslate) {
  *  paired with it, and forgetting it. */
 function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean }) {
   const t = hostTranslator();
+  // Renaming the machine on this device: the name being typed, or null.
+  const [naming, setNaming] = useState<string | null>(null);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const agents = useRef<HTMLElement>(null);
@@ -153,7 +157,19 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          <h3>{copy.name}</h3>
+          {naming !== null ? <form className="host-rename" onSubmit={(event) => { event.preventDefault(); window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming.trim() || null); setNaming(null); }}>
+              <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } }} />
+              <Button type="submit" size="sm" variant="primary">{t("hosts.devices.renameSave")}</Button>
+              <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
+            </form>
+            : <h3 className="host-name">{copy.name}
+              {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: copy.name })} title={t("hosts.rename", { machine: copy.name })}
+                onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
+            </h3>}
+          {/* Renamed here: whose name it really is, and the way back to it. */}
+          {machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
+            <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
@@ -405,6 +421,22 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const local = !!machine.local;
   const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
+  // Renaming a device is the machine's to keep (its device list): asked of it with this device's pairing.
+  const rename = (id: string, name: string) => local ? window.sidevoiceActions?.renameLocalHostDevice?.(id, name) : window.sidevoiceActions?.renameMachineDevice?.(machine.pairingId!, id, name);
+  const canRename = !!(local ? window.sidevoiceActions?.renameLocalHostDevice : window.sidevoiceActions?.renameMachineDevice);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  async function saveName() {
+    if (!renaming) return;
+    const name = renaming.name.trim().slice(0, 60);
+    if (!name) { setRenaming(null); return; }
+    setLoading(true);
+    try {
+      await rename(renaming.id, name);
+      setDevices((rows) => rows.map((row) => row.device_id === renaming.id ? { ...row, name } : row));
+      setRenaming(null);
+    } catch { setDeviceNote(t("hosts.devices.renameFailed")); }
+    finally { setLoading(false); }
+  }
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
   const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
@@ -462,10 +494,22 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
               {/* The name and, on the same line, whether it is this device: the name gives way (an ellipsis), the tag never. */}
-              <span className="host-device-title">
-                <strong title={device.name || undefined}>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
-                {(device.kind === "local" || device.current) && device.name && <Badge tone="accent">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</Badge>}
-              </span>
+              {renaming?.id === device.device_id ? <form className="host-device-rename" onSubmit={(event) => { event.preventDefault(); void saveName(); }}>
+                  <Input aria-label={t("hosts.devices.renameLabel")} value={renaming.name} maxLength={60} autoFocus disabled={loading}
+                    onChange={(event) => setRenaming({ id: device.device_id, name: event.target.value })}
+                    onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setRenaming(null); } }} />
+                  <Button type="submit" size="sm" variant="primary" loading={loading}>{t("hosts.devices.renameSave")}</Button>
+                  <Button size="sm" variant="ghost" tone="neutral" disabled={loading} onClick={() => setRenaming(null)}>{t("hosts.cancel")}</Button>
+                </form>
+                : <span className="host-device-title">
+                  <strong title={device.name || undefined}>{device.name || t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</strong>
+                  {/* This device; or, in another machine's list, that machine's own Sidevoice (paired with itself), which is
+                      not revocable from here. */}
+                  {(device.kind === "local" || device.current) && device.name && <Badge tone="accent">{t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</Badge>}
+                  {device.kind === "local" && !local && <InfoTip label={t("hosts.devices.thisMachineInfoLabel")}>{t("hosts.devices.thisMachineInfo")}</InfoTip>}
+                  {usable && canRename && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-device-rename-open" aria-label={t("hosts.devices.rename", { device: device.name || device.device_id })}
+                    title={t("hosts.devices.rename", { device: device.name || device.device_id })} onClick={() => setRenaming({ id: device.device_id, name: device.name || "" })}><EditIcon size={14} /></Button>}
+                </span>}
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>

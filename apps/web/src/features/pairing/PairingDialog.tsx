@@ -111,7 +111,7 @@ export function PairingCodeForm({ idPrefix = "device-pairing", autoFocus = false
     setBusy(true);
     setError("");
     try {
-      await window.sidevoiceActions?.pairDevice(code, currentDeviceName((where) => t("pair.deviceName", { where })), address);
+      await window.sidevoiceActions?.pairDevice(code, currentDeviceName((_, params) => t("pair.deviceNameBrowser", params)), address);
       setCode("");
     } catch (reason) {
       setError(pairingError(reason, t));

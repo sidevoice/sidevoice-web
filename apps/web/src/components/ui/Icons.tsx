@@ -9,7 +9,7 @@ import {
   Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform, ArrowUp, ArrowRight, Laptop,
+  Box, AudioWaveform, ArrowUp, ArrowRight, Laptop, Pencil,
   Timer, ScrollText,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -36,10 +36,15 @@ export const ConversationsIcon = mark(MessagesSquare, 16);
 export const MachinesIcon = mark(Monitor, 16);
 /** This computer, among machines. */
 export const ThisComputerIcon = mark(Laptop, 14);
+/** Renames what it sits beside. */
+export const EditIcon = mark(Pencil, 14);
 export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
 /** Puts away what dropped from above: a phone's conversations panel. */
 export const CloseUpIcon = mark(ChevronUp, 18);
+/** More of a list above, or below, what it shows: a select's long list. */
+export const MoreAboveIcon = mark(ChevronUp, 14);
+export const MoreBelowIcon = mark(ChevronDown, 14);
 export const SidebarCollapseIcon = mark(PanelLeftClose, 18);
 export const SidebarExpandIcon = mark(PanelLeftOpen, 18);
 export const MoreIcon = mark(MoreHorizontal, 18);
