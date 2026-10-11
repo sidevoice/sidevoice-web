@@ -89,6 +89,26 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
   expect(screen.getByText("Cursor")).toBeInTheDocument();
 });
 
+test("the runtime's Settings handler on the menu entry survives the header's renders, and still opens at the agents", async () => {
+  const store = createRoomStore();
+  const host = pairing("fp-nuc", "NUC");
+  const openAgentSettings = vi.fn();
+  setActions({ openAgentSettings });
+  act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: ready([known("cursor", { actionable: true })]) } }));
+  render(<RoomProvider store={store}><RoomHeader /></RoomProvider>);
+  // The runtime wires the entry once it loads, as room-session-controller.js does.
+  const openSettings = vi.fn();
+  settingsEntry().onclick = openSettings;
+  // Renders that change the notice must leave that handler alone.
+  act(() => store.patch({ hostAgents: { [host.fp]: ready([known("cursor", { actionable: true }), known("claude", { actionable: true })]) } }));
+  act(() => store.patch({ hostAgents: {} }));
+  act(() => store.patch({ hostAgents: { [host.fp]: ready([known("cursor", { actionable: true })]) } }));
+  expect(settingsEntry().onclick).toBe(openSettings);
+  await act(async () => { fireEvent.click(settingsEntry()); });
+  expect(openSettings).toHaveBeenCalledTimes(1);
+  expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
+});
+
 test("multiple pending hosts leave an explicit translated choice in Machines", async () => {
   const store = createRoomStore();
   const hosts = [pairing("fp-nuc", "NUC"), pairing("fp-laptop", "Laptop")];
