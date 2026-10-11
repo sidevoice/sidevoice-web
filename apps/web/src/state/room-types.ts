@@ -105,6 +105,8 @@ export interface DetectedAgent {
   dismissed?: boolean;
   actionable?: boolean;
   instructions?: { command?: string; snippet?: string; file?: string | null } | null;
+  /** How to take Sidevoice out of the agent by hand (the connector's, as `instructions` is for adding it). */
+  removal?: { command?: string; snippet?: string; file?: string | null } | null;
 }
 
 export interface HostAgentsListing {

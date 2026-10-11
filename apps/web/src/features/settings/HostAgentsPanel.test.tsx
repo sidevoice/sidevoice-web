@@ -26,10 +26,6 @@ const ready = (agents = [known()]): HostAgentsState => ({
 const pairing = (fp: string, host: string): PairingSummary => ({ fp, host, urls: [`https://${host.toLowerCase()}.example`], rv: null,
   device_id: `device-${fp}`, paired_at: 1_700_000_000, revoked: false });
 
-/** Opens a row's ⋯ menu, as a keyboard does (Radix opens it on a key or a pointer press, not a click). */
-function openMenu(name: string) {
-  fireEvent.keyDown(document.querySelector(`button[aria-label="${name}"]`) as HTMLElement, { key: "Enter" });
-}
 
 function setActions(actions: Partial<NonNullable<typeof window.sidevoiceActions>>) {
   window.sidevoiceActions = actions as typeof window.sidevoiceActions;
@@ -61,7 +57,7 @@ test("manual instructions come from the selected host and trigger four-second wa
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp-a" /></RoomProvider>);
 
     // Connected by hand only: its one action opens how.
-    fireEvent.click(document.querySelector('button[aria-label="Connect Codex to Sidevoice"]') as HTMLElement);
+    fireEvent.click(screen.getByText("I’ll do it myself"));
     expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === "CODE" && element.textContent?.includes("[mcp_servers.sidevoice]"))).toBeInTheDocument();
     fireEvent.click(screen.getByText("Don’t see yours? Connect it by hand"));
@@ -170,7 +166,7 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Not now" })).toBeNull();
 
-    fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Connect Codex to Sidevoice" }));
+    fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Replace manually" }));
     expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp remove sidevoice");
     expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio");
     expect(foreignRow as HTMLElement).toHaveTextContent("after you replace the agent configuration");
@@ -196,7 +192,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
   try {
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
     const row = screen.getByText("Connected to a different MCP server").closest("li") as HTMLElement;
-    const reveal = within(row).getByRole("button", { name: "Connect Codex to Sidevoice" });
+    const reveal = within(row).getByRole("button", { name: "Replace manually" });
     fireEvent.click(reveal);
     expect(reveal).toHaveAttribute("aria-expanded", "true");
     expect(row).toHaveTextContent("codex mcp remove sidevoice");
@@ -218,7 +214,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
 
     const disconnected = known("codex", { registration: "not-connected", actionable: false });
     act(() => store.patch({ hostAgents: { fp: ready([disconnected]) } }));
-    expect(within(row).getByRole("button", { name: "Connect Codex to Sidevoice" })).not.toHaveAttribute("aria-expanded");
+    expect(within(row).getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
     expect(row).not.toHaveTextContent("codex mcp remove sidevoice");
   } finally {
     view?.unmount();
@@ -269,16 +265,6 @@ test("a row is always its name and one status line: connecting turns that line t
   } finally { vi.useRealTimers(); }
 });
 
-// Last in the file: Radix's menu leaves the document slow for whatever renders after it in jsdom.
-test("an agent Sidevoice can connect keeps connecting by hand in its menu", () => {
-  const store = createRoomStore();
-  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
-  act(() => store.patch({ hostAgents: { fp: ready() } }));
-  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-  openMenu("More for Codex");
-  fireEvent.click(screen.getByText("Connect by hand"));
-  expect(screen.getByText("/opt/sidevoice/bin/connector mcp --stdio")).toBeInTheDocument();
-});
 
 test("the original row actions: connecting by hand and Connect are both buttons on the row", () => {
   localStorage.setItem("sidevoice.variants", JSON.stringify({ "agent-actions": "original" }));

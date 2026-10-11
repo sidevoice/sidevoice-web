@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, type ButtonProps } from "../../components/ui/Button";
-import { SplitButton } from "../../components/ui/SplitButton";
-import { useVariant } from "../../lib/variants";
+import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/cn";
-import { DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
@@ -57,10 +54,12 @@ function CodeBlock({ code }: { code: string }) {
   );
 }
 
-function Instructions({ agent, fp, id, onClose }: { agent: DetectedAgent; fp: string; id: string; onClose: () => void }) {
+/** How to add Sidevoice to the agent by hand, or (`removing`) take it out; the list is read again meanwhile, so the row
+ *  follows what was done. */
+function Instructions({ agent, fp, id, removing = false, onClose }: { agent: DetectedAgent; fp: string; id: string; removing?: boolean; onClose: () => void }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.hostAgents[fp]?.status ?? "idle");
-  const how = agent.instructions;
+  const how = removing ? agent.removal : agent.instructions;
   const command = how?.command?.trim() ? how.command : undefined;
   const snippet = how?.snippet?.trim() ? how.snippet : undefined;
   useEffect(() => {
@@ -75,7 +74,7 @@ function Instructions({ agent, fp, id, onClose }: { agent: DetectedAgent; fp: st
       {!command && !snippet ? <p className="muted">{t("agents.manual.none")}</p> : <>
         {command && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><CodeBlock code={command} /></>}
         {snippet && <><p className="host-agent-howto-label">{how?.file ? t("agents.manual.file", { file: how.file }) : t("agents.manual.snippet")}</p><CodeBlock code={snippet} /></>}
-        <p className="muted" role="status">{t(agent.registration === "foreign" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
+        <p className="muted" role="status">{t(removing ? "agents.manual.removeWaiting" : agent.registration === "foreign" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
         <Button variant="ghost" size="sm" onClick={onClose}>{t("agents.close")}</Button>
       </>}
     </div>
@@ -113,7 +112,6 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     return () => window.clearTimeout(timer);
   }, [justConnected]);
 
-  const actions = useVariant("agent-actions", ["split", "original"] as const);
   const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
@@ -124,18 +122,9 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted" }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
-  const howTo = manualOnly || agent.registration === "foreign";
-  const main: ButtonProps | null = agent.registration === "connected"
-    ? { variant: "secondary", size: "sm", loading: busy === "disconnect", disabled: !!busy || confirming, "aria-label": t("agents.disconnectNamed", { agent: agent.label }),
-        onClick: () => setConfirming(true), children: t("agents.disconnect") }
-    : !readOnly || (agent.registration === "foreign" && hasManualInstructions)
-      ? { variant: "primary", size: "sm", loading: busy === "connect", disabled: !!busy, "aria-label": t("agents.connectNamed", { agent: agent.label }),
-          "aria-expanded": howTo ? open : undefined, "aria-controls": howTo ? panelId : undefined,
-          onClick: () => howTo ? setOpen((value) => !value) : run("connect"), children: t("agents.connect") }
-      : null;
-  const more = t("agents.more", { agent: agent.label });
-  const menu = hasManualInstructions && !howTo && agent.registration === "not-connected"
-    ? [<DropdownMenuItem key="manual" onSelect={() => setOpen(true)}>{t("agents.byHand")}</DropdownMenuItem>] : [];
+  const connected = agent.registration === "connected";
+  // The hints say what each button does: Sidevoice doing it, or the person.
+  const handHint = t(connected ? "agents.hint.removeByHand" : agent.registration === "foreign" ? "agents.hint.replaceByHand" : "agents.hint.byHand", { agent: agent.label });
   return (
     <li className="host-agent-row" data-registration={agent.registration} data-open={open || undefined}>
       <div className="host-agent-main">
@@ -149,18 +138,22 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
             role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
         </span>
-        {/* Variant "agent-actions": one action — Connect or Disconnect (an agent connected by hand only, or to another
-            server, opens how to) — with the others behind a chevron joined to it; or, as the list first had them, every
-            action a button on the row, connecting by hand among them. */}
+        {/* Every action a button on the row, each with a hint: doing it by hand (add, replace, or take Sidevoice out), and
+            Connect or Disconnect, which Sidevoice does itself. */}
         <span className="host-agent-actions">
-          {actions === "split" ? main && <SplitButton {...main} menuLabel={more} items={menu} />
-            : agent.registration === "connected" ? main && <Button {...main} variant="ghost" />
-              : <>
-                {hasManualInstructions && <Button variant="ghost" size="sm" disabled={!!busy} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
-                  {t(agent.registration === "foreign" ? "agents.foreign.manual.toggle" : "agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
-                </Button>}
-                {!readOnly && !manualOnly && main && <Button {...main} />}
-              </>}
+          {(connected || hasManualInstructions) && <Tooltip content={handHint}>
+            <Button variant="ghost" size="sm" disabled={!!busy} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
+              {t(agent.registration === "foreign" ? "agents.foreign.manual.toggle" : "agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
+            </Button>
+          </Tooltip>}
+          {connected ? <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
+              <Button variant="ghost" size="sm" loading={busy === "disconnect"} disabled={!!busy || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
+                onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
+            </Tooltip>
+            : !readOnly && !manualOnly && <Tooltip content={t("agents.hint.connect", { agent: agent.label })}>
+              <Button variant="primary" size="sm" loading={busy === "connect"} disabled={!!busy} aria-label={t("agents.connectNamed", { agent: agent.label })}
+                onClick={() => run("connect")}>{t("agents.connect")}</Button>
+            </Tooltip>}
         </span>
       </div>
       {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}>
@@ -170,8 +163,8 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <Button variant="danger" size="sm" onClick={() => { setConfirming(false); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
         </span>
       </div>}
-      {open && (agent.registration === "not-connected" || agent.registration === "foreign") &&
-        <Instructions agent={agent} fp={fp} id={panelId} onClose={() => setOpen(false)} />}
+      {open && agent.registration !== "unknown" &&
+        <Instructions agent={agent} fp={fp} id={panelId} removing={connected} onClose={() => setOpen(false)} />}
     </li>
   );
 }
