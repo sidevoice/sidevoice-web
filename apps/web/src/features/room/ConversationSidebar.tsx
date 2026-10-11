@@ -95,7 +95,7 @@ export function ConversationSidebar() {
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
-                  sub={(row) => <span className="sidebar-state" data-state={conversationState(row, inCall)}>{row.harness && <HarnessIcon harness={row.harness} size={11} />}{[row.harness ? HARNESS_NAMES[row.harness] : null, row.model].filter(Boolean).map((part) => part + " · ").join("")}{stateText(row, inCall, t)}</span>}
+                  sub={(row) => <span className="sidebar-state" data-state={conversationState(row, inCall)}>{row.harness && <HarnessIcon harness={row.harness} size={11} />}{stateText(row, inCall, t)}</span>}
                   aside={(row) => (
                     <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" size="icon" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
                       <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}>{t("sidebar.closeConversation")}</DropdownMenuItem>

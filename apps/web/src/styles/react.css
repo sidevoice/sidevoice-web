@@ -466,3 +466,7 @@ body,
 .settings-dialog [id$="-model-download"] { padding:.55rem 1rem;font-size:.85rem }
 .settings-dialog .settings-content { padding-top:1.25rem }
 .settings-machines #pair-device-open { width:auto;margin-top:.9rem;padding:.6rem 1rem;border:1px solid var(--sv-border);background:var(--sv-surface-raised);font-size:.85rem }
+/* Settings wear the app's own colours: its background, its panels' surface for the sections' list. */
+#language-settings.settings-dialog[open] { background:var(--sv-bg);color:var(--sv-text) }
+.settings-dialog .settings-nav { background:var(--sv-bg);border-right:1px solid var(--sv-border) }
+.settings-dialog .settings-heading,.settings-dialog .settings-footer { border-color:var(--sv-border) }
