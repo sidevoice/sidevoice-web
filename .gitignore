@@ -20,3 +20,7 @@ coverage/
 .pytest_cache/
 # A checkout's copy of the pinned core wheel (packages/connector/core.mjs)
 packages/connector/core/
+# Browser e2e (apps/web/e2e): the site it serves, and what a run leaves.
+.playwright-static-web/
+apps/web/test-results/
+apps/web/playwright-report/
