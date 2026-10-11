@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { WebEngine } from "@sidevoice/engine";
-import { engineCatalogs, localStorageCredentials } from "./model-catalogs.js";
+import { engineCatalogs, localStorageCredentials, nativeInstall, webInstallProgress } from "./model-catalogs.js";
 
 /* The engine's catalogues and the providers' keys, as the settings pane reads them on the web. */
 
@@ -48,4 +48,54 @@ test("a catalogue whose listing fails with no reason of its own is not an empty 
   expect(await engineCatalogs(engine, localStorageCredentials(storage)).catalogs()).toEqual([
     { id: "local", name: null, status: { stale: false, reason: { code: "storage-blocked", params: {} } }, models: [] },
   ]);
+});
+
+test("on the web a model installs through the engine, its progress a share of its files, and a cancel is install-cancelled", async () => {
+  const seen: unknown[] = [];
+  let signalled: AbortSignal | undefined;
+  const engine = {
+    catalogs: () => [],
+    install: async (model: string, build: string | undefined, onProgress: (p: object) => void, signal?: AbortSignal) => {
+      seen.push(["install", model, build]);
+      onProgress({ files: 4, done: 1, received: 50, size: 100 });
+      signalled = signal;
+      if (signal?.aborted) throw Object.assign(new Error("cancelled"), { code: "cancelled" });
+    },
+  } as unknown as WebEngine;
+  const catalogs = engineCatalogs(engine, localStorageCredentials(memory().storage));
+  const progress: unknown[] = [];
+  await catalogs.install("kokoro-82m-v1.0", { build: "kokoro/q8", onProgress: (p) => progress.push(p) });
+  expect(seen).toEqual([["install", "kokoro-82m-v1.0", "kokoro/q8"]]);
+  expect(progress).toEqual([{ fraction: 0.375, done: null, total: null }]);
+  expect(webInstallProgress({ files: 0 })).toEqual({ fraction: null, done: null, total: null });
+  const abort = new AbortController();
+  abort.abort();
+  await expect(catalogs.install("kokoro-82m-v1.0", { signal: abort.signal })).rejects.toMatchObject({ code: "install-cancelled" });
+  expect(signalled?.aborted).toBe(true);
+});
+
+test("in the desktop app the native engine installs it: its bytes as the share done, the signal as its cancel(job)", async () => {
+  let report: ((event: object) => void) | null = null;
+  let finish: (() => void) | null = null;
+  let fail: ((error: unknown) => void) | null = null;
+  const cancelled: string[] = [];
+  const native = {
+    install: (model: string, engine: string, onProgress: (event: object) => void) => {
+      report = onProgress;
+      return Object.assign(new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; }), { job: "install-1-" + model + "-" + engine });
+    },
+    cancel: async (job: string) => { cancelled.push(job); fail?.({ key: "install_cancelled", message: "cancelled" }); return true; },
+  };
+  const install = nativeInstall(native);
+  const progress: unknown[] = [];
+  const done = install("whisper-small", { engine: "sherpa-onnx", onProgress: (p) => progress.push(p) });
+  report!({ job: "install-1", done: 25, total: 100, bytes_per_s: null });
+  finish!();
+  await done;
+  expect(progress).toEqual([{ fraction: 0.25, done: 25, total: 100 }]);
+  const abort = new AbortController();
+  const stopped = install("kokoro-82m-v1.0", { engine: "sherpa-onnx", signal: abort.signal });
+  abort.abort();
+  await expect(stopped).rejects.toMatchObject({ code: "install-cancelled" });
+  expect(cancelled).toEqual(["install-1-kokoro-82m-v1.0-sherpa-onnx"]);
 });

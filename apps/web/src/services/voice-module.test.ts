@@ -50,3 +50,12 @@ test("an engine the browser will not let keep files (site data blocked) is the v
   await expect(page.voice()).rejects.toMatchObject({ code: "storage-blocked" });
   await expect(page.catalogs()).rejects.toMatchObject({ code: "storage-blocked" });
 });
+
+test("in the desktop app a model installs through its native engine when the app's engine has no install of its own", async () => {
+  const native = { install: vi.fn(() => Object.assign(Promise.resolve(), { job: "j1" })), cancel: vi.fn() };
+  const engine = { catalogs: async () => [], setCredential: async () => {}, hasCredential: async () => false };
+  const catalogs = await pageVoice({ host: { voice: {}, engine, nativeEngine: native }, load: vi.fn() }).catalogs();
+  await catalogs.install("whisper-small", { engine: "sherpa-onnx" });
+  expect(native.install).toHaveBeenCalledWith("whisper-small", "sherpa-onnx", expect.any(Function));
+  expect(await catalogs.catalogs()).toEqual([]);
+});
