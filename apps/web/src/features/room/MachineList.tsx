@@ -502,7 +502,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
       {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.unavailable")}
         action={<Button size="sm" onClick={() => void refresh()}>{t("hosts.retry")}</Button>} />}
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
-      {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t("hosts.devices.empty")}</p>}
+      {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t(local ? "hosts.devices.emptyOthers" : "hosts.devices.empty")}</p>}
       <ul className="host-device-list">
         {visibleDevices.map((device) => (
           <li className="host-device-row" key={device.device_id}>
