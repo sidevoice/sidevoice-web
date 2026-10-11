@@ -1326,7 +1326,7 @@ function cancelVoiceTry(){voiceTry?.abort()}
 let voiceInstall=null;
 async function installVoiceModel(task){
  // The end of turn has no slot: its model is this device's end-of-turn model.
- const turn=task==='end-of-turn'?endOfTurnModel(state.voiceCatalogue.catalogs):null;
+ const turn=task==='end-of-turn'?endOfTurnModel(state.voiceCatalogue.catalogs,(state.voiceDraft||state.voiceSettings)?.turn_model):null;
  const slot=turn?{catalog:'local',model:turn.id}:(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
  const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
  const build=(slot.build&&model?.builds?.find(b=>b.id===slot.build))??model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);

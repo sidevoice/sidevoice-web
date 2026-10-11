@@ -6,7 +6,7 @@ import { Field } from "../../components/ui/Field";
 import { Group, Row } from "../../components/ui/Card";
 import { Alert } from "../../components/ui/Alert";
 import { Segmented } from "../../components/ui/Tabs";
-import { voiceChoices, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
+import { voiceChoices, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
@@ -190,6 +190,8 @@ export function TurnChoices({ draft }: { draft: Settings }) {
   // Smart where its model runs here; silence where it does not (voiceSettingsHere), whatever was kept.
   const smart = draft.end_of_turn === "smart-turn" && choices.endOfTurn.smartTurn;
   const turn = useModelState("end-of-turn", draft);
+  const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
+  const turnModels = useMemo(() => endOfTurnModels(catalogs), [catalogs]);
   return (
     <Group title={t("settings.call.turn")}>
       <Row label={t("voice.patience")} description={t(current.hint)}>
@@ -204,6 +206,12 @@ export function TurnChoices({ draft }: { draft: Settings }) {
       </Row>
       {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
         <ModelPrepare id="turn-model-card" actionIds="turn-model" status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
+          pickers={(locked) => <Field label={t("voice.model")}>
+            {/* Just the models: one today, more later; no families, sizes or runtime here. */}
+            <NativeSelect id="turn-model" value={turn.model!.id} disabled={locked} onChange={(event) => edit({ turn_model: event.target.value })}>
+              {turnModels.map((model: { id: string; builds?: { available: boolean }[] }) => <option key={model.id} value={model.id} disabled={!model.builds?.some((build) => build.available)}>{model.id}</option>)}
+            </NativeSelect>
+          </Field>}
           onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
       </Row>}
     </Group>

@@ -17,7 +17,7 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
   const install = useRoomStore((state) => state.facts.voiceInstall);
   // The end of turn has no slot of its own: its model is this device's end-of-turn model, when it is the smart one.
-  const turnModel = task === "end-of-turn" && draft?.end_of_turn === "smart-turn" ? endOfTurnModel(catalogs) : null;
+  const turnModel = task === "end-of-turn" && draft?.end_of_turn === "smart-turn" ? endOfTurnModel(catalogs, draft?.turn_model) : null;
   const slot = task === "end-of-turn" ? (turnModel ? { catalog: "local", model: turnModel.id, build: undefined as string | undefined } : undefined) : draft?.[task];
   const model = slot ? catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model) ?? null : null;
   const local = slot?.catalog === "local";

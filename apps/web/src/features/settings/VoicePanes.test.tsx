@@ -218,3 +218,14 @@ test("catalogues read again after a download keep the pane as it is: nothing emp
   expect(document.getElementById("stt-model-card")).toBe(card);
   expect(screen.queryByText("Loading the call's voice settings…")).toBeNull();
 });
+
+test("the smart end of turn has its model chosen like the others — just the models — and made ready in the same block", () => {
+  const withTurn = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models,
+    local("smart-turn-v3.2", "smart-turn", ["end-of-turn"], { installed: false, recommendedBuild: "smart-turn-v3.2/int8", builds: [build("smart-turn-v3.2/int8", { downloadBytes: 9e6, installed: false })] })] } : catalog) as CatalogView[];
+  const { actions } = renderPane("voice", { voiceCatalogue: { state: "ready", catalogs: withTurn, error: "" } });
+  expect(options("voice-end-of-turn")[0]).toHaveTextContent("Smart");
+  expect(options("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
+  expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
+  fireEvent.click(document.getElementById("turn-model-download")!);
+  expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");
+});

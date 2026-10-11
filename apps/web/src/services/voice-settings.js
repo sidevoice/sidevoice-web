@@ -15,6 +15,7 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
  *   patience: NonNullable<VoiceSettings['patience']>,
  *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
  *   idle_unload_minutes: number,
+ *   turn_model?: string,
  * }} DeviceVoiceSettings The settings this device keeps: every field filled, so they are the voice's `VoiceSettings` as they are.
  * @typedef {{key: string, params?: Record<string, string | number>, reasons?: string[], detail?: string}} Note What the pane
  *   says about a choice: a message key and its params, the codes of why a model does not run here, and a provider's own
@@ -75,6 +76,7 @@ export function normaliseVoiceSettings(value, defaults) {
     patience: PATIENCE.includes(value?.patience) ? value.patience : defaults.patience,
     end_of_turn: END_OF_TURN.includes(value?.end_of_turn) ? value.end_of_turn : defaults.end_of_turn,
     idle_unload_minutes: IDLE_UNLOAD_MINUTES.includes(value?.idle_unload_minutes) ? value.idle_unload_minutes : defaults.idle_unload_minutes,
+    ...(text(value?.turn_model) ? { turn_model: value.turn_model } : {}),
   };
 }
 
@@ -196,11 +198,22 @@ function slotChoices(catalogs, capability, slot) {
 }
 
 /**
- * This device's end-of-turn model: the first of the local catalogue's that runs here, or none.
+ * This device's end-of-turn model: the one chosen (`id`) when it runs here, else the first of the local catalogue's
+ * that does, or none.
+ * @param {CatalogView[]} catalogs
+ * @param {string} [id]
+ */
+export function endOfTurnModel(catalogs, id) {
+  const models = endOfTurnModels(catalogs);
+  return models.find((model) => model.id === id && runs(model)) ?? models.find(runs) ?? null;
+}
+
+/**
+ * The local catalogue's end-of-turn models, those that run here and those that do not.
  * @param {CatalogView[]} catalogs
  */
-export function endOfTurnModel(catalogs) {
-  return offered(catalogs.find((catalog) => catalog.id === LOCAL_CATALOG), 'end-of-turn').find(runs) ?? null;
+export function endOfTurnModels(catalogs) {
+  return offered(catalogs.find((catalog) => catalog.id === LOCAL_CATALOG), 'end-of-turn');
 }
 
 /**
@@ -211,7 +224,7 @@ export function endOfTurnModel(catalogs) {
  * @returns {DeviceVoiceSettings}
  */
 export function voiceSettingsHere(settings, catalogs) {
-  if (settings.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs)) return settings;
+  if (settings.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs, settings.turn_model)) return settings;
   return { ...settings, end_of_turn: 'silence' };
 }
 

@@ -132,7 +132,10 @@ export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSource
       const local = engine.localCatalog();
       const vad = runnable(await local.models("vad"), "silero-vad");
       if (!vad) throw voiceRefusal("vad-unavailable");
-      const endOfTurn = settings.end_of_turn === "smart-turn" ? runnable(await local.models("end-of-turn")) : null;
+      // The end-of-turn model chosen (Settings → Call), when it runs here; else the first that does.
+      const turnModels = settings.end_of_turn === "smart-turn" ? (await local.models("end-of-turn")).filter(runsHere) : [];
+      const chosenTurn = (settings as { turn_model?: unknown }).turn_model;
+      const endOfTurn = turnModels.find((model) => model.id === chosenTurn) ?? turnModels[0] ?? null;
       if (settings.end_of_turn === "smart-turn" && !endOfTurn) throw voiceRefusal("end-of-turn-unavailable");
       return {
         async load() {
