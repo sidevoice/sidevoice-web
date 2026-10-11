@@ -1,4 +1,4 @@
-import { Fragment, useContext, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
 import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
@@ -136,6 +136,10 @@ export function SettingsDialog() {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
+  // A section changed (or a machine within Machines) starts at its top, not where the last one was scrolled to.
+  const content = useRef<HTMLDivElement>(null);
+  const machine = useRoomStore((state) => state.facts.machinesView?.machine ?? null);
+  useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [current, machine]);
   const waits = useVoiceReadiness();
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
@@ -178,7 +182,7 @@ export function SettingsDialog() {
               {section.id === "machines" && <MachineNav current={current === "machines"} />}
               </Fragment>)}
             </nav>
-            <div className="settings-content">
+            <div className="settings-content" ref={content}>
               <p id="settings-error" className="settings-error" role="alert" />
               <div className="settings-column">
                 <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
