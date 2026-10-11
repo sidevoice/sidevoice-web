@@ -174,6 +174,11 @@ export interface SidevoiceActions {
   pairDevice(code: string, name: string): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
+  /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
+   *  that work become this device's. Rejects with a sentence and the failure's `code`. */
+  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null }): Promise<{ text?: string }>;
+  /** Stops the try in progress, which then rejects `trial-cancelled`. */
+  cancelVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */
   loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
   /** Connect, disconnect, or dismiss an agent on the identified machine. */

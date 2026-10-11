@@ -6,6 +6,7 @@ import { voiceChoices, SPEED, type DeviceVoiceSettings as Settings, type Note } 
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
+import { ProviderKey } from "./ProviderKeys";
 
 /* The call's voice as the person chooses it: for what transcribes and what speaks, a source first — this device, or a
  * remote provider — then a model of it; then the voice, and when a turn ends. The choices are the engine's catalogues;
@@ -64,64 +65,97 @@ function SlotNote({ id, note, t }: { id: string; note: Note | null | undefined; 
   return note ? <p className="muted" id={id}>{noteText(t, note)}</p> : null;
 }
 
-function VoiceChoices({ draft, t }: { draft: Settings; t: HostTranslate }) {
+type Edit = Parameters<NonNullable<typeof window.sidevoiceActions>["editVoice"]>[0];
+const edit = (patch: Edit) => window.sidevoiceActions?.editVoice(patch);
+const chosen = (options: Option[], value: string) => options.find((option) => option.id === value)?.note;
+const sourceNote = (sources: Source[], value: string) => sources.find((source) => source.id === value)?.note;
+const keyless = (note: Note | null | undefined) => note?.key === "voice.catalog.reason" && note.params?.code === "credential-missing";
+
+/** What a slot offers, from the engine's catalogues and the settings being edited. */
+function useChoices(draft: Settings) {
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
-  const choices = useMemo(() => voiceChoices(catalogs, draft, SPEECH_LANGUAGES), [catalogs, draft]);
-  const edit = (patch: Parameters<NonNullable<typeof window.sidevoiceActions>["editVoice"]>[0]) => window.sidevoiceActions?.editVoice(patch);
-  const chosen = (options: Option[], value: string) => options.find((option) => option.id === value)?.note;
-  const sourceNote = (sources: Source[], value: string) => sources.find((source) => source.id === value)?.note;
+  return useMemo(() => voiceChoices(catalogs, draft, SPEECH_LANGUAGES), [catalogs, draft]);
+}
+
+/** The sources of a slot. With `keysInPlace`, a provider that only lacks its key can be chosen, and asks for it below. */
+function SlotSource({ slot, draft, sources, keysInPlace, t }: { slot: "stt" | "tts"; draft: Settings; sources: Source[]; keysInPlace: boolean; t: HostTranslate }) {
+  const offered = keysInPlace ? sources.map((source) => keyless(source.note) ? { ...source, disabled: false } : source) : sources;
+  const note = sourceNote(sources, draft[slot].catalog);
+  const provider = keysInPlace && keyless(note) ? sources.find((source) => source.id === draft[slot].catalog) : null;
+  return <>
+    <label>{t("voice.source")}<SourceSelect id={slot + "-source"} value={draft[slot].catalog} sources={offered} onChange={(catalog) => edit({ [slot]: { catalog } })} t={t} /></label>
+    <SlotNote id={slot + "-source-note"} note={note} t={t} />
+    {provider && <ProviderKey provider={provider.id} name={provider.name ?? provider.id} t={t} />}
+  </>;
+}
+
+/** Where speech is transcribed: source, model, language. */
+export function TranscriptionChoices({ draft, keysInPlace = false }: { draft: Settings; keysInPlace?: boolean }) {
+  const t = hostTranslator();
+  const choices = useChoices(draft);
+  return <>
+    <SlotSource slot="stt" draft={draft} sources={choices.stt.sources} keysInPlace={keysInPlace} t={t} />
+    <label>{t("voice.model")}<ModelSelect id="stt-model" value={draft.stt.model} options={choices.stt.options} onChange={(model) => edit({ stt: { model } })} t={t} /></label>
+    <SlotNote id="stt-model-note" note={chosen(choices.stt.options, draft.stt.model)} t={t} />
+    <label>{t("voice.language")}
+      <NativeSelect id="stt-language" value={draft.stt.language ?? ""} onChange={(event) => edit({ stt: { language: event.target.value || null } })}>
+        <option value="">{t("voice.language.detect")}</option>
+        {choices.stt.languages.map((tag: string) => <option key={tag} value={tag}>{languageName(tag)}</option>)}
+      </NativeSelect>
+    </label>
+  </>;
+}
+
+/** How replies sound: source, model, voice, speed. */
+export function SpeechChoices({ draft, keysInPlace = false }: { draft: Settings; keysInPlace?: boolean }) {
+  const t = hostTranslator();
+  const choices = useChoices(draft);
   const speed = choices.tts.speed;
+  return <>
+    <SlotSource slot="tts" draft={draft} sources={choices.tts.sources} keysInPlace={keysInPlace} t={t} />
+    <label>{t("voice.model")}<ModelSelect id="tts-model" value={draft.tts.model} options={choices.tts.options} onChange={(model) => edit({ tts: { model } })} t={t} /></label>
+    <SlotNote id="tts-model-note" note={chosen(choices.tts.options, draft.tts.model)} t={t} />
+    {choices.tts.voices.length ? (
+      <label>{t("voice.voice")}
+        <NativeSelect id="tts-voice" value={draft.tts.voice ?? ""} onChange={(event) => edit({ tts: { voice: event.target.value || null } })}>
+          <option value="">{t("voice.voice.first")}</option>
+          {choices.tts.voices.map((voice: { id: string; name: string | null; languages: string[] }) => <option key={voice.id} value={voice.id}>{voice.name ?? voice.id}{voice.languages.length ? " · " + voice.languages.map(languageName).join(", ") : ""}</option>)}
+        </NativeSelect>
+      </label>
+    ) : <SlotNote id="tts-voice-note" note={choices.tts.voiceNote} t={t} />}
+    {speed ? (
+      <label>{t("voice.speed")} <output id="tts-speed-value">{draft.tts.speed.toFixed(2)}×</output>
+        <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
+      </label>
+    ) : null}
+  </>;
+}
+
+function TurnChoices({ draft, t }: { draft: Settings; t: HostTranslate }) {
+  const choices = useChoices(draft);
   const patience: [Settings["patience"], HostMessageKey][] = [["fast", "voice.patience.fast"], ["normal", "voice.patience.normal"], ["calm", "voice.patience.calm"]];
+  return <>
+    <label>{t("voice.patience")}
+      <NativeSelect id="voice-patience" value={draft.patience} onChange={(event) => edit({ patience: event.target.value as Settings["patience"] })}>
+        {patience.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
+      </NativeSelect>
+    </label>
+    <label>{t("voice.endOfTurn")}
+      <NativeSelect id="voice-end-of-turn" value={draft.end_of_turn} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
+        <option value="silence">{t("voice.endOfTurn.silence")}</option>
+        <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn && draft.end_of_turn !== "smart-turn"}>{t("voice.endOfTurn.smart")}</option>
+      </NativeSelect>
+    </label>
+    <SlotNote id="end-of-turn-note" note={choices.endOfTurn.note} t={t} />
+  </>;
+}
+
+function VoiceChoices({ draft, t }: { draft: Settings; t: HostTranslate }) {
   return (
     <>
-      <fieldset className="voice-stage">
-        <legend>{t("voice.stt")}</legend>
-        <label>{t("voice.source")}<SourceSelect id="stt-source" value={draft.stt.catalog} sources={choices.stt.sources} onChange={(catalog) => edit({ stt: { catalog } })} t={t} /></label>
-        <SlotNote id="stt-source-note" note={sourceNote(choices.stt.sources, draft.stt.catalog)} t={t} />
-        <label>{t("voice.model")}<ModelSelect id="stt-model" value={draft.stt.model} options={choices.stt.options} onChange={(model) => edit({ stt: { model } })} t={t} /></label>
-        <SlotNote id="stt-model-note" note={chosen(choices.stt.options, draft.stt.model)} t={t} />
-        <label>{t("voice.language")}
-          <NativeSelect id="stt-language" value={draft.stt.language ?? ""} onChange={(event) => edit({ stt: { language: event.target.value || null } })}>
-            <option value="">{t("voice.language.detect")}</option>
-            {choices.stt.languages.map((tag: string) => <option key={tag} value={tag}>{languageName(tag)}</option>)}
-          </NativeSelect>
-        </label>
-      </fieldset>
-      <fieldset className="voice-stage">
-        <legend>{t("voice.tts")}</legend>
-        <label>{t("voice.source")}<SourceSelect id="tts-source" value={draft.tts.catalog} sources={choices.tts.sources} onChange={(catalog) => edit({ tts: { catalog } })} t={t} /></label>
-        <SlotNote id="tts-source-note" note={sourceNote(choices.tts.sources, draft.tts.catalog)} t={t} />
-        <label>{t("voice.model")}<ModelSelect id="tts-model" value={draft.tts.model} options={choices.tts.options} onChange={(model) => edit({ tts: { model } })} t={t} /></label>
-        <SlotNote id="tts-model-note" note={chosen(choices.tts.options, draft.tts.model)} t={t} />
-        {choices.tts.voices.length ? (
-          <label>{t("voice.voice")}
-            <NativeSelect id="tts-voice" value={draft.tts.voice ?? ""} onChange={(event) => edit({ tts: { voice: event.target.value || null } })}>
-              <option value="">{t("voice.voice.first")}</option>
-              {choices.tts.voices.map((voice: { id: string; name: string | null; languages: string[] }) => <option key={voice.id} value={voice.id}>{voice.name ?? voice.id}{voice.languages.length ? " · " + voice.languages.map(languageName).join(", ") : ""}</option>)}
-            </NativeSelect>
-          </label>
-        ) : <SlotNote id="tts-voice-note" note={choices.tts.voiceNote} t={t} />}
-        {speed ? (
-          <label>{t("voice.speed")} <output id="tts-speed-value">{draft.tts.speed.toFixed(2)}×</output>
-            <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
-          </label>
-        ) : null}
-      </fieldset>
-      <fieldset className="voice-stage">
-        <legend>{t("voice.turns")}</legend>
-        <label>{t("voice.patience")}
-          <NativeSelect id="voice-patience" value={draft.patience} onChange={(event) => edit({ patience: event.target.value as Settings["patience"] })}>
-            {patience.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
-          </NativeSelect>
-        </label>
-        <label>{t("voice.endOfTurn")}
-          <NativeSelect id="voice-end-of-turn" value={draft.end_of_turn} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
-            <option value="silence">{t("voice.endOfTurn.silence")}</option>
-            <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn && draft.end_of_turn !== "smart-turn"}>{t("voice.endOfTurn.smart")}</option>
-          </NativeSelect>
-        </label>
-        <SlotNote id="end-of-turn-note" note={choices.endOfTurn.note} t={t} />
-      </fieldset>
+      <fieldset className="voice-stage"><legend>{t("voice.stt")}</legend><TranscriptionChoices draft={draft} /></fieldset>
+      <fieldset className="voice-stage"><legend>{t("voice.tts")}</legend><SpeechChoices draft={draft} /></fieldset>
+      <fieldset className="voice-stage"><legend>{t("voice.turns")}</legend><TurnChoices draft={draft} t={t} /></fieldset>
     </>
   );
 }

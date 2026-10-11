@@ -5,6 +5,7 @@ import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
 import type { SessionFacts } from "../../state/room-session-state.js";
+import { markSetUp } from "../../test/onboarding";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -37,6 +38,7 @@ const rowOf = (title: string) => [...document.querySelectorAll(".conversation-si
 let selectParticipant: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   localStorage.clear();
+  markSetUp();
   selectParticipant = vi.fn();
   window.sidevoiceActions = { selectParticipant, cancelInput: vi.fn().mockResolvedValue(undefined), closeParticipant: vi.fn() } as unknown as typeof window.sidevoiceActions;
 });

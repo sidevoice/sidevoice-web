@@ -7,6 +7,7 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
+import {tryTranscription,tryVoice} from './voice-trial.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
@@ -56,6 +57,7 @@ const VOICE_FAILURES={
 function voiceErrorText(error){
  const code=failureCode(error,''),t=hostTranslator();
  if(code==='storage-blocked'||code==='SecurityError')return t('storage.blocked');
+ if(/^trial-[a-z-]+$/.test(code))return t('wizard.trial.'+code.slice(6));
  const text=VOICE_FAILURES[code]?.()||(/^[A-Z][A-Za-z]*Error$/.test(code)?t('voice.error.browser',{name:code}):'La voz de la llamada falló'+(code?' ('+code+')':'')+'.');
  return error?.detail?text+' '+String(error.detail):text;
 }
@@ -1296,6 +1298,23 @@ async function saveVoiceSettings(){
  if(host)await host.setSettings(draft);
  writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
 }
+// A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
+// one, since it would take that call's voice. Settings that work are this device's from then on.
+let voiceTry=null;
+async function tryVoiceSettings(task,{text='',language=null}={}){
+ if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
+ voiceTry?.abort();const abort=voiceTry=new AbortController();
+ const settings=state.voiceDraft||state.voiceSettings;
+ try{
+  const host=await voiceHost();
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal})}
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal}),{});
+  writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings});
+  return result;
+ }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ finally{if(voiceTry===abort)voiceTry=null}
+}
+function cancelVoiceTry(){voiceTry?.abort()}
 // A key changes what a provider lists: its catalogue is read again with it.
 async function saveProviderKey(provider,key){
  let models;
@@ -1363,6 +1382,8 @@ window.sidevoiceActions={
   }
   await refresh();await refreshPeople();await refreshHistory()
  },
+ tryVoiceSettings,
+ cancelVoiceTry,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,

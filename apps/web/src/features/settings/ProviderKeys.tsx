@@ -13,7 +13,8 @@ function keyError(t: HostTranslate, error: unknown) {
   return code ? t("keys.failed", { code }) : (error as Error | null)?.message || t("keys.failedPlain");
 }
 
-function ProviderKey({ provider, name, t }: { provider: string; name: string; t: HostTranslate }) {
+/** One provider's key: kept or not, typed and saved through the engine's host, removed. */
+export function ProviderKey({ provider, name, t }: { provider: string; name: string; t: HostTranslate }) {
   const kept = useRoomStore((state) => state.facts.providerKeys[provider]);
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
