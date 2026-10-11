@@ -210,3 +210,9 @@
 .voice-attention-list li > span { display: grid; gap: 2px; font-size: var(--sv-font-sm); }
 .voice-attention-list li > span > span { color: var(--sv-text-muted); }
 .voice-attention-list .ui-button { justify-self: start; }
+
+/* Over the bicho's backdrop (dark or light, whatever its seed rolled) the tile's words sit on a frosted surface of the
+ * theme, so they read on any of them: the conversation's name on a phone, the voice models, the agent's badge. */
+.stage-name { padding: var(--sv-space-1-5) var(--sv-space-3); border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }

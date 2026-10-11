@@ -33,13 +33,16 @@
 .sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
 .sidebar-group-label { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-1); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
 .sidebar-group-label span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.sidebar-rows { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
+.sidebar-rows { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
 .sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; text-align: center; color: var(--sv-text-muted); }
 
-/* A row: the agent with its dot, the title, the harness and the state in words, what is unread, and its options. */
-.sidebar-rows .participant-row { position: relative; display: flex; align-items: center; min-width: 0; border-radius: var(--sv-radius-md); }
-.sidebar-rows .participant-row[data-selected] { --dot-ring: var(--sv-accent-soft); background: var(--sv-accent-soft); }
-.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: var(--sv-space-1-5) var(--sv-space-2); border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* A conversation is a card, as the avatar lab draws them: its bicho on its own tint with its dot, the title, the harness
+ * and the state in words, what is unread, and its options; the one on the stage edged in the accent. */
+.sidebar-rows .participant-row { --dot-ring: var(--sv-surface); position: relative; display: flex; align-items: center; min-width: 0;
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); box-shadow: var(--sv-shadow-xs);
+  transition: border-color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease); }
+.sidebar-rows .participant-row[data-selected] { --dot-ring: var(--sv-accent-soft); border-color: color-mix(in srgb, var(--sv-accent) 55%, var(--sv-border)); background: var(--sv-accent-soft); }
+.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-2) var(--sv-space-2); border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sidebar-rows .person:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
 .sidebar-rows .person:disabled { cursor: default; opacity: .6; }
 .sidebar-rows .participant-copy { display: grid; flex: 1; min-width: 0; }
@@ -55,7 +58,7 @@
 .sidebar-rows .participant-more { flex: none; margin-inline-end: var(--sv-space-1); opacity: 0;
   transition: opacity var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
 .sidebar-rows .participant-row:is(:hover, :focus-within, [data-selected]) .participant-more, .sidebar-rows .participant-more[data-state="open"] { opacity: 1; }
-@media (hover: hover) { .sidebar-rows .participant-row:not([data-selected]):hover { background: var(--sv-hover); } }
+@media (hover: hover) { .sidebar-rows .participant-row:not([data-selected]):hover { border-color: var(--sv-border-strong); } }
 @media (hover: none), (pointer: coarse) { .sidebar-rows .participant-more { opacity: 1; } }
 
 /* The rail: the same avatars in a narrow column, the machines told apart by a line. */
@@ -132,4 +135,10 @@
   .room-shell .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
   .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }
   .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand span { display: none; }
+}
+
+/* The rail keeps the cards' bichos, without their frames. */
+@media (min-width: 900px) {
+  .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row { border-color: transparent; background: none; box-shadow: none; }
+  .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row[data-selected] { background: var(--sv-accent-soft); }
 }
