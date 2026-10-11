@@ -56,6 +56,8 @@ export interface SessionFacts {
  voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string};
  /** Whether this device's engine can take a model off it (`uninstallVoiceModel`). */
  modelsRemovable: boolean;
+ /** How long a downloaded model not used is kept, in days; null: forever (model-housekeeping.js). */
+ deleteUnusedDays: number | null;
  providerKeys: Record<string, boolean | null>;
  /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
  storageBlocked: boolean;

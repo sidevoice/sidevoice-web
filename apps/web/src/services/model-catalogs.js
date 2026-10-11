@@ -7,8 +7,9 @@
  * @typedef {{reason?: {code: string, params?: Record<string, number>}, stale: boolean, detail?: string}} CatalogStatus
  *   How a catalogue stands, as the engine says: why it is not current (absent when it is), whether its models are the
  *   last kept, and what a provider said when it last refused.
- * @typedef {import('@sidevoice/engine').ModelInfo & Partial<import('@sidevoice/engine').LocalModelInfo>} CatalogModel
- *   A model as its catalogue lists it; a local one also has its family and builds.
+ * @typedef {import('@sidevoice/engine').ModelInfo & Partial<import('@sidevoice/engine').LocalModelInfo> & {lastUsedAt?: number | null}} CatalogModel
+ *   A model as its catalogue lists it; a local one also has its family and builds, and — where the engine keeps it —
+ *   when it was last loaded (`lastUsedAt`, ms since the epoch; absent where the engine does not say).
  * @typedef {{id: string, name: string | null, status: CatalogStatus, models: CatalogModel[]}} CatalogView
  *   One catalogue: `local` first, then each remote provider's, its id the provider's.
  * @typedef {{fraction: number | null, done: number | null, total: number | null}} InstallProgress How far an install has

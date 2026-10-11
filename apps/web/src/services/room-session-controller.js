@@ -12,6 +12,7 @@ import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-langua
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
+import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
@@ -1342,7 +1343,8 @@ async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
  try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)});
   // A model chosen while it was not here yet is put in use once it is.
-  if(state.voiceDraft)void applyVoiceSettings()}
+  if(state.voiceDraft)void applyVoiceSettings();
+  void deleteUnusedModels(models,catalogs)}
  catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
 }
 // Settings apply as they change (there is no Save): the draft is what was chosen, and what of it is ready is put in use
@@ -1406,6 +1408,18 @@ async function installVoiceModel(task){
  finally{if(voiceInstall===abort)voiceInstall=null}
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
+// Models not used for as long as the person chose (model-housekeeping.js), deleted where the engine can: none in use,
+// none the engine says nothing about; the catalogues read again once one went.
+async function deleteUnusedModels(models,catalogs){
+ if(typeof models.uninstall!=='function')return;
+ const stale=staleModels(catalogs,state.voiceSettings,state.deleteUnusedDays,Date.now());if(!stale.length)return;
+ for(const model of stale)await models.uninstall(model).catch(()=>undefined);
+ await loadVoiceCatalogue();
+}
+async function setDeleteUnusedModels(days){
+ writeDeleteUnused(pageStorage(),days);roomStore.patch({deleteUnusedDays:readDeleteUnused(pageStorage())});
+ if(state.voiceCatalogue.state==='ready')await deleteUnusedModels(await modelCatalogs(),state.voiceCatalogue.catalogs);
+}
 // A model taken off this device, every build of it, where the engine can (`modelsRemovable`); the catalogues read again.
 // Its code stays on what it throws, for the pane to say a model in use as such.
 async function uninstallVoiceModel(model){
@@ -1447,7 +1461,7 @@ async function saveProviderKey(provider,key){
  const catalogs=await models.catalogs().catch(()=>null);
  if(catalogs)roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
-roomStore.patch({voiceSettings:readVoiceSettings(pageStorage())});
+roomStore.patch({voiceSettings:readVoiceSettings(pageStorage()),deleteUnusedDays:readDeleteUnused(pageStorage())});
 
 $('settings-open').onclick=()=>{try{
  // Every opening reads each paired machine's agents again.
@@ -1528,6 +1542,7 @@ window.sidevoiceActions={
  installVoiceModel,
  cancelVoiceInstall,
  uninstallVoiceModel,
+ setDeleteUnusedModels,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,

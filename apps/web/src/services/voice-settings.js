@@ -217,6 +217,16 @@ export function endOfTurnModels(catalogs) {
 }
 
 /**
+ * The voice activity detector every call uses on this device (voice-source.ts chooses it the same way): the local
+ * catalogue's Silero VAD when it runs here, else another `vad` model that does, or none. Never a person's choice.
+ * @param {CatalogView[]} catalogs
+ */
+export function vadModel(catalogs) {
+  const runsHere = offered(catalogs.find((catalog) => catalog.id === LOCAL_CATALOG), 'vad').filter(runs);
+  return runsHere.find((model) => model.family === 'silero-vad') ?? runsHere[0] ?? null;
+}
+
+/**
  * `settings` as this device can take them: the smart end of turn where no end-of-turn model runs here is silence. With
  * no catalogues read yet, as they are.
  * @param {DeviceVoiceSettings} settings

@@ -115,3 +115,11 @@ test("a model chosen before it is here waits: the one in use stays, the rest of 
   // The same model takes its other changes at once.
   expect(readyVoiceSettings({ ...saved, stt: { ...saved.stt, language: "es" } }, saved, []).stt.language).toBe("es");
 });
+
+test("the voice detector every call uses is the local Silero VAD where it runs, else another VAD that does", async () => {
+  const { vadModel } = await import("./voice-settings.js");
+  const vad = (id: string, family: string, runs = true) => ({ id, family, capabilities: ["vad"], builds: [{ id: id + "-b", available: runs, installed: true }] });
+  const catalogs = (models: unknown[]) => [{ id: "local", name: null, status: { stale: false }, models }] as never;
+  expect(vadModel(catalogs([vad("other-vad", "other"), vad("silero-vad", "silero-vad")]))?.id).toBe("silero-vad");
+  expect(vadModel(catalogs([vad("other-vad", "other"), vad("silero-vad", "silero-vad", false)]))?.id).toBe("other-vad");
+});

@@ -13,7 +13,7 @@ import { MachineList, MachineNav } from "../room/MachineList";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
-import { DownloadedModels } from "./DownloadedModels";
+import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
@@ -105,7 +105,7 @@ function AdvancedSettings({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
   return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
-    {draft && <Group title={t("settings.advanced.models")}><IdleUnloadChoice draft={draft} /><DownloadedModels /></Group>}
+    {draft && <Group title={t("settings.advanced.models")}><IdleUnloadChoice draft={draft} /><DeleteUnusedChoice /><DownloadedModels /></Group>}
     <Group title={t("settings.general.device")}>
       <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
         <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>

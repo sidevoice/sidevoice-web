@@ -69,17 +69,22 @@ test("the thinking sound and the screen are this device's, applied at once", () 
   localStorage.removeItem("sidevoice.call-preferences");
 });
 
-test("Advanced lists the models on this device with their size; Delete asks, says what uses one, and takes it off", async () => {
+test("Advanced lists the models in use first, by what they are for, then those not in use, which alone can be deleted", async () => {
   const store = open("whisper-base");
   act(() => store.patch({ modelsRemovable: true }));
   const uninstall = vi.fn(async () => {});
   window.sidevoiceActions = { ...window.sidevoiceActions, uninstallVoiceModel: uninstall } as unknown as SidevoiceActions;
   fireEvent.click(document.getElementById("settings-advanced")!);
-  const rows = [...document.querySelectorAll("#downloaded-models .downloaded-model")];
-  expect(rows.map((row) => row.getAttribute("data-model"))).toEqual(["whisper-base", "kokoro-82m-v1.0"]);
-  expect(rows[0]).toHaveTextContent("63 MB");
+  const purposes = [...document.querySelectorAll("#downloaded-models .downloaded-purpose")];
+  expect(purposes.map((group) => [group.getAttribute("data-purpose"), group.querySelector(".downloaded-model")?.getAttribute("data-model")]))
+    .toEqual([["transcription", "whisper-base"], ["voice", "kokoro-82m-v1.0"]]);
+  expect(purposes[0]).toHaveTextContent("63 MB");
+  // In use: not offered for deletion.
+  expect(screen.queryByRole("button", { name: "Delete whisper-base from this device" })).toBeNull();
+  act(() => store.patch({ voiceDraft: { ...store.getState().facts.voiceDraft!, stt: { catalog: "openai", model: "whisper-1", language: null } } }));
+  expect(document.querySelector("#downloaded-unused")?.parentElement).toHaveTextContent("whisper-base");
   fireEvent.click(screen.getByRole("button", { name: "Delete whisper-base from this device" }));
-  expect(screen.getByRole("group", { name: "Delete whisper-base from this device" })).toHaveTextContent("Transcription use whisper-base.");
+  expect(screen.getByRole("group", { name: "Delete whisper-base from this device" })).toHaveTextContent("whisper-base");
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
   expect(uninstall).toHaveBeenCalledWith("whisper-base");
 });

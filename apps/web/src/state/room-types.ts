@@ -198,6 +198,8 @@ export interface SidevoiceActions {
   /** Cancels that install: nothing of it is kept. */
   cancelVoiceInstall?(): void;
   uninstallVoiceModel?(model: string): Promise<void>;
+  /** Delete downloaded models not used for `days` (null: never), now and whenever the catalogues are read again. */
+  setDeleteUnusedModels?(days: number | null): Promise<void>;
   /** Stops the try in progress, which then rejects `trial-cancelled`. */
   cancelVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */

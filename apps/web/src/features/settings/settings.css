@@ -84,6 +84,11 @@
 .downloaded-model-copy { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
 .downloaded-model-name { font-size: var(--sv-font-sm); overflow-wrap: anywhere; }
 .downloaded-model-size { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.downloaded-group { display: grid; gap: var(--sv-space-2); }
+.downloaded-group + .downloaded-group { margin-top: var(--sv-space-3); }
+.downloaded-group-title { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
+.downloaded-purpose { display: grid; gap: var(--sv-space-1); }
+.downloaded-purpose-label { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
 .downloaded-model .provider-remove { margin: 0; }
 .downloaded-model-error { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-danger); }
 
