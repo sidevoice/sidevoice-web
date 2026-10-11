@@ -233,8 +233,17 @@ test('Microphone preference can be toggled before joining',()=>{
 test('The call socket follows the page scheme and host',()=>{
  const s=setup();assert.equal(s.run('roomSocketUrl()'),'wss://room.example/api/presentation/ws');
 });
+test('The screen is left to the device unless keeping it on was chosen',async()=>{
+ const s=setup();let requests=0;
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,0);
+});
 test('Wake lock is released if hangup wins the pending request',async()=>{
  const s=setup();let grant,requests=0,released=0;
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:()=>{requests++;return new Promise(resolve=>grant=resolve)}}};
  s.run('ws={}');
  const pending=s.run('keepScreenAwake()');
@@ -247,6 +256,8 @@ test('Wake lock is released if hangup wins the pending request',async()=>{
 });
 test('The tap that starts the call asks for the lock, before there is a socket',async()=>{
  const s=setup();let requests=0;
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
  s.run('connecting=true');
  await s.run('keepScreenAwake()');
@@ -255,6 +266,8 @@ test('The tap that starts the call asks for the lock, before there is a socket',
 });
 test('A refused lock shows red and says so, instead of failing silently',async()=>{
  const s=setup();
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:async()=>{throw Error('NotAllowedError')}}};
  s.run('ws={}');
  await s.run('keepScreenAwake()');
@@ -263,6 +276,8 @@ test('A refused lock shows red and says so, instead of failing silently',async()
 });
 test('A lock the system takes back is asked for again while the call is up, and not after it ends',async()=>{
  const s=setup();let requests=0,release=null;const scheduled=[];
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.setTimeout=fn=>{scheduled.push(fn);return 0};
  s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener:(name,fn)=>{if(name==='release')release=fn}}}}};
  s.run('ws={}');
