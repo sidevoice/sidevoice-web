@@ -1,0 +1,16 @@
+/* The updates' entry and its panel (UpdatesEntry): quiet, an accent count, never the voice's colour. */
+.updates-entry { position: relative; justify-content: flex-start; gap: var(--sv-space-2); }
+.updates-badge { margin-inline-start: auto; }
+.updates-entry--icon .updates-count { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
+  background: var(--sv-accent); color: var(--sv-on-accent); font-size: 10px; line-height: 16px; font-weight: var(--sv-weight-semibold); text-align: center; }
+.updates-panel { display: grid; gap: var(--sv-space-2); width: min(340px, calc(100vw - 32px)); }
+.updates-panel h3 { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.updates-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
+.update-row { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.update-row-copy { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); font-size: var(--sv-font-sm); }
+.update-row-note { flex-basis: 100%; color: var(--sv-text-muted); }
+.update-row-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
+.updates-none { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+/* A phone's chevron, when the updates live in its panel. */
+.conversations-toggle[data-updates]::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-bg); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
+.conversations-toggle { position: relative; }

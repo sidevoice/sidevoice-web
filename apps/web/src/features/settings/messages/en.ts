@@ -576,6 +576,22 @@ export const en = {
   "hosts.thisComputerTag": "This computer",
   "hosts.stoppedNote": "Sidevoice is stopped on this computer. Start it here, or it starts again when you next sign in.",
   "hosts.stoppedNoLoginNote": "Sidevoice is stopped on this computer and does not start when you sign in. Start it here when you need it.",
+  // What wants updating (UpdatesEntry).
+  "updates.title": "Updates",
+  "updates.entry": "Updates, {n} waiting",
+  "updates.web": "A new version of Sidevoice is ready",
+  "updates.app": "Sidevoice {version} is ready",
+  "updates.machine": "{machine} needs an update",
+  "updates.required": "Required",
+  "updates.afterCall": "Available when the call ends",
+  "updates.later": "Later",
+  "updates.reload": "Reload",
+  "updates.reloadNamed": "Reload Sidevoice",
+  "updates.restart": "Restart",
+  "updates.restartNamed": "Restart Sidevoice to update",
+  "updates.open": "Open",
+  "updates.openNamed": "Open {machine} in Machines",
+  "updates.none": "Everything is up to date.",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

@@ -15,6 +15,7 @@ import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
 import { openSettings, usePendingAgentHosts } from "./RoomHeader";
 import { hostTranslator } from "../settings/host-i18n";
+import { UpdatesEntry, useUpdatesEntry } from "../updates/UpdatesEntry";
 import "./room.css";
 
 /** How a conversation's harness is reached, when that matters; the harness itself is its mark, never its name. */
@@ -45,6 +46,7 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
+  const updatesHere = useUpdatesEntry();
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
   const rail = collapsed || crowded;
   const modal = narrow && open;
@@ -134,7 +136,8 @@ export function ConversationSidebar() {
         </div>
         {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
             opens upward from here. */}
-        {!narrow && <div className="sidebar-foot"><SidebarSettings rail={rail} onOpen={close} /></div>}
+        {!narrow && <div className="sidebar-foot"><UpdatesEntry compact={rail} /><SidebarSettings rail={rail} onOpen={close} /></div>}
+        {narrow && updatesHere === "panel" && <div className="sidebar-foot sidebar-foot--updates"><UpdatesEntry side="top" /></div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>

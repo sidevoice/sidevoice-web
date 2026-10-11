@@ -29,6 +29,8 @@ export interface SessionFacts {
   settingsSection: string;
   /** When a setting was last kept (there is no Save: each applies as it changes), for a moment's "Saved". */
   settingsSavedAt: number;
+  /** A newer build of this page the room serves, held while a call is on (the updates' list says so). */
+  webUpdate: string | null;
   /** The machine whose page Settings → Machines shows (MachineNav); null is the first. */
   machinesView: { machine: string | null };
  localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;

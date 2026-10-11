@@ -167,6 +167,7 @@ export interface SidevoiceActions {
   /** A key tried with the provider and kept only when it takes it; a refusal throws its `code` and `detail`. */
   connectProviderKey?(provider: string, key: string): Promise<void>;
   interfaceLanguage?(): string;
+  reloadToUpdate?(): void;
   setInterfaceLanguage?(value: string): void;
   /** Asks a provider again about its key, and reads the catalogues with what it said. */
   testProviderKey?(provider: string): Promise<void>;

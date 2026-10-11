@@ -1,6 +1,7 @@
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
-import { useCallLayout, useMedia } from "../../state/call-layout";
+import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { UpdatesEntry, useUpdatesEntry, useUpdatesWaiting } from "../updates/UpdatesEntry";
 
 /** A phone wide enough for four of the other conversations in its header. */
 const ROOMY_PHONE_QUERY = "(min-width: 390px)";
@@ -21,11 +22,14 @@ import "./room.css";
 export function RoomHeader() {
   const t = callTranslator();
   const listDown = useCallLayout((state) => state.conversationsOpen);
+  const narrow = useMedia(NARROW_QUERY);
+  const updatesHere = useUpdatesEntry();
   return (
     <>
       <header className="room-header" data-list-down={listDown || undefined}>
         <h1 className="brand"><SidevoiceMark size={22} /> <span className="brand-name">Sidevoice</span></h1>
         <HeaderConversations t={t} />
+        {narrow && updatesHere === "header" && <UpdatesEntry compact side="bottom" />}
         <SettingsButton t={t} />
       </header>
     </>
@@ -41,9 +45,13 @@ function ConversationsToggle({ t, rest }: { t: CallTranslate; rest: number }) {
   const openConversations = useCallLayout((state) => state.openConversations);
   const closeConversations = useCallLayout((state) => state.closeConversations);
   const label = t("header.allConversations", { n: count });
+  // Where the updates live in the dropped panel (VARIANTS updates-entry "panel"), the chevron wears their dot.
+  const waiting = useUpdatesWaiting();
+  const updatesHere = useUpdatesEntry();
+  const updates = waiting && updatesHere === "panel";
   return (
     <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} title={label}
-      aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
+      aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" data-updates={updates || undefined} onClick={open ? closeConversations : openConversations}>
       {rest > 0 && <span className="conversations-rest" aria-hidden="true">+{rest}</span>}<ChevronIcon size={18} />
     </Button>
   );

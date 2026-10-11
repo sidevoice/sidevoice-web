@@ -388,7 +388,8 @@ let refreshAsked=0,refreshApplied=0;
 function followServedBuild(served){
  const page=window.sidevoiceBuildId||'dev';
  if(!served||page==='dev'||served===page)return;
- if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';return}
+ // In a call it waits, said in the updates' list too (webUpdate), and loads after the hang-up.
+ if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
  try{if(sessionStorage.getItem('sidevoice.reloadedFor')===served)return;sessionStorage.setItem('sidevoice.reloadedFor',served)}catch{}
  const query=new URLSearchParams(location.search);query.set('v',served);
  location.replace(location.pathname+'?'+query);
@@ -1451,6 +1452,11 @@ window.sidevoiceActions={
  connectProviderKey,
  // The interface's language, as the first-run setup asks it: '' is Automatic.
  interfaceLanguage:()=>storedPreferences().ui_language||'',
+ // The newer build the room serves, loaded now (the updates' Reload): out of a call only.
+ reloadToUpdate(){
+  const served=state.webUpdate;if(!served||state.ws||state.connecting||state.reconnecting)return;
+  const query=new URLSearchParams(location.search);query.set('v',served);location.replace(location.pathname+'?'+query);
+ },
  setInterfaceLanguage(value){$('ui-language').value=value||'';saveLanguage()},
  testProviderKey,
  loadVoiceCatalogue,
