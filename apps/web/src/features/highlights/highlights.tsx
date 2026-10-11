@@ -55,7 +55,7 @@ function useCandidates(): Highlight[] {
   const dots = useWhatsNewPlace() === "dots";
   const features = useWhatsNew().items;
   const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
-  const agents = Object.entries(hostAgents).filter(([fp, listing]) => active.has(fp) && listing.status === "ready")
+  const agents = Object.entries(hostAgents).filter(([fp, listing]) => active.has(fp) && !!listing.value)
     .flatMap(([fp, listing]) => (listing.value?.agents ?? []).filter(actionableAgent).map((agent) => ({ id: `agent:${fp}:${agent.id}`, section: "machines", machine: fp })));
   return [...agents, ...(dots ? features.map((feature) => ({ id: `feature:${feature.id}`, section: feature.section })) : [])];
 }
@@ -98,6 +98,8 @@ export function NewMark({ id }: { id: string }) {
   const [showing, setShowing] = useState(isNew);
   if (isNew && !showing) setShowing(true);
   const ref = useRef<HTMLSpanElement>(null);
+  // Seen by looking, it stays in view until this view goes; cleared by its ×, it goes at once.
+  const dismiss = () => { clear(); setShowing(false); };
   const clear = () => {
     markSeen(id);
     // A setting from What's new, seen here, is seen there too.
@@ -117,6 +119,6 @@ export function NewMark({ id }: { id: string }) {
   if (!showing) return null;
   return <span className="new-mark" ref={ref} data-highlight={id}>
     <Badge tone="accent">{t("highlights.new")}</Badge>
-    {dismissable && isNew && <button type="button" className="new-mark-dismiss" aria-label={t("highlights.dismiss")} title={t("highlights.dismiss")} onClick={clear}><CloseIcon size={12} /></button>}
+    {dismissable && isNew && <button type="button" className="new-mark-dismiss" aria-label={t("highlights.dismiss")} title={t("highlights.dismiss")} onClick={dismiss}><CloseIcon size={12} /></button>}
   </span>;
 }

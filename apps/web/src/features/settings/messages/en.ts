@@ -118,6 +118,7 @@ export const en = {
   "hosts.devices.codeFailed": "Could not create a pairing code.",
   "hosts.devices.roomFailed": "Could not connect this machine to the room.",
   "hosts.devices.unavailable": "Devices cannot be loaded while this machine is unavailable.",
+  "hosts.devices.loadFailed": "Couldn’t read this machine’s devices.",
   "noMachine.title": "No machine connected",
   "noMachine.body": "Sidevoice talks to the machine where your agents run. Connect one to get started.",
   "pair.deviceNameBrowser": "{browser} on {os}",

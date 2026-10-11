@@ -120,6 +120,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.devices.codeFailed": "No se pudo crear el código de emparejamiento.",
   "hosts.devices.roomFailed": "No se pudo conectar esta máquina a la sala.",
   "hosts.devices.unavailable": "No se pueden cargar los dispositivos mientras esta máquina no esté disponible.",
+  "hosts.devices.loadFailed": "No se pudieron leer los dispositivos de esta máquina.",
   "noMachine.title": "Ninguna máquina conectada",
   "noMachine.body": "Sidevoice habla con la máquina donde se ejecutan tus agentes. Conecta una para empezar.",
   "pair.deviceNameBrowser": "{browser} en {os}",
