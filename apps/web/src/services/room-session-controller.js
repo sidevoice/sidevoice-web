@@ -1369,9 +1369,11 @@ async function saveVoiceSettings(){
  writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now()});$('settings-error').textContent='';
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
-// one, since it would take that call's voice. Settings that work are this device's from then on.
+// one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
+// whoever shows it (room-types.ts TrialProgress): transcription, that the voice listens and the microphone's level;
+// the voice, the part of `text` sounding, in the page's offsets into it as the room's karaoke has them (`sayingRange`).
 let voiceTry=null;
-async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
+async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress}={}){
  if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
@@ -1379,8 +1381,8 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
   const host=await voiceHost();
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,onTimings})}
-   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings}),{});
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,onTimings,onListening,onLevel})}
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;

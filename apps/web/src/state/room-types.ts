@@ -192,9 +192,9 @@ export interface SidevoiceActions {
   openPairing(): void;
   closePairing(): void;
   /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
-   *  that work become this device's. Rejects with a sentence and the failure's `code`. */
-  /** A try's result, with how long each phase took (voice-trial.js's TrialTimings). */
-  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean }): Promise<{ text?: string; timings?: TrialTimings | null }>;
+   *  that work become this device's (`keep`). Resolves with the words heard and how long each phase took (voice-trial.js's
+   *  TrialTimings); rejects with a sentence and the failure's `code`. What it tells while it runs: TrialProgress. */
+  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean } & TrialProgress): Promise<{ text?: string; timings?: TrialTimings | null }>;
   /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
   installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
@@ -217,6 +217,17 @@ export interface SidevoiceActions {
   revokeLocalHostDevice?(id: string): Promise<void>;
   machineDevices?(fp: string): Promise<HostDeviceView[]>;
   revokeMachineDevice?(fp: string, id: string): Promise<void>;
+}
+
+/** What a voice try tells while it runs, for whatever shows it. Transcription: `onListening` once the voice hears the
+ *  microphone (its models loaded, the microphone open), and `onLevel`, the microphone's level from 0 to 1, many times a
+ *  second. The voice: `onProgress` from its first sound on, the part of the sentence sounding now, in offsets into that
+ *  text as JavaScript indexes it; between parts `from` and `to` meet at the end of what was heard, and the first sound
+ *  is `{from: 0, to: 0}`. */
+export interface TrialProgress {
+  onListening?(): void;
+  onLevel?(level: number): void;
+  onProgress?(range: KaraokeRange): void;
 }
 
 /** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the
