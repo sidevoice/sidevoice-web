@@ -1,11 +1,11 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Card";
-import { Dialog } from "../../components/ui/Dialog";
 import "./machines.css";
-import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion, type LocalPairingCode } from "../../services/desktop-host";
+import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -36,7 +36,8 @@ function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTrans
 /* The paired machines, as Settings' own navigation lists them (MachineNav): under Machines a sub-entry per machine —
  * its name and a dot for its state, said in words to a screen reader and in its tooltip — and Add a machine last. The
  * machine chosen has its page in the pane (MachineList): its state, this computer's service (the local one), its
- * agents, its paired devices and pairing another, and forgetting it. Machines itself is the first machine, or, with
+ * agents, the devices paired with it (pairing goes from a device to the machine: Add a machine, and pair-device on
+ * the machine), and forgetting it. Machines itself is the first machine, or, with
  * none, a word and Add. On a phone, whose sections are a strip, the machines come at the pane's head instead. */
 
 /** A machine's state for its dot and its words. */
@@ -134,7 +135,7 @@ function reachText(machine: MachineView, t: HostTranslate) {
 }
 
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
- *  paired with it and pairing another, and forgetting it. */
+ *  paired with it, and forgetting it. */
 function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
@@ -346,17 +347,6 @@ function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
   );
 }
 
-/** A code's time left, by the second; at none, it is gone and another is to be made. */
-function CodeExpiry({ seconds, t, onExpired }: { seconds: number; t: HostTranslate; onExpired(): void }) {
-  const [until] = useState(() => Date.now() + seconds * 1000);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
-  const left = Math.max(0, Math.round((until - now) / 1000));
-  useEffect(() => { if (left === 0) onExpired(); }, [left]); // eslint-disable-line react-hooks/exhaustive-deps
-  const time = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
-  return <p className="muted pair-device-expiry">{t("hosts.devices.codeExpiresIn", { time })}</p>;
-}
-
 function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: string }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
@@ -365,24 +355,15 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [pairing, setPairing] = useState<LocalPairingCode | null>(null);
-  const [pairingFor, setPairingFor] = useState<string | null>(null);
-  const [pairingError, setPairingError] = useState(false);
   const [deviceNote, setDeviceNote] = useState("");
-  const [pairOpen, setPairOpen] = useState(false);
-  // Closed, a code is let go: a new one is made the next time.
-  const closePair = () => { setPairOpen(false); pairingEpoch.current++; setPairing(null); setPairingFor(null); setPairingError(false); };
   const deviceEpoch = useRef(0);
-  const pairingEpoch = useRef(0);
   const bridge = localHostBridge();
   const local = !!machine.local;
-  const canPairDevices = local && typeof bridge?.pairingCode === "function";
   const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
   const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
-  const visiblePairing = usable && pairingFor === pairingKey ? pairing : null;
 
   async function refresh() {
     const epoch = ++deviceEpoch.current;
@@ -395,10 +376,9 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   }
   useEffect(() => {
     deviceEpoch.current++;
-    pairingEpoch.current++;
     setLoading(false);
     setConfirmId(null);
-    setDevices([]);setDevicesFor(null);setPairing(null);setPairingFor(null);setPairingError(false);
+    setDevices([]);setDevicesFor(null);
     setDeviceNote("");
     if (!usable) {
       setError(true);
@@ -421,21 +401,16 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
     catch { if (deviceEpoch.current === epoch && usable) setError(true); }
     finally { if (deviceEpoch.current === epoch) setLoading(false); }
   }
-  async function createCode() {
-    if (!usable || !bridge?.pairingCode) return;
-    const epoch = ++pairingEpoch.current;
-    setPairingError(false);setPairing(null);setPairingFor(null);
-    try { const next = await bridge.pairingCode();if (pairingEpoch.current === epoch && usable) {setPairing(next);setPairingFor(pairingKey)} }
-    catch { if (pairingEpoch.current === epoch && usable) setPairingError(true); }
-  }
   return (
     <div className="host-devices-panel">
       <div className="host-devices-head">
         <h4>{t("hosts.tab.devices")}</h4>
-        {usable && <Button variant="ghost" size="sm" disabled={loading} onClick={() => void refresh()}>{t("hosts.retry")}</Button>}
       </div>
       {usable && loading && <p className="muted" role="status">{t("hosts.working")}</p>}
-      {(!usable || error) && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
+      {/* The list is read once as the page opens; reading it again is offered only when that failed. */}
+      {!usable && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
+      {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.unavailable")}
+        action={<Button size="sm" onClick={() => void refresh()}>{t("hosts.retry")}</Button>} />}
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
       {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t("hosts.devices.empty")}</p>}
       <ul className="host-device-list">
@@ -457,34 +432,6 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           </li>
         ))}
       </ul>
-      {/* Pairing another device is its own small dialog: create the code there, see it and its time left, close. On a
-          remote machine the code is made on the machine itself, and the dialog says how. */}
-      {(canPairDevices || !local) && <section className="pair-another-device">
-        <Button variant="secondary" disabled={local && !usable} onClick={() => setPairOpen(true)}><AddIcon />{t("hosts.devices.pairAnother")}</Button>
-      </section>}
-      <Dialog open={pairOpen} size="sm" titleId={"pair-device-title-" + machine.id} title={t("hosts.devices.pairAnother")} closeable closeLabel={t("hosts.devices.close")}
-        onClose={closePair} footer={<Button variant={visiblePairing ? "primary" : "ghost"} tone={visiblePairing ? undefined : "neutral"} onClick={closePair}>{t(visiblePairing ? "hosts.devices.done" : "hosts.cancel")}</Button>}>
-        {!local ? <div className="pair-device-dialog">
-          <p>{t("hosts.devices.pairOnMachine", { machine: name })}</p>
-          <code className="pair-device-command">npx @sidevoice/uplink pair-device</code>
-        </div> : <div className="pair-device-dialog">
-          {!visiblePairing && <>
-            <p>{t("hosts.devices.pairIntro")}</p>
-            <Button variant="primary" disabled={!usable} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>
-          </>}
-          {usable && pairingError && <p role="alert">{t("hosts.devices.codeFailed")}</p>}
-          {visiblePairing && <div className="local-pairing-code" role="status">
-            <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
-            {/* Selected whole on a tap or a click, so copying it is one gesture: no button of its own. */}
-            <output className="issued-pairing-code" aria-label={t("hosts.devices.codeSelect")}>{visiblePairing.code}</output>
-            <CodeExpiry seconds={visiblePairing.expires_in} t={t} onExpired={() => { setPairing(null); setPairingFor(null); }} />
-          </div>}
-          {/* "Connect this machine to a room" (a local-only machine joined to a room by its address and the room's pairing
-              code, through the desktop bridge's `pairRoom`) was on the machine page: taken out of Settings until the relay
-              ships as a feature. Machines reached through a room keep working; only that form went (the hosts.devices.room*
-              messages remain). */}
-        </div>}
-      </Dialog>
     </div>
   );
 }
