@@ -51,7 +51,7 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
   await openMachines(page, 390, 844);
   const agents = await openAgents(page);
   const foreign = page.locator(".host-agent-row[data-registration='foreign']");
-  await expect(foreign).toContainText("Connected to a different MCP server");
+  await expect(foreign).toContainText("Another ‘sidevoice’ entry");
   await foreign.getByRole("button", { name: "Replace manually" }).click();
   await expect(foreign.getByText("codex mcp remove sidevoice")).toBeVisible();
   await expect(foreign.getByRole("button", { name: "Connect" })).toHaveCount(0);

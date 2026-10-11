@@ -17,13 +17,16 @@ const pairing = {
   paired_at: 1_790_000_000,
 };
 
+// As the connector reports them: what it can do itself (`can`), and the steps by hand (`manual`) for each.
 const foreignCodex = {
   id: "codex", label: "Codex", present: true, version: "1.0", registration: "foreign", connect: "manual", actionable: false,
-  instructions: { command: "codex mcp remove sidevoice", file: "~/.codex/config.toml", snippet: '[mcp_servers.sidevoice]\ncommand = "/opt/sidevoice/bin/connector"' },
+  can: { connect: true, update: true, disconnect: true },
+  manual: { replace: [{ command: "codex mcp remove sidevoice" }, { command: "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio" }] },
 };
 const claude = (connected = false, actionable = true) => ({
   id: "claude", label: "Claude Code", present: true, version: "1.0", registration: connected ? "connected" : "not-connected",
-  connect: "auto", actionable, instructions: { command: "claude mcp add sidevoice" },
+  connect: "auto", actionable, can: { connect: true, update: true, disconnect: true },
+  manual: { connect: [{ command: "claude mcp add sidevoice" }], disconnect: [{ command: "claude mcp remove sidevoice" }] },
 });
 export const listing = ({ connected = false, actionable = true } = {}) => ({
   agents: [foreignCodex, claude(connected, actionable)], scanned_at: "2026-10-02T12:00:00Z",
