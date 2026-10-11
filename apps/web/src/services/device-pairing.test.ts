@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import {
-  base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven, pairingInUse,
-  pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, usingPairing, verifyIdentitySignature,
+  base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven,
+  pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
   privateHost, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
 } from "./device-pairing.js";
@@ -268,54 +268,46 @@ test("a pair answer whose key is not the code's is not kept", async () => {
 const pairing = (fp: string, extra: Partial<Pairing> = {}): Pairing => ({ fp, public_key: "pk-" + fp, host: fp + "-host", urls: [], rv: null,
   device_id: "d-" + fp, token: "t-" + fp, paired_at: 1, ...extra });
 
-test("several pairings, one in use, remembered across reloads", () => {
+test("several pairings, all of them kept across reloads, newest first", () => {
   const saved: Record<string, string> = {};
   const storage = { getItem: (key: string) => saved[key] ?? null, setItem: (key: string, value: string) => { saved[key] = value; } };
-  expect(readPairings(storage)).toEqual({ inUse: null, list: [] });
+  expect(readPairings(storage)).toEqual({ list: [] });
   let book = withPairing(readPairings(storage), pairing("a"));
   book = withPairing(book, pairing("b"));
-  expect(book.inUse).toBe("b");
   expect(book.list.map((p) => p.fp)).toEqual(["b", "a"]);
-  // Paired during a call, the new one waits to be chosen.
-  expect(withPairing(book, pairing("c"), { use: false }).inUse).toBe("b");
   // Pairing the same machine again replaces it, and a revoked one comes back to life that way.
   book = revokedPairing(book, "a");
   expect(book.list.find((p) => p.fp === "a")?.revoked).toBe(true);
   book = withPairing(book, pairing("a", { token: "t-new" }));
   expect(book.list.map((p) => [p.fp, p.token, !!p.revoked])).toEqual([["a", "t-new", false], ["b", "t-b", false]]);
-  book = usingPairing(book, "b");
-  expect(pairingInUse(book)?.fp).toBe("b");
-  expect(usingPairing(book, "nobody")).toBe(book);
   writePairings(storage, book);
   expect(readPairings(storage)).toEqual(book);
-  // Forgetting the one in use hands the use to the newest one left; forgetting the last leaves none.
+  // No machine is "the one in use": nothing of the kind is stored.
+  expect(JSON.parse(saved[PAIRINGS_KEY])).not.toHaveProperty("in_use");
   book = withoutPairing(book, "b");
-  expect(book).toMatchObject({ inUse: "a" });
-  expect(withoutPairing(book, "a")).toEqual({ inUse: null, list: [] });
+  expect(book.list.map((p) => p.fp)).toEqual(["a"]);
+  expect(withoutPairing(book, "a")).toEqual({ list: [] });
   // What storage cannot give back is no pairing, and the interface never sees a token.
-  saved[PAIRINGS_KEY] = JSON.stringify({ in_use: "x", pairings: [{ fp: "x" }, pairing("y")] });
-  expect(readPairings(storage)).toEqual({ inUse: "y", list: [pairing("y")] });
+  saved[PAIRINGS_KEY] = JSON.stringify({ pairings: [{ fp: "x" }, pairing("y")] });
+  expect(readPairings(storage)).toEqual({ list: [pairing("y")] });
   saved[PAIRINGS_KEY] = "{not json";
-  expect(readPairings(storage)).toEqual({ inUse: null, list: [] });
-  expect(readPairings(null)).toEqual({ inUse: null, list: [] });
+  expect(readPairings(storage)).toEqual({ list: [] });
+  expect(readPairings(null)).toEqual({ list: [] });
   expect(JSON.stringify(pairingSummary(pairing("z")))).not.toMatch(/t-z|pk-z/);
 });
 
-test("the local host is projected before in-use validation and its proxy credential never reaches page storage", () => {
+test("the local host is projected first and its proxy credential never reaches page storage", () => {
   const saved: Record<string, string> = {
-    [PAIRINGS_KEY]: JSON.stringify({ in_use: "local-fp", pairings: [pairing("remote-fp")] }),
+    [PAIRINGS_KEY]: JSON.stringify({ pairings: [pairing("remote-fp")] }),
   };
   const storage = { getItem: (key: string) => saved[key] ?? null, setItem: (key: string, value: string) => { saved[key] = value; } };
   const local = pairing("local-fp", { local: true, host: "Mac", token: "session-secret", urls: ["http://127.0.0.1:40000"], rv: null });
   const stored = readPairingState(storage);
-  expect(stored.inUse).toBe("local-fp");
   expect(stored.list.map((item) => item.fp)).toEqual(["remote-fp"]);
   const projected = projectPairings(stored, local);
-  expect(projected.inUse).toBe("local-fp");
   expect(projected.list.map((item) => item.fp)).toEqual(["local-fp", "remote-fp"]);
   writePairings(storage, projected);
   const persisted = JSON.parse(saved[PAIRINGS_KEY]);
-  expect(persisted.in_use).toBe("local-fp");
   expect(persisted.pairings.map((item: Pairing) => item.fp)).toEqual(["remote-fp"]);
   expect(JSON.stringify(persisted)).not.toContain("session-secret");
 });
@@ -323,9 +315,8 @@ test("the local host is projected before in-use validation and its proxy credent
 test("a bridge-owned local host wins over a duplicate stored code pairing", () => {
   const duplicate = pairing("same-fp", { device_id: "old-code-device", token: "old-token" });
   const local = pairing("same-fp", { local: true, device_id: "native-local-device", token: "native-proxy-secret" });
-  const projected = projectPairings({ inUse: "same-fp", list: [duplicate, pairing("remote-fp")] }, local);
+  const projected = projectPairings({ list: [duplicate, pairing("remote-fp")] }, local);
   expect(projected.list.map((item) => item.device_id)).toEqual(["native-local-device", "d-remote-fp"]);
-  expect(projected.inUse).toBe("same-fp");
 });
 
 test("a device names itself after what it is, unless the person says otherwise", () => {

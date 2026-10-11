@@ -59,7 +59,7 @@ export interface ParticipantView {
    *  the dot says both. */
   subtitle: string;
   working: boolean;
-  /** The machine this conversation runs on, by the name it gave when it paired; null when unknown. */
+  /** The paired machine this conversation runs on, as this device names it; `machineId` is its fingerprint. */
   machine?: string | null;
   machineId?: string | null;
   /** The harness the conversation runs in ("claude", "codex"), shown as its icon; null when unknown. */
@@ -85,16 +85,12 @@ export interface MachineView {
   /** The pairing fingerprint, when this row currently has a usable pairing. */
   pairingId?: string;
   host: string;
-  /** The one this page talks to: its conversations and its call. */
-  inUse: boolean;
   revoked: boolean;
-  /** Where this device reaches it: directly, through the room, not at all, or — not in use — not asked. */
-  reach: "direct" | "room" | "away" | "offline" | "checking" | "idle" | "revoked";
+  /** Where this device reaches it: directly, through the room, or not at all. Every paired machine is live at once. */
+  reach: "direct" | "room" | "away" | "offline" | "checking" | "revoked";
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
-  /** Whether this row has a pairing that may be selected for routing. */
-  selectable?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
   pairedLabel: string;
 }
@@ -188,10 +184,10 @@ export interface SidevoiceActions {
   replayReply(historyId: string | null): Promise<void>;
   toggleMic(): void;
   toggleCall(): Promise<void>;
+  /** A conversation by its key (machine and thread, ParticipantView.threadId): looked at, and the call goes to it — on
+   *  another machine the call moves there. */
   selectParticipant(threadId: string): void;
   closeParticipant(threadId: string): Promise<void>;
-  /** Talk to this paired machine from now on, on this device. In a call it hangs up and joins that machine's. */
-  chooseMachine(id: string): void;
   /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */
   forgetMachine(id: string): Promise<void>;
   /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */

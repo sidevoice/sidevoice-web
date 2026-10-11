@@ -15,7 +15,7 @@ test("renders the room as accessible React components", () => {
   expect(document.getElementById("language-settings")).toBeInTheDocument();
 });
 
-test("keeps local setup visible through native projection and selects the projected host after success", async () => {
+test("keeps local setup visible through native projection, and puts it away once the projected host answers, choosing nothing", async () => {
   localHostInstallController.clear();
   let rejectFirst!: (error: unknown) => void;
   let resolveRetry!: (status: LocalHostStatus) => void;
@@ -31,6 +31,7 @@ test("keeps local setup visible through native projection and selects the projec
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
     install, agents,
   } } } });
+  // Every machine is live at once: there is no machine to choose, so an action by that name must stay untouched.
   const chooseMachine = vi.fn();
   const openPairing = vi.fn();
   window.sidevoiceActions = { chooseMachine, openPairing } as unknown as typeof window.sidevoiceActions;
@@ -63,9 +64,9 @@ test("keeps local setup visible through native projection and selects the projec
       host: "This computer", local: true, paired_at: 1_700_000_000, revoked: false }],
     localHostAvailable: true, localHostStatus: { state: "running", reachable: true, installed: true },
   }));
-  await waitFor(() => expect(chooseMachine).toHaveBeenCalledWith("fp-local"));
-  expect(chooseMachine).toHaveBeenCalledOnce();
-  expect(screen.queryByText("Connecting to this computer…")).toBeNull();
+  await waitFor(() => expect(screen.queryByText("Connecting to this computer…")).toBeNull());
+  expect(localHostInstallController.getSnapshot().phase).toBe("idle");
+  expect(chooseMachine).not.toHaveBeenCalled();
   act(() => localHostInstallController.clear());
 });
 
@@ -107,8 +108,7 @@ test("a failed local host projected during setup returns to the normal room and 
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
     state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install, restart,
   } } } });
-  const chooseMachine = vi.fn();
-  window.sidevoiceActions = { chooseMachine } as unknown as typeof window.sidevoiceActions;
+  window.sidevoiceActions = {} as unknown as typeof window.sidevoiceActions;
   const store = createRoomStore();
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);

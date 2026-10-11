@@ -161,7 +161,6 @@ export function Wizard() {
   const t = hostTranslator();
   const onboarding = useOnboarding();
   const machines = useRoomStore((state) => state.machines);
-  const pairingInUse = useRoomStore((state) => state.facts.pairingInUse);
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -170,7 +169,12 @@ export function Wizard() {
   const [choice, setChoice] = useState<"agents" | "remote" | null>(onboarding.record.choice);
   const [completing, setCompleting] = useState(false);
   const touched = useRef(false);
-  const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
+  const localMachine = machines.find((machine) => machine.local && machine.state === "connected" && machine.pairingId);
+  // Another machine: the one answering, else the newest paired. Every machine is live at once: none is "in use".
+  const remoteMachine = machines.find((machine) => !machine.local && !machine.revoked && machine.state === "connected")
+    ?? machines.find((machine) => !machine.local && !machine.revoked);
+  // Whose agents the setup shows: this computer's on its path, the other machine's on the other.
+  const agentsFp = (onboarding.path === "remote" ? remoteMachine?.pairingId : localMachine?.pairingId ?? remoteMachine?.pairingId) ?? null;
   const install = useLocalInstallOffer();
   const installSnapshot = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
   const hostStatus = useRoomStore((state) => state.facts.localHostStatus);
@@ -225,7 +229,6 @@ export function Wizard() {
   async function choosePath(next: "agents" | "remote") {
     if (!await onboarding.setPath(next)) return;
     if (next === "agents") {
-      if (localMachine?.pairingId && pairingInUse !== localMachine.pairingId) window.sidevoiceActions?.chooseMachine(localMachine.pairingId);
       onboarding.goTo(onboarding.localReady ? "W3" : "W2");
     } else onboarding.goTo(onboarding.remoteReady ? "W4" : "W2r");
   }
@@ -260,9 +263,9 @@ export function Wizard() {
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
   const back = previous(step, onboarding.path, onboarding.canHostAgents);
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as HostMessageKey) : "";
-  const agents = pairingInUse ? hostAgents[pairingInUse] : undefined;
+  const agents = agentsFp ? hostAgents[agentsFp] : undefined;
 
-  const remoteName = machines.find((machine) => machine.pairingId === pairingInUse && !machine.local)?.host ?? "";
+  const remoteName = remoteMachine?.host ?? "";
 
   /** Preparing this computer: its action, then its progress in its place (downloading, preparing, starting…), with
    *  what failed and Retry. `alternative`: the way to another machine instead, where the step is this alone. */
@@ -283,9 +286,9 @@ export function Wizard() {
   /** This computer's agents, to connect and disconnect. */
   const agentsBlock = <>
     <p>{t("wizard.agentsHere")}</p>
-    {pairingInUse ? <HostAgentsPanel fp={pairingInUse} /> : null}
-    {/* With no machine in use, the list cannot say it; with one, the list says there are none. */}
-    {!pairingInUse && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
+    {agentsFp ? <HostAgentsPanel fp={agentsFp} /> : null}
+    {/* With no machine yet, the list cannot say it; with one, the list says there are none. */}
+    {!agentsFp && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
   </>;
 
   const ready = step === "W6";

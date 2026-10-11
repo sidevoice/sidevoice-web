@@ -1,6 +1,8 @@
 import type { ChatMessage, ConversationView, HostAgentsState, JoinStatusView, MachineView, PairingPromptView, ParticipantView, KaraokeRange, SettingsAgentRequest } from './room-types';
 import type { PairingSummary } from '../services/device-pairing.js';
-export type NodeReach = '' | 'ok' | 'unpaired' | 'revoked' | 'offline' | 'away';
+/** How a paired machine is reached now: proved at an address ('ok'), being looked for, or why not. */
+export type NodeReach = 'ok' | 'checking' | 'revoked' | 'offline' | 'away';
+export interface MachineLink { reach: NodeReach; via: '' | 'room' | 'node' }
 /** Where the call's voice is, as it reports it. */
 export interface VoiceState {
  listening: 'idle' | 'muted' | 'listening' | 'speaking'; recognising: number; playback: 'idle' | 'synthesizing' | 'playing';
@@ -24,8 +26,8 @@ export interface SessionFacts {
  /** The reply being said, and where the voice is in it: the part of `segment`'s text sounding now (`from`, `to`;
   *  both the end of what was heard between its chunks). */
  now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null;
- /** The machines this device is paired with (never their tokens), the one in use, and the clock they were read at. */
- pairings: PairingSummary[]; pairingInUse: string | null; machinesAt: number; machinesReady: boolean;
+ /** The machines this device is paired with (never their tokens), and the clock they were read at. */
+ pairings: PairingSummary[]; machinesAt: number; machinesReady: boolean;
  /** Per-fingerprint host agent listings. A late response remains attached to its host. */
  hostAgents: Record<string, HostAgentsState>; settingsAgentRequest: SettingsAgentRequest | null;
   /** The section Settings shows. */
@@ -44,12 +46,12 @@ export interface SessionFacts {
   webUpdate: string | null;
   /** The machine whose page Settings → Machines shows (MachineNav); null is the first. */
   machinesView: { machine: string | null };
- localHostAvailable: boolean; localHostSelected: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
+ localHostAvailable: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its
   *  Sidevoice version. */
  remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null}>;
- /** How the node base in use is reached, the machine (fingerprint) it belongs to, and with none, why. */
- rendezvous: '' | 'room' | 'node'; node: string | null; nodeReach: NodeReach;
+ /** How each paired machine is reached, by fingerprint (every one of them is live), and the machine the call is with. */
+ machineLinks: Record<string, MachineLink>; callNode: string | null;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */
  pairingOpen: boolean; pairingNote: string;
  /** The language this device speaks in a call, and whether this page runs inside the desktop app. */
@@ -106,6 +108,11 @@ export const NO_MACHINE: string;
 export const RECONNECT_GRACE_MS: number;
 export const UNPAIRED: string;
 export function machinesView(s: SessionFacts): MachineView[];
+/** A conversation as the page knows it: the machine (fingerprint) and the room's thread, as one key. */
+export function conversationKey(node: string | null | undefined, thread: string | null | undefined): string | null;
+export function conversationOf(key: string | null | undefined): { node: string; thread: string } | null;
+export function personKey(person: { node?: string | null; thread_id?: string | null } | null | undefined): string | null;
+export function selectedThread(s: SessionFacts): string | null;
 export function reachNote(s: SessionFacts): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;
 export function sinceText(seconds: number | null | undefined, now: number): string;

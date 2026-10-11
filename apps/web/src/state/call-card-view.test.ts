@@ -2,11 +2,12 @@ import { expect, test } from "vitest";
 import { createRoomSessionStore } from "./room-session-state.js";
 
 // The card's view comes from the room's own facts (the desktop bridge relays it as is): these drive the real store.
+// The page knows a conversation by its machine and thread ("n|a"); the room's binding keeps the bare thread.
 const people = [
-  { thread_id: "a", title: "Call A", available: true },
-  { thread_id: "b", title: "Transcript B", available: false },
+  { thread_id: "a", node: "n", title: "Call A", available: true },
+  { thread_id: "b", node: "n", title: "Transcript B", available: false },
 ];
-const base = { ws: {}, sessionId: "s", roomBinding: { thread_id: "a", title: "Call A" }, people };
+const base = { ws: {}, sessionId: "s", callNode: "n", roomBinding: { thread_id: "a", title: "Call A" }, people };
 
 test("the agent and the person are independent: both speaking at once", () => {
   const store = createRoomSessionStore({ ...base, userLive: true, botLive: true } as never);
@@ -16,7 +17,7 @@ test("the agent and the person are independent: both speaking at once", () => {
 });
 
 test("the agent works while the person's turn is transcribed, even when its harness says it is idle", () => {
-  const store = createRoomSessionStore({ ...base, pendingPhase: "transcribing", harness: { a: false } } as never);
+  const store = createRoomSessionStore({ ...base, pendingPhase: "transcribing", harness: { "n|a": false } } as never);
   expect(store.getState().callCard.agent).toBe("working");
   store.patch({ pendingPhase: "" });
   expect(store.getState().callCard.agent).toBe("idle");
@@ -28,7 +29,7 @@ test("a reply sounding is the agent speaking; the call's voice offers nothing to
 });
 
 test("the card names the conversation the call is on, not a transcript being browsed", () => {
-  const store = createRoomSessionStore({ ...base, viewedThread: "b" } as never);
+  const store = createRoomSessionStore({ ...base, viewedThread: "n|b" } as never);
   expect(store.getState().title).toBe("Transcript B");
-  expect(store.getState().callCard).toMatchObject({ conversation: "a", title: "Call A" });
+  expect(store.getState().callCard).toMatchObject({ conversation: "n|a", title: "Call A" });
 });

@@ -30,11 +30,11 @@ function dateText(value: string | number | null | undefined) {
 function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTranslate) {
   const name = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
   const subtitle = machine.local
-    ? machine.selectable && status.reachable === true ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
+    ? machine.state === "connected" ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
     : machine.state === "checking" ? t("hosts.checking")
       : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
       ? t("hosts.remoteNoResponse") : t("hosts.connected");
-  const reachable = machine.local ? machine.selectable && status.reachable === true : machine.state === "connected";
+  const reachable = machine.state === "connected";
   return { name, subtitle, reachable };
 }
 
@@ -78,7 +78,7 @@ export function MachineNav({ current }: { current: boolean }) {
         const state = machineState(machine, copy, t);
         return (
           <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.name + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.name}, ${state.label} · ${copy.subtitle}`}
-            data-name={copy.name} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined}
+            data-name={copy.name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
             {/* This computer, an icon before its name; the name cut short when long (whole in the title); the state's dot
@@ -171,15 +171,9 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           {/* Renamed here: whose name it really is, and the way back to it. */}
           {machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
             <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
-          <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
+          <p className="muted">{[copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {/* Talking to this machine from now on: not offered for the one in use; said why when it cannot answer. */}
-        {!machine.inUse && machine.selectable !== false && <Tooltip content={copy.reachable ? t("hosts.useHint", { machine: copy.name }) : t("hosts.useUnreachable", { machine: copy.name })}>
-          <Button variant="secondary" size="sm" disabled={!copy.reachable} blockedBy={copy.reachable ? undefined : "host-use-reason-" + machine.id}
-            onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useThis")}</Button>
-        </Tooltip>}
-        {!copy.reachable && <span id={"host-use-reason-" + machine.id} className="sr-only">{t("hosts.useUnreachable", { machine: copy.name })}</span>}
       </header>
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
@@ -428,7 +422,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const deviceEpoch = useRef(0);
   const bridge = localHostBridge();
   const local = !!machine.local;
-  const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
+  const usable = machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
   const ownName = useRoomStore((state) => state.facts.deviceName);
   const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name
