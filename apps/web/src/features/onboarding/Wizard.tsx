@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { SidevoiceMark } from "../../components/ui/Icons";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
-import { CONNECTOR_INSTALL } from "../pairing/connector-commands";
+import { ConnectorSteps } from "../pairing/ConnectorSteps";
+import { PairingCodeForm } from "../pairing/PairingDialog";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices } from "../settings/VoiceSettings";
 import { TryResult, cancelDownload, downloadModel, sizeText, useModelState, useVoiceTry, type ModelState } from "../settings/ModelSetup";
@@ -106,7 +107,6 @@ export function Wizard() {
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const [choice, setChoice] = useState<"agents" | "remote" | null>(onboarding.record.choice);
-  const [copied, setCopied] = useState("");
   const [completing, setCompleting] = useState(false);
   const touched = useRef(false);
   const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
@@ -155,11 +155,6 @@ export function Wizard() {
     if (await onboarding.markAgentsDone()) onboarding.goTo("W4");
   }
 
-  async function copyCommand() {
-    try { await navigator.clipboard.writeText(CONNECTOR_INSTALL); setCopied(t("noMachine.commandCopied")); }
-    catch { setCopied(t("noMachine.commandCopyFailed")); }
-  }
-
   async function complete() {
     setCompleting(true);
     await onboarding.complete();
@@ -206,11 +201,8 @@ export function Wizard() {
       </section>}
       {step === "W2r" && <section>
         <p>{t("wizard.pairIntro")}</p>
-        <div className="setup-command"><code>{CONNECTOR_INSTALL}</code>
-          <Button type="button" variant="ghost" size="compact" onClick={() => void copyCommand()}>{t("noMachine.copyCommand")}</Button>
-        </div>
-        {copied && <p className="muted" role="status">{copied}</p>}
-        <Button type="button" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}>{t("wizard.pairCode")}</Button>
+        <ConnectorSteps />
+        <PairingCodeForm idPrefix="wizard-pairing" rows={2} />
       </section>}
       {step === "W3" && <section>
         {pairingInUse ? <HostAgentsPanel fp={pairingInUse} /> : null}

@@ -4,7 +4,7 @@ import { DialogFrame } from "../../components/ui/DialogFrame";
 import { useRoomStore } from "../../state/room-store";
 import { currentDeviceName } from "../../state/device-name";
 import { hostTranslator } from "../settings/host-i18n";
-import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "./connector-commands";
+import { ConnectorSteps } from "./ConnectorSteps";
 
 function pairingError(reason: unknown, t: ReturnType<typeof hostTranslator>) {
   const message = reason instanceof Error ? reason.message : String(reason);
@@ -25,22 +25,16 @@ function pairingError(reason: unknown, t: ReturnType<typeof hostTranslator>) {
  *  The code is checked and redeemed by the controller; this only collects it and says how that went. */
 export function PairingDialog() {
   const t = hostTranslator();
-  const setupCommand = CONNECTOR_INSTALL;
   const prompt = useRoomStore((state) => state.pairing);
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [copyNote, setCopyNote] = useState("");
-  const codeField = useRef<HTMLTextAreaElement>(null);
+  const [opened, setOpened] = useState(0);
 
   // The store says whether it is open; the element follows. Escape, or the close button, tell the store.
   useEffect(() => {
     const dialog = document.getElementById("device-pairing") as HTMLDialogElement | null;
     if (!dialog) return;
     if (prompt.open && !dialog.open) {
-      setError("");
+      setOpened((count) => count + 1);
       if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
-      codeField.current?.focus();
     }
     if (!prompt.open && dialog.open) {
       if (typeof dialog.close === "function") dialog.close(); else dialog.removeAttribute("open");
@@ -52,6 +46,29 @@ export function PairingDialog() {
     dialog?.addEventListener("close", closed);
     return () => dialog?.removeEventListener("close", closed);
   }, []);
+
+  return (
+    <DialogFrame id="device-pairing" className="pair-dialog device-pairing" labelledBy="device-pairing-title" title={t("noMachine.connect")}
+      closeId="device-pairing-close" closeLabel={t("noMachine.closePairing")} closeTitle={t("noMachine.closePairing")} onClose={() => window.sidevoiceActions?.closePairing()}>
+      <section className="remote-setup-guidance">
+        <h3>{t("noMachine.prepareTitle")}</h3>
+        <ConnectorSteps />
+      </section>
+      {prompt.note && <p className="pairing-note" role="status">{prompt.note}</p>}
+      <PairingCodeForm key={opened} autoFocus />
+    </DialogFrame>
+  );
+}
+
+/** The pairing code field and its button: redeems a code the machine issued (`sidevoice pair-device`, or the agent).
+ *  Used by the pairing dialog and, inline, by the first-run setup. */
+export function PairingCodeForm({ idPrefix = "device-pairing", autoFocus = false, rows = 4 }: { idPrefix?: string; autoFocus?: boolean; rows?: number }) {
+  const t = hostTranslator();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const codeField = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (autoFocus) codeField.current?.focus(); }, [autoFocus]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -68,33 +85,14 @@ export function PairingDialog() {
     }
   }
 
-  async function copySetupCommand() {
-    try {
-      await navigator.clipboard.writeText(setupCommand);
-      setCopyNote(t("noMachine.commandCopied"));
-    } catch {
-      setCopyNote(t("noMachine.commandCopyFailed"));
-    }
-  }
-
   return (
-    <DialogFrame id="device-pairing" className="pair-dialog device-pairing" labelledBy="device-pairing-title" title={t("noMachine.connect")}
-      closeId="device-pairing-close" closeLabel={t("noMachine.closePairing")} closeTitle={t("noMachine.closePairing")} onClose={() => window.sidevoiceActions?.closePairing()}>
-      <section className="remote-setup-guidance">
-        <h3>{t("noMachine.prepareTitle")}</h3>
-        <p>{t("noMachine.prepareBody")}</p>
-        <div className="setup-command"><code>{setupCommand}</code><Button variant="ghost" size="compact" onClick={() => void copySetupCommand()}>{t("noMachine.copyCommand")}</Button></div>
-        <p className="muted" role="status">{copyNote || t("noMachine.pairingBody", { command: CONNECTOR_PAIR_DEVICE })}</p>
-      </section>
-      {prompt.note && <p className="pairing-note" role="status">{prompt.note}</p>}
-      <form className="pairing-form" onSubmit={submit} aria-busy={busy}>
-        <label>{t("pairing.code")}
-          <textarea ref={codeField} id="device-pairing-code" rows={4} value={code} placeholder={t("pairing.codePlaceholder")} required disabled={busy}
-            spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" onChange={(event) => setCode(event.currentTarget.value)} />
-        </label>
-        <p id="device-pairing-error" className="pairing-error" role="alert">{error}</p>
-        <Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pairing.connecting") : t("pairing.connect")}</Button>
-      </form>
-    </DialogFrame>
+    <form className="pairing-form" onSubmit={submit} aria-busy={busy}>
+      <label>{t("pairing.code")}
+        <textarea ref={codeField} id={`${idPrefix}-code`} rows={rows} value={code} placeholder={t("pairing.codePlaceholder")} required disabled={busy}
+          spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" onChange={(event) => setCode(event.currentTarget.value)} />
+      </label>
+      <p id={`${idPrefix}-error`} className="pairing-error" role="alert">{error}</p>
+      <Button type="submit" variant="primary" disabled={busy || !code.trim()}>{busy ? t("pairing.connecting") : t("pairing.connect")}</Button>
+    </form>
   );
 }

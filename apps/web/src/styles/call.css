@@ -3,7 +3,7 @@
    drop as a panel, and the transcript is a sheet; isNarrow() in state/call-layout.ts says the same width. */
 
 /* ---------- the layout ---------- */
-#root > main.call-layout { display:flex;flex-direction:row;height:auto;padding:0;gap:0;position:relative;overflow:hidden }
+#root > .room-shell > main.call-layout { display:flex;flex-direction:row;height:auto;padding:0;gap:0;position:relative;overflow:hidden }
 
 /* ---------- the header ---------- */
 .room-header { height:var(--sv-header-height);display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 14px 0 20px }
@@ -134,8 +134,8 @@
 .call-bar .transcript-toggle[aria-expanded=true] { background:var(--sv-primary-muted);color:var(--sv-primary-soft) }
 
 /* ---------- the transcript: docked at the call's right, or a sheet on a phone ---------- */
-#root > main.call-layout > .transcript { flex:none;width:380px;min-height:0;border:0;border-left:1px solid var(--sv-border);border-radius:0;background:var(--sv-surface) }
-#root > main.call-layout > .transcript:not([data-open]) { display:none }
+#root > .room-shell > main.call-layout > .transcript { flex:none;width:380px;min-height:0;border:0;border-left:1px solid var(--sv-border);border-radius:0;background:var(--sv-surface) }
+#root > .room-shell > main.call-layout > .transcript:not([data-open]) { display:none }
 .transcript-grab,.transcript-scrim { display:none }
 .call-layout .transcript-head { position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 12px 18px }
 .call-layout .transcript-heading { display:flex;flex:1;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;text-align:left }
@@ -156,7 +156,7 @@
   .header-avatar .state-dot { width:11px;height:11px }
   .header-more { display:inline-flex;align-items:center;gap:2px;height:30px;min-width:40px;margin-left:2px;padding:0 8px;border:1px solid var(--sv-border);border-radius:var(--sv-radius-pill);background:var(--sv-surface-raised);color:var(--sv-muted);font-size:12px;font-variant-numeric:tabular-nums }
 
-  #root > main.call-layout { flex-direction:column }
+  #root > .room-shell > main.call-layout { flex-direction:column }
   /* The conversations drop from the header as a panel over the dimmed call. */
   #root .conversation-sidebar { position:fixed;z-index:31;top:calc(var(--sv-header-height) + 6px);left:10px;right:10px;width:auto;max-height:min(62dvh,32rem);padding:12px 10px 16px;
     background:var(--sv-surface);border:1px solid var(--sv-border);border-radius:20px;box-shadow:var(--sv-shadow-dialog);
@@ -169,9 +169,9 @@
   .conversations-scrim[data-open],.transcript-scrim[data-open] { opacity:1;pointer-events:auto }
 
   /* The transcript rises from the bottom as a sheet. */
-  #root > main.call-layout > .transcript,#root > main.call-layout > .transcript:not([data-open]) { display:flex;position:fixed;z-index:31;left:0;right:0;bottom:0;width:auto;height:82dvh;
+  #root > .room-shell > main.call-layout > .transcript,#root > .room-shell > main.call-layout > .transcript:not([data-open]) { display:flex;position:fixed;z-index:31;left:0;right:0;bottom:0;width:auto;height:82dvh;
     border:1px solid var(--sv-border);border-bottom:0;border-radius:22px 22px 0 0;transform:translateY(105%);visibility:hidden;transition:transform .25s ease,visibility 0s linear .25s }
-  #root > main.call-layout > .transcript[data-open] { transform:none;visibility:visible;transition:transform .25s ease }
+  #root > .room-shell > main.call-layout > .transcript[data-open] { transform:none;visibility:visible;transition:transform .25s ease }
   .transcript-grab { display:block;flex:none;width:40px;height:4px;margin:9px auto 0;border-radius:2px;background:#4a5360 }
   .call-layout .transcript-head .compose-toggle:not([hidden]) { position:static;transform:none;flex:none }
 

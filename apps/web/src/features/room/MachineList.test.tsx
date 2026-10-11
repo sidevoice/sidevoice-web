@@ -466,7 +466,7 @@ test("the no-machine screen offers Connect; install guidance starts only in the 
   render(<RoomProvider store={store}><NoMachineScreen /></RoomProvider>);
   expect(screen.getByRole("heading", { name: "No machine connected" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect to a machine" })).toBeInTheDocument();
-  expect(screen.queryByText(/npx sidevoice install/)).toBeNull();
+  expect(screen.queryByText(/npx sidevoice@latest install/)).toBeNull();
 });
 
 test("the local warning only appears while the local host is selected", () => {

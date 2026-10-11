@@ -45,11 +45,12 @@ const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.pa
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
   const store = room();
   expect(title()).toHaveTextContent("Connect to your machine");
-  expect(document.querySelector("#wizard .setup-command code")).toHaveTextContent("npx sidevoice install");
+  expect(document.querySelector("#wizard .setup-command code")).toHaveTextContent("npx sidevoice@latest install");
   // The room, its settings and its call bar stay out of reach behind the setup.
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
-  fireEvent.click(screen.getByRole("button", { name: "Enter a pairing code" }));
-  expect(actions.openPairing).toHaveBeenCalled();
+  // The code is entered right here, not in another dialog on top.
+  expect(document.getElementById("wizard-pairing-code")).toBeInTheDocument();
+  expect(actions.openPairing).not.toHaveBeenCalled();
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
 });
