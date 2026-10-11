@@ -127,3 +127,11 @@
 .conversation-sidebar { overflow: hidden; }
 .conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
 .sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+
+/* Settings at the conversations' foot (VARIANTS settings-gear B): the header's gear steps aside on a desktop; the list
+ * ends with New conversation, and Settings holds the foot. */
+@media (min-width: 900px) { .room-header[data-gear="sidebar"] .header-settings { display: none; } }
+.sidebar-new { display: flex; justify-content: center; }
+.sidebar-settings { position: relative; justify-content: flex-start; }
+.conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
+.sidebar-settings .settings-notice-dot { position: absolute; top: 8px; left: 26px; }

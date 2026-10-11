@@ -17,15 +17,20 @@ import "./room.css";
  * conversations have no column, two others at most sit in the header — those waiting for you, then those working —
  * and a tap moves the call to one; the whole list comes down from the handle under the header, and the header stays
  * lit above the dimmed call while it is down. */
+/** Where Settings sits on a desktop (VARIANTS `settings-gear`): in the header's corner, or at the conversations' foot. */
+export const SETTINGS_GEAR = ["top", "sidebar"] as const;
+
 export function RoomHeader() {
   const t = callTranslator();
   // A design variant (lib/variants.ts): where a phone's header puts the other conversations — after the mark, in its
   // middle, or by the gear.
   const avatars = useVariant("header-avatars", ["left", "centre", "right"] as const);
+  // And where Settings sits on a desktop: the header's corner (top), or the foot of the conversations (sidebar).
+  const gear = useVariant("settings-gear", SETTINGS_GEAR);
   const listDown = useCallLayout((state) => state.conversationsOpen);
   return (
     <>
-      <header className="room-header" data-avatars={avatars} data-list-down={listDown || undefined}>
+      <header className="room-header" data-avatars={avatars} data-gear={gear} data-list-down={listDown || undefined}>
         <h1 className="brand"><SidevoiceMark size={22} /> <span className="brand-name">Sidevoice</span></h1>
         <HeaderConversations t={t} />
         <SettingsButton t={t} />
@@ -75,11 +80,17 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
 }
 
 /** The paired machines with agents waiting to be connected: the gear shows a dot, and Settings opens at their agents. */
-function usePendingAgentHosts() {
+export function usePendingAgentHosts() {
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const pairings = useRoomStore((state) => state.facts.pairings);
   const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
   return actionableHostFingerprints(hostAgents, active);
+}
+
+/** Settings from elsewhere on the page (the conversations' foot): the header's own button, which the runtime opens
+ *  Settings from, pressed — kept in the header even where it is not shown, so it is the only one. */
+export function openSettings() {
+  document.getElementById("settings-open")?.click();
 }
 
 /* The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an

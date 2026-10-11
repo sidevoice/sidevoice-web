@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
-import { CloseIcon, CloseUpIcon, HARNESS_NAMES, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, HARNESS_NAMES, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
@@ -13,6 +13,9 @@ import { conversationState, machineGroups, stateText } from "../call/conversatio
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
+import { openSettings, SETTINGS_GEAR, usePendingAgentHosts } from "./RoomHeader";
+import { useVariant } from "../../lib/variants";
+import { hostTranslator } from "../settings/host-i18n";
 import "./room.css";
 
 /** The harness a conversation runs in, and how it is reached when that matters, by their own names. */
@@ -44,6 +47,8 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
+  // A design variant (RoomHeader SETTINGS_GEAR): on a desktop, Settings may sit at the foot of the conversations.
+  const gearHere = useVariant("settings-gear", SETTINGS_GEAR) === "sidebar" && !narrow;
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
   const rail = collapsed || crowded;
   const modal = narrow && open;
@@ -126,10 +131,26 @@ export function ConversationSidebar() {
             );
           })}
           {!participants.length && <p className="sidebar-empty">{t("sidebar.empty")}</p>}
+          {/* With Settings at the foot, a new conversation follows the last one. */}
+          {gearHere && <div className="sidebar-new"><NewConversation rail={rail} /></div>}
         </div>
-        <div className="sidebar-foot"><NewConversation rail={rail && !narrow} /></div>
+        {gearHere ? <div className="sidebar-foot"><SidebarSettings rail={rail} /></div>
+          : <div className="sidebar-foot"><NewConversation rail={rail && !narrow} /></div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>
+  );
+}
+
+/** Settings at the conversations' foot: named beside the list, a gear in the rail; its dot when agents wait. */
+function SidebarSettings({ rail }: { rail: boolean }) {
+  const t = callTranslator();
+  const hosts = hostTranslator();
+  const notice = usePendingAgentHosts().length > 0;
+  const label = notice ? hosts("agents.gear.pending") : t("header.settings");
+  return (
+    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={openSettings}>
+      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}{notice && <span className="settings-notice-dot" aria-hidden="true" />}
+    </Button>
   );
 }
