@@ -129,3 +129,6 @@
 /* A control pointed at (what's new's Set up): its row lit for a moment. */
 .ui-row.settings-highlight { border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); box-shadow: 0 0 0 2px var(--sv-accent); transition: background-color var(--sv-dur-slow) var(--sv-ease); }
 @media (prefers-reduced-motion: reduce) { .ui-row.settings-highlight { transition: none; } }
+.downloaded-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); }
+.downloaded-group-title:focus { outline: none; }
+.downloaded-unused-confirm { margin: 0 0 var(--sv-space-2); }
