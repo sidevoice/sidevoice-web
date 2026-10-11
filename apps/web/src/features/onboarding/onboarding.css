@@ -20,7 +20,7 @@
 
 .wizard-stepper { display: grid; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6) 0; }
 .wizard-stepper-label { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.wizard-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sv-space-1); margin: 0; padding: 0; list-style: none; }
+.wizard-steps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sv-space-1); margin: 0; padding: 0; list-style: none; }
 .wizard-steps li { height: 4px; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); }
 [data-theme="dark"] .wizard-steps li { background: var(--sv-border); }
 .wizard-steps li[data-state="done"], .wizard-steps li[data-state="current"] { background: var(--sv-accent); }
