@@ -46,6 +46,8 @@
 /* Agreeing to no encryption: the button under the warning's words, the whole width on a phone and in the form's column
  * (split); busy, its words stay in sight beside the spinner. */
 .pairing-consent .ui-alert-body { margin-top: var(--sv-space-3); }
+/* Its words take the focus (not the button): ringed as one block, not line by line. */
+.pairing-consent .ui-alert-title > [tabindex="-1"] { display: block; border-radius: var(--sv-radius-sm); outline-offset: 2px; }
 .pairing-insecure[data-loading] .ui-button-content { visibility: visible; }
 .pairing-insecure[data-loading] .ui-spinner { position: static; flex: none; margin: 0; }
 .pair-machine[data-layout="split"] .pairing-insecure { width: 100%; }
@@ -71,7 +73,7 @@
 .pair-machine-side { display: grid; align-content: start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .pair-machine-side h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
 @media (min-width: 720px) {
-  .pair-machine[data-layout="split"] { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; gap: var(--sv-space-6); }
+  .pair-machine[data-layout="split"] { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); align-items: start; gap: var(--sv-space-6); }
   .pair-dialog[data-pair-layout="split"] { --ui-dialog-width: 760px; }
 }
 

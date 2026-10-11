@@ -294,7 +294,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
     <div className="pair-machine" data-layout="split">
       <section className="pair-machine-side" aria-labelledby={`${idPrefix}-machine`}>
         <h3 id={`${idPrefix}-machine`}>{t("pairing.onMachine")}</h3>
-        <ConnectorSteps />
+        {/* Its heading frames them, and a narrow column keeps its width for the commands: no numbers of their own. */}
+        <ConnectorSteps numbered={false} />
       </section>
       {form}
     </div>
