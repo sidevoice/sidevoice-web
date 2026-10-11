@@ -9,8 +9,9 @@
  *   - src/features/avatar/engine/   a mirror of the lab's src/ (wiped and rewritten on every run):
  *       verbatim   core.ts, desk.ts, backdrop.ts, bichos/*.ts, parts/*.ts
  *       patched    bichos/spec.ts (no adapter for old recipes), parts/core-species.ts (no v3:/monstruo: rollers)
- *       generated  styles/mascots.ts (only the Sidevoice mascot), styles/bichos.ts (the shared CSS without the
- *                  third-party mascots' rules, and the mascot frame), README.md (this mapping, with source hashes)
+ *       generated  styles/mascots.ts (only the Sidevoice mascot, with its hull), styles/bichos.ts (the lab's file with
+ *                  the third-party mascots' rules stripped from BASE_CSS, its interpolations kept as they are, and
+ *                  its seed-to-mascot style object replaced by the CSS alone), README.md (this mapping, with hashes)
  *   - src/styles/bichos.css         the engine's CSS as a flat global stylesheet (features/avatar/engine-stylesheet.ts)
  *
  * Left in the lab on purpose: main.ts, index.html, lab.css, i18n.ts (its stage words live in the call's message
@@ -123,6 +124,13 @@ function declaration(text, head, file) {
   return text.slice(from, end + close.length);
 }
 
+/** Sidevoice's row of the lab's hull table (MASCOT_HULLS), or nothing if the lab has no table. */
+function hull(mascots) {
+  const row = /^\s*sidevoice: (\[\d+(?:\.\d+)?, "[^"\n]*"\]),$/m.exec(mascots);
+  if (!row) fail("styles/mascots.ts: no sidevoice row in MASCOT_HULLS");
+  return row[1];
+}
+
 /** The lab's mascot module cut down to the Sidevoice mascot: its shade (the renderer's too), its drawing and its mark. */
 function mascotsModule(src) {
   const mascots = read(join(src, "styles/mascots.ts")), logos = read(join(src, "styles/logos.ts"));
@@ -142,10 +150,14 @@ const INK = "#1b1428";
 ${declaration(logos, "export const SIDEVOICE_24 = {", "styles/logos.ts")}
 ${declaration(mascots, "export function shade(", file)}
 ${declaration(mascots, "export interface Mascot {", file)}
-/** A mascot by name: only Sidevoice's. */
+/** Sidevoice's mark at rest, ink included, and its eyes' line, [eyeY, hull]: the shared cues keep clear of it. */
+const SIDEVOICE_HULL: [number, string] = ${hull(mascots)};
+
+/** A mascot by name: only Sidevoice's, with the hull its cues are placed by. */
 export function mascot(kind: Harness, id: string): Mascot {
   if (kind !== "sidevoice") throw new Error(\`[bichos] no mascot "\${String(kind)}" ships\`);
-  return sidevoice(id);
+  const [eyeY, hull] = SIDEVOICE_HULL;
+  return { ...sidevoice(id), hull, eyeY };
 }
 
 ${declaration(mascots, "function sidevoice(id: string): Mascot {", file)}`;
@@ -161,6 +173,12 @@ function cssItems(css) {
     const lead = /^\s*/.exec(css.slice(i))[0];
     const at = i + lead.length;
     if (at >= css.length) { items.push({ kind: "space", raw: lead }); break; }
+    if (css[at] === HOLE) {
+      const end = css.indexOf(HOLE, at + 1);
+      items.push({ kind: "hole", raw: css.slice(i, end + 1) });
+      i = end + 1;
+      continue;
+    }
     if (css.startsWith("/*", at)) {
       const end = css.indexOf("*/", at);
       if (end < 0) fail("unclosed comment in BASE_CSS");
@@ -208,6 +226,9 @@ function stripThirdParty(css) {
   };
   for (const item of items) {
     if (item.kind === "space") { kept.push(item.raw); continue; }
+    // An interpolation is the lab's own generated CSS (keyframes of a work style): kept as it is. What it produces is
+    // checked with the rest once the stylesheet is built.
+    if (item.kind === "hole") { blocks.push({ raw: item.raw }); continue; }
     if (item.kind === "comment") { if (blocks.length) flush(); head.push(item); continue; }
     const prelude = item.prelude.trim();
     if (prelude.startsWith("@")) {
@@ -226,31 +247,62 @@ function stripThirdParty(css) {
   return out;
 }
 
+/** Marks an interpolation held out of the CSS while it is stripped. */
+const HOLE = "\u0001";
+
+/** The end of the template literal whose text starts at `from` (the index of its closing backtick), and the
+ *  `${…}` interpolations in it (their braces counted, nested templates included). */
+function template(text, from, file) {
+  const holes = [];
+  for (let i = from; i < text.length; i += 1) {
+    if (text[i] === "\\") { i += 1; continue; }
+    if (text[i] === "`") return { end: i, holes };
+    if (text[i] === "$" && text[i + 1] === "{") {
+      let depth = 0, j = i + 1;
+      for (; j < text.length; j += 1) {
+        if (text[j] === "{") depth += 1;
+        else if (text[j] === "}" && (depth -= 1) === 0) break;
+      }
+      holes.push([i, j + 1]);
+      i = j;
+    }
+  }
+  fail(`${file}: unterminated template`);
+}
+
+/** The lab's shared-style module, as the app needs it: its BASE_CSS without the third-party mascots' rules, its
+ *  mascot frame exported, and its `bichos` style object (the lab's rows, and the lookup that turns a seed spelling a
+ *  harness into its mascot) replaced by the style's CSS alone. Everything else — the waiting alias, the entrance — as
+ *  the lab wrote it. */
 function bichosModule(src) {
-  const text = read(join(src, "styles/bichos.ts")), file = "styles/bichos.ts";
-  const start = text.indexOf("const BASE_CSS = `");
-  if (start < 0) fail(`${file}: no BASE_CSS`);
-  const bodyStart = start + "const BASE_CSS = `".length, bodyEnd = text.indexOf("`;\n", bodyStart);
-  const base = text.slice(bodyStart, bodyEnd);
-  if (base.includes("${")) fail(`${file}: BASE_CSS interpolates now; the strip needs a plain template`);
-  const frame = declaration(text, "function renderMascot(kind: Harness): Drawn {", file);
-  // The lab's own imports, as written (some go unused here), and its style's `css:` expression: whatever the lab adds
-  // to the shared CSS (another module's rules) comes along with them.
-  const imports = text.match(/^import [^;]*;/gm) ?? [];
+  const file = "styles/bichos.ts";
+  let text = read(join(src, file));
+  const once = (name, from, to) => {
+    const count = typeof from === "string" ? text.split(from).length - 1 : (text.match(new RegExp(from.source, "g")) ?? []).length;
+    if (count !== 1) fail(`${file}: "${name}" found its anchor ${count} times (expected once)`);
+    text = text.replace(from, to);
+  };
+  // BASE_CSS, its interpolations held out while the rules are stripped.
+  const head = "const BASE_CSS = `", at = text.indexOf(head);
+  if (at < 0 || text.indexOf(head, at + 1) >= 0) fail(`${file}: expected exactly one BASE_CSS`);
+  const bodyStart = at + head.length, { end, holes } = template(text, bodyStart, file);
+  let body = "", cursor = bodyStart;
+  holes.forEach(([s, e], n) => { body += text.slice(cursor, s) + HOLE + n + HOLE; cursor = e; });
+  body += text.slice(cursor, end);
+  const stripped = stripThirdParty(body).replace(new RegExp(HOLE + "(\\d+)" + HOLE, "g"), (_, n) => text.slice(...holes[Number(n)]));
+  text = text.slice(0, bodyStart) + stripped + text.slice(end);
+
   const css = /\n {2}css: (.+?),?\n\};\s*$/.exec(text)?.[1];
   if (!css) fail(`${file}: no \`css:\` at the end of the style object`);
-  return `/* GENERATED by scripts/sync-bichos.mjs from the avatar lab's styles/bichos.ts: do not edit.
+  once("the style object", /export const bichos: AvatarStyle = \{[\s\S]*\n\};\s*$/, `export const CSS = ${css};\n`);
+  once("the lab's rows", /\/\*\* One lab row per part file[\s\S]*?\n\}\)\);\n\n/, "");
+  once("the mascot frame, exported", "\nfunction renderMascot(", "\nexport function renderMascot(");
+  once("the lab's header", /\/\* Bichos — a cartoon cast[\s\S]*?\*\/\n/, `/* GENERATED by scripts/sync-bichos.mjs from the avatar lab's styles/bichos.ts: do not edit.
  * What every figure shares: the mascot frame and the CSS (moods, sizes, shared groups), with the third-party mascots'
- * rules left out. The lab's seed-to-mascot lookup (\`bichos.draw\`) is left out too: a mascot is drawn only when asked
- * for by name (renderMascot), never because a seed spells one. src/styles/bichos.css is built from \`CSS\`. */
-
-${imports.join("\n")}
-
-export ${frame}
-const BASE_CSS = \`${stripThirdParty(base)}\`;
-
-export const CSS = ${css};
-`;
+ * rules left out. The lab's seed-to-mascot lookup (its \`bichos\` style object) is left out too: a mascot is drawn only
+ * when asked for by name (renderMascot), never because a seed spells one. src/styles/bichos.css is built from \`CSS\`. */
+`);
+  return text;
 }
 
 /* ---------- the run ---------- */
@@ -317,7 +369,9 @@ ${rows.join("\n")}
   const server = await createServer({ root: APP, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true, hmr: false } });
   try {
     const { bichosStylesheet } = await server.ssrLoadModule("/src/features/avatar/engine-stylesheet.ts");
-    writeFileSync(STYLESHEET, bichosStylesheet());
+    const sheet = bichosStylesheet();
+    if (THIRD_PARTY_SELECTOR.test(sheet) || /@keyframes\s+(?:gk|pi|oc|cl|cp|cu|km|ol|lm|ds|mi|qw|ws)-/.test(sheet)) fail("styles/bichos.css: a third-party mascot rule survived");
+    writeFileSync(STYLESHEET, sheet);
   } finally {
     await server.close();
   }
