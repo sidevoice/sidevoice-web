@@ -10,6 +10,7 @@ import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callTranslator, type CallTranslate } from "./call-i18n";
+import type { CallMessageKey } from "./messages/en";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 import { TranscriptToggle } from "./CallToolbar";
@@ -87,6 +88,13 @@ function BootError() {
   return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={error} />}</div>;
 }
 
+/** An effort as people say it in the interface's language; one this page does not know, as the harness says it. */
+function effortName(effort: string, t: CallTranslate) {
+  const key = ("stage.effort." + effort) as CallMessageKey;
+  const name = t(key);
+  return name === key ? effort : name;
+}
+
 export function CallStage() {
   const t = callTranslator();
   const stage = useStageConversation();
@@ -126,7 +134,7 @@ export function CallStage() {
         <div className="stage-tags">
           {(harness || stage.row?.model) && <span className="stage-tag stage-badge">
             {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
-            <span>{[harness, stage.row?.model, stage.row?.effort && t("stage.effort", { effort: stage.row.effort })].filter(Boolean).join(" · ")}</span>
+            <span>{[harness, stage.row?.model, stage.row?.effort && t("stage.effort", { effort: effortName(stage.row.effort, t) })].filter(Boolean).join(" · ")}</span>
           </span>}
         </div>
         <PersonTurn conversation={conversation} t={t} />

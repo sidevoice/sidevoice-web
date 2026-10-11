@@ -855,7 +855,7 @@ async function refreshConnectionStats(){
   else if(!callId)$('stats-status').textContent='Entra en la sala para medir esta llamada.';
   else if(!matches)$('stats-status').textContent='Esperando las mediciones de esta sesión.';
   else $('stats-status').textContent='Mediciones de esta conversación · actualización cada 2 segundos';
-  $('stats-updated').textContent=new Date().toLocaleTimeString();
+  $('stats-updated').textContent=new Date().toLocaleTimeString(document.documentElement?.lang||undefined);
  }finally{
   clearTimeout(timeout);
   if(statsRequest===controller){statsRequest=null;$('stats-refresh').disabled=false}

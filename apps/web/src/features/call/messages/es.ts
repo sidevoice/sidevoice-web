@@ -38,6 +38,11 @@ export const es: Partial<Record<CallMessageKey, string>> = {
 
   "toolbar.micLevel": "Nivel de micrófono",
   "stage.effort": "esfuerzo {effort}",
+  "stage.effort.low": "bajo",
+  "stage.effort.medium": "medio",
+  "stage.effort.high": "alto",
+  "stage.effort.xhigh": "muy alto",
+  "stage.effort.max": "máximo",
   "toolbar.skip": "Saltar lo que está sonando",
 
   "transcript.show": "Ver la transcripción",
