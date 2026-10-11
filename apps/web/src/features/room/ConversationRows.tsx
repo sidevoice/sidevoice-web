@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Button } from "../../components/ui/Button";
 import type { ParticipantView } from "../../state/room-types";
 
 /** The shortest thing that still tells two conversations apart, for the narrow rail a phone gets. */
@@ -17,6 +16,8 @@ export interface ConversationRowsProps {
   disabled?(row: ParticipantView): boolean;
   /** What goes beside a row: the room's options menu, the card's unread badge. */
   aside?(row: ParticipantView): ReactNode;
+  /** What closes the row itself, after its title, and chooses it like the rest of it: the room's unread badge. */
+  end?(row: ParticipantView): ReactNode;
   /** The row's tooltip; its title by default. */
   tooltip?(row: ParticipantView): string;
   /** What leads the row; by default its initials and its state dot. The room's sidebar gives each agent's avatar. */
@@ -26,14 +27,15 @@ export interface ConversationRowsProps {
 }
 
 /** The conversations of the call, as rows to choose from: the room's sidebar (ConversationSidebar) and the desktop app's
- *  call controls card both show them through this, each with its own words and actions. */
-export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, tooltip = (row) => row.title, lead, id, className }: ConversationRowsProps) {
+ *  call controls card both show them through this, each with its own words, actions and styles. A row is a plain
+ *  button, not the system's Button: it is a list entry laid out by whoever shows it, and its parts are its own children. */
+export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, end, tooltip = (row) => row.title, lead, id, className }: ConversationRowsProps) {
   return (
     <div id={id} className={className}>
       {rows.map((row) => (
         <div className="participant-row" data-selected={row.selected || undefined} key={row.threadId}>
-          <Button
-            variant="ghost"
+          <button
+            type="button"
             className="person"
             data-reach={row.reach}
             aria-pressed={row.selected}
@@ -43,7 +45,8 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
           >
             {lead ? lead(row) : <><span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined} title={row.stateLabel}><span className="dot" /></span></>}
             <span className="participant-copy"><span className="person-name" title={row.title} translate="no">{row.title}</span><span className="person-sub muted">{sub(row)}</span></span>
-          </Button>
+            {end?.(row)}
+          </button>
           {aside?.(row)}
         </div>
       ))}

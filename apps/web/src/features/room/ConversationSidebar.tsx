@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
-import { CloseUpIcon, HARNESS_NAMES, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, HARNESS_NAMES, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
@@ -11,6 +12,7 @@ import { ConversationAvatar } from "../call/ConversationAvatar";
 import { conversationState, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
+import "./room.css";
 
 /** The harness a conversation runs in, and how it is reached when that matters, by their own names. */
 function harnessLine(row: ParticipantView) {
@@ -50,6 +52,13 @@ export function ConversationSidebar() {
     window.addEventListener(OPEN_CONVERSATIONS, show);
     return () => window.removeEventListener(OPEN_CONVERSATIONS, show);
   }, [openConversations]);
+  // The panel hangs from the header's lower edge, wherever a banner above the room has put it: measured once per
+  // opening, before it paints.
+  useLayoutEffect(() => {
+    if (!modal) return;
+    const header = document.querySelector(".room-header");
+    if (header) panel.current?.style.setProperty("--conversations-top", header.getBoundingClientRect().bottom + "px");
+  }, [modal]);
   useSurface({
     open: modal, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".participant-row[data-selected] .person:not(:disabled)")
@@ -67,6 +76,8 @@ export function ConversationSidebar() {
     if (collapsed) toggleSidebar();
     if (crowded) closeTranscript();
   };
+  // The unread count is the row's badge, so the line under the title says the state alone; the tooltip says both.
+  const unread = (row: ParticipantView) => row.unread > 0 && conversationState(row, inCall) !== "in-call";
 
   return (
     <>
@@ -74,14 +85,14 @@ export function ConversationSidebar() {
         role={modal ? "dialog" : undefined} aria-modal={modal || undefined} aria-label={t("sidebar.title")}>
         <div className="sidebar-head">
           <h2>{t("sidebar.title")}</h2>
-          <button type="button" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
+          <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
             aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")} title={rail ? t("sidebar.expand") : t("sidebar.collapse")}
             onClick={toggle}>
             {rail ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
-          </button>
-          <button type="button" className="sidebar-close" aria-label={t("sidebar.close")} title={t("sidebar.close")} onClick={close}>
+          </Button>
+          <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-close" aria-label={t("sidebar.close")} title={t("sidebar.close")} onClick={close}>
             <CloseUpIcon />
-          </button>
+          </Button>
         </div>
         <div id="participants" className="sidebar-body">
           {machineGroups(participants).map((group) => {
@@ -95,17 +106,23 @@ export function ConversationSidebar() {
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
-                  sub={(row) => <span className="sidebar-state" data-state={conversationState(row, inCall)}>{row.harness && <HarnessIcon harness={row.harness} size={11} />}{stateText(row, inCall, t)}</span>}
+                  sub={(row) => (
+                    <span className="sidebar-state" data-state={conversationState(row, inCall)}>
+                      {row.harness && <HarnessIcon harness={row.harness} size={12} />}
+                      <span className="sidebar-state-text">{stateText({ ...row, unread: 0 }, inCall, t)}</span>
+                    </span>
+                  )}
+                  end={(row) => unread(row) && <Badge tone="accent" className="sidebar-unread">{t("state.unread", { n: row.unread })}</Badge>}
                   aside={(row) => (
-                    <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" size="icon" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
-                      <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}>{t("sidebar.closeConversation")}</DropdownMenuItem>
+                    <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" tone="neutral" size="icon-sm" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
+                      <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</DropdownMenuItem>
                     </DropdownMenu>
                   )}
                 />
               </section>
             );
           })}
-          {!participants.length && <p className="sidebar-empty muted">{t("sidebar.empty")}</p>}
+          {!participants.length && <p className="sidebar-empty">{t("sidebar.empty")}</p>}
         </div>
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
