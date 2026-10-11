@@ -26,6 +26,7 @@ beforeEach(() => {
   actions = {
     openPairing: vi.fn(), chooseMachine: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
     tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?" }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
+    installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
@@ -61,8 +62,8 @@ test("transcription and voice are this device's, each tried for real before Cont
   expect((document.getElementById("stt-source") as HTMLSelectElement).value).toBe("local");
   expect(stageAction()).toHaveTextContent("Speak");
   await act(async () => { fireEvent.click(stageAction()); });
-  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", {});
-  expect(document.getElementById("wizard-heard")).toHaveTextContent("hola, ¿me oyes?");
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", { keep: true });
+  expect(document.getElementById("stt-heard")).toHaveTextContent("hola, ¿me oyes?");
   expect(stageAction()).toHaveTextContent("Continue");
   // Another model is another setting: it is tried again before going on.
   act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings("es"), stt: { catalog: "local", model: "moonshine-tiny", language: null } } }));
@@ -75,7 +76,7 @@ test("transcription and voice are this device's, each tried for real before Cont
   fireEvent.change(sample, { target: { value: "Probando la voz" } });
   await act(async () => { fireEvent.click(stageAction()); });
   // Transcription left to detect the language: the sample is said in the one this device speaks.
-  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", { text: "Probando la voz", language: "es" });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", { text: "Probando la voz", language: "es", keep: true });
   fireEvent.click(stageAction());
 
   expect(title()).toHaveTextContent("Ready");
@@ -115,4 +116,24 @@ test("put off, the setup leaves one action that resumes it where it stands", asy
   fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
   // Paired already: it does not ask for the machine again.
   expect(title()).toHaveTextContent("Set up transcription");
+});
+
+test("a model not on this device is downloaded first: the footer offers its download, then the try once it is here", async () => {
+  const store = room();
+  const absent = CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id === "whisper-base"
+    ? { ...model, installed: false, recommendedBuild: "whisper-base/int8", builds: [{ id: "whisper-base/int8", available: true, reasons: [], installed: false, downloadBytes: 148e6 }] } : model) }));
+  act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: absent as unknown as CatalogView[], error: "" } }));
+  paired(store);
+  expect(title()).toHaveTextContent("Set up transcription");
+  expect(stageAction()).toHaveTextContent("Download (148 MB)");
+  expect(document.getElementById("stt-language")).toBeNull();
+  fireEvent.click(stageAction());
+  expect(actions.installVoiceModel).toHaveBeenCalledWith("stt");
+  act(() => store.patch({ voiceInstall: { task: "stt", model: "whisper-base", state: "running", fraction: 0.5, error: "" } }));
+  expect(stageAction()).toHaveTextContent("Cancel download");
+  fireEvent.click(stageAction());
+  expect(actions.cancelVoiceInstall).toHaveBeenCalled();
+  act(() => store.patch({ voiceInstall: null, voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  expect(stageAction()).toHaveTextContent("Speak");
+  expect(document.getElementById("stt-language")).toBeInTheDocument();
 });

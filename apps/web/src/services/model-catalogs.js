@@ -56,7 +56,10 @@ export function webInstallProgress(progress) {
 }
 
 /** The desktop app's native engine install (`host.nativeEngine`, sidevoice-desktop's BRIDGE.md) as `install`: its
- *  bytes as the share done, and the signal as its `cancel(job)`. */
+ *  bytes as the share done, and the signal as its `cancel(job)`.
+ * @param {{install(model: string, engine: string | null, onProgress: (report: {done: number, total: number}) => void): Promise<void> & {job: string}, cancel(job: string): unknown}} nativeEngine
+ * @returns {ModelCatalogs['install']}
+ */
 export function nativeInstall(nativeEngine) {
   return (model, { engine = null, onProgress, signal } = {}) => {
     if (signal?.aborted) return Promise.reject(cancelled());

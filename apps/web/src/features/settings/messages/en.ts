@@ -345,6 +345,16 @@ export const en = {
   "wizard.trial.cancelled": "The try was stopped.",
   "wizard.trial.not-heard": "The sentence did not play to its end. Try again.",
   "wizard.trial.in-call": "Leave the call before trying the voice settings.",
+  "voice.model.notHere": "Not on this device yet · {size} to download",
+  "voice.model.notHereUnknown": "Not on this device yet",
+  "voice.model.download": "Download ({size})",
+  "voice.model.downloadUnknown": "Download",
+  "voice.model.downloading": "Downloading…",
+  "voice.model.downloadingAt": "Downloading… {percent}%",
+  "voice.model.cancelDownload": "Cancel download",
+  "voice.model.here": "On this device",
+  "voice.try.speak": "Try it: speak",
+  "voice.try.listen": "Try it: listen",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

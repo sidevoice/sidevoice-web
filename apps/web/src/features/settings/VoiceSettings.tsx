@@ -7,6 +7,7 @@ import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ProviderKey } from "./ProviderKeys";
+import { ModelCard, VoiceTry, useModelState } from "./ModelSetup";
 
 /* The call's voice as the person chooses it: for what transcribes and what speaks, a source first — this device, or a
  * remote provider — then a model of it; then the voice, and when a turn ends. The choices are the engine's catalogues;
@@ -90,32 +91,43 @@ function SlotSource({ slot, draft, sources, keysInPlace, t }: { slot: "stt" | "t
 }
 
 /** Where speech is transcribed: source, model, language. */
-export function TranscriptionChoices({ draft, keysInPlace = false }: { draft: Settings; keysInPlace?: boolean }) {
+/** `setup`: as in the first-run setup, a provider's missing key asked for in place, and the model's main action (its
+ *  download, its try) left to the dialog's footer; in Settings the card and the try carry their own. */
+type SlotProps = { draft: Settings; setup?: boolean };
+
+export function TranscriptionChoices({ draft, setup = false }: SlotProps) {
   const t = hostTranslator();
   const choices = useChoices(draft);
+  const model = useModelState("stt", draft);
   return <>
-    <SlotSource slot="stt" draft={draft} sources={choices.stt.sources} keysInPlace={keysInPlace} t={t} />
+    <SlotSource slot="stt" draft={draft} sources={choices.stt.sources} keysInPlace={setup} t={t} />
     <label>{t("voice.model")}<ModelSelect id="stt-model" value={draft.stt.model} options={choices.stt.options} onChange={(model) => edit({ stt: { model } })} t={t} /></label>
     <SlotNote id="stt-model-note" note={chosen(choices.stt.options, draft.stt.model)} t={t} />
-    <label>{t("voice.language")}
+    <ModelCard task="stt" state={model} actionsInFooter={setup} />
+    {/* Its options once it is ready to use. */}
+    {model.ready && <><label>{t("voice.language")}
       <NativeSelect id="stt-language" value={draft.stt.language ?? ""} onChange={(event) => edit({ stt: { language: event.target.value || null } })}>
         <option value="">{t("voice.language.detect")}</option>
         {choices.stt.languages.map((tag: string) => <option key={tag} value={tag}>{languageName(tag)}</option>)}
       </NativeSelect>
     </label>
+    {!setup && <VoiceTry task="stt" draft={draft} ready={model.ready} />}</>}
   </>;
 }
 
 /** How replies sound: source, model, voice, speed. */
-export function SpeechChoices({ draft, keysInPlace = false }: { draft: Settings; keysInPlace?: boolean }) {
+export function SpeechChoices({ draft, setup = false }: SlotProps) {
   const t = hostTranslator();
   const choices = useChoices(draft);
+  const model = useModelState("tts", draft);
   const speed = choices.tts.speed;
   return <>
-    <SlotSource slot="tts" draft={draft} sources={choices.tts.sources} keysInPlace={keysInPlace} t={t} />
+    <SlotSource slot="tts" draft={draft} sources={choices.tts.sources} keysInPlace={setup} t={t} />
     <label>{t("voice.model")}<ModelSelect id="tts-model" value={draft.tts.model} options={choices.tts.options} onChange={(model) => edit({ tts: { model } })} t={t} /></label>
     <SlotNote id="tts-model-note" note={chosen(choices.tts.options, draft.tts.model)} t={t} />
-    {choices.tts.voices.length ? (
+    <ModelCard task="tts" state={model} actionsInFooter={setup} />
+    {/* Its voices and speed once it is ready to use. */}
+    {model.ready && <>{choices.tts.voices.length ? (
       <label>{t("voice.voice")}
         <NativeSelect id="tts-voice" value={draft.tts.voice ?? ""} onChange={(event) => edit({ tts: { voice: event.target.value || null } })}>
           <option value="">{t("voice.voice.first")}</option>
@@ -128,6 +140,7 @@ export function SpeechChoices({ draft, keysInPlace = false }: { draft: Settings;
         <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
       </label>
     ) : null}
+    {!setup && <VoiceTry task="tts" draft={draft} ready={model.ready} />}</>}
   </>;
 }
 

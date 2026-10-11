@@ -86,7 +86,7 @@ test("in the desktop app the native engine installs it: its bytes as the share d
     },
     cancel: async (job: string) => { cancelled.push(job); fail?.({ key: "install_cancelled", message: "cancelled" }); return true; },
   };
-  const install = nativeInstall(native);
+  const install = nativeInstall(native as unknown as Parameters<typeof nativeInstall>[0]);
   const progress: unknown[] = [];
   const done = install("whisper-small", { engine: "sherpa-onnx", onProgress: (p) => progress.push(p) });
   report!({ job: "install-1", done: 25, total: 100, bytes_per_s: null });

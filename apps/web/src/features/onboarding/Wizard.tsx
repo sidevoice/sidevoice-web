@@ -5,6 +5,7 @@ import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { CONNECTOR_INSTALL } from "../pairing/connector-commands";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices } from "../settings/VoiceSettings";
+import { TryResult, cancelDownload, downloadModel, sizeText, useModelState, useVoiceTry, type ModelState } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
@@ -40,31 +41,6 @@ function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHos
   return null;
 }
 
-type Trial = { phase: "idle" | "running" | "done" | "failed"; text: string; error: string };
-
-/** The try of the step's voice slot (none outside W4/W4v): running, what it heard, or why it failed. A changed setting
- *  clears it, and leaving the step stops it. */
-function useTrial(task: "stt" | "tts" | null) {
-  const onboarding = useOnboarding();
-  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
-  const [trial, setTrial] = useState<Trial>({ phase: "idle", text: "", error: "" });
-  const slot = JSON.stringify(task && draft ? draft[task] : null);
-  useEffect(() => { setTrial({ phase: "idle", text: "", error: "" }); }, [slot, task]);
-  useEffect(() => () => window.sidevoiceActions?.cancelVoiceTry?.(), [task]);
-  async function run(options: { text?: string; language?: string | null } = {}) {
-    if (!task) return;
-    setTrial({ phase: "running", text: "", error: "" });
-    try {
-      const result = await window.sidevoiceActions!.tryVoiceSettings!(task, options);
-      setTrial({ phase: "done", text: result.text ?? "", error: "" });
-      await onboarding.markTried(task);
-    } catch (error) {
-      setTrial({ phase: (error as { code?: string }).code === "trial-cancelled" ? "idle" : "failed", text: "", error: (error as Error).message });
-    }
-  }
-  return { trial, run, cancel: () => window.sidevoiceActions?.cancelVoiceTry?.() };
-}
-
 /** A slot chosen with no model (a provider whose key just came) takes its catalogue's first runnable one. */
 function useFirstModel(task: "stt" | "tts") {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -78,7 +54,7 @@ function useFirstModel(task: "stt" | "tts") {
   }, [draft, catalogs, task]);
 }
 
-type StageTry = ReturnType<typeof useTrial> & { sample: string; setSample(value: string): void; again(): void };
+type StageTry = ReturnType<typeof useVoiceTry> & { sample: string; setSample(value: string): void; again(): void };
 
 function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -94,19 +70,31 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
     {catalogue.state === "failed" ? <p role="alert" className="voice-catalogue-error">{catalogue.error}</p>
       : catalogue.state !== "ready" || !draft ? <p className="muted" role="status">{t("voice.loading")}</p>
-        : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} keysInPlace /> : <SpeechChoices draft={draft} keysInPlace />}</div>}
+        : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} setup /> : <SpeechChoices draft={draft} setup />}</div>}
     {task === "tts" && <label className="wizard-sample">{t("wizard.sample")}
       <textarea id="wizard-sample" rows={2} maxLength={SAMPLE_MAX} value={stage.sample} placeholder={t("wizard.samplePlaceholder")}
         onChange={(event) => stage.setSample(event.target.value)} />
       <span className="muted">{t("wizard.sampleCount", { count: stage.sample.length, max: SAMPLE_MAX })}</span>
     </label>}
-    <div className="wizard-trial" aria-live="polite">
-      {trial.phase === "running" && <p className="muted" role="status">{t(task === "stt" ? "wizard.listening" : "wizard.playing")}</p>}
-      {trial.phase === "done" && task === "stt" && <div className="wizard-heard"><span className="muted">{t("wizard.transcript")}</span><p className="speech-bubble" id="wizard-heard">{trial.text}</p></div>}
+    <div className="wizard-trial">
+      <TryResult task={task} trial={trial} t={t} />
       {onboarding.tried(task) && trial.phase !== "running" && <Button type="button" variant="ghost" size="compact" id="wizard-try-again" onClick={stage.again}>{t("wizard.trialAgain")}</Button>}
-      {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
     </div>
   </section>;
+}
+
+/** The voice steps' footer action, what the model still needs, in the prototype's order: its download while it is not
+ *  on this device (cancel while it downloads, again if it failed), then the try (cancel while it runs), then Continue. */
+function StageAction({ task, model, running, tried, disabled, onTry, onCancelTry, onContinue, t }: {
+  task: "stt" | "tts"; model: ModelState; running: boolean; tried: boolean; disabled: boolean;
+  onTry(): void; onCancelTry(): void; onContinue(): void; t: HostTranslate;
+}) {
+  const [label, action, off] = model.installing ? [t("voice.model.cancelDownload"), cancelDownload, false]
+    : model.model && !model.ready ? [model.failure ? t("voice.retry") : model.size ? t("voice.model.download", { size: sizeText(model.size) }) : t("voice.model.downloadUnknown"), () => downloadModel(task), false]
+      : running ? [t("wizard.cancelTrial"), onCancelTry, false]
+        : tried ? [t("wizard.continue"), onContinue, false]
+          : [task === "stt" ? t("wizard.speak") : t("wizard.listen"), onTry, disabled];
+  return <Button type="button" variant="primary" id="wizard-stage-action" disabled={off} onClick={action}>{label}</Button>;
 }
 
 export function Wizard() {
@@ -124,9 +112,10 @@ export function Wizard() {
   const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
   const { step } = onboarding;
   const stageTask = step === "W4" ? "stt" : step === "W4v" ? "tts" : null;
-  const trial = useTrial(stageTask);
-  const [sample, setSample] = useState(() => t("wizard.sampleText"));
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const trial = useVoiceTry(stageTask, { onTried: (task) => void onboarding.markTried(task) });
+  const model = useModelState(stageTask ?? "stt", draft);
+  const [sample, setSample] = useState(() => t("wizard.sampleText"));
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const tryAgain = () => void trial.run(stageTask === "stt" ? {} : { text: sample.trim(), language: draft?.stt.language || speechLanguage });
   const stage: StageTry = { ...trial, sample, setSample, again: tryAgain };
@@ -239,11 +228,9 @@ export function Wizard() {
         <Button type="button" variant="ghost" onClick={() => void finishAgents()}>{t("wizard.agentsSkip")}</Button>
         <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>
       </>}
-      {stageTask && <Button type="button" variant="primary" id="wizard-stage-action"
-        disabled={trial.trial.phase !== "running" && !stageTried && (!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim()))}
-        onClick={trial.trial.phase === "running" ? trial.cancel : stageTried ? () => onboarding.goTo(stageTask === "stt" ? "W4v" : "W6") : tryAgain}>
-        {trial.trial.phase === "running" ? t("wizard.cancelTrial") : stageTried ? t("wizard.continue") : stageTask === "stt" ? t("wizard.speak") : t("wizard.listen")}
-      </Button>}
+      {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"} tried={stageTried}
+        disabled={!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim())}
+        onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => onboarding.goTo(stageTask === "stt" ? "W4v" : "W6")} t={t} />}
       {step === "W6" && <Button type="button" variant="primary" disabled={completing} onClick={() => void complete()}>
         {error ? t("wizard.retryCompletion") : t("wizard.enter")}
       </Button>}
