@@ -7,7 +7,7 @@
  * the slot kept for it beside your wave, and the room's call controls appear below. Panels open below the controls
  * and close by themselves. */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ChevronIcon, HangupIcon, HARNESS_NAMES, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon, SpeakerIcon } from "../components/ui/Icons";
+import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon, SpeakerIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
 import type { ParticipantView } from "../state/room-types";
 import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
@@ -163,12 +163,11 @@ function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (command: Cal
 
 /** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest). */
 function conversationSub(row: ParticipantView, t: Translate) {
-  const harness = row.harness && HARNESS_NAMES[row.harness] ? row.harness : null;
   const reach = row.reach === "holding" ? t("card.reach.holding") : row.reach === "offline" || !row.available ? t("card.reach.offline") : null;
   return (
     <>
       {row.machine && <span className="person-machine"><MachinesIcon size={11} /> {row.machine}</span>}
-      {harness && <span className="person-harness"><HarnessIcon harness={harness} size={11} /> {HARNESS_NAMES[harness]}</span>}
+      {(row.harness || row.model) && <span className="person-harness">{row.harness && <HarnessIcon harness={row.harness} size={11} />} {[row.model, row.effort].filter(Boolean).join(" · ")}</span>}
       {reach && <span className="person-reach"> · {reach}</span>}
     </>
   );
@@ -236,7 +235,6 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
   useEffect(() => { if (expanded) guardUntil.current = Math.max(guardUntil.current, Date.now() + CLICK_GUARD_MS); }, [expanded]);
 
   const selected = call.participants.find((participant) => participant.selected);
-  const harness = selected?.harness && HARNESS_NAMES[selected.harness] ? selected.harness : null;
   const agent = reconnecting ? "reconnecting" : call.agent;
   const run = (command: CallCommand) => { if (Date.now() >= guardUntil.current) host.run(command); };
   const muteLabel = muted ? t("card.unmute") : t("card.mute");
@@ -290,7 +288,7 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
             ? <span className="card-sub reconnecting">{t("card.reconnecting")}</span>
             : <span className="card-sub">{[
                 selected?.machine && <span key="machine" className="card-machine"><MachinesIcon size={11} /> <span>{selected.machine}</span></span>,
-                harness && <span key="harness" className="card-harness"><HarnessIcon harness={harness} size={11} /> <span>{HARNESS_NAMES[harness]}</span></span>,
+                (selected?.harness || selected?.model) && <span key="harness" className="card-harness">{selected?.harness && <HarnessIcon harness={selected.harness} size={11} />} <span>{[selected?.model, selected?.effort].filter(Boolean).join(" · ")}</span></span>,
                 call.since && <span key="clock" className="card-clock">{duration(call.since, now)}</span>,
               ].filter(Boolean).flatMap((part, i) => (i ? [<span key={"dot" + i} aria-hidden="true">·</span>, part] : [part]))}</span>}
         </div>

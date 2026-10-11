@@ -41,12 +41,6 @@ export const en = {
   "stage.cancelTurn": "Cancel sending",
 
   "toolbar.micLevel": "Microphone level",
-  "stage.effort": "{effort} effort",
-  "stage.effort.low": "low",
-  "stage.effort.medium": "medium",
-  "stage.effort.high": "high",
-  "stage.effort.xhigh": "extra high",
-  "stage.effort.max": "max",
   "toolbar.skip": "Skip what is playing",
 
   "transcript.show": "Show transcript",

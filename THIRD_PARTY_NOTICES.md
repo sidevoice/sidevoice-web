@@ -14,7 +14,7 @@ The desktop app's call controls card bundles the DM Sans typeface
 licence beside it (`OFL.txt`).
 
 The web shows other products' marks to identify their integrations (OpenAI, ElevenLabs,
-Claude, Codex, Cursor): each is its owner's trademark, taken unaltered from its brand kit
+Claude, Codex, Cursor, and the Model Context Protocol for any other agent): each is its owner's trademark, taken unaltered from its brand kit
 (`apps/web/src/assets/logos/`, with each source and its usage rules), and implies no
 endorsement.
 

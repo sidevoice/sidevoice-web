@@ -18,6 +18,7 @@ import codexLogo from "../../assets/logos/codex.svg?raw";
 import cursorLogo from "../../assets/logos/cursor.svg?raw";
 import elevenLabsLogo from "../../assets/logos/elevenlabs.svg?raw";
 import openAiLogo from "../../assets/logos/openai.svg?raw";
+import mcpLogo from "../../assets/logos/mcp.svg?raw";
 
 type IconProps = { className?: string; size?: number };
 type LucideLike = ComponentType<{ className?: string; size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
@@ -120,6 +121,8 @@ export const CodexIcon = logo(codexLogo, 1.6);
 export const CursorIcon = logo(cursorLogo);
 export const OpenAILogo = logo(openAiLogo, 1.6);
 export const ElevenLabsLogo = logo(elevenLabsLogo, 2);
+/** Any coding agent we do not recognise: it reaches Sidevoice over the Model Context Protocol, whose mark it wears. */
+export const McpLogo = logo(mcpLogo);
 
 /** A provider's mark by its catalogue id; none for a provider without one here. */
 export function ProviderLogo({ provider, size = 20 }: { provider: string; size?: number }) {
@@ -144,11 +147,12 @@ export function PlatformIcon({ platform, size = 12 }: { platform: string; size?:
   return <MachinesIcon size={size} />;
 }
 
-export const HARNESS_NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
-
+/** A harness as its own mark, never its name in words: the ones we recognise by theirs, any other by MCP's. The
+ *  harness says who it is as it likes ("claude", "claude-code"); what follows the product's name does not matter. */
 export function HarnessIcon({ harness, size = 12 }: { harness: string; size?: number }) {
-  if (harness === "claude") return <ClaudeIcon size={size} />;
-  if (harness === "codex") return <CodexIcon size={size} />;
-  if (harness === "cursor") return <CursorIcon size={size} />;
-  return null;
+  const id = harness.toLowerCase();
+  if (id === "claude" || id.startsWith("claude-")) return <ClaudeIcon size={size} />;
+  if (id === "codex" || id.startsWith("codex-")) return <CodexIcon size={size} />;
+  if (id === "cursor" || id.startsWith("cursor-")) return <CursorIcon size={size} />;
+  return <McpLogo size={size} />;
 }

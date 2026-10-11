@@ -157,7 +157,7 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
         {mood === "working" && <p className="pt-working" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("stage.working")}</p>}
       </div>
       <Avatar id="sidevoice-web" mood={mood === "listening" ? "waiting" : mood} size="stage" />
-      <div className="pt-stage-tags"><span className="pt-tag"><HarnessIcon harness="claude" size={12} />Claude Code · opus · {t("stage.effort", { effort: "high" })}</span></div>
+      <div className="pt-stage-tags"><span className="pt-tag"><HarnessIcon harness="claude-code" size={12} />claude-opus-5-5 · xhigh</span></div>
       {mood === "listening" && <div className="pt-bubble pt-bubble--person">
         <span>…and make the dark theme a little warmer</span>
         <Button variant="ghost" tone="neutral" size="sm">{t("stage.cancelTurn")}</Button>

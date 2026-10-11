@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
-import { CloseIcon, CloseUpIcon, HARNESS_NAMES, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
@@ -18,10 +18,9 @@ import { useVariant } from "../../lib/variants";
 import { hostTranslator } from "../settings/host-i18n";
 import "./room.css";
 
-/** The harness a conversation runs in, and how it is reached when that matters, by their own names. */
+/** How a conversation's harness is reached, when that matters; the harness itself is its mark, never its name. */
 function harnessLine(row: ParticipantView) {
-  const name = row.harness ? HARNESS_NAMES[row.harness] : null;
-  return name ? name + (row.route ? " · " + row.route : "") : null;
+  return [row.model, row.effort].filter(Boolean).join(" · ") + (row.route ? (row.model ? " · " : "") + row.route : "") || null;
 }
 
 /** Asked for by the runtime when a call finds no conversation to land on. */

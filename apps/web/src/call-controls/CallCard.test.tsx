@@ -56,7 +56,9 @@ test("at rest: the agent, the conversation, who is on it and for how long, and y
   render(<CallCard host={fakeHost()} t={t} />);
   expect(screen.getByRole("button", { name: /Sidevoice: mini call/ })).toBeInTheDocument();
   expect(screen.getByText("daimon")).toBeInTheDocument();
-  expect(screen.getByText("Claude Code")).toBeInTheDocument();
+  // The harness is its mark, never its name in words.
+  expect(screen.queryByText("Claude Code")).toBeNull();
+  expect(document.querySelector(".card-harness .ui-logo")).toBeInTheDocument();
   expect(screen.getByText("12:34")).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "The agent is idle" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Your microphone" })).toBeInTheDocument();

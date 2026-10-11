@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { HARNESS_NAMES, HarnessIcon } from "../../components/ui/Icons";
+import { HarnessIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
@@ -10,7 +10,6 @@ import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callTranslator, type CallTranslate } from "./call-i18n";
-import type { CallMessageKey } from "./messages/en";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
 import { TranscriptToggle } from "./CallToolbar";
@@ -88,13 +87,6 @@ function BootError() {
   return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={error} />}</div>;
 }
 
-/** An effort as people say it in the interface's language; one this page does not know, as the harness says it. */
-function effortName(effort: string, t: CallTranslate) {
-  const key = ("stage.effort." + effort) as CallMessageKey;
-  const name = t(key);
-  return name === key ? effort : name;
-}
-
 export function CallStage() {
   const t = callTranslator();
   const stage = useStageConversation();
@@ -103,7 +95,6 @@ export function CallStage() {
   const narrow = useMedia(NARROW_QUERY);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
-  const harness = stage.row?.harness ? HARNESS_NAMES[stage.row.harness] : null;
 
   if (!stage.threadId) {
     return (
@@ -132,9 +123,9 @@ export function CallStage() {
         <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage"
           mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agent", { title: stage.title })} />
         <div className="stage-tags">
-          {(harness || stage.row?.model) && <span className="stage-tag stage-badge">
+          {(stage.row?.harness || stage.row?.model) && <span className="stage-tag stage-badge">
             {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
-            <span>{[harness, stage.row?.model, stage.row?.effort && t("stage.effort", { effort: effortName(stage.row.effort, t) })].filter(Boolean).join(" · ")}</span>
+            <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
           </span>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
