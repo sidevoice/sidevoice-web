@@ -15,7 +15,7 @@ import { NewMark } from "../highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
-import { cancelDownload, catalogueShown, downloadModel, TryResult, useModelState, useVoiceTry, type ModelState } from "./ModelSetup";
+import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, useModelState, useVoiceTry, type ModelState, type SetupTry, type VoiceTry } from "./ModelSetup";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -117,11 +117,11 @@ function useFirstModel(task: "stt" | "tts") {
   }, [draft, catalogs, task]);
 }
 
-/** One slot: where it runs, its model made ready, then its options. A provider that only lacks its key can be chosen,
- *  and a row under it says so, with Connect: the key's entry, as Providers opens it, saved where Providers keeps it.
- *  Once kept, the row goes, the slot says so and its source takes the focus. `setup`: the first-run setup's, whose try
- *  is its own. */
-function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; setup: boolean }) {
+/** One slot: where it runs, its model made ready and tried in its block, then its options. A provider that only lacks
+ *  its key can be chosen, and a row under it says so, with Connect: the key's entry, as Providers opens it, saved where
+ *  Providers keeps it; once kept, the row goes and its source takes the focus. `setup`: the first-run setup's, whose
+ *  try is its own (`trial`), shown in the block all the same. */
+function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; draft: Settings; setup: boolean; trial?: SetupTry }) {
   useFirstModel(task);
   const t = hostTranslator();
   const choices = useChoices(draft);
@@ -132,7 +132,7 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   const pending = !setup && inUse && (inUse.catalog !== draft[task].catalog || inUse.model !== draft[task].model)
     ? t("voice.prepare.willSwitch", { model: inUse.model }) : undefined;
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
-  const { trial, run, cancel } = useVoiceTry(setup ? null : task, { keep: false });
+  const own = useVoiceTry(setup ? null : task, { keep: false });
   // A provider that only lacks its key can be chosen, and asks for it below.
   const sources = slot.sources.map((source) => keyless(source.note) ? { ...source, disabled: false } : source);
   const sourceNote = slot.sources.find((source) => source.id === draft[task].catalog)?.note;
@@ -144,10 +144,10 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   const languages = model.model?.languages ?? [];
   const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
   const tryLanguage = draft.stt.language || speechLanguage;
-  const startTry = () => void run(task === "stt" ? {} : { text: t("wizard.sampleText"), language: tryLanguage });
-  const tryButton = !setup && <Button size="sm" id={task + "-try"} onClick={trial.phase === "running" ? cancel : startTry}>
-    {trial.phase === "running" ? t("wizard.cancelTrial") : t(task === "stt" ? "voice.try.speak" : "voice.try.listen")}
-  </Button>;
+  // Settings' try says the sample sentence; the first-run setup's is the setup's, started from its footer too.
+  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: t("wizard.sampleText"), language: tryLanguage }) });
+  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried} again={setupTry?.tried} t={t} />;
+  const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
   // A key kept from here: said, and the focus on the slot's source (its box, found in this slot's group: the setup and
@@ -167,10 +167,9 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
-          readyAction={tryButton || undefined} onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)}
+          readyAction={tryButton || undefined} readyPanel={tryPanel || undefined} onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)}
           />
         <ModelRuntime task={task} state={model} locked={model.installing} />
-        {!setup && <TryResult task={task} trial={trial} t={t} />}
       </Row>
       {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
         <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
@@ -193,16 +192,16 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   );
 }
 
-type SlotProps = { draft: Settings; setup?: boolean };
+type SlotProps = { draft: Settings; setup?: boolean; trial?: SetupTry };
 
 /** Where speech is transcribed: source, model, language. */
-export function TranscriptionChoices({ draft, setup = false }: SlotProps) {
-  return <SlotSettings task="stt" draft={draft} setup={setup} />;
+export function TranscriptionChoices({ draft, setup = false, trial }: SlotProps) {
+  return <SlotSettings task="stt" draft={draft} setup={setup} trial={trial} />;
 }
 
 /** How replies sound: source, model, voice, speed. */
-export function SpeechChoices({ draft, setup = false }: SlotProps) {
-  return <SlotSettings task="tts" draft={draft} setup={setup} />;
+export function SpeechChoices({ draft, setup = false, trial }: SlotProps) {
+  return <SlotSettings task="tts" draft={draft} setup={setup} trial={trial} />;
 }
 
 /** When the person's turn ends: how long a pause may be (fast, normal, calm), and what decides it — silence, or the

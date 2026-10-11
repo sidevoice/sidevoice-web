@@ -113,7 +113,7 @@
 #call-controls .mic-control { display: flex; align-items: center; gap: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); isolation: isolate; }
 #call-controls #mute { border-radius: var(--sv-radius-pill); }
 .mic-wave { display: flex; align-items: center; gap: 2.4px; height: 22px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
-.mic-wave i { display: block; width: 2.6px; height: calc(3px + var(--mic-fill, 0%) * var(--bar) * .19); max-height: 22px; border-radius: 2px; background: var(--sv-accent); transition: height 70ms linear; }
+.mic-wave i { display: block; width: 2.6px; height: calc(3px + var(--mic-fill, 0%) * var(--bar) * .86); max-height: 22px; border-radius: 2px; background: var(--sv-accent); transition: height 70ms linear; }
 .mic-wave i:nth-child(1) { --bar: .45; }
 .mic-wave i:nth-child(2) { --bar: .8; }
 .mic-wave i:nth-child(3) { --bar: 1; }

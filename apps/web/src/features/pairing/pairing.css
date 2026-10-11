@@ -10,23 +10,73 @@
   border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold);
 }
 .connector-steps > li > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
-.command-block { display: grid; min-width: 0; }
-.setup-command { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
-.setup-command code { flex: 1; min-width: 0; overflow-x: auto; font: var(--sv-font-sm) / 1.25rem var(--sv-font-mono); white-space: nowrap; color: var(--sv-text); scrollbar-width: thin; }
-.command-note { display: flex; align-items: center; gap: var(--sv-space-1); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.command-note:not(:empty) { margin-top: var(--sv-space-1-5); }
-.command-note[data-copied] { color: var(--sv-positive); }
+/* Already one numbered step of the pairing screen's (`steps`): the two commands without numbers of their own. */
+.connector-steps[data-plain] { gap: var(--sv-space-3); }
+.connector-steps[data-plain] > li { padding-inline-start: 0; }
+.connector-steps[data-plain] > li::before { content: none; }
 
-/* ----- the pairing form, and the dialog around it */
-.pairing-form { display: grid; gap: var(--sv-space-4); min-width: 0; }
+/* ----- "Connect to your machine" (PairMachine): the form, the same in every layout */
+.pair-machine { display: grid; gap: var(--sv-space-5); min-width: 0; }
+.pairing-form { position: relative; display: grid; gap: var(--sv-space-4); min-width: 0; }
+.pairing-intro { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
 .ui-textarea.pairing-code { font-family: var(--sv-font-mono); font-size: var(--sv-font-sm); line-height: 1.25rem; word-break: break-all; }
-.pairing-error:empty { display: none; }
+.pairing-recognised { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); color: var(--sv-positive); font-variant-numeric: tabular-nums; }
+.pairing-recognised svg { flex: none; }
+/* How to get a code (`code`): a quiet toggle, its chevron pointing where the commands are. */
+.pairing-how { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; margin-top: calc(-1 * var(--sv-space-2)); }
+.pairing-how-toggle { margin-inline-start: calc(-1 * var(--sv-space-3)); }
+.pairing-how-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-base) var(--sv-ease); }
+.pairing-how-toggle[aria-expanded="true"] svg { transform: none; }
+.pairing-how-body { justify-self: stretch; min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+/* The address's (i) right by its label, not at the far end of the row. */
+.pairing-address .ui-field-head { justify-content: flex-start; align-items: center; gap: var(--sv-space-1); }
+.pairing-address .ui-infotip { margin-block: -4px; }
+.pairing-other-address { justify-self: start; margin-top: calc(-1 * var(--sv-space-2)); margin-inline-start: calc(-1 * var(--sv-space-3)); }
+.pairing-status { display: flex; align-items: center; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.pairing-status[data-connected] { color: var(--sv-positive); }
+/* Saying nothing, it takes no room, and is still there to say what comes. */
+.pairing-status:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.pairing-alert:empty { display: none; }
+/* Agreeing to no encryption: the button under the warning's words, the whole width on a phone and in the form's column
+ * (split); busy, its words stay in sight beside the spinner. */
+.pairing-consent .ui-alert-body { margin-top: var(--sv-space-3); }
+/* Its words take the focus (not the button): ringed as one block, not line by line. */
+.pairing-consent .ui-alert-title > [tabindex="-1"] { display: block; border-radius: var(--sv-radius-sm); outline-offset: 2px; }
+.pairing-insecure[data-loading] .ui-button-content { visibility: visible; }
+.pairing-insecure[data-loading] .ui-spinner { position: static; flex: none; margin: 0; }
+.pair-machine[data-layout="split"] .pairing-insecure { width: 100%; }
+@media (max-width: 599px) { .pairing-insecure { width: 100%; min-height: 44px; } }
 .pairing-form-actions { display: flex; justify-content: flex-end; }
-.remote-setup-guidance { display: grid; gap: var(--sv-space-3); }
-.remote-setup-guidance h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
 /* The form's Connect, sent to a footer from the form: laid out there as if it were the footer's own. */
 .pairing-submit { display: contents; }
 @media (max-width: 599px) { .ui-dialog-foot > .pairing-submit > .ui-button { flex: 1 1 0; } }
+
+/* `steps`: what to run on the machine, then this form, as two numbered steps on a line; the first a check once a code
+ * is recognised. */
+.pair-steps { display: grid; gap: var(--sv-space-6); margin: 0; padding: 0; list-style: none; }
+.pair-step { position: relative; display: grid; gap: var(--sv-space-3); min-width: 0; padding-inline-start: 40px; }
+.pair-step-mark {
+  position: absolute; inset-inline-start: 0; top: 0; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-bold);
+}
+.pair-step[data-done] .pair-step-mark { background: var(--sv-positive-soft); color: var(--sv-positive); }
+.pair-step:not(:last-child)::after { content: ""; position: absolute; inset-inline-start: 13.5px; top: 36px; bottom: calc(8px - var(--sv-space-6)); width: 1px; background: var(--sv-border); }
+.pair-step-title { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 28px; color: var(--sv-text); }
+
+/* `split`: the machine's column, on a muted ground, beside the form from 720px; above it, narrower. */
+.pair-machine-side { display: grid; align-content: start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.pair-machine-side h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+@media (min-width: 720px) {
+  .pair-machine[data-layout="split"] { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); align-items: start; gap: var(--sv-space-6); }
+  .pair-dialog[data-pair-layout="split"] { --ui-dialog-width: 760px; }
+}
+
+/* On touch, every target here is at least 44px: the small buttons grow, the (i) and the copy buttons reach further
+ * than they show. */
+@media (pointer: coarse) {
+  .pair-machine .ui-button--sm:not(.ui-button--icon) { height: 44px; }
+  .pair-machine .ui-infotip::after { content: ""; position: absolute; inset: -10px; }
+}
 
 /* ----- this computer's preparation: the offer, then its progress */
 .local-install-entry { min-width: 0; }

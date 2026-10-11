@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/cn";
-import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { ChevronIcon, ConnectorIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { Snippet } from "../../components/ui/Snippet";
 import { Tooltip } from "../../components/ui/Tooltip";
-import type { DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
+import type { AgentManualStep, DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { actionableAgent } from "../../services/host-agents";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
@@ -34,49 +35,39 @@ function useRelativeTime(value: string | number | null | undefined): string {
   return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
 }
 
-function CodeBlock({ code }: { code: string }) {
-  const t = hostTranslator();
-  const [note, setNote] = useState("");
-  async function copy() {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard-unavailable");
-      await navigator.clipboard.writeText(code);
-      setNote(t("agents.copied"));
-    } catch {
-      setNote(t("agents.copyFailed"));
-    }
-  }
-  return (
-    <div className="host-agent-code">
-      <pre><code>{code}</code></pre>
-      <Button size="sm" variant="ghost" aria-label={t("agents.copy")} title={t("agents.copy")} onClick={() => void copy()}>
-        <CopyIcon size={15} />{note && <span role="status">{note}</span>}
-      </Button>
-    </div>
-  );
-}
-
 /** How to add Sidevoice to the agent by hand, or (`removing`) take it out; the list is read again meanwhile, so the row
  *  follows what was done. */
-function Instructions({ agent, fp, id, removing = false, onClose }: { agent: DetectedAgent; fp: string; id: string; removing?: boolean; onClose: () => void }) {
+/** What doing it by hand means for an agent as it stands: connecting it, taking Sidevoice out, or replacing another
+ *  "sidevoice" entry — the connector's steps for its harness. */
+type ManualKind = "connect" | "disconnect" | "replace";
+function manualKind(agent: DetectedAgent): ManualKind {
+  return agent.registration === "connected" ? "disconnect" : agent.registration === "foreign" ? "replace" : "connect";
+}
+function manualSteps(agent: DetectedAgent, kind: ManualKind): AgentManualStep[] {
+  const steps = agent.manual?.[kind] ?? (kind === "connect" && agent.instructions ? [agent.instructions] : kind === "disconnect" && agent.removal ? [agent.removal] : []);
+  return steps.filter((step) => step.command?.trim() || step.snippet?.trim());
+}
+
+function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; fp: string; id: string; kind: ManualKind; onClose: () => void }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.hostAgents[fp]?.status ?? "idle");
-  const how = removing ? agent.removal : agent.instructions;
-  const command = how?.command?.trim() ? how.command : undefined;
-  const snippet = how?.snippet?.trim() ? how.snippet : undefined;
+  const steps = manualSteps(agent, kind);
   useEffect(() => {
-    if ((!command && !snippet) || status === "loading") return;
+    if (!steps.length || status === "loading") return;
     const timer = window.setInterval(() => {
       void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true, watch: agent.id });
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [fp, agent.id, command, snippet, status]);
+  }, [fp, agent.id, steps.length, status]);
   return (
     <div className="host-agent-howto" id={id}>
-      {!command && !snippet ? <p className="muted">{t("agents.manual.none")}</p> : <>
-        {command && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><CodeBlock code={command} /></>}
-        {snippet && <><p className="host-agent-howto-label">{how?.file ? t("agents.manual.file", { file: how.file }) : t("agents.manual.snippet")}</p><CodeBlock code={snippet} /></>}
-        <p className="muted" role="status">{t(removing ? "agents.manual.removeWaiting" : agent.registration === "foreign" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
+      {!steps.length ? <p className="muted">{t("agents.manual.none")}</p> : <>
+        {/* The connector's steps, in order, each one to copy. */}
+        <ol className="host-agent-steps">{steps.map((step, index) => <li key={index}>
+          {step.command?.trim() && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><Snippet text={step.command} /></>}
+          {step.snippet?.trim() && <><p className="host-agent-howto-label">{step.file ? t("agents.manual.file", { file: step.file }) : t("agents.manual.snippet")}</p><Snippet text={step.snippet} /></>}
+        </li>)}</ol>
+        <p className="muted" role="status">{t(kind === "disconnect" ? "agents.manual.removeWaiting" : kind === "replace" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
         <Button variant="ghost" size="sm" onClick={onClose}>{t("agents.close")}</Button>
       </>}
     </div>
@@ -94,10 +85,13 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const [confirming, setConfirming] = useState(false);
   const [justConnected, setJustConnected] = useState(false);
   const previous = useRef(agent.registration);
-  const manualOnly = agent.connect === "manual";
+  // What the connector can do itself; an older one says only connect "auto" | "manual".
+  const can = agent.can ?? { connect: agent.connect === "auto", update: agent.connect === "auto", disconnect: true };
+  const manualOnly = !can.connect;
   const readOnly = agent.registration === "foreign" || agent.registration === "invalid" || agent.registration === "unknown";
   const isNew = !readOnly && actionableAgent(agent);
-  const hasManualInstructions = !!(agent.instructions?.command?.trim() || agent.instructions?.snippet?.trim());
+  const kind = manualKind(agent);
+  const hasManualInstructions = manualSteps(agent, kind).length > 0;
   const panelId = `host-agent-howto-${fp.slice(0, 7)}-${agent.id}`;
 
   useEffect(() => { if (error) setOpen(true); }, [error]);
@@ -128,6 +122,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   const connected = agent.registration === "connected";
+  const outdated = agent.registration === "outdated";
   // The confirm goes: the focus goes back to Disconnect (after Remove, to the row's action as it now stands).
   const action = useRef<HTMLButtonElement>(null);
   const cancelConfirm = () => { setConfirming(false); requestAnimationFrame(() => action.current?.focus()); };
@@ -152,18 +147,19 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         {/* Every action a button on the row, each with a hint: doing it by hand (add, replace, or take Sidevoice out), and
             Connect or Disconnect, which Sidevoice does itself. */}
         <span className="host-agent-actions">
-          {(connected || hasManualInstructions) && <Tooltip content={handHint}>
+          {hasManualInstructions && <Tooltip content={handHint}>
             <Button variant="ghost" size="sm" disabled={!!busy} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
               {t(agent.registration === "foreign" ? "agents.foreign.manual.toggle" : "agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
             </Button>
           </Tooltip>}
-          {connected ? <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
+          {connected ? can.disconnect !== false && <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
               <Button ref={action} variant="ghost" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
                 onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
             </Tooltip>
-            : !readOnly && !manualOnly && <Tooltip content={t("agents.hint.connect", { agent: agent.label })}>
-              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t("agents.connectNamed", { agent: agent.label })}
-                onClick={() => run("connect")}>{t("agents.connect")}</Button>
+            // An entry an older Sidevoice made reads Update, as its (i) says; the connector's connect rewrites it.
+            : !readOnly && (outdated ? can.update ?? can.connect : can.connect) && <Tooltip content={t(outdated ? "agents.hint.update" : "agents.hint.connect", { agent: agent.label })}>
+              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t(outdated ? "agents.updateNamed" : "agents.connectNamed", { agent: agent.label })}
+                onClick={() => run("connect")}>{t(outdated ? "agents.update" : "agents.connect")}</Button>
             </Tooltip>}
         </span>
       </div>
@@ -176,7 +172,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         </span>
       </div>}
       {open && agent.registration !== "unknown" &&
-        <Instructions agent={agent} fp={fp} id={panelId} removing={connected} onClose={() => setOpen(false)} />}
+        <Instructions agent={agent} fp={fp} id={panelId} kind={kind} onClose={() => setOpen(false)} />}
     </li>
   );
 }
@@ -193,8 +189,8 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
       </button>
       {open && <div className="host-agent-howto" id="host-agent-other-howto">
         <p className="muted">{t("agents.other.detail")}</p>
-        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><CodeBlock code={custom.command} /></>}
-        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><CodeBlock code={custom.snippet} /></>}
+        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><Snippet text={custom.command} /></>}
+        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><Snippet text={custom.snippet} /></>}
       </div>}
     </section>
   );

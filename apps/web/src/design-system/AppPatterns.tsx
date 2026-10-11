@@ -6,10 +6,11 @@ import { ChoiceCard, Group, Row, Section } from "../components/ui/Card";
 import { DialogSurface } from "../components/ui/Dialog";
 import { Field } from "../components/ui/Field";
 import { Select } from "../components/ui/Select";
+import { Snippet } from "../components/ui/Snippet";
 import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
-  AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, CopyIcon, HangupIcon, HarnessIcon, ProviderLogo,
+  AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, HangupIcon, HarnessIcon, ProviderLogo,
   ListenAgainIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
   SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
@@ -278,15 +279,6 @@ function Stepper({ current }: { current: number }) {
   );
 }
 
-function CommandBlock({ command, label }: { command: string; label: string }) {
-  return (
-    <div className="pt-command">
-      <code>{command}</code>
-      <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={label} title={label}><CopyIcon /></Button>
-    </div>
-  );
-}
-
 function WizardFrame({ step, title, children, footer }: { step: number; title: string; children: ReactNode; footer: ReactNode }) {
   const t = hostTranslator();
   return (
@@ -331,10 +323,10 @@ function WizardPair() {
   const t = hostTranslator();
   return (
     <WizardFrame step={1} title={t("wizard.title.pair")} footer={<><Button variant="ghost" tone="neutral" className="pt-back">{t("wizard.back")}</Button><Button variant="primary">{t("pairing.connect")}</Button></>}>
-      <p>{t("wizard.pairIntro")}</p>
+      <p>{t("pairing.intro")}</p>
       <ol className="pt-steps">
-        <li><p>{t("noMachine.stepInstall")}</p><CommandBlock command={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} /></li>
-        <li><p>{t("noMachine.stepPair")}</p><CommandBlock command={CONNECTOR_PAIR_DEVICE} label={t("noMachine.copyPairCommand")} /></li>
+        <li><p>{t("pairing.stepInstall")}</p><Snippet text={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} /></li>
+        <li><p>{t("pairing.stepPair")}</p><Snippet text={CONNECTOR_PAIR_DEVICE} label={t("noMachine.copyPairCommand")} /></li>
       </ol>
       <PairingForm />
     </WizardFrame>
@@ -461,7 +453,7 @@ function HostAgents() {
       <div className="ui-row ui-row--block pt-agent">
         <div className="pt-machine-line"><span className="pt-machine-icon"><HarnessIcon harness="cursor" size={18} /></span>
           <div className="ui-row-text"><span className="ui-row-label">Cursor</span><p className="ui-row-description">{t("agents.manual.toggle")}</p></div></div>
-        <div className="ui-row-control pt-howto"><CommandBlock command="sidevoice mcp install --client cursor" label="Copy" /><p className="pt-hint">Waiting for Cursor to connect…</p></div>
+        <div className="ui-row-control pt-howto"><Snippet text="sidevoice mcp install --client cursor" /><p className="pt-hint">Waiting for Cursor to connect…</p></div>
       </div>
     </Group>
   );
@@ -497,7 +489,7 @@ function Menus() {
 function StatusLines() {
   return (
     <div className="pt-stack">
-      <p className="pt-status"><CheckIcon size={16} />Command copied.</p>
+      <p className="pt-status"><CheckIcon size={16} />Paired with the NUC.</p>
       <p className="pt-status" data-tone="muted"><span className="ui-spinner ui-spinner--inline" aria-hidden />Connecting…</p>
       <div className="pt-toast" role="status"><CheckIcon size={18} /><span>Key saved.</span><Button variant="ghost" tone="neutral" size="icon-sm" aria-label="Dismiss"><CloseIcon /></Button></div>
     </div>
@@ -586,7 +578,7 @@ export function AppPatterns() {
         <Frame className="pt-frame--dialog">
           <DialogSurface titleId="pt-pair-title" title="Connect to a machine" onClose={() => {}} footer={<><Button variant="ghost" tone="neutral">Cancel</Button><Button variant="primary" loading>Connect</Button></>}>
             <ol className="pt-steps">
-              <li><p>On the machine where your agents run, install Sidevoice from a terminal:</p><CommandBlock command={CONNECTOR_INSTALL} label="Copy setup command" /></li>
+              <li><p>On the machine where your agents run, install Sidevoice from a terminal:</p><Snippet text={CONNECTOR_INSTALL} label="Copy setup command" /></li>
               <li><p>Then get a pairing code there and paste it below with the machine's address:</p></li>
             </ol>
             <PairingForm error />

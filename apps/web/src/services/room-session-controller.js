@@ -668,12 +668,45 @@ async function forgetMachine(fp){
  if(fp===state.callNode&&inCallNow())disconnect();
  keepPairings(withoutPairing(pairings,fp));
  if(pairing.revoked)return;
- try{
-  const place=known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?{base:known}
-   :await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
-  if(place)await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
- }catch{}
+ // Gone from here at once; the machine is told now if it answers, else whenever it does (pendingRevokes).
+ const told=await revokeOn(pairing,known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?known:null);
+ if(!told)keepPendingRevoke(pairing);
 }
+// A forgotten machine that could not be told: its token is still good there until it is. What is needed to tell it is
+// kept (this device's storage, as the pairing was) and tried again — on start, and every few minutes — until it hears.
+const PENDING_REVOKES_KEY='sidevoice.pending-revokes';
+function pendingRevokes(){try{const kept=JSON.parse(pageStorage()?.getItem(PENDING_REVOKES_KEY)||'[]');return Array.isArray(kept)?kept.filter(p=>p&&typeof p.fp==='string'&&typeof p.token==='string'&&typeof p.device_id==='string'):[]}catch{return []}}
+function writePendingRevokes(list){try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}}
+function keepPendingRevoke(pairing){
+ const {fp,device_id,token,urls,rv,public_key,host,insecure}=pairing;
+ writePendingRevokes([...pendingRevokes().filter(p=>p.fp!==fp),{fp,device_id,token,urls,rv,public_key,host,...(insecure?{insecure}:{})}]);
+}
+/** Tells a machine this device is gone (its token revoked there), at an address that proves it is that machine. */
+async function revokeOn(pairing,knownBase=null){
+ try{
+  // The page's own origin is the base '', which is known all the same.
+  const place=knownBase!=null?{base:knownBase}:await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+  if(!place)return false;
+  const response=await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
+  // Gone there already (401/404) is as good as told.
+  return response.ok||response.status===401||response.status===404;
+ }catch{return false}
+}
+let revokingPending=false;
+async function retryPendingRevokes(){
+ if(revokingPending)return;revokingPending=true;
+ try{
+  const left=[];
+  for(const pending of pendingRevokes()){
+   // Paired again since: nothing to revoke.
+   if(pairings.list.some(p=>p.fp===pending.fp))continue;
+   if(!await revokeOn(pending))left.push(pending);
+  }
+  writePendingRevokes(left);
+ }finally{revokingPending=false}
+}
+// (Never holding a process open where timers can: the runtime's tests.)
+if(typeof setInterval==='function'){setTimeout(()=>void retryPendingRevokes(),5000)?.unref?.();setInterval(()=>void retryPendingRevokes(),5*60*1000)?.unref?.()}
 async function localHostApi(path,options={}){
  const pairing=localPairing;
  if(!pairing||!pairing.urls[0])throw Error('local-host-unavailable');
@@ -1580,9 +1613,11 @@ async function saveVoiceSettings(){
  writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now()});$('settings-error').textContent='';
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
-// one, since it would take that call's voice. Settings that work are this device's from then on.
+// one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
+// whoever shows it (room-types.ts TrialProgress): transcription, that the voice listens and the microphone's level;
+// the voice, the part of `text` sounding, in the page's offsets into it as the room's karaoke has them (`sayingRange`).
 let voiceTry=null;
-async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
+async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress}={}){
  if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
@@ -1590,8 +1625,8 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true}={}){
   const host=await voiceHost();
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,onTimings})}
-   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings}),{});
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,onTimings,onListening,onLevel})}
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;

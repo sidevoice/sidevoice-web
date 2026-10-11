@@ -9,6 +9,11 @@ import { markSetUp } from "../../test/onboarding";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
+/** The whole App rendered and taken through several steps: about a second on its own, and several times that with the
+ *  rest of the suite on a busy machine — past vitest's five seconds (2026-10-11, load 25 on 8 cores). Only the tests
+ *  seen to run that close get it. */
+const WHOLE_APP_MS = 15_000;
+
 const REPLY = "Okay. I'll start with the login and then look at the cart tests. I'll tell you as soon as I have something.";
 // Each row comes from the machine it runs on (`node`); the page knows it by machine and thread ("fp-1|t-login").
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
@@ -95,7 +100,7 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   // Out of the call the agent is idle.
   patch(store, { ws: null });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
-});
+}, WHOLE_APP_MS);
 
 test("the person has no picture on the stage, only a bubble of their own while they speak", async () => {
   const store = room();
@@ -190,28 +195,30 @@ test("a phone's header avatars switch the call at a tap, and the chevron brings 
   expect(others[1].getAttribute("aria-label")).toBe("Migrate the payments API · Working");
   expect(document.querySelector(".conversations-rest")).toBeNull();
   const sidebar = document.getElementById("conversations")!;
+  // Asked of the header alone: a role query over the whole page costs a third of a second each under jsdom.
+  const chevron = () => within(document.querySelector<HTMLElement>(".room-header")!).getByRole("button", { name: "All conversations (4)" });
   // A tap on one moves the call to it, without the list.
   await act(async () => { fireEvent.click(others[0]); });
   expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
   // The whole list comes down from the chevron after them; picking one there switches too.
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
+  await act(async () => { fireEvent.click(chevron()); });
   expect(sidebar).toHaveAttribute("data-open");
   await act(async () => { fireEvent.click(rowOf("Migrate the payments API")); });
   expect(selectParticipant).toHaveBeenLastCalledWith("fp-1|t-pay");
   expect(sidebar).not.toHaveAttribute("data-open");
 
   // The close button, a tap outside and Escape put it away too.
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Close conversations" })); });
+  await act(async () => { fireEvent.click(chevron()); });
+  await act(async () => { fireEvent.click(within(sidebar).getByRole("button", { name: "Close conversations" })); });
   expect(sidebar).not.toHaveAttribute("data-open");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
+  await act(async () => { fireEvent.click(chevron()); });
   await act(async () => { fireEvent.click(document.querySelector(".conversations-scrim")!); });
   expect(sidebar).not.toHaveAttribute("data-open");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
+  await act(async () => { fireEvent.click(chevron()); });
   await act(async () => { fireEvent.keyDown(document, { key: "Escape" }); });
   expect(sidebar).not.toHaveAttribute("data-open");
-});
+}, WHOLE_APP_MS);
 
 test("the transcript opens and closes from the call bar, and is inert while closed", async () => {
   room();

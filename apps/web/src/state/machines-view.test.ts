@@ -75,3 +75,10 @@ test("out of a call, the reach note speaks of the machine of the conversation be
   expect(reachNote(createRoomSessionStore({ ...facts, viewedThread: null,
     machineLinks: { "fp-nuc": { reach: "offline", via: "" }, "fp-ws": { reach: "away", via: "" } } }).getState().facts)).toMatch(/^Ninguna máquina disponible/);
 });
+
+test("a pairing kept without encryption by the person's choice is a machine that says so", () => {
+  const store = createRoomSessionStore({ pairings: [{ ...remote, insecure: true, urls: ["http://192.168.1.20:8765"], rv: null }, { ...remote, fp: "fp-other" }] });
+  const [nuc, other] = store.getState().machines;
+  expect(nuc).toMatchObject({ id: "fp-nuc", insecure: true });
+  expect(other.insecure).toBe(false);
+});

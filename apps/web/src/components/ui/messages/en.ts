@@ -4,8 +4,8 @@ export const en = {
   "ui.closeNamed": "Close {name}",
   "ui.loading": "Working…",
   "ui.copy": "Copy",
-  "ui.copied": "Copied.",
-  "ui.copyFailed": "Select it and copy it.",
+  "ui.copied": "Copied",
+  "ui.copyFailed": "Select and copy",
 } as const;
 
 export type UiMessageKey = keyof typeof en;

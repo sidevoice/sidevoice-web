@@ -22,9 +22,6 @@
 .host-agent-howto { display: grid; gap: var(--sv-space-2); min-width: 0; margin: 0 var(--sv-space-5) var(--sv-space-4); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .host-agent-howto p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .host-agent-howto-label { font-weight: 600; color: var(--sv-text-muted); }
-.host-agent-code { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
-.host-agent-code pre { flex: 1; min-width: 0; max-height: 16rem; margin: 0; padding: 6px 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: var(--sv-font-sm) / 1.5 var(--sv-font-mono); color: var(--sv-text); user-select: text; }
-.host-agent-code .ui-button { flex: none; }
 /* The way to an agent the list does not show: a quiet link under it, its instructions opening below. */
 .host-agent-other { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .host-agent-other-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted); font: inherit; font-size: var(--sv-font-sm); text-decoration: underline; text-decoration-color: var(--sv-border-strong); text-underline-offset: 3px; cursor: pointer; }
@@ -36,6 +33,10 @@
 .host-agent-tab-label { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
 @media (max-width: 550px) {
   .host-agent-main { gap: var(--sv-space-2); padding: var(--sv-space-3) var(--sv-space-4); }
+  /* On a phone the name keeps its width: the actions go under it, the whole width, in every row alike. */
+  .host-agent-main { flex-wrap: wrap; }
+  .host-agent-copy { flex: 1 1 calc(100% - 48px); }
+  .host-agent-actions { flex: 1 1 100%; justify-content: flex-end; }
   .host-agent-problem { align-items: flex-start; flex-direction: column; }
 }
 
@@ -48,3 +49,5 @@
 .host-agent-status-line { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
 .host-agent-status-line .host-agent-status { min-width: 0; }
 .host-agent-status-line .ui-infotip { flex: none; }
+.host-agent-steps { display: grid; gap: var(--sv-space-3); margin: 0; padding-inline-start: var(--sv-space-5); }
+.host-agent-steps > li { display: grid; gap: var(--sv-space-1); min-width: 0; }

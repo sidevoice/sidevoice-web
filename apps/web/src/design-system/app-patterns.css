@@ -199,8 +199,6 @@
 .pt-steps li { position: relative; display: grid; gap: var(--sv-space-2); padding-inline-start: 36px; counter-increment: step; }
 .pt-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: 700; }
 .pt-steps p { margin: 0; }
-.pt-command { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
-.pt-command code { flex: 1; min-width: 0; overflow-x: auto; font: var(--sv-font-sm) / 1.25rem var(--sv-font-mono); white-space: nowrap; color: var(--sv-text); }
 .pt-empty { display: grid; justify-items: center; gap: var(--sv-space-2); padding: var(--sv-space-8) var(--sv-space-6); text-align: center; }
 .pt-empty h3 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .pt-empty p { max-width: 40ch; margin: 0; color: var(--sv-text-muted); }

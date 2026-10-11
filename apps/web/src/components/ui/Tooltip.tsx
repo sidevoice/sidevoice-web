@@ -52,8 +52,10 @@ export function Tooltip({ content, children }: TooltipProps) {
         onClick={(event) => {
           // Before Radix's own handler, which would close it.
           event.preventDefault();
+          // A tap toggles, a click opens. Some browsers (WebKit) say "mouse" for a tap: a screen with no hover is a touch one.
           const type = (event.nativeEvent as PointerEvent).pointerType || pointer.current;
-          setOpen(type === "mouse" ? true : !openRef.current);
+          const touch = type === "touch" || type === "pen" || (typeof matchMedia === "function" && matchMedia("(hover: none)").matches);
+          setOpen(touch ? !openRef.current : true);
           window.setTimeout(() => { pressing.current = false; }, 0);
         }}>{children}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal container={overlayContainer(provided, trigger.current)}>

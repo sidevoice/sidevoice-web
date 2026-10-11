@@ -29,6 +29,8 @@
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
 .host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
+.host-insecure { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.host-insecure .ui-badge svg { width: 12px; height: 12px; }
 /* Its sections one under another, each headed, a rule between them: everything a machine has, none behind a tab. */
 .host-section { display: grid; gap: var(--sv-space-3); min-width: 0; padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); scroll-margin-top: var(--sv-space-4); }
 .host-section > h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
@@ -72,7 +74,7 @@
 @media (max-width: 480px) {
   /* A narrow page keeps the state beside the name, under the icon's column: a grid, not a wrapping row. */
   .host-detail-header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sv-space-3); row-gap: var(--sv-space-2); }
-  .host-detail-header > .ui-badge, .host-detail-header > .ui-button { grid-column: 2; justify-self: start; }
+  .host-detail-header > .ui-badge, .host-detail-header > .ui-button, .host-detail-header > .host-insecure { grid-column: 2; justify-self: start; }
 }
 
 /* The machines under Machines in Settings' navigation: a dot for each one's state, Add a machine last; on a phone, at the
@@ -83,6 +85,8 @@
 .machine-nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
 .machine-nav-here { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
 .machine-entry .new-dot { margin-inline-start: 0; }
+/* Reached without encryption: its sign after the name, never pushed out by it. */
+.machine-nav-insecure { display: inline-grid; place-items: center; flex: none; color: var(--sv-warning); }
 .machine-nav-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-text-subtle); }
 .machine-nav-dot[data-tone="positive"] { background: var(--sv-positive); }
 .machine-nav-dot[data-tone="danger"] { background: var(--sv-danger); }
@@ -94,6 +98,7 @@
   .settings-nav .machine-nav { display: none; }
   .machines-inline { display: block; margin-bottom: var(--sv-space-3); }
   .machines-inline .machine-nav { display: flex; flex-wrap: wrap; gap: var(--sv-space-1); margin: 0; }
+  .machines-inline { min-width: 0; }
   .machines-inline .ui-nav-item--sub { width: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); padding-inline: var(--sv-space-3); }
 }
 

@@ -1,4 +1,4 @@
-import { expect, test, vi, beforeEach, afterEach } from "vitest";
+import { expect, onTestFinished, test, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MachineList } from "./MachineList";
 import { NoMachineScreen } from "../pairing/NoMachineScreen";
@@ -64,19 +64,18 @@ test("the local host is first, every remote row says Connected without revealing
   }
 });
 
-test("an unreachable remote machine only says No response", () => {
-  actions();
+test("an unreachable remote machine only says No response, and can still be forgotten, told when it's back", () => {
+  const done = { ...actions(), machineDevices: vi.fn(), forgetMachine: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
   expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toMatch(/No response/);
   expect(screen.queryByRole("button", { name: /Retry NUC/ })).toBeNull();
-});
-
-// A known gap, not the intent: Forget sits on this device's row of the machine's devices, a list an unreachable machine
-// cannot give, so it cannot be forgotten. Flip this to test() once Forget has a place there.
-test.fails("an unreachable remote machine can still be forgotten", () => {
-  actions();
-  room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
-  expect(screen.getByRole("button", { name: /Forget NUC/ })).toBeInTheDocument();
+  // Its list can't be read, so no row of this device's: Forget is offered on its own, and never waits on the machine.
+  expect(done.machineDevices).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
+  expect(screen.getByRole("group", { name: "Forget NUC" })).toHaveTextContent("NUC is offline: it will be told when it’s back.");
+  fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
+  expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
 });
 
 test("the Machines footer offers local setup only when no local host is projected, and keeps remote pairing", async () => {
@@ -141,7 +140,9 @@ test("local F6 status shows only supported service actions", async () => {
   expect(screen.getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(document.querySelector(".host-status-summary")).toHaveTextContent("Does not start when you sign in");
+  // Not installed: its one action is Start, which installs the service; Start at sign-in comes once there is one.
   expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
+  expect(screen.queryByRole("switch", { name: "Start at sign-in" })).toBeNull();
   expect(screen.queryByRole("button", { name: /agent/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /copy from another machine/i })).toBeNull();
   expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
@@ -283,7 +284,7 @@ test.each([
   expect(update).not.toHaveBeenCalled();
 });
 
-test("stopping the local host while calls are on requires confirmation and Cancel leaves it running", async () => {
+test("stopping the local host while calls are active asks first, and Cancel leaves it running", async () => {
   const stop = vi.fn().mockResolvedValue(undefined);
   setBridge({ stop });
   actions();
@@ -299,6 +300,18 @@ test("stopping the local host while calls are on requires confirmation and Cance
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
+  expect(stop).toHaveBeenCalledOnce();
+});
+
+test("with no active calls, Stop stops the local host without asking", async () => {
+  const stop = vi.fn().mockResolvedValue(undefined);
+  setBridge({ stop });
+  actions();
+  room([local], { localHostStatus: { ...running, calls: 0 } });
+  await act(async () => { entry("MacBook").click(); });
+
+  await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
+  expect(screen.queryByText("Stop Sidevoice on this computer? Active calls will end.")).toBeNull();
   expect(stop).toHaveBeenCalledOnce();
 });
 
@@ -416,7 +429,7 @@ test("an in-flight device list cannot repopulate Devices after reachability is l
   expect(screen.queryByRole("textbox", { name: "Room address" })).toBeNull();
 
   act(() => { store.patch({ pairings: [local], localHostStatus: status }); });
-  await waitFor(() => expect(screen.getByText("No devices are paired with this machine.")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("No other devices are paired with this computer.")).toBeInTheDocument());
 });
 
 test("Add machine opens the explicit remote setup and pairing flow", async () => {
@@ -463,7 +476,7 @@ test("a lost native pairing keeps a local Status row and recovery action, with n
   expect(screen.queryByRole("button", { name: "Use This computer" })).toBeNull();
   expect(screen.getByText(/This computer is unavailable/)).toBeInTheDocument();
   await act(async () => { entry("This computer").click(); });
-  expect(screen.getByRole("heading", { name: "Sidevoice on This computer" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
   await act(async () => { screen.getAllByRole("button", { name: "Retry" })[0].click(); });
   expect(restart).toHaveBeenCalledOnce();
@@ -481,8 +494,11 @@ test("a reachable local core stays Connected when its service state is not runni
 
 
 test("a remote machine's page has it all: how it is reached, its agents, its devices (others revocable, never this one), and Forget", async () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "a" }));
-  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "This browser", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" }];
+  // This device's name here, which the machine last heard otherwise.
+  localStorage.setItem("sidevoice.deviceName", "Ana’s laptop");
+  onTestFinished(() => localStorage.removeItem("sidevoice.deviceName"));
+  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "Chrome on Mac", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" },
+    { device_id: "d-self", name: "NUC", kind: "local" }, { device_id: "d-tablet", name: "Tablet", kind: "code" }];
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue(devices), revokeMachineDevice: vi.fn().mockResolvedValue(undefined), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } },
@@ -490,17 +506,61 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
   expect(done.machineDevices).toHaveBeenCalledWith("fp-nuc");
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Revoke This browser" })).toBeNull();
+  const rows = [...document.querySelectorAll<HTMLElement>(".host-device-row")];
+  // This device's row: its name, "This device", and forgetting the machine — never revoking itself.
+  expect(rows[0]).toHaveTextContent("Ana’s laptop");
+  expect(within(rows[0]).getByText("This device")).toBeInTheDocument();
+  expect(within(rows[0]).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Revoke (Chrome on Mac|Ana’s laptop)/ })).toBeNull();
+  // The machine's own Sidevoice, paired with itself, is never listed; every other device has Revoke.
+  expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual(["Ana’s laptop", "Phone", "Tablet"]);
+  expect(screen.queryByRole("button", { name: "Revoke NUC" })).toBeNull();
+  expect(within(rows[1]).getByRole("button", { name: "Revoke Phone" })).toBeInTheDocument();
+  expect(within(rows[2]).getByRole("button", { name: "Revoke Tablet" })).toBeInTheDocument();
+  // Devices are named where they are (this one in General); none is renamed here. Read once: nothing to retry.
+  expect(screen.queryByRole("button", { name: /^Rename (Ana’s laptop|Phone)/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Revoke Phone" }));
   const confirm = screen.getByRole("group", { name: "Revoke Phone" });
   await act(async () => { fireEvent.click(within(confirm).getByRole("button", { name: "Revoke Phone" })); });
   expect(done.revokeMachineDevice).toHaveBeenCalledWith("fp-nuc", "d-phone");
   // Pairing goes from a device to the machine, never from here.
   expect(screen.queryByRole("button", { name: "Pair another device" })).toBeNull();
-  expect(screen.queryByRole("heading", { name: "Sidevoice on this computer" })).toBeNull();
+  // Its Sidevoice card is to read: it is run there.
+  expect(screen.getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
   fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
   expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
+});
+
+test("this computer's page never lists its own Sidevoice: alone, no other devices are paired; the others, each revocable", async () => {
+  const done = actions();
+  done.localHostDevices.mockResolvedValueOnce([{ device_id: "d-local", name: "MacBook", kind: "local" }])
+    .mockResolvedValue([{ device_id: "d-local", name: "MacBook", kind: "local" }, { device_id: "d-phone", name: "Phone", kind: "code" }]);
+  const store = room([local]);
+  await waitFor(() => expect(screen.getByText("No other devices are paired with this computer.")).toBeInTheDocument());
+  expect(document.querySelectorAll(".host-device-row")).toHaveLength(0);
+  // Another device pairs with it: listed, and revocable; this computer still not.
+  act(() => { store.patch({ pairings: [paired({ ...local, fp: "fp-local-2" })] }); });
+  await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
+  expect([...document.querySelectorAll(".host-device-row strong")].map((name) => name.textContent)).toEqual(["Phone"]);
+  expect(screen.getByRole("button", { name: "Revoke Phone" })).toBeInTheDocument();
+  expect(screen.queryByText("No other devices are paired with this computer.")).toBeNull();
+});
+
+test("a devices list that couldn't be read offers Retry, which reads it again", async () => {
+  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "Chrome on Mac", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" }];
+  const machineDevices = vi.fn().mockRejectedValueOnce(new Error("unreachable")).mockResolvedValue(devices);
+  const done = { ...actions(), machineDevices, loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  const retry = await screen.findByRole("button", { name: "Retry" });
+  await act(async () => { fireEvent.click(retry); });
+  await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
+  expect(machineDevices).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(within(document.querySelector(".host-device-row") as HTMLElement).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
 });
 
 test("the machines are entries under Machines, Add a machine last; an entry shows its machine's whole page", async () => {
@@ -508,13 +568,16 @@ test("the machines are entries under Machines, Add a machine last; an entry show
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   const store = room([local, paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
   const nav = document.querySelector(".machines-inline .machine-nav")!;
-  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
+  // This computer's entry says so before its name (an icon, in words to a screen reader).
+  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^This computerMacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
   expect(entry("NUC")).toHaveAccessibleName("NUC, Online · Connected");
   // Machines alone is the first machine.
   expect(screen.getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
   await act(async () => { entry("NUC").click(); });
   expect(store.getState().facts.machinesView.machine).not.toBeNull();
+  // Every machine's page has its Sidevoice card: another machine's, to read.
   expect(screen.queryByRole("heading", { name: "Sidevoice on MacBook" })).toBeNull();
+  expect(screen.getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
 });
@@ -542,3 +605,23 @@ test("this computer's machine is marked in the list; stopped, it says Start brin
   expect(screen.getByText(/does not start when you sign in\. Start it here/)).toBeInTheDocument();
 });
 
+
+test("a machine paired without encryption says so on its page, with why, and its entry carries a sign heard with its name", async () => {
+  actions();
+  const remote = { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 }, "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } };
+  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8765"], rv: null }), paired()], { remoteHostStatus: remote });
+  await act(async () => { entry("Lab box").click(); });
+  const page = screen.getByRole("region", { name: "Lab box" });
+  const badge = within(page.querySelector("header")!).getByText("Not encrypted");
+  expect(badge.closest(".ui-badge")).toHaveAttribute("data-tone", "warning");
+  expect(badge.closest(".ui-badge")!.querySelector("svg")).not.toBeNull();
+  expect(within(page).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
+  // In the list, a sign after the name (which gives way, the sign never), and in words to a screen reader.
+  expect(entry("Lab box").querySelector(".machine-nav-name + .machine-nav-insecure svg")).not.toBeNull();
+  expect(entry("Lab box").getAttribute("aria-label")).toMatch(/^Lab box, not encrypted, /);
+  // One paired over https says nothing of the kind.
+  expect(entry("NUC").querySelector(".machine-nav-insecure")).toBeNull();
+  expect(entry("NUC").getAttribute("aria-label")).not.toMatch(/not encrypted/);
+  await act(async () => { entry("NUC").click(); });
+  expect(screen.queryByText("Not encrypted")).toBeNull();
+});

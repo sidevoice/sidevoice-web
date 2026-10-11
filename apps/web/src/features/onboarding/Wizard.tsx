@@ -7,14 +7,13 @@ import { ArrowRightIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../.
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
-import { ConnectorSteps } from "../pairing/ConnectorSteps";
-import { PairingCodeForm } from "../pairing/PairingDialog";
+import { PairMachine, usePairMachineLayout } from "../pairing/PairMachine";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
 import { Appearance } from "../settings/SettingsDialog";
 import { Group, Row } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
-import { TryResult, useModelState, useVoiceTry, type ModelState, catalogueShown } from "../settings/ModelSetup";
+import { useModelState, useTryResult, useVoiceTry, type ModelState, type SetupTry, catalogueShown } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { hostStatusText } from "../settings/local-host-status";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -108,31 +107,30 @@ function Stepper({ current, t }: { current: number; t: HostTranslate }) {
   </div>;
 }
 
-type StageTry = ReturnType<typeof useVoiceTry> & { sample: string; setSample(value: string): void; again(): void };
+type StageTry = SetupTry & { sentence: string; setSentence(value: string): void };
 
+/** A voice step: its slot as Settings has it, the try in the model's block (what it shows and where, the `try-result`
+ *  variant's), its first try offered in the footer. The sentence to hear is edited in the block, where it is then lit
+ *  as it is heard (`card`); with the try in its own dialog, beside the block (`dialog`). */
 function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
-  const onboarding = useOnboarding();
-  const { trial } = stage;
+  const inCard = useTryResult() === "card";
   useEffect(() => {
     if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue();
     window.sidevoiceActions?.editVoice({});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const sample = task === "tts" ? <Field className="wizard-sample" label={t("wizard.sample")} aside={t("wizard.sampleCount", { count: stage.sentence.length, max: SAMPLE_MAX })}>
+    <Textarea id="wizard-sample" minRows={2} maxRows={4} maxLength={SAMPLE_MAX} value={stage.sentence} placeholder={t("wizard.samplePlaceholder")}
+      onChange={(event) => stage.setSentence(event.target.value)} />
+  </Field> : null;
+  const trial: SetupTry = { ...stage, sample: inCard && sample ? sample : undefined };
   return <section className="wizard-stage-step">
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
-        : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} setup /> : <SpeechChoices draft={draft} setup />}</div>}
-    {task === "tts" && <Field className="wizard-sample" label={t("wizard.sample")} aside={t("wizard.sampleCount", { count: stage.sample.length, max: SAMPLE_MAX })}>
-      <Textarea id="wizard-sample" minRows={2} maxRows={4} maxLength={SAMPLE_MAX} value={stage.sample} placeholder={t("wizard.samplePlaceholder")}
-        onChange={(event) => stage.setSample(event.target.value)} />
-    </Field>}
-    <div className="wizard-trial">
-      {trial.phase === "idle" && !onboarding.tried(task) && <p className="wizard-try-hint">{t("wizard.tryHint")}</p>}
-      <TryResult task={task} trial={trial} t={t} />
-      {onboarding.tried(task) && trial.phase !== "running" && <Button type="button" variant="ghost" size="sm" id="wizard-try-again" onClick={stage.again}>{t("wizard.trialAgain")}</Button>}
-    </div>
+        : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} setup trial={trial} /> : <SpeechChoices draft={draft} setup trial={trial} />}</div>}
+    {!inCard && sample}
   </section>;
 }
 
@@ -195,7 +193,8 @@ export function Wizard() {
   const [sample, setSample] = useState(() => t("wizard.sampleText"));
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const tryAgain = () => void trial.run(stageTask === "stt" ? {} : { text: sample.trim(), language: draft?.stt.language || speechLanguage });
-  const stage: StageTry = { ...trial, sample, setSample, again: tryAgain };
+  const tried = !!stageTask && onboarding.tried(stageTask);
+  const stage: StageTry = { ...trial, start: tryAgain, tried, hint: tried ? undefined : t("wizard.tryHint"), sentence: sample, setSentence: setSample };
   // The end of turn waits for its model when it is the smart one, as the voice steps wait for theirs.
   const turnModel = useModelState("end-of-turn", draft);
   const turnWaits = !!turnModel.model && !turnModel.ready;
@@ -292,7 +291,9 @@ export function Wizard() {
   </>;
 
   const ready = step === "W6";
-  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
+  // Connecting to another machine side by side (`split`) takes a wider setup on that step.
+  const pairLayout = usePairMachineLayout();
+  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined} data-pair-layout={pairLayout}
     // Escape puts the setup off, except once it is done: Ready only goes on.
     onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}
     // On Ready, Escape is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes. Closed
@@ -321,9 +322,7 @@ export function Wizard() {
       {step === "W0" && <BasicsStep t={t} />}
       {step === "W2" && <section className="wizard-prepare">{prepareBlock(true)}</section>}
       {step === "W2r" && <section>
-        <p>{t("wizard.pairIntro")}</p>
-        <ConnectorSteps />
-        <PairingCodeForm idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
+        <PairMachine idPrefix="wizard-pairing" rows={2} howOpen submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}

@@ -32,11 +32,12 @@ function bounded(promise, { signal, timeoutMs }) {
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * `onTimings`, once heard: how long the voice took to be ready, and the turn's own (the speech, the pause waited for,
- * the recognition).
- * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void}} [options]
+ * the recognition). As it goes: `onListening` once the voice hears the microphone (its models loaded, the microphone
+ * open), and `onLevel`, the microphone's level from 0 to 1 as the voice measures it.
+ * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState, onTimings } = {}) {
+export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState, onTimings, onListening, onLevel } = {}) {
   const stops = [];
   let readyMs = null;
   try {
@@ -53,8 +54,9 @@ export async function tryTranscription(voice, settings, { signal, timeoutMs = 20
     // Its failure before the voice even listens is the start's to report; this one must not go unheard.
     heard.catch(() => {});
     if (onState) stops.push(voice.onState(onState));
+    if (onLevel) stops.push(voice.onLevel(onLevel));
     const starting = now();
-    return await bounded(voice.start().then(() => { readyMs = Math.round(now() - starting); return heard; }), { signal, timeoutMs });
+    return await bounded(voice.start().then(() => { readyMs = Math.round(now() - starting); onListening?.(); return heard; }), { signal, timeoutMs });
   } finally {
     for (const stop of stops) stop();
     await voice.stop().catch(() => {});
@@ -68,9 +70,12 @@ export async function tryTranscription(voice, settings, { signal, timeoutMs = 20
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * @param {string} text
  * `onTimings`, once heard: how long the voice took to be ready, and from asking it to speak to its first sound.
- * @param {{language?: string | null, signal?: AbortSignal, timeoutMs?: number, onTimings?: (timings: TrialTimings) => void}} [options]
+ * `onProgress`, from that first sound on: where the voice is in `text`, in the voice's own count of its characters —
+ * the part sounding now (`sounding`, [from, to)), or `null` between parts — and how much of it was heard. The first
+ * sound is `{sounding: null, heard_chars: 0}`.
+ * @param {{language?: string | null, signal?: AbortSignal, timeoutMs?: number, onTimings?: (timings: TrialTimings) => void, onProgress?: (progress: {sounding: [number, number] | null, heard_chars: number}) => void}} [options]
  */
-export async function tryVoice(voice, settings, text, { language = null, signal, timeoutMs = 60000, onTimings } = {}) {
+export async function tryVoice(voice, settings, text, { language = null, signal, timeoutMs = 60000, onTimings, onProgress } = {}) {
   let saying = null;
   let readyMs = null, firstSoundMs = null;
   try {
@@ -80,7 +85,10 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
       readyMs = Math.round(now() - starting);
       const asked = now();
       saying = voice.say(text, language ? { language } : undefined);
-      saying.onEvent?.((event) => { if (event.type === 'playing' && firstSoundMs === null) firstSoundMs = Math.round(now() - asked); });
+      saying.onEvent?.((event) => {
+        if (event.type === 'playing' && firstSoundMs === null) { firstSoundMs = Math.round(now() - asked); onProgress?.({ sounding: null, heard_chars: 0 }); }
+        if (event.type === 'progress') onProgress?.({ sounding: event.sounding, heard_chars: event.heard_chars });
+      });
       return saying.outcome;
     }), { signal, timeoutMs });
     if (outcome.status === 'heard') { onTimings?.({ ready_ms: readyMs, first_sound_ms: firstSoundMs }); return outcome; }

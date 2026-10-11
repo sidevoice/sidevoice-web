@@ -3,7 +3,7 @@ import {
   base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven,
   pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
-  privateHost, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
+  privateHost, previewPairingCode, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
 } from "./device-pairing.js";
 
 // jsdom's window has no WebCrypto of its own; node's is what the tests run on, handed in where it is used.
@@ -90,6 +90,26 @@ test("a code's plain-http addresses off this machine are left out, and a code le
   expect(() => decode({ urls: ["http://mac.lan:8768"], rv: null })).toThrow(/solo lleva a la máquina por http/);
   // Loopback is this same machine: plain http stays.
   for (const url of ["http://127.0.0.1:8768", "http://localhost:8768", "http://[::1]:8768"]) expect(decode({ urls: [url], rv: null }).urls, url).toEqual([url]);
+});
+
+test("as it is pasted, a code says whose it is, until when, and whether it says where its machine is from here", () => {
+  const fp = "A".repeat(43);
+  const preview = (extra: Record<string, unknown>) => previewPairingCode(codeFor(payload({ fp }, extra)), NOW);
+  expect(preview({ urls: ["http://127.0.0.1:8768", "https://mac.example:8765"], rv: null }))
+    .toEqual({ host: "macbook", exp: NOW / 1000 + 600, reachable: true, plain: [] });
+  // A room is a way there; loopback is this machine, not the one the code is for.
+  expect(preview({}).reachable).toBe(true);
+  expect(preview({ urls: ["http://127.0.0.1:8768"], rv: null, host: null })).toMatchObject({ host: null, reachable: false, plain: [] });
+  // Its private addresses over plain http are offered to type (and agree to); a public one, or another network's name, is not.
+  expect(preview({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8765", "http://mac.lan:8765", "http://203.0.113.5:8765"], rv: null }))
+    .toMatchObject({ reachable: false, plain: ["192.168.1.20:8765"] });
+  // What cannot be used anywhere is said as when it is redeemed.
+  const why = (code: string) => { try { previewPairingCode(code, NOW); return ""; } catch (error) { return (error as Error).message; } };
+  expect(why("   ")).toMatch(/Pega el código/);
+  expect(why("123-456")).toMatch(/empieza por «SV1\.»/);
+  expect(why(codeFor(payload({ fp }, { v: 2 })))).toMatch(/otra versión/);
+  expect(why(codeFor(payload({ fp }, { exp: NOW / 1000 })))).toMatch(/caducó/);
+  expect(why(codeFor(payload({ fp }, { urls: [], rv: null })))).toBe("");
 });
 
 test("a secret or a token goes over https, or plain http to loopback only", () => {
@@ -320,10 +340,13 @@ test("a bridge-owned local host wins over a duplicate stored code pairing", () =
 });
 
 test("a device names itself after what it is, unless the person says otherwise", () => {
-  expect(deviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" })).toBe("Sidevoice en iPhone");
-  expect(deviceName({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", platform: "MacIntel" })).toBe("Sidevoice en Mac");
-  expect(deviceName({ userAgent: "Mozilla/5.0 (Linux; Android 14)" })).toBe("Sidevoice en Android");
-  expect(deviceName({ userAgent: "", userAgentData: { platform: "Windows" } })).toBe("Sidevoice en Windows");
+  // "{browser} on {system}"; a browser it can't tell is a Browser; nothing to tell, Sidevoice.
+  expect(deviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" })).toBe("Safari on iPhone");
+  expect(deviceName({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", platform: "MacIntel" })).toBe("Chrome on Mac");
+  expect(deviceName({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0" })).toBe("Edge on Windows");
+  expect(deviceName({ userAgent: "Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0" })).toBe("Firefox on Android");
+  expect(deviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" })).toBe("Browser on iPhone");
+  expect(deviceName({ userAgent: "", userAgentData: { platform: "Windows" } })).toBe("Browser on Windows");
   expect(deviceName({})).toBe("Sidevoice");
 });
 

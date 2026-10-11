@@ -1,16 +1,21 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import { ONBOARDING_STORAGE_KEY, trialKey } from "../../services/onboarding-state";
 import { localHostInstallController } from "../../services/local-host-install";
-import type { SidevoiceActions } from "../../state/room-types";
+import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { chooseOption, selectedValue } from "../../test/select";
 import { VARIANTS_KEY } from "../../lib/variants";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
+
+/** The whole App rendered and taken through several steps: about a second on its own, and several times that with the
+ *  rest of the suite on a busy machine — past vitest's five seconds (2026-10-11, load 25 on 8 cores). Only the tests
+ *  seen to run that close get it. */
+const WHOLE_APP_MS = 15_000;
 
 /* The first-run setup over the real room, in a browser: the basics, then (no agents here) pairing another machine, this
  * device's transcription and voice (trying them is suggested, not required; the actions stand in for the voice), when a
@@ -34,7 +39,7 @@ beforeEach(() => {
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); });
+afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); });
 
 function room() {
   const store = createRoomStore();
@@ -42,20 +47,30 @@ function room() {
   render(<App store={store} />);
   return store;
 }
-const title = () => screen.getByRole("heading", { level: 2 });
+// Asked of the setup alone: Settings is drawn under it, and a role query over the whole page costs a third of a second
+// each under jsdom — enough, a few times over, to run a test past its time on a busy machine.
+const wizard = () => within(document.getElementById("wizard")!);
+const title = () => wizard().getByRole("heading", { level: 2 });
 const stageAction = () => document.getElementById("wizard-stage-action") as HTMLButtonElement;
 const tryButton = () => document.getElementById("wizard-try") as HTMLButtonElement;
+// Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
+const card = (task: "stt" | "tts") => document.querySelector("#wizard #" + task + "-model-card")!;
 const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }));
 
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
   const store = room();
   expect(title()).toHaveTextContent("Connect to your machine");
-  expect(document.querySelector("#wizard .setup-command code")).toHaveTextContent("npx sidevoice@latest install");
+  // Each command a Snippet: monospace, with its copy button.
+  expect([...document.querySelectorAll("#wizard .ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
+  expect(screen.getByRole("button", { name: "Copy setup command" })).toHaveClass("ui-copy-button");
   // The room, its settings and its call bar stay out of reach behind the setup.
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
   // The code is entered right here, not in another dialog on top.
   expect(document.getElementById("wizard-pairing-code")).toBeInTheDocument();
   expect(actions.openPairing).not.toHaveBeenCalled();
+  // How to get a code starts unfolded here, and Connect is the step's own action, in its footer.
+  expect(screen.getByRole("button", { name: "How do I get a code?" })).toHaveAttribute("aria-expanded", "true");
+  expect(document.querySelector("#wizard .wizard-actions button[type=submit][form=wizard-pairing-form]")).toHaveTextContent("Connect");
   // Paired is not answering: the setup waits for the machine's link to say so.
   act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "checking", via: "" } } }));
   expect(title()).toHaveTextContent("Connect to your machine");
@@ -89,15 +104,20 @@ test("transcription and voice are this device's: trying them is recommended, and
   // Source first, then the model, as in Settings → Voice.
   expect(selectedValue("stt-source")).toBe("local");
   expect(tryButton()).toHaveTextContent("Speak");
-  expect(document.querySelector(".wizard-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  // The try is the model's: its hint in its block, and the block offers no second Speak beside the footer's.
+  expect(card("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  expect(document.getElementById("wizard-try-again")).toBeNull();
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", { keep: true });
-  expect(document.getElementById("stt-heard")).toHaveTextContent("hola, ¿me oyes?");
-  // Tried: Continue is the main action now, and how quick it was is said in a line.
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
+  expect(card("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  // Tried: Continue is the main action now, and how quick it was is said in a line, in the block.
   expect(stageAction()).toHaveTextContent(/^Continue$/);
   expect(stageAction()).toHaveClass("ui-button--primary");
-  expect(document.getElementById("stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
-  expect(document.getElementById("stt-timing")).not.toHaveTextContent("smaller model");
+  expect(card("stt").querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(card("stt").querySelector("#stt-timing")).not.toHaveTextContent("smaller model");
+  // Trying it again is the block's.
+  expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
+  expect(document.querySelector(".model-try-hint")).toBeNull();
   await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("Set up voice");
@@ -113,33 +133,98 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(title()).toHaveTextContent("You’re all set — talk to your agents");
   // What was set up, read from what the steps wrote, and what to tell an agent.
   expect(document.querySelector(".wizard-recap-list")).toHaveTextContent("Transcription");
-  expect(document.querySelector(".wizard-ready blockquote")).toHaveTextContent("voice_connect");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
+  expect(document.querySelector(".wizard-ready .ui-quote blockquote")).toHaveTextContent("voice_connect");
+  expect(wizard().getByRole("button", { name: "Copy the message for your agent" })).toHaveClass("ui-copy-button");
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
   const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);
   expect(kept.completed_at).toBeGreaterThan(0);
   expect(kept.trials.tts).toBeUndefined();
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
-});
+}, WHOLE_APP_MS);
 
 test("a failed try says why and keeps the step; a completion that is not stored keeps Ready, with Retry", async () => {
   const store = room();
   paired(store);
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(screen.getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
+  expect(wizard().getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
+  expect(card("stt")).toContainElement(wizard().getByRole("alert"));
   expect(title()).toHaveTextContent("Set up transcription");
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
 
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key) => { if (key === ONBOARDING_STORAGE_KEY) throw new DOMException("blocked", "SecurityError"); });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
   expect(title()).toHaveTextContent("You’re all set — talk to your agents");
-  expect(screen.getByRole("alert")).toHaveTextContent("Setup progress was not saved");
+  expect(wizard().getByRole("alert")).toHaveTextContent("Setup progress was not saved");
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
   setItem.mockRestore();
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Retry" })); });
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
+}, WHOLE_APP_MS);
+
+/** A try that runs until the test ends it, and what the page asked it to tell as it goes. */
+function pendingTry() {
+  const running: { told: TrialProgress; finish(result: unknown): void } = { told: {}, finish: () => {} };
+  actions.tryVoiceSettings.mockImplementation((_task: string, options: TrialProgress) => {
+    running.told = options;
+    return new Promise((resolve) => { running.finish = resolve; });
+  });
+  return running;
+}
+
+test("try-result card: the voice's try is all in its block — the sentence edited there, lit as it is heard, then how quick and Listen again", async () => {
+  const store = room();
+  paired(store);
+  await act(async () => { fireEvent.click(stageAction()); });
+  expect(title()).toHaveTextContent("Set up voice");
+  // The sentence to hear is the block's, where it is then heard.
+  const sample = card("tts").querySelector("#wizard-sample") as HTMLTextAreaElement;
+  expect(sample).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  fireEvent.change(sample, { target: { value: "Hola, qué tal." } });
+  const running = pendingTry();
+  await act(async () => { fireEvent.click(tryButton()); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
+  expect(card("tts")).toHaveTextContent("Getting ready…");
+  // Playing: the sentence in the field's place, lit up to what was heard; Stop is the block's too.
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 5, to: 5 }); });
+  expect(card("tts").querySelector("#wizard-sample")).toBeNull();
+  expect(card("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hola,$/);
+  expect(card("tts").querySelector(".model-try-unsaid")).toHaveTextContent("qué tal.");
+  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Stop");
+  await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
+  expect(card("tts").querySelector("#tts-timing")).toHaveTextContent("Starts speaking in 0.3 s");
+  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Listen again");
+  expect(card("tts").querySelector("#wizard-sample")).toHaveValue("Hola, qué tal.");
+  expect(stageAction()).toHaveTextContent(/^Continue$/);
+});
+
+test("try-result dialog: the footer's Speak opens the try's dialog — listening, then what was heard; its Escape is its own, and the block keeps a line", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "try-result": "dialog" }));
+  const store = room();
+  paired(store);
+  const running = pendingTry();
+  await act(async () => { fireEvent.click(tryButton()); });
+  const dialog = document.querySelector("#wizard #stt-try-dialog")!;
+  expect(dialog).toHaveAttribute("open");
+  expect(dialog).toHaveTextContent("Try transcription");
+  act(() => running.told.onListening!());
+  expect(dialog).toHaveTextContent("Listening… say a short sentence");
+  expect(dialog.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  await act(async () => { running.finish({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }); });
+  expect(dialog.querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  expect(dialog.querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  // Escape closes the try's dialog alone: the setup is not put off, and stays on its step.
+  await act(async () => { fireEvent(dialog, new Event("cancel", { cancelable: true })); });
+  expect(dialog).not.toHaveAttribute("open");
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at).toBeFalsy();
+  expect(title()).toHaveTextContent("Set up transcription");
+  // The block keeps how it went in a line, and offers it again; the footer goes on.
+  expect(card("stt").querySelector(".model-try-summary")).toHaveTextContent("hola, ¿me oyes? · Transcribed in 0.4 s");
+  expect(document.querySelector("#wizard #stt-heard")).toBeNull();
+  expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
+  expect(stageAction()).toHaveTextContent(/^Continue$/);
 });
 
 test("put off, the setup leaves one action that resumes it where it stands", async () => {
@@ -259,4 +344,4 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
     expect(document.querySelector("#wizard[open]")).toBe(wizard);
     expect(deferred()).toBeNull();
   } finally { localStorage.removeItem(VARIANTS_KEY); }
-});
+}, WHOLE_APP_MS);
