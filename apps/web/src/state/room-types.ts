@@ -231,6 +231,8 @@ export interface SidevoiceActions {
   renameMachineDevice?(fp: string, id: string, name: string): Promise<void>;
   /** A machine's name on this device only (null: back to the machine's own). */
   renameMachine?(fp: string, name: string | null): void;
+  /** Asks a paired machine for its Sidevoice's version (remoteHostStatus), where it says. */
+  loadMachineInfo?(fp: string): Promise<void>;
   /** This device's name as machines list it: kept for pairing, and sent to each machine it is paired with. Resolves with
    *  how many machines could not be told. */
   setDeviceName?(name: string): Promise<number>;
