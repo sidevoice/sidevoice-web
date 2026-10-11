@@ -43,8 +43,8 @@ export function CallToolbar() {
         <div className="call-actions">
           <MicControl>
             <span id="mic-level-meter" className="sr-only" role="meter" aria-label={t("toolbar.micLevel")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} />
-            <MuteButton />
             <AudioDevicesToggle open={devicesOpen} controls="audio-devices" onToggle={() => setDevicesOpen((was) => !was)} />
+            <MuteButton />
           </MicControl>
           <SkipButton />
           <CallButton />

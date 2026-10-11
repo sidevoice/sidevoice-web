@@ -4,6 +4,7 @@ import { Field } from "../../components/ui/Field";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { ChevronIcon, CloseIcon, RefreshIcon } from "../../components/ui/Icons";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
+import { MicWave } from "./CallIndicators";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import type { CallMessageKey } from "./messages/en";
 
@@ -13,13 +14,15 @@ import type { CallMessageKey } from "./messages/en";
  * moves the speaker after what is playing — and is this device's from then on. A speaker this platform cannot choose
  * is shown, disabled, with why; a chosen device that went away is said once, the system's default in use since. */
 
-/** The chevron beside the microphone's button: opens and closes the bar. */
+/** The devices' button, joined at the left of the microphone's in one pill: it shows the microphone's level while it
+ *  listens, and its chevron on hover, on focus, while the bar is open and while muted (as Meet). Opens and closes the bar. */
 export function AudioDevicesToggle({ open, onToggle, controls }: { open: boolean; onToggle(): void; controls: string }) {
   const t = callTranslator();
   return (
     <button type="button" className="audio-devices-toggle" aria-expanded={open} aria-controls={controls}
       aria-label={t("devices.toggle")} title={t("devices.toggle")} onClick={onToggle}>
-      <ChevronIcon size={14} />
+      <MicWave />
+      <ChevronIcon size={18} className="audio-chevron" />
     </button>
   );
 }

@@ -1061,7 +1061,7 @@ const waveLevels=new Float32Array(256);
 function voiceLevel(level){
  const value=Math.max(0,Math.min(100,Math.round(Number(level)*100)||0));
  waveLevels.copyWithin(0,1);waveLevels[waveLevels.length-1]=value/100;
- $('mute')?.style.setProperty('--mic-fill',value+'%');
+ $('mic-control')?.style.setProperty('--mic-fill',value+'%');
  $('mic-level-meter')?.setAttribute('aria-valuenow',String(value));
  const channel=window.sidevoiceUI?.micLevel;if(typeof channel?.publish==='function')channel.publish(value);
 }
