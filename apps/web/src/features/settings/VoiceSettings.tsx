@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { Button } from "../../components/ui/Button";
@@ -10,7 +10,7 @@ import { voiceChoices, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceV
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
-import { ProviderKey } from "./ProviderKeys";
+import { ProviderKeyNeeded, type KeyOutcome } from "./ProviderConnect";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
@@ -59,9 +59,9 @@ function useChoices(draft: Settings) {
   return useMemo(() => voiceChoices(catalogs, draft, SPEECH_LANGUAGES), [catalogs, draft]);
 }
 
-function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: HostTranslate }) {
+const SourceSelect = forwardRef<HTMLSelectElement, { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: HostTranslate }>(function SourceSelect({ id, value, sources, onChange, t }, ref) {
   return (
-    <NativeSelect id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+    <NativeSelect ref={ref} id={id} value={value} onChange={(event) => onChange(event.target.value)}>
       {sources.map((source) => (
         <option key={source.id} value={source.id} disabled={source.disabled}>
           {source.local ? t("voice.source.local") : source.name ?? source.id}{source.note ? " — " + noteText(t, source.note) : ""}
@@ -69,7 +69,7 @@ function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: 
       ))}
     </NativeSelect>
   );
-}
+});
 
 /** The family first, then a model of it: a family changed picks its first model that runs here. A provider's models
  *  have no family, and are one list. */
@@ -118,8 +118,9 @@ function useFirstModel(task: "stt" | "tts") {
 }
 
 /** One slot: where it runs, its model made ready, then its options. A provider that only lacks its key can be chosen,
- *  and asks for it in place (ProviderKey, as Providers does), saved where Providers keeps it; `setup`: the first-run
- *  setup's, whose try is its own. */
+ *  and a row under it says so, with Connect: the key's entry, as Providers opens it, saved where Providers keeps it.
+ *  Once kept, the row goes, the slot says so and its source takes the focus. `setup`: the first-run setup's, whose try
+ *  is its own. */
 function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; setup: boolean }) {
   useFirstModel(task);
   const t = hostTranslator();
@@ -135,7 +136,9 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   // A provider that only lacks its key can be chosen, and asks for it below.
   const sources = slot.sources.map((source) => keyless(source.note) ? { ...source, disabled: false } : source);
   const sourceNote = slot.sources.find((source) => source.id === draft[task].catalog)?.note;
-  const provider = keyless(sourceNote) ? slot.sources.find((source) => source.id === draft[task].catalog) : null;
+  const current = slot.sources.find((source) => source.id === draft[task].catalog);
+  const remote = current && !current.local ? current : null;
+  const provider = keyless(sourceNote) ? current : null;
   const status = prepareStatus(model, sourceNote);
   const optionNote = slot.options.find((option: Option) => option.id === draft[task].model)?.note;
   const languages = model.model?.languages ?? [];
@@ -147,12 +150,18 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   </Button>;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
+  const source = useRef<HTMLSelectElement>(null);
+  const [keyNote, setKeyNote] = useState("");
+  const keyKept = (name: string, outcome: KeyOutcome) => {
+    setKeyNote(outcome === "unverified" ? t("keys.why.unverified", { provider: name }) : t("keys.connected", { provider: name }));
+    source.current?.focus();
+  };
   return (
     <Group>
       <Row label={t("voice.source")} description={sourceNote && !provider ? noteText(t, sourceNote) : undefined} htmlFor={task + "-source"}>
-        <SourceSelect id={task + "-source"} value={draft[task].catalog} sources={sources} onChange={(catalog) => edit({ [task]: { catalog } })} t={t} />
+        <SourceSelect ref={source} id={task + "-source"} value={draft[task].catalog} sources={sources} onChange={(catalog) => edit({ [task]: { catalog } })} t={t} />
       </Row>
-      {provider && <Row label={provider.name ?? provider.id} block><ProviderKey provider={provider.id} name={provider.name ?? provider.id} t={t} /></Row>}
+      {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={(outcome) => keyKept(remote.name ?? remote.id, outcome)} />}
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
@@ -179,6 +188,7 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
           <output id="tts-speed-value" htmlFor="tts-speed">{draft.tts.speed.toFixed(2)}×</output>
         </span>
       </Row>}
+      <p className="sr-only" role="status">{keyNote}</p>
     </Group>
   );
 }

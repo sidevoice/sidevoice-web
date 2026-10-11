@@ -19,7 +19,6 @@
 .provider-name { display: inline-flex; align-items: center; gap: var(--sv-space-3); }
 .provider-mark { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-sm); background: var(--sv-surface); color: var(--sv-text); }
 .provider-mark:empty { display: none; }
-.provider-key { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-3); }
 .provider-key-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); }
 .provider-key-actions [role="status"] { margin: 0 auto 0 0; font-size: var(--sv-font-sm); }
 .provider-key-actions [role="status"]:empty { visibility: hidden; }
@@ -65,7 +64,7 @@
 .provider-row > .provider-key, .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; font-size: var(--sv-font-sm); font-weight: 600; color: var(--sv-accent-text); text-decoration: none; }
 .provider-key-link:hover { text-decoration: underline; }
-.provider-key-input { display: flex; gap: var(--sv-space-2); }
+.provider-key-input { display: flex; align-items: center; gap: var(--sv-space-2); }
 .provider-key-input .ui-input { flex: 1; }
 .provider-key-cost, .provider-key-replacing { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-remove p { margin: 0 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
@@ -92,8 +91,9 @@
 .downloaded-model .provider-remove { margin: 0; }
 .downloaded-model-error { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-danger); }
 
-/* Providers as cards: the mark, the name and what it is for, and Connect; connected, the check, the key's last four,
- * Replace and Remove; the key's form opening in the card. Where keys are kept, in one line above them. */
+/* Providers as cards: the mark, the name, one line on what it is for, and one control — Connect; connected, the
+ * state, the key's last four and its menu. A problem with the key is a line under them, with the one thing to do.
+ * Where keys are kept, in one line above them. */
 .provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0 0 var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-keys-where svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
 .provider-cards { display: grid; gap: var(--sv-space-3); }
@@ -103,22 +103,43 @@
 .provider-card-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .provider-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
 .provider-card-purpose { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.provider-card-key { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sv-space-2) var(--sv-space-3); padding-inline-start: 52px; }
-.provider-card-status { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
-.provider-card-status .ui-badge svg { width: 12px; height: 12px; }
-.provider-card-masked { font-size: var(--sv-font-sm); letter-spacing: .04em; color: var(--sv-text-muted); }
-.provider-card-actions { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
-.provider-card-problem { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; padding-inline-start: 52px; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
-.provider-card-problem svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
-.provider-card[data-state="rejected"] .provider-card-problem svg, .provider-card[data-state="unreadable"] .provider-card-problem svg { color: var(--sv-danger); }
+.provider-card-control { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; }
+.provider-card-control .ui-badge svg { width: 12px; height: 12px; }
+.provider-card-masked { font-family: var(--sv-font-mono); font-size: var(--sv-font-sm); letter-spacing: .04em; color: var(--sv-text-muted); }
+.provider-card-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); padding-inline-start: 52px; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.provider-card-problem > svg { flex: none; color: var(--sv-warning); }
+.provider-card-problem p { flex: 1 1 16rem; margin: 0; }
+.provider-card[data-state="rejected"] .provider-card-problem > svg, .provider-card[data-state="unreadable"] .provider-card-problem > svg { color: var(--sv-danger); }
 .provider-card-detail { color: var(--sv-text-muted); }
-.provider-card > .provider-key, .provider-card > .provider-remove { margin: 0 0 0 52px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
-.provider-card .provider-key-actions .provider-key-link { margin-inline-end: auto; }
-.provider-card-note { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
-.provider-card-note:empty { display: none; }
+/* The row way: the entry, or Remove's question, in place of the line and the control, under the name. */
+.provider-card[data-open] .provider-card-main { align-items: flex-start; }
+.provider-card[data-open] .provider-card-copy { gap: var(--sv-space-2); }
 @media (max-width: 640px) {
-  .provider-card-key, .provider-card-problem { padding-inline-start: 0; }
-  .provider-card > .provider-key, .provider-card > .provider-remove { margin-inline-start: 0; }
+  .provider-card-problem { padding-inline-start: 0; }
+}
+
+/* The key's entry (ProviderConnect). Its box with Show beside it; under it, where to get a key and where it is kept, in
+ * one muted line; what testing said, beside Test and save. */
+.provider-key-help { display: inline; }
+.provider-key-help .provider-key-link { display: inline-flex; vertical-align: bottom; }
+.provider-key-status { margin: 0 auto 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-key-error { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-danger); }
+.provider-key-error svg { flex: none; margin-top: 2px; }
+.provider-key-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sv-space-1); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-key-line .provider-key-status { margin: 0; }
+.provider-key-line .provider-key-status:empty { display: none; }
+.provider-key-dialog .ui-dialog-reason:empty, .provider-remove-dialog .ui-dialog-reason:empty { flex: 0 0 0; }
+/* The row: the box, Test and save and × on one line; on a phone, the box alone on its line and the button under it. */
+.provider-key-row, .provider-remove-inline { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.provider-key-row-controls { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.provider-key-row-controls .ui-input { flex: 1; min-width: 0; }
+.provider-remove-question { margin: 0; font-size: var(--sv-font-sm); font-weight: 600; line-height: 1.25rem; color: var(--sv-text); }
+.provider-remove-inline .provider-key-actions { justify-content: flex-start; }
+.provider-remove-inline .provider-key-status:empty { display: none; }
+@media (max-width: 599px) {
+  .provider-key-row-controls { flex-wrap: wrap; }
+  .provider-key-row-controls .ui-input { flex: 1 0 100%; }
+  .provider-key-row-controls .ui-button--primary { flex: 1; }
 }
 
 /* "Saved", beside the title for a moment; the error line at the content's head. */
