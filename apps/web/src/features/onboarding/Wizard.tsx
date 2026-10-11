@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
-import { ArrowRightIcon, CheckIcon, ChevronIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ArrowRightIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
@@ -96,29 +96,13 @@ function TurnStep({ t }: { t: HostTranslate }) {
 }
 
 /** Where the setup stands: the step and its group in words, then the five groups as a bar, done and current lit. */
-function Stepper({ groups, current, t }: { groups: typeof GROUPS; current: number; t: HostTranslate }) {
+function Stepper({ current, t }: { current: number; t: HostTranslate }) {
   return <div className="wizard-stepper">
-    <p className="wizard-stepper-label">{t("wizard.stepOf", { n: current + 1, total: groups.length, group: t(groups[current].key) })}</p>
+    <p className="wizard-stepper-label">{t("wizard.stepOf", { n: current + 1, total: GROUPS.length, group: t(GROUPS[current].key) })}</p>
     <ol className="wizard-steps" aria-label={t("wizard.progress")}>
-      {groups.map((group, index) => <li key={group.key} data-state={index < current ? "done" : index === current ? "current" : "next"}
+      {GROUPS.map((group, index) => <li key={group.key} data-state={index < current ? "done" : index === current ? "current" : "next"}
         aria-current={index === current ? "step" : undefined}><span className="sr-only">{t(group.key)}</span></li>)}
     </ol>
-  </div>;
-}
-
-/** One of the where step's choices as an expanding card: a radio that, chosen, opens what the choice needs in place,
- *  and says ready once it is. */
-function WhereCard({ id, selected, ready, onSelect, icon, label, note, t, children }: {
-  id: string; selected: boolean; ready: boolean; onSelect(): void; icon: ReactNode; label: string; note: string; t: HostTranslate; children: ReactNode;
-}) {
-  return <div id={id} className="wizard-where-card" data-selected={selected || undefined}>
-    <button type="button" aria-expanded={selected} aria-controls={id + "-body"} className="wizard-where-head" onClick={onSelect}>
-      <span className="wizard-where-icon">{icon}</span>
-      <span className="wizard-where-text"><strong>{label}</strong><span className="wizard-choice-note">{note}</span></span>
-      {ready && <span className="wizard-where-ready"><CheckIcon size={14} />{t("wizard.where.ready")}</span>}
-      <ChevronIcon size={16} className="wizard-where-chevron" />
-    </button>
-    {selected && <div id={id + "-body"} className="wizard-where-body">{children}</div>}
   </div>;
 }
 
@@ -198,11 +182,7 @@ export function Wizard() {
   const hostFailed = hostStatus.state === "failed" || hostStatus.state === "service-failed";
   const prepare = () => { setPreparing(true); localHostInstallController.start("no-machine"); };
   const { step } = onboarding;
-  // Two designs of where the agents are, for the operator to compare: separate steps (this computer prepared, then its
-  // agents; or another machine paired), or one step whose two choices open in place with all of it.
-  const cards = useVariant("where", ["steps", "cards"] as const) === "cards" && onboarding.canHostAgents;
   const readyVariant = useVariant("ready", ["a", "b"] as const);
-  const shown: OnboardingStep = cards && (step === "W2" || step === "W3" || step === "W2r") ? "W1" : step;
   const stageTask = step === "W4" ? "stt" : step === "W4v" ? "tts" : null;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const trial = useVoiceTry(stageTask, { onTried: (task) => void onboarding.markTried(task) });
@@ -229,14 +209,13 @@ export function Wizard() {
   }, [onboarding.open]);
   useEffect(() => { if (onboarding.open) title.current?.focus(); }, [onboarding.open, step]);
 
-  // A machine prepared or paired while its step is shown moves the setup on by itself, to where it then stands (a
-  // machine that answers after the setup opened leaves the steps already done behind). The expanding cards wait for
-  // Continue instead: what is ready shows in its card.
+  // A machine prepared or paired while its step is step moves the setup on by itself, to where it then stands (a
+  // machine that answers after the setup opened leaves the steps already done behind).
   useEffect(() => {
-    if (!onboarding.open || cards) return;
+    if (!onboarding.open) return;
     if (step === "W2" && onboarding.localReady) onboarding.openWizard();
     if (step === "W2r" && onboarding.remoteReady) onboarding.openWizard();
-  }, [onboarding.open, cards, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function choosePath(next: "agents" | "remote") {
     if (!await onboarding.setPath(next)) return;
@@ -273,38 +252,19 @@ export function Wizard() {
     setChoice(next);
   }
 
-  /** The expanding cards: a choice is the path at once (this computer chosen as the machine in use), its card opening
-   *  in place and brought into sight. */
-  function selectWhere(next: "agents" | "remote") {
-    choose(next);
-    void onboarding.setPath(next);
-    if (next === "agents" && localMachine?.pairingId && pairingInUse !== localMachine.pairingId) window.sidevoiceActions?.chooseMachine(localMachine.pairingId);
-    requestAnimationFrame(() => document.getElementById(next === "agents" ? "wizard-where-local" : "wizard-where-remote")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }));
-  }
-
-  /** On from the expanding cards, once the choice is ready: the path and its agents' answer kept (a preselected card
-   *  was never pressed), to where the setup then stands. */
-  async function finishWhere(next: "agents" | "remote") {
-    if (!await onboarding.setPath(next)) return;
-    if (next === "agents" && !await onboarding.markAgentsDone()) return;
-    onboarding.openWizard();
-  }
-
-  const groups = cards ? GROUPS.filter((group) => group.key !== "wizard.group.agents") : GROUPS;
-  const current = groups.findIndex((group) => group.steps.includes(shown));
-  const back = previous(shown, onboarding.path, onboarding.canHostAgents);
+  const current = GROUPS.findIndex((group) => group.steps.includes(step));
+  const back = previous(step, onboarding.path, onboarding.canHostAgents);
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as HostMessageKey) : "";
   const agents = pairingInUse ? hostAgents[pairingInUse] : undefined;
 
   const remoteName = machines.find((machine) => machine.pairingId === pairingInUse && !machine.local)?.host ?? "";
-  const whereReady = choice === "agents" ? onboarding.localReady : choice === "remote" && onboarding.remoteReady;
 
   /** Preparing this computer: its action, then its progress in its place (downloading, preparing, starting…), with
    *  what failed and Retry. `alternative`: the way to another machine instead, where the step is this alone. */
   const prepareBlock = (alternative: boolean) => <>
     <p>{t("localInstall.description")}</p>
     {!preparing && install.offered && <Button type="button" variant="primary" id="wizard-prepare" onClick={prepare}>{t("wizard.prepare")}</Button>}
-    <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" onAnotherMachine={cards ? () => selectWhere("remote") : undefined} />
+    <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" />
     {/* Installed, it waits for this computer to answer: never back to Prepare in between (the install's own state is
         cleared once its machine is chosen, before this device reaches it). */}
     {preparing && installSnapshot.phase !== "installing" && installSnapshot.phase !== "failed" && installSnapshot.phase !== "cancelled" && !onboarding.localReady && (
@@ -322,19 +282,19 @@ export function Wizard() {
     {(!pairingInUse || (agents?.status === "ready" && agents.value?.agents.length === 0)) && <p className="muted">{t("wizard.noAgentsConnected")}</p>}
   </>;
 
-  const ready = shown === "W6";
-  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={shown} data-ready={ready ? readyVariant : undefined}
+  const ready = step === "W6";
+  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready ? readyVariant : undefined}
     // Escape puts the setup off, except once it is done: Ready only goes on.
     onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}>
     <header className="wizard-head">
       <span className="wizard-brand"><SidevoiceMark size={18} />{t("wizard.eyebrow")}</span>
       {step !== "W6" && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </header>
-    {!(ready && readyVariant === "b") && <Stepper groups={groups} current={current} t={t} />}
-    {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[shown])}</h2>}
+    {!(ready && readyVariant === "b") && <Stepper current={current} t={t} />}
+    {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[step])}</h2>}
     <div className="wizard-body">
       {error && !ready && <Alert tone="danger" live title={error} />}
-      {shown === "W1" && !cards && <section>
+      {step === "W1" && <section>
         <p>{t("wizard.where.body")}</p>
         <div className="wizard-choices" role="radiogroup" aria-label={t("wizard.title.where")}>
           {onboarding.canHostAgents && <ChoiceCard selected={choice === "agents"} onSelect={() => choose("agents")}>
@@ -345,30 +305,14 @@ export function Wizard() {
           </ChoiceCard>
         </div>
       </section>}
-      {shown === "W1" && cards && <section>
-        <p>{t("wizard.where.body")}</p>
-        {/* The two choices open in place: this computer prepared and its agents, or the other machine's commands and its
-            pairing — all in the one step, which goes on once either is ready. */}
-        <div className="wizard-where" role="group" aria-label={t("wizard.title.where")}>
-          <WhereCard id="wizard-where-local" selected={choice === "agents"} ready={onboarding.localReady} onSelect={() => selectWhere("agents")}
-            icon={<MachinesIcon size={20} />} label={t("wizard.choice.local")} note={t("wizard.choice.localNote")} t={t}>
-            {onboarding.localReady ? agentsBlock : prepareBlock(false)}
-          </WhereCard>
-          <WhereCard id="wizard-where-remote" selected={choice === "remote"} ready={onboarding.remoteReady} onSelect={() => selectWhere("remote")}
-            icon={<ConnectorIcon size={20} />} label={t("wizard.choice.remote")} note={t("wizard.choice.remoteNote")} t={t}>
-            {onboarding.remoteReady ? <p className="wizard-where-done" role="status"><CheckIcon size={16} />{t("wizard.where.paired", { name: remoteName })}</p>
-              : <><p>{t("wizard.pairIntro")}</p><ConnectorSteps /><PairingCodeForm idPrefix="wizard-pairing" rows={2} /></>}
-          </WhereCard>
-        </div>
-      </section>}
       {step === "W0" && <BasicsStep t={t} />}
-      {shown === "W2" && <section className="wizard-prepare">{prepareBlock(true)}</section>}
-      {shown === "W2r" && <section>
+      {step === "W2" && <section className="wizard-prepare">{prepareBlock(true)}</section>}
+      {step === "W2r" && <section>
         <p>{t("wizard.pairIntro")}</p>
         <ConnectorSteps />
         <PairingCodeForm idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
-      {shown === "W3" && <section>{agentsBlock}</section>}
+      {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep t={t} />}
       {ready && <ReadyStep variant={readyVariant} path={onboarding.path} machineName={remoteName} title={title} t={t} />}
@@ -377,11 +321,11 @@ export function Wizard() {
     <footer className="wizard-actions">
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
-      {shown === "W1" && <Button type="button" variant="primary" id="wizard-where-continue" disabled={!choice || (cards && !whereReady)} onClick={() => choice && void (cards ? finishWhere(choice) : choosePath(choice))}>{t("wizard.continue")}</Button>}
-      {shown === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
-      {shown === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
+      {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
+      {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
+      {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
-      {shown === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
+      {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
       {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
         disabled={!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim())}
         onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}

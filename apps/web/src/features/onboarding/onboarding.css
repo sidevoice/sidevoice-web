@@ -51,30 +51,6 @@
 .wizard-choice-note { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
 .wizard-choices .ui-card > .wizard-choice-note { padding-inline-end: var(--sv-space-2); }
 
-/* The other design of it: the two choices as cards that open in place with what each needs (preparing this computer
-   and its agents; the other machine's commands and its pairing). The body scrolls; an opened card is brought into view. */
-.wizard-where { display: grid; gap: var(--sv-space-3); min-width: 0; }
-.wizard-where-card { min-width: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); transition: border-color .15s, box-shadow .15s; scroll-margin-block: var(--sv-space-3); }
-[data-theme="dark"] .wizard-where-card { background: var(--sv-surface-raised); }
-.wizard-where-card[data-selected] { border-color: var(--sv-accent); box-shadow: 0 0 0 1px var(--sv-accent); }
-.wizard-where-head {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--sv-space-3); width: 100%;
-  padding: var(--sv-space-4); border: 0; border-radius: inherit; background: none; color: var(--sv-text); font: inherit; text-align: start; cursor: pointer;
-}
-.wizard-where-head:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.wizard-where-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--sv-radius-lg); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
-.wizard-where-text { display: grid; gap: 2px; min-width: 0; }
-.wizard-where-text > strong { font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
-.wizard-where-ready { display: inline-flex; align-items: center; gap: var(--sv-space-1); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-positive); }
-.wizard-where-chevron { color: var(--sv-text-muted); transition: transform .15s; }
-.wizard-where-card[data-selected] .wizard-where-chevron { transform: rotate(180deg); }
-.wizard-where-body { display: grid; gap: var(--sv-space-4); min-width: 0; padding: 0 var(--sv-space-4) var(--sv-space-4); }
-.wizard-where-body > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
-.wizard-where-body > .ui-button { justify-self: start; }
-.wizard-where-done { display: flex; align-items: center; gap: var(--sv-space-2); }
-.wizard-where-done svg { color: var(--sv-positive); flex: none; }
-@media (prefers-reduced-motion: reduce) { .wizard-where-card, .wizard-where-chevron { transition: none; } }
-
 /* ----- transcription and voice: the choices (Settings' own), the sentence to hear, and the try */
 .wizard-stage-step { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .wizard-stage-step > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
