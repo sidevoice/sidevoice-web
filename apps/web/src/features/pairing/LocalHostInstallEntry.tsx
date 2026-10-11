@@ -44,12 +44,15 @@ export function LocalHostInstallEntry({
   className = "",
   holdSuccess = false,
   source = "machines",
+  onAnotherMachine,
 }: {
   showCta: boolean;
   controller?: LocalHostInstallController;
   className?: string;
   holdSuccess?: boolean;
   source?: "no-machine" | "machines";
+  /** Where "Connect to another machine" leads instead of the pairing dialog (the setup's own other choice). */
+  onAnotherMachine?: () => void;
 }) {
   const t = hostTranslator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
@@ -68,7 +71,7 @@ export function LocalHostInstallEntry({
 
   async function connectAnotherMachine() {
     if (snapshot.phase !== "installing") controller.clear();
-    window.sidevoiceActions?.openPairing();
+    if (onAnotherMachine) onAnotherMachine(); else window.sidevoiceActions?.openPairing();
   }
 
   async function copyDetails() {

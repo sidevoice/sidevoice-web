@@ -124,7 +124,7 @@ function WhereCard({ id, selected, ready, onSelect, icon, label, note, t, childr
   id: string; selected: boolean; ready: boolean; onSelect(): void; icon: ReactNode; label: string; note: string; t: HostTranslate; children: ReactNode;
 }) {
   return <div id={id} className="wizard-where-card" data-selected={selected || undefined}>
-    <button type="button" role="radio" aria-checked={selected} aria-expanded={selected} aria-controls={id + "-body"} className="wizard-where-head" onClick={onSelect}>
+    <button type="button" aria-expanded={selected} aria-controls={id + "-body"} className="wizard-where-head" onClick={onSelect}>
       <span className="wizard-where-icon">{icon}</span>
       <span className="wizard-where-text"><strong>{label}</strong><span className="wizard-choice-note">{note}</span></span>
       {ready && <span className="wizard-where-ready"><CheckIcon size={14} />{t("wizard.where.ready")}</span>}
@@ -310,7 +310,7 @@ export function Wizard() {
   const prepareBlock = (alternative: boolean) => <>
     <p>{t("localInstall.description")}</p>
     {!preparing && install.offered && <Button type="button" variant="primary" id="wizard-prepare" onClick={prepare}>{t("wizard.prepare")}</Button>}
-    <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" />
+    <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" onAnotherMachine={cards ? () => selectWhere("remote") : undefined} />
     {/* Installed, it waits for this computer to answer: never back to Prepare in between (the install's own state is
         cleared once its machine is chosen, before this device reaches it). */}
     {preparing && installSnapshot.phase !== "installing" && installSnapshot.phase !== "failed" && installSnapshot.phase !== "cancelled" && !onboarding.localReady && (
@@ -335,7 +335,7 @@ export function Wizard() {
       {step !== "W6" && <Button type="button" variant="ghost" tone="neutral" size="sm" className="wizard-later" onClick={() => void onboarding.defer()}>{t("wizard.later")}</Button>}
     </header>
     <Stepper groups={groups} current={current} t={t} />
-    <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[step])}</h2>
+    <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[shown])}</h2>
     <div className="wizard-body">
       {error && <Alert tone="danger" live title={error} />}
       {shown === "W1" && !cards && <section>
@@ -353,7 +353,7 @@ export function Wizard() {
         <p>{t("wizard.where.body")}</p>
         {/* The two choices open in place: this computer prepared and its agents, or the other machine's commands and its
             pairing — all in the one step, which goes on once either is ready. */}
-        <div className="wizard-where" role="radiogroup" aria-label={t("wizard.title.where")}>
+        <div className="wizard-where" role="group" aria-label={t("wizard.title.where")}>
           <WhereCard id="wizard-where-local" selected={choice === "agents"} ready={onboarding.localReady} onSelect={() => selectWhere("agents")}
             icon={<MachinesIcon size={20} />} label={t("wizard.choice.local")} note={t("wizard.choice.localNote")} t={t}>
             {onboarding.localReady ? agentsBlock : prepareBlock(false)}
