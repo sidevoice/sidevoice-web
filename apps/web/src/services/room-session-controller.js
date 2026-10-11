@@ -167,7 +167,19 @@ function setLocalHostStatus(status){
 }
 let localHostEpoch=0;
 function setRemoteHostStatus(fp,status){
- roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{state:status,checkedAt:Date.now()}}});
+ roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],state:status,checkedAt:Date.now()}}});
+}
+// What a paired machine says of its Sidevoice — its version, its active calls — for its page's card: asked of it with this
+// device's pairing (core GET /api/host/status, which core does not serve yet: a contract gap). Unknown stays unknown.
+async function loadMachineInfo(fp){
+ try{
+  const answer=await hostApi(fp,'/api/host/status',{headers:{accept:'application/json'},cache:'no-store'});
+  const info=answer&&typeof answer==='object'?answer:{};
+  const version=typeof info.version==='string'&&/^\d+\.\d+\.\d+/.test(info.version)?info.version:null;
+  const calls=Number.isSafeInteger(info.calls)&&info.calls>=0?info.calls:null;
+  const known=state.remoteHostStatus?.[fp]??{state:'checking',checkedAt:Date.now()};
+  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...known,version,calls}}});
+ }catch{}
 }
 async function refreshLocalHost(){
  if(!desktopLocalHost){
@@ -1592,6 +1604,7 @@ window.sidevoiceActions={
  renameMachineDevice,
  renameMachine,
  setDeviceName,
+ loadMachineInfo,
  machineDevices,
  revokeMachineDevice,
  openPairing:()=>openPairing(),

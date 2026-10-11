@@ -181,9 +181,11 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
         </Tooltip>}
         {!copy.reachable && <span id={"host-use-reason-" + machine.id} className="sr-only">{t("hosts.useUnreachable", { machine: copy.name })}</span>}
       </header>
-      {machine.local && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
-        <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} />
-      </section>}
+      {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
+      <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
+        {machine.local ? <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} name={copy.name} />
+          : <RemoteHostCard machine={machine} name={copy.name} titleId={"host-status-" + machine.id} />}
+      </section>
       <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
       </section>
@@ -191,6 +193,30 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
         <MachineDevicesPanel machine={machine} name={copy.name} />
       </section>
     </section>
+  );
+}
+
+/** Another machine's Sidevoice, to read: how this device reaches it (directly, through the room, not at all), whether
+ *  without encryption, and — where the machine says — its version and active calls. No controls: it is run there. */
+function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
+  const t = hostTranslator();
+  const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
+  useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
+  const state: { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } = machine.revoked ? { tone: "danger", label: "hosts.state.revoked" }
+    : machine.state === "connected" ? { tone: "positive", label: machine.reach === "room" ? "hosts.state.throughRoom" : "hosts.state.connected" }
+    : machine.state === "checking" ? { tone: "neutral", label: "hosts.state.checking" } : { tone: "danger", label: "hosts.state.offline" };
+  return (
+    <div className="host-status-card" data-tone={state.tone} data-remote>
+      <div className="host-status-head">
+        <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
+        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
+      </div>
+      {(machine.insecure || info?.version || info?.calls != null) && <dl className="host-status-facts">
+        {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
+        {info?.calls != null && <div><dt>{t("hosts.fact.calls")}</dt><dd>{info.calls}</dd></div>}
+        {machine.insecure && <div><Badge tone="warning" dot>{t("hosts.notEncrypted")}</Badge></div>}
+      </dl>}
+    </div>
   );
 }
 
@@ -207,7 +233,7 @@ function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" |
 /* This computer's service as a status card: its state with its dot, first; its version and active calls as compact facts;
  * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
  * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
-function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; titleId: string }) {
+function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStatus; titleId: string; name: string }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -264,7 +290,7 @@ function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; ti
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
-        <h4 id={titleId}>{t("hosts.section.service")}</h4>
+        <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
         <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
