@@ -32,11 +32,11 @@ export function SkipButton() {
   );
 }
 
-/* The microphone's level is drawn inside its own button: the runtime writes it as `--mic-fill` on #mute on every
- * reading, and the bars beside the microphone take their height from it in CSS (call-view.css), so no render
- * happens per reading. */
-function MicWave() {
-  return <span className="mic-wave" aria-hidden="true"><i /><i /><i /><i /></span>;
+/* The microphone's level, as five bars on the devices' button at the left of the microphone (as Meet, and the room
+ * before): the runtime writes it as `--mic-fill` on #mic-control on every reading, and the bars take their height from
+ * it in CSS (call-view.css), so no render happens per reading. */
+export function MicWave() {
+  return <span className="mic-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>;
 }
 
 /** The microphone gives no sound though the person has not muted it: its device is held elsewhere (another app, the
@@ -55,7 +55,6 @@ export function MuteButton() {
       aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
       aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts="Meta+D Control+D"
       onClick={() => window.sidevoiceActions?.toggleMic()}>
-      <MicWave />
       {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
     </Button>
   );

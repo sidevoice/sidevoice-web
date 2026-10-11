@@ -79,7 +79,10 @@
  * pane's head as a row of chips instead. */
 .machine-nav { display: grid; gap: 2px; margin: 2px 0 var(--sv-space-2) var(--sv-space-6); }
 .ui-nav-item--sub { min-height: 34px; font-size: var(--sv-font-sm); }
-.machine-nav-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.machine-entry { min-width: 0; max-width: 100%; overflow: hidden; }
+.machine-nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.machine-nav-here { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
+.machine-entry .new-dot { margin-inline-start: 0; }
 .machine-nav-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-text-subtle); }
 .machine-nav-dot[data-tone="positive"] { background: var(--sv-positive); }
 .machine-nav-dot[data-tone="danger"] { background: var(--sv-danger); }
@@ -99,4 +102,43 @@
 .pair-device-dialog p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .pair-device-expiry { font-variant-numeric: tabular-nums; }
 /* This computer's own machine, marked in the list. */
-.machine-nav-local { flex: none; padding: 0 var(--sv-space-1-5); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1.125rem; }
+
+/* This computer's service as a status card (LocalHostStatusPanel): its title and state (a dot and a word) first, its
+   facts compact, Start at sign-in as a switch, its actions at the foot. */
+.host-status-card { display: grid; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4) var(--sv-space-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); }
+[data-theme="dark"] .host-status-card { background: var(--sv-surface-raised); }
+.host-status-card p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.host-status-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
+.host-status-head h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
+.host-status-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-weight: var(--sv-weight-semibold); }
+.host-status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--sv-text-subtle); }
+.host-status-card[data-tone="positive"] .host-status-dot { background: var(--sv-positive); box-shadow: 0 0 0 3px var(--sv-positive-soft); }
+.host-status-card[data-tone="warning"] .host-status-dot { background: var(--sv-warning); }
+.host-status-card[data-tone="danger"] .host-status-dot { background: var(--sv-danger); }
+.host-status-card[data-tone="danger"] .host-status-state, .host-status-card[data-tone="danger"] .host-status-summary { color: var(--sv-danger); }
+.host-status-facts { display: flex; flex-wrap: wrap; gap: var(--sv-space-1) var(--sv-space-5); margin: 0; }
+.host-status-facts > div { display: flex; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
+.host-status-facts dt { color: var(--sv-text-muted); }
+.host-status-facts dd { margin: 0; font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
+.host-status-login { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); cursor: pointer; }
+.host-status-login > span { display: grid; gap: 2px; }
+.host-status-login-label { font-weight: var(--sv-weight-semibold); font-size: var(--sv-font-sm); }
+.host-status-login .muted { font-size: var(--sv-font-xs); }
+.host-status-actions { padding-top: var(--sv-space-1); }
+.host-status-card .host-stop-confirm { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-3); border-radius: var(--sv-radius-lg); background: var(--sv-danger-soft); }
+.host-status-product { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
+.host-device-title { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; max-width: 100%; }
+.host-device-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host-device-title .ui-badge { flex: none; }
+.host-device-copy { flex: 1 1 12rem; }
+.host-device-rename { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.host-device-rename .ui-input { flex: 1 1 12rem; min-width: 0; }
+.host-device-rename-open { flex: none; opacity: .7; }
+.host-device-rename-open:hover, .host-device-rename-open:focus-visible { opacity: 1; }
+.host-name { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
+.host-rename { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
+.host-rename .ui-input { flex: 1 1 12rem; min-width: 0; }
+.host-rename-open { opacity: .7; }
+.host-rename-open:hover, .host-rename-open:focus-visible { opacity: 1; }
+.host-alias { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); }
+.device-name-note { display: block; margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); color: var(--sv-text-muted); }

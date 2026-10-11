@@ -12,9 +12,9 @@ import "./whats-new.css";
 /* What's new for someone already set up: only what a later release added that needs them (FEATURES), never the setup
  * again. Shown once a session, on entering the room after the setup (finished or put off), never during a call or over
  * another dialog. Set up opens exactly where it is set up; Got it is seen; Later brings it back after a day (a second
- * Later is seen). Where it shows is a design to compare (VARIANTS `whats-new`): a small dialog, or a section of the
- * updates' list (UpdatesEntry). */
-export const WHATS_NEW = ["dialog", "panel"] as const;
+ * Later is seen). How it shows is a design to compare (VARIANTS `whats-new`): a small dialog, or only the "new"
+ * highlights on each setting (highlights.tsx), seen where they are. */
+export const WHATS_NEW = ["dialog", "dots"] as const;
 export function useWhatsNewPlace() { return useVariant("whats-new", WHATS_NEW); }
 
 const DAY = 24 * 60 * 60 * 1000;

@@ -101,8 +101,6 @@
   --sv-voice-text: #7d5300;
   --sv-disabled-bg: #efebf4;
   --sv-disabled-text: #8e8a98;
-  /* The select's chevron, drawn in text-muted (a data URL cannot read a token). */
-  --sv-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23545766' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --sv-scrim: rgb(27 18 40 / 45%);
   --sv-tooltip-bg: #2a1a40;
   --sv-tooltip-text: #ffffff;
@@ -132,7 +130,6 @@
   --sv-danger: #ffb4ab; --sv-danger-soft: #3a1a18; --sv-danger-fill: #d0382d; --sv-danger-fill-hover: #b52e25; --sv-on-danger-fill: #ffffff;
   --sv-voice: #e0a82e; --sv-on-voice: #2a1a40; --sv-voice-soft: #2d2412; --sv-voice-text: #ecbe5c;
   --sv-disabled-bg: #26262b; --sv-disabled-text: #73737c;
-  --sv-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8b8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --sv-scrim: rgb(0 0 0 / 70%); --sv-tooltip-bg: #fafafa; --sv-tooltip-text: #18181b; --sv-bubble-agent: #1e1b26; --sv-bubble-self: #24211b;
   --sv-stage-bg: radial-gradient(ellipse at 12% 0%, rgb(201 182 236 / 14%) 0, transparent 50%), linear-gradient(145deg, #161518, #111113);
   --sv-shadow-xs: 0 1px 2px rgb(0 0 0 / 60%); --sv-shadow-sm: none; --sv-shadow-md: 0 16px 34px rgb(0 0 0 / 55%); --sv-shadow-lg: 0 30px 80px rgb(0 0 0 / 70%);

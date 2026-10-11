@@ -75,6 +75,11 @@ export interface ParticipantView {
 /** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
  *  it stays, saying so, until the person pairs again or forgets it. */
 export interface MachineView {
+  /** Renamed on this device (an alias): `host` is that name, `machineHost` the machine's own. */
+  alias?: boolean;
+  machineHost?: string | null;
+  /** Paired without encryption by the person's choice (plain http on a private network). */
+  insecure?: boolean;
   /** Stable UI row identity. The local row remains stable while its native pairing is unavailable. */
   id: string;
   /** The pairing fingerprint, when this row currently has a usable pairing. */
@@ -100,7 +105,10 @@ export interface DetectedAgent {
   label: string;
   present: boolean;
   version: string | null;
-  registration: "connected" | "not-connected" | "foreign" | "unknown";
+  /** `foreign`: the agent's MCP configuration already has an entry named "sidevoice" that Sidevoice did not add (made by
+   *  hand or by another tool) — never touched. `outdated`: Sidevoice's own entry, from an older version — Connect updates it.
+   *  `invalid`: the agent's MCP configuration file cannot be read (broken JSON/TOML): nothing is changed until it is fixed. */
+  registration: "connected" | "not-connected" | "foreign" | "outdated" | "invalid" | "unknown";
   connect: "auto" | "manual";
   dismissed?: boolean;
   actionable?: boolean;
@@ -188,7 +196,8 @@ export interface SidevoiceActions {
   forgetMachine(id: string): Promise<void>;
   /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */
   /** Redeems a machine's pairing code; `address` is where the person says the machine is (host:port or a URL). */
-  pairDevice(code: string, name: string, address?: string): Promise<{ host: string | null }>;
+  /** `insecure`: the person agreed to pair over plain http with a machine on a private network (device-pairing.js). */
+  pairDevice(code: string, name: string, address?: string, options?: { insecure?: boolean }): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
   /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
@@ -217,6 +226,14 @@ export interface SidevoiceActions {
   revokeLocalHostDevice?(id: string): Promise<void>;
   machineDevices?(fp: string): Promise<HostDeviceView[]>;
   revokeMachineDevice?(fp: string, id: string): Promise<void>;
+  /** Renames a device in a machine's list (this computer's, or a paired machine's): the machine keeps the name. */
+  renameLocalHostDevice?(id: string, name: string): Promise<void>;
+  renameMachineDevice?(fp: string, id: string, name: string): Promise<void>;
+  /** A machine's name on this device only (null: back to the machine's own). */
+  renameMachine?(fp: string, name: string | null): void;
+  /** This device's name as machines list it: kept for pairing, and sent to each machine it is paired with. Resolves with
+   *  how many machines could not be told. */
+  setDeviceName?(name: string): Promise<number>;
 }
 
 /** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the

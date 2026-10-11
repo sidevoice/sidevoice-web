@@ -9,13 +9,14 @@ import { useRoomStore } from "../../state/room-store";
 import { currentDeviceName } from "../../state/device-name";
 import { hostTranslator } from "../settings/host-i18n";
 import { ConnectorSteps } from "./ConnectorSteps";
-import { ADDRESS_INSECURE, ADDRESS_INVALID, decodePairingCode } from "../../services/device-pairing.js";
+import { ADDRESS_INSECURE, ADDRESS_INVALID, PAIRING_HTTP_ONLY, decodePairingCode } from "../../services/device-pairing.js";
 import "./pairing.css";
 
 function pairingError(reason: unknown, t: ReturnType<typeof hostTranslator>) {
   const message = reason instanceof Error ? reason.message : String(reason);
   if (message === ADDRESS_INVALID) return t("pairing.addressInvalid");
   if (message === ADDRESS_INSECURE) return t("pairing.addressInsecure");
+  if (message === PAIRING_HTTP_ONLY) return t("pairing.httpOnly");
   if (/Pega el código/.test(message)) return t("pairing.empty");
   if (/empieza por|incompleto o dañado/.test(message)) return t("pairing.invalid");
   if (/caduc|expired|already used|already been used/i.test(message)) return t("pairing.expired");
@@ -110,7 +111,7 @@ export function PairingCodeForm({ idPrefix = "device-pairing", autoFocus = false
     setBusy(true);
     setError("");
     try {
-      await window.sidevoiceActions?.pairDevice(code, currentDeviceName((where) => t("pair.deviceName", { where })), address);
+      await window.sidevoiceActions?.pairDevice(code, currentDeviceName((_, params) => t("pair.deviceNameBrowser", params)), address);
       setCode("");
     } catch (reason) {
       setError(pairingError(reason, t));

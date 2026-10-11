@@ -8,6 +8,8 @@ import { useRoomStore } from "../../state/room-store";
 import { actionableAgent } from "../../services/host-agents";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
+import { NewMark } from "../highlights/highlights";
+import { InfoTip } from "../../components/ui/InfoTip";
 import "./host-agents.css";
 
 function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): string {
@@ -27,7 +29,7 @@ function useRelativeTime(value: string | number | null | undefined): string {
   const at = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value).valueOf();
   if (Number.isNaN(at)) return "";
   const seconds = Math.round((at - Math.max(now, at)) / 1000);
-  const words = new Intl.RelativeTimeFormat(navigator.language, { numeric: "auto" });
+  const words = new Intl.RelativeTimeFormat(document.documentElement.lang || navigator.language, { numeric: "auto" });
   const minutes = Math.round(seconds / 60), hours = Math.round(seconds / 3600), days = Math.round(seconds / 86400);
   return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
 }
@@ -93,7 +95,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const [justConnected, setJustConnected] = useState(false);
   const previous = useRef(agent.registration);
   const manualOnly = agent.connect === "manual";
-  const readOnly = agent.registration === "foreign" || agent.registration === "unknown";
+  const readOnly = agent.registration === "foreign" || agent.registration === "invalid" || agent.registration === "unknown";
   const isNew = !readOnly && actionableAgent(agent);
   const hasManualInstructions = !!(agent.instructions?.command?.trim() || agent.instructions?.snippet?.trim());
   const panelId = `host-agent-howto-${fp.slice(0, 7)}-${agent.id}`;
@@ -115,14 +117,20 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
-  const status: { text: string; tone: "ok" | "error" | "muted" | "" } = errorText ? { text: errorText, tone: "error" }
+  const status: { text: string; tone: "ok" | "error" | "muted" | ""; info?: string } = errorText ? { text: errorText, tone: "error" }
     : busy ? { text: t(`agents.busy.${busy}` as HostMessageKey), tone: "muted" }
     : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
     : agent.registration === "connected" ? { text: t("agents.connected"), tone: "" }
-    : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted" }
+    // Short in the row; what it means and what to do, only in its (i).
+    : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted", info: t("agents.foreign.info", { agent: agent.label }) }
+    : agent.registration === "outdated" ? { text: t("agents.outdated"), tone: "muted", info: t("agents.outdated.info", { agent: agent.label }) }
+    : agent.registration === "invalid" ? { text: t("agents.invalid"), tone: "error", info: t("agents.invalid.info", { agent: agent.label, file: agent.instructions?.file ?? "" }) }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
   const connected = agent.registration === "connected";
+  // The confirm goes: the focus goes back to Disconnect (after Remove, to the row's action as it now stands).
+  const action = useRef<HTMLButtonElement>(null);
+  const cancelConfirm = () => { setConfirming(false); requestAnimationFrame(() => action.current?.focus()); };
   // The hints say what each button does: Sidevoice doing it, or the person.
   const handHint = t(connected ? "agents.hint.removeByHand" : agent.registration === "foreign" ? "agents.hint.replaceByHand" : "agents.hint.byHand", { agent: agent.label });
   return (
@@ -131,12 +139,15 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
         <span className="host-agent-icon">{agent.id === "other" ? <ConnectorIcon size={16} /> : <HarnessIcon harness={agent.id} size={18} />}</span>
         <span className="host-agent-copy">
           <span className="host-agent-name"><strong>{agent.label}</strong>{agent.version && <span className="muted"> {agent.version}</span>}
-            {isNew && <span className="host-agent-badge">{t("agents.new")}</span>}
+            <NewMark id={`agent:${fp}:${agent.id}`} />
           </span>
           {/* Always one status line under the name, so a row never changes height: what went wrong, else a moment of
               "ready" once connected, else where it stands. */}
-          <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
-            role={status.tone === "error" ? "alert" : "status"} title={status.text}>{status.text}</span>
+          <span className="host-agent-status-line">
+            <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
+              role={errorText ? "alert" : "status"} title={status.text}>{status.text}</span>
+            {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
+          </span>
         </span>
         {/* Every action a button on the row, each with a hint: doing it by hand (add, replace, or take Sidevoice out), and
             Connect or Disconnect, which Sidevoice does itself. */}
@@ -147,20 +158,21 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             </Button>
           </Tooltip>}
           {connected ? <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
-              <Button variant="ghost" size="sm" loading={busy === "disconnect"} disabled={!!busy || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
+              <Button ref={action} variant="ghost" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}
                 onClick={() => setConfirming(true)}>{t("agents.disconnect")}</Button>
             </Tooltip>
             : !readOnly && !manualOnly && <Tooltip content={t("agents.hint.connect", { agent: agent.label })}>
-              <Button variant="primary" size="sm" loading={busy === "connect"} disabled={!!busy} aria-label={t("agents.connectNamed", { agent: agent.label })}
+              <Button ref={action} variant="primary" size="sm" loading={busy === "connect"} disabled={busy === "disconnect"} aria-label={t("agents.connectNamed", { agent: agent.label })}
                 onClick={() => run("connect")}>{t("agents.connect")}</Button>
             </Tooltip>}
         </span>
       </div>
-      {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}>
+      {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}
+        onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConfirm(); } }}>
         <p>{t("agents.disconnectConfirm", { agent: agent.label })}</p>
         <span className="host-agent-confirm-actions">
-          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => setConfirming(false)}>{t("hosts.cancel")}</Button>
-          <Button variant="danger" size="sm" onClick={() => { setConfirming(false); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
+          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={cancelConfirm}>{t("hosts.cancel")}</Button>
+          <Button variant="danger" size="sm" onClick={() => { cancelConfirm(); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
         </span>
       </div>}
       {open && agent.registration !== "unknown" &&
@@ -204,26 +216,33 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   }, [fp]);
 
   if (!fp) return <div className="host-agent-problem" role="alert"><p>{t("agents.unreachable")}</p></div>;
-  if (listing?.status === "failed") return (
-    <div className="host-agent-problem" role="alert">
-      <p>{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
-      <Button size="sm" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
-    </div>
+  // A search that failed with nothing found before: the heading stays, and why, quietly, with searching again. With a
+  // list already shown (a rescan while connecting by hand blipped), the list stays and the header says it.
+  if (listing?.status === "failed" && !value) return (
+    <section className="host-agents" aria-labelledby="host-agents-title">
+      <div className="host-agents-heading"><h4 id="host-agents-title">{t("agents.heading")}</h4></div>
+      <div className="host-agent-problem-quiet">
+        <p className="muted">{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
+        <Button size="sm" variant="secondary" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
+      </div>
+    </section>
   );
   if (!value && (listing?.status === "loading" || !listing || listing.status === "idle")) return <p className="muted" role="status">{t("agents.scanning")}</p>;
 
   const rows = (value?.agents ?? []).filter((agent) => agent.present || agent.registration === "connected");
   const scanning = listing?.status === "loading";
+  const failed = listing?.status === "failed";
   return (
     <section className="host-agents" aria-labelledby="host-agents-title">
       {/* The heading, when the list was searched (in words, as time passes), and searching again as an icon. */}
       <div className="host-agents-heading">
         <h4 id="host-agents-title">{t("agents.heading")}</h4>
-        <span className="host-agents-scanned" role="status">{scanning ? t("agents.searching") : searchedAgo ? t("agents.searchedAgo", { time: searchedAgo }) : ""}</span>
+        {/* Not a live region: it changes every minute, and with each rescan while connecting by hand. */}
+        <span className="host-agents-scanned" data-failed={failed || undefined}>{scanning ? t("agents.searching") : failed ? t("agents.searchFailed") : searchedAgo ? t("agents.searchedAgo", { time: searchedAgo }) : ""}</span>
         <Tooltip content={t("agents.searchAgain")}>
-          <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("agents.searchAgain")} disabled={scanning}
+          <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("agents.searchAgain")} loading={scanning}
             onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>
-            {scanning ? <span className="ui-spinner ui-spinner--inline" aria-hidden /> : <RefreshIcon size={16} />}
+            <RefreshIcon size={16} />
           </Button>
         </Tooltip>
       </div>

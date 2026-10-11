@@ -3,6 +3,7 @@ import {
   base64ToBytes, bytesToBase64url, machineAddress, candidateBases, decodePairingCode, deviceName, fingerprintOf, firstProven, pairingInUse,
   pairingSummary, proveIdentity, projectPairings, readPairingState, readPairings, redeemPairingCode, revokedPairing, secureBase, usingPairing, verifyIdentitySignature,
   withPairing, withoutPairing, writePairings, NO_WEBCRYPTO, PAIRINGS_KEY, type Pairing,
+  privateHost, PAIRING_HTTP_PRIVATE, PAIRING_HTTP_ONLY, PAIRING_HTTP_BLOCKED,
 } from "./device-pairing.js";
 
 // jsdom's window has no WebCrypto of its own; node's is what the tests run on, handed in where it is used.
@@ -333,4 +334,50 @@ test("a device names itself after what it is, unless the person says otherwise",
   expect(deviceName({ userAgent: "Mozilla/5.0 (Linux; Android 14)" })).toBe("Sidevoice en Android");
   expect(deviceName({ userAgent: "", userAgentData: { platform: "Windows" } })).toBe("Sidevoice en Windows");
   expect(deviceName({})).toBe("Sidevoice");
+});
+
+// ----- plain http, on a private network, by consent -----
+test("private-network hosts are told from public ones", () => {
+  for (const host of ["10.0.0.5", "10.255.255.255", "172.16.0.1", "172.31.255.254", "192.168.1.20", "100.64.0.1", "100.127.255.255",
+    "127.0.0.1", "localhost", "::1", "[::1]", "fd12:3456::1", "fc00::1", "mac-mini.local", "nuc.local."])
+    expect(privateHost(host), host).toBe(true);
+  for (const host of ["8.8.8.8", "172.15.0.1", "172.32.0.1", "192.169.1.1", "100.63.0.1", "100.128.0.1", "11.0.0.1", "300.1.1.1",
+    "example.com", "local", "evil.local.example.com", "2001:db8::1", "fe80::1", ""])
+    expect(privateHost(host), host).toBe(false);
+});
+
+test("plain http goes to a private address only for a pairing the person agreed to keep unencrypted", () => {
+  expect(secureBase("http://192.168.1.20:8765")).toBe(false);
+  expect(secureBase("http://192.168.1.20:8765", "", { insecure: true })).toBe(true);
+  expect(secureBase("http://203.0.113.5:8765", "", { insecure: true })).toBe(false);
+  const pairing = { fp: "x", urls: ["http://192.168.1.20:8765", "https://nuc.example"], rv: null };
+  expect(candidateBases(pairing).map((c) => c.base)).toEqual(["https://nuc.example"]);
+  expect(candidateBases({ ...pairing, insecure: true }).map((c) => c.base)).toEqual(["http://192.168.1.20:8765", "https://nuc.example"]);
+});
+
+test("a private machine answering only over http is asked about, then paired unencrypted with consent and marked so", async () => {
+  const node = await fakeNode("nuc");
+  const code = codeFor(payload(node, { urls: [], rv: null }));
+  const get = network({ "http://192.168.1.20:8765": node });
+  // Without consent: it says so, and nothing is sent.
+  await expect(redeemPairingCode(code, { address: "192.168.1.20:8765", get, subtle, now: NOW, origin: "http://localhost:5173" }))
+    .rejects.toThrow(PAIRING_HTTP_PRIVATE);
+  expect(node.secrets).toEqual([]);
+  // With it: paired over http, and the pairing says it is not encrypted.
+  const { pairing, base } = await redeemPairingCode(code, { address: "192.168.1.20:8765", get, subtle, now: NOW, origin: "http://localhost:5173", insecure: true });
+  expect(base.base).toBe("http://192.168.1.20:8765");
+  expect(pairing.insecure).toBe(true);
+  expect(pairingSummary(pairing).insecure).toBe(true);
+});
+
+test("a public machine answering only over http is refused, consent or not; an https page is told where it can work", async () => {
+  const node = await fakeNode("vps");
+  const code = codeFor(payload(node, { urls: [], rv: null }));
+  const get = network({ "http://203.0.113.5:8765": node });
+  await expect(redeemPairingCode(code, { address: "203.0.113.5:8765", get, subtle, now: NOW, origin: "http://localhost:5173" })).rejects.toThrow(PAIRING_HTTP_ONLY);
+  await expect(redeemPairingCode(code, { address: "203.0.113.5:8765", get, subtle, now: NOW, origin: "http://localhost:5173", insecure: true })).rejects.toThrow();
+  expect(node.secrets).toEqual([]);
+  const local = await fakeNode("nuc");
+  await expect(redeemPairingCode(codeFor(payload(local, { urls: [], rv: null })), { address: "192.168.1.20:8765", get: network({}), subtle, now: NOW, origin: "https://room.example" }))
+    .rejects.toThrow(PAIRING_HTTP_BLOCKED);
 });

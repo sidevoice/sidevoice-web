@@ -6,11 +6,12 @@ import { ChoiceCard, Group, Row, Section } from "../components/ui/Card";
 import { Dialog, DialogSurface } from "../components/ui/Dialog";
 import { Field } from "../components/ui/Field";
 import { Input, Textarea } from "../components/ui/Input";
-import { NativeSelect } from "../components/ui/NativeSelect";
 import { ProgressBar } from "../components/ui/ProgressBar";
+import { Select, type SelectItems } from "../components/ui/Select";
 import { Segmented, Tabs } from "../components/ui/Tabs";
 import { Switch } from "../components/ui/Switch";
-import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
+import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ProviderLogo, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
+import { NewDot } from "../features/highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "../features/settings/ModelPrepare";
 import { applyTheme } from "../lib/theme";
 import { AppPatterns } from "./AppPatterns";
@@ -88,13 +89,59 @@ function Fields() {
     <Field label="Machine name" hint="How this machine shows in the room."><Input defaultValue="Office iMac" /></Field>
     <Field label="Room address" error="That does not look like an address." hint="Copy it from the room's pairing screen."><Input defaultValue="sidevoice:/room" /></Field>
     <Field label="Interface language" aside="(optional)">
-      <NativeSelect defaultValue="es"><option value="en">English</option><option value="es">Español</option></NativeSelect>
+      <Select defaultValue="es" options={[{ value: "en", label: "English" }, { value: "es", label: "Español" }]} />
     </Field>
     <Field label="Sample sentence"><Textarea value={text} onChange={(event) => setText(event.target.value)} /></Field>
     <Field label="Disabled"><Input disabled defaultValue="Can't edit" /></Field>
     <div className="ds-row">
       <Input size="sm" placeholder="Small input" aria-label="Small input" style={{ width: "12rem" }} />
-      <NativeSelect size="sm" aria-label="Small select" style={{ width: "12rem" }}><option>Small select</option></NativeSelect>
+      <Select size="sm" aria-label="Small select" style={{ width: "12rem" }} defaultValue="small" options={[{ value: "small", label: "Small select" }]} />
+    </div>
+  </div>;
+}
+
+const MODELS: SelectItems = [
+  { label: "Whisper", options: [
+    { value: "whisper-base", label: "whisper-base", description: "74 MB · fast, good accuracy", badge: <Badge tone="positive" dot>Downloaded</Badge> },
+    { value: "whisper-small", label: "whisper-small", description: "466 MB · better accuracy", badge: <Badge tone="accent">Recommended</Badge> },
+    { value: "whisper-large", label: "whisper-large", description: "3 GB · the best accuracy", disabled: true, reason: "Does not run here: it does not fit in this device's memory." },
+  ] },
+  { label: "Moonshine", options: [
+    { value: "moonshine-tiny", label: "moonshine-tiny", description: "English only · the fastest" },
+  ] },
+];
+
+const SOURCES: SelectItems = [
+  { value: "local", label: "On this device", icon: <MachinesIcon />, description: "Private and free; a one-time download." },
+  { value: "openai", label: "OpenAI", icon: <ProviderLogo provider="openai" size={16} />, badge: <Badge tone="warning" dot>Needs a key</Badge> },
+  { value: "elevenlabs", label: "ElevenLabs", icon: <ProviderLogo provider="elevenlabs" size={16} /> },
+];
+
+const LANGUAGES: SelectItems = [
+  { value: "", label: "Detect automatically" },
+  { label: "Supported by the voice", options: ["English", "Español", "Français", "Deutsch", "Italiano", "Português"].map((label) => ({ value: label, label })) },
+  { label: "Transcription only", options: ["Nederlands", "Polski", "Svenska", "Türkçe", "Українська", "日本語", "中文", "한국어"].map((label) => ({ value: label, label })) },
+];
+
+function Selects() {
+  const [model, setModel] = useState("whisper-small");
+  const [source, setSource] = useState("openai");
+  const [language, setLanguage] = useState("");
+  return <div className="ds-stack">
+    <Field label="Model" hint="Groups with their names; a line under an option; a badge after it; one that can't be chosen says why.">
+      <Select value={model} onValueChange={setModel} options={MODELS} />
+    </Field>
+    <Field label="Source" hint="An icon before each option; the chosen one's shows in the box.">
+      <Select value={source} onValueChange={setSource} options={SOURCES} />
+    </Field>
+    <Field label="Language" hint="A long list scrolls, with a chevron at the edge that has more; type a name to jump to it.">
+      <Select value={language} onValueChange={setLanguage} options={LANGUAGES} />
+    </Field>
+    <Field label="Voice" error="Choose a voice to go on."><Select value="" placeholder="Choose a voice" options={[{ value: "dora", label: "Dora" }, { value: "alex", label: "Alex" }]} /></Field>
+    <Field label="Speaker" hint="This browser plays through the system's speaker."><Select disabled value="" options={[{ value: "", label: "System default" }]} /></Field>
+    <div className="ds-row">
+      <Select size="sm" aria-label="Small select" style={{ width: "14rem" }} value={model} onValueChange={setModel} options={MODELS} />
+      <Select aria-label="Medium select" style={{ width: "14rem" }} value={model} onValueChange={setModel} options={MODELS} />
     </div>
   </div>;
 }
@@ -122,6 +169,21 @@ function Badges() {
   </div>;
 }
 
+/* "New" (features/highlights): information, never a warning. A dot (accent) on each thing that leads to it — the gear,
+ * the Settings section, the machine — and the word "New" on the thing itself, which seeing clears (half of it in view
+ * for a second); the dots above go once nothing new is under them. It goes on its own two weeks after first shown; at
+ * most three at once. Rules: only for what is genuinely new to this person or needs nothing but a look — never
+ * marketing or tips; what needs an action (a model to download, a key) uses the attention style (amber) and clears only
+ * when resolved; the dot is never the only cue: containers say ", new" to screen readers, the gear its count. */
+function NewHighlights() {
+  return <div className="ds-row">
+    <span className="ds-row"><SettingsIcon size={20} /><NewDot label=", new" /></span>
+    <span className="ui-nav-item" style={{ width: 200 }}>Machines<NewDot label=", new" /></span>
+    <span>Codex <Badge tone="accent">New</Badge></span>
+    <Badge tone="warning" dot>Needs a key</Badge>
+  </div>;
+}
+
 function Alerts() {
   return <div className="ds-stack">
     <Alert title="Storage is blocked" tone="warning">This browser won't keep settings. Allow site data to keep them.</Alert>
@@ -138,7 +200,7 @@ function Cards() {
     <Section title="General" description="How Sidevoice looks and speaks to you on this device.">
       <Group>
         <Row label="Interface language" description="The language of Sidevoice's own words." htmlFor="ds-row-lang">
-          <NativeSelect id="ds-row-lang" defaultValue="en"><option value="en">English</option><option value="es">Español</option></NativeSelect>
+          <Select id="ds-row-lang" defaultValue="en" options={[{ value: "en", label: "English" }, { value: "es", label: "Español" }]} />
         </Row>
         <Row label="Appearance"><Segmented size="sm" label="Appearance" value="system" onChange={() => {}} items={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} /></Row>
         <Row label="End turn on silence" description="Send what you said when you stop talking."><Switch checked={send} onChange={setSend} aria-label="End turn on silence" /></Row>
@@ -156,8 +218,8 @@ function Cards() {
 
 function Pickers({ locked }: { locked: boolean }) {
   return <>
-    <Field label="Family"><NativeSelect disabled={locked} defaultValue="whisper"><option value="whisper">Whisper</option><option value="parakeet">Parakeet</option></NativeSelect></Field>
-    <Field label="Model"><NativeSelect disabled={locked} defaultValue="small"><option value="small">whisper-small</option><option value="base">whisper-base</option></NativeSelect></Field>
+    <Field label="Family"><Select disabled={locked} defaultValue="whisper" options={[{ value: "whisper", label: "Whisper" }, { value: "parakeet", label: "Parakeet" }]} /></Field>
+    <Field label="Model"><Select disabled={locked} defaultValue="small" options={[{ value: "small", label: "whisper-small" }, { value: "base", label: "whisper-base" }]} /></Field>
   </>;
 }
 
@@ -198,8 +260,10 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
     <Specimen title="Type" note="DM Sans, the landing's typeface. 15px body; nothing under 12px; sentence case."><Type /></Specimen>
     <Specimen title="Button" note="Soft solid: 10px corners like the fields, a light raise on fills, a small press. Content always centred; one primary per region; loading keeps the width."><Buttons /></Specimen>
     <Specimen title="Field · Input · Select · Textarea" note="Label, control, error, hint. Textareas grow and are never resized by hand."><Fields /></Specimen>
+    <Specimen title="Select" note="One value of a list. The list drops from the box, at least as wide as it, and goes up when there is no room below; it wears the box's theme, and inside a dialog it is drawn in the dialog. Arrows, Home and End move; typing jumps; Enter or Space picks; Escape closes only the list. A tap opens and picks on a phone."><Selects /></Specimen>
     <Specimen title="Tabs · Segmented · Switch" note="Tabs for views, Segmented for one value of a few, Switch for a boolean."><Navigation /></Specimen>
     <Specimen title="Badge"><Badges /></Specimen>
+    <Specimen title="New (highlights)"><NewHighlights /></Specimen>
     <Specimen title="Alert"><Alerts /></Specimen>
     <Specimen title="Section · Group · Row · Choice card" note="Settings: a section, its groups as cards, rows label-left and control-right; stacked when narrow."><Cards /></Specimen>
     <Specimen title="Progress"><ProgressBar value={0.66} label="Example progress" /><ProgressBar value={null} label="Example indeterminate progress" /></Specimen>
@@ -244,7 +308,7 @@ function SettingsExample({ open, onClose }: { open: boolean; onClose: () => void
                   readyAction={<Button size="sm">Try it</Button>} />
               </Row>
               <Row label="Language" htmlFor="ds-lang" description="What you speak; auto-detect when unsure.">
-                <NativeSelect id="ds-lang" defaultValue="auto"><option value="auto">Detect automatically</option><option value="es">Español</option><option value="en">English</option></NativeSelect>
+                <Select id="ds-lang" defaultValue="" options={LANGUAGES} />
               </Row>
             </Group>
           </Section>

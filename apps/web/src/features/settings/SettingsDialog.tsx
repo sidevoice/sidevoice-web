@@ -4,7 +4,7 @@ import { OverlayPortalProvider } from "../../components/ui/Tooltip";
 import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select } from "../../components/ui/Select";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -14,6 +14,8 @@ import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
+import { DeviceNameField } from "./DeviceNameField";
+import { NewDot, useHighlights } from "../highlights/highlights";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
@@ -46,12 +48,16 @@ export function Appearance({ t }: { t: HostTranslate }) {
 }
 
 function GeneralSettings({ t }: { t: HostTranslate }) {
+  // The runtime keeps it (saved as it is chosen, said to the call); this shows it and asks for a change.
+  const language = useRoomStore((state) => state.facts.uiLanguage);
   return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
     <Group>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
-        <NativeSelect id="ui-language" defaultValue=""><option value="">{t("settings.general.languageAuto")}</option><option value="es">Español</option><option value="en">English</option></NativeSelect>
+        <Select id="ui-language" value={language} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
+          options={[{ value: "", label: t("settings.general.languageAuto") }, { value: "es", label: "Español" }, { value: "en", label: "English" }]} />
       </Row>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
+      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
     </Group>
   </Section>;
 }
@@ -141,6 +147,7 @@ export function SettingsDialog() {
   const machine = useRoomStore((state) => state.facts.machinesView?.machine ?? null);
   useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [current, machine]);
   const waits = useVoiceReadiness();
+  const news = useHighlights();
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
   // A control asked for (what's new's Set up): in view, focused, and lit for a moment, once its section is drawn.
@@ -176,6 +183,7 @@ export function SettingsDialog() {
                 aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
                 onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                 {section.icon}<span>{t(section.label)}</span>
+                {news.some((item) => item.section === section.id) && <NewDot label={t("highlights.navNew")} />}
                 {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>
               {/* Each machine under Machines, and Add a machine after them. */}

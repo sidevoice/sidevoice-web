@@ -8,6 +8,9 @@ export interface LocalHostStatus {
   service?: "launchd" | "systemd" | "none";
   installed?: boolean;
   core?: { pid?: number; version?: string; api?: number; launch_id?: string } | null;
+  /** The installed Sidevoice's version — the `sidevoice` package, which bundles the core — as the person knows it.
+   *  The one version the UI shows. */
+  product_version?: string | null;
   calls?: number | null;
   reachable?: boolean;
   attempts?: number | null;
@@ -80,6 +83,9 @@ export interface LocalHostBridge {
   restart?(): Promise<unknown>;
   serviceInstall?(): Promise<unknown>;
   serviceUninstall?(): Promise<unknown>;
+  /** Whether the service starts at the next sign-in, and only that: a running service keeps running, a stopped one stays
+   *  stopped. (serviceInstall/serviceUninstall also start and stop it.) */
+  setStartAtLogin?(enabled: boolean): Promise<unknown>;
   reconnect?(): Promise<unknown>;
   revealLog?(): Promise<unknown> | unknown;
   pairingCode?(): Promise<LocalPairingCode>;
@@ -97,7 +103,7 @@ export function localHostBridge(): LocalHostBridge | null {
     typeof localHost.pairing === "function" ? localHost : null;
 }
 
-function desktopHost() {
+export function desktopHost() {
   return (globalThis.window as Window & { __sidevoiceDesktop?: { host?: Record<string, unknown> } } | undefined)
     ?.__sidevoiceDesktop?.host;
 }

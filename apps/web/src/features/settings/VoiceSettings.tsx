@@ -1,6 +1,6 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoomStore } from "../../state/room-store";
-import { NativeSelect } from "../../components/ui/NativeSelect";
+import { Select, type SelectOption } from "../../components/ui/Select";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Group, Row } from "../../components/ui/Card";
@@ -11,6 +11,7 @@ import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ProviderKeyNeeded, type KeyOutcome } from "./ProviderConnect";
+import { NewMark } from "../highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
@@ -59,17 +60,20 @@ function useChoices(draft: Settings) {
   return useMemo(() => voiceChoices(catalogs, draft, SPEECH_LANGUAGES), [catalogs, draft]);
 }
 
-const SourceSelect = forwardRef<HTMLSelectElement, { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: HostTranslate }>(function SourceSelect({ id, value, sources, onChange, t }, ref) {
+/** What the pane says about a choice, in its list: under it, or as why it cannot be chosen when it cannot. */
+function noted(t: HostTranslate, option: { disabled: boolean; note: Note | null }): Pick<SelectOption, "description" | "reason"> {
+  const text = noteText(t, option.note);
+  if (!text) return {};
+  return option.disabled ? { reason: text } : { description: text };
+}
+
+function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: HostTranslate }) {
   return (
-    <NativeSelect ref={ref} id={id} value={value} onChange={(event) => onChange(event.target.value)}>
-      {sources.map((source) => (
-        <option key={source.id} value={source.id} disabled={source.disabled}>
-          {source.local ? t("voice.source.local") : source.name ?? source.id}{source.note ? " — " + noteText(t, source.note) : ""}
-        </option>
-      ))}
-    </NativeSelect>
+    <Select id={id} value={value} onValueChange={onChange} options={sources.map((source) => ({
+      value: source.id, label: source.local ? t("voice.source.local") : source.name ?? source.id, disabled: source.disabled, ...noted(t, source),
+    }))} />
   );
-});
+}
 
 /** The family first, then a model of it: a family changed picks its first model that runs here. A provider's models
  *  have no family, and are one list. */
@@ -78,22 +82,18 @@ function ModelPickers({ task, draft, options, locked, t }: { task: Task; draft: 
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
   const shown = families.length ? options.filter((option) => option.group === family || (!option.group && option.id === draft[task].model)) : options;
-  const label = (option: Option) => option.id + (option.note ? " — " + noteText(t, option.note) : "");
   const pickFamily = (next: string) => {
     const first = options.find((option) => option.group === next && !option.disabled) ?? options.find((option) => option.group === next);
     if (first) edit({ [task]: { model: first.id } });
   };
   return <>
     {families.length > 0 && <Field label={t("voice.family")}>
-      <NativeSelect id={task + "-family"} value={family ?? ""} disabled={locked} onChange={(event) => pickFamily(event.target.value)}>
-        {!family && <option value="" disabled>{t("voice.family.none")}</option>}
-        {families.map((name) => <option key={name} value={name}>{familyName(name)}</option>)}
-      </NativeSelect>
+      <Select id={task + "-family"} value={family ?? ""} disabled={locked} onValueChange={pickFamily} placeholder={t("voice.family.none")}
+        options={families.map((name) => ({ value: name, label: familyName(name) }))} />
     </Field>}
     <Field label={t("voice.model")}>
-      <NativeSelect id={task + "-model"} value={draft[task].model} disabled={locked} onChange={(event) => edit({ [task]: { model: event.target.value } })}>
-        {shown.map((option) => <option key={option.id} value={option.id} disabled={option.disabled}>{label(option)}</option>)}
-      </NativeSelect>
+      <Select id={task + "-model"} value={draft[task].model} disabled={locked} onValueChange={(model) => edit({ [task]: { model } })}
+        options={shown.map((option) => ({ value: option.id, label: option.id, disabled: option.disabled, ...noted(t, option) }))} />
     </Field>
   </>;
 }
@@ -150,16 +150,18 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
   </Button>;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
-  const source = useRef<HTMLSelectElement>(null);
+  // A key kept from here: said, and the focus on the slot's source (its box, found in this slot's group: the setup and
+  // Settings may both be drawn, each with its own).
+  const announce = useRef<HTMLParagraphElement>(null);
   const [keyNote, setKeyNote] = useState("");
   const keyKept = (name: string, outcome: KeyOutcome) => {
     setKeyNote(outcome === "unverified" ? t("keys.why.unverified", { provider: name }) : t("keys.connected", { provider: name }));
-    source.current?.focus();
+    announce.current?.closest(".ui-group")?.querySelector<HTMLElement>(`#${task}-source`)?.focus();
   };
   return (
     <Group>
       <Row label={t("voice.source")} description={sourceNote && !provider ? noteText(t, sourceNote) : undefined} htmlFor={task + "-source"}>
-        <SourceSelect ref={source} id={task + "-source"} value={draft[task].catalog} sources={sources} onChange={(catalog) => edit({ [task]: { catalog } })} t={t} />
+        <SourceSelect id={task + "-source"} value={draft[task].catalog} sources={sources} onChange={(catalog) => edit({ [task]: { catalog } })} t={t} />
       </Row>
       {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={(outcome) => keyKept(remote.name ?? remote.id, outcome)} />}
       <Row label={t("voice.model")} block>
@@ -170,17 +172,15 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
         <ModelRuntime task={task} state={model} locked={model.installing} />
         {!setup && <TryResult task={task} trial={trial} t={t} />}
       </Row>
-      {model.ready && task === "stt" && <Row label={t("voice.language")} description={t("voice.language.hint")} htmlFor="stt-language">
-        <NativeSelect id="stt-language" value={draft.stt.language ?? ""} onChange={(event) => edit({ stt: { language: event.target.value || null } })}>
-          <option value="">{t("voice.language.detect")}</option>
-          {choices.stt.languages.map((tag: string) => <option key={tag} value={tag}>{languageName(tag)}</option>)}
-        </NativeSelect>
+      {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
+        <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
+          options={[{ value: "", label: t("voice.language.detect") }, ...choices.stt.languages.map((tag: string) => ({ value: tag, label: languageName(tag) }))]} />
       </Row>}
       {model.ready && task === "tts" && (voices.length ? <Row label={t("voice.voice")} htmlFor="tts-voice">
-        <NativeSelect id="tts-voice" value={draft.tts.voice ?? ""} onChange={(event) => edit({ tts: { voice: event.target.value || null } })}>
-          <option value="">{t("voice.voice.first")}</option>
-          {voices.map((voice: { id: string; name: string | null; languages: string[] }) => <option key={voice.id} value={voice.id}>{voice.name ?? voice.id}{voice.languages.length ? " · " + voice.languages.map(languageName).join(", ") : ""}</option>)}
-        </NativeSelect>
+        <Select id="tts-voice" value={draft.tts.voice ?? ""} onValueChange={(voice) => edit({ tts: { voice: voice || null } })}
+          options={[{ value: "", label: t("voice.voice.first") }, ...voices.map((voice: { id: string; name: string | null; languages: string[] }) => ({
+            value: voice.id, label: voice.name ?? voice.id, description: voice.languages.length ? voice.languages.map(languageName).join(", ") : undefined,
+          }))]} />
       </Row> : <Row label={t("voice.voice")} description={noteText(t, choices.tts.voiceNote)} />)}
       {model.ready && speed && <Row label={t("voice.speed")} htmlFor="tts-speed">
         <span className="voice-speed">
@@ -188,7 +188,7 @@ function SlotSettings({ task, draft, setup }: { task: Task; draft: Settings; set
           <output id="tts-speed-value" htmlFor="tts-speed">{draft.tts.speed.toFixed(2)}×</output>
         </span>
       </Row>}
-      <p className="sr-only" role="status">{keyNote}</p>
+      <p ref={announce} className="sr-only" role="status">{keyNote}</p>
     </Group>
   );
 }
@@ -230,20 +230,17 @@ export function TurnChoices({ draft }: { draft: Settings }) {
         <Segmented size="sm" label={t("voice.patience")} value={draft.patience} onChange={(value) => edit({ patience: value })}
           items={patience.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
-      <Row label={<>{t("voice.endOfTurn")}<InfoTip label={t("voice.endOfTurn.infoLabel")}>{t("voice.endOfTurn.info")}</InfoTip></>}
+      <Row label={<>{t("voice.endOfTurn")}<InfoTip label={t("voice.endOfTurn.infoLabel")}>{t("voice.endOfTurn.info")}</InfoTip><NewMark id="feature:end-of-turn-smart" /></>}
         description={choices.endOfTurn.note ? noteText(t, choices.endOfTurn.note) : t(smart ? "voice.endOfTurn.smartHint" : "voice.endOfTurn.silenceHint")}>
-        <NativeSelect id="voice-end-of-turn" aria-label={t("voice.endOfTurn")} value={smart ? "smart-turn" : "silence"} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
-          <option value="smart-turn" disabled={!choices.endOfTurn.smartTurn}>{t("voice.endOfTurn.smart")}</option>
-          <option value="silence">{t("voice.endOfTurn.silence")}</option>
-        </NativeSelect>
+        <Select id="voice-end-of-turn" aria-label={t("voice.endOfTurn")} value={smart ? "smart-turn" : "silence"} onValueChange={(value) => edit({ end_of_turn: value as Settings["end_of_turn"] })}
+          options={[{ value: "smart-turn", label: t("voice.endOfTurn.smart"), disabled: !choices.endOfTurn.smartTurn }, { value: "silence", label: t("voice.endOfTurn.silence") }]} />
       </Row>
       {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
         <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
           pickers={(locked) => <Field label={t("voice.model")}>
             {/* Just the models: one today, more later; no families, sizes or runtime here. */}
-            <NativeSelect id="turn-model" value={turn.model!.id} disabled={locked} onChange={(event) => edit({ turn_model: event.target.value })}>
-              {turnModels.map((model: { id: string; builds?: { available: boolean }[] }) => <option key={model.id} value={model.id} disabled={!model.builds?.some((build) => build.available)}>{model.id}</option>)}
-            </NativeSelect>
+            <Select id="turn-model" value={turn.model!.id} disabled={locked} onValueChange={(model) => edit({ turn_model: model })}
+              options={turnModels.map((model: { id: string; builds?: { available: boolean }[] }) => ({ value: model.id, label: model.id, disabled: !model.builds?.some((build) => build.available) }))} />
           </Field>}
           onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
       </Row>}
@@ -256,9 +253,8 @@ export function IdleUnloadChoice({ draft }: { draft: Settings }) {
   const t = hostTranslator();
   return (
     <Row label={t("settings.advanced.idleUnload")} description={t("settings.advanced.idleUnloadHint")} htmlFor="voice-idle-unload">
-      <NativeSelect id="voice-idle-unload" value={String(draft.idle_unload_minutes)} onChange={(event) => edit({ idle_unload_minutes: Number(event.target.value) })}>
-        {IDLE_UNLOAD_MINUTES.map((minutes: number) => <option key={minutes} value={minutes}>{t("settings.advanced.minutes", { n: minutes })}</option>)}
-      </NativeSelect>
+      <Select id="voice-idle-unload" value={String(draft.idle_unload_minutes)} onValueChange={(minutes) => edit({ idle_unload_minutes: Number(minutes) })}
+        options={IDLE_UNLOAD_MINUTES.map((minutes: number) => ({ value: String(minutes), label: t("settings.advanced.minutes", { n: minutes }) }))} />
     </Row>
   );
 }
