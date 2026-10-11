@@ -26,7 +26,7 @@ export function initialSessionFacts() {
         // Host-owned agent state is keyed by fingerprint, never by the machine currently in use.
         hostAgents: {}, settingsAgentRequest: null,
         // The section Settings shows (SettingsDialog).
-        settingsSection: 'general', machinesView: { machine: null }, settingsSavedAt: 0, webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
+        settingsSection: 'general', machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
         localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
         // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
         // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
@@ -41,7 +41,7 @@ export function initialSessionFacts() {
         voiceInstall: null,
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
-        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, providerKeys: {},
+        voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, deviceName: null, providerKeys: {},
     };
 }
 export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
@@ -240,7 +240,7 @@ export function machinesView(s) {
     const localStatus = s.localHostStatus?.state || 'absent';
     const showLocal = !!local || (s.localHostAvailable && localStatus !== 'absent');
     const localRow = showLocal ? {
-        fp: local?.fp || 'local-host', host: local?.host || null, local: true,
+        fp: local?.fp || 'local-host', host: local?.host || null, local: true, alias: !!local?.alias, machine_host: local?.machine_host ?? null,
         inUse: !!s.localHostSelected || (!!local && s.pairingInUse === local.fp),
         selectable: !!local && s.localHostStatus?.reachable === true,
         localStatus,
@@ -265,7 +265,7 @@ export function machinesView(s) {
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
         return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', inUse, revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, selectable: p.selectable,
+            state, local: !!p.local, localStatus, selectable: p.selectable, alias: !!p.alias, machineHost: p.machine_host ?? null, insecure: p.insecure === true,
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }

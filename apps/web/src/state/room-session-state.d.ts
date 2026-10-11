@@ -32,6 +32,8 @@ export interface SessionFacts {
   settingsSection: string;
   /** When a setting was last kept (there is no Save: each applies as it changes), for a moment's "Saved". */
   settingsSavedAt: number;
+  /** The interface language this device keeps; '' is Automatic (the system's, followed as it is). */
+  uiLanguage: string;
   /** A control in Settings to bring into view and point at, by its id (what's new's Set up); cleared once done. */
   settingsFocus: string | null;
   /** The voice's microphones and speakers, and which are chosen (null: the voice offers no choice, or not yet). */
@@ -58,6 +60,8 @@ export interface SessionFacts {
  modelsRemovable: boolean;
  /** How long a downloaded model not used is kept, in days; null: forever (model-housekeeping.js). */
  deleteUnusedDays: number | null;
+ /** This device's name as the person set it (General, the setup), for its own row in machines' lists; null until set. */
+ deviceName: string | null;
  providerKeys: Record<string, boolean | null>;
  /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
  storageBlocked: boolean;

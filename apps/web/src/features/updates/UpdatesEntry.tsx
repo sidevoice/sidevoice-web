@@ -7,7 +7,6 @@ import { useVariant } from "../../lib/variants";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { appUpdater, updateLater, useUpdates, type UpdateItem } from "./useUpdates";
-import { WhatsNewList, useWhatsNew, useWhatsNewPlace } from "../whats-new/WhatsNew";
 import "./updates.css";
 
 /* The updates waiting, behind one quiet entry with their count: on a desktop at the conversations' foot, above
@@ -62,9 +61,7 @@ function UpdatesList({ items, inCall, t }: { items: UpdateItem[]; inCall: boolea
 export function UpdatesEntry({ compact = false, side = "top" }: { compact?: boolean; side?: "top" | "bottom" }) {
   const t = hostTranslator();
   const { items, inCall } = useUpdates();
-  const news = useWhatsNew();
-  const newHere = useWhatsNewPlace() === "panel" ? news.items : [];
-  const count = items.length + newHere.length;
+  const count = items.length;
   if (!count) return null;
   const label = t("updates.entry", { n: count });
   const trigger = compact
@@ -75,15 +72,11 @@ export function UpdatesEntry({ compact = false, side = "top" }: { compact?: bool
   return <Popover trigger={trigger} label={t("updates.title")} side={side} align="start">
     <div className="updates-panel">
       {items.length > 0 && <><h3>{t("updates.title")}</h3><UpdatesList items={items} inCall={inCall} t={t} /></>}
-      {newHere.length > 0 && <><h3>{t("whatsNew.title")}</h3><WhatsNewList items={newHere} t={t} onSetUp={news.setUp} />
-        <Button variant="ghost" tone="neutral" size="sm" onClick={() => news.mark("seen", newHere.map((item) => item.id))}>{t("whatsNew.gotIt")}</Button></>}
     </div>
   </Popover>;
 }
 
 /** Whether something waits: a phone's chevron wears a dot for it where the updates live in its panel. */
 export function useUpdatesWaiting() {
-  const updates = useUpdates().items.length;
-  const news = useWhatsNew().items.length;
-  return updates + (useWhatsNewPlace() === "panel" ? news : 0) > 0;
+  return useUpdates().items.length > 0;
 }

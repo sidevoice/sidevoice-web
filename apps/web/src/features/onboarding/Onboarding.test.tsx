@@ -7,6 +7,7 @@ import { ONBOARDING_STORAGE_KEY, trialKey } from "../../services/onboarding-stat
 import { localHostInstallController } from "../../services/local-host-install";
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
+import { chooseOption, selectedValue } from "../../test/select";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -67,11 +68,12 @@ test("the basics come first: appearance, the interface's language and the one th
   room();
   expect(title()).toHaveTextContent("The basics");
   expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
-  expect((document.getElementById("wizard-ui-language") as HTMLSelectElement).value).toBe("");
-  expect((document.getElementById("wizard-speech-language") as HTMLSelectElement).value).toBe("");
-  fireEvent.change(document.getElementById("wizard-ui-language")!, { target: { value: "es" } });
+  expect(selectedValue("wizard-ui-language")).toBe("");
+  expect(document.getElementById("wizard-ui-language")).toHaveTextContent("Automatic");
+  expect(selectedValue("wizard-speech-language")).toBe("");
+  chooseOption("wizard-ui-language", "es");
   expect(actions.setInterfaceLanguage).toHaveBeenCalledWith("es");
-  fireEvent.change(document.getElementById("wizard-speech-language")!, { target: { value: "en" } });
+  chooseOption("wizard-speech-language", "en");
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { language: "en" } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Continue" })); });
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).basics_done).toBe(true);
@@ -83,7 +85,7 @@ test("transcription and voice are this device's: trying them is recommended, and
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
   // Source first, then the model, as in Settings → Voice.
-  expect((document.getElementById("stt-source") as HTMLSelectElement).value).toBe("local");
+  expect(selectedValue("stt-source")).toBe("local");
   expect(tryButton()).toHaveTextContent("Speak");
   // The try is the model's: its hint in its block, and the block offers no second Speak beside the footer's.
   expect(card("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");

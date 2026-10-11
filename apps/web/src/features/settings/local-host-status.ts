@@ -29,6 +29,7 @@ export interface SafeLocalHostStatusDetails {
   window_started?: string;
   next_retry_at?: string;
   failure?: { key?: string; at?: string };
+  product_version?: string;
 }
 
 export function safeLocalHostCount(value: unknown) {
@@ -71,6 +72,7 @@ export function safeLocalHostStatusDetails(status: LocalHostStatus): SafeLocalHo
     if (typeof core.version === "string" && VERSION.test(core.version)) safeCore.version = core.version;
     if (Object.keys(safeCore).length) details.core = safeCore;
   }
+  if (typeof source.product_version === "string" && VERSION.test(source.product_version)) details.product_version = source.product_version;
   if (source.failure && typeof source.failure === "object" && !Array.isArray(source.failure)) {
     const failure = source.failure as Record<string, unknown>;
     const safeFailure: NonNullable<SafeLocalHostStatusDetails["failure"]> = {};

@@ -8,8 +8,8 @@ import { useEffect, useRef, type RefObject } from "react";
 interface Surface { close(): void }
 const stack: Surface[] = [];
 /** What sits above these surfaces and answers Escape and Tab itself: a dialog the page opened (the pairing dialog can
- *  open over a phone's sheet), the header menu, a row's options menu, a popover (New conversation's). */
-const ABOVE = "dialog[open], details.call-menu[open], [role=menu], .ui-popover";
+ *  open over a phone's sheet), the header menu, a row's options menu, a popover (New conversation's), a select's list. */
+const ABOVE = "dialog[open], details.call-menu[open], [role=menu], .ui-popover, .ui-select-content";
 const above = () => !!document.querySelector(ABOVE);
 
 function escape(event: KeyboardEvent) {

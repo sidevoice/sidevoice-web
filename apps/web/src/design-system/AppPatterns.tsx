@@ -5,7 +5,7 @@ import { Button } from "../components/ui/Button";
 import { ChoiceCard, Group, Row, Section } from "../components/ui/Card";
 import { DialogSurface } from "../components/ui/Dialog";
 import { Field } from "../components/ui/Field";
-import { NativeSelect } from "../components/ui/NativeSelect";
+import { Select } from "../components/ui/Select";
 import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
@@ -180,9 +180,9 @@ function DevicesBar({ fixed = false, lost = false }: { fixed?: boolean; lost?: b
   const t = callTranslator();
   return (
     <div className="pt-devices">
-      <Field label={t("devices.mic")}><NativeSelect defaultValue="headset"><option value="">{t("devices.default")}</option><option value="headset">AirPods Pro</option><option>MacBook Pro Microphone</option></NativeSelect></Field>
+      <Field label={t("devices.mic")}><Select defaultValue="headset" options={[{ value: "", label: t("devices.default") }, { value: "headset", label: "AirPods Pro" }, { value: "built-in", label: "MacBook Pro Microphone" }]} /></Field>
       <Field label={t("devices.speaker")} hint={fixed ? t("devices.speakerFixed") : undefined}>
-        <NativeSelect defaultValue="" disabled={fixed}><option value="">{t("devices.default")}</option><option>AirPods Pro</option><option>MacBook Pro Speakers</option></NativeSelect>
+        <Select defaultValue="" disabled={fixed} options={[{ value: "", label: t("devices.default") }, { value: "headset", label: "AirPods Pro" }, { value: "built-in", label: "MacBook Pro Speakers" }]} />
       </Field>
       <span className="pt-devices-actions"><Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("devices.refresh")}><RefreshIcon size={16} /></Button>
         <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("devices.close")}><CloseIcon size={16} /></Button></span>
@@ -347,8 +347,9 @@ function WizardTranscription() {
     <WizardFrame step={2} title={t("wizard.title.stt")} footer={<><Button variant="ghost" tone="neutral" className="pt-back">{t("wizard.back")}</Button><p className="ui-dialog-reason" id="pt-wizard-reason">The transcription model isn't ready yet.</p><Button variant="primary" disabled blockedBy="pt-wizard-reason">{t("wizard.continue")}</Button></>}>
       <ModelPrepare status="downloading" model="whisper-small" size={466e6} fraction={0.58} meta="English, Spanish and 4 more · good accuracy, fast"
         pickers={(locked) => <>
-          <Field label="Family"><select className="ui-select" disabled={locked} defaultValue="whisper"><option value="whisper">Whisper</option></select></Field>
-          <Field label="Model"><select className="ui-select" disabled={locked} defaultValue="small"><option value="small">whisper-small</option></select></Field>
+          <Field label="Family"><Select disabled={locked} defaultValue="whisper" options={[{ value: "whisper", label: "Whisper" }]} /></Field>
+          <Field label="Model"><Select disabled={locked} defaultValue="small" options={[{ value: "base", label: "whisper-base" }, { value: "small", label: "whisper-small" },
+            { value: "large", label: "whisper-large", disabled: true, reason: t("voice.model.unfit", { reasons: t("voice.unfit.memory") }) }]} /></Field>
         </>} />
     </WizardFrame>
   );
@@ -454,7 +455,7 @@ function HostAgents() {
       </div>
       <div className="ui-row pt-agent">
         <div className="pt-machine-line"><span className="pt-machine-icon"><HarnessIcon harness="codex" size={18} /></span>
-          <div className="ui-row-text"><span className="ui-row-label">Codex <span className="pt-version">0.48</span> <Badge tone="accent">{t("agents.new")}</Badge></span><p className="ui-row-description">Not connected yet</p></div></div>
+          <div className="ui-row-text"><span className="ui-row-label">Codex <span className="pt-version">0.48</span> <Badge tone="accent">{t("highlights.new")}</Badge></span><p className="ui-row-description">Not connected yet</p></div></div>
         <div className="ui-row-control pt-confirm"><Button variant="ghost" tone="neutral" size="sm">{t("agents.notNow")}</Button><Button variant="primary" size="sm">{t("agents.connect")}</Button></div>
       </div>
       <div className="ui-row ui-row--block pt-agent">

@@ -1,8 +1,13 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
+import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { Input } from "../../components/ui/Input";
+import { InfoTip } from "../../components/ui/InfoTip";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
+import type { HostMessageKey } from "../settings/messages/en";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
@@ -12,7 +17,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
-import { actionableAgent } from "../../services/host-agents";
+import { NewDot, useHighlights } from "../highlights/highlights";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -46,10 +51,10 @@ function machineState(machine: MachineView, copy: ReturnType<typeof machineCopy>
     : machine.state === "checking" ? { tone: "neutral", label: t("hosts.checking") } : { tone: "danger", label: t("hosts.unavailable") };
 }
 
+/** Whether something new (an agent it found) is under a machine: its entry's dot. */
 function useNotice() {
-  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
-  return (machine: MachineView) => !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
-    hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
+  const news = useHighlights();
+  return (machine: MachineView) => !!machine.pairingId && news.some((item) => item.machine === machine.pairingId);
 }
 
 /** The machine shown: the one chosen, else the first. */
@@ -72,14 +77,16 @@ export function MachineNav({ current }: { current: boolean }) {
         const copy = machineCopy(machine, status, t);
         const state = machineState(machine, copy, t);
         return (
-          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={state.label + " · " + copy.subtitle} aria-label={`${copy.name}, ${state.label} · ${copy.subtitle}`}
+          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.name + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.name}, ${state.label} · ${copy.subtitle}`}
             data-name={copy.name} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
-            <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
+            {/* This computer, an icon before its name; the name cut short when long (whole in the title); the state's dot
+                last. An entry never grows past the column. */}
+            {machine.local && <span className="machine-nav-here" title={t("hosts.thisComputer")}><ThisComputerIcon /><span className="sr-only">{t("hosts.thisComputer")}</span></span>}
             <span className="machine-nav-name">{copy.name}</span>
-            {machine.local && copy.name !== t("hosts.thisComputer") && <span className="machine-nav-local">{t("hosts.thisComputerTag")}</span>}
-            {notice(machine) && <Badge tone="accent" className="ui-nav-badge">{t("agents.notice")}</Badge>}
+            {notice(machine) && <NewDot label={t("highlights.navNew")} />}
+            <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
           </button>
         );
       })}
@@ -138,6 +145,8 @@ function reachText(machine: MachineView, t: HostTranslate) {
  *  paired with it, and forgetting it. */
 function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean }) {
   const t = hostTranslator();
+  // Renaming the machine on this device: the name being typed, or null.
+  const [naming, setNaming] = useState<string | null>(null);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const agents = useRef<HTMLElement>(null);
@@ -149,17 +158,31 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          <h3>{copy.name}</h3>
+          {naming !== null ? <form className="host-rename" onSubmit={(event) => { event.preventDefault(); window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming.trim() || null); setNaming(null); }}>
+              <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } }} />
+              <Button type="submit" size="sm" variant="primary">{t("hosts.devices.renameSave")}</Button>
+              <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
+            </form>
+            : <h3 className="host-name">{copy.name}
+              {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: copy.name })} title={t("hosts.rename", { machine: copy.name })}
+                onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
+            </h3>}
+          {/* Renamed here: whose name it really is, and the way back to it. */}
+          {machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
+            <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {notice && <Badge tone="accent">{t("agents.notice")}</Badge>}
-        {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
-          onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
+        {/* Talking to this machine from now on: not offered for the one in use; said why when it cannot answer. */}
+        {!machine.inUse && machine.selectable !== false && <Tooltip content={copy.reachable ? t("hosts.useHint", { machine: copy.name }) : t("hosts.useUnreachable", { machine: copy.name })}>
+          <Button variant="secondary" size="sm" disabled={!copy.reachable} blockedBy={copy.reachable ? undefined : "host-use-reason-" + machine.id}
+            onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useThis")}</Button>
+        </Tooltip>}
+        {!copy.reachable && <span id={"host-use-reason-" + machine.id} className="sr-only">{t("hosts.useUnreachable", { machine: copy.name })}</span>}
       </header>
       {machine.local && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
-        <h4 id={"host-status-" + machine.id}>{t("hosts.section.service")}</h4>
-        <LocalHostStatusPanel status={status} />
+        <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} />
       </section>}
       <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
@@ -167,31 +190,24 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <section className="host-section">
         <MachineDevicesPanel machine={machine} name={copy.name} />
       </section>
-      {!machine.local && machine.pairingId && <ForgetMachine fp={machine.pairingId} name={copy.name} />}
     </section>
   );
 }
 
-/** Forgetting a machine on this device: its pairing dropped here, and the machine asked to revoke it. */
-function ForgetMachine({ fp, name }: { fp: string; name: string }) {
-  const t = hostTranslator();
-  const [asking, setAsking] = useState(false);
-  return (
-    <section className="host-section host-forget">
-      <h4>{t("hosts.section.thisDevice")}</h4>
-      {asking ? <div className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
-        <span className="muted">{t("hosts.confirmForget")}</span>
-        <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(fp)}>{t("hosts.forgetConfirm")}</Button>
-        <Button variant="ghost" size="sm" autoFocus onClick={() => setAsking(false)}>{t("hosts.cancel")}</Button>
-      </div> : <div className="host-forget-row">
-        <p className="muted">{t("hosts.forgetHint", { machine: name })}</p>
-        <Button variant="ghost" tone="danger" size="sm" onClick={() => setAsking(true)}>{t("hosts.forget", { machine: name })}</Button>
-      </div>}
-    </section>
-  );
+/** Where this computer's service stands, as one word and its dot. */
+function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } {
+  switch (status.state) {
+    case "running": return { tone: "positive", label: "hosts.state.running" };
+    case "starting": case "installing": case "backoff": return { tone: "warning", label: "hosts.state.starting" };
+    case "failed": case "service-failed": case "refused": case "incompatible": return { tone: "danger", label: "hosts.state.failed" };
+    default: return { tone: "neutral", label: "hosts.state.stopped" };
+  }
 }
 
-function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
+/* This computer's service as a status card: its state with its dot, first; its version and active calls as compact facts;
+ * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
+ * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
+function LocalHostStatusPanel({ status, titleId }: { status: LocalHostStatus; titleId: string }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -200,21 +216,23 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
-  const buttons: { action: LocalHostAction; label: string }[] = [];
+  const state = serviceState(status);
+  const calls = details.calls ?? 0;
+  const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
   if (status.state === "running") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart") });
-    if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart"), variant: "secondary" });
+    if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop"), variant: "ghost" });
   } else if (status.state === "not-installed") {
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.startAtLogin") });
+    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.start"), variant: "primary" });
   } else if (status.state === "stopped-by-person") {
-    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start") });
+    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start"), variant: "primary" });
   } else if (status.state === "backoff" || status.state === "failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
   } else if (status.state === "service-failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry") });
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.reinstall") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
+    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.reinstall"), variant: "secondary" });
   } else if (status.state === "refused") {
-    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect") });
+    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect"), variant: "primary" });
   }
   const installed = status.installed ?? (status.service !== "none" && status.service !== undefined);
   const loginAction: LocalHostAction | null = status.state === "absent" || (!installed && status.state === "not-installed") ? null
@@ -227,39 +245,66 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
     catch { setNote(t("hosts.actionFailed")); }
     finally { setBusy(null); }
   }
+  const bridge = localHostBridge();
+  const canSetLogin = typeof bridge?.setStartAtLogin === "function";
+  async function setLogin(enabled: boolean) {
+    if (busy || !bridge?.setStartAtLogin) return;
+    setBusy(loginAction);setNote("");
+    try { await bridge.setStartAtLogin(enabled); }
+    catch { setNote(t("hosts.actionFailed")); }
+    finally { setBusy(null); }
+  }
   async function copyDetails() {
     try { await navigator.clipboard.writeText(JSON.stringify(details, null, 2));setCopied(true);setNote(t("hosts.detailsCopied")); }
     catch { setCopied(false);setNote(t("hosts.actionFailed")); }
   }
   const cause = status.failure ? hostCause(status, t) : "";
   const failureAt = dateText(details.failure?.at);
+  const failed = status.state === "failed" || status.state === "service-failed";
   return (
-    <div className="host-status-panel" data-state={status.state}>
-      <p className="host-status-summary" role="status">{statusMessage}</p>
-      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at login it would not
-          come back by itself either. Only this computer's machine has this panel: a remote one is never stopped from here. */}
+    <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
+      <div className="host-status-head">
+        <h4 id={titleId}>{t("hosts.section.service")}</h4>
+        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
+      </div>
+      {/* The facts, compact; then what the state means where it says more than its word. */}
+      <dl className="host-status-facts">
+        {/* One version, the product's as the person installed it (never the core's or the connector's). */}
+        {details.product_version && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version })}</div>}
+        {details.calls !== undefined && <div><dt>{t("hosts.fact.calls")}</dt><dd>{calls}</dd></div>}
+      </dl>
+      {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
+      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
+          come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
       {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}
-      {details.core?.version && <p className="muted">{t("hosts.version", { version: details.core.version })}</p>}
-      {details.calls !== undefined && <p className="muted">{t("hosts.calls", { calls: details.calls })}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
-      {status.failure && (status.state === "failed" || status.state === "service-failed") && (
+      {status.failure && failed && (
         <div className="host-failure-details">
           {details.attempts !== undefined && <p>{t("hosts.failureAttempts", { attempts: details.attempts, limit: details.limit ? ` of ${details.limit}` : "" })}</p>}
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
         </div>
       )}
-      <div className="host-action-list">
-        {buttons.map(({ action, label }) => action !== "stop" || !confirmStop ? <Button key={action} variant={action === "stop" ? "ghost" : "primary"} disabled={!!busy}
-          onClick={() => action === "stop" ? setConfirmStop(true) : void run(action)}>{busy === action ? t("hosts.working") : label}</Button> : null)}
-        {confirmStop && <span className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
-          <span>{t("hosts.stopConfirm")}</span>
-          <Button variant="danger" disabled={!!busy} onClick={() => void run("stop")}>{busy === "stop" ? t("hosts.working") : t("hosts.stop")}</Button>
-          <Button variant="ghost" disabled={!!busy} onClick={() => setConfirmStop(false)}>{t("hosts.cancel")}</Button>
-        </span>}
-        {loginAction && <Button variant="ghost" disabled={!!busy} onClick={() => void run(loginAction)}>{installed ? t("hosts.stopAtLogin") : t("hosts.startAtLogin")}</Button>}
-        {(status.state === "failed" || status.state === "service-failed") && hasMethod("revealLog") && <Button variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
-        {(status.state === "failed" || status.state === "service-failed") && typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
-      </div>
+      {/* Start at sign-in is its own: it changes only whether the service starts at the next sign-in, never whether it
+          runs now. Where the app can only set it by installing or removing the service (which starts or stops it too),
+          it is shown, and says why it cannot change here. */}
+      {loginAction && <label className="host-status-login">
+        <span><span className="host-status-login-label">{t("hosts.startAtSignIn")}</span>
+          <span className="muted">{t(canSetLogin ? "hosts.startAtSignInHint" : "hosts.startAtSignInUnavailable")}</span></span>
+        <Switch checked={installed} disabled={!!busy || !canSetLogin} aria-label={t("hosts.startAtSignIn")} onChange={(next) => void setLogin(next)} />
+      </label>}
+      {confirmStop ? <div className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
+          <p>{t("hosts.stopConfirm")}</p>
+          <span className="host-action-list">
+            <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={!!busy} onClick={() => setConfirmStop(false)}>{t("hosts.cancel")}</Button>
+            <Button variant="danger" size="sm" loading={busy === "stop"} onClick={() => void run("stop")}>{t("hosts.stop")}</Button>
+          </span>
+        </div>
+        : (buttons.length > 0 || failed) && <div className="host-action-list host-status-actions">
+          {buttons.map(({ action, label, variant }) => <Button key={action} size="sm" variant={variant} tone={action === "stop" ? "danger" : undefined} loading={busy === action} disabled={!!busy && busy !== action}
+            onClick={() => action === "stop" && calls > 0 ? setConfirmStop(true) : void run(action)}>{label}</Button>)}
+          {failed && hasMethod("revealLog") && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
+          {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
+        </div>}
       {note && <p className="muted" role="status">{note}</p>}
       <LocalHostUpdateControl status={status} />
     </div>
@@ -361,6 +406,9 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const local = !!machine.local;
   const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
+  const ownName = useRoomStore((state) => state.facts.deviceName);
+  const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name
+    || t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice");
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
   const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
@@ -417,11 +465,27 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
         {visibleDevices.map((device) => (
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
-              <strong>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
-              {(device.kind === "local" || device.current) && <Badge tone="accent">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</Badge>}
+              {/* The name and, on the same line, whether it is this device: the name gives way (an ellipsis), the tag never. */}
+              <span className="host-device-title">
+                {/* This device by the name it has now (General's), however the machine last heard it. */}
+                <strong title={shownName(device)}>{shownName(device)}</strong>
+                {/* This device; or, in another machine's list, that machine's own Sidevoice (paired with itself), which is
+                    not revocable from here. */}
+                {(device.kind === "local" || device.current) && <Badge tone="accent">{t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</Badge>}
+                {device.kind === "local" && !local && <InfoTip label={t("hosts.devices.thisMachineInfoLabel")}>{t("hosts.devices.thisMachineInfo")}</InfoTip>}
+              </span>
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
+            {device.current && !local && machine.pairingId && (confirmId === device.device_id ? (
+              <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
+                <span className="muted">{t("hosts.confirmForget")}</span>
+                <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
+                <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
+              </span>
+            ) : <Tooltip content={t("hosts.forgetHint", { machine: name })}>
+              <Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId(device.device_id)}>{t("hosts.forget", { machine: name })}</Button>
+            </Tooltip>)}
             {usable && device.kind !== "local" && !device.current && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>

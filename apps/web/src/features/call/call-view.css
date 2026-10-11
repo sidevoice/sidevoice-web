@@ -105,23 +105,25 @@
 :is(#call-controls, .call-bar-end) .call-button:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .call-bar-end #transcript-toggle[aria-expanded="true"], #call-menu[open] > summary { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 
-/* The microphone: one pill, its level beside it. The runtime writes the level as `--mic-fill` (0%–100%) on #mute on
- * every reading (room-session-controller.js voiceLevel); each bar grows from it, so the wave draws itself with no
- * render. Muted, the pill turns danger; held to talk while muted, it turns positive. */
-#call-controls .mic-control { display: flex; align-items: center; }
-#call-controls #mute { width: auto; gap: var(--sv-space-3); padding: 0 13px 0 14px; }
-#mute .mic-wave { display: flex; align-items: center; gap: 2px; height: 20px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
-#mute .mic-wave i { display: block; width: 3px; height: calc(4px + var(--mic-fill, 0%) * var(--bar) * .8); border-radius: 2px; background: var(--sv-accent); transition: height 80ms linear; }
-#mute .mic-wave i:nth-child(1) { --bar: .55; }
-#mute .mic-wave i:nth-child(2) { --bar: 1; }
-#mute .mic-wave i:nth-child(3) { --bar: .75; }
-#mute .mic-wave i:nth-child(4) { --bar: .4; }
+/* The microphone: one pill — the devices' button at its left showing the level, then the microphone (as Meet, and the
+ * room's v0.6.0). The runtime writes the level as `--mic-fill` (0%–100%) on #mic-control on every reading
+ * (room-session-controller.js voiceLevel); each bar grows from it, so the wave draws itself with no render. On hover, on
+ * focus, with the bar open or muted, the bars give way to the chevron. Muted, the pill turns danger; held to talk while
+ * muted, it turns positive. */
+#call-controls .mic-control { display: flex; align-items: center; gap: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); isolation: isolate; }
+#call-controls #mute { border-radius: var(--sv-radius-pill); }
+.mic-wave { display: flex; align-items: center; gap: 2.4px; height: 22px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
+.mic-wave i { display: block; width: 2.6px; height: calc(3px + var(--mic-fill, 0%) * var(--bar) * .19); max-height: 22px; border-radius: 2px; background: var(--sv-accent); transition: height 70ms linear; }
+.mic-wave i:nth-child(1) { --bar: .45; }
+.mic-wave i:nth-child(2) { --bar: .8; }
+.mic-wave i:nth-child(3) { --bar: 1; }
+.mic-wave i:nth-child(4) { --bar: .7; }
+.mic-wave i:nth-child(5) { --bar: .4; }
+#mic-control[data-muted="true"] { background: var(--sv-danger-soft); }
 #mic-control[data-muted="true"] #mute { background: var(--sv-danger-soft); color: var(--sv-danger); }
 @media (hover: hover) { #mic-control[data-muted="true"] #mute:not(:disabled):hover { background: color-mix(in srgb, var(--sv-danger) 14%, var(--sv-danger-soft)); } }
-#mic-control[data-muted="true"] .mic-wave, #mute:disabled .mic-wave { opacity: .35; }
 #mic-control[data-muted] #mute:disabled { background: var(--sv-bg-sunken); color: var(--sv-disabled-text); }
 #mic-control #mute.holding { background: var(--sv-positive-soft); color: var(--sv-positive); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-positive) 25%, transparent); }
-#mic-control #mute.holding .mic-wave { opacity: 1; }
 
 #call-controls #connect { width: 64px; background: var(--sv-positive); color: var(--sv-positive-soft); }
 #call-controls #connect:not(.joined) svg { transform: rotate(-135deg); }
@@ -217,13 +219,16 @@
 .voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
-/* The microphone and the speaker (AudioDevices): a chevron joined to the microphone's button, and the bar it opens
- * above the call's controls. */
-#call-controls .mic-control { gap: 0; }
-.audio-devices-toggle { display: grid; place-items: center; width: 22px; height: var(--sv-call-button, 48px); margin-inline-start: -6px; padding: 0; border: 0; border-radius: 0 var(--sv-radius-pill) var(--sv-radius-pill) 0;
-  background: var(--sv-bg-sunken); color: var(--sv-text-muted); cursor: pointer; transition: background-color var(--sv-dur-fast) var(--sv-ease); }
-.audio-devices-toggle svg { transform: rotate(180deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
-.audio-devices-toggle[aria-expanded="true"] svg { transform: none; }
+/* The microphone and the speaker (AudioDevices): the devices' button at the microphone's left, in its pill, and the bar
+ * it opens above the call's controls. The level and the chevron share its place, one showing at a time. */
+.audio-devices-toggle { display: grid; place-items: center; width: 44px; height: var(--sv-call-button, 48px); padding: 0 0 0 4px; border: 0; border-radius: var(--sv-radius-pill) 0 0 var(--sv-radius-pill);
+  background: transparent; color: var(--sv-text-muted); cursor: pointer; transition: background-color var(--sv-dur-fast) var(--sv-ease); }
+.audio-devices-toggle > * { grid-area: 1 / 1; }
+.audio-devices-toggle .audio-chevron { opacity: 0; transform: rotate(180deg); transition: opacity var(--sv-dur-fast) var(--sv-ease), transform var(--sv-dur-fast) var(--sv-ease); }
+:is(.audio-devices-toggle:hover, .audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .mic-wave { opacity: 0; }
+:is(.audio-devices-toggle:hover, .audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .audio-chevron { opacity: 1; }
+.audio-devices-toggle[aria-expanded="true"] .audio-chevron { transform: none; }
+#mic-control[data-muted="true"] .audio-devices-toggle { color: var(--sv-danger); }
 @media (hover: hover) { .audio-devices-toggle:hover { background: var(--sv-hover); color: var(--sv-text); } }
 .audio-devices-toggle:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .call-bar { position: relative; }
@@ -235,7 +240,7 @@
 .audio-devices-note, .audio-devices-lost, .audio-devices-error { flex-basis: 100%; display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .audio-devices-lost { color: var(--sv-text); }
 .audio-devices-error { color: var(--sv-danger); }
-@media (prefers-reduced-motion: reduce) { .audio-devices-toggle, .audio-devices-toggle svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .audio-devices-toggle, .audio-devices-toggle .audio-chevron, .mic-wave, .mic-wave i { transition: none; } }
 
 /* The microphone gives no sound though the person has not muted it (another app holds it): said above it, and the
  * button wears the warning. */
