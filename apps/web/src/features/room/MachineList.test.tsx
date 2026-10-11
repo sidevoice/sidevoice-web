@@ -429,7 +429,7 @@ test("an in-flight device list cannot repopulate Devices after reachability is l
   expect(screen.queryByRole("textbox", { name: "Room address" })).toBeNull();
 
   act(() => { store.patch({ pairings: [local], pairingInUse: "fp-local", localHostStatus: status }); });
-  await waitFor(() => expect(screen.getByText("No devices are paired with this machine.")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("No other devices are paired with this computer.")).toBeInTheDocument());
 });
 
 test("Add machine opens the explicit remote setup and pairing flow", async () => {
@@ -496,7 +496,7 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   localStorage.setItem("sidevoice.deviceName", "Ana’s laptop");
   onTestFinished(() => localStorage.removeItem("sidevoice.deviceName"));
   const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "Chrome on Mac", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" },
-    { device_id: "d-self", name: "NUC", kind: "local" }];
+    { device_id: "d-self", name: "NUC", kind: "local" }, { device_id: "d-tablet", name: "Tablet", kind: "code" }];
   const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue(devices), revokeMachineDevice: vi.fn().mockResolvedValue(undefined), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { pairingInUse: "fp-nuc", node: "fp-nuc", nodeReach: "ok",
@@ -510,9 +510,11 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   expect(within(rows[0]).getByText("This device")).toBeInTheDocument();
   expect(within(rows[0]).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /^Revoke (Chrome on Mac|Ana’s laptop)/ })).toBeNull();
-  // The machine's own Sidevoice, paired with itself, is never listed.
-  expect(rows).toHaveLength(2);
+  // The machine's own Sidevoice, paired with itself, is never listed; every other device has Revoke.
+  expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual(["Ana’s laptop", "Phone", "Tablet"]);
   expect(screen.queryByRole("button", { name: "Revoke NUC" })).toBeNull();
+  expect(within(rows[1]).getByRole("button", { name: "Revoke Phone" })).toBeInTheDocument();
+  expect(within(rows[2]).getByRole("button", { name: "Revoke Tablet" })).toBeInTheDocument();
   // Devices are named where they are (this one in General); none is renamed here. Read once: nothing to retry.
   expect(screen.queryByRole("button", { name: /^Rename (Ana’s laptop|Phone)/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
@@ -528,6 +530,21 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
   fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
   expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
+});
+
+test("this computer's page never lists its own Sidevoice: alone, no other devices are paired; the others, each revocable", async () => {
+  const done = actions();
+  done.localHostDevices.mockResolvedValueOnce([{ device_id: "d-local", name: "MacBook", kind: "local" }])
+    .mockResolvedValue([{ device_id: "d-local", name: "MacBook", kind: "local" }, { device_id: "d-phone", name: "Phone", kind: "code" }]);
+  const store = room([local], { pairingInUse: "fp-local" });
+  await waitFor(() => expect(screen.getByText("No other devices are paired with this computer.")).toBeInTheDocument());
+  expect(document.querySelectorAll(".host-device-row")).toHaveLength(0);
+  // Another device pairs with it: listed, and revocable; this computer still not.
+  act(() => { store.patch({ pairings: [paired({ ...local, fp: "fp-local-2" })], pairingInUse: "fp-local-2" }); });
+  await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
+  expect([...document.querySelectorAll(".host-device-row strong")].map((name) => name.textContent)).toEqual(["Phone"]);
+  expect(screen.getByRole("button", { name: "Revoke Phone" })).toBeInTheDocument();
+  expect(screen.queryByText("No other devices are paired with this computer.")).toBeNull();
 });
 
 test("a devices list that couldn't be read offers Retry, which reads it again", async () => {
