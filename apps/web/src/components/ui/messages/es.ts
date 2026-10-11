@@ -5,6 +5,6 @@ export const es: Partial<Record<UiMessageKey, string>> = {
   "ui.closeNamed": "Cerrar {name}",
   "ui.loading": "Procesando…",
   "ui.copy": "Copiar",
-  "ui.copied": "Copiado.",
-  "ui.copyFailed": "Selecciónalo y cópialo.",
+  "ui.copied": "Copiado",
+  "ui.copyFailed": "No se pudo copiar — selecciona el texto",
 };

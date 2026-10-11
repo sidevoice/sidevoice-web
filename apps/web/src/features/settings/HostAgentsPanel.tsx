@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/cn";
-import { ChevronIcon, ConnectorIcon, CopyIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { ChevronIcon, ConnectorIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
+import { Snippet } from "../../components/ui/Snippet";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { AgentManualStep, DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
@@ -10,7 +11,6 @@ import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { NewMark } from "../highlights/highlights";
 import { InfoTip } from "../../components/ui/InfoTip";
-import { Snippet } from "../../components/ui/Snippet";
 import "./host-agents.css";
 
 function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): string {
@@ -33,28 +33,6 @@ function useRelativeTime(value: string | number | null | undefined): string {
   const words = new Intl.RelativeTimeFormat(document.documentElement.lang || navigator.language, { numeric: "auto" });
   const minutes = Math.round(seconds / 60), hours = Math.round(seconds / 3600), days = Math.round(seconds / 86400);
   return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
-}
-
-function CodeBlock({ code }: { code: string }) {
-  const t = hostTranslator();
-  const [note, setNote] = useState("");
-  async function copy() {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard-unavailable");
-      await navigator.clipboard.writeText(code);
-      setNote(t("agents.copied"));
-    } catch {
-      setNote(t("agents.copyFailed"));
-    }
-  }
-  return (
-    <div className="host-agent-code">
-      <pre><code>{code}</code></pre>
-      <Button size="sm" variant="ghost" aria-label={t("agents.copy")} title={t("agents.copy")} onClick={() => void copy()}>
-        <CopyIcon size={15} />{note && <span role="status">{note}</span>}
-      </Button>
-    </div>
-  );
 }
 
 /** How to add Sidevoice to the agent by hand, or (`removing`) take it out; the list is read again meanwhile, so the row
@@ -86,8 +64,8 @@ function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; 
       {!steps.length ? <p className="muted">{t("agents.manual.none")}</p> : <>
         {/* The connector's steps, in order, each one to copy. */}
         <ol className="host-agent-steps">{steps.map((step, index) => <li key={index}>
-          {step.command?.trim() && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><Snippet kind="command" text={step.command} /></>}
-          {step.snippet?.trim() && <><p className="host-agent-howto-label">{step.file ? t("agents.manual.file", { file: step.file }) : t("agents.manual.snippet")}</p><Snippet kind="command" text={step.snippet} /></>}
+          {step.command?.trim() && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><Snippet text={step.command} /></>}
+          {step.snippet?.trim() && <><p className="host-agent-howto-label">{step.file ? t("agents.manual.file", { file: step.file }) : t("agents.manual.snippet")}</p><Snippet text={step.snippet} /></>}
         </li>)}</ol>
         <p className="muted" role="status">{t(kind === "disconnect" ? "agents.manual.removeWaiting" : kind === "replace" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
         <Button variant="ghost" size="sm" onClick={onClose}>{t("agents.close")}</Button>
@@ -211,8 +189,8 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
       </button>
       {open && <div className="host-agent-howto" id="host-agent-other-howto">
         <p className="muted">{t("agents.other.detail")}</p>
-        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><CodeBlock code={custom.command} /></>}
-        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><CodeBlock code={custom.snippet} /></>}
+        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><Snippet text={custom.command} /></>}
+        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><Snippet text={custom.snippet} /></>}
       </div>}
     </section>
   );

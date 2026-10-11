@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
@@ -70,12 +70,14 @@ function usePurposes() {
   return (model: string) => [...new Set([...editing(model), ...now(model)])];
 }
 
-/** Deletes `ids` one by one: how many went, and the first that was running and stayed. */
+/** Deletes `ids` one by one: how many went, and the first that stayed with why (running now, or what the engine said). */
 async function deleteAll(ids: string[]) {
-  let done = 0, kept: string | null = null;
+  let done = 0, kept: { id: string; running: boolean; message: string } | null = null;
   for (const id of ids) {
     try { await window.sidevoiceActions?.uninstallVoiceModel?.(id); done++; }
-    catch { kept ??= id; }
+    catch (failure) {
+      kept ??= { id, running: (failure as { code?: string } | null)?.code === "model-in-use", message: (failure as Error)?.message ?? "" };
+    }
   }
   return { done, kept };
 }
@@ -84,6 +86,7 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const deleteButton = useRef<HTMLButtonElement>(null);
   const size = sizeText(model.bytes);
   async function remove() {
     setBusy(true); setError("");
@@ -107,12 +110,12 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
           <span className="downloaded-model-meta">{chip && <PurposeChip purpose={model.purpose} t={t} />}
             <span className="downloaded-model-size">{size}{!inUse && model.lastUsedAt ? " · " + ago(model.lastUsedAt, t) : ""}</span></span>
         </span>
-        {removable && !inUse && !asking && <Button variant="ghost" tone="danger" size="sm" aria-label={t("settings.advanced.deleteNamed", { model: model.id })} onClick={() => setAsking(true)}>{t("settings.advanced.delete")}</Button>}
+        {removable && !inUse && !asking && <Button ref={deleteButton} variant="ghost" tone="danger" size="sm" aria-label={t("settings.advanced.deleteNamed", { model: model.id })} onClick={() => setAsking(true)}>{t("settings.advanced.delete")}</Button>}
       </div>
       {asking && <div className="provider-remove" role="group" aria-label={t("settings.advanced.deleteNamed", { model: model.id })}>
         <p>{t("settings.advanced.deleteConfirm", { model: model.id, size })}</p>
         <div className="provider-key-actions">
-          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => setAsking(false)} disabled={busy}>{t("hosts.cancel")}</Button>
+          <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => { setAsking(false); requestAnimationFrame(() => deleteButton.current?.focus()); }} disabled={busy}>{t("hosts.cancel")}</Button>
           <Button variant="danger" size="sm" loading={busy} onClick={() => void remove()}>{t("settings.advanced.delete")}</Button>
         </div>
       </div>}
@@ -142,7 +145,8 @@ export function DownloadedModels() {
     setBusyAll(true); setAllNote("");
     const { done, kept } = await deleteAll(unused.map((model) => model.id));
     setBusyAll(false); setAskingAll(false);
-    if (kept) setAllNote(t("settings.advanced.deleteAllPartial", { done, count: unused.length, model: kept }));
+    if (kept) setAllNote(kept.running ? t("settings.advanced.deleteAllPartial", { done, count: unused.length, model: kept.id })
+      : t("settings.advanced.deleteAllFailed", { done, count: unused.length, model: kept.id, reason: kept.message }));
     document.getElementById("downloaded-models")?.focus();
   }
   const row = (model: Downloaded, chip = true) => <DownloadedModel key={model.id} model={model} inUse={inUse(model)} removable={removable} chip={chip} t={t} />;
@@ -152,7 +156,7 @@ export function DownloadedModels() {
       : <div className="provider-remove" role="group" aria-label={t("settings.advanced.deleteAllUnused")}>
         <p>{t("settings.advanced.deleteAllConfirm", { count: unused.length, size: freed })}</p>
         <div className="provider-key-actions">
-          <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={busyAll} onClick={() => setAskingAll(false)}>{t("hosts.cancel")}</Button>
+          <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={busyAll} onClick={() => { setAskingAll(false); requestAnimationFrame(() => document.getElementById("downloaded-remove-all")?.focus()); }}>{t("hosts.cancel")}</Button>
           <Button variant="danger" size="sm" loading={busyAll} onClick={() => void removeAll()}>{t("settings.advanced.deleteAllYes", { count: unused.length })}</Button>
         </div>
       </div>}
@@ -209,6 +213,8 @@ export function DeleteUnusedChoice() {
     if (ids.length) setPending({ days: next!, ids });
     else void window.sidevoiceActions?.setDeleteUnusedModels?.(next);
   };
+  // The question goes: the focus goes back to the choice it came from.
+  const backToChoice = () => requestAnimationFrame(() => document.getElementById("delete-unused-models")?.focus());
   const size = pending ? sizeText(models.filter((model) => pending.ids.includes(model.id)).reduce((sum, model) => sum + model.bytes, 0)) : "";
   return (<>
     <Row label={t("settings.advanced.deleteUnused")} description={t("settings.advanced.deleteUnusedHint")} htmlFor="delete-unused-models">
@@ -218,10 +224,10 @@ export function DeleteUnusedChoice() {
           label: value == null ? t("settings.advanced.never") : t("settings.advanced.days", { n: value }) }))} />
     </Row>
     {pending && <div className="provider-remove downloaded-unused-confirm" role="group" aria-label={t("settings.advanced.deleteUnused")}>
-      <p>{t("settings.advanced.deleteUnusedNow", { count: pending.ids.length, size })}</p>
+      <p>{pending.ids.length === 1 ? t("settings.advanced.deleteUnusedNowOne", { size }) : t("settings.advanced.deleteUnusedNow", { count: pending.ids.length, size })}</p>
       <div className="provider-key-actions">
-        <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => setPending(null)}>{t("hosts.cancel")}</Button>
-        <Button variant="danger" size="sm" onClick={() => { void window.sidevoiceActions?.setDeleteUnusedModels?.(pending.days); setPending(null); }}>{t("settings.advanced.deleteUnusedYes")}</Button>
+        <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => { setPending(null); backToChoice(); }}>{t("hosts.cancel")}</Button>
+        <Button variant="danger" size="sm" onClick={() => { void window.sidevoiceActions?.setDeleteUnusedModels?.(pending.days); setPending(null); backToChoice(); }}>{t("settings.advanced.deleteUnusedYes")}</Button>
       </div>
     </div>}
   </>);

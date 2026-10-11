@@ -189,8 +189,12 @@ test("a foreign Codex row is short, with the why in its (i), and replacing it by
     fireEvent.click(within(foreignRow).getByRole("button", { name: "Replace manually" }));
     expect(steps(foreignRow)).toEqual(["codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"]);
     expect(foreignRow).toHaveTextContent("after you replace the agent configuration");
-    await act(async () => { fireEvent.click(within(foreignRow).getAllByRole("button", { name: "Copy" })[0]); });
+    const copy = within(foreignRow).getAllByRole("button", { name: "Copy" })[0];
+    await act(async () => { fireEvent.click(copy); });
     expect(writeText).toHaveBeenCalledWith("codex mcp remove sidevoice");
+    // Copying turns its button into a check and says so out of sight.
+    expect(copy).toHaveAttribute("data-state", "copied");
+    expect(within(foreignRow).getByText("Copied")).toHaveClass("ui-copy-live");
     expect(hostAgentAction).not.toHaveBeenCalled();
   } finally {
     if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);

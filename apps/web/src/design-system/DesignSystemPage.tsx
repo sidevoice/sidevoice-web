@@ -9,9 +9,13 @@ import { Input, Textarea } from "../components/ui/Input";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { Select, type SelectItems } from "../components/ui/Select";
 import { Segmented, Tabs } from "../components/ui/Tabs";
+import { Quote, Snippet, type CopyFeedback } from "../components/ui/Snippet";
 import { Switch } from "../components/ui/Switch";
 import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ProviderLogo, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
+import { callTranslator } from "../features/call/call-i18n";
 import { NewDot } from "../features/highlights/highlights";
+import { CONNECTOR_INSTALL } from "../features/pairing/connector-commands";
+import { hostTranslator } from "../features/settings/host-i18n";
 import { ModelPrepare, type PrepareStatus } from "../features/settings/ModelPrepare";
 import { applyTheme } from "../lib/theme";
 import { AppPatterns } from "./AppPatterns";
@@ -193,6 +197,27 @@ function Alerts() {
   </div>;
 }
 
+/* Each state held in place (`feedback`); in the app the button says it for 1.5 s, then is the copy button again. */
+const COPY_STATES: { name: string; feedback?: CopyFeedback }[] = [{ name: "idle" }, { name: "copied", feedback: "copied" }, { name: "failed", feedback: "failed" }];
+// Tall enough to scroll, with a path long enough to wrap.
+const CONFIG = JSON.stringify({ mcpServers: {
+  sidevoice: { command: "/Applications/Sidevoice.app/Contents/Resources/bin/sidevoice-connector", args: ["mcp", "--stdio"], env: { SIDEVOICE_LOG: "info" } },
+  filesystem: { command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/projects"] },
+  github: { command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_TOKEN: "…" } },
+} }, null, 2);
+
+function Copyables() {
+  const call = callTranslator();
+  const host = hostTranslator();
+  return <div className="ds-stack">
+    {COPY_STATES.map(({ name, feedback }) => <div className="ds-state" key={name}><code>{name}</code>
+      <Snippet text={CONNECTOR_INSTALL} label={host("noMachine.copyCommand")} feedback={feedback} />
+      <Quote text={call("sidebar.newPhrase")} label={call("sidebar.newCopy")} feedback={feedback} />
+    </div>)}
+    <div className="ds-state"><code>a file's lines</code><Snippet text={CONFIG} /></div>
+  </div>;
+}
+
 function Cards() {
   const [where, setWhere] = useState<"device" | "provider">("device");
   const [send, setSend] = useState(true);
@@ -265,6 +290,7 @@ function Showcase({ onOpen }: { onOpen: (layout: "dialog" | "page") => void }) {
     <Specimen title="Badge"><Badges /></Specimen>
     <Specimen title="New (highlights)"><NewHighlights /></Specimen>
     <Specimen title="Alert"><Alerts /></Specimen>
+    <Specimen title="Snippet · Quote" note="The only two ways to show something to copy. A Snippet is for a terminal or a file (monospace; it wraps, and scrolls once tall); a Quote is a phrase to say to an agent, between guillemets. A tap or click selects the whole text. The button turns into a ✓ once copied, or a warning when the clipboard refuses, said out of sight to a screen reader; nothing appears under it. Its visibility is VARIANTS copy-button: visible, faint, or shown on hover (always on touch screens and to keyboard focus)."><Copyables /></Specimen>
     <Specimen title="Section · Group · Row · Choice card" note="Settings: a section, its groups as cards, rows label-left and control-right; stacked when narrow."><Cards /></Specimen>
     <Specimen title="Progress"><ProgressBar value={0.66} label="Example progress" /><ProgressBar value={null} label="Example indeterminate progress" /></Specimen>
     <Specimen title="Model · prepare" note="One block wherever a model is chosen, onboarding and Settings alike. Every state below. In Settings the one in use stays until a new one is ready (no Save); the setup's Continue waits for it."><Prepare /></Specimen>

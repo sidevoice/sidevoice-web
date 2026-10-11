@@ -48,7 +48,7 @@ test("it opens on the code, how to get one folded away, with no device name fiel
   expect(document.getElementById(how.getAttribute("aria-controls")!)).not.toBeVisible();
   fireEvent.click(how);
   expect(how).toHaveAttribute("aria-expanded", "true");
-  expect([...element().querySelectorAll(".setup-command code")].map((command) => command.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
+  expect([...element().querySelectorAll(".ui-snippet code")].map((command) => command.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
   expect(screen.getByText("Then run this. It prints a code starting with SV1.")).toBeVisible();
   // The address waits until a code says it is needed; the device's name is General's.
   noAddress();
@@ -232,7 +232,7 @@ test("split: the machine's column comes first, beside the form on a wide screen,
   const { element } = dialog(vi.fn(), "split");
   expect(element()).toHaveAttribute("data-pair-layout", "split");
   const side = screen.getByRole("region", { name: "On your machine" });
-  expect([...side.querySelectorAll(".setup-command code")].map((command) => command.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
+  expect([...side.querySelectorAll(".ui-snippet code")].map((command) => command.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
   expect(screen.queryByRole("button", { name: "How do I get a code?" })).toBeNull();
   // In DOM order, the machine's column and then the form: stacked so on a narrow screen.
   expect(side.compareDocumentPosition(code()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
