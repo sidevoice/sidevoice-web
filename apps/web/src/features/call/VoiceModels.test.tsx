@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -59,4 +59,18 @@ test("the smart end of turn adds its model's badge under the other two; the sile
   expect(chips[2]).toHaveAccessibleName("End of turn: smart-turn-v3, not downloaded");
   act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } }));
   expect(document.querySelectorAll(".voice-chip")).toHaveLength(2);
+});
+
+test("on a phone: nothing while every model is ready, and only a dot when one needs something", () => {
+  const narrow = vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
+    media, matches: media === "(max-width: 899px)", onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
+  }) as unknown as MediaQueryList);
+  shown({ ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } });
+  expect(document.querySelector(".voice-chip")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Your voice needs attention" })).toBeNull();
+  cleanup();
+  shown({ ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } });
+  expect(document.querySelector(".voice-chip")).toBeNull();
+  expect(screen.getByRole("button", { name: "Your voice needs attention" })).toBeInTheDocument();
+  narrow.mockRestore();
 });

@@ -63,6 +63,11 @@ export const en = {
   "voiceModels.state.unavailable": "not available now",
   "voiceModels.state.needsKey": "needs a key",
   "voiceModels.state.unknown": "not checked yet",
+  "voiceModels.attention": "Your voice needs attention",
+  "voiceModels.addKey": "Add the key",
+  "voiceModels.download": "Download",
+  "voiceModels.retry": "Try again",
+  "voiceModels.openSettings": "Open its settings",
 } as const;
 
 export type CallMessageKey = keyof typeof en;

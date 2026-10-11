@@ -200,3 +200,13 @@
 .stage-tile:has(.transcript-entry) .stage-tags { max-width: calc(100% - 2 * (var(--stage-inset) + 44px + var(--sv-space-2))); }
 
 .stage-badge:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+
+/* A phone's voice models: a dot in the corner while one needs something, opening what and what to do. */
+.voice-attention { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.voice-attention span { width: 10px; height: 10px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-warning); }
+.voice-attention:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.voice-attention-list { display: grid; gap: var(--sv-space-3); width: min(280px, calc(100vw - 48px)); margin: 0; padding: 0; list-style: none; }
+.voice-attention-list li { display: grid; gap: var(--sv-space-2); }
+.voice-attention-list li > span { display: grid; gap: 2px; font-size: var(--sv-font-sm); }
+.voice-attention-list li > span > span { color: var(--sv-text-muted); }
+.voice-attention-list .ui-button { justify-self: start; }

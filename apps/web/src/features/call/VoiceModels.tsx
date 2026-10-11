@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
+import { Popover } from "../../components/ui/Popover";
+import { Button } from "../../components/ui/Button";
+import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
 import { useModelState } from "../settings/ModelSetup";
@@ -14,7 +17,7 @@ import type { CallMessageKey } from "./messages/en";
  * (voiceSettingsHere); the voice reports no model of its own. */
 
 /** A model's slot as the badge says it; `attention` when something must be done or waited for before it works. */
-type Slot = { id: string; where: string; state: string; attention: boolean };
+type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string };
 
 function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
@@ -34,6 +37,7 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn:
     // A provider's model with no key is the key's to fix, whatever else its catalogue says.
     const status = !known ? "unknown" : chosen.catalog !== "local" && keys[chosen.catalog] === false ? "needsKey" : model.status ?? "unavailable";
     return {
+      task, status, catalog: chosen.catalog,
       id: chosen.model,
       where: chosen.catalog === "local" ? t("voiceModels.here") : t("voiceModels.provider", { provider }),
       state: t(("voiceModels.state." + status) as CallMessageKey),
@@ -43,7 +47,7 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn:
   // The smart end of turn has a model of its own; the silence one has none, and no badge.
   const turnId = settings?.end_of_turn === "smart-turn" ? turn.model?.id ?? settings.turn_model ?? null : null;
   const turnStatus = !known ? "unknown" : turn.status ?? "unavailable";
-  const turnSlot: Slot | null = turnId ? { id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as CallMessageKey),
+  const turnSlot: Slot | null = turnId ? { task: "end-of-turn", status: turnStatus, catalog: "local", id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as CallMessageKey),
     attention: turnStatus !== "ready" && turnStatus !== "unknown" } : null;
   return { stt: slot("stt", stt), tts: slot("tts", tts), turn: turnSlot };
 }
@@ -67,12 +71,46 @@ function Chip({ slot, label, icon, details }: { slot: Slot; label: string; icon:
   );
 }
 
+/** What a model that needs something can have done about it, from the call: download it (again), add the provider's
+ *  key, or its settings. None while it downloads. */
+function SlotAction({ slot, t }: { slot: Slot; t: CallTranslate }) {
+  const section = slot.task === "stt" ? "transcription" : slot.task === "tts" ? "voice" : "call";
+  const settings = (where: string) => { window.sidevoiceActions?.showSettingsSection?.(where); document.getElementById("settings-open")?.click(); window.sidevoiceUI?.store?.patch({ settingsSection: where }); };
+  if (slot.status === "downloading" || slot.status === "verifying" || slot.status === "loading") return null;
+  if (slot.status === "needsKey") return <Button size="sm" onClick={() => settings("providers")}>{t("voiceModels.addKey")}</Button>;
+  if (slot.status === "absent" || slot.status === "failed") return <Button size="sm" onClick={() => void window.sidevoiceActions?.installVoiceModel?.(slot.task as never)}>
+    {t(slot.status === "failed" ? "voiceModels.retry" : "voiceModels.download")}</Button>;
+  return <Button size="sm" variant="secondary" onClick={() => settings(section)}>{t("voiceModels.openSettings")}</Button>;
+}
+
+/** A phone's corner has no room for the badges: nothing while every model is ready, and a dot when one needs
+ *  something; a tap on it says which, and what can be done. */
+function AttentionDot({ slots, t }: { slots: { slot: Slot; label: string }[]; t: CallTranslate }) {
+  const needs = slots.filter(({ slot }) => slot.attention);
+  if (!needs.length) return null;
+  return (
+    <Popover label={t("voiceModels.attention")} side="bottom" align="end"
+      trigger={<button type="button" className="voice-attention" aria-label={t("voiceModels.attention")}><span aria-hidden="true" /></button>}>
+      <ul className="voice-attention-list">
+        {needs.map(({ slot, label }) => <li key={slot.task}>
+          <span><strong>{label}</strong><span translate="no">{slot.id} · {slot.state}</span></span>
+          <SlotAction slot={slot} t={t} />
+        </li>)}
+      </ul>
+    </Popover>
+  );
+}
+
 /** The models, stacked: speech to text, text to speech, and the end of turn's when it is the smart one; nothing before
- *  any is chosen. */
+ *  any is chosen. A phone shows only a dot, and only when one needs something (AttentionDot). */
 export function VoiceModels() {
   const t = callTranslator();
   const { stt, tts, turn } = useSlots(t);
+  const narrow = useMedia(NARROW_QUERY);
   if (!stt && !tts) return null;
+  if (narrow) return <AttentionDot t={t} slots={[
+    ...(stt ? [{ slot: stt, label: t("voiceModels.stt") }] : []), ...(tts ? [{ slot: tts, label: t("voiceModels.tts") }] : []),
+    ...(turn ? [{ slot: turn, label: t("voiceModels.turn") }] : [])]} />;
   const label = t("voiceModels.label", { stt: stt?.id ?? t("voiceModels.none"), tts: tts?.id ?? t("voiceModels.none") });
   const details = <Details stt={stt} tts={tts} turn={turn} t={t} />;
   return (

@@ -64,4 +64,9 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "voiceModels.state.unavailable": "no disponible ahora",
   "voiceModels.state.needsKey": "falta la clave",
   "voiceModels.state.unknown": "sin comprobar aún",
+  "voiceModels.attention": "Tu voz necesita atención",
+  "voiceModels.addKey": "Añadir la clave",
+  "voiceModels.download": "Descargar",
+  "voiceModels.retry": "Reintentar",
+  "voiceModels.openSettings": "Abrir sus ajustes",
 };
