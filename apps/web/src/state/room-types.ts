@@ -75,6 +75,11 @@ export interface ParticipantView {
 /** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
  *  it stays, saying so, until the person pairs again or forgets it. */
 export interface MachineView {
+  /** Renamed on this device (an alias): `host` is that name, `machineHost` the machine's own. */
+  alias?: boolean;
+  machineHost?: string | null;
+  /** Paired without encryption by the person's choice (plain http on a private network). */
+  insecure?: boolean;
   /** Stable UI row identity. The local row remains stable while its native pairing is unavailable. */
   id: string;
   /** The pairing fingerprint, when this row currently has a usable pairing. */
@@ -224,6 +229,11 @@ export interface SidevoiceActions {
   /** Renames a device in a machine's list (this computer's, or a paired machine's): the machine keeps the name. */
   renameLocalHostDevice?(id: string, name: string): Promise<void>;
   renameMachineDevice?(fp: string, id: string, name: string): Promise<void>;
+  /** A machine's name on this device only (null: back to the machine's own). */
+  renameMachine?(fp: string, name: string | null): void;
+  /** This device's name as machines list it: kept for pairing, and sent to each machine it is paired with. Resolves with
+   *  how many machines could not be told. */
+  setDeviceName?(name: string): Promise<number>;
 }
 
 /** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the

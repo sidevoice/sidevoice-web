@@ -95,7 +95,30 @@ function saveLocalHostSelected(){try{if(localHostSelected)pairingStorage?.setIte
 // The local host is selected only when this page said so (LOCAL_HOST_SELECTION_KEY) and the app offers it.
 let localHostSelected=!!desktopLocalHost&&readLocalHostSelected();
 roomStore.patch({localHostAvailable:!!desktopLocalHost,localHostSelected});
-function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
+// What this device calls a machine, if the person renamed it here (a hostname they would rather not read): this
+// device's alone, shown everywhere here in place of the machine's own name, which stays as `machine_host`.
+const ALIASES_KEY='sidevoice.machine-aliases';
+function machineAliases(){try{const kept=JSON.parse(pageStorage()?.getItem(ALIASES_KEY)||'{}');return kept&&typeof kept==='object'&&!Array.isArray(kept)?kept:{}}catch{return {}}}
+function aliased(summary){const alias=machineAliases()[summary.fp];return typeof alias==='string'&&alias.trim()?{...summary,host:alias.trim(),machine_host:summary.host,alias:true}:summary}
+function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary).map(aliased),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
+/** Renames a machine on this device only; null goes back to the machine's own name. */
+function renameMachine(fp,name){
+ const next={...machineAliases()},text=typeof name==='string'?name.trim().slice(0,60):'';
+ if(text)next[fp]=text;else delete next[fp];
+ try{pageStorage()?.setItem(ALIASES_KEY,JSON.stringify(next))}catch{}
+ publishPairings();
+}
+/** This device's name, as machines list it: kept for the next pairing, and asked of each machine it is paired with now
+ *  (renaming this device in their lists). Resolves with how many could not be told. */
+async function setDeviceName(name){
+ const text=String(name||'').trim().slice(0,60);
+ try{if(text)pageStorage()?.setItem('sidevoice.deviceName',text);else pageStorage()?.removeItem('sidevoice.deviceName')}catch{}
+ if(!text)return 0;
+ const asked=pairings.list.filter(p=>!p.revoked&&p.device_id).map(p=>p.local
+  ?renameLocalHostDevice(p.device_id,text):renameMachineDevice(p.fp,p.device_id,text));
+ const results=await Promise.allSettled(asked);
+ return results.filter(r=>r.status==='rejected').length;
+}
 function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
 function keepPairings(next){
  const keepUnavailableLocal=localHostSelected&&!localPairing&&next.inUse===pairings.inUse;
@@ -538,7 +561,7 @@ function pairingRefused(fp,{call=false}={}){
 // A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
 async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
- const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t(kind==='app'?'pair.deviceNameApp':'pair.deviceNameBrowser',params));
+ const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t('pair.deviceNameBrowser',params));
  const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch,insecure});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
@@ -1567,6 +1590,8 @@ window.sidevoiceActions={
  revokeLocalHostDevice,
  renameLocalHostDevice,
  renameMachineDevice,
+ renameMachine,
+ setDeviceName,
  machineDevices,
  revokeMachineDevice,
  openPairing:()=>openPairing(),

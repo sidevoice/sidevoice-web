@@ -3,6 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
+import { InfoTip } from "../../components/ui/InfoTip";
 import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -487,8 +488,11 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
                   <Button size="sm" variant="ghost" tone="neutral" disabled={loading} onClick={() => setRenaming(null)}>{t("hosts.cancel")}</Button>
                 </form>
                 : <span className="host-device-title">
-                  <strong title={device.name || undefined}>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
-                  {(device.kind === "local" || device.current) && device.name && <Badge tone="accent">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</Badge>}
+                  <strong title={device.name || undefined}>{device.name || t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</strong>
+                  {/* This device; or, in another machine's list, that machine's own Sidevoice (paired with itself), which is
+                      not revocable from here. */}
+                  {(device.kind === "local" || device.current) && device.name && <Badge tone="accent">{t(device.kind === "local" && !local ? "hosts.devices.thisMachine" : "hosts.devices.thisDevice")}</Badge>}
+                  {device.kind === "local" && !local && <InfoTip label={t("hosts.devices.thisMachineInfoLabel")}>{t("hosts.devices.thisMachineInfo")}</InfoTip>}
                   {usable && canRename && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-device-rename-open" aria-label={t("hosts.devices.rename", { device: device.name || device.device_id })}
                     title={t("hosts.devices.rename", { device: device.name || device.device_id })} onClick={() => setRenaming({ id: device.device_id, name: device.name || "" })}><EditIcon size={14} /></Button>}
                 </span>}

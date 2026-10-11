@@ -240,7 +240,7 @@ export function machinesView(s) {
     const localStatus = s.localHostStatus?.state || 'absent';
     const showLocal = !!local || (s.localHostAvailable && localStatus !== 'absent');
     const localRow = showLocal ? {
-        fp: local?.fp || 'local-host', host: local?.host || null, local: true,
+        fp: local?.fp || 'local-host', host: local?.host || null, local: true, alias: !!local?.alias, machine_host: local?.machine_host ?? null,
         inUse: !!s.localHostSelected || (!!local && s.pairingInUse === local.fp),
         selectable: !!local && s.localHostStatus?.reachable === true,
         localStatus,
@@ -265,7 +265,7 @@ export function machinesView(s) {
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
         return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', inUse, revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, selectable: p.selectable,
+            state, local: !!p.local, localStatus, selectable: p.selectable, alias: !!p.alias, machineHost: p.machine_host ?? null, insecure: p.insecure === true,
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
