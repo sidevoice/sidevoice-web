@@ -58,11 +58,16 @@ function renderShot(shot: Shot) {
   const store = createRoomStore();
   store.patch({ ...BASE_FACTS, ...shot.facts } as never);
   (window as unknown as { __journeyStore: typeof store }).__journeyStore = store;
-  root.render(<App store={store} onboarding={{ repository, startAt: shot.setup?.step }} />);
+  root.render(<App store={store} runtime={false} onboarding={{ repository, startAt: shot.setup?.step }} />);
   setTimeout(async () => {
     await shot.after?.(document);
     if (shot.pairRefusal) {
       const field = document.getElementById("device-pairing-code") as HTMLTextAreaElement | null;
+      const address = document.getElementById("device-pairing-address") as HTMLInputElement | null;
+      if (address) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(address, shot.pairRefusal === "address-insecure" ? "http://192.168.1.20:8765" : "https://nuc.example");
+        address.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       if (field) {
         Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "SV1.EXAMPLE-CODE");
         field.dispatchEvent(new Event("input", { bubbles: true }));

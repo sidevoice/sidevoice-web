@@ -57,6 +57,11 @@ const THIS: PairingSummary = { fp: "fp-local", host: "MacBook", urls: ["http://1
 
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
   ({ thread_id, title, available: true, reach: { state: "listening" }, machine: { host: "NUC", id: "fp-nuc" }, harness: "claude-code", engine: { model: "claude-opus-5-5", effort: "high" }, ...extra });
+/** A machine's coding agents as its connector lists them: Claude Code connected, Codex to connect. */
+const agentsListing = () => ({ status: "ready", error: null, busy: {}, actionErrors: {}, value: { scanned_at: Date.now(), custom: null, agents: [
+  { id: "claude-code", label: "Claude Code", present: true, version: "2.4.1", registration: "connected", connect: "auto", instructions: null },
+  { id: "codex", label: "Codex", present: true, version: "0.157.0", registration: "not-connected", connect: "auto", actionable: false, instructions: { command: "codex mcp add sidevoice -- sidevoice mcp", file: null, snippet: null } },
+] } });
 const REPLY = "I ran the tests: two fail in the settings pane, both about the Save button that no longer exists. Shall I update them?";
 
 /** A device set up, paired with the NUC, in a call on "sidevoice-web" with two other conversations. */
@@ -66,6 +71,7 @@ export const BASE_FACTS: Record<string, unknown> = {
   people: [person("t-web", "sidevoice-web"), person("t-release", "release", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
     person("t-notes", "notes", { harness: "cursor", reach: { state: "holding" } })],
   harness: {},
+  hostAgents: { "fp-nuc": agentsListing(), "fp-local": agentsListing(), "fp-ws": agentsListing() },
   history: [
     { segment: "h-1", thread: "t-web", role: "user", text: "Can you run the tests and tell me what fails?", name: "", time: Date.now() - 60_000, session: "s1", seq: 1 },
     { segment: "h-2", thread: "t-web", role: "assistant", text: REPLY, name: "sidevoice-web", time: Date.now() - 30_000, session: "s1", seq: 2, audio: "played" },
@@ -94,7 +100,7 @@ export const JOURNEYS: Journey[] = [
     { id: "w1", caption: "Where you use your agents: this computer preselected in the desktop app; another machine.", setup: { step: "W1", record: { basics_done: true } }, desktop: localBridge({ state: "absent" }) },
     { id: "w2", caption: "Prepare this computer: one button, its progress in place.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } }, desktop: localBridge({ state: "absent" }) },
     { id: "w3", caption: "Ready here: the agents on this computer, Connect or Disconnect each.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
-      facts: { pairings: [THIS], pairingInUse: THIS.fp, node: THIS.fp, localHostStatus: running } },
+      facts: { pairings: [THIS], pairingInUse: THIS.fp, node: THIS.fp, localHostStatus: running, localHostAvailable: true } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], pairingInUse: null, node: null, nodeReach: "" } },
     { id: "w4", caption: "Transcription: a model not downloaded yet — Continue waits for it; trying is recommended.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       facts: { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } } } },
@@ -126,9 +132,9 @@ export const JOURNEYS: Journey[] = [
     { id: "s-providers", caption: "Providers: one connected, one to connect.", after: openSettings("providers") },
     { id: "s-providers-error", caption: "Providers: a key the provider refused, in its words.", facts: { voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((c) => c.id === "elevenlabs" ? { ...c, status: { stale: false, reason: { code: "credential-rejected" }, detail: "invalid_api_key" } } : c) } }, after: openSettings("providers") },
     { id: "s-machine-local", caption: "Machines: this computer, running — its service, agents, devices.", desktop: localBridge(running),
-      facts: { pairings: [THIS, NUC], pairingInUse: THIS.fp, node: THIS.fp, localHostStatus: running }, after: openSettings("machines") },
+      facts: { pairings: [THIS, NUC], pairingInUse: THIS.fp, node: THIS.fp, localHostStatus: running, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-stopped", caption: "Machines: this computer, stopped — Start brings it back.", desktop: localBridge({ ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" }),
-      facts: { pairings: [THIS, NUC], pairingInUse: NUC.fp, localHostStatus: { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" } }, after: openSettings("machines") },
+      facts: { pairings: [THIS, NUC], pairingInUse: NUC.fp, localHostStatus: { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" }, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-remote", caption: "Machines: a remote machine, connected.", facts: { pairings: [NUC, WORKSTATION, LAPTOP], remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1 } } }, after: openSettings("machines") },
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], pairingInUse: LAPTOP.fp, node: LAPTOP.fp, nodeReach: "away" }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], pairingInUse: NUC.fp, nodeReach: "revoked" }, after: openSettings("machines") },
@@ -136,11 +142,12 @@ export const JOURNEYS: Journey[] = [
   ] },
   { id: "updates", title: "Updates and what's new", note: "What wants updating, behind one quiet entry; what a release added, shown once, never the setup again.", shots: [
     { id: "u-web", caption: "A new version of the page while in a call: Reload waits for the call to end.", facts: { webUpdate: "b2" } },
-    { id: "u-several", caption: "Several at once: the desktop app, the page, this computer's machine; one entry with their count.", facts: { webUpdate: "b2", pairings: [THIS, NUC], localHostStatus: running },
+    { id: "u-several", caption: "Several at once: the desktop app, the page, this computer's machine; one entry with their count.", facts: { webUpdate: "b2", pairings: [THIS, NUC], localHostStatus: running, localHostAvailable: true },
       updater: { available: true, version: "0.5.0" }, desktop: { ...localBridge(running), version: { bridge: 1, bundled: { version: "0.5.0" }, installed: { version: "0.4.0" }, core_api: 1, update: "available" } } },
     { id: "u-phone-panel", caption: "On a phone, variant B: in the dropped panel, a dot on the chevron.", facts: { webUpdate: "b2" }, variants: { "updates-entry": "panel" }, views: ["phone"] },
     { id: "whats-new", caption: "What's new for someone set up on an earlier release: only what needs them, with Set up.", record: { baseline_release: 0 },
-      facts: { voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } } },
+      // Out of a call: what's new never shows during one.
+      facts: { ws: null, voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } } },
     { id: "whats-new-panel", caption: "What's new, variant B: a section of the updates' list.", record: { baseline_release: 0 }, variants: { "whats-new": "panel" } },
   ] },
 ];

@@ -6,9 +6,11 @@ let controllerImport: Promise<unknown> | null = null;
 
 interface RoomProviderProps extends PropsWithChildren {
   store?: RoomStore;
+  /** Whether the runtime (the controller) runs: off for a storyboard of seeded states. */
+  runtime?: boolean;
 }
 
-export function RoomProvider({ children, store: suppliedStore }: RoomProviderProps) {
+export function RoomProvider({ children, store: suppliedStore, runtime = true }: RoomProviderProps) {
   const started = useRef(false);
   const storeRef = useRef<RoomStore | null>(null);
   if (!storeRef.current) storeRef.current = suppliedStore ?? createRoomStore();
@@ -19,7 +21,8 @@ export function RoomProvider({ children, store: suppliedStore }: RoomProviderPro
 
   useEffect(() => {
     installRoomBridge(store);
-    if (started.current) return;
+    // Without the runtime (the journeys' storyboard) the store is only what was seeded.
+    if (started.current || !runtime) return;
     started.current = true;
     // Telemetry first, so `window.sidevoiceTelemetry` exists before the controller opens a call.
     // It is a facade: the OpenTelemetry SDK itself only loads if the room names a collector.
@@ -30,7 +33,7 @@ export function RoomProvider({ children, store: suppliedStore }: RoomProviderPro
       const message = error instanceof Error ? error.message : String(error);
       window.sidevoiceUI?.setBootError(`No se pudo iniciar Sidevoice: ${message}`);
     });
-  }, [store]);
+  }, [store, runtime]);
 
   return (
     <RoomStoreContext.Provider value={store}>

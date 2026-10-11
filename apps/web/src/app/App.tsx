@@ -86,9 +86,9 @@ function RoomContent() {
 }
 
 /** `onboarding`: where the setup keeps its record, and a step to open at — the journeys' storyboard shows each step. */
-export function App({ store, onboarding }: { store?: RoomStore; onboarding?: { repository?: OnboardingRepository; startAt?: OnboardingStep } } = {}) {
+export function App({ store, onboarding, runtime }: { store?: RoomStore; onboarding?: { repository?: OnboardingRepository; startAt?: OnboardingStep }; runtime?: boolean } = {}) {
   return (
-    <RoomProvider store={store}>
+    <RoomProvider store={store} runtime={runtime}>
       <OnboardingProvider repository={onboarding?.repository} startAt={onboarding?.startAt}>
         <TooltipProvider>
           <RoomContent />
