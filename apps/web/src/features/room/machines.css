@@ -76,3 +76,26 @@
   .host-detail-header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sv-space-3); row-gap: var(--sv-space-2); }
   .host-detail-header > .ui-badge, .host-detail-header > .ui-button { grid-column: 2; justify-self: start; }
 }
+
+/* B: a machine opens in place under its row, one at a time; Add a machine at the list's foot. */
+.machine-item + .machine-item { border-top: 1px solid var(--sv-border); }
+.machine-item .machine-row { border: 0; }
+.machine-item .machine-chevron { transform: none; transition: transform var(--sv-dur-base) var(--sv-ease); }
+.machine-item[data-expanded] .machine-chevron { transform: rotate(180deg); }
+.machine-body { padding: 0 var(--sv-space-5) var(--sv-space-5); }
+.machine-body .host-detail > .host-section:first-child { padding-top: var(--sv-space-3); }
+.machines-add { display: flex; margin-top: var(--sv-space-3); }
+
+/* C: the machine and its parts under Machines in Settings' navigation; on a phone, at the pane's head instead. */
+.machine-nav { display: grid; gap: var(--sv-space-1); margin: var(--sv-space-1) 0 var(--sv-space-2) var(--sv-space-6); }
+.machine-nav .ui-select, .machine-nav select { width: 100%; }
+.machine-nav-parts { display: grid; gap: 2px; }
+.ui-nav-item--sub { min-height: 32px; font-size: var(--sv-font-sm); }
+.machine-nav-add { justify-self: start; }
+.machines-c-inline { display: none; }
+@media (max-width: 767px) {
+  .settings-nav .machine-nav { display: none; }
+  .machines-c-inline { display: block; }
+  .machines-c-inline .machine-nav { margin: 0 0 var(--sv-space-3); }
+  .machines-c-inline .machine-nav-parts { display: flex; flex-wrap: wrap; gap: var(--sv-space-1); }
+}

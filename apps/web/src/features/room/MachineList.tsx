@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useContext, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, ChevronIcon, MachinesIcon } from "../../components/ui/Icons";
 import { Badge } from "../../components/ui/Badge";
@@ -10,7 +10,7 @@ import "./machines.css";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion, type LocalPairingCode } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
@@ -35,37 +35,103 @@ function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTrans
   return { name, subtitle, reachable };
 }
 
-/* The paired machines, with adding one always in sight. Two layouts to compare (the preview's VARIANTS, `machines`):
+/* The paired machines, with adding one always in sight. Three layouts to compare (the preview's VARIANTS, `machines`):
  * A, a picker of machines with the chosen one's page below it and "Add a machine" beside the picker; B, the machines
- * as a list, each opening its own page, "Add a machine" at the list's head. */
+ * as a list, each opening in place (one at a time) to show everything it has, "Add a machine" at the list's foot; C,
+ * as Paseo's settings do, the machine picked in Settings' own navigation, its parts (agents, paired devices…) as
+ * sub-items there, and the part chosen alone in the pane (MachineNav). */
+export const MACHINES_LAYOUT = ["a", "b", "c"] as const;
+
+/** The parts of a machine a layout may show one at a time (C): this computer's service, its agents, its devices. */
+export type MachinePart = "service" | "agents" | "devices";
+
+function useNotice() {
+  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
+  return (machine: MachineView) => !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
+    hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
+}
+
+function AddMachine({ primary = false }: { primary?: boolean }) {
+  const t = hostTranslator();
+  return <Button id="pair-device-open" variant={primary ? "primary" : "secondary"} onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</Button>;
+}
+
+/** The machine shown where one is shown at a time (A, C): the one picked, else the one in use, else the first. */
+function shownMachine(machines: MachineView[], picked: string | null) {
+  return (picked ? machines.find((machine) => machine.id === picked) : null) ?? machines.find((machine) => machine.inUse) ?? machines[0] ?? null;
+}
+
+/** C's navigation, under Machines in Settings' own: the machine picker with Add beside it, then the machine's parts.
+ *  Choosing one shows Machines with that part (the store's `machinesView`). */
+export function MachineNav({ current }: { current: boolean }) {
+  const t = hostTranslator();
+  const machines = useRoomStore((state) => state.machines);
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const view = useRoomStore((state) => state.facts.machinesView);
+  const store = useContext(RoomStoreContext);
+  const notice = useNotice();
+  const shown = shownMachine(machines, view.machine);
+  const show = (patch: Partial<typeof view>) => store?.patch({ settingsSection: "machines", machinesView: { ...view, machine: shown?.id ?? null, ...patch } });
+  const parts: MachinePart[] = shown?.local ? ["service", "agents", "devices"] : ["agents", "devices"];
+  const part = parts.includes(view.part) ? view.part : parts[0];
+  return (
+    <div className="machine-nav">
+      {machines.length > 0 && <NativeSelect aria-label={t("hosts.pick")} value={shown?.id ?? ""} onChange={(event) => show({ machine: event.target.value })}>
+        {machines.map((machine) => <option key={machine.id} value={machine.id}>{machineCopy(machine, status, t).name}{machine.inUse ? " · " + t("hosts.inUse") : ""}</option>)}
+      </NativeSelect>}
+      {shown && <div className="machine-nav-parts">
+        {parts.map((name) => <button key={name} type="button" className="ui-nav-item ui-nav-item--sub" aria-current={current && part === name ? "page" : undefined} onClick={() => show({ part: name })}>
+          <span>{t(name === "service" ? "hosts.section.service" : name === "agents" ? "agents.heading" : "hosts.tab.devices")}</span>
+          {name === "agents" && notice(shown) && <Badge tone="warning" className="ui-nav-badge">{t("agents.notice")}</Badge>}
+        </button>)}
+      </div>}
+      <Button variant="ghost" tone="neutral" size="sm" className="machine-nav-add" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</Button>
+    </div>
+  );
+}
+
 export function MachineList() {
   const t = hostTranslator();
-  const layout = useVariant("machines", ["a", "b"] as const);
+  const layout = useVariant("machines", MACHINES_LAYOUT);
   const machines = useRoomStore((state) => state.machines);
-  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const status = useRoomStore((state) => state.facts.localHostStatus);
+  const view = useRoomStore((state) => state.facts.machinesView);
+  const store = useContext(RoomStoreContext);
+  const notice = useNotice();
   const [selected, setSelected] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const localMachine = machines.find((machine) => machine.local) ?? null;
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
-  const selectedMachine = selected ? machines.find((machine) => machine.id === selected) ?? null : null;
-  const notice = (machine: MachineView) => !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
-    hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
-  const open = (machine: MachineView) => setSelected(machine.id);
 
+  // Asked for a machine's agents (an agent waiting): that machine, open at them.
   useEffect(() => {
-    if (!agentRequest) return;
-    if (!agentRequest.fp) { setSelected(null);return; }
+    if (!agentRequest?.fp) return;
     const machine = machines.find((entry) => entry.pairingId === agentRequest.fp);
-    if (machine) setSelected(machine.id);
+    if (!machine) return;
+    setSelected(machine.id);setExpanded(machine.id);
+    if (layout === "c") store?.patch({ machinesView: { machine: machine.id, part: "agents" } });
   }, [agentRequest, machines]);
 
-  const add = <Button id="pair-device-open" variant={layout === "a" ? "secondary" : "primary"} onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</Button>;
   const footer = <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />;
+  const none = machines.length === 0 && <p className="muted">{t("hosts.none")}</p>;
+
+  if (layout === "c") {
+    const shown = shownMachine(machines, view.machine);
+    const copy = shown ? machineCopy(shown, status, t) : null;
+    return (
+      <Section id="machines" title={t("hosts.title")} description={t("hosts.description")}>
+        {/* A phone's sections are a strip across the top, with no room for a machine's: they come with the pane. */}
+        <div className="machines-c-inline"><MachineNav current /></div>
+        {none}{machines.length === 0 && <AddMachine primary />}
+        {shown && copy && <HostDetail machine={shown} copy={copy} notice={notice(shown)} parts={[shown.local || view.part !== "service" ? view.part : "agents"]} />}
+        {footer}
+      </Section>
+    );
+  }
 
   if (layout === "a") {
-    // The machine shown: the one asked for, else the one in use, else the first.
-    const shown = selectedMachine ?? machines.find((machine) => machine.inUse) ?? machines[0] ?? null;
+    const shown = shownMachine(machines, selected);
     const copy = shown ? machineCopy(shown, status, t) : null;
     return (
       <Section id="machines" title={t("hosts.title")} description={t("hosts.description")}>
@@ -75,9 +141,9 @@ export function MachineList() {
               {machines.map((machine) => { const name = machineCopy(machine, status, t).name; return <option key={machine.id} value={machine.id}>{name}{machine.inUse ? " · " + t("hosts.inUse") : ""}{notice(machine) ? " · " + t("agents.notice") : ""}</option>; })}
             </NativeSelect>
           </Field>}
-          {add}
+          <AddMachine />
         </div>
-        {machines.length === 0 && <p className="muted">{t("hosts.none")}</p>}
+        {none}
         {shown && copy && <div className="machine-row machine-row--shown" data-state={shown.state} data-in-use={shown.inUse || undefined} data-local={shown.local || undefined}>
           <HostDetail machine={shown} copy={copy} notice={notice(shown)} />
         </div>}
@@ -86,32 +152,39 @@ export function MachineList() {
     );
   }
 
-  if (selectedMachine) return <HostDetail machine={selectedMachine} copy={machineCopy(selectedMachine, status, t)} notice={notice(selectedMachine)} onBack={() => setSelected(null)} />;
-
   return (
-    <Section id="machines" title={t("hosts.title")} description={t("hosts.description")} actions={add}>
-      {machines.length === 0 ? <p className="muted">{t("hosts.none")}</p> : <Group>
+    <Section id="machines" title={t("hosts.title")} description={t("hosts.description")}>
+      {none}
+      {machines.length > 0 && <Group>
         {machines.map((machine) => {
           const copy = machineCopy(machine, status, t);
+          const open = expanded === machine.id;
           return (
-            <div className="ui-row machine-row" key={machine.id} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined} data-agent-notice={notice(machine) || undefined}>
-              <button type="button" className="machine-open" aria-label={machine.local ? t("hosts.open", { machine: copy.name }) : t("agents.review", { machine: copy.name })} onClick={() => open(machine)}>
-                <span className="machine-icon" aria-hidden="true"><MachinesIcon size={18} /></span>
-                <span className="machine-copy">
-                  <span className="machine-name">{copy.name}{machine.inUse && <Badge tone="accent">{t("hosts.inUse")}</Badge>}{notice(machine) && <Badge tone="warning">{t("agents.notice")}</Badge>}</span>
-                  <span className="machine-brief">{copy.subtitle}</span>
+            <div className="machine-item" key={machine.id} data-expanded={open || undefined}>
+              <div className="ui-row machine-row" data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined} data-agent-notice={notice(machine) || undefined}>
+                <button type="button" className="machine-open" aria-expanded={open} aria-controls={"machine-body-" + machine.id}
+                  aria-label={machine.local ? t("hosts.open", { machine: copy.name }) : t("agents.review", { machine: copy.name })} onClick={() => setExpanded(open ? null : machine.id)}>
+                  <span className="machine-icon" aria-hidden="true"><MachinesIcon size={18} /></span>
+                  <span className="machine-copy">
+                    <span className="machine-name">{copy.name}{machine.inUse && <Badge tone="accent">{t("hosts.inUse")}</Badge>}{notice(machine) && <Badge tone="warning">{t("agents.notice")}</Badge>}</span>
+                    <span className="machine-brief">{[copy.subtitle, reachText(machine, t)].filter(Boolean).join(" · ")}</span>
+                  </span>
+                </button>
+                <span className="ui-row-control machine-actions">
+                  <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
+                  {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" className="machine-action" aria-label={t("hosts.use", { machine: copy.name })}
+                    onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
+                  <ChevronIcon size={16} className="machine-chevron" />
                 </span>
-              </button>
-              <span className="ui-row-control machine-actions">
-                <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-                {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" className="machine-action" aria-label={t("hosts.use", { machine: copy.name })}
-                  onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
-                <ChevronIcon size={16} className="machine-chevron" />
-              </span>
+              </div>
+              {open && <div id={"machine-body-" + machine.id} className="machine-body">
+                <HostDetail machine={machine} copy={copy} notice={notice(machine)} bare />
+              </div>}
             </div>
           );
         })}
       </Group>}
+      <div className="machines-add"><AddMachine primary={machines.length === 0} /></div>
       {footer}
     </Section>
   );
@@ -126,10 +199,10 @@ function reachText(machine: MachineView, t: HostTranslate) {
   return "";
 }
 
-/** A machine's own page, everything about it at once: whether it answers and how, this computer's service (the local
- *  one), its agents, the devices paired with it and pairing another, and forgetting it. With `onBack`, a page reached
- *  from the list (B); without, the picker's (A). */
-function HostDetail({ machine, copy, notice, onBack }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; onBack?: () => void }) {
+/** A machine's page: whether it answers and how, then its parts — this computer's service (the local one), its agents,
+ *  the devices paired with it and pairing another, and forgetting it — all of them, or the `parts` named (C). `bare`
+ *  leaves out its head, where the row it opens under already says it (B). */
+function HostDetail({ machine, copy, notice, parts, bare = false }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; parts?: MachinePart[]; bare?: boolean }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
@@ -137,31 +210,31 @@ function HostDetail({ machine, copy, notice, onBack }: { machine: MachineView; c
   // Asked for its agents (a new agent waiting): its agents in view.
   useEffect(() => { if (agentRequest?.fp && agentRequest.fp === machine.pairingId) agents.current?.scrollIntoView?.({ block: "start" }); }, [agentRequest, machine.pairingId]);
   const reach = reachText(machine, t);
+  const has = (part: MachinePart) => !parts || parts.includes(part);
   return (
-    <section className="host-detail" aria-labelledby="host-detail-title">
-      {onBack && <Button variant="ghost" tone="neutral" size="sm" className="host-back" onClick={onBack}><ChevronIcon size={16} className="host-back-icon" />{t("hosts.pageBack")}</Button>}
-      <header className="host-detail-header">
+    <section className="host-detail" aria-label={copy.name} data-bare={bare || undefined}>
+      {!bare && <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
         <div className="host-detail-copy">
-          <h3 id="host-detail-title">{copy.name}</h3>
+          <h3>{copy.name}</h3>
           <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
         {notice && <Badge tone="warning">{t("agents.notice")}</Badge>}
         {!machine.inUse && machine.selectable !== false && <Button variant="secondary" size="sm" aria-label={t("hosts.use", { machine: copy.name })}
           onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.useShort")}</Button>}
-      </header>
-      {machine.local && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
+      </header>}
+      {machine.local && has("service") && <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
         <h4 id={"host-status-" + machine.id}>{t("hosts.section.service")}</h4>
         <LocalHostStatusPanel status={status} />
       </section>}
-      <section className="host-section" ref={agents}>
+      {has("agents") && <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
-      </section>
-      <section className="host-section">
+      </section>}
+      {has("devices") && <section className="host-section">
         <MachineDevicesPanel machine={machine} name={copy.name} />
-      </section>
-      {!machine.local && machine.pairingId && <ForgetMachine fp={machine.pairingId} name={copy.name} />}
+      </section>}
+      {has("devices") && !machine.local && machine.pairingId && <ForgetMachine fp={machine.pairingId} name={copy.name} />}
     </section>
   );
 }

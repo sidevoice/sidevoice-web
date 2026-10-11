@@ -97,7 +97,8 @@ async function openAgents(page) {
   const open = page.getByRole("button", { name: "Review agents for E2E Host" });
   await expect(open).toBeVisible();
   await open.click();
-  await expect(page.getByRole("heading", { name: "E2E Host" })).toBeVisible();
+  // Layout B opens the machine in place, under its row.
+  await expect(open).toHaveAttribute("aria-expanded", "true");
   // Every part of the machine on its page, its agents among them.
   const agents = page.getByRole("heading", { name: "Agents", exact: true });
   await expect(agents).toBeVisible();
@@ -141,12 +142,14 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
 
   // The smallest phone: every action still on screen.
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.getByRole("button", { name: "Back to machines" }).click();
   const reviewAgents = page.getByRole("button", { name: "Review agents for E2E Host" });
   await expectInsideViewport(reviewAgents, 320, 568);
-  await reviewAgents.click();
-  await expect(page.getByRole("heading", { name: "E2E Host" })).toBeVisible();
+  await expect(reviewAgents).toHaveAttribute("aria-expanded", "true");
   await expectInsideViewport(agents, 320, 568);
+  // The row stayed open in place, its hand-made replacement still shown: closing and opening it again fits too.
+  const close = foreign.getByRole("button", { name: "Close" }).first();
+  await expectInsideViewport(close, 320, 568);
+  await close.click();
   const replace = page.getByRole("button", { name: "Replace manually" });
   await expectInsideViewport(replace, 320, 568);
   await replace.click();
@@ -166,7 +169,6 @@ test("a machine that revokes this device loses its Agents actions and asks for p
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("sidevoice.pairings")));
   expect(stored.pairings[0].revoked).toBe(true);
   await pairingDialog.getByRole("button", { name: "Close pairing" }).click();
-  await page.getByRole("button", { name: "Back to machines" }).click();
   await expect(page.locator(".machine-row[data-state='revoked']")).toContainText("E2E Host");
   await expect(page.getByRole("heading", { name: "Agents", exact: true })).toHaveCount(0);
 });

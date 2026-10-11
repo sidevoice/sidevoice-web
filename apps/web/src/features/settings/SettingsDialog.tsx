@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
 import { AdvancedIcon, CallSettingsIcon, SidevoiceMark, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
@@ -10,7 +10,7 @@ import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { useVariant } from "../../lib/variants";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
-import { MachineList } from "../room/MachineList";
+import { MACHINES_LAYOUT, MachineList, MachineNav } from "../room/MachineList";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
@@ -128,6 +128,7 @@ const SETTINGS_HEADER = ["own", "app"] as const;
 export function SettingsDialog() {
   const t = hostTranslator();
   const header = useVariant("settings-header", SETTINGS_HEADER);
+  const machinesLayout = useVariant("machines", MACHINES_LAYOUT);
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
   const waits = useVoiceReadiness();
@@ -148,11 +149,14 @@ export function SettingsDialog() {
           </>}>
           <form id="language-form" className="settings-layout">
             <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
-              {SECTIONS.map((section) => <button key={section.id} type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
-                aria-current={section.id === current ? "page" : undefined} onClick={() => show(section.id)}>
+              {SECTIONS.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
+                aria-current={section.id === current ? section.id === "machines" && machinesLayout === "c" ? "true" : "page" : undefined} onClick={() => show(section.id)}>
                 {section.icon}<span>{t(section.label)}</span>
                 {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
-              </button>)}
+              </button>
+              {/* Machines as Paseo's settings lay them out (VARIANTS machines C): the machine and its parts under it. */}
+              {section.id === "machines" && machinesLayout === "c" && <MachineNav current={current === "machines"} />}
+              </Fragment>)}
             </nav>
             <div className="settings-content">
               <div className="settings-column">

@@ -130,7 +130,7 @@ test("local F6 status shows only supported service actions", async () => {
   await act(async () => { screen.getByRole("button", { name: "Open MacBook" }).click(); });
   expect(screen.getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(screen.getByText("Does not start when you sign in")).toBeInTheDocument();
+  expect(document.querySelector(".host-status-summary")).toHaveTextContent("Does not start when you sign in");
   expect(screen.getAllByRole("button", { name: "Start at login" })).toHaveLength(1);
   expect(screen.queryByRole("button", { name: /agent/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /copy from another machine/i })).toBeNull();
@@ -162,7 +162,7 @@ test("service failure display and copied diagnostics omit secret-bearing native 
     render(<RoomProvider store={store}><LocalHostBanner /><MachineList /></RoomProvider>);
     expect(document.querySelector(".local-host-banner")).toBeInTheDocument();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open MacBook" })); });
-    expect(screen.getByText("The Sidevoice service is unavailable: the service could not start")).toBeInTheDocument();
+    expect(document.querySelector(".host-status-summary")).toHaveTextContent("The Sidevoice service is unavailable: the service could not start");
     expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
     expect(screen.queryByText(/PAIRING_CODE_SECRET_42|RAW_FAILURE_SECRET_42|TOKEN_SECRET_42|ENV_SECRET_42|CODE_SECRET_42|LAUNCH_SECRET_42/)).toBeNull();
 
@@ -549,4 +549,32 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
   fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
   expect(done.forgetMachine).toHaveBeenCalledWith("fp-nuc");
+});
+
+test("layout B: a row opens in place, one at a time, with its agents and devices; Add a machine is at the list's foot", async () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([local, paired()], { remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  const nuc = screen.getByRole("button", { name: "Review agents for NUC" });
+  expect(nuc).toHaveAttribute("aria-expanded", "false");
+  await act(async () => { fireEvent.click(nuc); });
+  expect(nuc).toHaveAttribute("aria-expanded", "true");
+  expect(document.getElementById(nuc.getAttribute("aria-controls")!)).toHaveTextContent("Paired devices");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Open MacBook" })); });
+  expect(nuc).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("button", { name: "Back to machines" })).toBeNull();
+  expect(document.querySelector(".machines-add #pair-device-open")).toBeInTheDocument();
+});
+
+test("layout C: the machine and its parts are navigation; the part chosen shows alone", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "c" }));
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  const store = room([paired()], { pairingInUse: "fp-nuc", remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  expect(screen.getByText("Checking this machine for agents…")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Paired devices" })).toBeNull();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Paired devices" })); });
+  expect(store.getState().facts.machinesView.part).toBe("devices");
+  expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
+  expect(screen.queryByText("Checking this machine for agents…")).toBeNull();
 });

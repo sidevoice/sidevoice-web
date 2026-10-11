@@ -85,8 +85,8 @@ test("P11 pending notice on the Settings entry routes to its host's Agents scree
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
-  expect(screen.getByRole("heading", { name: /^NUC/ })).toBeInTheDocument();
-  expect(screen.getByText("Not checked yet")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /NUC/, expanded: true })).toBeInTheDocument();
+  expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Agents" })).toBeInTheDocument();
   expect(screen.getByText("Cursor")).toBeInTheDocument();
 });
