@@ -37,7 +37,7 @@ test("with nothing kept, the defaults on this device's catalogue, the language h
   expect(readVoiceSettings(storage)).toEqual({
     stt: { catalog: "elevenlabs", model: "scribe_v2", language: null },
     tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: null, speed: 1.1 },
-    patience: "normal", end_of_turn: "smart-turn",
+    patience: "normal", end_of_turn: "smart-turn", idle_unload_minutes: 10,
   });
   expect(readVoiceSettings(memory({ [VOICE_SETTINGS_KEY]: "{broken" }))).toEqual(defaultVoiceSettings());
   writeVoiceSettings(storage, defaultVoiceSettings());

@@ -14,6 +14,7 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
  *   tts: {catalog: string, model: string, voice: string | null, speed: number},
  *   patience: NonNullable<VoiceSettings['patience']>,
  *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
+ *   idle_unload_minutes: number,
  * }} DeviceVoiceSettings The settings this device keeps: every field filled, so they are the voice's `VoiceSettings` as they are.
  * @typedef {{key: string, params?: Record<string, string | number>, reasons?: string[], detail?: string}} Note What the pane
  *   says about a choice: a message key and its params, the codes of why a model does not run here, and a provider's own
@@ -23,6 +24,8 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
 export const VOICE_SETTINGS_KEY = 'sidevoice.voice-settings';
 export const PATIENCE = ['fast', 'normal', 'calm'];
 export const END_OF_TURN = ['silence', 'smart-turn'];
+/** How long models stay loaded with nothing to do, in minutes, as Settings offers it; the voice's own default is 10. */
+export const IDLE_UNLOAD_MINUTES = [5, 10, 30, 60];
 /** The normal pace, and the step the pane moves a speed by. */
 export const SPEED = { normal: 1, step: 0.05 };
 
@@ -37,6 +40,7 @@ export function defaultVoiceSettings() {
     tts: { catalog: LOCAL_CATALOG, model: 'kokoro-82m-v1.0', voice: null, speed: SPEED.normal },
     patience: 'normal',
     end_of_turn: 'silence',
+    idle_unload_minutes: 10,
   };
 }
 
@@ -67,6 +71,7 @@ export function normaliseVoiceSettings(value, defaults) {
     },
     patience: PATIENCE.includes(value?.patience) ? value.patience : defaults.patience,
     end_of_turn: END_OF_TURN.includes(value?.end_of_turn) ? value.end_of_turn : defaults.end_of_turn,
+    idle_unload_minutes: IDLE_UNLOAD_MINUTES.includes(value?.idle_unload_minutes) ? value.idle_unload_minutes : defaults.idle_unload_minutes,
   };
 }
 

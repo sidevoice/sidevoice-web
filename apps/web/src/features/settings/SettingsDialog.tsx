@@ -1,7 +1,7 @@
-import { useContext, useState, type ReactNode } from "react";
+import { useContext, useEffect, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, CallSettingsIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { NativeSelect } from "../../components/ui/NativeSelect";
 import { Group, Row, Section } from "../../components/ui/Card";
@@ -10,7 +10,10 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
 import { MachineList } from "../room/MachineList";
 import { ProviderKeys } from "./ProviderKeys";
-import { SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
+import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
+import { Alert } from "../../components/ui/Alert";
+import { Switch } from "../../components/ui/Switch";
+import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import "./settings.css";
@@ -24,6 +27,7 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: ReactNode }[] = [
   { id: "general", label: "settings.section.general", icon: <GeneralIcon /> },
   { id: "transcription", label: "settings.section.transcription", icon: <TranscriptionIcon /> },
   { id: "voice", label: "settings.section.voice", icon: <VoicesIcon /> },
+  { id: "call", label: "settings.section.call", icon: <CallSettingsIcon /> },
   { id: "providers", label: "settings.section.providers", icon: <IntegrationsIcon /> },
   { id: "machines", label: "settings.section.machines", icon: <MachinesIcon /> },
   { id: "advanced", label: "settings.section.advanced", icon: <AdvancedIcon /> },
@@ -38,7 +42,6 @@ function Appearance({ t }: { t: HostTranslate }) {
 }
 
 function GeneralSettings({ t }: { t: HostTranslate }) {
-  const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
   return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
     <Group>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
@@ -46,28 +49,65 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
       </Row>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
     </Group>
-    <Group title={t("settings.general.device")}>
-      <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
-        <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>
-      </Row>
-      <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
-    </Group>
   </Section>;
 }
 
 function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslate }) {
   return <Section id={id} title={t(id === "transcription" ? "settings.section.transcription" : "settings.section.voice")}
     description={t(id === "transcription" ? "settings.transcription.description" : "settings.voice.description")}>
+    <RestartNote t={t} />
     <SlotPane task={id === "transcription" ? "stt" : "tts"} />
   </Section>;
 }
 
-function AdvancedSettings({ t }: { t: HostTranslate }) {
+/** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works and the screen during
+ *  a call (this device's, applied at once). */
+function CallSettings({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const ready = useRoomStore((state) => state.facts.voiceCatalogue.state === "ready");
-  return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
+  const [prefs, setPrefs] = useState(readCallPreferences);
+  useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
+  const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));
+  const wakeLock = typeof navigator !== "undefined" && "wakeLock" in navigator;
+  const presence: { value: PresenceSound; label: HostMessageKey }[] = [
+    { value: "off", label: "settings.call.presence.off" }, { value: "hidden", label: "settings.call.presence.hidden" }, { value: "always", label: "settings.call.presence.always" },
+  ];
+  return <Section id="call" title={t("settings.section.call")} description={t("settings.call.description")}>
+    <RestartNote t={t} />
     {ready && draft ? <TurnChoices draft={draft} /> : <p className="muted" role="status">{t("voice.loading")}</p>}
-    <p className="muted settings-note">{t("voice.restartNote")}</p>
+    <Group title={t("settings.call.working")}>
+      <Row label={t("settings.call.presence")} description={t(prefs.presence === "off" ? "settings.call.presence.offHint" : prefs.presence === "hidden" ? "settings.call.presence.hiddenHint" : "settings.call.presence.alwaysHint")}>
+        <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}
+          items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
+      </Row>
+    </Group>
+    <Group title={t("settings.call.device")}>
+      <Row label={t("settings.call.keepAwake")} description={wakeLock ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
+        <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
+      </Row>
+    </Group>
+  </Section>;
+}
+
+/** What changing a source, a model or when a turn ends does during a call: the voice restarts for a moment. Said only
+ *  while a call is on. */
+function RestartNote({ t }: { t: HostTranslate }) {
+  const inCall = useRoomStore((state) => !!(state.facts.ws || state.facts.reconnecting));
+  return inCall ? <Alert tone="warning" title={t("settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;
+}
+
+/** For diagnosis and recovery, and the engine's internals: models' memory, this device's settings, the build. */
+function AdvancedSettings({ t }: { t: HostTranslate }) {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
+  return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
+    {draft && <Group title={t("settings.advanced.models")}><IdleUnloadChoice draft={draft} /></Group>}
+    <Group title={t("settings.general.device")}>
+      <Row label={t("settings.general.reset")} description={<>{t("settings.general.deviceHint")} <span id="reset-settings-note" role="status" /></>}>
+        <Button id="reset-settings" variant="ghost" tone="danger" size="sm" aria-label={t("settings.general.reset")}>{t("settings.general.resetShort")}</Button>
+      </Row>
+      <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
+    </Group>
   </Section>;
 }
 
@@ -107,6 +147,7 @@ export function SettingsDialog() {
                 <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
+                <Pane id="call" current={current}><CallSettings t={t} /></Pane>
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 <Pane id="machines" current={current}><MachineList /></Pane>
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>

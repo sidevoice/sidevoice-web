@@ -161,7 +161,7 @@ export interface SidevoiceActions {
   /** Stops the reply sounding now on this device; the reply stays written and what is queued after it plays on. */
   skipReply(): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
-  editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]>; tts?: Partial<DeviceVoiceSettings["tts"]>; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"] }): void;
+  editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]>; tts?: Partial<DeviceVoiceSettings["tts"]>; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
   saveProviderKey(provider: string, key: string | null): Promise<void>;
   /** Reads the engine's catalogues, and which providers have a key, again. */

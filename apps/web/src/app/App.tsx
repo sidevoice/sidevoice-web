@@ -8,6 +8,7 @@ import { ConversationSidebar } from "../features/room/ConversationSidebar";
 import { TranscriptPanel } from "../features/conversation/TranscriptPanel";
 import { CallStage } from "../features/call/CallStage";
 import { CallToolbar } from "../features/call/CallToolbar";
+import { PresenceSound } from "../features/call/PresenceSound";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
 import { PairingDialog } from "../features/pairing/PairingDialog";
@@ -70,6 +71,7 @@ function RoomContent() {
             <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>
           </>}
         </main>
+        {!noMachine && <PresenceSound />}
         <ConnectionStatsDialog />
         <SettingsDialog />
       </div>

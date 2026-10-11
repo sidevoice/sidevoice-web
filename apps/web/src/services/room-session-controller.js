@@ -11,6 +11,7 @@ import {tryTranscription,tryVoice} from './voice-trial.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
+import {readCallPreferences} from './call-preferences.ts';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
@@ -219,6 +220,8 @@ async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
  // call, and by the end of the preparation chain that gesture has expired.
  if(!(state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
+ // Settings → Advanced may leave the screen to the system: a call that goes on with it off.
+ if(!readCallPreferences().keepAwake)return;
  if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','Este dispositivo no permite mantener la pantalla encendida.');return}
  const epoch=wakeEpoch;
  const request=(async()=>{

@@ -31,15 +31,19 @@ function open(draftModel: string) {
   return store;
 }
 
-test("the sections are General, Transcription, Voice, Providers, Machines and Advanced, one showing at a time", () => {
+test("the sections are General, Transcription, Voice, Call, Providers, Machines and Advanced, one showing at a time", () => {
   open("whisper-base");
-  expect([...document.querySelectorAll(".settings-nav button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Providers", "Machines", "Advanced"]);
+  expect([...document.querySelectorAll(".settings-nav button")].map((button) => button.textContent)).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
   fireEvent.click(document.getElementById("settings-advanced")!);
   expect(document.getElementById("pane-general")).toHaveAttribute("hidden");
   expect(document.getElementById("pane-advanced")).not.toHaveAttribute("hidden");
   expect(document.getElementById("settings-advanced")).toHaveAttribute("aria-current", "page");
+  expect(document.getElementById("voice-idle-unload")).toBeInTheDocument();
+  expect(document.getElementById("reset-settings")).toBeInTheDocument();
+  fireEvent.click(document.getElementById("settings-call")!);
   expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
+  expect(screen.getByRole("radiogroup", { name: "Thinking sound" })).toBeInTheDocument();
 });
 
 test("Save waits while the chosen model is not on this device, says why, and takes the person to it", () => {
@@ -56,4 +60,14 @@ test("Save is free once every chosen model is ready", () => {
   const save = screen.getByRole("button", { name: "Save changes" });
   expect(save).not.toHaveAttribute("aria-disabled");
   expect(save).not.toBeDisabled();
+});
+
+test("the thinking sound and the screen are this device's, applied at once", () => {
+  localStorage.removeItem("sidevoice.call-preferences");
+  open("whisper-base");
+  fireEvent.click(document.getElementById("settings-call")!);
+  expect(screen.getByRole("radio", { name: "Screen off" })).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(screen.getByRole("radio", { name: "Always" }));
+  expect(JSON.parse(localStorage.getItem("sidevoice.call-preferences")!).presence).toBe("always");
+  localStorage.removeItem("sidevoice.call-preferences");
 });

@@ -5,7 +5,8 @@ import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Group, Row } from "../../components/ui/Card";
 import { Alert } from "../../components/ui/Alert";
-import { voiceChoices, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
+import { Segmented } from "../../components/ui/Tabs";
+import { voiceChoices, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
@@ -173,17 +174,22 @@ export function SpeechChoices({ draft, setup = false }: SlotProps) {
   return <SlotSettings task="tts" draft={draft} setup={setup} />;
 }
 
-/** When the person's turn ends: how long a pause may be, and what decides it. */
+/** When the person's turn ends: how long a pause may be (fast, normal, calm), and what decides it — silence, or the
+ *  smart model when it runs here (else why not). Part of what Save keeps. */
 export function TurnChoices({ draft }: { draft: Settings }) {
   const t = hostTranslator();
   const choices = useChoices(draft);
-  const patience: [Settings["patience"], HostMessageKey][] = [["fast", "voice.patience.fast"], ["normal", "voice.patience.normal"], ["calm", "voice.patience.calm"]];
+  const patience: { value: Settings["patience"]; label: HostMessageKey; hint: HostMessageKey }[] = [
+    { value: "fast", label: "voice.patience.fastShort", hint: "voice.patience.fast" },
+    { value: "normal", label: "voice.patience.normal", hint: "voice.patience.normalHint" },
+    { value: "calm", label: "voice.patience.calmShort", hint: "voice.patience.calm" },
+  ];
+  const current = patience.find((option) => option.value === draft.patience) ?? patience[1];
   return (
-    <Group>
-      <Row label={t("voice.patience")} description={t("voice.patience.hint")} htmlFor="voice-patience">
-        <NativeSelect id="voice-patience" value={draft.patience} onChange={(event) => edit({ patience: event.target.value as Settings["patience"] })}>
-          {patience.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
-        </NativeSelect>
+    <Group title={t("settings.call.turn")}>
+      <Row label={t("voice.patience")} description={t(current.hint)}>
+        <Segmented size="sm" label={t("voice.patience")} value={draft.patience} onChange={(value) => edit({ patience: value })}
+          items={patience.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
       <Row label={t("voice.endOfTurn")} description={choices.endOfTurn.note ? noteText(t, choices.endOfTurn.note) : t("voice.endOfTurn.hint")} htmlFor="voice-end-of-turn">
         <NativeSelect id="voice-end-of-turn" value={draft.end_of_turn} onChange={(event) => edit({ end_of_turn: event.target.value as Settings["end_of_turn"] })}>
@@ -192,6 +198,18 @@ export function TurnChoices({ draft }: { draft: Settings }) {
         </NativeSelect>
       </Row>
     </Group>
+  );
+}
+
+/** How long this device keeps its models loaded with nothing to do, before freeing their memory. */
+export function IdleUnloadChoice({ draft }: { draft: Settings }) {
+  const t = hostTranslator();
+  return (
+    <Row label={t("settings.advanced.idleUnload")} description={t("settings.advanced.idleUnloadHint")} htmlFor="voice-idle-unload">
+      <NativeSelect id="voice-idle-unload" value={String(draft.idle_unload_minutes)} onChange={(event) => edit({ idle_unload_minutes: Number(event.target.value) })}>
+        {IDLE_UNLOAD_MINUTES.map((minutes: number) => <option key={minutes} value={minutes}>{t("settings.advanced.minutes", { n: minutes })}</option>)}
+      </NativeSelect>
+    </Row>
   );
 }
 
