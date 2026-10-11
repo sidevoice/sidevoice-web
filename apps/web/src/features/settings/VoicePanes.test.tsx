@@ -1,3 +1,4 @@
+import { TooltipProvider } from "../../components/ui/Tooltip";
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SlotPane, TurnChoices } from "./VoiceSettings";
@@ -41,7 +42,7 @@ function renderPane(pane: "voice" | "keys", facts: Record<string, unknown> = {})
   const actions = { editVoice: vi.fn(), saveProviderKey: vi.fn().mockResolvedValue(undefined), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(), tryVoiceSettings: vi.fn().mockResolvedValue({}), cancelVoiceTry: vi.fn() };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
-  render(<RoomStoreContext.Provider value={store}>{pane === "voice" ? <VoicePanes /> : <ProviderKeys />}</RoomStoreContext.Provider>);
+  render(<RoomStoreContext.Provider value={store}><TooltipProvider>{pane === "voice" ? <VoicePanes /> : <ProviderKeys />}</TooltipProvider></RoomStoreContext.Provider>);
   for (const section of document.querySelectorAll("section")) section.hidden = false;
   return { store, actions };
 }

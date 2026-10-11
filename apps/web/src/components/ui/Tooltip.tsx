@@ -21,7 +21,10 @@ interface TooltipProps {
 export function Tooltip({ content, children }: TooltipProps) {
   const container = useOverlayPortal();
   if (!content) return children;
+  // A provider of its own, so a tooltip drawn outside the app's (a pattern page, a pane on its own) never throws; each
+  // tooltip keeps its own delay.
   return (
+    <TooltipPrimitive.Provider delayDuration={350}>
     <TooltipPrimitive.Root delayDuration={350}>
       <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal container={container ?? undefined}>
@@ -31,5 +34,6 @@ export function Tooltip({ content, children }: TooltipProps) {
         </TooltipPrimitive.Content>
       </TooltipPrimitive.Portal>
     </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
   );
 }
