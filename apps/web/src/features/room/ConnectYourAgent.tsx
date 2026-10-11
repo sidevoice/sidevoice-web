@@ -1,4 +1,4 @@
-import { Snippet } from "../../components/ui/Snippet";
+import { Quote } from "../../components/ui/Snippet";
 import { callTranslator } from "../call/call-i18n";
 import "./connect-agent.css";
 
@@ -12,7 +12,7 @@ export function ConnectYourAgent({ why = false, titleAs: Title = "p" }: { why?: 
     <div className="connect-agent">
       <Title className="connect-agent-title">{t("sidebar.newTitle")}</Title>
       <p className="connect-agent-body">{t(why ? "sidebar.newBody" : "connect.body")}</p>
-      <Snippet text={t("sidebar.newPhrase")} label={t("sidebar.newCopy")} />
+      <Quote text={t("sidebar.newPhrase")} label={t("sidebar.newCopy")} />
     </div>
   );
 }

@@ -52,7 +52,9 @@ const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.pa
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
   const store = room();
   expect(title()).toHaveTextContent("Connect to your machine");
-  expect(document.querySelector("#wizard .setup-command code")).toHaveTextContent("npx sidevoice@latest install");
+  // Each command a Snippet: monospace, with its copy button.
+  expect([...document.querySelectorAll("#wizard .ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
+  expect(screen.getByRole("button", { name: "Copy setup command" })).toHaveClass("ui-copy-button");
   // The room, its settings and its call bar stay out of reach behind the setup.
   expect(document.querySelector(".room-shell")).toHaveAttribute("hidden");
   // The code is entered right here, not in another dialog on top.
@@ -120,7 +122,8 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(title()).toHaveTextContent("You’re all set — talk to your agents");
   // What was set up, read from what the steps wrote, and what to tell an agent.
   expect(document.querySelector(".wizard-recap-list")).toHaveTextContent("Transcription");
-  expect(document.querySelector(".wizard-ready blockquote")).toHaveTextContent("voice_connect");
+  expect(document.querySelector(".wizard-ready .ui-quote blockquote")).toHaveTextContent("voice_connect");
+  expect(screen.getByRole("button", { name: "Copy the message for your agent" })).toHaveClass("ui-copy-button");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enter Sidevoice" })); });
   const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);
   expect(kept.completed_at).toBeGreaterThan(0);

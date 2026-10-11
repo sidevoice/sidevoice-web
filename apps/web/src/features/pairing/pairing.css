@@ -10,12 +10,6 @@
   border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold);
 }
 .connector-steps > li > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
-.command-block { display: grid; min-width: 0; }
-.setup-command { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); }
-.setup-command code { flex: 1; min-width: 0; overflow-x: auto; font: var(--sv-font-sm) / 1.25rem var(--sv-font-mono); white-space: nowrap; color: var(--sv-text); scrollbar-width: thin; }
-.command-note { display: flex; align-items: center; gap: var(--sv-space-1); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.command-note:not(:empty) { margin-top: var(--sv-space-1-5); }
-.command-note[data-copied] { color: var(--sv-positive); }
 /* Already one numbered step of the pairing screen's (`steps`): the two commands without numbers of their own. */
 .connector-steps[data-plain] { gap: var(--sv-space-3); }
 .connector-steps[data-plain] > li { padding-inline-start: 0; }
@@ -82,7 +76,6 @@
 @media (pointer: coarse) {
   .pair-machine .ui-button--sm:not(.ui-button--icon) { height: 44px; }
   .pair-machine .ui-infotip::after { content: ""; position: absolute; inset: -10px; }
-  .pair-machine .setup-command .ui-button::after { content: ""; position: absolute; inset: -4px; }
 }
 
 /* ----- this computer's preparation: the offer, then its progress */

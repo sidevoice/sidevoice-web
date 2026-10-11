@@ -148,7 +148,8 @@ test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", (
 test("a foreign Codex row exposes its host-provided replacement command and Copy without automatic actions", async () => {
   const replacement = ["# Replace the existing Sidevoice entry by running these Codex commands:",
     "codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"].join("\n");
-  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: { command: replacement, file: null, snippet: null } });
+  // Replacing is the connector's `manual.replace` steps for the harness.
+  const foreign = known("codex", { registration: "foreign", actionable: false, instructions: null, manual: { replace: [{ command: replacement, file: null, snippet: null }] } });
   const store = createRoomStore();
   const hostAgentAction = vi.fn(async () => {});
   const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
@@ -159,8 +160,8 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
   try {
     render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-    expect(screen.getByText("Connected to a different MCP server")).toBeInTheDocument();
-    const foreignRow = screen.getByText("Connected to a different MCP server").closest("li");
+    expect(screen.getByText("Another ‘sidevoice’ entry")).toBeInTheDocument();
+    const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li");
     expect(foreignRow).not.toBeNull();
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: "Connect" })).toBeNull();
     expect(within(foreignRow as HTMLElement).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
@@ -170,8 +171,13 @@ test("a foreign Codex row exposes its host-provided replacement command and Copy
     expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp remove sidevoice");
     expect(foreignRow as HTMLElement).toHaveTextContent("codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio");
     expect(foreignRow as HTMLElement).toHaveTextContent("after you replace the agent configuration");
-    await act(async () => { fireEvent.click(within(foreignRow as HTMLElement).getByRole("button", { name: "Copy" })); });
+    // The commands are a Snippet, line breaks kept; copying turns its button into a check and says so out of sight.
+    expect((foreignRow as HTMLElement).querySelector(".ui-snippet pre code")?.textContent).toBe(replacement);
+    const copy = within(foreignRow as HTMLElement).getByRole("button", { name: "Copy" });
+    await act(async () => { fireEvent.click(copy); });
     expect(writeText).toHaveBeenCalledWith(replacement);
+    expect(copy).toHaveAttribute("data-state", "copied");
+    expect(within(foreignRow as HTMLElement).getByText("Copied")).toHaveClass("ui-copy-live");
     expect(hostAgentAction).not.toHaveBeenCalled();
   } finally {
     if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
