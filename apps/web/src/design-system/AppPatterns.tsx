@@ -18,6 +18,7 @@ import { callTranslator } from "../features/call/call-i18n";
 import { conversationTranslator } from "../features/conversation/conversation-i18n";
 import { hostTranslator } from "../features/settings/host-i18n";
 import { ModelPrepare } from "../features/settings/ModelPrepare";
+import { NewConversation } from "../features/room/NewConversation";
 import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/connector-commands";
 
 /* The app's whole vocabulary drawn with the design system: every surface of the room, the call, the transcript, the
@@ -119,6 +120,8 @@ function Sidebar({ rail = false }: { rail?: boolean }) {
         {!rail && <p className="pt-group-label"><PlatformIcon platform="linux" size={12} />NUC del salón</p>}
         {ROWS.slice(2).map((row) => <ConversationRow key={row.id} row={row} rail={rail} />)}
       </div>
+      {/* The real button: it opens what it says to tell your agent. */}
+      <div className="pt-sidebar-foot"><NewConversation rail={rail} /></div>
     </aside>
   );
 }
@@ -529,7 +532,7 @@ export function AppPatterns() {
         <Frame><Header /></Frame>
         <Phone label="Phone"><Header phone /></Phone>
       </Pattern>
-      <Pattern title="Room · conversations" note="Grouped by machine; each row is the agent's avatar with its state dot, its title, its harness and state, and ⋯. Collapses into a rail; on a phone it drops from the header over the dimmed call.">
+      <Pattern title="Room · conversations" note="Grouped by machine; each row is the agent's avatar with its state dot, its title, its harness and state, and ⋯. Collapses into a rail; on a phone it drops from the header over the dimmed call. At its foot, New conversation (a + in the rail) says what to tell your agent.">
         <div className="pt-two pt-two--sidebar"><Frame><Sidebar /></Frame><Frame><Sidebar rail /></Frame></div>
         <Phone label="Phone · the list drops from the header"><PhonePanel /></Phone>
       </Pattern>

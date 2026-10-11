@@ -253,3 +253,5 @@
 .pt-table td { padding: var(--sv-space-2) var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .pt-stage:has(.pt-floating) .pt-stage-tags { justify-self: start; }
 .pt-stage:has(.pt-bubble--person) .pt-stage-tags { display: none; }
+.pt-sidebar-foot { display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.pt-sidebar[data-rail] .pt-sidebar-foot { width: 100%; }

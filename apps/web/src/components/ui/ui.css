@@ -240,3 +240,30 @@
   .ui-dialog-reason { flex: 1 0 100%; }
 }
 
+
+/* ----- Popover: a small panel anchored to its trigger. */
+.ui-popover { z-index: 60; display: grid; gap: var(--sv-space-3); width: min(20rem, calc(100vw - 24px)); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface-raised); color: var(--sv-text); box-shadow: var(--sv-shadow-md); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.ui-popover:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.ui-popover-title { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
+.ui-popover p { margin: 0; color: var(--sv-text-muted); }
+
+/* ----- Snippet: something to copy as it is. A message to say, quoted as the landing quotes it; a command, as a line. */
+.ui-snippet-wrap { display: grid; gap: var(--sv-space-1); min-width: 0; }
+.ui-snippet { position: relative; min-width: 0; margin: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); }
+.ui-snippet--message { display: flex; align-items: center; justify-content: center; gap: var(--sv-space-1); padding: var(--sv-space-5) 44px var(--sv-space-5) var(--sv-space-6);
+  border-color: color-mix(in srgb, var(--sv-accent) 25%, var(--sv-border)); background: linear-gradient(120deg, color-mix(in srgb, var(--sv-accent-soft) 70%, var(--sv-surface-raised)), var(--sv-surface-raised) 75%);
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--sv-accent) 55%, transparent), var(--sv-shadow-xs); text-align: center; }
+.ui-snippet--message::before, .ui-snippet--message::after { flex: none; color: var(--sv-accent-text); font: 700 1.4rem / 1 Georgia, serif; pointer-events: none; }
+.ui-snippet--message::before { content: "«"; }
+.ui-snippet--message::after { content: "»"; }
+.ui-snippet--message .ui-snippet-text { min-width: 0; margin: 0; color: var(--sv-text); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); line-height: 1.45; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.ui-snippet--command { display: flex; align-items: center; gap: var(--sv-space-2); padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); background: var(--sv-bg-sunken); }
+.ui-snippet--command .ui-snippet-text { flex: 1; min-width: 0; overflow-x: auto; font: var(--sv-font-sm) / 1.25rem var(--sv-font-mono); white-space: nowrap; color: var(--sv-text); user-select: all; -webkit-user-select: all; }
+.ui-snippet-copy { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: var(--sv-radius-sm); background: color-mix(in srgb, var(--sv-accent) 8%, transparent); color: var(--sv-accent-text); cursor: pointer; transition: background-color var(--sv-dur-fast) var(--sv-ease), border-color var(--sv-dur-fast) var(--sv-ease); }
+.ui-snippet--message .ui-snippet-copy { position: absolute; top: var(--sv-space-2); right: var(--sv-space-2); }
+@media (hover: hover) { .ui-snippet-copy:hover { background: color-mix(in srgb, var(--sv-accent) 16%, transparent); border-color: color-mix(in srgb, var(--sv-accent) 30%, transparent); } }
+.ui-snippet-copy:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.ui-snippet-copy[data-state="done"] { border-color: var(--sv-accent); background: var(--sv-accent); color: var(--sv-on-accent); }
+.ui-snippet-copy[data-state="failed"] { border-color: var(--sv-danger); color: var(--sv-danger); }
+.ui-snippet-note { min-height: 1rem; margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
+.ui-snippet-note[data-state="done"] { color: var(--sv-positive); }

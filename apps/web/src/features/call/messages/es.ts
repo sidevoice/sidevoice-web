@@ -18,6 +18,11 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "sidebar.unknownMachine": "Máquina desconocida",
   "sidebar.options": "Opciones de {title}",
   "sidebar.closeConversation": "Cerrar conversación",
+  "sidebar.new": "Nueva conversación",
+  "sidebar.newTitle": "Pide a tu agente que entre",
+  "sidebar.newBody": "Aún no se puede empezar una conversación desde aquí. En la sesión de tu agente, di:",
+  "sidebar.newPhrase": "Conéctate a Sidevoice (usa su herramienta voice_connect)",
+  "sidebar.newCopy": "Copiar el mensaje para tu agente",
 
   "state.inCall": "En llamada",
   "state.working": "Trabajando",

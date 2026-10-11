@@ -112,3 +112,18 @@
   .conversations-scrim { position: fixed; inset: 0; z-index: 30; display: block; background: var(--sv-scrim); opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease); }
   .conversations-scrim[data-open] { opacity: 1; pointer-events: auto; }
 }
+
+/* A new conversation, at the list's foot: kept in sight while the list scrolls above it. */
+.conversation-sidebar { overflow: hidden; }
+.conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
+.sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+
+/* A new conversation, at the list's foot: kept in sight while the list scrolls above it. */
+.conversation-sidebar { overflow: hidden; }
+.conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
+.sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+
+/* A new conversation, at the list's foot: kept in sight while the list scrolls above it. */
+.conversation-sidebar { overflow: hidden; }
+.conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
+.sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }

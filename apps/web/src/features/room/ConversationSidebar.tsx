@@ -12,6 +12,7 @@ import { ConversationAvatar } from "../call/ConversationAvatar";
 import { conversationState, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
+import { NewConversation } from "./NewConversation";
 import "./room.css";
 
 /** The harness a conversation runs in, and how it is reached when that matters, by their own names. */
@@ -126,6 +127,7 @@ export function ConversationSidebar() {
           })}
           {!participants.length && <p className="sidebar-empty">{t("sidebar.empty")}</p>}
         </div>
+        <div className="sidebar-foot"><NewConversation rail={rail && !narrow} /></div>
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>
