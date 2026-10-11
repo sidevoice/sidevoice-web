@@ -131,11 +131,10 @@ export function ConversationSidebar() {
             );
           })}
           {!participants.length && <p className="sidebar-empty">{t("sidebar.empty")}</p>}
-          {/* With Settings at the foot, a new conversation follows the last one. */}
-          {gearHere && <div className="sidebar-new"><NewConversation rail={rail} /></div>}
+          {/* A new conversation follows the last one, in either layout. */}
+          <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>
         </div>
-        {gearHere ? <div className="sidebar-foot"><SidebarSettings rail={rail} /></div>
-          : <div className="sidebar-foot"><NewConversation rail={rail && !narrow} /></div>}
+        {gearHere && <div className="sidebar-foot"><SidebarSettings rail={rail} /></div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>

@@ -121,7 +121,7 @@ function Sidebar({ rail = false }: { rail?: boolean }) {
         {ROWS.slice(2).map((row) => <ConversationRow key={row.id} row={row} rail={rail} />)}
       </div>
       {/* The real button: it opens what it says to tell your agent. */}
-      <div className="pt-sidebar-foot"><NewConversation rail={rail} /></div>
+      <div className="pt-sidebar-new"><NewConversation rail={rail} /></div>
     </aside>
   );
 }
@@ -532,7 +532,7 @@ export function AppPatterns() {
         <Frame><Header /></Frame>
         <Phone label="Phone"><Header phone /></Phone>
       </Pattern>
-      <Pattern title="Room · conversations" note="Grouped by machine; each row is the agent's avatar with its state dot, its title, its harness and state, and ⋯. Collapses into a rail; on a phone it drops from the header over the dimmed call. At its foot, New conversation (a + in the rail) says what to tell your agent.">
+      <Pattern title="Room · conversations" note="Grouped by machine; each row is the agent's avatar with its state dot, its title, its harness and state, and ⋯. Collapses into a rail; on a phone it drops from the header over the dimmed call. After the last conversation, New conversation (a + in the rail) says what to tell your agent.">
         <div className="pt-two pt-two--sidebar"><Frame><Sidebar /></Frame><Frame><Sidebar rail /></Frame></div>
         <Phone label="Phone · the list drops from the header"><PhonePanel /></Phone>
       </Pattern>

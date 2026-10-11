@@ -90,9 +90,10 @@ test("Settings at the conversations' foot (variant B): it opens Settings through
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
 
-test("Settings in the header's corner (variant A, the default): the foot holds New conversation", () => {
+test("Settings in the header's corner (variant A, the default): no foot, and a new conversation follows the list", () => {
   room();
   expect(header()).toHaveAttribute("data-gear", "top");
-  expect(document.querySelector(".sidebar-foot")).toHaveTextContent("New conversation");
+  expect(document.querySelector(".sidebar-foot")).toBeNull();
+  expect(document.querySelector(".sidebar-body .sidebar-new")).toHaveTextContent("New conversation");
   expect(document.querySelector(".sidebar-settings")).toBeNull();
 });
