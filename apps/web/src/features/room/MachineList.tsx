@@ -104,11 +104,14 @@ export function MachineList() {
   const localMachine = machines.find((machine) => machine.local) ?? null;
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
 
-  // Asked for a machine's agents (an agent waiting): that machine, open at them.
+  // Asked for a machine's agents (an agent waiting): that machine, open at them, once per request. `machines` is a new
+  // list after every change to the store, this patch included: answered once, the two cannot feed each other.
+  const answered = useRef<number | null>(null);
   useEffect(() => {
-    if (!agentRequest?.fp) return;
+    if (!agentRequest?.fp || answered.current === agentRequest.id) return;
     const machine = machines.find((entry) => entry.pairingId === agentRequest.fp);
     if (!machine) return;
+    answered.current = agentRequest.id;
     setSelected(machine.id);setExpanded(machine.id);
     if (layout === "c") store?.patch({ machinesView: { machine: machine.id, part: "agents" } });
   }, [agentRequest, machines]);

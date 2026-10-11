@@ -578,3 +578,14 @@ test("layout C: the machine and its parts are navigation; the part chosen shows 
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(screen.queryByText("Checking this machine for agents…")).toBeNull();
 });
+
+test("asked for a machine's agents in layout C, Machines answers once, without feeding the store back into itself", () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ machines: "c" }));
+  actions();
+  const store = room([local, paired()], { remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  const patch = vi.spyOn(store, "patch");
+  act(() => store.patch({ settingsAgentRequest: { fp: "fp-nuc", id: 7 } }));
+  // The request, then the machine chosen; nothing after (it used to go on until React stopped it).
+  expect(patch.mock.calls.length).toBe(2);
+  expect(store.getState().facts.machinesView.machine).not.toBeNull();
+});
