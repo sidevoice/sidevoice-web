@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type FormEvent } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
 import { Badge } from "../../components/ui/Badge";
@@ -353,18 +353,11 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const [pairingFor, setPairingFor] = useState<string | null>(null);
   const [pairingError, setPairingError] = useState(false);
   const [deviceNote, setDeviceNote] = useState("");
-  const [roomUrl, setRoomUrl] = useState("");
-  const [roomCode, setRoomCode] = useState("");
-  const [roomBusy, setRoomBusy] = useState(false);
-  const [roomPaired, setRoomPaired] = useState(false);
-  const [roomError, setRoomError] = useState(false);
   const deviceEpoch = useRef(0);
   const pairingEpoch = useRef(0);
-  const roomEpoch = useRef(0);
   const bridge = localHostBridge();
   const local = !!machine.local;
   const canPairDevices = local && typeof bridge?.pairingCode === "function";
-  const canPairRoom = local && typeof bridge?.pairRoom === "function";
   const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
@@ -384,11 +377,10 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   useEffect(() => {
     deviceEpoch.current++;
     pairingEpoch.current++;
-    roomEpoch.current++;
     setLoading(false);
     setConfirmId(null);
     setDevices([]);setDevicesFor(null);setPairing(null);setPairingFor(null);setPairingError(false);
-    setDeviceNote("");setRoomUrl("");setRoomCode("");setRoomBusy(false);setRoomPaired(false);setRoomError(false);
+    setDeviceNote("");
     if (!usable) {
       setError(true);
       return;
@@ -416,15 +408,6 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
     setPairingError(false);setPairing(null);setPairingFor(null);
     try { const next = await bridge.pairingCode();if (pairingEpoch.current === epoch && usable) {setPairing(next);setPairingFor(pairingKey)} }
     catch { if (pairingEpoch.current === epoch && usable) setPairingError(true); }
-  }
-  async function connectRoom(event: FormEvent) {
-    event.preventDefault();
-    if (!usable || !bridge?.pairRoom || !roomUrl.trim() || !roomCode.trim()) return;
-    const epoch = ++roomEpoch.current;
-    setRoomBusy(true);setRoomError(false);setRoomPaired(false);
-    try { await bridge.pairRoom(roomUrl.trim(), roomCode.trim());if (roomEpoch.current === epoch && usable){setRoomPaired(true);setRoomCode("");setPairing(null)} }
-    catch { if (roomEpoch.current === epoch && usable) setRoomError(true); }
-    finally { if (roomEpoch.current === epoch) setRoomBusy(false); }
   }
   return (
     <div className="host-devices-panel">
@@ -470,17 +453,9 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           <output className="issued-pairing-code" aria-label={t("hosts.devices.codeSelect")}>{visiblePairing.code}</output>
           <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(visiblePairing.expires_in / 60) })}</p>
         </div>}
-        {visiblePairing?.reach === "local-only" && <>
-          {canPairRoom && <form className="room-pair-form" onSubmit={connectRoom}>
-            <h5>{t("hosts.devices.roomTitle")}</h5>
-            <p>{t("hosts.devices.roomInstructions")}</p>
-            <label>{t("hosts.devices.roomUrl")}<input value={roomUrl} autoComplete="url" onChange={(event) => setRoomUrl(event.currentTarget.value)} /></label>
-            <label>{t("hosts.devices.roomCode")}<input value={roomCode} autoComplete="off" onChange={(event) => setRoomCode(event.currentTarget.value)} /></label>
-            <Button type="submit" variant="primary" disabled={!usable || roomBusy || !roomUrl.trim() || !roomCode.trim()}>{t("hosts.devices.pairRoom")}</Button>
-            {roomPaired && <p role="status">{t("hosts.devices.roomPaired")}</p>}
-            {roomError && <p role="alert">{t("hosts.devices.roomFailed")}</p>}
-          </form>}
-        </>}
+        {/* "Connect this machine to a room" (a local-only machine joined to a room by its address and the room's pairing
+            code, through the desktop bridge's `pairRoom`) was here: taken out of Settings until the relay ships as a feature.
+            Machines reached through a room keep working; only this form went (the hosts.devices.room* messages remain). */}
       </section>}
     </div>
   );

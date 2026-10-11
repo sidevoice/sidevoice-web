@@ -50,7 +50,7 @@
 
 /* This computer's devices, and a code to pair another: made on a button, then shown to be selected whole. */
 .host-devices-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); }
-.host-devices-head h4, .pair-another-device h4, .room-pair-form h5 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
+.host-devices-head h4, .pair-another-device h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
 .host-device-list { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); }
 .host-device-list:empty { display: none; }
 .host-device-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); flex-wrap: wrap; min-height: 56px; padding: var(--sv-space-3) var(--sv-space-5); }
@@ -58,11 +58,9 @@
 .host-device-copy { display: grid; gap: 2px; min-width: 0; }
 .host-device-copy .muted { font-size: var(--sv-font-sm); }
 .device-revoke-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
-.pair-another-device, .room-pair-form { display: grid; justify-items: start; gap: var(--sv-space-3); padding-top: var(--sv-space-4); border-top: 1px solid var(--sv-border); }
+.pair-another-device { display: grid; justify-items: start; gap: var(--sv-space-3); padding-top: var(--sv-space-4); border-top: 1px solid var(--sv-border); }
 .local-pairing-code { display: grid; justify-items: start; gap: var(--sv-space-2); }
 .issued-pairing-code { display: block; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font: 600 1.375rem / 1.75rem var(--sv-font-mono); letter-spacing: .08em; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
-.room-pair-form label { display: grid; gap: var(--sv-space-1-5); width: 100%; font-size: var(--sv-font-sm); font-weight: 600; }
-.room-pair-form input { height: var(--sv-control-md); padding: 0 var(--sv-space-3); border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-md); background: var(--sv-input-bg); color: var(--sv-text); font: var(--sv-weight-regular) var(--sv-font-md) var(--sv-font-sans); }
 .local-install-entry--machines { margin-top: var(--sv-space-2); }
 
 @media (max-width: 640px) {

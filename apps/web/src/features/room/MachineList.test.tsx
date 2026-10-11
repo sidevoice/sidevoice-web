@@ -295,7 +295,7 @@ test("stopping the local host requires confirmation and Cancel leaves it running
   expect(stop).toHaveBeenCalledOnce();
 });
 
-test("Devices shows the local code and pairs a local-only host with a room", async () => {
+test("Devices shows the local code; joining a local-only machine to a room is not in Settings for now", async () => {
   const pairingCode = vi.fn().mockResolvedValue({ code: "SV1.local", expires_in: 600, reach: "local-only" });
   const pairRoom = vi.fn().mockResolvedValue({ ok: true });
   setBridge({ pairingCode, pairRoom });
@@ -310,10 +310,9 @@ test("Devices shows the local code and pairs a local-only host with a room", asy
   expect(pairingCode).toHaveBeenCalledOnce();
   expect(screen.getByText("SV1.local")).toBeInTheDocument();
   expect(screen.getByText(/only be reached from this computer/i)).toBeInTheDocument();
-  fireEvent.change(screen.getByRole("textbox", { name: "Room address" }), { target: { value: "https://room.example" } });
-  fireEvent.change(screen.getByRole("textbox", { name: "Room pairing code" }), { target: { value: "ROOM-123" } });
-  await act(async () => { fireEvent.submit(screen.getByRole("textbox", { name: "Room pairing code" }).closest("form")!); });
-  expect(pairRoom).toHaveBeenCalledWith("https://room.example", "ROOM-123");
+  // Until the relay ships, no form asks for a room here.
+  expect(screen.queryByRole("textbox", { name: "Room address" })).toBeNull();
+  expect(pairRoom).not.toHaveBeenCalled();
 });
 
 test.each(["not-installed", "service-failed", "stopped-by-person"] as const)(
@@ -403,7 +402,6 @@ test("Devices clears cached contents on loss and refreshes them when native reac
   await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
   await act(async () => { screen.getByRole("button", { name: "Create pairing code" }).click(); });
   expect(screen.getByText("SV1.initial")).toBeInTheDocument();
-  expect(screen.getByRole("textbox", { name: "Room address" })).toBeInTheDocument();
   await act(async () => { screen.getByRole("button", { name: "Revoke Phone" }).click(); });
   expect(screen.getByRole("group", { name: "Revoke Phone" })).toBeInTheDocument();
 
