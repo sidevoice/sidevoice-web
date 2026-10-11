@@ -12,7 +12,7 @@ export function ConversationAvatar({ row }: { row: ParticipantView }) {
   const state = conversationState(row, inCall);
   return (
     <span className="conversation-avatar" data-state={state}>
-      <CharacterAvatar spec={avatarFor(row.threadId)} mood={smallAvatarMood(row, inCall)} size="small" />
+      <CharacterAvatar spec={avatarFor(row.threadId)} mood={smallAvatarMood(row)} size="small" unread={row.unread > 0} />
       <span className="state-dot" data-state={state} aria-hidden="true" />
     </span>
   );

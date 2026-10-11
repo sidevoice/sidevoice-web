@@ -38,7 +38,7 @@ function ConversationTrigger({ t }: { t: CallTranslate }) {
   const where = [stage.row?.machine, harness].filter(Boolean).join(" · ");
   return (
     <button type="button" className="conversation-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={showConversations}>
-      {stage.threadId && <CharacterAvatar className="trigger-avatar" spec={avatarFor(stage.threadId)} mood={stage.mood} size="small" />}
+      {stage.threadId && <CharacterAvatar className="trigger-avatar" spec={avatarFor(stage.threadId)} mood={stage.mood} size="small" unread={stage.unread > 0} />}
       <span className="trigger-copy">
         <strong className="trigger-title" translate="no">{stage.threadId ? stage.title : t("header.noConversation")}</strong>
         <span className="trigger-sub">

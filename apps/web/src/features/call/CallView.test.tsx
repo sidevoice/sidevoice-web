@@ -53,6 +53,7 @@ const escape = () => act(() => { fireEvent.keyDown(document, { key: "Escape" });
 
 test("the stage plays what the agent says as a karaoke bubble, the chunk before dim above it", () => {
   const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
   const bubble = document.querySelector(".stage-bubble")!;
@@ -60,36 +61,60 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   expect(bubble.querySelector(".stage-bubble-previous")?.textContent).toBe("…I'll start with the login and");
   expect(bubble.querySelector(".karaoke-played")?.textContent).toBe("then look at the cart");
   expect(bubble.querySelector(".karaoke-upcoming")?.textContent).toBe(" tests.");
-  // Each spoken word is a beat of the mouth.
-  expect(stageAgent()).toHaveAttribute("data-beat");
+  // Each spoken word is a beat of the mouth, "a" and "b" in turn.
+  expect(stageAgent().getAttribute("data-beat")).toMatch(/^[ab]$/);
+  expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Between turns the bubble goes, and what the agent is doing stands in its place.
   patch(store, { botLive: false, karaokeState: null, harness: { "t-login": true } });
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-visible");
   expect(document.querySelector(".stage-activity")).toHaveTextContent("Working…");
-  expect(stageAgent()).toHaveAttribute("data-mood", "working");
-  expect(stageAgent().querySelector(".av-thinking")).toBeInTheDocument();
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
+  // It works at the desk that slid in, a tool in hand, the cogs turning.
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
+  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
+  expect(stageAgent()).toHaveAttribute("data-desk");
+  expect(stageAgent().getAttribute("data-work")).toMatch(/^(crank|hammer|read|type)$/);
+  expect(stageAgent().querySelector(".cogs")).toBeInTheDocument();
+  expect(stageAgent()).not.toHaveAttribute("data-idle");
 
+  // With nothing to do and its turn over, it rests: waiting for you is idle now.
   patch(store, { harness: { "t-login": false } });
-  expect(stageAgent()).toHaveAttribute("data-mood", "waiting");
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
+  expect(stageAgent()).not.toHaveAttribute("data-work");
+  expect(stageAgent()).not.toHaveAttribute("data-desk");
+  // Resting goes in steps, quiet first, then its pastimes.
+  expect(stageAgent()).toHaveAttribute("data-idle", "quiet");
   expect(document.querySelector(".stage-activity")).toBeNull();
 
   // Out of the call the agent is idle, and so is the person.
   patch(store, { ws: null });
-  expect(stageAgent()).toHaveAttribute("data-mood", "idle");
-  expect(document.querySelector(".stage-pip .sv-avatar")).toHaveAttribute("data-mood", "idle");
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
+  expect(document.querySelector(".stage-pip .sv-avatar")).toHaveAttribute("data-avatar-state", "idle");
 });
 
 test("the person is the picture-in-picture, with a bubble of their own while they speak", async () => {
   const store = room();
   const pip = () => document.querySelector(".stage-pip .sv-avatar")!;
-  expect(pip()).toHaveAttribute("data-mood", "present");
+  expect(pip()).toHaveAttribute("data-avatar-state", "present");
+  // The person is a bicho too: their own, awake and quiet while present.
+  expect(pip()).toHaveAttribute("data-mood", "idle");
+  expect(pip()).toHaveAttribute("data-idle", "quiet");
+  expect(pip()).toHaveAttribute("data-mouth", "level");
   expect(document.querySelector(".pip-bubble")).toBeNull();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
-  expect(pip()).toHaveAttribute("data-mood", "speaking");
+  expect(pip()).toHaveAttribute("data-avatar-state", "speaking");
   expect(document.querySelector(".pip-bubble")).toHaveTextContent("Split it into two commits.");
-  // The agent waits for the person meanwhile, looking toward them.
-  expect(stageAgent()).toHaveAttribute("data-mood", "waiting");
+  // The agent listens to the person meanwhile, and goes on listening while it is transcribed. It starts with a startle
+  // out of its rest (data-enter, a moment), dropping what it had in hand.
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
+  expect(stageAgent()).toHaveAttribute("data-mood", "listening");
+  expect(stageAgent()).toHaveAttribute("data-enter", "idle");
+  expect(stageAgent()).toHaveAttribute("data-idle", "quiet");
+  await waitFor(() => expect(stageAgent()).not.toHaveAttribute("data-enter"));
+  expect(stageAgent()).not.toHaveAttribute("data-idle");
+  patch(store, { userLive: false, pendingPhase: "transcribing" });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   await act(async () => { screen.getByRole("button", { name: "Cancel sending" }).click(); });
   expect(window.sidevoiceActions?.cancelInput).toHaveBeenCalledOnce();
 });
@@ -97,14 +122,65 @@ test("the person is the picture-in-picture, with a bubble of their own while the
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
   room();
   const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");
-  const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-mood");
-  expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["in-call", "waiting"]);
+  const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-avatar-state");
+  // The dot says whether it hears you; the bicho is offline, working or resting.
+  expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["in-call", "idle"]);
   expect([dot("Migrate the payments API"), mood("Migrate the payments API")]).toEqual(["working", "working"]);
-  expect([dot("Review the nightly backups"), mood("Review the nightly backups")]).toEqual(["waiting", "waiting"]);
-  expect([dot("Plan the week"), mood("Plan the week")]).toEqual(["idle", "idle"]);
+  expect([dot("Review the nightly backups"), mood("Review the nightly backups")]).toEqual(["waiting", "idle"]);
+  expect([dot("Plan the week"), mood("Plan the week")]).toEqual(["idle", "offline"]);
+  expect(rowOf("Plan the week").querySelector(".sv-avatar")).toHaveAttribute("data-offline");
+  // Offline sleeps: no pastimes. A resting one goes in steps.
+  expect(rowOf("Plan the week").querySelector(".sv-avatar")).not.toHaveAttribute("data-idle");
+  expect(rowOf("Review the nightly backups").querySelector(".sv-avatar")).toHaveAttribute("data-idle", "quiet");
+  expect(rowOf("Plan the week").querySelector(".sv-avatar")).toHaveAttribute("data-size", "sidebar");
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
+});
+
+test("an offline conversation on the stage is a wanted poster, in the interface's language", () => {
+  const store = room({ viewedThread: "t-week" });
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "offline");
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "offline");
+  expect(stageAgent()).toHaveAttribute("data-mood", "idle");
+  expect(stageAgent()).toHaveAccessibleName("Plan the week · Offline");
+  const poster = document.querySelector(".wanted")!;
+  expect(poster).toHaveAttribute("aria-hidden", "true");
+  expect(poster).toHaveTextContent("WANTED");
+  expect(poster).toHaveTextContent("ONLINE OR PAUSED");
+  expect(poster).toHaveTextContent("IF SEEN, PLEASE TELL ITS HUMAN.");
+  expect(poster.querySelector(".w-bounty")?.textContent).toMatch(/^\d{3},000,000-$/);
+  // Its portrait is the same bicho, laughing.
+  expect(poster.querySelector(".w-photo .sv-avatar")).toHaveAttribute("data-mood", "speaking");
+  expect(document.querySelector(".stage-desk")).toBeInTheDocument();
+  // Back within reach, the poster goes.
+  patch(store, { viewedThread: "t-login" });
+  expect(document.querySelector(".wanted")).toBeNull();
+});
+
+test("the poster speaks Spanish on a device set to it", () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  room({ viewedThread: "t-week" });
+  expect(document.querySelector(".wanted")).toHaveTextContent("VIVO O EN PAUSA");
+  expect(document.querySelector(".wanted .w-bounty")?.textContent).toMatch(/^\d{3}\.000\.000-$/);
+  expect(stageAgent()).toHaveAccessibleName("Plan the week · Desconectada");
+});
+
+test("a conversation that is holding does not react to the person talking", () => {
+  room({
+    people: [person("t-login", "Fix the slow login", { reach: { state: "holding" } })],
+    userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "t-login" }, pendingPhase: "listening",
+  });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
+});
+
+test("replies this browser has not seen put the unread cue on that conversation's avatar", () => {
+  room({ history: [
+    { segment: "h-2", thread: "t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" },
+    { segment: "p-1", thread: "t-backup", role: "assistant", text: "The backups ran.", name: "Review the nightly backups", time: 2, session: "s1", seq: 4 },
+  ] });
+  expect(rowOf("Review the nightly backups").querySelector(".sv-avatar")).toHaveAttribute("data-unread");
+  expect(rowOf("Migrate the payments API").querySelector(".sv-avatar")).not.toHaveAttribute("data-unread");
 });
 
 test("a phone's header avatars bring the conversations down, and picking one switches the call to it", async () => {

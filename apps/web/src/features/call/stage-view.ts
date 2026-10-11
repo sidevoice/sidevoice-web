@@ -1,5 +1,5 @@
 import { useRoomStore, type RoomViewState } from "../../state/room-store";
-import type { ParticipantView } from "../../state/room-types";
+import type { ConversationView, ParticipantView } from "../../state/room-types";
 import type { AvatarMood } from "../avatar/avatar-spec";
 import { canHear, stageMood } from "./conversation-state";
 
@@ -20,23 +20,28 @@ export interface StageConversation {
   canHear: boolean;
   speaking: boolean;
   working: boolean;
+  /** Its replies this browser has not seen yet (ParticipantView.unread); 0 when it is not listed. */
+  unread: number;
   mood: AvatarMood;
 }
 
 type StageFacts = Pick<RoomViewState, "participants" | "title"> & {
   viewed: string | null; selected: string | null; inCall: boolean; botLive: boolean; working: boolean;
+  /** The viewed conversation's open turn of the person's (ConversationView.pendingPhase). */
+  pendingPhase?: ConversationView["pendingPhase"];
 };
 
-export function stageConversation({ participants, title, viewed, selected, inCall, botLive, working }: StageFacts): StageConversation {
+export function stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase }: StageFacts): StageConversation {
   const row = viewed ? participants.find((participant) => participant.threadId === viewed) ?? null : null;
   const isTarget = !!viewed && viewed === selected;
   // A conversation the room has bound to the call but not listed yet hears the call: it was just chosen for it.
   const hears = row ? canHear(row) : isTarget;
   const speaking = isTarget && botLive;
   const busy = isTarget && working;
+  const personSpeaking = pendingPhase === "listening" || pendingPhase === "transcribing";
   return {
-    threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy,
-    mood: stageMood({ inCall, isTarget, canHear: hears, speaking, working: busy }),
+    threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: row?.unread ?? 0,
+    mood: stageMood({ inCall, isTarget, canHear: hears, reach: row?.reach ?? null, speaking, personSpeaking, working: busy }),
   };
 }
 
@@ -48,5 +53,6 @@ export function useStageConversation(): StageConversation {
   const inCall = useRoomStore(selectInCall);
   const botLive = useRoomStore((state) => state.facts.botLive);
   const working = useRoomStore((state) => state.session.working);
-  return stageConversation({ participants, title, viewed, selected, inCall, botLive, working });
+  const pendingPhase = useRoomStore((state) => state.conversation.pendingPhase);
+  return stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase });
 }
