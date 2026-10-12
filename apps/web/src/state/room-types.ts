@@ -113,9 +113,10 @@ export interface DetectedAgent {
   /** What the connector can do itself for this agent: add Sidevoice (`connect`, its CLI found — or Cursor, whose file
    *  it edits), rewrite an entry an older Sidevoice made (`update`), take it out (`disconnect`). */
   can?: { connect?: boolean; update?: boolean; disconnect?: boolean };
-  /** How to do each by hand, as the connector writes it for this harness: connecting, disconnecting, and replacing
-   *  another "sidevoice" entry (remove it, then connect) — in order. */
-  manual?: { connect?: AgentManualStep[]; disconnect?: AgentManualStep[]; replace?: AgentManualStep[] } | null;
+  /** How to do each by hand, as the connector writes it for this harness: connecting; updating an entry an older
+   *  Sidevoice made (remove it, then add ours); disconnecting; and replacing another "sidevoice" entry (remove it, then
+   *  connect) — in order. */
+  manual?: { connect?: AgentManualStep[]; update?: AgentManualStep[]; disconnect?: AgentManualStep[]; replace?: AgentManualStep[] } | null;
   /** How to take Sidevoice out of the agent by hand (the connector's, as `instructions` is for adding it). */
   removal?: { command?: string; snippet?: string; file?: string | null } | null;
 }

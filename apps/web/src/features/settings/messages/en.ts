@@ -278,6 +278,7 @@ export const en = {
   "agents.hint.byHand": "Shows the command or configuration to add Sidevoice to {agent} yourself.",
   "agents.hint.replaceByHand": "Shows how to replace {agent}’s other Sidevoice entry yourself.",
   "agents.hint.removeByHand": "Shows how to remove Sidevoice from {agent} yourself.",
+  "agents.hint.updateByHand": "Shows how to replace the entry an older Sidevoice added to {agent} yourself: remove it, then add it again.",
   "agents.manual.foreignWaiting": "Sidevoice will check again automatically after you replace the agent configuration.",
   "agents.manual.none": "Instructions are not available.",
   "agents.other.detail": "Use this command or add the JSON configuration to your agent.",

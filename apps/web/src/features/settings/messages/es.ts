@@ -280,6 +280,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "agents.hint.byHand": "Muestra el comando o la configuración para añadir Sidevoice a {agent} tú mismo.",
   "agents.hint.replaceByHand": "Muestra cómo sustituir tú mismo la otra entrada de Sidevoice en {agent}.",
   "agents.hint.removeByHand": "Muestra cómo quitar Sidevoice de {agent} tú mismo.",
+  "agents.hint.updateByHand": "Muestra cómo sustituir tú mismo la entrada que añadió un Sidevoice anterior en {agent}: quitarla y volver a añadirla.",
   "agents.manual.foreignWaiting": "Sidevoice volverá a comprobarlo automáticamente cuando reemplaces la configuración del agente.",
   "agents.manual.none": "No hay instrucciones disponibles.",
   "agents.other.detail": "Ejecuta este comando o añade el JSON a la configuración de tu agente.",

@@ -39,12 +39,15 @@ function useRelativeTime(value: string | number | null | undefined): string {
  *  follows what was done. */
 /** What doing it by hand means for an agent as it stands: connecting it, taking Sidevoice out, or replacing another
  *  "sidevoice" entry — the connector's steps for its harness. */
-type ManualKind = "connect" | "disconnect" | "replace";
+type ManualKind = "connect" | "update" | "disconnect" | "replace";
 function manualKind(agent: DetectedAgent): ManualKind {
-  return agent.registration === "connected" ? "disconnect" : agent.registration === "foreign" ? "replace" : "connect";
+  return agent.registration === "connected" ? "disconnect" : agent.registration === "foreign" ? "replace"
+    : agent.registration === "outdated" ? "update" : "connect";
 }
 function manualSteps(agent: DetectedAgent, kind: ManualKind): AgentManualStep[] {
-  const steps = agent.manual?.[kind] ?? (kind === "connect" && agent.instructions ? [agent.instructions] : kind === "disconnect" && agent.removal ? [agent.removal] : []);
+  // An update's steps where the connector gives them; else a replacement's (remove, then add), else adding.
+  const steps = agent.manual?.[kind] ?? (kind === "update" ? agent.manual?.replace ?? agent.manual?.connect : undefined)
+    ?? ((kind === "connect" || kind === "update") && agent.instructions ? [agent.instructions] : kind === "disconnect" && agent.removal ? [agent.removal] : []);
   return steps.filter((step) => step.command?.trim() || step.snippet?.trim());
 }
 
@@ -67,7 +70,7 @@ function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; 
           {step.command?.trim() && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><Snippet text={step.command} /></>}
           {step.snippet?.trim() && <><p className="host-agent-howto-label">{step.file ? t("agents.manual.file", { file: step.file }) : t("agents.manual.snippet")}</p><Snippet text={step.snippet} /></>}
         </li>)}</ol>
-        <p className="muted" role="status">{t(kind === "disconnect" ? "agents.manual.removeWaiting" : kind === "replace" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
+        <p className="muted" role="status">{t(kind === "disconnect" ? "agents.manual.removeWaiting" : kind === "replace" || kind === "update" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>
         <Button variant="ghost" size="sm" onClick={onClose}>{t("agents.close")}</Button>
       </>}
     </div>
@@ -127,7 +130,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const action = useRef<HTMLButtonElement>(null);
   const cancelConfirm = () => { setConfirming(false); requestAnimationFrame(() => action.current?.focus()); };
   // The hints say what each button does: Sidevoice doing it, or the person.
-  const handHint = t(connected ? "agents.hint.removeByHand" : agent.registration === "foreign" ? "agents.hint.replaceByHand" : "agents.hint.byHand", { agent: agent.label });
+  const handHint = t(connected ? "agents.hint.removeByHand" : agent.registration === "foreign" ? "agents.hint.replaceByHand" : agent.registration === "outdated" ? "agents.hint.updateByHand" : "agents.hint.byHand", { agent: agent.label });
   return (
     <li className="host-agent-row" data-registration={agent.registration} data-open={open || undefined}>
       <div className="host-agent-main">
