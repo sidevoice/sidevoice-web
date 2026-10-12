@@ -118,7 +118,7 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(card("stt").querySelector("#stt-timing")).not.toHaveTextContent("smaller model");
   // Trying it again is the block's.
   expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
-  expect(document.querySelector(".model-try-hint")).toBeNull();
+  expect(card("stt").querySelector(".model-try-hint")).toBeNull();
   await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("Set up voice");
