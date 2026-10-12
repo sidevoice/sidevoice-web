@@ -1,5 +1,7 @@
-/* The call controls card (CallCard.tsx). Its window is transparent and exactly the card's size plus a margin for
- * the shadow; nothing here styles anything else. Dark by default, light with the system. */
+/* The call controls card (CallCard.tsx): today's card, and the panels every value of the variant `floating-card`
+ * shares (the options' own look is floating-card.css). Its window is transparent and exactly the card's size plus a
+ * margin for the shadow; nothing here styles anything else. Today's card is dark by default, light with the system: its
+ * colours are its own, never the theme tokens' that the options wear. */
 /* The brand's typeface, bundled with its licence (public/fonts/OFL.txt). */
 @font-face { font-family: "DM Sans"; src: url("/voice/fonts/DMSans-Variable-latin.woff2") format("woff2"); font-weight: 100 1000; font-display: swap; }
 :root { color-scheme: light dark; }
@@ -9,7 +11,7 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 #root { padding: 12px; }
 
 .call-card {
-  --fg: var(--sv-text); --mu: var(--sv-muted); --btn: rgb(255 255 255 / 9%); --btn-hover: rgb(255 255 255 / 16%);
+  --fg: #e8edf1; --mu: var(--sv-muted); --btn: rgb(255 255 255 / 9%); --btn-hover: rgb(255 255 255 / 16%);
   --line: rgb(255 255 255 / 9%); --accent: var(--sv-primary); --accent-bg: var(--sv-primary-muted);
   --avatar: #4a2f6b; --muted-bg: #f9dedc; --muted-fg: #601410; --end: #dc362e; --end-hover: #ef443b; --cross: #ff8a80;
   box-sizing: border-box; width: 320px; padding: 10px 12px; border-radius: 16px; color: var(--fg);
@@ -24,10 +26,10 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
   }
 }
 
-.call-card button { font: inherit; color: inherit; border: 0; background: none; padding: 0; margin: 0; cursor: pointer; display: grid; place-items: center; }
-.call-card button:disabled { opacity: .35; cursor: default; }
+:is(.call-card, .fc) button { font: inherit; color: inherit; border: 0; background: none; padding: 0; margin: 0; cursor: pointer; display: grid; place-items: center; }
+:is(.call-card, .fc) button:disabled { opacity: .35; cursor: default; }
 .call-card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.call-card svg { display: block; }
+:is(.call-card, .fc) svg { display: block; }
 
 /* At rest: the agent, who and where, your wave. */
 .card-row { display: flex; align-items: center; gap: 10px; }
@@ -77,25 +79,25 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 .card-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 0 6px; }
 .card-mic { display: inline-flex; align-items: center; height: 30px; border-radius: 15px; background: var(--btn); }
 .card-mic[data-muted] { background: var(--muted-bg); color: var(--muted-fg); }
-.call-card .card-devices { width: 20px; height: 30px; border-radius: 15px 0 0 15px; color: var(--mu); border-right: 1px solid var(--line); }
+:is(.call-card, .fc) .card-devices { width: 20px; height: 30px; border-radius: 15px 0 0 15px; color: var(--mu); border-right: 1px solid var(--line); }
 /* The devices open below the controls: the chevron points down, and up while they are open. */
-.call-card .card-devices[aria-expanded=true] svg { transform: rotate(180deg); }
+:is(.call-card, .fc) .card-devices[aria-expanded=true] svg { transform: rotate(180deg); }
 .card-mic[data-muted] .card-devices { color: var(--muted-fg); border-right-color: rgb(96 20 16 / 20%); }
-.call-card .card-mute { width: 30px; height: 30px; border-radius: 0 15px 15px 0; }
-.call-card .card-mic button:hover:not(:disabled) { background: var(--btn-hover); }
-.call-card .card-skip { width: 30px; height: 30px; border-radius: 50%; color: var(--fg); }
-.call-card .card-skip:hover:not(:disabled) { background: var(--btn); }
-.call-card .card-hangup { width: 30px; height: 30px; border-radius: 50%; background: var(--end); color: #fff; }
-.call-card .card-hangup:hover { background: var(--end-hover); }
+:is(.call-card, .fc) .card-mute { width: 30px; height: 30px; border-radius: 0 15px 15px 0; }
+:is(.call-card, .fc) .card-mic button:hover:not(:disabled) { background: var(--btn-hover); }
+:is(.call-card, .fc) .card-skip { width: 30px; height: 30px; border-radius: 50%; color: var(--fg); }
+:is(.call-card, .fc) .card-skip:hover:not(:disabled) { background: var(--btn); }
+:is(.call-card, .fc) .card-hangup { width: 30px; height: 30px; border-radius: 50%; background: var(--end); color: #fff; }
+:is(.call-card, .fc) .card-hangup:hover { background: var(--end-hover); }
 /* Call model B, the voice switch (contract gap #38): Mute agents with the count of conversations that want to talk, and
  * turning the voice off — neutral, a power mark, never red. A marked conversation in the picker wears an amber dot. */
-.call-card .card-agents { position: relative; width: 30px; height: 30px; border-radius: 50%; color: var(--fg); }
-.call-card .card-agents:hover { background: var(--btn); }
-.call-card .card-agents[aria-pressed=true] { background: var(--muted-bg); color: var(--muted-fg); }
+:is(.call-card, .fc) .card-agents { position: relative; width: 30px; height: 30px; border-radius: 50%; color: var(--fg); }
+:is(.call-card, .fc) .card-agents:hover { background: var(--btn); }
+:is(.call-card, .fc) .card-agents[aria-pressed=true] { background: var(--muted-bg); color: var(--muted-fg); }
 .card-agents-badge { position: absolute; top: -4px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; display: grid; place-items: center;
   font-size: 10px; font-weight: 700; background: var(--sv-voice); color: var(--sv-on-primary); }
-.call-card .card-voice-off { width: 30px; height: 30px; border-radius: 50%; background: var(--btn); color: var(--fg); }
-.call-card .card-voice-off:hover { background: var(--btn-hover); }
+:is(.call-card, .fc) .card-voice-off { width: 30px; height: 30px; border-radius: 50%; background: var(--btn); color: var(--fg); }
+:is(.call-card, .fc) .card-voice-off:hover { background: var(--btn-hover); }
 .card-mark { width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--sv-voice); flex: none; }
 .card-mark[data-mark=wants-to-talk] { background: transparent; box-shadow: inset 0 0 0 2px var(--sv-voice); }
 .person-mark { color: var(--fg); }
@@ -107,11 +109,11 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 .card-badge { min-width: 16px; height: 16px; padding: 0 4px; margin-right: 6px; border-radius: 8px; display: grid; place-items: center; font-size: 10px; font-weight: 700; background: var(--accent); color: var(--sv-on-primary); flex: none; }
 .card-note { margin: 6px 8px 2px; font-size: 11.5px; color: var(--mu); }
 .card-panel .person:disabled { opacity: .5; }
-@media (prefers-color-scheme: light) { .card-badge { color: #fff; } }
+@media (prefers-color-scheme: light) { .call-card .card-badge { color: #fff; } }
 .card-panel .participant-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: 12px; margin: 2px 0; }
 .card-panel .participant-row[data-selected] { border-color: var(--sv-selected-border); background: var(--sv-selected); }
-.call-card .card-panel .person { display: flex; gap: 8px; align-items: center; justify-content: flex-start; width: 100%; padding: 7px 8px; border-radius: 12px; text-align: left; }
-.call-card .card-panel .person:hover { background: var(--btn); }
+:is(.call-card, .fc) .card-panel .person { display: flex; gap: 8px; align-items: center; justify-content: flex-start; width: 100%; padding: 7px 8px; border-radius: 12px; text-align: left; }
+:is(.call-card, .fc) .card-panel .person:hover { background: var(--btn); }
 .card-panel .person-initials { display: none; }
 .card-panel .person-state { display: inline-flex; flex: none; }
 .card-panel .person-state .dot { width: 8px; height: 8px; border-radius: 50%; background: #5bbf8a; }
@@ -124,16 +126,16 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smo
 .card-panel .person-machine, .card-panel .person-harness { display: inline-flex; align-items: center; gap: 3px; vertical-align: -1px; }
 .card-panel .person-harness { margin-inline-start: 4px; }
 @media (prefers-color-scheme: light) {
-  .card-panel .participant-row[data-selected] { border-color: #8c7eab; background: #f3eefa; }
+  .call-card .card-panel .participant-row[data-selected] { border-color: #8c7eab; background: #f3eefa; }
 }
 
-.call-card .device-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 9px; font-size: 12.5px; text-align: left; }
-.call-card .device-row:hover { background: var(--btn); }
+:is(.call-card, .fc) .device-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 9px; font-size: 12.5px; text-align: left; }
+:is(.call-card, .fc) .device-row:hover { background: var(--btn); }
 .device-row svg { color: var(--mu); flex: none; }
 .device-kind { flex: 1; }
 .device-current { color: var(--mu); font-size: 12px; max-width: 165px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .device-options { margin: 0 0 4px 25px; display: flex; flex-direction: column; }
-.call-card .device-option { display: flex; align-items: center; gap: 8px; justify-content: flex-start; padding: 5px 8px; border-radius: 8px; font-size: 12px; text-align: left; }
-.call-card .device-option:hover { background: var(--btn); }
+:is(.call-card, .fc) .device-option { display: flex; align-items: center; gap: 8px; justify-content: flex-start; padding: 5px 8px; border-radius: 8px; font-size: 12px; text-align: left; }
+:is(.call-card, .fc) .device-option:hover { background: var(--btn); }
 .device-option .check { width: 12px; color: var(--accent); }
 .device-option[aria-selected=true] { font-weight: 600; }

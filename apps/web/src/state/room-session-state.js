@@ -48,9 +48,11 @@ export function initialSessionFacts() {
         // state: 'asking' | 'no-answer'}`), and the conversation a move to another machine is taking the session to.
         voiceOn: false, voiceStarting: false, voiceOffReason: null, voiceOffDetail: '', voiceIdleWarning: false,
         agentsMuted: false, agentsMutedBy: null, hearing: null, movingTo: null,
-        // The call model this page runs, as the runtime read it once ('call' is A, 'voice-switch' B): the desktop card is
-        // told it, never left to guess it from what the snapshot carries.
-        callModel: 'call',
+        // The floating call card (briefs/FLOATING-CARD-SPEC.md): the call model this page runs (the runtime's, read once:
+        // 'call' is A, 'voice-switch' B), whether the first setup is finished with its wizard closed, call model A's idle
+        // warning and why its call ended by itself (`{reason: 'idle' | 'offline' | 'failed', detail}`), and the theme and
+        // language the page wears.
+        callModel: 'call', setupDone: false, callIdleWarning: false, callEnded: null, pageTheme: 'light', pageLanguage: 'en',
     };
 }
 /* ----- call model B: the voice switch (CALL-MODEL-B-SPEC.md) -----
@@ -117,17 +119,105 @@ export function sessionStatus(s) {
         selected: selectedThread(s), viewed: viewedThread(s), harness: s.harness[selectedThread(s)] ?? null,
         working: busy };
 }
-/** What the desktop app's call controls card shows (sidevoice/sidevoice-desktop#4), projected from the facts: the
- *  agent and the person are independent — both can speak at once, and the agent works while a turn is transcribed —
- *  and the card names the conversation the call is on (the microphone's), never a transcript being browsed. */
-export function callCardView(s) {
-    const selected = selectedThread(s);
-    const agentSpeaking = !!s.botLive;
-    const agent = agentSpeaking ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
-    const row = selected ? s.people.find(p => personKey(p) === selected) : null;
-    // Skip stops what is sounding, as the room's own Skip does.
-    return { agent, youTalking: !!s.userLive, canSkip: !!s.botLive, conversation: selected,
-        title: row?.title || s.roomBinding?.title || '' };
+/** The conversation hears the person right now. */
+export function canHear(row) {
+    return !!row.available && row.reach === 'listening';
+}
+/** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
+ *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
+ *  Short of offline it is idle whenever it cannot hear the person: out of the call, not the one the microphone talks
+ *  to, or holding what it is sent — a conversation that is holding does not react to the person at all. */
+export function stageMood(facts) {
+    if (facts.reach === 'offline')
+        return 'offline';
+    if (!facts.inCall || !facts.isTarget || !facts.canHear)
+        return 'idle';
+    if (facts.speaking)
+        return 'speaking';
+    if (facts.personSpeaking && (facts.reach === 'listening' || facts.reach === null))
+        return 'listening';
+    if (facts.working)
+        return 'working';
+    return 'idle';
+}
+/** The agent on the stage in call model B, by priority: offline, speaking and listening (with the voice on), working
+ *  (whatever the voice), idle. */
+export function voiceSwitchStageMood(facts) {
+    if (facts.reach === 'offline')
+        return 'offline';
+    if (facts.voiceOn && facts.speaking)
+        return 'speaking';
+    if (facts.voiceOn && facts.personSpeaking && facts.canHear)
+        return 'listening';
+    if (facts.working)
+        return 'working';
+    return 'idle';
+}
+/** Why call model B's microphone cannot be used, with the voice on (CALL-MODEL-B-SPEC §2.4), by its code: nobody to
+ *  talk to, the active conversation (the one looked at) cannot hear, or the session is still getting to it; null when
+ *  it can, or with the voice off. */
+export function voiceMicCode(s, rows) {
+    if (!s.voiceOn)
+        return null;
+    const key = s.viewedThread || selectedThread(s);
+    if (!key)
+        return 'noConversation';
+    const row = rows.find(candidate => candidate.threadId === key);
+    if (!row || !canHear(row))
+        return 'cantHear';
+    if (s.switching || s.movingTo || s.connecting || selectedThread(s) !== key)
+        return 'connecting';
+    return null;
+}
+/** The voice's devices as the card offers them (call-controls/host.ts AudioDevices): the system's default first, an
+ *  option of its own (id ''); a device the system lists without a name said by its place; the speaker chosen only where
+ *  the voice can move it. `busy` is its host's to set: a choice it carries that the room has not answered yet. */
+function cardDevices(devices) {
+    if (!devices)
+        return null;
+    const options = rows => [{ id: '', label: '', system: true }].concat((rows || [])
+        .map((row, index) => row && typeof row.id === 'string' && row.id ? (row.label ? { id: row.id, label: row.label } : { id: row.id, label: '', number: index + 1 }) : null)
+        .filter(Boolean));
+    const outputAvailable = !!devices.outputSelectable;
+    return { inputs: options(devices.inputs), outputs: options(devices.outputs), inputId: devices.input || '',
+        outputId: outputAvailable ? devices.output || '' : '', available: true, outputAvailable, busy: false };
+}
+/** What the desktop app's call controls card shows (sidevoice/sidevoice-desktop#4), projected from the facts: its whole
+ *  snapshot (call-controls/host.ts CallSnapshot) but what its host stamps — `version`, `since`, and `devices.busy` while
+ *  a device choice it carries is pending —, so the app and the preview pass it through and never map the room again
+ *  (briefs/FLOATING-CARD-SPEC.md FC0). The agent and the person are independent: both can speak at once, and the agent
+ *  works while a turn is transcribed. The card names the conversation the call is on (the microphone's), never a
+ *  transcript being browsed; its avatar acts out what the stage's would for it (stageMood, voiceSwitchStageMood, and the
+ *  preview's `avatarPreview`), so the card and the stage never disagree (FC4). */
+export function callCardView(s, participants = participantsView(s)) {
+    const selected = selectedThread(s), voiceSwitch = s.callModel === 'voice-switch';
+    // The call's conversation (A); with the voice switch (B) the active one, the person's pick, heard or not.
+    const key = voiceSwitch ? s.viewedThread || selected : selected, isTarget = !!key && key === selected;
+    const row = key ? participants.find(p => p.threadId === key) || null : null;
+    const agent = s.botLive ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
+    // The person's turn to it, open: they are talking, or it is being transcribed (ConversationView.pendingPhase).
+    const turn = isTarget && s.userTurn?.thread === key && !s.cancelledInput && (s.pendingPhase === 'listening' || s.pendingPhase === 'transcribing') ? s.pendingPhase : null;
+    const reach = row?.reach ?? null, hears = row ? canHear(row) : isTarget, speaking = isTarget && !!s.botLive;
+    const mood = s.avatarPreview ? s.avatarPreview.mood
+        : voiceSwitch ? voiceSwitchStageMood({ voiceOn: !!s.voiceOn, reach, canHear: hears && isTarget, speaking, personSpeaking: !!turn, working: !!row?.agentWorking })
+            : stageMood({ inCall: inCall(s), isTarget, canHear: hears, reach, speaking, personSpeaking: !!turn, working: working(s) });
+    const mic = micView(s);
+    const micReason = voiceSwitch ? voiceMicCode(s, participants) : null;
+    const busyReason = s.reconnectShown ? 'reconnecting' : s.switching || s.movingTo ? 'switching' : null;
+    const target = busyReason === 'switching' ? s.movingTo || (s.viewedThread && s.viewedThread !== selected ? s.viewedThread : selected) : null;
+    const title = row?.title || (isTarget && s.roomBinding?.title) || '';
+    return { ready: true, joined: callView(s).joined, busy: !!busyReason, micEnabled: mic.enabled, micDisabled: voiceSwitch ? !!micReason : mic.disabled,
+        // Skip stops what is sounding, as the room's own Skip (FC3).
+        title, agent, youTalking: !!s.userLive, canSkip: !!s.botLive, conversation: key, participants, devices: cardDevices(s.audioDevices),
+        // Call model B (gap #38, G9): the voice, the agents' mute, how many conversations want to talk, and why the voice
+        // last turned itself off.
+        voiceOn: !!s.voiceOn, agentsMuted: !!s.agentsMuted, wantToTalk: wantToTalk(participants), voiceOffReason: s.voiceOffReason, voiceOffDetail: s.voiceOffDetail || '',
+        // The floating card's (FLOATING-CARD-SPEC FC1, FC2, FC4, FC6, FC7, FC10–FC13).
+        setupDone: !!s.setupDone, callModel: voiceSwitch ? 'voice-switch' : 'call', mood, turn,
+        idleWarning: voiceSwitch ? !!s.voiceIdleWarning : !!s.callIdleWarning, ended: voiceSwitch ? null : s.callEnded || null,
+        micReason, busyReason, switchingTo: target ? participants.find(p => p.threadId === target)?.title || (target === selected ? title : '') : null,
+        theme: s.pageTheme === 'dark' ? 'dark' : 'light', language: s.pageLanguage || 'en',
+        micSilent: !!s.ws && mic.enabled && s.voiceState?.microphone === 'muted' };
 }
 export function joinView(s) {
     if (s.joinFailure)
@@ -396,10 +486,8 @@ export function createRoomSessionStore(seed = {}) {
     let snapshot;
     function project() {
         const participants = participantsView(facts);
-        // The desktop card's view, and call model B's on top (gap #38, G9): whether the voice is on, the agents muted,
-        // how many conversations want to talk, and why the voice last turned itself off.
-        const callCard = { ...callCardView(facts), voiceOn: !!facts.voiceOn, agentsMuted: !!facts.agentsMuted, wantToTalk: wantToTalk(participants),
-            voiceOffReason: facts.voiceOffReason, callModel: facts.callModel === 'voice-switch' ? 'voice-switch' : 'call' };
+        // The desktop card's whole snapshot, from the same rows.
+        const callCard = callCardView(facts, participants);
         return { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts), live: liveText(facts),
             mic: micView(facts), call: callView(facts), callCard, title: viewedTitle(facts), screenLock: facts.screenLock,

@@ -1,4 +1,5 @@
 import type { ParticipantView } from "../../state/room-types";
+import { canHear } from "../../state/room-session-state.js";
 import type { AvatarMood } from "../avatar/avatar-spec";
 import type { CallTranslate } from "./call-i18n";
 
@@ -7,14 +8,14 @@ import type { CallTranslate } from "./call-i18n";
  * Nothing here reads a clock or the DOM. */
 
 export type { AvatarMood };
+/* Whether a conversation hears the person, and the stage's mood for it in each call model, are the room's own projections
+ * (state/room-session-state.js): the desktop card's snapshot takes its avatar's mood from them too, so the stage and the
+ * card never disagree (FLOATING-CARD-SPEC FC4). */
+export { canHear, stageMood, voiceSwitchStageMood } from "../../state/room-session-state.js";
+export type { StageFacts, VoiceSwitchStageFacts } from "../../state/room-session-state.js";
 
 /** The state a conversation's dot and line show. */
 export type ConversationState = "in-call" | "working" | "waiting" | "idle";
-
-/** The conversation hears the person right now. */
-export function canHear(row: Pick<ParticipantView, "available" | "reach">) {
-  return row.available && row.reach === "listening";
-}
 
 /** In call: the call's own conversation, while this page is in the call — the room keeps its binding before a join
  *  and after a hang-up, and that is not a call. Working: its harness says so (a room only knows this during a call).
@@ -32,34 +33,6 @@ export function conversationState(row: ParticipantView, inCall: boolean): Conver
 export function smallAvatarMood(row: Pick<ParticipantView, "reach" | "working">): AvatarMood {
   if (row.reach === "offline") return "offline";
   return row.working ? "working" : "idle";
-}
-
-export interface StageFacts {
-  /** The page is in the call. */
-  inCall: boolean;
-  /** The conversation on the stage is the one the microphone talks to. */
-  isTarget: boolean;
-  canHear: boolean;
-  /** How the room reaches it; null while the room has not listed it yet. */
-  reach: ParticipantView["reach"] | null;
-  /** Its reply is sounding. */
-  speaking: boolean;
-  /** The person's turn to it is open: they are talking, or it is being transcribed (ConversationView.pendingPhase). */
-  personSpeaking: boolean;
-  working: boolean;
-}
-
-/** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
- *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
- *  Short of offline it is idle whenever it cannot hear the person: out of the call, not the one the microphone talks
- *  to, or holding what it is sent — a conversation that is holding does not react to the person at all. */
-export function stageMood(facts: StageFacts): AvatarMood {
-  if (facts.reach === "offline") return "offline";
-  if (!facts.inCall || !facts.isTarget || !facts.canHear) return "idle";
-  if (facts.speaking) return "speaking";
-  if (facts.personSpeaking && (facts.reach === "listening" || facts.reach === null)) return "listening";
-  if (facts.working) return "working";
-  return "idle";
 }
 
 /** The person in the picture-in-picture. */
@@ -107,28 +80,6 @@ export function voiceSwitchStateText(row: ParticipantView, t: CallTranslate): st
 export function voiceSwitchAvatarMood(row: Pick<ParticipantView, "reach" | "agentWorking">): AvatarMood {
   if (row.reach === "offline") return "offline";
   return row.agentWorking ? "working" : "idle";
-}
-
-export interface VoiceSwitchStageFacts {
-  voiceOn: boolean;
-  reach: ParticipantView["reach"] | null;
-  canHear: boolean;
-  /** Its reply is sounding. */
-  speaking: boolean;
-  /** The person's turn to it is open. */
-  personSpeaking: boolean;
-  /** Its agent works (any voice state: the room says so for every conversation). */
-  working: boolean;
-}
-
-/** The agent on the stage in call model B, by priority: offline, speaking and listening (with the voice on), working
- *  (whatever the voice), idle. */
-export function voiceSwitchStageMood(facts: VoiceSwitchStageFacts): AvatarMood {
-  if (facts.reach === "offline") return "offline";
-  if (facts.voiceOn && facts.speaking) return "speaking";
-  if (facts.voiceOn && facts.personSpeaking && facts.canHear) return "listening";
-  if (facts.working) return "working";
-  return "idle";
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */

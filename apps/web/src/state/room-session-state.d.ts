@@ -85,9 +85,22 @@ export interface SessionFacts {
  voiceOn: boolean; voiceStarting: boolean; voiceOffReason: VoiceOffReason | null; voiceOffDetail: string; voiceIdleWarning: boolean;
  agentsMuted: boolean; agentsMutedBy: 'person' | 'output-lost' | null;
  hearing: {thread: string; state: 'asking' | 'no-answer'} | null; movingTo: string | null;
- /** The call model this page runs, as the runtime read it once (`call` is A, `voice-switch` B). */
- callModel: 'call' | 'voice-switch';
+ /** The floating call card (briefs/FLOATING-CARD-SPEC.md). The call model this page runs, as the runtime read it once
+  *  (`call` is A, `voice-switch` B; FC2). */
+ callModel: CallModel;
+ /** The first setup is finished and its wizard is not open (the onboarding provider says it; FC1). */
+ setupDone: boolean;
+ /** Call model A: the minute before a call nobody uses ends itself, and why the last call ended without the person
+  *  ending it (FC6, FC7); cleared as a call starts. */
+ callIdleWarning: boolean; callEnded: CallEnded | null;
+ /** The theme and the interface language the page wears now (its root's `data-theme` and `lang`; FC12). */
+ pageTheme: 'light' | 'dark'; pageLanguage: string;
 }
+/** Call model A or B (VARIANTS `call-model`), as the card is told it. */
+export type CallModel = 'call' | 'voice-switch';
+/** Why a call (A) ended without the person ending it: nobody used it, its conversation's machine went away (`detail`:
+ *  the conversation's title), or the room or the machine refused it (`detail`: the room's words). */
+export interface CallEnded { reason: 'idle' | 'offline' | 'failed'; detail: string }
 /** Why the voice turned itself off (call model B). */
 export type VoiceOffReason = 'idle' | 'micLost' | 'micBlocked' | 'micUnavailable' | 'failed' | 'reloaded';
 export const VOICE_OFF_REASONS: VoiceOffReason[];
@@ -111,22 +124,108 @@ export interface SessionSnapshot {
  join: JoinStatusView | null; live: string;
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
- callCard: CallCardSnapshotView;
+ callCard: CallCardView;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string};
  bootError: string | null; machines: MachineView[]; pairing: PairingPromptView;
 }
+/** One device to choose, as the card lists it. `system` is the system's own choice, `number` a device the system lists
+ *  without a name (its place, from 1), `missing` the chosen one, no longer connected: the card words those itself. */
+export interface AudioDeviceOption { id: string; label: string; system?: boolean; number?: number; missing?: boolean }
+/** The voice's microphones and speakers, the chosen ones, and whether each can be chosen now; `busy` while a choice is
+ *  on its way (its host's). */
+export interface AudioDevices {
+ inputs: AudioDeviceOption[]; outputs: AudioDeviceOption[];
+ inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
+}
+/** What the agent is doing, for today's card: its mark shows it, and only it. */
+export type AgentState = 'idle' | 'working' | 'speaking';
+/** Why call model B's microphone cannot be used (`voiceMicCode`). */
+export type MicCode = 'noConversation' | 'cantHear' | 'connecting';
+/** The desktop card's snapshot as the room projects it (`callCardView`, the store's `callCard`): the whole of
+ *  call-controls/host.ts CallSnapshot but what its host stamps (FLOATING-CARD-SPEC FC0). */
 export interface CallCardView {
- agent: 'idle' | 'working' | 'speaking'; youTalking: boolean; canSkip: boolean; conversation: string | null; title: string;
+ ready: boolean;
+ /** In the call (A), or the room open (B). */
+ joined: boolean;
+ /** Reconnecting or switching conversation (`busyReason` says which). */
+ busy: boolean;
+ micEnabled: boolean;
+ /** The microphone cannot be used: A as its button says, B with a reason (`micReason`). */
+ micDisabled: boolean;
+ /** The conversation the call is on. */
+ title: string;
+ agent: AgentState;
+ /** You are speaking (the room hears a turn open). */
+ youTalking: boolean;
+ /** Something is playing that "skip" would stop (FC3). */
+ canSkip: boolean;
+ /** The conversation the call is on, by its key (its seed: the stage's bicho); null with none. */
+ conversation: string | null;
+ participants: ParticipantView[];
+ devices: AudioDevices | null;
+ /* Call model B, the voice switch (contract gap #38, G9). */
+ voiceOn: boolean;
+ /** The agents are muted: they answer in writing. */
+ agentsMuted: boolean;
+ /** How many conversations want to talk (a mark, and reachable). */
+ wantToTalk: number;
+ /** Why the voice last turned itself off, and a failure's words. */
+ voiceOffReason: VoiceOffReason | null; voiceOffDetail: string;
+ /* The floating card (briefs/FLOATING-CARD-SPEC.md). */
+ /** FC1: the first setup is finished, its wizard closed. */
+ setupDone: boolean;
+ /** FC2: call model A or B: the card follows it, and so does its host's `run()`. */
+ callModel: CallModel;
+ /** FC4: what the conversation's avatar acts out, as the stage's would for it; and the person's turn to it, open. */
+ mood: import('../features/avatar/avatar-spec').AvatarMood;
+ turn: 'listening' | 'transcribing' | null;
+ /** FC6: the minute before the call (A) or the voice (B) ends itself for want of the person. */
+ idleWarning: boolean;
+ /** FC7: why the call (A) ended by itself; B says it in `voiceOffReason`. */
+ ended: CallEnded | null;
+ /** FC10: why B's microphone cannot be used. */
+ micReason: MicCode | null;
+ /** FC11: what `busy` is, and the title of the conversation a switch goes to. */
+ busyReason: 'reconnecting' | 'switching' | null;
+ switchingTo: string | null;
+ /** FC12: the room's theme and language, resolved. */
+ theme: 'light' | 'dark'; language: string;
+ /** FC13: the microphone gives no sound though it is not muted (another app holds it). */
+ micSilent: boolean;
 }
-/** The card's view in the store, call model B's facts on top (contract gap #38, G9). */
-export interface CallCardSnapshotView extends CallCardView {
- voiceOn: boolean; agentsMuted: boolean; wantToTalk: number; voiceOffReason: VoiceOffReason | null;
- /** The call model: the card follows it, and so does the app's `run()`. */
- callModel: 'call' | 'voice-switch';
+export function callCardView(s: SessionFacts, participants?: ParticipantView[]): CallCardView;
+/** The conversation hears the person right now. */
+export function canHear(row: Pick<ParticipantView, 'available' | 'reach'>): boolean;
+export interface StageFacts {
+ /** The page is in the call. */
+ inCall: boolean;
+ /** The conversation on the stage is the one the microphone talks to. */
+ isTarget: boolean;
+ canHear: boolean;
+ /** How the room reaches it; null while the room has not listed it yet. */
+ reach: ParticipantView['reach'] | null;
+ /** Its reply is sounding. */
+ speaking: boolean;
+ /** The person's turn to it is open: they are talking, or it is being transcribed (ConversationView.pendingPhase). */
+ personSpeaking: boolean;
+ working: boolean;
 }
-export function callCardView(s: SessionFacts): CallCardView;
+export function stageMood(facts: StageFacts): import('../features/avatar/avatar-spec').AvatarMood;
+export interface VoiceSwitchStageFacts {
+ voiceOn: boolean;
+ reach: ParticipantView['reach'] | null;
+ canHear: boolean;
+ /** Its reply is sounding. */
+ speaking: boolean;
+ /** The person's turn to it is open. */
+ personSpeaking: boolean;
+ /** Its agent works (any voice state: the room says so for every conversation). */
+ working: boolean;
+}
+export function voiceSwitchStageMood(facts: VoiceSwitchStageFacts): import('../features/avatar/avatar-spec').AvatarMood;
+export function voiceMicCode(s: SessionFacts, rows: ParticipantView[]): MicCode | null;
 export interface SessionStore {
  facts: SessionFacts;
  getState(): SessionSnapshot; getInitialState(): SessionSnapshot;

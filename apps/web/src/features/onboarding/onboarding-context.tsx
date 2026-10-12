@@ -134,6 +134,11 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     setOpen(true);
   }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, live, persist, resume, startAt]);
 
+  // The desktop's floating call card shows only once the first setup is finished and its wizard is closed: the room
+  // says so in its facts, which the card's host passes on (FLOATING-CARD-SPEC FC1).
+  const setupDone = !!record.completed_at && !open;
+  useEffect(() => { roomStore.patch({ setupDone }); }, [roomStore, setupDone]);
+
   const draft = room.facts.voiceDraft ?? room.facts.voiceSettings;
   const value: OnboardingValue = {
     ready, record, error, open, step, canHostAgents,

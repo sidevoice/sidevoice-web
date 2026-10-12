@@ -1,69 +1,26 @@
 /* The desktop app's call controls card (sidevoice/sidevoice-desktop#4): a compact call surface that floats over the
  * person's other apps while the room's window is not in front.
  *
- * At rest, one row: the agent (the avatar, which shows only what the agent is doing), the conversation the call is on
- * and who is on it, and your microphone (the wave, which shows only you). Near the pointer, without growing wider and
- * without moving anything, it offers the rest: the title becomes the conversation picker, "open Sidevoice" appears in
- * the slot kept for it beside your wave, and the room's call controls appear below. Panels open below the controls
- * and close by themselves. */
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+ * Which card it is, is a design variant (VARIANTS `floating-card`, briefs/FLOATING-CARD-SPEC.md): today's card, the
+ * default until the operator chooses — the desktop app has no panel, so it ships it —, or one of the spec's options 1–4
+ * (FloatingCard.tsx). This file keeps what they share: the gate, the host's state and the plumbing (card-shell.tsx).
+ *
+ * Today's card, at rest, is one row: the agent (the avatar, which shows only what the agent is doing), the conversation
+ * the call is on and who is on it, and your microphone (the wave, which shows only you). Near the pointer, without
+ * growing wider and without moving anything, it offers the rest: the title becomes the conversation picker, "open
+ * Sidevoice" appears in the slot kept for it beside your wave, and the room's call controls appear below. Panels open
+ * below the controls and close by themselves. */
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, PowerIcon, SkipIcon, SpeakerIcon, SpeakerOffIcon } from "../components/ui/Icons";
-import { ConversationRows } from "../features/room/ConversationRows";
-import type { ParticipantView } from "../state/room-types";
-import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
-import type { Translate } from "./i18n";
+import { useVariant } from "../lib/variants";
+import { resolveTheme } from "../lib/theme";
+import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
+import { exitText, FLOATING_CARD, gateOpen, isVoiceSwitch } from "./card-view";
+import { FloatingCardBody } from "./FloatingCard";
+import type { CallControlsHost, CallControlsState } from "./host";
+import { cardLanguage, translator, type Translate } from "./i18n";
 
-/** Space around the card inside its window, for its shadow. */
-export const CARD_MARGIN = 12;
-/** Before the controls show on hover, and before they hide once the pointer leaves. */
-export const SHOW_DELAY_MS = 120;
-export const HIDE_DELAY_MS = 500;
-/** A panel left open closes this long after the pointer leaves. */
-export const PANEL_CLOSE_MS = 2500;
-/** Right after the card changes size (the app may move its window under the pointer), its buttons ignore clicks. */
-export const CLICK_GUARD_MS = 350;
-/** More than this many pixels between pressing and releasing is a drag, not a click. */
-export const DRAG_THRESHOLD_PX = 4;
-/** Your wave: the microphone's level, sampled this often, the last five samples. */
-export const WAVE_SAMPLE_MS = 100;
-const WAVE_BARS = 5;
-
-type Panel = "conversations" | "devices" | null;
-
-/** The latest state the app sent, null until the first. */
-function useHostState(host: CallControlsHost): CallControlsState | null {
-  const [state, setState] = useState<CallControlsState | null>(null);
-  useEffect(() => host.subscribe(setState), [host]);
-  return state;
-}
-
-/** `value`, but turning on only after `onDelay` and off only after `offDelay`. */
-function useDelayed(value: boolean, onDelay: number, offDelay: number): boolean {
-  const [shown, setShown] = useState(value);
-  useEffect(() => {
-    if (value === shown) return;
-    const timer = setTimeout(() => setShown(value), value ? onDelay : offDelay);
-    return () => clearTimeout(timer);
-  }, [value, shown, onDelay, offDelay]);
-  return shown;
-}
-
-function useNow(every: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), every);
-    return () => clearInterval(timer);
-  }, [every]);
-  return now;
-}
-
-export function duration(since: number | null, now: number): string {
-  if (!since) return "";
-  const seconds = Math.max(0, Math.floor((now - since) / 1000));
-  const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
-  const two = (n: number) => String(n).padStart(2, "0");
-  return h ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
-}
+export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 
 /** The brand mark, whose bars move with what the agent does (the mustard fourth bar is the agent's voice). */
 function AgentMark({ state }: { state: string }) {
@@ -89,203 +46,69 @@ function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolea
   );
 }
 
-/** The level's last samples, taken every WAVE_SAMPLE_MS whatever arrives (the room sends a level only when it
- *  changes), so silence drains the wave instead of freezing old peaks. Muted, it is flat and starts over. */
-function useWave(level: number, muted: boolean): number[] {
-  const latest = useRef(level);
-  latest.current = muted ? 0 : level;
-  const [levels, setLevels] = useState<number[]>(() => Array(WAVE_BARS).fill(0));
-  useEffect(() => {
-    if (muted) {
-      setLevels(Array(WAVE_BARS).fill(0));
-      return;
-    }
-    const timer = setInterval(() => setLevels((previous) => [...previous.slice(1), latest.current]), WAVE_SAMPLE_MS);
-    return () => clearInterval(timer);
-  }, [muted]);
-  return levels;
+/** The call's exit notice (§2.1, O6): once the gate this card saw open closes by itself, why, until the person closes
+ *  it or a new call or voice session opens the gate again. How long the card stays is its host's (the desktop's
+ *  `wanted()`, FC7). */
+function useExit(state: CallControlsState | null, open: boolean, t: Translate) {
+  const seen = useRef<{ since: number | null } | null>(null);
+  const [dismissed, setDismissed] = useState<{ since: number | null } | null>(null);
+  if (state && open) seen.current = { since: state.call.since };
+  const session = seen.current;
+  const text = state && !open && session && dismissed !== session ? exitText(state.call, t) : null;
+  return { text, since: session?.since ?? null, dismiss: () => setDismissed(session) };
 }
-
-/** A device as the card words it: a real device keeps its own name; the system's choice, an unnamed device and a
- *  chosen device that went away are said in the card's words. */
-function deviceName(option: AudioDeviceOption, kind: "input" | "output", t: Translate): string {
-  if (option.system) return t("card.systemDefault");
-  if (option.missing) return t("card.deviceMissing");
-  if (option.number) return t(kind === "input" ? "card.microphoneNumber" : "card.speakerNumber", { n: option.number });
-  return option.label;
-}
-
-function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (command: CallCommand) => void; t: Translate }) {
-  const [open, setOpen] = useState<"input" | "output" | null>(null);
-  const [asked, setAsked] = useState<{ kind: "input" | "output"; id: string } | null>(null);
-  const devices = call.devices;
-  // The room changes devices and says no by keeping the one it had: the card says so once the room has answered.
-  const failed = !!asked && !!devices && !devices.busy && (asked.kind === "input" ? devices.inputId : devices.outputId) !== asked.id;
-  if (!devices) return null;
-  const rows = [
-    { kind: "input" as const, label: t("card.microphone"), Icon: MicrophoneIcon, options: devices.inputs, current: devices.inputId, usable: devices.available },
-    { kind: "output" as const, label: t("card.speaker"), Icon: SpeakerIcon, options: devices.outputs, current: devices.outputId, usable: devices.available && devices.outputAvailable },
-  ];
-  return (
-    <div className="card-panel devices" role="group" aria-label={t("card.devices")}>
-      {rows.map((row) => {
-        const current = row.options.find((option) => option.id === row.current);
-        return (
-          <div key={row.kind}>
-            <button type="button" className="device-row" aria-expanded={open === row.kind} disabled={devices.busy || !row.usable}
-              title={row.usable ? undefined : t("card.devicesInSystem")}
-              onClick={() => setOpen(open === row.kind ? null : row.kind)}>
-              <row.Icon size={15} /><span className="device-kind">{row.label}</span>
-              <span className="device-current">{current ? deviceName(current, row.kind, t) : t("card.systemDefault")}</span><ChevronIcon size={14} />
-            </button>
-            {open === row.kind && (
-              <div className="device-options" role="listbox" aria-label={row.label}>
-                {row.options.map((option) => (
-                  <button type="button" role="option" key={option.id} aria-selected={option.id === row.current}
-                    className="device-option" onClick={() => {
-                      setOpen(null);
-                      setAsked({ kind: row.kind, id: option.id });
-                      run({ command: "select-audio-device", kind: row.kind, id: option.id });
-                    }}>
-                    <span className="check" aria-hidden="true">{option.id === row.current ? "✓" : ""}</span>{deviceName(option, row.kind, t)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {!devices.available && <p className="card-note">{t("card.devicesInSystem")}</p>}
-      {failed && <p className="card-note" role="status">{t("card.deviceFailed")}</p>}
-    </div>
-  );
-}
-
-/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest); with the
- *  voice switch (call model B), its mark after them. */
-function conversationSub(row: ParticipantView, t: Translate) {
-  const reach = row.reach === "holding" ? t("card.reach.holding") : row.reach === "offline" || !row.available ? t("card.reach.offline") : null;
-  const mark = row.mark === "waiting-for-you" ? t("card.mark.waitingForYou") : row.mark === "wants-to-talk" ? t("card.mark.wantsToTalk") : null;
-  return (
-    <>
-      {row.machine && <span className="person-machine"><MachinesIcon size={11} /> {row.machine}</span>}
-      {(row.harness || row.model) && <span className="person-harness">{row.harness && <HarnessIcon harness={row.harness} size={11} />} {[row.model, row.effort].filter(Boolean).join(" · ")}</span>}
-      {reach && <span className="person-reach"> · {reach}</span>}
-      {mark && <span className="person-mark"> · {mark}</span>}
-    </>
-  );
-}
-
-/** Whether the room runs call model B, the voice switch: its card is about the voice, not a call (contract gap #38). The
- *  snapshot says it; whether it carries `voiceOn` does not (the room projects it in both models). */
-const voiceSwitch = (call: CallSnapshot) => call.callModel === "voice-switch";
 
 export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
   const state = useHostState(host);
-  // With the voice switch (call model B) the card is there while the voice is on; the room's window says why it went off.
-  if (!state || !(voiceSwitch(state.call) ? state.call.voiceOn : state.call.joined)) return null;
-  // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
-  return <ActiveCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
+  const variant = useVariant("floating-card", FLOATING_CARD);
+  const options = variant !== "today";
+  // The options wear the room's theme and language (FC12): the system's where the host does not say them.
+  const language = state?.call.language;
+  const tc = useMemo(() => (options && language ? translator(cardLanguage([language])) : t), [options, language, t]);
+  const theme = options ? state?.call.theme ?? resolveTheme("system") : null;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme) root.dataset.theme = theme; else delete root.dataset.theme;
+    if (options && language) root.lang = cardLanguage([language]);
+  }, [theme, options, language]);
+  const open = !!state && (options ? gateOpen(state.call) : isVoiceSwitch(state.call) ? !!state.call.voiceOn : state.call.joined);
+  const exit = useExit(state, open, tc);
+  if (!state) return null;
+  if (!options) {
+    // With the voice switch (call model B) the card is there while the voice is on; the room's window says why it went off.
+    if (!open) return null;
+    // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
+    return <TodayCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
+  }
+  if (!open && !exit.text) return null;
+  return (
+    <FloatingCardBody key={(open ? state.call.since : exit.since) ?? "call"} host={host} state={state} variant={variant} t={tc}
+      exit={open ? null : exit.text} onDismiss={exit.dismiss} />
+  );
 }
 
-function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallControlsState; t: Translate }) {
+function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallControlsState; t: Translate }) {
   const call = state.call;
-  const card = useRef<HTMLDivElement>(null);
   const now = useNow(1000);
-  const [domInside, setDomInside] = useState(false);
-  const [panel, setPanel] = useState<Panel>(null);
-  const guardUntil = useRef(0);
-  const drag = useRef<{ x: number; y: number; moving: boolean; id: number } | null>(null);
-  const dragged = useRef(false);
+  const shell = useCardShell(host, state);
+  const { panel, setPanel, expanded, run } = shell;
 
   const muted = !call.micEnabled;
   const reconnecting = call.busy;
-  const inside = state.pointerInside ?? domInside;
-  const hovered = useDelayed(inside, SHOW_DELAY_MS, HIDE_DELAY_MS);
-  const expanded = state.alwaysExpanded || hovered || panel !== null;
   const levels = useWave(state.level, muted);
-
-  // A panel left open closes once the pointer has been away a while; a click outside the card closes it at once (the
-  // app tells the card about clicks elsewhere, which a window that is never focused does not see itself).
-  useEffect(() => {
-    if (!panel || inside) return;
-    const timer = setTimeout(() => setPanel(null), PANEL_CLOSE_MS);
-    return () => clearTimeout(timer);
-  }, [panel, inside]);
-  const outside = state.outsideClicks ?? 0;
-  const firstOutside = useRef(outside);
-  useEffect(() => {
-    if (outside !== firstOutside.current) setPanel(null);
-  }, [outside]);
-
-  // The window is the card's size, margin included: the app sizes (and may move) it to what is shown, so every change
-  // of size re-arms the click guard.
-  useEffect(() => {
-    const element = card.current;
-    if (!element) return;
-    let last = "";
-    const report = () => {
-      const box = element.getBoundingClientRect();
-      if (!box.width || !box.height) return;
-      const size = { width: Math.ceil(box.width) + 2 * CARD_MARGIN, height: Math.ceil(box.height) + 2 * CARD_MARGIN };
-      const key = size.width + "x" + size.height;
-      if (key === last) return;
-      if (last) guardUntil.current = Date.now() + CLICK_GUARD_MS;
-      last = key;
-      host.layout(size);
-    };
-    report();
-    const observer = new ResizeObserver(report);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [host]);
-  // Appearing is a change too (the pointer may have just come onto the card).
-  useEffect(() => { if (expanded) guardUntil.current = Math.max(guardUntil.current, Date.now() + CLICK_GUARD_MS); }, [expanded]);
 
   const selected = call.participants.find((participant) => participant.selected);
   const agent = reconnecting ? "reconnecting" : call.agent;
-  const run = (command: CallCommand) => { if (Date.now() >= guardUntil.current) host.run(command); };
   // With the voice switch the microphone keeps one name, its state pressed (call model B).
-  const switching = voiceSwitch(call);
+  const switching = isVoiceSwitch(call);
   const muteLabel = switching ? t("card.muteMic") : muted ? t("card.unmute") : t("card.mute");
   const agentsMuted = !!call.agentsMuted;
   const waiting = agentsMuted ? call.wantToTalk ?? 0 : 0;
   const waitingText = waiting ? t(waiting === 1 ? "card.waiting.one" : "card.waiting.other", { n: waiting }) : null;
   const unreadElsewhere = call.participants.reduce((n, row) => n + (row.selected ? 0 : row.unread || 0), 0);
 
-  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    dragged.current = false;
-    const target = event.target as Element;
-    // A press anywhere in the card but in an open panel or on what opens it closes the panel.
-    if (panel && !target.closest(".card-panel, .card-title, .card-devices")) setPanel(null);
-    // Dragging from anywhere but a button (the title counts as card): past the threshold it moves the window.
-    if (event.button > 0 || target.closest("button:not(.card-title)")) return;
-    drag.current = { x: event.screenX, y: event.screenY, moving: false, id: event.pointerId };
-  };
-  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d || d.id !== event.pointerId) return;
-    if (!d.moving) {
-      if (Math.hypot(event.screenX - d.x, event.screenY - d.y) <= DRAG_THRESHOLD_PX) return;
-      d.moving = true;
-      dragged.current = true;
-      setPanel(null);
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      host.drag("start");
-    }
-    host.drag("move");
-  };
-  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    drag.current = null;
-    if (d?.moving) host.drag("end");
-  };
-
   return (
-    <div ref={card} className="call-card" data-expanded={expanded || undefined}
-      onPointerEnter={() => setDomInside(true)} onPointerLeave={() => setDomInside(false)}
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
-      onClickCapture={(event) => { if (dragged.current) { event.stopPropagation(); event.preventDefault(); dragged.current = false; } }}>
+    <div ref={shell.card} className="call-card" data-expanded={expanded || undefined} {...shell.handlers}>
       <div className="card-row">
         <span className="card-avatar" data-state={agent} role="img" aria-label={reconnecting ? t("card.reconnecting") : t(`card.agent.${call.agent}`)}>
           <AgentMark state={agent} />
@@ -344,20 +167,10 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
       )}
 
       {panel === "conversations" && (
-        <div className="card-panel conversations" aria-label={t("card.conversations")}>
-          <ConversationRows
-            className="card-conversations"
-            rows={call.participants}
-            // The call can only go to a conversation that is there; the room browses the others.
-            disabled={(row) => row.switching || !row.available || row.reach === "offline"}
-            onSelect={(threadId) => { setPanel(null); run({ command: "select-participant", threadId }); }}
-            sub={(row) => conversationSub(row, t)}
-            aside={(row) => (<>
-              {row.mark && <span className="card-mark" data-mark={row.mark} aria-hidden="true" />}
-              {row.unread && !row.selected ? <span className="card-badge" aria-label={t("card.unread", { n: row.unread })}>{row.unread}</span> : null}
-            </>)}
-          />
-        </div>
+        <ConversationPicker call={call} t={t}
+          // The call can only go to a conversation that is there; the room browses the others.
+          disabled={(row) => row.switching || !row.available || row.reach === "offline"}
+          onSelect={(threadId) => { setPanel(null); run({ command: "select-participant", threadId }); }} />
       )}
 
       {panel === "devices" && <DevicePicker call={call} run={run} t={t} />}

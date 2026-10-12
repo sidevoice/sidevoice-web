@@ -219,7 +219,8 @@ export interface SidevoiceActions {
   /** Call model B: asks a conversation for a fresh reply about what the person missed (contract gap #35, G4): it makes
    *  it the active one, turns the voice on and unmutes the agents first, as each is needed. */
   hearIt?(threadId: string): Promise<void>;
-  /** Call model B: a sign of the person (the idle warning's "Keep voice on"). */
+  /** A sign of the person: the idle warning's "Keep voice on" (B), and the desktop card's Keep in either call model
+   *  (its `keep-alive`, FLOATING-CARD-SPEC FC6), which keeps a call (A) on too. */
   keepVoiceOn?(): void;
   /** A conversation by its key (machine and thread, ParticipantView.threadId): looked at, and the call goes to it — on
    *  another machine the call moves there. */

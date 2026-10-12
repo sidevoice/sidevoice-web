@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { HandIcon, HarnessIcon } from "../../components/ui/Icons";
@@ -13,7 +13,8 @@ import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
 import { moodText } from "./conversation-state";
-import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
+import { bubbleAt } from "./speech-chunks";
+import { latestWords, sounding, useSentTurn, useSpokenTo } from "./speech-reading";
 import { useStageConversation } from "./stage-view";
 import { useVariant } from "../../lib/variants";
 import { useVoiceSwitch } from "../../state/call-model";
@@ -41,33 +42,6 @@ import "./call-view.css";
  * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
  * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
 
-/** The reply sounding now. Until its row says so the voice may already be playing it: then it is the oldest one
- *  waiting, since replies are said in order. */
-function sounding(messages: ChatMessage[], voiceLive: boolean) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role === "assistant" && message.playback === "playing") return message;
-  }
-  return voiceLive ? messages.find((message) => message.role === "assistant" && message.playback === "pending") ?? null : null;
-}
-
-/** How far into `reply` the voice is (speech-chunks.ts `readOn`): the part sounding now, its words moving on at a
- *  speaking pace within it, or that pace from the start while the voice gives no cue yet. A reply that has finished,
- *  or left the list, is read from the start if it sounds again (listening again). */
-function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]): number | null {
-  const reading = useRef<Reading | null>(null);
-  const kept = reading.current && messages.some((message) => message.segment === reading.current!.segment && message.playback !== "complete") ? reading.current : null;
-  reading.current = readOn(kept, reply?.segment ?? null, sounding, reply?.karaoke ?? null, Date.now());
-  const ticking = !!reply && !!reading.current && readingMoves(reading.current);
-  const [, tick] = useReducer((count: number) => count + 1, 0);
-  useEffect(() => {
-    if (!ticking) return;
-    const timer = setInterval(tick, 200);
-    return () => clearInterval(timer);
-  }, [ticking]);
-  return reply && reading.current?.segment === reply.segment ? readingPosition(reading.current) : null;
-}
-
 function AgentBubble({ reply, spokenTo, visible }: { reply: ChatMessage | null; spokenTo: number | null; visible: boolean }) {
   const view = reply && spokenTo !== null ? bubbleAt(reply.text, spokenTo) : null;
   return (
@@ -78,44 +52,12 @@ function AgentBubble({ reply, spokenTo, visible }: { reply: ChatMessage | null; 
   );
 }
 
-/** How much of what the person is saying their bubble holds: the latest words, a few lines; the transcript has all. */
-const LIVE_TAIL = 90;
-function latestWords(text: string) {
-  if (text.length <= LIVE_TAIL) return text;
-  const cut = text.slice(-LIVE_TAIL);
-  return "…" + cut.slice(cut.indexOf(" ") + 1);
-}
-
-/** How long what was sent stays on the stage before it leaves, and how long leaving takes (call-view.css). */
-const SENT_SHOWN_MS = 1600;
-const SENT_LEAVING_MS = 500;
-
 /** The person's turn at the tile's foot: while they speak and while it is transcribed, the voice's bars;
  *  once transcribed, what is sent, for a moment, then it lifts away toward the agent and fades (a plain fade under
  *  reduced motion). Only a turn spoken here is shown as sent, never a message typed. */
 function PersonTurn({ conversation, t }: { conversation: ConversationView; t: CallTranslate }) {
   const pending = !!conversation.pendingText || !!conversation.pendingPhase;
-  const lastUser = [...conversation.messages].reverse().find((message) => message.role === "user") ?? null;
-  const lastKey = lastUser ? lastUser.segment ?? String(lastUser.time) : null;
-  const [sent, setSent] = useState<{ text: string; key: string; leaving: boolean } | null>(null);
-  const spoke = useRef(false);
-  const seen = useRef(lastKey);
-  if (pending) spoke.current = true;
-  useEffect(() => {
-    if (lastKey === seen.current) return;
-    seen.current = lastKey;
-    if (!spoke.current || !lastUser?.text.trim()) return;
-    spoke.current = false;
-    setSent({ text: lastUser.text, key: lastKey!, leaving: false });
-  }, [lastKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Its own clock, so a message typed meanwhile cannot stop it leaving.
-  const sentKey = sent?.key;
-  useEffect(() => {
-    if (!sentKey) return;
-    const leave = window.setTimeout(() => setSent((now) => now?.key === sentKey ? { ...now, leaving: true } : now), SENT_SHOWN_MS);
-    const gone = window.setTimeout(() => setSent((now) => now?.key === sentKey ? null : now), SENT_SHOWN_MS + SENT_LEAVING_MS);
-    return () => { window.clearTimeout(leave); window.clearTimeout(gone); };
-  }, [sentKey]);
+  const sent = useSentTurn(conversation);
   if (pending) return (
     <div className="speech-bubble person-bubble" translate="no">
       <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />

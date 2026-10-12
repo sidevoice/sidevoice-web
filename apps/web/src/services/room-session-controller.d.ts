@@ -22,6 +22,8 @@ declare global {
       setBootError(value: string | null): void;
       /** The microphone's level as the meter measures it (state/mic-level.ts). */
       micLevel?: import("../state/mic-level").MicLevelChannel;
+      /** The words being said, for the floating call card (state/card-caption.ts). */
+      caption?: import("../state/card-caption").CaptionChannel;
     };
     /** The meter's analyser, pulled per animation frame by the waveform bubble; null while no call captures. */
     sidevoiceAudio?: { readWaveform(): Float32Array | null };

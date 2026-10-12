@@ -3,11 +3,12 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS, duration, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS } from "./CallCard";
 import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import { cardLanguage, translator } from "./i18n";
+import { cardSnapshot } from "../test/call-card";
 
 const t = translator("en");
 
 function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
-  return {
+  return cardSnapshot({
     version: 2, ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, title: "Sidevoice: mini call",
     agent: "idle", youTalking: false, canSkip: false, since: SINCE,
     participants: [
@@ -22,8 +23,9 @@ function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
       { id: "x", label: "Micrófono 2", number: 2 }, { id: "gone", label: "Dispositivo seleccionado · desconectado", missing: true }],
       outputs: [{ id: "default", label: "Predeterminado del sistema", system: true }], inputId: "default", outputId: "default",
       available: true, outputAvailable: true, busy: false },
+    conversation: "a",
     ...overrides,
-  };
+  });
 }
 
 function fakeHost(initial: Partial<CallControlsState> = {}) {

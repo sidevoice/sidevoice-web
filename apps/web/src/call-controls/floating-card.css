@@ -1,0 +1,202 @@
+/* The floating card's options 1–4 (FloatingCard.tsx; briefs/FLOATING-CARD-SPEC.md §2.6, §3–6). They wear the room's
+ * theme (data-theme on the page's root, FC12): light by default, dark under [data-theme=dark]. The panels and the
+ * call controls' shapes are today's (call-card.css), in these colours. */
+
+.fc {
+  /* The chrome (caption, strip, pill), the chips over the scene, the bottom scrim, the buttons over the scene. */
+  --fc-chrome: rgb(255 255 255 / 92%); --fc-halo: #ffffff; --fc-fg: #1b1d24; --fc-mu: #5d6470;
+  --fc-scrim: rgb(255 255 255 / 86%); --fc-scrim-fg: #1b1d24; --fc-bottom: rgb(255 255 255 / 70%);
+  --fc-btn: #ffffff; --fc-btn-line: rgb(27 29 36 / 18%); --fc-btn-fg: #1b1d24;
+  --fc-hand: var(--sv-voice-text, #7d5300); --fc-hand-bg: var(--sv-voice-soft, #fbf0d4);
+  --fc-accent: #4a2f6b; --fc-ring: var(--sv-voice-text, #7d5300);
+  /* Today's names, for the controls and the panels it shares (call-card.css). */
+  --fg: var(--fc-fg); --mu: var(--fc-mu); --btn: rgb(27 29 36 / 7%); --btn-hover: rgb(27 29 36 / 13%); --line: rgb(42 26 64 / 12%);
+  --accent: var(--fc-accent); --muted-bg: #f9dedc; --muted-fg: #601410; --end: #dc362e; --end-hover: #ef443b;
+  --tile-w: 288px; --tile-h: 180px;
+  position: relative; box-sizing: border-box; width: var(--tile-w); color: var(--fc-fg); cursor: grab;
+  font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; background: var(--fc-chrome);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow: 0 8px 22px rgb(42 26 64 / 22%);
+}
+[data-theme=dark] .fc {
+  --fc-chrome: rgb(22 25 31 / 92%); --fc-halo: #16191f; --fc-fg: #e8edf1; --fc-mu: #a1acb9;
+  --fc-scrim: rgb(10 11 14 / 72%); --fc-scrim-fg: #fafafa; --fc-bottom: rgb(0 0 0 / 55%);
+  --fc-btn: #24272e; --fc-btn-line: rgb(255 255 255 / 14%); --fc-btn-fg: #e8edf1;
+  --fc-hand: var(--sv-voice, #e0a82e); --fc-hand-bg: transparent;
+  --fc-accent: #c9b6ec; --fc-ring: var(--sv-voice, #e0a82e);
+  --btn: rgb(255 255 255 / 9%); --btn-hover: rgb(255 255 255 / 16%); --line: rgb(255 255 255 / 9%);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 40%);
+}
+.fc[data-size=L] { --tile-w: 384px; --tile-h: 240px; }
+.fc button { cursor: pointer; }
+.fc .card-title { cursor: grab; }
+.fc button[aria-disabled=true] { cursor: default; }
+/* Focus shows on any backdrop: the accent, and a halo of the surface around it (§2.5). */
+.fc button:focus-visible { outline: 2px solid var(--fc-accent); outline-offset: 2px; box-shadow: 0 0 0 2px var(--fc-halo); }
+
+/* What waits for the pointer is always there: hidden at rest, shown near the pointer or with focus inside. */
+.fc :is(.fc-chevron, .fc-sub, .fc-tools, .fc-controls, .fc-pill-open > button) { opacity: 0; pointer-events: none; transition: opacity .15s; }
+.fc[data-expanded] :is(.fc-chevron, .fc-sub, .fc-tools, .fc-controls, .fc-pill-open > button) { opacity: 1; pointer-events: auto; }
+
+/* ---------- options 1–3: the tile ---------- */
+.fc-pip { border-radius: 14px; overflow: hidden; }
+.fc-tile { position: relative; display: block; width: var(--tile-w); height: var(--tile-h); overflow: hidden; background: var(--sv-surface);
+  border-radius: 14px; --stage-avatar-share: .62; }
+.fc-pip:has(.fc-caption, .fc-strip, .card-panel) .fc-tile { border-radius: 14px 14px 0 0; }
+.fc-tile .stage-scene { transition: opacity .4s; }
+/* Reconnecting or switching: the scene at 60 %, fading slowly (still under reduced motion). */
+.fc-tile[data-dim] .stage-scene { opacity: .6; animation: fc-fade 2.4s ease-in-out infinite; }
+@keyframes fc-fade { 0%, 100% { opacity: .6 } 50% { opacity: .35 } }
+/* The agent speaking: the video calls' active-speaker outline, inside the tile's edge. */
+.fc-tile[data-ring]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px var(--fc-ring); pointer-events: none; }
+.fc[data-exit] .fc-tile .stage-scene { opacity: .35; }
+.fc-brand { position: absolute; inset: 0; display: grid; place-items: center; color: var(--fc-accent); background: var(--fc-chrome); }
+
+/* Chips over the scene. */
+.fc-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--fc-scrim); color: var(--fc-scrim-fg); }
+.fc-top { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.fc-who { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.fc .fc-title { max-width: calc(var(--tile-w) - 92px); font-size: 12px; font-weight: 600; justify-content: flex-start; display: inline-flex; }
+.fc-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fc-chevron { width: 12px; flex: none; color: inherit; }
+.fc .card-title[aria-expanded=true] .fc-chevron svg { transform: rotate(180deg); }
+.fc-sub { display: inline-flex; align-items: center; gap: 4px; max-width: calc(var(--tile-w) - 92px); height: 18px; padding: 0 7px; border-radius: 9px; font-size: 11px;
+  background: var(--fc-scrim); color: var(--fc-scrim-fg); white-space: nowrap; overflow: hidden; }
+.fc-sub span { overflow: hidden; text-overflow: ellipsis; opacity: .85; }
+.fc-tools { display: flex; gap: 4px; flex: none; }
+.fc .fc-tool { width: 28px; height: 28px; border-radius: 8px; background: var(--fc-btn); color: var(--fc-btn-fg); box-shadow: inset 0 0 0 1px var(--fc-btn-line); }
+.fc-o4 { display: inline-flex; align-items: center; gap: 2px; flex: none; margin-left: 2px; font-size: 11px; font-weight: 700; color: var(--fc-hand); }
+.fc-o4[data-kind=hand] { padding: 0 4px; border-radius: 8px; background: var(--fc-hand-bg); }
+.fc-o4[data-kind=dot] { width: 7px; height: 7px; border-radius: 50%; background: var(--fc-accent); }
+
+/* At the tile's foot: the mark notice (B) and your microphone; they lift above the controls near the pointer. */
+.fc-mark, .fc-you { position: absolute; top: calc(var(--tile-h) - 36px); height: 28px; transition: transform .15s; }
+.fc[data-expanded] :is(.fc-mark, .fc-you) { transform: translateY(-48px); }
+.fc-mark { left: 8px; height: 28px; padding: 0 3px 0 8px; gap: 6px; color: var(--fc-hand); }
+[data-theme=light] .fc-mark { background: var(--fc-hand-bg); }
+.fc .fc-hear { height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; display: inline-flex; gap: 5px; align-items: center;
+  background: var(--fc-btn); color: var(--fc-btn-fg); box-shadow: inset 0 0 0 1px var(--fc-btn-line); }
+.fc-mark-note { padding-right: 6px; font-size: 12px; color: var(--fc-scrim-fg); }
+.fc-you { right: 8px; padding: 0 9px; gap: 6px; color: var(--fc-scrim-fg); }
+.fc-you[data-muted] { background: var(--muted-bg); color: var(--muted-fg); }
+.fc-you-mic { display: inline-flex; }
+/* Your bars: the level, flat when muted or still; wide while your turn is open, dim while it is transcribed. */
+.fc-bars { display: inline-flex; align-items: center; justify-content: space-between; width: 24px; height: 14px; }
+.fc-bars i { width: 3px; height: calc(3px + var(--l, 0) * 11px); border-radius: 2px; background: currentColor; transition: height 70ms linear; }
+.fc-bars[data-still] i { opacity: .45; height: 3px; }
+.fc-you[data-turn=listening] .fc-bars { width: 72px; }
+.fc[data-size=L] .fc-you[data-turn=listening] .fc-bars { width: 96px; }
+.fc-you[data-turn=transcribing] .fc-bars { opacity: .5; animation: fc-pulse 1.6s ease-in-out infinite; }
+@keyframes fc-pulse { 0%, 100% { opacity: .5 } 50% { opacity: .25 } }
+
+/* Near the pointer: the controls over a scrim at the tile's foot. */
+.fc-controls { position: absolute; left: 0; top: calc(var(--tile-h) - 56px); width: var(--tile-w); height: 56px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(to bottom, transparent, var(--fc-bottom)); }
+.fc :is(.fc-controls, .fc-pill-controls) :is(.card-skip, .card-agents, .card-voice-off) { background: var(--fc-btn); color: var(--fc-btn-fg); box-shadow: inset 0 0 0 1px var(--fc-btn-line); }
+.fc .fc-controls :is(.card-skip, .card-agents, .card-voice-off, .card-hangup, .card-mute) { width: 32px; height: 32px; }
+.fc .fc-controls .card-devices { height: 32px; }
+.fc .fc-controls .card-mic { height: 32px; border-radius: 16px; background: var(--fc-btn); color: var(--fc-btn-fg); box-shadow: inset 0 0 0 1px var(--fc-btn-line); }
+.fc[data-size=L] .fc-controls :is(.card-skip, .card-agents, .card-voice-off, .card-hangup, .card-mute, .card-devices) { height: 36px; }
+.fc[data-size=L] .fc-controls :is(.card-skip, .card-agents, .card-voice-off, .card-hangup, .card-mute) { width: 36px; }
+.fc[data-size=L] .fc-controls .card-mic { height: 36px; border-radius: 18px; }
+.fc .card-mic[data-muted] { background: var(--muted-bg); color: var(--muted-fg); }
+.fc .card-hangup { background: var(--end); color: #fff; }
+.fc .card-agents[aria-pressed=true] { background: var(--muted-bg); color: var(--muted-fg); }
+.fc .card-mute[aria-disabled=true] { opacity: .45; }
+.fc .card-agents-badge { background: var(--fc-hand); color: var(--sv-on-voice, #2a1a40); }
+[data-theme=light] .fc .card-agents-badge { background: var(--fc-hand); color: #fff; }
+
+/* O5, the idle warning (options 1, 3): a banner across the tile's top. */
+.fc-banner { position: absolute; top: 0; left: 0; width: var(--tile-w); min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px;
+  background: var(--fc-halo); color: var(--fc-fg); font-size: 12px; line-height: 16px; box-shadow: 0 1px 0 var(--line); }
+.fc-banner > svg { flex: none; color: var(--fc-hand); }
+.fc-banner-text { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fc .fc-keep, .fc .fc-exit-open { flex: none; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 600; display: inline-flex; gap: 5px; align-items: center;
+  background: var(--fc-accent); color: var(--fc-halo); }
+/* O6, the exit notice (options 1, 3): the scene dims under a scrim; the reason and Open Sidevoice in its middle. */
+.fc-exit { position: absolute; top: 0; left: 0; width: var(--tile-w); height: var(--tile-h); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px 28px; text-align: center; background: color-mix(in srgb, var(--fc-halo) 80%, transparent); color: var(--fc-fg); }
+.fc-exit-text { margin: 0; font-size: 13px; line-height: 18px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.fc-exit .fc-close { position: absolute; top: 8px; right: 8px; }
+
+/* ---------- option 2: the caption ---------- */
+.fc-caption { box-sizing: border-box; height: 50px; display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 13px; line-height: 18px; cursor: grab; }
+.fc[data-size=L] .fc-caption { height: 56px; font-size: 14px; line-height: 20px; }
+.fc-caption > svg { flex: none; color: var(--fc-hand); }
+.fc-caption-text { flex: 1; min-width: 0; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fc-caption .fc-bars { vertical-align: middle; color: var(--fc-accent); }
+.fc-who-said { font-weight: 600; }
+.fc-dim, .fc-transcribing { color: var(--fc-mu); }
+/* What was sent stays a moment, then fades (a plain fade, as under reduced motion). */
+.fc-sent { animation: fc-leave .5s ease 1.6s forwards; }
+@keyframes fc-leave { to { opacity: 0 } }
+.fc-karaoke { flex: 1; min-width: 0; }
+.fc-karaoke p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-karaoke-previous { color: var(--fc-mu); }
+.fc-unsaid { color: var(--fc-mu); }
+.fc-spinner { display: inline-block; width: 11px; height: 11px; margin-right: 6px; vertical-align: -1px; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: fc-spin .8s linear infinite; }
+@keyframes fc-spin { to { transform: rotate(360deg) } }
+.fc-caption .fc-close { width: 24px; height: 24px; }
+
+/* ---------- option 3: the strip ---------- */
+.fc-strip { box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px; }
+.fc[data-size=L] .fc-strip { height: 52px; }
+.fc .fc-strip-row { position: relative; width: 28px; height: 28px; flex: none; border-radius: 50%; }
+.fc[data-size=L] .fc-strip-row { width: 34px; height: 34px; }
+.fc-strip-row[aria-disabled=true] { opacity: .5; }
+.fc .fc-strip-more { height: 28px; min-width: 28px; padding: 0 6px; display: inline-flex; gap: 2px; align-items: center; border-radius: 14px; font-size: 11px; font-weight: 700;
+  background: var(--btn); color: var(--fc-fg); }
+.fc .fc-strip-more svg { color: var(--fc-hand); }
+.fc-small-avatar { position: relative; display: block; width: 100%; height: 100%; }
+.fc-small-avatar .sv-avatar { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: var(--av-bg); }
+/* A conversation's corner signal (ConversationAvatar's): grey offline, mustard working, the accent ready (B), green in
+ * the call (A); an amber hand for a mark, filled while it waits for you. */
+.fc-dot { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; box-sizing: border-box; border: 2px solid var(--fc-halo); border-radius: 50%; background: #6b7885; }
+.fc-dot[data-state=in-call] { background: var(--sv-positive, #75d6ad); }
+.fc-dot:is([data-state=working], [data-state=speaking]) { background: var(--sv-voice, #e0a82e); }
+.fc-dot:is([data-state=waiting], [data-state=ready]) { background: var(--fc-accent); }
+.fc-dot:is([data-state=waiting-for-you], [data-state=wants-to-talk]) { display: grid; place-items: center; width: 14px; height: 14px; border-width: 1.5px;
+  background: var(--sv-voice-soft, #fbf0d4); color: var(--sv-voice-text, #7d5300); }
+
+/* ---------- option 4: the pill ---------- */
+.fc-pill { width: 256px; border-radius: 26px; }
+.fc-pill[data-model=b] { width: 292px; }
+.fc-pill:has(.card-panel) { border-radius: 20px; }
+.fc-pill-row { box-sizing: border-box; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 6px; }
+.fc-pill-avatar { position: relative; width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--av-bg, var(--btn)); color: var(--fc-accent); }
+.fc-pill-avatar .sv-avatar { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; }
+.fc-pill-avatar[data-ring]::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; box-shadow: 0 0 0 2px var(--fc-ring); }
+.fc-pill-avatar[data-dim] .sv-avatar { opacity: .6; animation: fc-fade 2.4s ease-in-out infinite; }
+.fc-pill-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; padding-left: 4px; }
+.fc .fc-pill-title { display: inline-flex; max-width: 100%; font-size: 13px; font-weight: 600; justify-content: flex-start; }
+.fc-pill-state { display: flex; align-items: center; gap: 6px; max-width: 100%; min-height: 16px; font-size: 11.5px; color: var(--fc-mu); white-space: nowrap; overflow: hidden; }
+.fc-pill-words { overflow: hidden; text-overflow: ellipsis; }
+.fc-pill-words .fc-o4 { vertical-align: middle; }
+.fc-pill-state .fc-bars { color: var(--fc-accent); }
+.fc-pill-hear { display: inline-flex; align-items: center; gap: 4px; color: var(--fc-hand); }
+.fc-pill-hear .fc-hear { height: 20px; font-size: 11px; padding: 0 7px; }
+.fc-pill-open { width: 28px; flex: none; }
+.fc-pill-controls { display: flex; align-items: center; gap: 4px; flex: none; }
+.fc .fc-pill-controls :is(.card-skip, .card-agents, .card-voice-off, .card-hangup, .card-mute) { width: 30px; height: 30px; }
+.fc .fc-pill-controls .card-mic { height: 30px; border-radius: 15px; background: var(--btn); }
+.fc .fc-pill-controls .card-devices { width: auto; height: 30px; padding: 0 3px 0 7px; display: inline-flex; gap: 2px; }
+.fc-pill-controls .card-devices .fc-bars { width: 16px; height: 12px; color: var(--fc-accent); }
+.fc-pill-controls .card-mic[data-muted] .fc-bars { color: currentColor; }
+.fc-pill-notice { box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; border-top: 1px solid var(--line); font-size: 11.5px; line-height: 15px; }
+.fc-pill-notice > svg { flex: none; color: var(--fc-hand); }
+.fc-pill-notice-text { flex: 1; min-width: 0; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fc-pill-notice :is(.fc-close, .fc-exit-icon) { width: 24px; height: 24px; flex: none; }
+.fc .fc-pill-notice .fc-exit-icon { background: var(--fc-accent); color: var(--fc-halo); box-shadow: none; }
+.fc .fc-pill-notice :is(.fc-keep, .fc-exit-open) { height: 24px; padding: 0 8px; font-size: 11px; }
+
+/* The panels below, in the theme's colours. */
+.fc .card-panel { margin: 0; padding: 6px 6px 8px; border-top: 1px solid var(--line); }
+[data-theme=light] .fc .card-panel .participant-row[data-selected] { border-color: #8c7eab; background: #f3eefa; }
+[data-theme=light] .fc .card-badge { color: #fff; }
+
+/* Under reduced motion nothing here moves: the bars follow the level without easing, the states read from words and
+ * still poses. What was sent still fades as it goes: a plain fade. */
+@media (prefers-reduced-motion: reduce) {
+  .fc, .fc *:not(.fc-sent) { animation: none !important; transition: none !important; }
+}

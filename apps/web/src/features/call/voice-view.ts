@@ -1,8 +1,7 @@
-import { reachNote, selectedThread, type SessionFacts, type VoiceOffReason } from "../../state/room-session-state.js";
+import { reachNote, selectedThread, voiceMicCode, type SessionFacts, type VoiceOffReason } from "../../state/room-session-state.js";
 import type { ParticipantView } from "../../state/room-types";
 import type { CallTranslate } from "./call-i18n";
 import type { CallMessageKey } from "./messages/en";
-import { canHear } from "./conversation-state";
 
 /* What call model B's bar, notes and line say (briefs/CALL-MODEL-B-SPEC.md §2), derived in one place from the
  * session's facts and the conversations' rows. No clock, no DOM: the components only paint it. */
@@ -49,14 +48,10 @@ function titleOf(key: string | null, rows: ParticipantView[]): string {
  *  sets the preference. With the voice on, why it cannot be used, when it cannot: nobody to talk to, the active
  *  conversation cannot hear, or the session is still getting to it. */
 export function voiceMicReason(facts: SessionFacts, rows: ParticipantView[], t: CallTranslate): string | null {
-  if (!facts.voiceOn) return null;
-  const key = activeKey(facts);
-  if (!key) return t("mic.noConversation");
-  const row = rows.find((candidate) => candidate.threadId === key);
-  const title = row?.title ?? "";
-  if (!row || !canHear(row)) return t("mic.cantHear", { title });
-  if (facts.switching || facts.movingTo || facts.connecting || selectedThread(facts) !== key) return t("mic.connecting", { title });
-  return null;
+  const code = voiceMicCode(facts, rows);
+  if (!code) return null;
+  if (code === "noConversation") return t("mic.noConversation");
+  return t(code === "cantHear" ? "mic.cantHear" : "mic.connecting", { title: titleOf(activeKey(facts), rows) });
 }
 
 /** The line above the bar in call model B (§2.7): the voice getting ready, a move to another machine, the room being

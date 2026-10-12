@@ -43,6 +43,10 @@ function setRoomError(message){const value=message||null;if(window.sidevoiceUI)w
 function joinStatus(step,{detail='',progress=null,subject=''}={}){roomStore.patch({joinStep:step,joinFailure:'',joinDetail:detail?String(detail).slice(0,80):'',joinProgress:progress==null?null:Number(progress),joinSubject:subject})}
 function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinDetail:'',joinProgress:null,joinSubject:'',liveNote:''})}
 function failJoin(text){roomStore.patch({joinStep:null,joinFailure:text||'',joinDetail:'',joinProgress:null,joinSubject:''})}
+// Why a call (A) ended without the person ending it, for the desktop card's exit notice (FLOATING-CARD-SPEC FC7): idle,
+// its machine gone (`detail`: the conversation's title) or refused (`detail`: the words the room shows). Said before the
+// call ends, so the snapshot that says the call is over already says why; cleared as a call starts; a hang-up never sets it.
+function callEndedBy(reason,detail){if(!VOICE_SWITCH)roomStore.patch({callEnded:{reason,detail:detail||''}})}
 // What this tab already calls the conversation it is going back to; the room is not asked again for a title.
 function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||'tu conversación'}
 /* The failures the person can do something about, by the voice's code. Any other code is quoted as it is, because
@@ -670,7 +674,7 @@ function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  if(!onCall&&!asked)return;
  // Said of the machine that refused, whichever one the call is on.
  const text=reachNote({...roomStore.getState().facts,callNode:fp});
- if(onCall){disconnect();reachFailure={text,node:fp};failJoin(text)}
+ if(onCall){callEndedBy('failed',text);disconnect();reachFailure={text,node:fp};failJoin(text)}
  openPairing(text);
 }
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
@@ -1439,7 +1443,7 @@ async function toggleCall(){
  if(state.ws||state.connecting||state.reconnecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
+ personSignal();primeNowPlaying();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
  try{
   const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
   // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said.
@@ -1530,7 +1534,7 @@ async function lostConnection(event,epoch,token=null){
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
  // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
  if(event?.code===4401){pairingRefused(state.callNode,{call:true,token});return}
- if(!shouldReconnect(event)){disconnect();failJoin('La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.');return}
+ if(!shouldReconnect(event)){const text='La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.';callEndedBy('failed',text);disconnect();failJoin(text);return}
  state.reconnecting=true;
  // The first seconds of a drop are the network's, not the person's: no line, no control held. One that outlasts the
  // grace is said.
@@ -1547,7 +1551,7 @@ async function lostConnection(event,epoch,token=null){
    catch(e){
     if(epoch!==connectEpoch)return;
     ++current;const pending=state.ws;state.ws=null;try{pending?.close()}catch{}
-    if(refusedForGood(e)){disconnect();failJoin(e.message||'La sala no deja entrar a este dispositivo.');return}
+    if(refusedForGood(e)){const text=e.message||'La sala no deja entrar a este dispositivo.';callEndedBy('failed',text);disconnect();failJoin(text);return}
     continue;
    }
    if(epoch!==connectEpoch||!session)return;
@@ -1608,7 +1612,7 @@ async function moveCall(fp,thread){
   // With the voice switch (B) the voice stays: the session opens again on the active conversation's machine once it
   // answers (followActive), and meanwhile the line says why.
   if(VOICE_SWITCH){roomRefused=refusedForGood(e);failJoin(joinFailureText('room',e))}
-  else{disconnect();failJoin(joinFailureText('room',e))}
+  else{const text=joinFailureText('room',e),gone=reachFailure?.node===fp;callEndedBy(gone?'offline':'failed',gone?conversationTitle(conversationKey(fp,thread)):text);disconnect();failJoin(text)}
  }
  finally{if(epoch===connectEpoch){state.switching=false;moving=false;state.movingTo=null;applyMicState()}}
 }
@@ -2213,7 +2217,7 @@ setupIdleWatch();
 // a sign of anybody: an agent can talk to an empty car for ever.
 function personSignal(){
  lastPersonSignal=Date.now();
- if(idleWarned){idleWarned=false;state.liveNote='';if(VOICE_SWITCH)roomStore.patch({voiceIdleWarning:false})}
+ if(idleWarned){idleWarned=false;state.liveNote='';roomStore.patch(VOICE_SWITCH?{voiceIdleWarning:false}:{callIdleWarning:false})}
 }
 function checkIdle(){
  // With the voice switch (B) it is the voice that nobody is using: warned a minute before, then turned off, the room
@@ -2228,13 +2232,14 @@ function checkIdle(){
  if(!state.ws){idleWarned=false;return}
  const quiet=Date.now()-lastPersonSignal;
  if(quiet>=IDLE_MS){
-  idleWarned=false;disconnect();
+  idleWarned=false;callEndedBy('idle','');disconnect();
   failJoin('Saliste de la llamada: '+Math.round(IDLE_MS/60000)+' minutos sin señales tuyas. Pulsa para volver a entrar.');
   return;
  }
  if(!idleWarned&&quiet>=IDLE_MS-IDLE_WARN_MS){
   idleWarned=true;
-  state.liveNote='¿Sigues ahí? Sin señales tuyas, saldrás de la llamada en '+Math.round(IDLE_WARN_MS/1000)+' segundos. Habla o toca la pantalla para seguir.';
+  // Said in the room's line, and shown on the desktop card with its Keep (FLOATING-CARD-SPEC FC6).
+  roomStore.batch(()=>{state.liveNote='¿Sigues ahí? Sin señales tuyas, saldrás de la llamada en '+Math.round(IDLE_WARN_MS/1000)+' segundos. Habla o toca la pantalla para seguir.';state.callIdleWarning=true});
  }
 }
 function setupIdleWatch(){
@@ -2243,7 +2248,7 @@ function setupIdleWatch(){
  idleTimer=setInterval(checkIdle,5000);
  if(VOICE_SWITCH)document.addEventListener('pointerdown',()=>{if(state.voiceOn)personSignal()},{capture:true,passive:true});
 }
-function stopIdleWatch(){lastPersonSignal=Date.now();idleWarned=false}
+function stopIdleWatch(){lastPersonSignal=Date.now();idleWarned=false;if(state.callIdleWarning)state.callIdleWarning=false}
 
 
 let lastBridge=null,lastJoin;

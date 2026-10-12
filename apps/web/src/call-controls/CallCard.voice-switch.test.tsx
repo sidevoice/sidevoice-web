@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS, SHOW_DELAY_MS } from "./CallCard";
 import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import { translator } from "./i18n";
+import { cardSnapshot } from "../test/call-card";
 
 // The desktop card in call model B, the voice switch (contract gap #38, G9): there while the voice is on, with Mute agents
 // and its count, a neutral "Turn off voice", one name for the microphone, and the marks in the picker.
@@ -12,12 +13,12 @@ const row = (threadId: string, extra: Record<string, unknown> = {}) => ({
   stateLabel: "", subtitle: "", working: false, machine: "daimon", harness: "claude", ...extra,
 });
 function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
-  return {
+  return cardSnapshot({
     version: 2, ready: true, joined: true, busy: false, micEnabled: false, micDisabled: false, title: "web", agent: "idle",
-    youTalking: false, canSkip: false, since: Date.now() - 60_000, devices: null,
+    youTalking: false, canSkip: false, since: Date.now() - 60_000, devices: null, conversation: "web",
     participants: [row("web", { selected: true }), row("docs", { mark: "waiting-for-you" }), row("release", { mark: "wants-to-talk" })],
     callModel: "voice-switch", voiceOn: true, agentsMuted: false, wantToTalk: 2, voiceOffReason: null, ...overrides,
-  };
+  });
 }
 function fakeHost(call: CallSnapshot) {
   let listener: ((state: CallControlsState) => void) | null = null;
@@ -75,8 +76,8 @@ test("the picker marks the conversations with something unheard, in words and wi
   expect(rows[0].querySelector(".card-mark")).toBeNull();
 });
 
-test("a room that runs the call model A keeps today's card, though its snapshot carries the voice's fields too", () => {
-  // The room projects voiceOn in both models: guessing B from it gave an A room B's card.
+test("a room that runs the call model A keeps today's card, whatever else its snapshot carries (FC2: the model is said, never guessed)", () => {
+  // The room projects voiceOn in both models: it once made an A room's card B's.
   const host = fakeHost(snapshot({ callModel: "call", voiceOn: false }));
   render(<CallCard host={host} t={t} />);
   ready();

@@ -385,6 +385,21 @@ test('A call with no sign of a person asks, then leaves, and only this browser l
  assert.equal(s.run('state.ws'),null,'with no answer the browser leaves the call');
  assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/Saliste de la llamada/);
 });
+test('The desktop card hears it too: the warning while it stands, and why the call ended, said as it ends; a hang-up says nothing',()=>{
+ const s=setup();
+ assert.equal(s.run('state.callModel'),'call','the card is told the call model');
+ s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS+30000;checkIdle()");
+ assert.equal(s.run('state.callIdleWarning'),true);
+ s.run('personSignal()');
+ assert.equal(s.run('state.callIdleWarning'),false,'Keep, or any sign of the person, answers it');
+ // The snapshot that says the call is over already says why.
+ s.run("var seen=[];roomStore.subscribe(v=>seen.push([!!v.facts.ws,v.facts.callEnded&&v.facts.callEnded.reason]))");
+ s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS-1;checkIdle()");
+ assert.equal(s.run('JSON.stringify(seen.find(([ws])=>!ws))'),'[false,"idle"]');
+ assert.equal(s.run('state.callIdleWarning'),false);
+ s.run("state.callEnded=null;state.ws={close(){},readyState:1,send(){}};disconnect()");
+ assert.equal(s.run('state.callEnded'),null,'the person hanging up is no reason to say');
+});
 test('The waveform bubble draws the level the voice reports, and nothing without a call',()=>{
  const s=setup();
  assert.equal(s.run('window.sidevoiceAudio.readWaveform()'),null,'no call, nothing to draw');

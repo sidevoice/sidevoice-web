@@ -19,6 +19,17 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
   // How the call view is laid out on this device (state/call-layout.ts).
   if (!layoutRef.current) layoutRef.current = createCallLayoutStore();
 
+  // The theme and the language the page wears (its root's data-theme and lang), in the facts: the desktop card wears
+  // the room's (FLOATING-CARD-SPEC FC12).
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => store.patch({ pageTheme: root.getAttribute("data-theme") === "dark" ? "dark" : "light", pageLanguage: root.lang || "en" });
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme", "lang"] });
+    return () => observer.disconnect();
+  }, [store]);
+
   useEffect(() => {
     installRoomBridge(store);
     // Without the runtime (the journeys' storyboard) the store is only what was seeded.

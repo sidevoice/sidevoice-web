@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Hand, VolumeX, Power, LockOpen, Sparkle,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Hand, VolumeX, Power, LockOpen, Sparkle, Maximize2, Minimize2,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -87,6 +87,9 @@ export const SpeakerIcon = mark(Volume2, 20);
 export const SpeakerOffIcon = mark(VolumeX, 20);
 /** Turning the voice off from the desktop card (call model B): never the handset, never red. */
 export const PowerIcon = mark(Power, 18);
+/** The desktop card's Size: larger, smaller (VARIANTS `floating-card`, options 1–3). */
+export const LargerIcon = mark(Maximize2, 14);
+export const SmallerIcon = mark(Minimize2, 14);
 /** A conversation that has something you did not hear (call model B's marks): filled while its agent waits for you,
  *  outlined while it works or nobody knows. */
 export function HandIcon({ className, size = 12, filled = false }: IconProps & { filled?: boolean }) {

@@ -1,54 +1,21 @@
 /* The desktop app's call controls card talks to the app through one seam, `window.__sidevoiceDesktop.host.callControls`,
  * which the app injects into the card's window (sidevoice-desktop bridge/call-controls-bridge.js, docs/BRIDGE.md →
  * "The call controls card"). The card never sees the room page: the app relays the call to it and carries its
- * buttons back. Outside the app the seam is absent and the page shows nothing. */
-import type { ParticipantView } from "../state/room-types";
+ * buttons back. Outside the app the seam is absent and the page shows nothing. The playground's preview gives the card
+ * page the same seam, fed from the room frame beside it (preview/mock/card-host.mjs). */
+import type { AgentState, AudioDeviceOption, AudioDevices, CallCardView, CallEnded, CallModel, MicCode } from "../state/room-session-state.js";
+import type { CardCaption } from "../state/card-caption";
 
-/** One device to choose, as the app lists it. `system` is the system's own choice, `number` a device the system lists
- *  without a name (its place, from 1), `missing` the chosen one, no longer connected: the card words those itself. */
-export interface AudioDeviceOption { id: string; label: string; system?: boolean; number?: number; missing?: boolean }
-/** The app's microphones and speakers, the chosen ones, and whether each can be chosen now. */
-export interface AudioDevices {
-  inputs: AudioDeviceOption[]; outputs: AudioDeviceOption[];
-  inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
-}
+export type { AgentState, AudioDeviceOption, AudioDevices, CallEnded, CallModel, CardCaption, MicCode };
 
-/** What the agent is doing: the avatar shows it, and only it. */
-export type AgentState = "idle" | "working" | "speaking";
-
-/** The call as the room window reports it to the app (snapshot version 2 of the desktop bridge). */
-export interface CallSnapshot {
+/** The call as the card shows it (snapshot version 2 of the desktop bridge): the room's own projection of it, the
+ *  store's `callCard` (state/room-session-state.js `callCardView`), passed through, with what is the host's own on top
+ *  — the bridge's version and when the call (A) or the voice (B) went on. One projection, never mapped again by the host
+ *  (briefs/FLOATING-CARD-SPEC.md FC0). The host may mark `devices.busy` while a choice it carries is on its way. */
+export interface CallSnapshot extends CallCardView {
   version: number;
-  ready: boolean;
-  joined: boolean;
-  /** Reconnecting or switching conversation. */
-  busy: boolean;
-  micEnabled: boolean;
-  micDisabled: boolean;
-  /** The conversation the call is on. */
-  title: string;
-  agent: AgentState;
-  /** You are speaking (the room hears a turn open). */
-  youTalking: boolean;
-  /** Something is playing that "skip" would stop. */
-  canSkip: boolean;
-  /** When the call was joined (ms since the epoch); null when not in one. */
+  /** When the call was joined (A), or the voice turned on (B) (ms since the epoch); null when neither. */
   since: number | null;
-  participants: ParticipantView[];
-  devices: AudioDevices | null;
-  /* Call model B, the voice switch (contract gap #38, G9): the card shows while the voice is on (`since` is when it went
-   * on), and can mute the agents. Present only from a room that runs it; each conversation row carries its `mark`. */
-  /** The voice is on. */
-  voiceOn?: boolean;
-  /** The agents are muted: they answer in writing. */
-  agentsMuted?: boolean;
-  /** How many conversations want to talk (a mark, and reachable). */
-  wantToTalk?: number;
-  /** Why the voice last turned itself off; the room's window says it, the card hides. */
-  voiceOffReason?: string | null;
-  /** The call model the room runs: A (`call`) unless it says B (`voice-switch`). Said, never guessed: the room projects
-   *  `voiceOn` in both models. */
-  callModel?: "call" | "voice-switch";
 }
 
 export interface CallControlsState {
@@ -65,6 +32,9 @@ export interface CallControlsState {
   /** Counts clicks the person made outside the card (the app sees them; a window never focused does not): any change
    *  closes an open panel. Absent where the app cannot tell. */
   outsideClicks?: number;
+  /** The words being said, from the room's caption channel (state/card-caption.ts; FC8): page → app `bridge_caption`,
+   *  app → card. Absent where the host carries none: the card then says the state instead. */
+  caption?: CardCaption | null;
 }
 
 export type CallCommand =
@@ -76,7 +46,13 @@ export type CallCommand =
   | { command: "skip-reply" }
   | { command: "open-app" }
   | { command: "select-participant"; threadId: string }
-  | { command: "select-audio-device"; kind: "input" | "output"; id: string };
+  | { command: "select-audio-device"; kind: "input" | "output"; id: string }
+  /** Call model B: "Hear it" for the active conversation, which has a mark (FC9; the room's `hearIt`). */
+  | { command: "hear-it"; threadId: string }
+  /** The idle warning's Keep: a sign of the person, so the call (A) or the voice (B) stays on (FC6). */
+  | { command: "keep-alive" }
+  /** The exit notice's Close: the card goes at once instead of when its time is up (FC7; card-local, the host's). */
+  | { command: "dismiss" };
 
 export interface CallControlsHost {
   /** Called with the whole state at once, and again on every change. Returns the function that stops it. */
