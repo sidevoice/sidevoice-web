@@ -656,6 +656,8 @@ export const en = {
   "runtime.device.cores": "{n} cores",
   "settings.section.notReady": "Not ready",
   "runtime.advanced": "Advanced: how it runs",
+  "runtime.infoLabel": "What is this?",
+  "runtime.info": "Which engine and format run this model on your device (e.g. MLX on Apple silicon). The recommended choice is already the best for this device — change it only if you know why.",
   // The smart end of turn's model (TurnChoices).
   "settings.save.waitTurn": "The end-of-turn model isn't ready yet.",
   "voice.endOfTurn.model": "End-of-turn model",

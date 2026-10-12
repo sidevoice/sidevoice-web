@@ -657,6 +657,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "runtime.device.cores": "{n} núcleos",
   "settings.section.notReady": "No listo",
   "runtime.advanced": "Avanzado: cómo se ejecuta",
+  "runtime.infoLabel": "¿Qué es esto?",
+  "runtime.info": "Qué motor y formato ejecutan este modelo en tu equipo (p. ej. MLX en Apple silicon). Lo recomendado ya es lo mejor para este equipo: cámbialo solo si sabes por qué.",
   // The smart end of turn's model (TurnChoices).
   "settings.save.waitTurn": "El modelo de fin de turno aún no está listo.",
   "voice.endOfTurn.model": "Modelo de fin de turno",

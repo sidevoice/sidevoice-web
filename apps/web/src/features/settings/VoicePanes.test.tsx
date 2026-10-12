@@ -217,6 +217,10 @@ test("how a model runs folds under it: each build with what it runs on and its s
   const { actions } = renderPane();
   const toggle = document.querySelector("#stt-model-card ~ .model-runtime .model-runtime-toggle") as HTMLButtonElement;
   expect(toggle).toHaveAttribute("aria-expanded", "false");
+  // An (i) beside the toggle's words, not inside it, says what this is.
+  const head = toggle.closest(".model-runtime-head")!;
+  expect(head.querySelector(".ui-infotip")).toHaveAccessibleName("What is this?");
+  expect(toggle.querySelector(".ui-infotip")).toBeNull();
   fireEvent.click(toggle);
   const options = [...document.querySelectorAll(".model-runtime-option")].slice(0, 2);
   expect(options[0]).toHaveTextContent("Automatic (recommended)");

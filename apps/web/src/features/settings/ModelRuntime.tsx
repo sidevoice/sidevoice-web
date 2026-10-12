@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { Badge } from "../../components/ui/Badge";
+import { InfoTip } from "../../components/ui/InfoTip";
 import { ChevronIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 import type { ModelBuild } from "@sidevoice/engine";
@@ -63,10 +64,14 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   const auto = builds.find((build) => build.id === recommended);
   return (
     <div className="model-runtime">
-      <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
-        <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
+      {/* The (i) says what this is and that most people can leave it: beside the toggle's words, not inside the toggle. */}
+      <div className="model-runtime-head">
+        <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
+          <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
+        </button>
+        <InfoTip label={t("runtime.infoLabel")}>{t("runtime.info")}</InfoTip>
         <span className="model-runtime-summary">{state.build ? describe(state.build) : ""}</span>
-      </button>
+      </div>
       {open && <div className="model-runtime-panel" id={panel}>
         <DeviceLine t={t} />
         <fieldset className="model-runtime-options">
