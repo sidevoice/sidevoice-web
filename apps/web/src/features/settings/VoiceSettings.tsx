@@ -146,8 +146,11 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const languages = model.model?.languages ?? [];
   const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
   const tryLanguage = draft.stt.language || speechLanguage;
-  // Settings' try says the sample sentence; the first-run setup's is the setup's, started from its footer too.
-  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: t("wizard.sampleText"), language: tryLanguage }) });
+  // Settings' try says its sentence (the sample, editable once it is shown); the first-run setup's is the setup's,
+  // started from its footer too.
+  const [sentence, setSentence] = useState(() => t("wizard.sampleText"));
+  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: tryLanguage }),
+    ...(task === "tts" ? { sentence, setSentence } : {}) });
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried || !!setupTry.inBody} again={setupTry?.tried} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];

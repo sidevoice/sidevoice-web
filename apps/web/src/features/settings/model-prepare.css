@@ -71,3 +71,16 @@
 
 /* The model in use stays until this one is ready (there is no Save: it switches by itself). */
 .model-prepare-pending { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+
+/* The voice's try once started (VoiceTryPlayer, VARIANTS voice-try): `row`, Play and the sentence on one line, the box
+   growing with it; `player`, the sentence quoted with Edit beside it, a big round Play/Stop under it, then how quick. */
+.voice-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.voice-try-row { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; }
+.voice-try-row .voice-try-text { flex: 1; min-width: 0; }
+.voice-try-row > .ui-button { flex: none; }
+.voice-try-quote { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; }
+.voice-try-quote > :first-child { flex: 1; min-width: 0; }
+.voice-try-said { display: block; font-size: var(--sv-font-md); line-height: 1.5rem; color: var(--sv-text); quotes: "“" "”"; }
+.voice-try-controls { display: flex; justify-content: center; }
+.voice-try-play-big { width: 48px; height: 48px; padding: 0; border-radius: 50%; }
+.voice-try-play-big svg { width: 20px; height: 20px; }

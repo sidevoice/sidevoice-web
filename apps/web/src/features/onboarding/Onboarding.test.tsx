@@ -176,30 +176,35 @@ function pendingTry() {
   return running;
 }
 
-test("the voice's try is all in its block — the sentence edited there, lit as it is heard, then how quick and Listen again", async () => {
+test("the voice's try is all in its block — its sentence and Play shown once started, edited there, then how quick and Play again", async () => {
   const store = room();
   paired(store);
   await act(async () => { fireEvent.click(stageAction()); });
   expect(title()).toHaveTextContent("Set up voice");
-  // The sentence to hear is the block's, where it is then heard.
-  const sample = card("tts").querySelector("#wizard-sample") as HTMLTextAreaElement;
-  expect(sample).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
-  fireEvent.change(sample, { target: { value: "Hola, qué tal." } });
+  // Before the try, no sentence and no Play: the footer's try starts it.
+  expect(card("tts").querySelector("#tts-sentence")).toBeNull();
+  expect(card("tts").querySelector("#tts-play")).toBeNull();
+  expect(card("tts").querySelector("#wizard-sample")).toBeNull();
   const running = pendingTry();
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies.", keep: true }));
   expect(card("tts")).toHaveTextContent("Getting ready…");
-  // Playing: the sentence in the field's place, lit up to what was heard; Stop is the block's too.
-  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 5, to: 5 }); });
-  expect(card("tts").querySelector("#wizard-sample")).toBeNull();
-  expect(card("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hola,$/);
-  expect(card("tts").querySelector(".model-try-unsaid")).toHaveTextContent("qué tal.");
-  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Stop");
+  // Playing: the sentence beside Play, not editable while it plays; the block's own Play is Stop.
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
+  expect(card("tts").querySelector("#tts-sentence")).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(card("tts").querySelector("#tts-sentence")).toHaveAttribute("readonly");
+  expect(card("tts").querySelector("#tts-play")).toHaveAccessibleName("Stop");
+  expect(card("tts").querySelector("#wizard-try-again")).toBeNull();
   await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
   expect(card("tts").querySelector("#tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
-  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Listen again");
-  expect(card("tts").querySelector("#wizard-sample")).toHaveValue("Hola, qué tal.");
+  expect(card("tts").querySelector("#tts-play")).toHaveAccessibleName("Play");
   expect(stageAction()).toHaveTextContent(/^Continue$/);
+  // The sentence edited there is what Play says next.
+  fireEvent.change(card("tts").querySelector("#tts-sentence")!, { target: { value: "Hola, qué tal." } });
+  const again = pendingTry();
+  await act(async () => { fireEvent.click(card("tts").querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
+  await act(async () => { again.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
 });
 
 

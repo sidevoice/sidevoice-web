@@ -204,6 +204,56 @@ test("the model's load is said after the try's time only when it had to load (fr
   expect(document.querySelector("#stt-timing .ui-infotip")).toBeNull();
 });
 
+test("the voice's try shows its sentence and Play only once started; edited there, Play says it; Stop stops it", async () => {
+  const { actions } = renderPane();
+  const card = document.getElementById("tts-model-card")!;
+  expect(card.querySelector("#tts-sentence")).toBeNull();
+  expect(card.querySelector("#tts-play")).toBeNull();
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies." }));
+  // Started: the block's own Play (Stop while it plays) beside the sentence, in one row; the slot's Try is gone.
+  expect(document.getElementById("tts-try")).toBeNull();
+  expect(card.querySelector(".voice-try")).toHaveAttribute("data-look", "row");
+  expect(card.querySelector("#tts-sentence")).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(card.querySelector("#tts-play")).toHaveTextContent("Stop");
+  fireEvent.click(card.querySelector("#tts-play")!);
+  expect(actions.cancelVoiceTry).toHaveBeenCalled();
+  await act(async () => { running.finish({ timings: { ready_ms: 300, first_sound_ms: 250 } }); });
+  expect(card.querySelector("#tts-play")).toHaveTextContent("Play");
+  fireEvent.change(card.querySelector("#tts-sentence")!, { target: { value: "Otra frase." } });
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(card.querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
+  await act(async () => { again.finish({}); });
+  // Nothing to say, nothing to play.
+  fireEvent.change(card.querySelector("#tts-sentence")!, { target: { value: "  " } });
+  expect(card.querySelector("#tts-play")).toBeDisabled();
+});
+
+test("the voice's try as a player: the sentence quoted with Edit, a big Play under it, the sentence lit as it plays", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "voice-try": "player" }));
+  const { actions } = renderPane();
+  const card = document.getElementById("tts-model-card")!;
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(card.querySelector(".voice-try")).toHaveAttribute("data-look", "player");
+  expect(card.querySelector("#tts-play")).toHaveClass("voice-try-play-big");
+  expect(card.querySelector("#tts-play")).toHaveAccessibleName("Stop");
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
+  expect(card.querySelector(".model-try-said")).toHaveTextContent(/^Hi!$/);
+  expect(card.querySelector("#tts-sentence")).toBeNull();
+  await act(async () => { running.finish({ timings: { ready_ms: 300, first_sound_ms: 250 } }); });
+  expect(card.querySelector("#tts-play")).toHaveAccessibleName("Play");
+  fireEvent.click(within(card).getByRole("button", { name: "Edit the sentence" }));
+  fireEvent.change(card.querySelector("#tts-sentence")!, { target: { value: "Otra frase." } });
+  fireEvent.click(within(card).getByRole("button", { name: "Done editing" }));
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(card.querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
+  await act(async () => { again.finish({}); });
+});
+
 test("a try that failed says why in the model's block, and offers it again", async () => {
   const { actions } = renderPane();
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
