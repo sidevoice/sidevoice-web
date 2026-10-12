@@ -711,11 +711,7 @@ export const en = {
   "updates.open": "Open",
   "updates.openNamed": "Open {machine} in Machines",
   "updates.none": "Everything is up to date.",
-  // What's new (WhatsNew).
-  "whatsNew.title": "New in Sidevoice",
-  "whatsNew.setUp": "Set up",
-  "whatsNew.gotIt": "Got it",
-  "whatsNew.later": "Later",
+  // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "A smart end of turn",
   "whatsNew.endOfTurn.line": "A small model hears when you have finished, so a pause to think does not cut you off.",
   "whatsNew.speechLanguage.title": "The language you speak",

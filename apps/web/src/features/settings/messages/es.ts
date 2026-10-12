@@ -712,11 +712,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "updates.open": "Abrir",
   "updates.openNamed": "Abrir {machine} en Máquinas",
   "updates.none": "Todo está al día.",
-  // What's new (WhatsNew).
-  "whatsNew.title": "Novedades en Sidevoice",
-  "whatsNew.setUp": "Configurar",
-  "whatsNew.gotIt": "Entendido",
-  "whatsNew.later": "Más tarde",
+  // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "Un fin de turno inteligente",
   "whatsNew.endOfTurn.line": "Un modelo pequeño oye cuándo has terminado, y una pausa para pensar no te corta.",
   "whatsNew.speechLanguage.title": "El idioma en que hablas",

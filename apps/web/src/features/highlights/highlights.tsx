@@ -5,7 +5,7 @@ import { actionableAgent } from "../../services/host-agents";
 import { useRoomStore } from "../../state/room-store";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
 import { hostTranslator } from "../settings/host-i18n";
-import { useWhatsNew, useWhatsNewPlace } from "../whats-new/WhatsNew";
+import { useWhatsNew } from "../whats-new/WhatsNew";
 import { useThisComputerSection } from "../../state/this-computer";
 import "./highlights.css";
 
@@ -18,8 +18,7 @@ import "./highlights.css";
  * this device's. A setting is new only while it is on the page (Settings keeps every section rendered): one not there
  * (Language, before a transcription model is ready) shows no dot anywhere until it appears — nothing to hunt for.
  *
- * Today: agents a machine found and Sidevoice could connect, and — where What's new shows as dots (VARIANTS
- * `whats-new`) — the settings a release added. */
+ * Today: agents a machine found and Sidevoice could connect, and the settings a release added (What's new). */
 
 export interface Highlight {
   id: string;
@@ -71,7 +70,6 @@ function announce(id: string) {
 function useCandidates(): Highlight[] {
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const pairings = useRoomStore((state) => state.facts.pairings);
-  const dots = useWhatsNewPlace() === "dots";
   const features = useWhatsNew().items;
   useSyncExternalStore(subscribePresent, presentNow, presentNow);
   const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
@@ -80,7 +78,7 @@ function useCandidates(): Highlight[] {
   const localFp = useRoomStore((state) => state.machines.find((machine) => machine.local)?.pairingId ?? null);
   const agents = Object.entries(hostAgents).filter(([fp, listing]) => active.has(fp) && !!listing.value)
     .flatMap(([fp, listing]) => (listing.value?.agents ?? []).filter(actionableAgent).map((agent) => ({ id: `agent:${fp}:${agent.id}`, section: ownComputer && localFp === fp ? "this-computer" : "machines", machine: fp })));
-  return [...agents, ...(dots ? features.filter((feature) => present.has(`feature:${feature.id}`)).map((feature) => ({ id: `feature:${feature.id}`, section: feature.section })) : [])];
+  return [...agents, ...features.filter((feature) => present.has(`feature:${feature.id}`)).map((feature) => ({ id: `feature:${feature.id}`, section: feature.section }))];
 }
 
 /** What shows as new now: not seen, not past its two weeks, at most three. Each is recorded as shown the first time. */

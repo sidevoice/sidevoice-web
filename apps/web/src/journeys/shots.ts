@@ -155,9 +155,7 @@ export const JOURNEYS: Journey[] = [
     { id: "u-several", caption: "Several at once: the desktop app, the page, this computer's machine; one entry with their count.", facts: { webUpdate: "b2", pairings: [THIS, NUC], localHostStatus: running, localHostAvailable: true },
       updater: { available: true, version: "0.5.0" }, desktop: { ...localBridge(running), version: { bridge: 1, bundled: { version: "0.5.0" }, installed: { version: "0.4.0" }, core_api: 1, update: "available" } } },
     { id: "u-phone-panel", caption: "On a phone, variant B: in the dropped panel, a dot on the chevron.", facts: { webUpdate: "b2" }, variants: { "updates-entry": "panel" }, views: ["phone"] },
-    { id: "whats-new", caption: "What's new for someone set up on an earlier release: only what needs them, with Set up.", record: { baseline_release: 0 },
-      // Out of a call: what's new never shows during one.
+    { id: "whats-new", caption: "What's new for someone set up on an earlier release: only what needs them, marked new where it is set up.", record: { baseline_release: 0 },
       facts: { ws: null, voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } } },
-    { id: "whats-new-panel", caption: "What's new, variant B: a section of the updates' list.", record: { baseline_release: 0 }, variants: { "whats-new": "panel" } },
   ] },
 ];

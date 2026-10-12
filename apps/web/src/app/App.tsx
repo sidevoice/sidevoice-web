@@ -13,7 +13,6 @@ import { RoomAnnouncer } from "../features/call/RoomAnnouncer";
 import { useVoiceSwitch } from "../state/call-model";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
-import { WhatsNew } from "../features/whats-new/WhatsNew";
 import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
@@ -80,7 +79,6 @@ function RoomContent() {
         {!noMachine && voiceSwitch && <RoomAnnouncer />}
         <ConnectionStatsDialog />
         <SettingsDialog />
-        {!setupPending && <WhatsNew />}
       </div>
       {setupPending && onboarding.ready && !onboarding.open && <main className="setup-main"><SetupPending /></main>}
       {onboarding.ready && <Wizard />}
