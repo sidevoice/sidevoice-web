@@ -147,8 +147,9 @@ function SavedNote({ at, t }: { at: number; t: HostTranslate }) {
 }
 
 function Pane({ id, current, children }: { id: string; current: string; children: ReactNode }) {
-  // A section that fails to draw says so in its own place; the other sections, and Save, stay.
-  return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
+  // A section that fails to draw says so in its own place; the other sections stay. Not a tab panel: the sections are a
+  // navigation, not tabs; the section in it is named by its own heading.
+  return <div id={"pane-" + id} className="settings-pane" hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
 }
 
 /** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
