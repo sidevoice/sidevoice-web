@@ -83,8 +83,21 @@ function useCandidates(): Highlight[] {
 export function useHighlights() {
   const seen = useSyncExternalStore(subscribe, read, read);
   const candidates = useCandidates();
+  const onboarding = useOnboardingIfAny();
+  // Until the first-run setup is finished nothing is new — everything is, there — and what is there then is taken as
+  // seen: only what appears after the setup is ever marked new. While the setup's record is not read yet, nothing shows
+  // and nothing is taken as seen.
+  const settingUp = !!onboarding && onboarding.ready && !onboarding.record.completed_at;
+  const unknown = !!onboarding && !onboarding.ready;
+  const unseen = settingUp ? candidates.filter((item) => !seen[item.id]?.seenAt).map((item) => item.id).join(" ") : "";
+  useEffect(() => {
+    if (!unseen) return;
+    const next = { ...read() };
+    for (const id of unseen.split(" ")) next[id] = { shownAt: next[id]?.shownAt ?? Date.now(), seenAt: Date.now() };
+    write(next);
+  }, [unseen]);
   const now = Date.now();
-  const items = candidates.filter((item) => !seen[item.id]?.seenAt && !(seen[item.id] && now - seen[item.id].shownAt > EXPIRES_MS)).slice(0, AT_ONCE);
+  const items = settingUp || unknown ? [] : candidates.filter((item) => !seen[item.id]?.seenAt && !(seen[item.id] && now - seen[item.id].shownAt > EXPIRES_MS)).slice(0, AT_ONCE);
   const fresh = items.filter((item) => !seen[item.id]).map((item) => item.id).join(" ");
   useEffect(() => {
     if (!fresh) return;
