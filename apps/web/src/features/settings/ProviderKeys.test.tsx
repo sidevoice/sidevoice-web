@@ -134,6 +134,19 @@ test("while the key is tested nothing closes the dialog and it says so; a provid
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Connect OpenAI" }));
 });
 
+test("a key that fails for a reason with no words here says so generically: what the engine said is behind Details, never the sentence", async () => {
+  const { actions } = renderKeys();
+  actions.connectProviderKey.mockRejectedValueOnce(Object.assign(new Error("The native engine failed: keychain locked"), { code: "internal" }));
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+  const dialog = screen.getByRole("dialog", { name: "Connect OpenAI" });
+  fireEvent.change(within(dialog).getByLabelText("API key"), { target: { value: "sk-x" } });
+  await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Connect" })); });
+  await settle();
+  const error = dialog.querySelector(".ui-field-error")!;
+  expect(error.textContent!.startsWith("Something went wrong with the provider's key.")).toBe(true);
+  expect(error.querySelector("details:not([open]) > pre")!.textContent).toBe("internal\nThe native engine failed: keychain locked");
+});
+
 test("Disconnect asks first — what stops, that the key is forgotten, Cancel focused — then moves the provider down, its Connect focused", async () => {
   hint("openai", "7f3a");
   const settings = defaultVoiceSettings();

@@ -11,7 +11,7 @@ import {
 } from "../../services/local-host-install";
 import { hostTranslator } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
-import { localHostBridgeErrorText } from "../settings/local-host-status";
+import { localHostBridgeError } from "../settings/local-host-status";
 import "./pairing.css";
 
 const stepKeys: Record<string, HostMessageKey> = {
@@ -91,7 +91,7 @@ export function LocalHostInstallEntry({
     : null;
   const byteProgress = progress && progress.done !== null && progress.total !== null;
   const error = snapshot.phase === "failed" ? snapshot.error : null;
-  const errorMessage = error ? localHostBridgeErrorText(error, t) : "";
+  const errorMessage = error ? localHostBridgeError(error, t) : null;
   const errorStep = error?.step || (snapshot.phase === "failed" ? snapshot.step : null);
   const displayStep = snapshot.phase === "installing" && snapshot.step ? snapshot.step : errorStep;
   const mappedStep = displayStep ? stepKeys[displayStep] ?? "localInstall.step.unknown" : null;
@@ -123,7 +123,7 @@ export function LocalHostInstallEntry({
             {snapshot.cancelState === "too-late" && <p className="muted" role="status">{t("localInstall.cancelTooLate")}</p>}
             {snapshot.cancelState === "failed" && <p className="muted" role="status">{t("localInstall.cancelFailed")}</p>}
           </>}
-          {snapshot.phase === "failed" && <Alert tone="danger" live className="local-install-error" title={errorMessage}>
+          {snapshot.phase === "failed" && <Alert tone="danger" live className="local-install-error" title={errorMessage?.text} details={errorMessage?.details}>
             {mappedStep ? t("hosts.failureStep", { step: t(mappedStep) }) : undefined}
           </Alert>}
           {snapshot.phase === "cancelled" && <p className="local-install-status" role="status">{t("localInstall.cancelled")}</p>}

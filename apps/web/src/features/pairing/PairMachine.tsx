@@ -8,6 +8,7 @@ import { InfoTip } from "../../components/ui/InfoTip";
 import { Input, Textarea } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
 import type { HostMessageKey } from "../settings/messages/en";
 import {
   ADDRESS_INSECURE, ADDRESS_INVALID, PAIRING_HTTP_BLOCKED, PAIRING_HTTP_ONLY, PAIRING_HTTP_PRIVATE, machineAddress, previewPairingCode,
@@ -22,26 +23,37 @@ import "./pairing.css";
  * machine), the same everywhere: one card, the code first, and how to get one behind a disclosure for when it is needed.
  * This computer's own machine pairs by itself and never comes here. */
 
-type AlertKind = "expired" | "unreachable" | "httpPrivate" | "httpOnly" | "httpBlocked" | "said";
+type AlertKind = "expired" | "unreachable" | "httpPrivate" | "httpOnly" | "httpBlocked" | "said" | "failed";
 /** Why a code was not redeemed, and where that is said: under the field it is about, or in the form's alert. The
- *  controller rejects with device-pairing.js's code or sentence; they are told apart here. */
-type Failure = { field: "code" | "address"; key: HostMessageKey } | { alert: AlertKind; key?: HostMessageKey };
+ *  controller rejects with device-pairing.js's code; anything else is said in the generic words of a failure, what it
+ *  said behind Details (error-message.ts). */
+type Failure = { field: "code" | "address"; key: HostMessageKey } | { alert: AlertKind; key?: HostMessageKey; why?: ErrorMessage };
 
-function failure(reason: unknown): Failure {
-  const message = reason instanceof Error ? reason.message : String(reason);
-  if (message === ADDRESS_INVALID) return { field: "address", key: "pairing.addressInvalid" };
-  if (message === ADDRESS_INSECURE) return { field: "address", key: "pairing.addressInsecure" };
-  if (message === PAIRING_HTTP_PRIVATE) return { alert: "httpPrivate" };
-  if (message === PAIRING_HTTP_ONLY) return { alert: "httpOnly" };
-  if (message === PAIRING_HTTP_BLOCKED) return { alert: "httpBlocked" };
-  if (/Pega el código/.test(message)) return { field: "code", key: "pairing.empty" };
-  if (/empieza por|incompleto o dañado/.test(message)) return { field: "code", key: "pairing.invalid" };
-  if (/otra versión|another version|incompatible/i.test(message)) return { field: "code", key: "pairing.incompatible" };
-  if (/caduc|expired|already used|already been used/i.test(message)) return { alert: "expired" };
-  if (/dónde encontrar|where the machine can be found|solo lleva a la máquina por http/i.test(message)) return { field: "address", key: "pairing.addressNeeded" };
-  if (/navegador no puede comprobar|WebCrypto|verify the machine/i.test(message)) return { alert: "said", key: "pairing.noWebCrypto" };
-  if (/no es la del código|does not match this code/i.test(message)) return { alert: "said", key: "pairing.identityMismatch" };
-  return { alert: "unreachable" };
+const FAILURES: Record<string, Failure> = {
+  [ADDRESS_INVALID]: { field: "address", key: "pairing.addressInvalid" },
+  [ADDRESS_INSECURE]: { field: "address", key: "pairing.addressInsecure" },
+  [PAIRING_HTTP_PRIVATE]: { alert: "httpPrivate" },
+  [PAIRING_HTTP_ONLY]: { alert: "httpOnly" },
+  [PAIRING_HTTP_BLOCKED]: { alert: "httpBlocked" },
+  "code-empty": { field: "code", key: "pairing.empty" },
+  "code-invalid": { field: "code", key: "pairing.invalid" },
+  "code-damaged": { field: "code", key: "pairing.invalid" },
+  "code-version": { field: "code", key: "pairing.incompatible" },
+  "code-expired": { alert: "expired" },
+  // The machine said the code was not one it could take: used, or expired.
+  "code-spent": { alert: "expired" },
+  "code-no-address": { field: "address", key: "pairing.addressNeeded" },
+  "code-plaintext": { field: "address", key: "pairing.addressNeeded" },
+  "no-webcrypto": { alert: "said", key: "pairing.noWebCrypto" },
+  "identity-mismatch": { alert: "said", key: "pairing.identityMismatch" },
+  unreachable: { alert: "unreachable" },
+};
+
+function failure(reason: unknown, t: HostTranslate): Failure {
+  const known = FAILURES[failureParts(reason).code];
+  if (known) return known;
+  // The machine answered and said no (its own sentence behind Details), or something this screen has no words for.
+  return { alert: "failed", why: errorMessage(reason, { t, what: "pairing", known: (code) => code === "pair-refused" ? t("pairing.failed") : null }) };
 }
 
 /** What the code pasted says, or nothing while it is not one that could be used. */
@@ -81,7 +93,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   // Connecting: over https (Connect), or without encryption once the person agreed (its own button).
   const [busy, setBusy] = useState<"https" | "insecure" | null>(null);
   const [fieldError, setFieldError] = useState<{ field: "code" | "address"; key: HostMessageKey } | null>(null);
-  const [alert, setAlert] = useState<{ kind: AlertKind; key?: HostMessageKey; host: string; address: string } | null>(null);
+  const [alert, setAlert] = useState<{ kind: AlertKind; key?: HostMessageKey; why?: ErrorMessage; host: string; address: string } | null>(null);
   const [connected, setConnected] = useState("");
   // What a screen reader hears once when a code is recognised; the line under the field counts the minutes down quietly.
   const [heard, setHeard] = useState("");
@@ -153,7 +165,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     setFieldError(null);
     // The code's own addresses did not answer: where else it might be is asked for.
     if (why.alert === "unreachable") setAddressAsked(true);
-    setAlert({ kind: why.alert, key: why.key, host, address: typed });
+    setAlert({ kind: why.alert, key: why.key, why: why.why, host, address: typed });
   }
 
   async function submit(event: FormEvent) {
@@ -161,12 +173,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     if (busy) return;
     setConnected("");
     let seen: PairingCodePreview;
-    try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason), "", ""); return; }
+    try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason, t), "", ""); return; }
     const host = named(seen.host, t);
     const typed = addressShown || !seen.reachable ? address.trim() : "";
     if (!seen.reachable && !typed) { refuse({ field: "address", key: "pairing.addressNeeded" }, host, ""); return; }
     if (typed) {
-      try { machineAddress(typed); } catch (reason) { refuse(failure(reason), host, typed); return; }
+      try { machineAddress(typed); } catch (reason) { refuse(failure(reason, t), host, typed); return; }
     }
     await redeem(seen, typed, false);
   }
@@ -188,7 +200,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
       setAlert(null);
       setConnected(t(insecure ? "pairing.connectedInsecure" : "pairing.connected", { host: named(result?.host ?? seen.host, t) }));
     } catch (reason) {
-      const why = failure(reason);
+      const why = failure(reason, t);
       if (insecure && !("field" in why)) refocusConnect.current = true;
       // Not reached without encryption either: the machine is named, not the https address.
       refuse(why, host, insecure ? "" : typed);
@@ -201,7 +213,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   function agree() {
     if (busy || alert?.kind !== "httpPrivate") return;
     let seen: PairingCodePreview;
-    try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason), "", ""); return; }
+    try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason, t), "", ""); return; }
     void redeem(seen, alert.address, true);
   }
 
@@ -226,6 +238,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
       case "httpOnly": return <Alert tone="danger" live title={upperFirst(t("pairing.httpOnly", { host: alert.host }))} />;
       case "httpBlocked": return <Alert tone="warning" live title={t("pairing.httpBlocked")} />;
       case "said": return <Alert tone="danger" live title={t(alert.key ?? "pairing.unreachable")} />;
+      case "failed": return <Alert tone="danger" live title={alert.why?.text ?? t("pairing.failed")} details={alert.why?.details} />;
     }
   }
 

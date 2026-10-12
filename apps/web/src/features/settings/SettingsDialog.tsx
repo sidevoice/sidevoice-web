@@ -20,6 +20,7 @@ import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
 import { MachineEntryCopy, MachineState, machineEntryName } from "./MachineState";
 import { Alert } from "../../components/ui/Alert";
+import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
@@ -33,9 +34,9 @@ import "./settings.css";
 
 /* Settings: a screen of their own, its sections beside its content on a desktop; on a phone a menu of them, each
  * section a page of its own under it (settings-levels.tsx). The runtime opens and closes it by its ids
- * (#language-settings, #settings-close) and writes what fails under its header (#settings-error), whatever shows; which
- * section shows is the store's `settingsSection`, which the runtime also sets (no machine yet, an agent waiting). There
- * is no Save: every setting applies as it changes. */
+ * (#language-settings, #settings-close) and says what fails under its header (#settings-error, the store's
+ * `settingsError`), whatever shows; which section shows is the store's `settingsSection`, which the runtime also sets
+ * (no machine yet, an agent waiting). There is no Save: every setting applies as it changes. */
 
 /** Each section in the nav's order, its icon drawn at the size asked (the nav's, by default; a phone's row, 20px). */
 const SECTIONS: { id: string; label: HostMessageKey; icon: (size?: number) => ReactNode }[] = [
@@ -173,6 +174,12 @@ function useSummaries(t: HostTranslate, thisDevice: MachineStatus): Record<strin
   };
 }
 
+/** What failed while Settings was open (the store's `settingsError`): its sentence, what was raw about it behind Details. */
+function SettingsError() {
+  const error = useRoomStore((state) => state.facts.settingsError);
+  return <div id="settings-error" className="settings-error" role="alert">{error && <ErrorText message={error} />}</div>;
+}
+
 export function SettingsDialog() {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
@@ -246,7 +253,7 @@ export function SettingsDialog() {
           {/* No Save: every setting applies as it changes. */}
           <form id="language-form" className="settings-layout">
             {/* What fails says so here, under the header, whichever level shows. */}
-            <p id="settings-error" className="settings-error" role="alert" />
+            <SettingsError />
             <nav ref={nav} className="ui-nav settings-nav" aria-label={t("settings.sections")} hidden={!navShown}
               inert={motionOf(across, 1)?.startsWith("out") || undefined} data-motion={motionOf(across, 1)}>
               {phone ? <ul className="settings-menu">

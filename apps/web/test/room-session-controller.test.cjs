@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js'};
+ const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./host-i18n':'HostI18n'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -383,7 +383,7 @@ test('A call with no sign of a person asks, then leaves, and only this browser l
  assert.equal(s.run('state.liveNote'),'');
  s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS-1;checkIdle()");
  assert.equal(s.run('state.ws'),null,'with no answer the browser leaves the call');
- assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/Saliste de la llamada/);
+ assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/^You left the call: 15 minutes without a sign from you/);
 });
 test('The waveform bubble draws the level the voice reports, and nothing without a call',()=>{
  const s=setup();
@@ -502,7 +502,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const socket=await firstSocket(room.sockets);
  socket.onerror();socket.onclose({code:1006});   // everything the socket could have said, lost on the way
  await joined;
- assert.equal(full.run('roomStore.getState().join.text'),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.',
+ assert.equal(full.run('roomStore.getState().join.text'),'The room already has the maximum number of devices connected. Wait for someone to leave and join again.',
   'the reason came from the room, asked over a request no proxy rewrites');
  assert.deepEqual(room.voice.calls.at(-1),['stop'],'and the voice the join started is stopped');
 
@@ -515,7 +515,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
   message:'The room already has the maximum number of browsers connected.'}})});
  telling.onclose({code:1006});
  await tellJoined;
- assert.equal(told.run('roomStore.getState().join.text'),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.');
+ assert.equal(told.run('roomStore.getState().join.text'),'The room already has the maximum number of devices connected. Wait for someone to leave and join again.');
 
  // A room that answers nothing at all is not a room that refused: the page says which it was.
  const gone=setup({strictDOM:true});
@@ -524,18 +524,30 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const lost=await firstSocket(away.sockets);
  lost.onerror();lost.onclose({code:1006});
  await awayJoined;
- assert.equal(gone.run('roomStore.getState().join.text'),'No se pudo conectar con la sala.');
+ assert.equal(gone.run('roomStore.getState().join.text'),'Could not connect to the room.');
+
+ // A refusal this page has no words for is the room refusing: what the room said is only behind Details, and a device
+ // set to Spanish reads it in Spanish.
+ const other=setup({strictDOM:true});other.saved['sidevoice.settings']=JSON.stringify({ui_language:'es'});
+ const odd=joining(other,{admission:{admitted:false,reason:'device_quarantined',message:'This device is quarantined by policy.'}});
+ const oddJoined=odd.tap();
+ const oddSocket=await firstSocket(odd.sockets);
+ oddSocket.onerror();oddSocket.onclose({code:1006});
+ await oddJoined;
+ assert.equal(other.run('roomStore.getState().join.text'),'La sala no deja entrar a este dispositivo.');
+ assert.equal(other.run('roomStore.getState().join.details'),'device_quarantined\nThis device is quarantined by policy.');
 });
 test('A voice that cannot start says why, and opens no socket',async()=>{
  const s=setup({strictDOM:true});
  const room=joining(s,{start:async()=>{throw Object.assign(Error('denied'),{code:'microphone-denied'})}});
  await room.tap();
- assert.match(s.run('roomStore.getState().join.text'),/micrófono está bloqueado para esta página/);
+ assert.match(s.run('roomStore.getState().join.text'),/^The microphone is blocked for this page/);
+ assert.equal(s.run('roomStore.getState().join.details'),'denied','what the voice said is only a detail');
  assert.equal(room.sockets.length,0);
  const missing=setup({strictDOM:true});
  const none=joining(missing,{voice:null});
  await none.tap();
- assert.match(missing.run('roomStore.getState().join.text'),/aún no está disponible/,'a page with no voice module says so');
+ assert.match(missing.run('roomStore.getState().join.text'),/not available in this version of the page yet/,'a page with no voice module says so');
 });
 test('The page answers when the room asks whether anybody is still there',()=>{
  // The room asks because a closed tab behind a tunnel leaves its socket up and its seat taken.
@@ -868,10 +880,11 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
   if(frame)socket.onmessage({data:JSON.stringify({type:'error',data:frame})});
   socket.onclose({code:1013});return pending.then(()=>null,error=>error)};
  const away=await refused({message:'Esa máquina no está conectada a la sala ahora mismo.',reason:'node_offline'});
- assert.equal(away.message,'Esa máquina no está conectada a la sala ahora mismo.');
+ assert.equal(away.message,'The machine is not connected to the room right now.');
+ assert.equal(away.words.text,away.message);
  assert.equal(away.refused,false,'a machine restarting may be back at the next attempt');
  const full=await refused(null);
- assert.match(full.message,/máximo de dispositivos/,'the close code alone still means a full room');
+ assert.match(full.message,/maximum number of devices/,'the close code alone still means a full room');
  assert.equal(full.refused,true);
 });
 // ----- a dropped call taken back as it was -----
@@ -1152,13 +1165,13 @@ test('Voice settings apply as they change: checked by the voice, kept on this de
  assert.equal(asked.some(({init})=>String(init.body||'').includes('gpt-4o-transcribe')),false,'the room is not told');
 });
 test('Settings the voice refuses are not kept, and the reason is said with the provider\'s own words',async()=>{
- const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'credential-missing',detail:'invalid_api_key'})}});
+ const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('credential-rejected'),{code:'credential-rejected',detail:'invalid_api_key: Incorrect API key'})}});
  s.run("$('settings-open').onclick()");await settleSoon();
  const before=plain(s.run('voiceSettings'));
  // A change that is ready at once (a model still to come waits, and never reaches the voice).
  s.run("window.sidevoiceActions.editVoice({patience:'calm'})");
  await s.run("applying");await settleSoon();
- assert.match(s.run("$('settings-error').textContent"),/Falta la clave del proveedor.*invalid_api_key/);
+ assert.deepEqual(plain(s.run('settingsError')),{text:"The provider didn't accept the key: it was revoked or mistyped.",said:'invalid_api_key: Incorrect API key'});
  assert.deepEqual(plain(s.run('voiceSettings')),before);
  assert.equal(s.run("localStorage.getItem('sidevoice.voice-settings')"),null);
 });
@@ -1178,17 +1191,17 @@ test('An app that does not give the page its catalogues yet says so, and still k
  const s=setup({strictDOM:true});withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
  s.run("$('settings-open').onclick()");await settleSoon();
  assert.equal(s.run('voiceCatalogue.state'),'failed');
- assert.match(s.run('voiceCatalogue.error'),/lista de modelos/);
+ assert.match(s.run('voiceCatalogue.error'),/does not give the page the list of models yet/);
 });
 test('A page with no voice keeps its settings unchecked and says why it cannot keep a key',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
  s.run("$('settings-open').onclick()");await settleSoon();
  assert.equal(s.run('voiceCatalogue.state'),'failed');
- assert.match(s.run('voiceCatalogue.error'),/aún no está disponible/);
+ assert.match(s.run('voiceCatalogue.error'),/not available in this version of the page yet/);
  s.run("window.sidevoiceActions.editVoice({patience:'fast'})");
  await s.run('applying');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).patience,'fast');
- await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),/aún no está disponible/);
+ await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),{code:'voice-module-unavailable'},'its code, for the key\'s dialog to say');
 });
 
 // ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
@@ -1266,7 +1279,7 @@ test('A voice failure is said and logged',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>name==='setBootError'?value=>said.push(value):()=>{}});
  voice.emit('error',{code:'credential-missing'});
- assert.match(said.at(-1)||'',/Falta la clave del proveedor/);
+ assert.match(said.at(-1)?.text||'',/^The provider's key is missing/);
  assert.deepEqual(plain(c.frames(c.first).filter(m=>m.type==='voice-client-error').map(m=>[m.data.kind,m.data.message])),[['voice','credential-missing']]);
  s.run('disconnect()');
 });
@@ -1357,17 +1370,23 @@ test('A held turn refused again keeps its words, and starts again at the next en
 });
 
 // ----- a browser that blocks site data, and a page served as a static site -----
-test('A browser\'s own refusal is said in words, by its name: never its legacy number',()=>{
+test('A browser\'s own refusal is said in words, its name behind Details: never its legacy number',()=>{
  const s=setup({strictDOM:true});
  // A DOMException carries a numeric code (18 for a SecurityError): that is never what the person reads.
  const security={name:'SecurityError',code:18,message:'The operation is insecure.'};
- assert.match(s.run('voiceErrorText')(security),/blocking site data for this page/);
- assert.match(s.run('voiceErrorText')({code:'storage-blocked'}),/blocking site data for this page/);
- const denied=s.run('voiceErrorText')({name:'NotAllowedError',code:0});
- assert.match(denied,/NotAllowedError/);assert.doesNotMatch(denied,/\(\d+\)/);
- assert.doesNotMatch(s.run('voiceErrorText')({name:'InvalidStateError',code:11}),/\b11\b/);
- // The engine's own codes keep their sentence, and a provider's words follow.
- assert.match(s.run('voiceErrorText')({code:'credential-missing',detail:'invalid_api_key'}),/Falta la clave del proveedor.*invalid_api_key/);
+ assert.match(s.run('voiceError')(security).text,/blocking site data for this page/);
+ assert.match(s.run('voiceError')({code:'storage-blocked'}).text,/blocking site data for this page/);
+ const denied=s.run('voiceError')({name:'NotAllowedError',code:0});
+ assert.equal(denied.text,"The browser refused something the call's voice needs.");
+ assert.equal(denied.details,'NotAllowedError');
+ const state=s.run('voiceError')({name:'InvalidStateError',code:11});
+ assert.doesNotMatch(state.text+(state.details||''),/\b11\b/);
+ // The engine's own codes keep their sentence; a provider's words follow its refusal, and any other detail is behind
+ // Details, never the sentence.
+ assert.deepEqual(plain(s.run('voiceError')({code:'credential-missing',detail:'no key'})),{text:"The provider's key is missing. Add it in Settings → Providers.",details:'no key'});
+ assert.deepEqual(plain(s.run('voiceError')({code:'credential-rejected',detail:'invalid_api_key'})),{text:"The provider didn't accept the key: it was revoked or mistyped.",said:'invalid_api_key'});
+ // A code with no words here: the generic line, the code and what came with it behind Details.
+ assert.deepEqual(plain(s.run('voiceError')({code:'format-model',message:'format model q5 unsupported'})),{text:'Something went wrong with the voice.',details:'format-model\nformat model q5 unsupported'});
 });
 test('A static site asks its own origin nothing; a page with a room in front of it still does',async()=>{
  const s=setup({strictDOM:true}),asked=[];
@@ -1508,7 +1527,8 @@ test('A model the slot names but that is not on this device installs, its progre
  engine.install=async()=>{throw Object.assign(Error('net'),{code:'download-failed'})};
  await s.run("window.sidevoiceActions.installVoiceModel('tts')");
  assert.equal(s.run('state.voiceInstall.state'),'failed');
- assert.match(s.run('state.voiceInstall.error'),/download-failed/);
+ assert.equal(s.run('state.voiceInstall.error'),'The model could not be downloaded. Check the connection and try again.');
+ assert.equal(s.run('state.voiceInstall.details'),'net','what the engine said is only a detail');
 });
 
 test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{

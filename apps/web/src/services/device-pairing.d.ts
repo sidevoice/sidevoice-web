@@ -68,7 +68,7 @@ export function privateHost(hostname: string): boolean;
 export function bytesToBase64url(input: Uint8Array | ArrayBuffer): string;
 export function base64ToBytes(text: string): Uint8Array;
 export function utf8(text: string): Uint8Array;
-export function pairingError(message: string): Error & { pairing: true };
+export function pairingError(message: string, code?: string): Error & { pairing: true; code: string };
 export const ADDRESS_INVALID: "address-invalid";
 export const ADDRESS_INSECURE: "address-insecure";
 export const PAIRING_HTTP_ONLY: "pairing-http-only";

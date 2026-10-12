@@ -7,6 +7,8 @@ import { Field } from "../../components/ui/Field";
 import { Input, type InputProps } from "../../components/ui/Input";
 import { Row } from "../../components/ui/Card";
 import { ExternalLinkIcon, EyeIcon, EyeOffIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
+import { ErrorDetails } from "../../components/ui/ErrorText";
+import { errorMessage, type ErrorMessage } from "./error-message";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 
@@ -50,16 +52,20 @@ export function reasonState(code: string | undefined): KeyState {
   return "problem";
 }
 
-/** What went wrong with a key, in words, and the provider's own words after them (`detail`, when it gave any).
+/** The states that are the provider answering about the key: its own words may follow what is said of them. */
+export const PROVIDER_SAYS = new Set<KeyState>(["rejected", "permission", "quota", "limited", "unreachable"]);
+
+/** What went wrong with a key, in words (error-message.ts): a provider's reason by its code, the provider's own words
+ *  after it (`said`, when it gave any); anything else a generic line, what was raw about it behind Details.
  *  `typed`: a key just typed — said as what to check in it, or that it could not be checked. */
-export function keyError(t: HostTranslate, error: unknown, name: string, typed = false): { words: string; detail: string } {
-  const failure = error as { code?: string; detail?: string; message?: string } | null;
-  const state = reasonState(failure?.code);
-  const words = typed && state === "rejected" ? t("keys.entry.rejected", { provider: name })
-    : typed && state === "unreachable" ? t("keys.entry.unreachable", { provider: name })
-    : state !== "connected" && state !== "problem" ? t(("keys.why." + state) as HostMessageKey, { provider: name, last4: "" })
-    : failure?.code ? t("keys.failed", { code: failure.code }) : failure?.message || t("keys.failedPlain");
-  return { words, detail: failure?.detail ?? "" };
+export function keyError(t: HostTranslate, error: unknown, name: string, typed = false): ErrorMessage {
+  return errorMessage(error, { t, what: "key", known: (code) => {
+    const state = reasonState(code);
+    return typed && state === "rejected" ? t("keys.entry.rejected", { provider: name })
+      : typed && state === "unreachable" ? t("keys.entry.unreachable", { provider: name })
+      : state !== "connected" && state !== "problem" ? t(("keys.why." + state) as HostMessageKey, { provider: name, last4: "" })
+      : null;
+  } });
 }
 
 /** Where the key is really kept, then where to get one: two muted lines. */
@@ -102,7 +108,7 @@ export function KeyDialog({ provider, name, replacing, onDone, onCancel }: KeyDi
   const t = hostTranslator();
   const [value, setValue] = useState("");
   const [shown, setShown] = useState(false);
-  const [error, setError] = useState<{ words: string; detail: string } | null>(null);
+  const [error, setError] = useState<ErrorMessage | null>(null);
   const [testing, setTesting] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const titleId = useId();
@@ -141,7 +147,7 @@ export function KeyDialog({ provider, name, replacing, onDone, onCancel }: KeyDi
         <Button variant="primary" disabled={!value.trim()} loading={testing} onClick={() => void submit()}>{t(replacing ? "keys.replace" : "keys.connect")}</Button>
       </>}>
       {replacing && <p className="provider-key-replacing">{t("keys.replacing", { last4: replacing })}</p>}
-      <Field label={t("keys.apiKey")} error={error ? <>{error.words}{error.detail && <span className="provider-key-detail"> {error.detail}</span>}</> : undefined}
+      <Field label={t("keys.apiKey")} error={error ? <div>{error.text}{error.said && <span className="provider-key-detail" translate="no"> {error.said}</span>}<ErrorDetails details={error.details} /></div> : undefined}
         hint={<KeyHelp provider={provider} name={name} t={t} />}>
         <KeyInput ref={field} shown={shown} onReveal={() => setShown(!shown)} t={t} value={value} readOnly={testing} placeholder={t("keys.placeholder.new")}
           onChange={(event) => { setValue(event.target.value); setError(null); }} onKeyDown={enter} />
@@ -157,17 +163,18 @@ export function DisconnectDialog({ provider, name, last4, inUse, onDone, onCance
 }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorMessage | null>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   async function disconnect() {
     if (busy) return;
-    setBusy(true); setError("");
+    setBusy(true); setError(null);
     try { await window.sidevoiceActions?.saveProviderKey(provider, null); }
     catch (failure) {
       setBusy(false);
-      const { detail } = keyError(t, failure, name);
-      setError(`${t("keys.disconnectFailed", { provider: name })}${detail ? " " + detail : ""}`);
+      // Its own sentence, whatever failed: what the key's failure said goes behind Details.
+      const why = keyError(t, failure, name);
+      setError({ text: t("keys.disconnectFailed", { provider: name }), details: [why.text, why.said, why.details].filter(Boolean).join("\n") });
       return;
     }
     writeHint(provider, null);
@@ -187,7 +194,7 @@ export function DisconnectDialog({ provider, name, last4, inUse, onDone, onCance
         {t(inUse.length > 1 ? "keys.disconnectInUse.many" : "keys.disconnectInUse.one", { uses, provider: name })}</p>}
       <p>{last4 ? t("keys.disconnectForget", { last4, provider: name }) : t("keys.disconnectForgetPlain", { provider: name })}</p>
       <p className="muted">{t("keys.disconnectRevoke", { provider: name })}</p>
-      {error && <p className="provider-key-error" role="alert"><WarningIcon size={16} />{error}</p>}
+      {error && <div className="provider-key-error" role="alert"><WarningIcon size={16} /><div>{error.text}<ErrorDetails details={error.details} /></div></div>}
     </Dialog>, document.body);
 }
 

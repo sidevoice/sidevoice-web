@@ -91,6 +91,7 @@
 .provider-row-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
 .provider-row-problem > svg { flex: none; color: var(--sv-warning); }
 .provider-row-problem p { flex: 1 1 14rem; margin: 0; }
+.provider-row-why { flex: 1 1 14rem; min-width: 0; }
 .provider-row[data-state="rejected"] .provider-row-problem > svg, .provider-row[data-state="unreadable"] .provider-row-problem > svg { color: var(--sv-danger); }
 .provider-key-detail { color: var(--sv-text-muted); }
 .provider-row-action { flex: none; margin-top: 4px; }

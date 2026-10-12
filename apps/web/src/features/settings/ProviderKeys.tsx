@@ -3,6 +3,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Alert } from "../../components/ui/Alert";
+import { ErrorDetails } from "../../components/ui/ErrorText";
 import { Section } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { CloseIcon, LinkIcon, ProviderLogo, SearchIcon, UnlinkIcon, WarningIcon } from "../../components/ui/Icons";
@@ -11,7 +12,8 @@ import type { CatalogView } from "../../services/model-catalogs.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import { catalogueShown } from "./ModelSetup";
 import type { HostMessageKey } from "./messages/en";
-import { DisconnectDialog, KeyDialog, keyError, listed, readHint, reasonState, useFocusBack, type KeyState } from "./ProviderConnect";
+import { DisconnectDialog, KeyDialog, keyError, listed, PROVIDER_SAYS, readHint, reasonState, useFocusBack, type KeyState } from "./ProviderConnect";
+import { errorLine } from "./error-message";
 
 /* The remote providers, as a catalogue of connections: "Your providers" lists those with a key — the mark, the name with
  * how its key stands right after it, what it is for, and Disconnect — and "Add a provider" offers the rest as cards in a
@@ -74,10 +76,15 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
   // The page's note of the key, read as drawn: the dialog writes it once the key is kept, after this row appears.
   const last4 = readHint(provider)?.last4 ?? null;
   const problem = state !== "connected" && state !== "unknown";
+  // The provider's own words follow its reason; anything else there is to know (a reason this page has no words for, what
+  // the engine said) is behind Details.
+  const detail = catalog?.status.detail ?? "";
+  const said = PROVIDER_SAYS.has(state) ? detail : "";
+  const raw = said ? "" : [state === "problem" ? catalog?.status.reason?.code ?? "" : "", detail].filter(Boolean).join("\n");
   async function test() {
     setTesting(true); setNote("");
     try { await window.sidevoiceActions?.testProviderKey?.(provider); }
-    catch (failure) { setTesting(false); setNote(keyError(t, failure, name).words); return; }
+    catch (failure) { setTesting(false); setNote(errorLine(keyError(t, failure, name))); return; }
     setTesting(false);
     const after = reasonState(store?.getState().facts.voiceCatalogue.catalogs.find((entry) => entry.id === provider)?.status.reason?.code);
     if (after === "connected") { setNote(t("keys.tested")); row.current?.focus(); }
@@ -95,8 +102,11 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
         <span className="provider-row-line">{usedFor(provider, catalog, t)}</span>
         {problem && <div className="provider-row-problem">
           <WarningIcon size={14} />
-          <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
-            {catalog?.status.detail ? <span className="provider-key-detail"> {catalog.status.detail}</span> : null}</p>
+          <div className="provider-row-why">
+            <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
+              {said ? <span className="provider-key-detail" translate="no"> {said}</span> : null}</p>
+            <ErrorDetails details={raw} />
+          </div>
           {REPLACE_FOR.has(state)
             ? <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={(event) => show("replace", event.currentTarget)}>{t("keys.replace")}</Button>
             : <Button variant="secondary" size="sm" loading={testing} aria-label={t("keys.testNamed", { provider: name })} onClick={() => void test()}>{t("keys.testAgain")}</Button>}
@@ -201,7 +211,7 @@ export function ProviderKeys() {
             rather than listing none. */}
         {!catalogueShown(catalogue) && (catalogue.state === "loading" || catalogue.state === "idle") ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
         {catalogue.state === "failed" ? (
-          <div id="provider-keys-failed" role="alert"><Alert tone="danger" title={catalogue.error}
+          <div id="provider-keys-failed" role="alert"><Alert tone="danger" title={catalogue.error} details={catalogue.details}
             action={<Button id="provider-keys-retry" size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /></div>
         ) : null}
         {catalogueShown(catalogue) && !providers.length ? <p className="muted" id="provider-keys-none">{t("keys.none")}</p> : null}

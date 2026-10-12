@@ -6,11 +6,13 @@ import { Badge } from "../../components/ui/Badge";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { CallIcon, EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Row } from "../../components/ui/Card";
+import { ErrorText } from "../../components/ui/ErrorText";
 import { LOCAL_CATALOG } from "../../services/model-catalogs.js";
 import { DELETE_UNUSED_DAYS, modelPurposes, staleModels, type ModelPurpose } from "../../services/model-housekeeping.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { sizeText } from "./ModelSetup";
+import { voiceFailure, type ErrorMessage } from "./error-message";
 
 /* The models on this device's storage, each with the space it takes and what it is for — a purpose chip: Transcription,
  * Voice, End of turn, Every call (the voice activity detector) — so a person knows Kokoro is a voice. Those in use come
@@ -70,13 +72,13 @@ function usePurposes() {
   return (model: string) => [...new Set([...editing(model), ...now(model)])];
 }
 
-/** Deletes `ids` one by one: how many went, and the first that stayed with why (running now, or what the engine said). */
+/** Deletes `ids` one by one: how many went, and the first that stayed with why (running now, or why in words). */
 async function deleteAll(ids: string[]) {
-  let done = 0, kept: { id: string; running: boolean; message: string } | null = null;
+  let done = 0, kept: { id: string; running: boolean; why: ErrorMessage } | null = null;
   for (const id of ids) {
     try { await window.sidevoiceActions?.uninstallVoiceModel?.(id); done++; }
     catch (failure) {
-      kept ??= { id, running: (failure as { code?: string } | null)?.code === "model-in-use", message: (failure as Error)?.message ?? "" };
+      kept ??= { id, running: (failure as { code?: string } | null)?.code === "model-in-use", why: voiceFailure(failure, { what: "delete" }) };
     }
   }
   return { done, kept };
@@ -85,11 +87,11 @@ async function deleteAll(ids: string[]) {
 function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: Downloaded; inUse: boolean; removable: boolean; chip?: boolean; t: HostTranslate }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorMessage | null>(null);
   const deleteButton = useRef<HTMLButtonElement>(null);
   const size = sizeText(model.bytes);
   async function remove() {
-    setBusy(true); setError("");
+    setBusy(true); setError(null);
     try {
       await window.sidevoiceActions?.uninstallVoiceModel?.(model.id);
       // Its row goes: the focus goes to the list's heading rather than to the page.
@@ -97,7 +99,7 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
     }
     catch (failure) {
       const code = (failure as { code?: string } | null)?.code;
-      setError(code === "model-in-use" ? t("settings.advanced.deleteBusy", { model: model.id }) : (failure as Error).message);
+      setError(code === "model-in-use" ? { text: t("settings.advanced.deleteBusy", { model: model.id }) } : voiceFailure(failure, { what: "delete" }));
       setAsking(false);
     } finally { setBusy(false); }
   }
@@ -121,7 +123,7 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
           <Button variant="danger" size="sm" loading={busy} onClick={() => void remove()}>{t("settings.advanced.delete")}</Button>
         </div>
       </div>}
-      {error && <p className="downloaded-model-error" role="alert">{error}</p>}
+      {error && <ErrorText className="downloaded-model-error" role="alert" message={error} />}
     </div>
   );
 }
@@ -134,7 +136,7 @@ export function DownloadedModels() {
   const total = sizeText(models.reduce((sum, model) => sum + model.bytes, 0));
   const [askingAll, setAskingAll] = useState(false);
   const [busyAll, setBusyAll] = useState(false);
-  const [allNote, setAllNote] = useState("");
+  const [allNote, setAllNote] = useState<ErrorMessage | null>(null);
   const inUse = (model: Downloaded) => purposes(model.id).length > 0;
   // One plain list: the voice detector first (every call needs it), then the rest in use by purpose, then those not in
   // use, the largest first, as storage lists are.
@@ -145,11 +147,11 @@ export function DownloadedModels() {
   const unused = sorted.filter((model) => !inUse(model));
   const freed = sizeText(unused.reduce((sum, model) => sum + model.bytes, 0));
   async function removeAll() {
-    setBusyAll(true); setAllNote("");
+    setBusyAll(true); setAllNote(null);
     const { done, kept } = await deleteAll(unused.map((model) => model.id));
     setBusyAll(false); setAskingAll(false);
-    if (kept) setAllNote(kept.running ? t("settings.advanced.deleteAllPartial", { done, count: unused.length, model: kept.id })
-      : t("settings.advanced.deleteAllFailed", { done, count: unused.length, model: kept.id, reason: kept.message }));
+    if (kept) setAllNote(kept.running ? { text: t("settings.advanced.deleteAllPartial", { done, count: unused.length, model: kept.id }) }
+      : { text: t("settings.advanced.deleteAllFailed", { done, count: unused.length, model: kept.id, reason: kept.why.text }), details: kept.why.details });
     document.getElementById("downloaded-models")?.focus();
   }
   const row = (model: Downloaded, chip = true) => <DownloadedModel key={model.id} model={model} inUse={inUse(model)} removable={removable} chip={chip} t={t} />;
@@ -163,7 +165,7 @@ export function DownloadedModels() {
           <Button variant="danger" size="sm" loading={busyAll} onClick={() => void removeAll()}>{t("settings.advanced.deleteAllYes", { count: unused.length })}</Button>
         </div>
       </div>}
-    {allNote && <p className="downloaded-model-error" role="status">{allNote}</p>}
+    {allNote && <ErrorText className="downloaded-model-error" role="status" message={allNote} />}
   </div>;
   return (
     <Row block label={t("settings.advanced.downloaded")}

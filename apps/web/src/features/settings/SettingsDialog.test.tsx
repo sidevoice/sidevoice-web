@@ -132,7 +132,7 @@ test("Remove all deletes every model not in use, asking first with how many and 
   expect(screen.getByRole("group", { name: "Remove all" })).toHaveTextContent("Delete 2 models not in use and free 126 MB?");
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Delete 2 models" })));
   expect(uninstall.mock.calls.map(([id]) => id)).toEqual(["whisper-small", "whisper-tiny"]);
-  expect(screen.getByText(/^Deleted 1 of 2\. whisper-tiny is running right now/)).toHaveAttribute("role", "status");
+  expect(screen.getByText(/^Deleted 1 of 2\. whisper-tiny is running right now/).closest(".downloaded-model-error")).toHaveAttribute("role", "status");
 });
 
 test("where the engine can't delete models, they are listed without Delete, and it says so", () => {

@@ -33,6 +33,16 @@ test("a step is one quiet line, and a failure takes its place as an alert", () =
   expect(screen.queryByRole("status")).toBeNull();
   expect(screen.getByRole("alert")).toHaveTextContent("El micrófono está bloqueado para esta página.");
   expect(document.getElementById("join-status")?.dataset.state).toBe("failed");
+  expect(screen.getByRole("alert").querySelector("details")).toBeNull();
+
+  // What was raw about it is closed behind Details, after the line: never the line itself.
+  act(() => {
+    window.sidevoiceUI?.store?.patch({joinFailure:"Something went wrong with the room.",joinFailureDetails:"TypeError\nFailed to fetch"});
+  });
+  const line = screen.getByRole("alert");
+  expect(line.querySelector("span")).toHaveTextContent(/^Something went wrong with the room\.$/);
+  expect(line.querySelector("details:not([open]) > summary")).toHaveTextContent("Details");
+  expect(line.querySelector("details > pre")!.textContent).toBe("TypeError\nFailed to fetch");
 });
 
 test("the line goes away once the call is up", () => {

@@ -11,6 +11,8 @@ import "./styles/app.css";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
 import { Button } from "./components/ui/Button";
+import { ErrorDetails } from "./components/ui/ErrorText";
+import { hostTranslator } from "./features/settings/host-i18n";
 
 import "./i18n/room-i18n.js";
 import { startPageTheme } from "./lib/theme";
@@ -41,12 +43,14 @@ const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 try {
   root.render(<App />);
 } catch (error) {
+  // What it threw is no sentence for people: behind Details.
   const message = error instanceof Error ? error.message : String(error);
+  const t = hostTranslator();
   root.render(
     <main className="startup-error" role="alert">
-      <h1>No se pudo iniciar Sidevoice</h1>
-      <p>{message}</p>
-      <Button variant="primary" onClick={() => location.reload()}>Reintentar</Button>
+      <h1>{t("app.startFailed")}</h1>
+      <ErrorDetails details={message} />
+      <Button variant="primary" onClick={() => location.reload()}>{t("app.retry")}</Button>
     </main>,
   );
 }

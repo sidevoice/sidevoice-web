@@ -62,6 +62,16 @@ test("P10 a search that failed with nothing found keeps the heading, says why qu
   }
 });
 
+test("a search that failed for a reason with no words here says the panel's own line, its key behind Details", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}) });
+  act(() => store.patch({ hostAgents: { fp: { status: "failed", value: null, error: { key: "connector.quarantined" }, busy: {}, actionErrors: {} } } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const quiet = document.querySelector(".host-agent-problem-quiet")!;
+  expect(quiet.querySelector("p")).toHaveTextContent(/^This action could not be completed\.$/);
+  expect(quiet.querySelector("details:not([open]) > pre")!.textContent).toBe("connector.quarantined");
+});
+
 test("manual instructions come from the selected host and trigger four-second watch rescans", async () => {
   // The watch's interval faked; Radix's menu runs on real timeouts.
   vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });

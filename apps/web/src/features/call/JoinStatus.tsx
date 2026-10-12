@@ -1,5 +1,6 @@
 import { useRoomStore } from "../../state/room-store";
 import { WarningIcon } from "../../components/ui/Icons";
+import { ErrorDetails } from "../../components/ui/ErrorText";
 import { callTranslator } from "./call-i18n";
 import { useVoiceSwitch } from "../../state/call-model";
 import { voiceJoinLine } from "./voice-view";
@@ -11,7 +12,8 @@ import { voiceJoinLine } from "./voice-view";
  * Before any tap it can hold one standing note — no machine to talk to — which is not a step and
  * so has no progress dot. A failure carries a warning mark, so it does not rest on its colour alone.
  * With the voice switch (call model B) there is no join: the line says the voice getting ready, a move to another
- * machine, a reconnection, the room's refusal and the standing note (voice-view.ts).
+ * machine, a reconnection, the room's refusal and the standing note (voice-view.ts). A failure's raw text, when it has
+ * any, is behind its Details, after the line.
  */
 export function JoinStatus() {
   const join = useRoomStore((state) => state.join);
@@ -20,9 +22,9 @@ export function JoinStatus() {
   const facts = useRoomStore((state) => (voiceSwitch ? state.facts : null));
   const participants = useRoomStore((state) => (voiceSwitch ? state.participants : null));
   const line = facts && participants ? voiceJoinLine(facts, participants, callTranslator()) : join
-    ? { text: join.text, state: join.failed ? "failed" as const : join.note ? "note" as const : "busy" as const } : null;
+    ? { text: join.text, state: join.failed ? "failed" as const : join.note ? "note" as const : "busy" as const, details: join.details } : null;
   return (
-    <p
+    <div
       id="join-status"
       className="join-status"
       role={line?.state === "failed" ? "alert" : "status"}
@@ -34,8 +36,9 @@ export function JoinStatus() {
         <>
           {line.state === "failed" ? <WarningIcon size={14} /> : line.state === "note" ? null : <i className="join-status-dot" aria-hidden="true" />}
           <span>{line.text}</span>
+          {line.state === "failed" && <ErrorDetails details={line.details} />}
         </>
       ) : null}
-    </p>
+    </div>
   );
 }

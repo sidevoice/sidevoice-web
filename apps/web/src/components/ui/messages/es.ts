@@ -7,4 +7,5 @@ export const es: Partial<Record<UiMessageKey, string>> = {
   "ui.copy": "Copiar",
   "ui.copied": "Copiado",
   "ui.copyFailed": "Selecciona y copia",
+  "ui.details": "Detalles",
 };

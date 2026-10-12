@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { Button } from "../../components/ui/Button";
+import { ErrorDetails } from "../../components/ui/ErrorText";
 import { MicrophoneIcon, MicrophoneOffIcon, SpeakerIcon, SpeakerOffIcon, VoiceIcon, WarningIcon } from "../../components/ui/Icons";
 import { cn } from "../../lib/cn";
 import { wantToTalk } from "../../state/room-session-state.js";
@@ -50,6 +51,8 @@ export function VoiceNote() {
       <WarningIcon size={14} />
       <span className="voice-note-body">
         <span>{voiceNoteText(note.kind, detail, t)}</span>
+        {/* Why it failed, when what failed said more than its sentence: behind Details. */}
+        {note.kind === "failed" && <ErrorDetails details={facts.voiceOffDetails} />}
         {note.kind === "idle-warning" && <Button variant="ghost" tone="neutral" size="sm" className="voice-note-keep"
           onClick={() => window.sidevoiceActions?.keepVoiceOn?.()}>{t("voice.idle.keep")}</Button>}
         {outputLost && <span className="voice-note-also">{t("agents.outputLost")}</span>}

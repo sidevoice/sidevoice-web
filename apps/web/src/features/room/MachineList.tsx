@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
+import { ErrorText } from "../../components/ui/ErrorText";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, EditIcon, NotEncryptedIcon, OtherMachineIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
@@ -23,7 +24,7 @@ import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
 import { MachineEntryCopy, MachineState, machineEntryName, machineEntryTitle, useMachineStateStyle } from "../settings/MachineState";
-import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
+import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeError, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
@@ -515,7 +516,7 @@ function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
     <div className="host-update-control" aria-live="polite">
       {waitingForCalls && <p className="muted">{t("hosts.update.waitCalls", { calls })}</p>}
       {error && <div className="local-install-error" role="alert">
-        <p>{localHostBridgeErrorText(error, t)}</p>
+        <ErrorText message={localHostBridgeError(error, t)} />
         <div className="local-install-actions">
           <Button variant="ghost" onClick={() => void copyErrorDetails()}>{t("localInstall.copyDetails")}</Button>
           {note && <span className="muted" role="status">{note}</span>}

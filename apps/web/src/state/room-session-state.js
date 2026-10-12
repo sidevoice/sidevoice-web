@@ -17,7 +17,7 @@ export function initialSessionFacts() {
         userTurn: null, pendingPhase: '', pendingUserText: '', cancelledInput: false, textSending: false, micEnabled: true,
         // Where the call's voice is (`{listening, recognising, playback}`, as it reports it), or null outside a call.
         voiceState: null,
-        joinStep: null, joinFailure: '', joinProgress: null, joinDetail: '', joinSubject: '',
+        joinStep: null, joinFailure: '', joinFailureDetails: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0, liveNote: '',
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
         // The machines this device is paired with (never their tokens) and the clock of the moment they were read so a
@@ -26,7 +26,7 @@ export function initialSessionFacts() {
         // Host-owned agent state is keyed by fingerprint.
         hostAgents: {}, settingsAgentRequest: null,
         // The section Settings shows (SettingsDialog), and whether a phone shows that section's page or the list of them.
-        settingsSection: 'general', settingsLevel: 'list', machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
+        settingsSection: 'general', settingsLevel: 'list', settingsError: null, machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
         localHostAvailable: false, localHostStatus: { state: 'absent' },
         // How each paired machine is reached, by fingerprint: `{reach, via}` — reach 'ok', 'checking', 'away', 'offline'
         // or 'revoked'; via 'room' (through a relay) or 'node' (directly). And the machine the call is with, if any.
@@ -46,7 +46,7 @@ export function initialSessionFacts() {
         // is on or turning on, why it last turned itself off (VOICE_OFF_REASONS, and a failure's words), whether the idle
         // warning is up, whether the agents are muted and by what, the conversation a "Hear it" is asking (`{thread,
         // state: 'asking' | 'no-answer'}`), and the conversation a move to another machine is taking the session to.
-        voiceOn: false, voiceStarting: false, voiceOffReason: null, voiceOffDetail: '', voiceIdleWarning: false,
+        voiceOn: false, voiceStarting: false, voiceOffReason: null, voiceOffDetail: '', voiceOffDetails: '', voiceIdleWarning: false,
         agentsMuted: false, agentsMutedBy: null, hearing: null, movingTo: null,
     };
 }
@@ -127,7 +127,7 @@ export function callCardView(s) {
 }
 export function joinView(s) {
     if (s.joinFailure)
-        return { step: 'failed', text: s.joinFailure, progress: null, failed: true };
+        return { step: 'failed', text: s.joinFailure, progress: null, failed: true, ...(s.joinFailureDetails ? { details: s.joinFailureDetails } : {}) };
     // With no machine to talk to, the line where a join starts says so before anybody taps: a standing
     // note rather than a step, gone by itself the moment the machine answers.
     if (!s.joinStep) {
