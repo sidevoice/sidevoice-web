@@ -254,6 +254,31 @@ test("the voice's try as a player: the sentence quoted with Edit, a big Play und
   await act(async () => { again.finish({}); });
 });
 
+test("the voice's try as a player: once edited, the quote shows the sentence as edited, and Play says it", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "voice-try": "player" }));
+  const { actions } = renderPane();
+  const card = document.getElementById("tts-model-card")!;
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  await act(async () => { running.finish({}); });
+  expect(card.querySelector(".voice-try-quote")).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
+  // Trailing spaces: still the sentence played (it was said trimmed), so still the lit one.
+  fireEvent.click(within(card).getByRole("button", { name: "Edit the sentence" }));
+  fireEvent.change(card.querySelector("#tts-sentence")!, { target: { value: "Hi! This is how Sidevoice will read your agent's replies.  " } });
+  fireEvent.click(within(card).getByRole("button", { name: "Done editing" }));
+  expect(card.querySelector(".voice-try-quote .model-try-said")).not.toBeNull();
+  fireEvent.click(within(card).getByRole("button", { name: "Edit the sentence" }));
+  fireEvent.change(card.querySelector("#tts-sentence")!, { target: { value: "Otra frase." } });
+  fireEvent.click(within(card).getByRole("button", { name: "Done editing" }));
+  expect(card.querySelector("#tts-sentence")).toBeNull();
+  expect(card.querySelector(".voice-try-quote")).toHaveTextContent(/^Otra frase\.$/);
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(card.querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
+  await act(async () => { again.finish({}); });
+  expect(card.querySelector(".voice-try-quote")).toHaveTextContent(/^Otra frase\.$/);
+});
+
 test("a try that failed says why in the model's block, and offers it again", async () => {
   const { actions } = renderPane();
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));

@@ -296,7 +296,8 @@ function VoiceTryPlayer({ handle, t }: { handle: VoiceTry; t: HostTranslate }) {
   return <div className="voice-try" data-look="player">
     <div className="voice-try-quote">
       {editing && !running ? field
-        : running || trial.phase === "done" ? <TrySentence key={trial.attempt} text={trial.said || text} range={trial.range} sounding={running && trial.live} done={!running} />
+        // Lit as it plays, and after while it is still the sentence played; edited since, the sentence as it is now.
+        : running || (trial.phase === "done" && trial.said === text.trim()) ? <TrySentence key={trial.attempt} text={trial.said || text} range={trial.range} sounding={running && trial.live} done={!running} />
         : <q className="voice-try-said">{text}</q>}
       {!running && <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t(editing ? "voiceTry.done" : "voiceTry.edit")} title={t(editing ? "voiceTry.done" : "voiceTry.edit")}
         aria-pressed={editing} onClick={() => setEditing(!editing)}><EditIcon /></Button>}
