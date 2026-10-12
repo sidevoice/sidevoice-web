@@ -51,6 +51,18 @@ function manualSteps(agent: DetectedAgent, kind: ManualKind): AgentManualStep[] 
   return steps.filter((step) => step.command?.trim() || step.snippet?.trim());
 }
 
+/** `steps` with commands that follow one another (and nothing else in them) joined into one, a line each. */
+function groupedSteps(steps: AgentManualStep[]): AgentManualStep[] {
+  const grouped: AgentManualStep[] = [];
+  for (const step of steps) {
+    const onlyCommand = !!step.command?.trim() && !step.snippet?.trim();
+    const last = grouped[grouped.length - 1];
+    if (onlyCommand && last && last.command?.trim() && !last.snippet?.trim()) last.command = last.command.trimEnd() + "\n" + step.command!.trim();
+    else grouped.push(onlyCommand ? { command: step.command!.trim() } : step);
+  }
+  return grouped;
+}
+
 function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; fp: string; id: string; kind: ManualKind; onClose: () => void }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.hostAgents[fp]?.status ?? "idle");
@@ -65,9 +77,10 @@ function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; 
   return (
     <div className="host-agent-howto" id={id}>
       {!steps.length ? <p className="muted">{t("agents.manual.none")}</p> : <>
-        {/* The connector's steps, in order, each one to copy. */}
-        <ol className="host-agent-steps">{steps.map((step, index) => <li key={index}>
-          {step.command?.trim() && <><p className="host-agent-howto-label">{t("agents.manual.command")}</p><Snippet text={step.command} /></>}
+        {/* The connector's steps, in order, each one to copy: commands one after another are one step, one per line,
+            copied at once; anything else (a file to edit, a snippet to paste) is a step of its own. */}
+        <ol className="host-agent-steps">{groupedSteps(steps).map((step, index) => <li key={index}>
+          {step.command?.trim() && <><p className="host-agent-howto-label">{t(step.command.includes("\n") ? "agents.manual.commands" : "agents.manual.command")}</p><Snippet text={step.command} /></>}
           {step.snippet?.trim() && <><p className="host-agent-howto-label">{step.file ? t("agents.manual.file", { file: step.file }) : t("agents.manual.snippet")}</p><Snippet text={step.snippet} /></>}
         </li>)}</ol>
         <p className="muted" role="status">{t(kind === "disconnect" ? "agents.manual.removeWaiting" : kind === "replace" || kind === "update" ? "agents.manual.foreignWaiting" : "agents.manual.waiting")}</p>

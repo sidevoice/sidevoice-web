@@ -37,6 +37,8 @@ const pairing = (fp: string, host: string): PairingSummary => ({ fp, host, urls:
 
 /** The steps shown in a row, each a block to copy, in order. */
 const steps = (row: HTMLElement) => [...row.querySelectorAll(".host-agent-steps .ui-snippet-text")].map((step) => step.textContent);
+/** What each step's block is, in order: Command, Commands, File: …, Configuration. */
+const labels = (row: HTMLElement) => [...row.querySelectorAll(".host-agent-steps .host-agent-howto-label")].map((label) => label.textContent);
 
 function setActions(actions: Partial<NonNullable<typeof window.sidevoiceActions>>) {
   window.sidevoiceActions = actions as typeof window.sidevoiceActions;
@@ -193,11 +195,13 @@ test("a foreign Codex row is short, with the why in its (i), and replacing it by
     expect(within(foreignRow).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
 
     fireEvent.click(within(foreignRow).getByRole("button", { name: "Replace manually" }));
-    expect(steps(foreignRow)).toEqual(["codex mcp remove sidevoice", "codex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"]);
+    // Two commands one after the other: one step, a line each, copied at once.
+    expect(steps(foreignRow)).toEqual(["codex mcp remove sidevoice\ncodex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio"]);
+    expect(labels(foreignRow)).toEqual(["Commands"]);
     expect(foreignRow).toHaveTextContent("after you replace the agent configuration");
     const copy = within(foreignRow).getAllByRole("button", { name: "Copy" })[0];
     await act(async () => { fireEvent.click(copy); });
-    expect(writeText).toHaveBeenCalledWith("codex mcp remove sidevoice");
+    expect(writeText).toHaveBeenCalledWith("codex mcp remove sidevoice\ncodex mcp add sidevoice -- /opt/sidevoice/bin/connector mcp --stdio");
     // Copying turns its button into a check and says so out of sight.
     expect(copy).toHaveAttribute("data-state", "copied");
     expect(within(foreignRow).getByText("Copied")).toHaveClass("ui-copy-live");
@@ -331,4 +335,39 @@ test("an entry an older Sidevoice set up says so, with the why in its (i), and U
   act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "outdated", actionable: false, can: { connect: true, update: false, disconnect: true } })]) } }));
   expect(within(row()).queryByRole("button", { name: /^Update / })).toBeNull();
   expect(within(row()).getByRole("button", { name: "I’ll do it myself" })).toBeInTheDocument();
+});
+
+test("by hand, commands one after another are one step with one snippet, a line each; a file between them splits them", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  const twoCommands = { ...STEPS, connect: [{ command: "codex mcp remove sidevoice" }, { command: "codex mcp add sidevoice -- connector" }] };
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { manual: twoCommands })]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  fireEvent.click(within(row()).getByText("I’ll do it myself"));
+  expect(row().querySelectorAll(".host-agent-steps > li")).toHaveLength(1);
+  expect(row().querySelectorAll(".host-agent-steps .ui-snippet")).toHaveLength(1);
+  expect(steps(row())).toEqual(["codex mcp remove sidevoice\ncodex mcp add sidevoice -- connector"]);
+  expect(steps(row())[0]!.split("\n")).toHaveLength(2);
+  expect(labels(row())).toEqual(["Commands"]);
+
+  // A command, a file to edit (Cursor's way), a command: three steps, the file's on its own.
+  const split = { ...STEPS, connect: [{ command: "first --one" }, { file: "~/.cursor/mcp.json", snippet: '{"mcpServers":{}}' }, { command: "second --two" }] };
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { manual: split })]) } }));
+  expect(row().querySelectorAll(".host-agent-steps > li")).toHaveLength(3);
+  expect(steps(row())).toEqual(["first --one", '{"mcpServers":{}}', "second --two"]);
+  expect(labels(row())).toEqual(["Command", "File: ~/.cursor/mcp.json", "Command"]);
+});
+
+test("in Spanish, several commands are Comandos", () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  try {
+    const store = createRoomStore();
+    setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+    act(() => store.patch({ hostAgents: { fp: ready([known("codex", { manual: { ...STEPS, connect: [{ command: "a" }, { command: "b" }] } })]) } }));
+    render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+    const row = document.querySelector(".host-agent-row") as HTMLElement;
+    fireEvent.click(within(row).getByText("Lo hago yo"));
+    expect(labels(row)).toEqual(["Comandos"]);
+  } finally { localStorage.removeItem("sidevoice.settings"); }
 });

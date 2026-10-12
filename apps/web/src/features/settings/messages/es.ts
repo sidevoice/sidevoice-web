@@ -266,6 +266,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "agents.notNow": "Ahora no",
   "agents.manual.toggle": "Lo hago yo",
   "agents.manual.command": "Comando",
+  "agents.manual.commands": "Comandos",
   "agents.manual.file": "Archivo: {file}",
   "agents.manual.snippet": "Configuración",
   "agents.manual.waiting": "Sidevoice volverá a comprobarlo automáticamente cuando lo conectes.",
