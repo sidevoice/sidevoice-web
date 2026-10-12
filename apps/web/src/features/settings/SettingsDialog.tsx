@@ -53,12 +53,12 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
   const language = useRoomStore((state) => state.facts.uiLanguage);
   return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
     <Group>
+      <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
+      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
         <Select id="ui-language" value={language} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
           options={[{ value: "", label: t("settings.general.languageAuto") }, { value: "es", label: "Español" }, { value: "en", label: "English" }]} />
       </Row>
-      <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
-      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
     </Group>
   </Section>;
 }

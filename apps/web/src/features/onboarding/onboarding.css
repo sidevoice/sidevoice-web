@@ -62,7 +62,6 @@
 .wizard-choices .ui-card > svg { color: var(--sv-accent-text); }
 .wizard-choices .ui-card > strong { padding-inline-end: var(--sv-space-6); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
 .wizard-chips { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
-.wizard-body .wizard-alternative { justify-self: start; margin-inline-start: calc(-1 * var(--sv-space-3)); }
 .wizard-choice-note { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
 .wizard-choices .ui-card > .wizard-choice-note { padding-inline-end: var(--sv-space-2); }
 
