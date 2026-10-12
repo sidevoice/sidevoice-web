@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, Hand, VolumeX, Power,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, Eye, EyeOff, Hand, VolumeX, Power,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -70,6 +70,9 @@ export const ExternalLinkIcon = mark(ExternalLink, 14);
 /** Connecting something (a provider's key), and taking it back. */
 export const LinkIcon = mark(Link, 16);
 export const UnlinkIcon = mark(Unlink, 16);
+/** Showing what a secret field holds, and hiding it again. */
+export const EyeIcon = mark(Eye, 16);
+export const EyeOffIcon = mark(EyeOff, 16);
 /** Back a step. */
 export const BackIcon = mark(ChevronLeft, 16);
 /** Searching a list. */

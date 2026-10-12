@@ -6,7 +6,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { Field } from "../../components/ui/Field";
 import { Input, type InputProps } from "../../components/ui/Input";
 import { Row } from "../../components/ui/Card";
-import { ExternalLinkIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
+import { ExternalLinkIcon, EyeIcon, EyeOffIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 
@@ -62,22 +62,24 @@ export function keyError(t: HostTranslate, error: unknown, name: string, typed =
   return { words, detail: failure?.detail ?? "" };
 }
 
-/** Where to get a key, and where it is kept: one muted line. */
+/** Where the key is really kept, then where to get one: two muted lines. */
 function KeyHelp({ provider, name, t }: { provider: string; name: string; t: HostTranslate }) {
   const inApp = useRoomStore((state) => state.facts.inApp);
   const page = KEY_PAGES[provider];
   return <span className="provider-key-help">
-    {page && <><a className="provider-key-link" href={page} target="_blank" rel="noreferrer">{t("keys.getKey", { provider: name })}<ExternalLinkIcon size={14} />
-      <span className="sr-only">{t("keys.newTab")}</span></a><span aria-hidden="true"> · </span></>}
-    <span>{t(inApp ? "keys.where.app" : "keys.where.browser")}</span>
+    <span className="provider-key-where">{t(inApp ? "keys.where.app" : "keys.where.browser")}</span>
+    {page && <a className="provider-key-link" href={page} target="_blank" rel="noreferrer">{t("keys.getKey", { provider: name })}<ExternalLinkIcon size={14} />
+      <span className="sr-only">{t("keys.newTab")}</span></a>}
   </span>;
 }
 
-/** The key's box and Show beside it. Field gives the box its id and what describes it; they go to the input. */
+/** The key's box with an eye at its end that shows or hides it, as password fields have. Field gives the box its id and
+ *  what describes it; they go to the input. */
 const KeyInput = forwardRef<HTMLInputElement, InputProps & { shown: boolean; onReveal: () => void; t: HostTranslate }>(function KeyInput({ shown, onReveal, t, ...input }, ref) {
   return <div className="provider-key-input">
     <Input ref={ref} {...input} type={shown ? "text" : "password"} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
-    <Button variant="ghost" tone="neutral" size="sm" aria-pressed={shown} onClick={onReveal}>{shown ? t("keys.hide") : t("keys.show")}</Button>
+    <Button variant="ghost" tone="neutral" size="icon-sm" className="provider-key-reveal" aria-label={t(shown ? "keys.hideKey" : "keys.showKey")}
+      title={t(shown ? "keys.hideKey" : "keys.showKey")} aria-pressed={shown} onClick={onReveal}>{shown ? <EyeOffIcon /> : <EyeIcon />}</Button>
   </div>;
 });
 

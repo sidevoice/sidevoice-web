@@ -45,8 +45,10 @@
 .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; font-size: var(--sv-font-sm); font-weight: 600; color: var(--sv-accent-text); text-decoration: none; }
 .provider-key-link:hover { text-decoration: underline; }
-.provider-key-input { display: flex; align-items: center; gap: var(--sv-space-2); }
-.provider-key-input .ui-input { flex: 1; }
+/* The eye sits inside the box at its end; the box leaves it room. */
+.provider-key-input { position: relative; display: flex; align-items: center; }
+.provider-key-input .ui-input { flex: 1; padding-inline-end: 40px; }
+.provider-key-reveal { position: absolute; inset-inline-end: 4px; }
 .provider-key-cost, .provider-key-replacing { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-remove p { margin: 0 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
 @media (max-width: 767px) {
@@ -105,8 +107,8 @@
 .provider-search-clear { position: absolute; inset-inline-end: 2px; }
 /* The key's dialog: the box with Show beside it; under it, where to get a key and where it is kept; the provider's own
  * words after a refusal, muted. */
-.provider-key-help { display: inline; }
-.provider-key-help .provider-key-link { display: inline-flex; vertical-align: bottom; }
+.provider-key-help { display: grid; justify-items: start; gap: 2px; }
+.provider-key-help .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); }
 .provider-key-error { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-danger); }
 .provider-key-error svg { flex: none; margin-top: 2px; }
 .provider-key-dialog .ui-dialog-reason:empty, .provider-disconnect-dialog .ui-dialog-reason:empty { flex: 0 0 0; }
