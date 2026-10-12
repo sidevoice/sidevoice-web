@@ -1,13 +1,8 @@
-import { useVariant } from "../lib/variants";
 import { useRoomStore } from "./room-store";
 
-/** Where this computer is shown in Settings (VARIANTS `this-computer`): one entry under Machines (`in-machines`), or
- *  a section of its own above Machines wherever this device can host (`own-section`), Machines then the other
- *  machines alone. */
-export const THIS_COMPUTER = ["in-machines", "own-section"] as const;
+/** Whether this device has a section of its own in Settings ("This device", before Providers; decided 2026-10-12):
+ *  in the desktop app only, where it can host — never in a browser (not even one talking to a local Sidevoice) nor on a phone. Machines then lists
+ *  the remote machines alone. */
 export function useThisComputerSection() {
-  const placed = useVariant("this-computer", THIS_COMPUTER);
-  // Where this device can host (the desktop app), whatever is paired: a browser or a phone never has it.
-  const canHost = useRoomStore((state) => state.facts.localHostAvailable);
-  return placed === "own-section" && canHost;
+  return useRoomStore((state) => state.facts.inApp && state.facts.localHostAvailable);
 }

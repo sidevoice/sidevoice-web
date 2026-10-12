@@ -696,7 +696,7 @@ test('A local row survives reload with no native pairing',async()=>{
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
 });
 
-test('With this computer in its own section, its agents are asked for there and another machine\'s under Machines',async()=>{
+test('In the desktop app, this device\'s agents are asked for in This device and another machine\'s under Remote machines; in a browser, all under Machines',async()=>{
  const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
  const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
@@ -706,9 +706,11 @@ test('With this computer in its own section, its agents are asked for there and 
  // The harness mirrors each fact as a global, `settingsSection` among them: the controller's own helper is put back.
  Object.defineProperty(s.context,'settingsSection',{value:name=>s.run('roomStore').patch({settingsSection:name}),writable:true,configurable:true});
  const section=fp=>{s.run(`openAgentSettings(${JSON.stringify(fp)})`);return s.run('roomStore.getState()').facts.settingsSection};
- // A (the default): every machine's agents are under Machines.
+ // A browser talking to a local Sidevoice: it can host, but it isn't the app — every machine's agents are under Machines.
+ assert.equal(s.run('roomStore.getState()').facts.inApp,false);
  assert.equal(section('fp-local'),'machines');
- s.saved['sidevoice.variants']=JSON.stringify({'this-computer':'own-section'});
+ // The desktop app: this device's are This device's.
+ s.run('roomStore').patch({inApp:true});
  assert.equal(section('fp-local'),'this-computer');
  assert.equal(section(PAIRED.fp),'machines');
 });

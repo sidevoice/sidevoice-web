@@ -75,7 +75,7 @@ function useCandidates(): Highlight[] {
   const features = useWhatsNew().items;
   useSyncExternalStore(subscribePresent, presentNow, presentNow);
   const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
-  // This computer's agents are its own section's when it has one (`this-computer` own-section).
+  // This computer's agents are its own section's when it has one.
   const ownComputer = useThisComputerSection();
   const localFp = useRoomStore((state) => state.machines.find((machine) => machine.local)?.pairingId ?? null);
   const agents = Object.entries(hostAgents).filter(([fp, listing]) => active.has(fp) && !!listing.value)

@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -36,8 +36,8 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: ReactNode }[] = [
   { id: "transcription", label: "settings.section.transcription", icon: <TranscriptionIcon /> },
   { id: "voice", label: "settings.section.voice", icon: <VoicesIcon /> },
   { id: "call", label: "settings.section.call", icon: <CallSettingsIcon /> },
+  { id: "this-computer", label: "settings.section.thisDevice", icon: <ThisComputerIcon size={18} /> },
   { id: "providers", label: "settings.section.providers", icon: <IntegrationsIcon /> },
-  { id: "this-computer", label: "hosts.thisComputer", icon: <ThisComputerIcon size={18} /> },
   { id: "machines", label: "settings.section.machines", icon: <MachinesIcon /> },
   { id: "advanced", label: "settings.section.advanced", icon: <AdvancedIcon /> },
 ];
@@ -149,7 +149,7 @@ export function SettingsDialog() {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
-  // This computer as a section of its own (`this-computer` own-section), where this device can host.
+  // This computer as a section of its own, where this device can host.
   const ownComputer = useThisComputerSection();
   // A section changed (or a machine within Machines) starts at its top, not where the last one was scrolled to.
   const content = useRef<HTMLDivElement>(null);
@@ -191,7 +191,7 @@ export function SettingsDialog() {
               {SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer).map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
                 aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
                 onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
-                <NewOnIcon icon={section.icon} isNew={news.some((item) => item.section === section.id)} label={t("highlights.navNew")} /><span>{t(section.label)}</span>
+                <NewOnIcon icon={ownComputer && section.id === "machines" ? <OtherMachineIcon size={18} /> : section.icon} isNew={news.some((item) => item.section === section.id)} label={t("highlights.navNew")} /><span>{t(ownComputer && section.id === "machines" ? "settings.section.remoteMachines" : section.label)}</span>
                 {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>
               {/* Each machine under Machines, and Add a machine after them. */}

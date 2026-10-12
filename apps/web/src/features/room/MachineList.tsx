@@ -76,6 +76,8 @@ function shownMachine(machines: MachineView[], picked: string | null) {
 /** The machines under Machines in Settings' navigation, and Add a machine after them. */
 export function MachineNav({ current }: { current: boolean }) {
   const t = hostTranslator();
+  // With this device in a section of its own, these are the remote machines, and said so.
+  const own = useThisComputerSection();
   const machines = useListedMachines();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
@@ -105,7 +107,7 @@ export function MachineNav({ current }: { current: boolean }) {
           </button>
         );
       })}
-      <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</button>
+      <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</button>
     </div>
   );
 }
@@ -137,11 +139,11 @@ export function MachineList() {
   const shown = shownMachine(machines, picked);
   const copy = shown ? machineCopy(shown, status, t) : null;
   return (
-    <Section id="machines" title={t("hosts.title")} description={t("hosts.description")}>
+    <Section id="machines" title={t(own ? "hosts.titleRemote" : "hosts.title")} description={t("hosts.description")}>
       {/* A phone's sections are a strip across the top, with no room for the machines: they come with the pane. */}
       <div className="machines-inline"><MachineNav current /></div>
       {machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
-        <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</Button></div>}
+        <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</Button></div>}
       {shown && copy && <HostDetail machine={shown} copy={copy} notice={notice(shown)} />}
       {/* Preparing this computer is its own section's, when it has one. */}
       {!own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />}
@@ -149,7 +151,7 @@ export function MachineList() {
   );
 }
 
-/** This computer as a section of its own (`this-computer` own-section): not prepared, preparing it — the setup's
+/** This computer as a section of its own: not prepared, preparing it — the setup's
  *  block; prepared, its page as Machines shows it — whether it answers, its Sidevoice service, its agents, the devices
  *  paired with it. */
 export function ThisComputerSettings() {
@@ -159,7 +161,7 @@ export function ThisComputerSettings() {
   const notice = useNotice();
   const copy = local ? machineCopy(local, status, t) : null;
   return (
-    <Section id="this-computer" title={t("hosts.thisComputer")}>
+    <Section id="this-computer" title={t("settings.section.thisDevice")}>
       {local && copy ? <HostDetail machine={local} copy={copy} notice={notice(local)} />
         : <div className="this-computer-prepare">
             <p>{t("localInstall.description")}</p>

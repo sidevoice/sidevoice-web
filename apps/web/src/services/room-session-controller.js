@@ -799,9 +799,9 @@ function discardChangedHostAgents(previous,next){
 function scanPairedAgents(rescan=false){
  for(const pairing of pairings.list)if(!pairing.revoked)void hostAgentsController.load(pairing.fp,{rescan});
 }
-// This computer in a section of its own (VARIANTS this-computer own-section, where this device can host): its agents and
-// its preparing are asked for there, not under Machines.
-function ownComputerSection(){try{return JSON.parse(localStorage.getItem('sidevoice.variants')||'{}')?.['this-computer']==='own-section'&&state.localHostAvailable}catch{return false}}
+// This device in a section of its own, in the desktop app only: its agents and its preparing are asked for
+// there, not under Remote machines.
+function ownComputerSection(){return !!(state.inApp&&state.localHostAvailable)}
 function openAgentSettings(fp){
  settingsSection(ownComputerSection()&&localPairing?.fp===fp?'this-computer':'machines');
  roomStore.patch({settingsAgentRequest:{fp,id:++settingsAgentRequestId}});
