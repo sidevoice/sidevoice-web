@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { DownloadsIcon } from "../../components/ui/Icons";
 import { Popover } from "../../components/ui/Popover";
 import { useVariant } from "../../lib/variants";
+import { useVoiceSwitch } from "../../state/call-model";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { appUpdater, updateLater, useUpdates, type UpdateItem } from "./useUpdates";
@@ -22,6 +23,8 @@ function UpdateRow({ item, inCall, t }: { item: UpdateItem; inCall: boolean; t: 
   const machines = useRoomStore((state) => state.machines);
   const store = useContext(RoomStoreContext);
   const waits = inCall && item.kind !== "machine";
+  // With the voice switch (call model B) it waits for the voice to be off, not for a call to end.
+  const voiceSwitch = useVoiceSwitch();
   const title = item.kind === "web" ? t("updates.web") : item.kind === "app" ? t("updates.app", { version: item.version }) : t("updates.machine", { machine: t("hosts.thisComputer") });
   const act = () => {
     if (item.kind === "web") window.sidevoiceActions?.reloadToUpdate?.();
@@ -38,7 +41,7 @@ function UpdateRow({ item, inCall, t }: { item: UpdateItem; inCall: boolean; t: 
     <li className="update-row">
       <span className="update-row-copy">
         <strong>{title}</strong>{item.required && <Badge tone="warning">{t("updates.required")}</Badge>}
-        {waits && <span className="update-row-note" id={why}>{t("updates.afterCall")}</span>}
+        {waits && <span className="update-row-note" id={why}>{t(voiceSwitch ? "updates.afterVoice" : "updates.afterCall")}</span>}
       </span>
       <span className="update-row-actions">
         {!item.required && <Button variant="ghost" tone="neutral" size="sm" onClick={() => updateLater(item)}>{t("updates.later")}</Button>}

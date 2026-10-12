@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { useVariant } from "../../lib/variants";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import { selectInCall } from "../call/stage-view";
+import { useVoiceLive } from "../call/stage-view";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { FEATURES, type Feature } from "./catalogue";
@@ -66,7 +66,7 @@ const markShown = () => { try { sessionStorage.setItem(SHOWN_KEY, "1"); } catch 
 export function WhatsNew() {
   const t = hostTranslator();
   const place = useWhatsNewPlace();
-  const inCall = useRoomStore(selectInCall);
+  const inCall = useVoiceLive();
   const { items, mark, setUp } = useWhatsNew();
   const [open, setOpen] = useState(false);
   useEffect(() => {

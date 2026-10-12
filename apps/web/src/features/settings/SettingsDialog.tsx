@@ -22,6 +22,7 @@ import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, ty
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
+import { useVoiceSwitch } from "../../state/call-model";
 import "./settings.css";
 
 /* Settings: a screen of their own, its sections beside its content (above it on a phone), and Save at the foot. The
@@ -80,6 +81,7 @@ function CallSettings({ t }: { t: HostTranslate }) {
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
   const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));
   const wakeLock = typeof navigator !== "undefined" && "wakeLock" in navigator;
+  const voiceSwitch = useVoiceSwitch();
   const presence: { value: PresenceSound; label: HostMessageKey }[] = [
     { value: "off", label: "settings.call.presence.off" }, { value: "hidden", label: "settings.call.presence.hidden" }, { value: "always", label: "settings.call.presence.always" },
   ];
@@ -93,8 +95,8 @@ function CallSettings({ t }: { t: HostTranslate }) {
       </Row>
     </Group>
     <Group title={t("settings.call.device")}>
-      <Row label={t("settings.call.keepAwake")} description={wakeLock ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
-        <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
+      <Row label={t(voiceSwitch ? "settings.call.keepAwakeVoice" : "settings.call.keepAwake")} description={wakeLock ? t(voiceSwitch ? "settings.call.keepAwakeVoiceHint" : "settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
+        <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t(voiceSwitch ? "settings.call.keepAwakeVoice" : "settings.call.keepAwake")} />
       </Row>
     </Group>
   </Section>;
@@ -103,8 +105,10 @@ function CallSettings({ t }: { t: HostTranslate }) {
 /** What switching between Smart and Silence does during a call: the voice restarts for a moment (a source or a model
  *  changes without a cut — the new one takes over once it is ready). Said only while a call is on, in Call. */
 function RestartNote({ t }: { t: HostTranslate }) {
-  const inCall = useRoomStore((state) => !!(state.facts.ws || state.facts.reconnecting));
-  return inCall ? <Alert tone="warning" title={t("settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;
+  // With the voice switch (call model B) it is the voice being on that a restart interrupts.
+  const voiceSwitch = useVoiceSwitch();
+  const inCall = useRoomStore((state) => (voiceSwitch ? state.facts.voiceOn : !!(state.facts.ws || state.facts.reconnecting)));
+  return inCall ? <Alert tone="warning" title={t(voiceSwitch ? "settings.restart.voiceOn" : "settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;
 }
 
 /** For diagnosis and recovery, and the engine's internals: models' memory, this device's settings, the build. */

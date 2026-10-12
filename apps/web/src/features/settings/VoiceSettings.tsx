@@ -17,6 +17,7 @@ import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, useModelState, useVoiceTry, type ModelState, type SetupTry, type VoiceTry } from "./ModelSetup";
 import { TurnTry, useTurnTryVariant } from "./TurnTry";
+import { useVoiceSwitch } from "../../state/call-model";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -258,8 +259,10 @@ export function TurnChoices({ draft, setup = false, active = true }: { draft: Se
 /** How long this device keeps its models loaded with nothing to do, before freeing their memory. */
 export function IdleUnloadChoice({ draft }: { draft: Settings }) {
   const t = hostTranslator();
+  // With the voice switch (call model B) the models load again when the voice is next on, not on the next call.
+  const voiceSwitch = useVoiceSwitch();
   return (
-    <Row label={t("settings.advanced.idleUnload")} description={t("settings.advanced.idleUnloadHint")} htmlFor="voice-idle-unload">
+    <Row label={t("settings.advanced.idleUnload")} description={t(voiceSwitch ? "settings.advanced.idleUnloadHintVoice" : "settings.advanced.idleUnloadHint")} htmlFor="voice-idle-unload">
       <Select id="voice-idle-unload" value={String(draft.idle_unload_minutes)} onValueChange={(minutes) => edit({ idle_unload_minutes: Number(minutes) })}
         options={IDLE_UNLOAD_MINUTES.map((minutes: number) => ({ value: String(minutes), label: t("settings.advanced.minutes", { n: minutes }) }))} />
     </Row>

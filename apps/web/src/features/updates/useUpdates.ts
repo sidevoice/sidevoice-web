@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
 import { useRoomStore } from "../../state/room-store";
-import { selectInCall } from "../call/stage-view";
+import { useVoiceLive } from "../call/stage-view";
 
 /* What wants updating, from three places: this page (a newer build the room serves, held while a call is on — out of a
  * call the page reloads itself), the desktop app (its updater, behind the host's `updater` seam; the app has none yet,
@@ -36,7 +36,8 @@ export function updateLater(item: UpdateItem) {
 
 export function useUpdates() {
   const web = useRoomStore((state) => state.facts.webUpdate);
-  const inCall = useRoomStore(selectInCall);
+  // A call (A), or the voice on (call model B): what a reload or a restart waits for.
+  const inCall = useVoiceLive();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [app, setApp] = useState<{ version: string; required: boolean } | null>(null);
   const [machine, setMachine] = useState<LocalHostVersion | null>(null);
