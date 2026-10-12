@@ -6,12 +6,11 @@ import { Popover } from "../../components/ui/Popover";
 import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import type { HostTranslate } from "./host-i18n";
 import type { PrepareStatus } from "./ModelPrepare";
-import { InfoTip } from "../../components/ui/InfoTip";
+import { MAX_TAKE_MS } from "../../services/voice-trial.js";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { wordEnd } from "../conversation/KaraokeText";
 import { readingMoves, readingPosition, readOn, type Reading } from "../call/speech-chunks";
 import type { KaraokeRange, TrialTimings } from "../../state/room-types";
-import type { HostMessageKey } from "./messages/en";
 
 /* A voice slot's chosen model made ready, the same in Settings and in the first-run setup: one of this device's
  * catalogue is downloaded first when it is not on disk (its size said, with progress and cancel), then checked; a
@@ -117,6 +116,8 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
   }, [slot, task]);
   useEffect(() => () => window.sidevoiceActions?.cancelVoiceTry?.(), [task]);
   const cancel = () => window.sidevoiceActions?.cancelVoiceTry?.();
+  // Stop: a transcription try's take ends with what was said, and is transcribed; a voice try is cancelled.
+  const finish = () => task === "stt" && window.sidevoiceActions?.finishVoiceTry ? window.sidevoiceActions.finishVoiceTry() : cancel();
   async function run(options: { text?: string; language?: string | null } = {}) {
     if (!task) return;
     const mine = ++attempt.current;
@@ -137,7 +138,7 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
       level.publish(0);
     }
   }
-  return { trial, run, cancel, level };
+  return { trial, run, cancel, finish, level };
 }
 
 /** A try with what it starts with (the sentence, its language), for whatever shows it. */
@@ -158,21 +159,21 @@ export const seconds = (ms: number) => new Intl.NumberFormat(navigator.language,
 const timingMs = (task: Task, timings: TrialTimings) => task === "stt" ? timings.recognition_ms : timings.first_sound_ms;
 const timingText = (task: Task, ms: number, t: HostTranslate) => t(task === "stt" ? "try.timing.stt" : "try.timing.tts", { s: seconds(ms) });
 
-/** After a try, one plain line with the time that matters ("Transcribed in 0.4 s", "Starts speaking in 0.3 s"), a
- *  smaller model suggested when that is slow for this device, and every phase in its tooltip. */
+/** From this long, getting ready was loading the model (a cold start), worth saying apart; below it, it was there. */
+const COLD_LOAD_MS = 1000;
+
+/** After a try, one plain line with the time that matters ("Transcribed in 0.4 s", "First sound in 0.3 s"), the model's
+ *  load after it only when it had to load, and a smaller model suggested when that is slow for this device. */
 export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimings; t: HostTranslate }) {
   const key = timingMs(task, timings);
   if (key == null) return null;
   const slow = key > SLOW_MS[task];
-  const phases: [HostMessageKey, number | null | undefined][] = task === "stt"
-    ? [["try.phase.ready", timings.ready_ms], ["try.phase.speech", timings.audio_ms], ["try.phase.pause", timings.endpoint_silence_ms], ["try.phase.recognition", timings.recognition_ms]]
-    : [["try.phase.ready", timings.ready_ms], ["try.phase.firstSound", timings.first_sound_ms]];
+  // What this try's step chooses, and nothing else: transcribing (Transcription), the first sound (Voice); the model's
+  // load only when it was loaded for this try (a cold start), not a few ms of a model already there.
+  const cold = timings.ready_ms != null && timings.ready_ms >= COLD_LOAD_MS ? timings.ready_ms : null;
   return <p className="voice-try-timing" data-slow={slow || undefined} id={task + "-timing"}>
-    <span>{timingText(task, key, t)}</span>
+    <span>{timingText(task, key, t)}{cold != null && " " + t("try.loadedIn", { s: seconds(cold) })}</span>
     {slow && <span className="voice-try-slow">{t("try.slow")}</span>}
-    <InfoTip label={t("try.timing.details")}>
-      <span className="voice-try-phases">{phases.filter(([, ms]) => ms != null).map(([label, ms]) => <span key={label}>{t(label, { s: seconds(ms!) })}</span>)}</span>
-    </InfoTip>
   </p>;
 }
 
@@ -184,7 +185,7 @@ const AGAIN = { stt: "try.speakAgain", tts: "try.listenAgain" } as const;
 export function TryButton({ task, handle, id, offered = true, again = false, t }: { task: Task; handle: VoiceTry; id: string; offered?: boolean; again?: boolean; t: HostTranslate }) {
   const running = handle.trial.phase === "running";
   if (!running && !offered) return null;
-  return <Button size="sm" id={id} onClick={running ? handle.cancel : handle.start}>
+  return <Button size="sm" id={id} onClick={running ? handle.finish : handle.start}>
     {running ? t("try.stop") : t(again || handle.trial.phase !== "idle" ? AGAIN[task] : FIRST[task])}
   </Button>;
 }
@@ -252,6 +253,8 @@ function TryBody({ task, handle, roomy = false, sample, t }: { task: Task; handl
       {running && trial.live && task === "stt" && <div className="model-try-listening">
         <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={() => handle.level.current() / 100} /></span>
         <p className="model-try-state">{t("try.listening")}</p>
+        {/* The take's length, filling to its longest (MAX_TAKE_MS), from when it listens. */}
+        <span className="model-try-take" key={trial.attempt} style={{ animationDuration: MAX_TAKE_MS + "ms" }} role="img" aria-label={t("try.takeMax", { s: MAX_TAKE_MS / 1000 })} />
       </div>}
       {running && trial.live && task === "tts" && <p className="model-try-state">{t("wizard.playing")}</p>}
       {trial.phase === "done" && task === "stt" && <TryHeard text={trial.text} roomy={roomy} t={t} />}

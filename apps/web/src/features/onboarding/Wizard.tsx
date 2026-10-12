@@ -378,7 +378,7 @@ export function Wizard() {
       {stageTask && <ModelStepFooter variant={footerVariant} reason={waitReason(model, stageTask, t)}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)} pressed={trial.trial.phase !== "idle"}
-        onTry={tryAgain} onStop={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
+        onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
       {step === "W5" && <ModelStepFooter variant={footerVariant} reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} pressed={turnTry.trial.attempt > 0} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}
       {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>

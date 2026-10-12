@@ -4,9 +4,17 @@
  * the voice, waits for its result — one, or each turn as it comes until stopped — and stops it, whatever happens. A
  * try is cancellable, bounded in time, and fails by a stable code. */
 
-/** How long a try's phases took, in ms (null where the voice did not say). Transcription: `ready_ms`, `audio_ms`,
- * `endpoint_silence_ms`, `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
+/** How long a try's phases took, in ms (null where the voice did not say). Transcription: `ready_ms`,
+ * `recognition_ms`; voice: `ready_ms`, `first_sound_ms`.
  * @typedef {{ ready_ms: number | null, audio_ms?: number | null, endpoint_silence_ms?: number | null, recognition_ms?: number | null, first_sound_ms?: number | null }} TrialTimings */
+
+/** A transcription try ends the take on a plain short silence: when a turn ends is End of turn's to choose and to try,
+ *  not this one's (its Smart model, its patience). The voice's shortest is 2 s of silence (`fast`); 1.5 s, as the
+ *  operator asked, waits on the voice taking a silence of its own per call (contract gap). */
+const TAKE_ENDS = { end_of_turn: 'silence', patience: 'fast' };
+/** The longest take, from when the voice listens: past it, still talking, the take ends there and what was said is
+ *  transcribed — the voice's mute ends the open turn with what was said (`VoiceHost.mute`). */
+export const MAX_TAKE_MS = 10_000;
 
 /** A monotonic clock where there is one (pages, workers), else the wall clock. */
 const now = () => globalThis.performance?.now?.() ?? Date.now();
@@ -40,33 +48,61 @@ function bounded(promise, { signal, timeoutMs }) {
  * words is the result. A turn with none (a cough, a merge) is not one; an error of the voice ends the try with it.
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
- * `onTimings`, once heard: how long the voice took to be ready, and the turn's own (the speech, the pause waited for,
- * the recognition). As it goes: `onListening` once the voice hears the microphone (its models loaded, the microphone
- * open), and `onLevel`, the microphone's level from 0 to 1 as the voice measures it.
- * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void}} [options]
+ * `onTimings`, once heard: how long the voice took to be ready, and how long transcribing took — not how the take
+ * ended (on a short silence, `TAKE_ENDS`), which is End of turn's. As it goes: `onListening` once the voice hears the
+ * microphone (its models loaded, the microphone open), and `onLevel`, the microphone's level from 0 to 1 as the voice
+ * measures it. The take ends on its silence, at `maxTakeMs`, or when `finish` aborts (Stop): those last two end it with
+ * what was said, by muting (unmuted again after); before anything was said, `finish` is a cancel.
+ * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState, onTimings, onListening, onLevel } = {}) {
+export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel } = {}) {
   const stops = [];
   let readyMs = null;
+  // Recognising: the take has ended and is being transcribed; the longest take no longer cuts it.
+  let recognising = false;
+  // Spoke: the person has started talking; the longest take cuts a take, not a silent microphone (that is the
+  // try's own timeout, `trial-silence`).
+  let spoke = false;
+  let tooLong = null;
+  let muted = false;
+  let stopped = null;
+  // Ends the take with what was said; nothing said, there is nothing to end (Stop is then a cancel).
+  const endTake = () => { if (!spoke || recognising || muted) return false; muted = true; voice.mute(true); return true; };
   try {
-    await voice.setSettings(settings);
+    await voice.setSettings({ ...settings, ...TAKE_ENDS });
     const heard = new Promise((resolve, reject) => {
       stops.push(voice.onTurn((turn) => {
+        if (turn.phase === 'started') spoke = true;
         const text = turn.phase === 'finished' ? String(turn.text ?? '').trim() : '';
         if (!text) return;
-        onTimings?.({ ready_ms: readyMs, audio_ms: turn.timings?.audio_ms ?? null, endpoint_silence_ms: turn.timings?.endpoint_silence_ms ?? null, recognition_ms: turn.timings?.recognition_ms ?? null });
+        // Its own times only: how the take ended is not this try's.
+        onTimings?.({ ready_ms: readyMs, recognition_ms: turn.timings?.recognition_ms ?? null });
         resolve(text);
       }));
       stops.push(voice.onError(reject));
     });
     // Its failure before the voice even listens is the start's to report; this one must not go unheard.
     heard.catch(() => {});
-    if (onState) stops.push(voice.onState(onState));
+    stops.push(voice.onState((state) => { recognising = state.recognising > 0; if (state.listening === 'speaking') spoke = true; onState?.(state); }));
     if (onLevel) stops.push(voice.onLevel(onLevel));
     const starting = now();
-    return await bounded(voice.start().then(() => { readyMs = Math.round(now() - starting); onListening?.(); return heard; }), { signal, timeoutMs });
+    const take = voice.start().then(() => {
+      readyMs = Math.round(now() - starting);
+      onListening?.();
+      tooLong = setTimeout(endTake, maxTakeMs);
+      return heard;
+    });
+    const asked = new Promise((_, reject) => {
+      stopped = () => { if (!endTake()) reject(trialError('trial-cancelled')); };
+      if (finish?.aborted) stopped(); else finish?.addEventListener('abort', stopped, { once: true });
+    });
+    asked.catch(() => {});
+    return await bounded(Promise.race([take, asked]), { signal, timeoutMs: timeoutMs + maxTakeMs });
   } finally {
+    clearTimeout(tooLong);
+    if (stopped) finish?.removeEventListener('abort', stopped);
+    if (muted) voice.mute(false);
     for (const stop of stops) stop();
     await voice.stop().catch(() => {});
   }

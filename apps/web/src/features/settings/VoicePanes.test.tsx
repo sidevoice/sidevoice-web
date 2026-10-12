@@ -173,17 +173,35 @@ test("a try is all in the model's block — getting ready, listening with the le
   act(() => running.told.onListening!());
   expect(card).toHaveTextContent("Listening… say a short sentence");
   expect(card.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  // The take's bar fills to its longest (10 s) while it listens.
+  expect(card.querySelector(".model-try-take")).toHaveStyle({ animationDuration: "10000ms" });
+  expect(card.querySelector(".model-try-take")).toHaveAccessibleName("Records up to 10 s");
   // Longer than its two lines where it is drawn: the rest a See all away.
   const long = "una frase bastante larga para la prueba ".repeat(6).trim();
   const restore = overflowing();
-  await act(async () => { running.finish({ text: long, timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }); });
+  await act(async () => { running.finish({ text: long, timings: { ready_ms: 900, recognition_ms: 420 } }); });
   restore();
+  expect(card.querySelector(".model-try-take")).toBeNull();
   expect(card.querySelector("blockquote#stt-heard")).toHaveTextContent(long);
-  expect(card.querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  // One line, its own time only: a model already there (under 1 s to be ready) is not said.
+  expect(card.querySelector("#stt-timing")).toHaveTextContent(/^Transcribed in 0\.4 s$/);
   expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
   // See all opens the Popover with the whole of it (opened here, a Radix popover stalls jsdom for the tests after it).
   expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-haspopup", "dialog");
   expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("the model's load is said after the try's time only when it had to load (from 1 s), on its line", async () => {
+  const { actions } = renderPane();
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 1000, recognition_ms: 420 } }); });
+  expect(document.querySelector("#stt-timing")).toHaveTextContent(/^Transcribed in 0\.4 s \(model loaded in 1\.0 s\)$/);
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  await act(async () => { again.finish({ text: "hola", timings: { ready_ms: 999, recognition_ms: 420 } }); });
+  expect(document.querySelector("#stt-timing")).toHaveTextContent(/^Transcribed in 0\.4 s$/);
+  expect(document.querySelector("#stt-timing .ui-infotip")).toBeNull();
 });
 
 test("a try that failed says why in the model's block, and offers it again", async () => {

@@ -29,7 +29,6 @@
 .voice-try-timing { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); margin: 0; color: var(--sv-text-muted); }
 .voice-try-timing > span:first-child { color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
 .voice-try-slow { color: var(--sv-warning); }
-.voice-try-phases { display: grid; gap: 2px; }
 .stage-try-error { margin: 0; color: var(--sv-danger); }
 .voice-speed { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; }
 .voice-speed input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }

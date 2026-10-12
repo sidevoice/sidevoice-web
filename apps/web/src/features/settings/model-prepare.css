@@ -23,7 +23,11 @@
 .model-try-hint, .model-try-state { margin: 0; color: var(--sv-text-muted); }
 .model-try-state { display: flex; align-items: center; gap: var(--sv-space-2); }
 .model-try-state .ui-spinner { color: var(--sv-accent-text); }
-.model-try-listening { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.model-try-listening { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+/* How long the take has run, filling to its longest (MAX_TAKE_MS, set as its animation's length) from when it listens. */
+.model-try-take { flex: 1 0 100%; height: 3px; border-radius: 2px; background: var(--sv-accent) no-repeat 0 0 / 0% 100%; background-color: var(--sv-bg-sunken);
+  background-image: linear-gradient(var(--sv-accent), var(--sv-accent)); animation: model-try-take linear forwards; }
+@keyframes model-try-take { to { background-size: 100% 100%; } }
 .model-try-wave { display: inline-flex; flex: none; color: var(--sv-accent-text); }
 .model-try .voice-wave { width: min(9rem, 36vw); height: 28px; }
 /* The voice's sentence: what was heard in the text's colour, the rest quieter until it is. */

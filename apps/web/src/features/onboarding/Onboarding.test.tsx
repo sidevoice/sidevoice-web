@@ -33,7 +33,7 @@ beforeEach(() => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
     openPairing: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
-    tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
+    tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
@@ -196,7 +196,7 @@ test("the voice's try is all in its block — the sentence edited there, lit as 
   expect(card("tts").querySelector(".model-try-unsaid")).toHaveTextContent("qué tal.");
   expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Stop");
   await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
-  expect(card("tts").querySelector("#tts-timing")).toHaveTextContent("Starts speaking in 0.3 s");
+  expect(card("tts").querySelector("#tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
   expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Listen again");
   expect(card("tts").querySelector("#wizard-sample")).toHaveValue("Hola, qué tal.");
   expect(stageAction()).toHaveTextContent(/^Continue$/);

@@ -251,6 +251,8 @@ export interface SidevoiceActions {
   setDeleteUnusedModels?(days: number | null): Promise<void>;
   /** Stops the try in progress, which then rejects `trial-cancelled`. */
   cancelVoiceTry?(): void;
+  /** Stop on a try that records (transcription): its take ends with what was said and is transcribed. */
+  finishVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */
   loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
   /** Connect, disconnect, or dismiss an agent on the identified machine. */
