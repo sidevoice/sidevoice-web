@@ -404,7 +404,6 @@ export const en = {
   "wizard.continueWithoutTrying": "Continue without trying",
   "try.tryIt": "Try it",
   "wizard.wait.sentence": "Write a sentence to try the voice.",
-  "wizard.tryFirst": "Try it above first.",
   "try.timing.stt": "Transcribed in {s} s",
   "try.timing.tts": "First sound in {s} s",
   "voiceTry.sentence": "What the voice says",

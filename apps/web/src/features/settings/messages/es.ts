@@ -406,7 +406,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "wizard.continueWithoutTrying": "Continuar sin probar",
   "try.tryIt": "Probar",
   "wizard.wait.sentence": "Escribe una frase para probar la voz.",
-  "wizard.tryFirst": "Pruébalo arriba primero.",
   "try.timing.stt": "Transcrito en {s} s",
   "try.timing.tts": "Primer sonido en {s} s",
   "voiceTry.sentence": "Lo que dice la voz",

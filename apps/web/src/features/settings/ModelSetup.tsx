@@ -159,8 +159,7 @@ export type VoiceTry = ReturnType<typeof useVoiceTry> & { start(): void; sentenc
 
 /** The first-run setup's try, shown in the slot's block: its first one started from the setup's footer, `tried`
  *  already (then the block offers it again), a line before it (`hint`), and the sentence to hear, to edit (`sample`). */
-/** The setup's try: `inBody`, offered in the model's card from the start (as in Settings), not only once tried. */
-export type SetupTry = VoiceTry & { tried: boolean; inBody?: boolean; hint?: string; sample?: ReactNode };
+export type SetupTry = VoiceTry & { tried: boolean; hint?: string; sample?: ReactNode };
 
 /** Past these, a try is slow for this device: transcribing what was said, or the first sound of a sentence. */
 const SLOW_MS = { stt: 1500, tts: 1500 } as const;

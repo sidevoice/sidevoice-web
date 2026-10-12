@@ -130,7 +130,7 @@
 @media (prefers-reduced-motion: reduce) { .ui-row.settings-highlight { transition: none; } }
 .downloaded-unused-confirm { margin: 0 0 var(--sv-space-2); }
 /* A downloaded model is one line: its name with its tags right after it (what it is for, a quiet chip with its icon,
-   and In use, in the order VARIANTS models-row says), its size at the end, and Delete. On a narrow screen the size
+   then In use), its size at the end, and Delete. On a narrow screen the size
    wraps under the name. */
 .downloaded-models:focus { outline: none; }
 .downloaded-model-copy { flex: 1 1 auto; justify-content: space-between; gap: var(--sv-space-3); }

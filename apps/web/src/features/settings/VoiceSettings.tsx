@@ -151,7 +151,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const [sentence, setSentence] = useState(() => t("wizard.sampleText"));
   const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: tryLanguage }),
     ...(task === "tts" ? { sentence, setSentence } : {}) });
-  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried || !!setupTry.inBody} again={setupTry?.tried} t={t} />;
+  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried} again={setupTry?.tried} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;

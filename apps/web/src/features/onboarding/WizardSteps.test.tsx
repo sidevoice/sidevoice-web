@@ -13,8 +13,8 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 /** The whole App rendered: past vitest's five seconds on a busy machine (see Onboarding.test.tsx). */
 const WHOLE_APP_MS = 15_000;
 
-/* The setup's basics in their order, This computer's path with no way to another machine but Back, and a try stopped from one place only: the footer's when it offers the first try
- * (model-step-footer try-first), the block's when the try is the block's own (in-card). */
+/* The setup's basics in their order, This computer's path with no way to another machine but Back, and the first try started and stopped from the
+ * footer alone. */
 
 const CATALOGS = [{ id: "local", name: null, status: { stale: false }, models: [
   { id: "whisper-base", family: "whisper", capabilities: ["stt"], languages: ["es", "en"], voices: [], parametersM: 1, license: "MIT", installed: true, builds: [{ id: "whisper-base/int8", available: true, reasons: [] }] },
@@ -55,7 +55,7 @@ test("the basics: appearance, this device's name, then the interface's language 
     .toEqual(["Appearance", "This device’s name", "Interface language", "The language you speak"]);
 });
 
-test("try-first: the first try is started and stopped from the footer alone, never a second Stop in the step", async () => {
+test("the first try is started and stopped from the footer alone, never a second Stop in the step", async () => {
   transcriptionStep();
   // Not tried: the step's try is the footer's, not offered in the block.
   expect(document.getElementById("wizard-try-again")).toBeNull();
@@ -64,16 +64,6 @@ test("try-first: the first try is started and stopped from the footer alone, nev
   expect(stops()).toHaveLength(1);
   expect(stops()[0]).toHaveAttribute("id", "wizard-try");
   expect(document.getElementById("wizard-try-again")).toBeNull();
-}, WHOLE_APP_MS);
-
-test("in-card: the block's try is offered from the start, and it is the one Stop while it runs", async () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "model-step-footer": "in-card" }));
-  transcriptionStep();
-  expect(document.getElementById("wizard-try")).toBeNull();
-  expect(document.getElementById("wizard-try-again")).toHaveTextContent("Try it: speak");
-  await act(async () => { fireEvent.click(document.getElementById("wizard-try-again")!); });
-  expect(stops()).toHaveLength(1);
-  expect(stops()[0]).toHaveAttribute("id", "wizard-try-again");
 }, WHOLE_APP_MS);
 
 test("preparing this computer, the setup offers no other machine in any state of the install: Back is the way there", async () => {
