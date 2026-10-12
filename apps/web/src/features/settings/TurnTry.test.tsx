@@ -8,6 +8,7 @@ import { defaultVoiceSettings, type DeviceVoiceSettings } from "../../services/v
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { TurnStep } from "../../services/voice-trial.js";
+import type { VoiceTake } from "../../services/voice-take";
 
 /* Trying the end of turn where it is chosen, in its card after the choices: the actions stand in for
  * the voice, and tell the try's steps as the controller would (voice-trial.js TurnStep). The interface speaks English
@@ -49,6 +50,8 @@ function renderTurn({ variant: _variant = "card" as (typeof variants)[number], s
     store, actions, view,
     show: (active: boolean) => view.rerender(tree(active)),
     step: (step: TurnStep) => act(() => { running!.progress.onTurnStep!(step); }),
+    /** The take the voice hands once it has stopped (contract gap #40), when it hands one. */
+    take: (take: VoiceTake) => act(() => { running!.progress.onTake?.(take); }),
     end: async (error: unknown) => { await act(async () => { end(error); }); },
     start: async () => { await act(async () => { fireEvent.click(button()); }); },
   };
@@ -234,4 +237,40 @@ test("in the first-run setup the try says nothing of what is kept: the choices t
   renderTurn({ setup: true });
   expect(panel()).toHaveTextContent("Talk as you would to the agent, pausing to think. Headphones help.");
   expect(panel()).not.toHaveTextContent("Uses what's selected");
+});
+
+test("once stopped, the try's take shows in its card to be played, with its turn's marks; not while it runs, and a new try lets it go", async () => {
+  const { step, start, end, take } = renderTurn();
+  await start();
+  step({ step: "listening", again: false });
+  step({ step: "speaking" });
+  step({ step: "heard", text: "hola", endpoint_silence_ms: 900 });
+  const recorded: VoiceTake = { sampleRate: 16000, samples: new Float32Array(48000), started_at: 0, ended_at: 3000,
+    turns: [{ turn_id: "t1", speech_ms: 400, pauses: [{ from_ms: 1000, to_ms: 1400 }], end_ms: 2600 }] };
+  take(recorded);
+  expect(document.getElementById("turn-try-take")).toBeNull();
+  await end(Object.assign(new Error("The try was stopped."), { code: "trial-cancelled" }));
+  const card = panel().querySelector("#turn-try-take")!;
+  expect(card).toHaveTextContent("Your recording");
+  expect(card).toHaveTextContent("3.0 s recorded");
+  expect(card).toHaveTextContent("speech starts at 0.4 s");
+  expect(card).toHaveTextContent("pause from 1.0 to 1.4 s");
+  expect(card).toHaveTextContent("turn ends at 2.6 s");
+  expect(card.querySelector("button[aria-pressed='false']")).toHaveAccessibleName("Play your recording");
+  await start();
+  expect(document.getElementById("turn-try-take")).toBeNull();
+  // Ended by a quiet stretch, what the microphone gave shows all the same.
+  take({ ...recorded, turns: [] });
+  await end(Object.assign(new Error("Nothing heard."), { code: "trial-silence" }));
+  expect(document.getElementById("turn-try-take")).toHaveTextContent("no speech detected");
+});
+
+test("a voice that hands no take shows none (@sidevoice/voice 0.3.x, the desktop app's)", async () => {
+  const { step, start, end } = renderTurn();
+  await start();
+  step({ step: "listening", again: false });
+  step({ step: "heard", text: "hola", endpoint_silence_ms: 900 });
+  await end(Object.assign(new Error("The try was stopped."), { code: "trial-cancelled" }));
+  expect(document.getElementById("turn-try-heard")).toHaveTextContent("hola");
+  expect(document.getElementById("turn-try-take")).toBeNull();
 });

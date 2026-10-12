@@ -1,0 +1,26 @@
+/* A try's take (TryTake.tsx), under its result in the model's card or the end of turn's: its title; Play, the whole
+   take as bars on the live waveform's pitch (the part played in the accent), its marks over it and the playhead, then
+   the clock; under it, the marks in words, each with the key it wears above. Speech starting is a green line, a pause
+   a shaded band, the end of a turn a line in the voice's colour. */
+.try-take { display: grid; gap: var(--sv-space-2); margin: 0; min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.try-take-title { color: var(--sv-text-muted); }
+.try-take-player { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.try-take-play { flex: none; }
+.try-take-wave { position: relative; flex: 1; min-width: 0; height: 40px; border-radius: var(--sv-radius-xs); color: var(--sv-text-subtle); cursor: pointer; touch-action: none; }
+.try-take-wave:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 4px; }
+.try-take-bars { position: absolute; inset: 0; width: 100%; height: 100%; fill: currentColor; }
+.try-take-played { position: absolute; inset: 0; color: var(--sv-accent); clip-path: inset(0 100% 0 0); }
+.try-take-pause { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: color-mix(in srgb, var(--sv-text-muted) 18%, transparent); pointer-events: none; }
+.try-take-mark { position: absolute; top: 2px; bottom: 0; width: 2px; margin-left: -1px; border-radius: 1px; pointer-events: none; }
+.try-take-mark::before { content: ""; position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; border-radius: 50%; background: inherit; }
+.try-take-mark[data-kind="speech"] { background: var(--sv-positive); }
+.try-take-mark[data-kind="end"] { background: var(--sv-voice-text); }
+.try-take-mark[data-kind="end"]::before { border-radius: 1px; }
+.try-take-head { position: absolute; top: -2px; bottom: -2px; left: 0; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--sv-text); pointer-events: none; }
+.try-take-clock { flex: none; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.try-take-marks { display: flex; flex-wrap: wrap; gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
+.try-take-marks > span { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
+.try-take-key { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.try-take-marks [data-kind="speech"] > .try-take-key { background: var(--sv-positive); }
+.try-take-marks [data-kind="pause"] > .try-take-key { border-radius: 2px; background: color-mix(in srgb, var(--sv-text-muted) 45%, transparent); }
+.try-take-marks [data-kind="end"] > .try-take-key { border-radius: 1px; background: var(--sv-voice-text); }
