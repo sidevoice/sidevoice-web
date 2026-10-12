@@ -36,6 +36,16 @@ export interface CallSnapshot {
   since: number | null;
   participants: ParticipantView[];
   devices: AudioDevices | null;
+  /* Call model B, the voice switch (contract gap #38, G9): the card shows while the voice is on (`since` is when it went
+   * on), and can mute the agents. Present only from a room that runs it; each conversation row carries its `mark`. */
+  /** The voice is on. */
+  voiceOn?: boolean;
+  /** The agents are muted: they answer in writing. */
+  agentsMuted?: boolean;
+  /** How many conversations want to talk (a mark, and reachable). */
+  wantToTalk?: number;
+  /** Why the voice last turned itself off; the room's window says it, the card hides. */
+  voiceOffReason?: string | null;
 }
 
 export interface CallControlsState {
@@ -57,6 +67,9 @@ export interface CallControlsState {
 export type CallCommand =
   | { command: "toggle-mute" }
   | { command: "hang-up" }
+  /** Call model B (contract gap #38): the voice off (the room stays), and the agents muted or not. */
+  | { command: "voice-off" }
+  | { command: "toggle-agents" }
   | { command: "skip-reply" }
   | { command: "open-app" }
   | { command: "select-participant"; threadId: string }

@@ -7,7 +7,7 @@
  * the slot kept for it beside your wave, and the room's call controls appear below. Panels open below the controls
  * and close by themselves. */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon, SpeakerIcon } from "../components/ui/Icons";
+import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, PowerIcon, SkipIcon, SpeakerIcon, SpeakerOffIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
 import type { ParticipantView } from "../state/room-types";
 import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
@@ -161,21 +161,28 @@ function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (command: Cal
   );
 }
 
-/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest). */
+/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest); with the
+ *  voice switch (call model B), its mark after them. */
 function conversationSub(row: ParticipantView, t: Translate) {
   const reach = row.reach === "holding" ? t("card.reach.holding") : row.reach === "offline" || !row.available ? t("card.reach.offline") : null;
+  const mark = row.mark === "waiting-for-you" ? t("card.mark.waitingForYou") : row.mark === "wants-to-talk" ? t("card.mark.wantsToTalk") : null;
   return (
     <>
       {row.machine && <span className="person-machine"><MachinesIcon size={11} /> {row.machine}</span>}
       {(row.harness || row.model) && <span className="person-harness">{row.harness && <HarnessIcon harness={row.harness} size={11} />} {[row.model, row.effort].filter(Boolean).join(" · ")}</span>}
       {reach && <span className="person-reach"> · {reach}</span>}
+      {mark && <span className="person-mark"> · {mark}</span>}
     </>
   );
 }
 
+/** Whether the room runs call model B, the voice switch: its card is about the voice, not a call (contract gap #38). */
+const voiceSwitch = (call: CallSnapshot) => typeof call.voiceOn === "boolean";
+
 export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
   const state = useHostState(host);
-  if (!state || !state.call.joined) return null;
+  // With the voice switch (call model B) the card is there while the voice is on; the room's window says why it went off.
+  if (!state || !(voiceSwitch(state.call) ? state.call.voiceOn : state.call.joined)) return null;
   // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
   return <ActiveCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
 }
@@ -237,7 +244,12 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
   const selected = call.participants.find((participant) => participant.selected);
   const agent = reconnecting ? "reconnecting" : call.agent;
   const run = (command: CallCommand) => { if (Date.now() >= guardUntil.current) host.run(command); };
-  const muteLabel = muted ? t("card.unmute") : t("card.mute");
+  // With the voice switch the microphone keeps one name, its state pressed (call model B).
+  const switching = voiceSwitch(call);
+  const muteLabel = switching ? t("card.muteMic") : muted ? t("card.unmute") : t("card.mute");
+  const agentsMuted = !!call.agentsMuted;
+  const waiting = agentsMuted ? call.wantToTalk ?? 0 : 0;
+  const waitingText = waiting ? t(waiting === 1 ? "card.waiting.one" : "card.waiting.other", { n: waiting }) : null;
   const unreadElsewhere = call.participants.reduce((n, row) => n + (row.selected ? 0 : row.unread || 0), 0);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -312,12 +324,21 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
               {muted ? <MicrophoneOffIcon size={17} /> : <MicrophoneIcon size={17} />}
             </button>
           </span>
+          {switching && <button type="button" className="card-agents" aria-pressed={agentsMuted} title={[t("card.muteAgents"), waitingText].filter(Boolean).join(" · ")}
+            aria-label={t("card.muteAgents")} aria-description={waitingText ?? undefined} onClick={() => run({ command: "toggle-agents" })}>
+            {agentsMuted ? <SpeakerOffIcon size={17} /> : <SpeakerIcon size={17} />}
+            {waiting > 0 && <span className="card-agents-badge" aria-hidden="true">{waiting > 9 ? "9+" : waiting}</span>}
+          </button>}
           <button type="button" className="card-skip" disabled={!call.canSkip} title={t("card.skip")} aria-label={t("card.skip")} onClick={() => run({ command: "skip-reply" })}>
             <SkipIcon size={17} />
           </button>
-          <button type="button" className="card-hangup" title={t("card.hangUp")} aria-label={t("card.hangUp")} onClick={() => run({ command: "hang-up" })}>
-            <HangupIcon size={18} />
-          </button>
+          {switching
+            ? <button type="button" className="card-voice-off" title={t("card.voiceOff")} aria-label={t("card.voiceOff")} onClick={() => run({ command: "voice-off" })}>
+                <PowerIcon size={17} />
+              </button>
+            : <button type="button" className="card-hangup" title={t("card.hangUp")} aria-label={t("card.hangUp")} onClick={() => run({ command: "hang-up" })}>
+                <HangupIcon size={18} />
+              </button>}
         </div>
       )}
 
@@ -330,7 +351,10 @@ function ActiveCard({ host, state, t }: { host: CallControlsHost; state: CallCon
             disabled={(row) => row.switching || !row.available || row.reach === "offline"}
             onSelect={(threadId) => { setPanel(null); run({ command: "select-participant", threadId }); }}
             sub={(row) => conversationSub(row, t)}
-            aside={(row) => (row.unread && !row.selected ? <span className="card-badge" aria-label={t("card.unread", { n: row.unread })}>{row.unread}</span> : null)}
+            aside={(row) => (<>
+              {row.mark && <span className="card-mark" data-mark={row.mark} aria-hidden="true" />}
+              {row.unread && !row.selected ? <span className="card-badge" aria-label={t("card.unread", { n: row.unread })}>{row.unread}</span> : null}
+            </>)}
           />
         </div>
       )}

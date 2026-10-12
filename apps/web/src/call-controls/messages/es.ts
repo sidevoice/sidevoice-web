@@ -28,4 +28,11 @@ export const es: Partial<Record<MessageKey, string>> = {
   "card.deviceFailed": "La sala siguió con el dispositivo anterior: ese no se pudo usar.",
   "card.devicesInSystem": "Elige este dispositivo en los ajustes del sistema.",
   "card.youAreMuted": "Estás silenciado",
+  "card.voiceOff": "Desactivar la voz",
+  "card.muteMic": "Silenciar micrófono",
+  "card.muteAgents": "Silenciar agentes",
+  "card.waiting.one": "1 conversación quiere hablar",
+  "card.waiting.other": "{n} conversaciones quieren hablar",
+  "card.mark.waitingForYou": "esperándote",
+  "card.mark.wantsToTalk": "quiere hablar",
 };
