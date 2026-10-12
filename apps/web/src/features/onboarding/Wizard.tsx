@@ -218,12 +218,16 @@ export function Wizard() {
   const travel = useRef<{ step: OnboardingStep; direction: "forward" | "back" | null }>({ step, direction: null });
   if (travel.current.step !== step) travel.current = { step, direction: ORDER.indexOf(step) < ORDER.indexOf(travel.current.step) ? "back" : "forward" };
 
-  // A machine prepared or paired while its step is step moves the setup on by itself, to where it then stands (a
-  // machine that answers after the setup opened leaves the steps already done behind).
+  // A machine prepared or paired while its step shows moves the setup on by itself, to where it then stands (a machine
+  // that answers after the setup opened leaves the steps already done behind). Only one that becomes ready there: a
+  // step arrived at with its machine already ready (Back) stays, with Continue — Back always lands where it says.
+  const readyOnArrival = useRef({ step, local: onboarding.localReady, remote: onboarding.remoteReady });
+  if (readyOnArrival.current.step !== step) readyOnArrival.current = { step, local: onboarding.localReady, remote: onboarding.remoteReady };
   useEffect(() => {
     if (!onboarding.open) return;
-    if (step === "W2" && onboarding.localReady) onboarding.openWizard();
-    if (step === "W2r" && onboarding.remoteReady) onboarding.openWizard();
+    const arrived = readyOnArrival.current;
+    if (step === "W2" && onboarding.localReady && !arrived.local) onboarding.openWizard();
+    if (step === "W2r" && onboarding.remoteReady && !arrived.remote) onboarding.openWizard();
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function choosePath(next: "agents" | "remote") {
@@ -305,7 +309,10 @@ export function Wizard() {
     </header>
     <Stepper current={current} t={t} />
     {!ready && <h2 id="wizard-title" className="wizard-title" ref={title} tabIndex={-1}>{t(TITLES[step])}</h2>}
-    <div className="wizard-body" key={step} data-travel={travel.current.direction ?? undefined}>
+    {/* Scrolled, it says so at its top edge (a line under the title, the text fading under it), so what goes under the
+        title reads as scrolled, not cut. Set on the element itself: scrolling re-renders nothing. */}
+    <div className="wizard-body" key={step} data-travel={travel.current.direction ?? undefined}
+      onScroll={(event) => event.currentTarget.toggleAttribute("data-scrolled", event.currentTarget.scrollTop > 0)}>
       {error && !ready && <Alert tone="danger" live title={error} />}
       {step === "W1" && <section>
         <p>{t("wizard.where.body")}</p>

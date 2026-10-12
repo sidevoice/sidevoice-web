@@ -36,6 +36,8 @@
 .wizard-body[data-travel="back"] { --wizard-from: -16px; }
 @keyframes wizard-step-in { from { opacity: 0; transform: translateX(var(--wizard-from, 16px)); } }
 @media (prefers-reduced-motion: reduce) { .wizard-body[data-travel] { animation: none; } }
+.wizard-title:has(+ .wizard-body[data-scrolled]) { position: relative; z-index: 1; box-shadow: 0 1px 0 var(--sv-border); }
+.wizard-body[data-scrolled] { mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sv-space-4)); }
 .wizard-body > section { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .wizard-body > section > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .wizard-loading { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }

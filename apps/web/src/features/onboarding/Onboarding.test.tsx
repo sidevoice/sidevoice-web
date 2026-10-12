@@ -38,7 +38,8 @@ beforeEach(() => {
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
-afterEach(() => { delete window.sidevoiceActions; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); });
+// A desktop app a test stood in for goes with it: the next test is in a browser unless it says otherwise.
+afterEach(() => { delete window.sidevoiceActions; delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; vi.restoreAllMocks(); localStorage.removeItem("sidevoice.variants"); });
 
 function room() {
   const store = createRoomStore();
@@ -331,4 +332,43 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
   expect(screen.queryByRole("dialog", { name: "Connect OpenAI" })).toBeNull();
   expect(document.querySelector("#wizard[open]")).toBe(wizard);
   expect(deferred()).toBeNull();
+}, WHOLE_APP_MS);
+
+/** Back pressed from wherever the setup stands to its first step: each step it lands on, read again once everything
+ *  pending has run — a step that moved on by itself would read as the next one. */
+async function walkBack() {
+  const seen = [title().textContent];
+  for (let back = document.querySelector<HTMLButtonElement>("#wizard .wizard-back"); back; back = document.querySelector<HTMLButtonElement>("#wizard .wizard-back")) {
+    await act(async () => { fireEvent.click(back!); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    seen.push(title().textContent);
+  }
+  return seen;
+}
+
+test("Back from the last step lands on each step before it and stays there, on another machine's path", async () => {
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: CHOSEN }));
+  const store = room();
+  paired(store);
+  expect(title()).toHaveTextContent("When your turn ends");
+  // Its machine paired and answering: Connect to your machine stays, with Continue, rather than moving on again.
+  expect(await walkBack()).toEqual(["When your turn ends", "Set up voice", "Set up transcription", "Connect to your machine", "The basics"]);
+}, WHOLE_APP_MS);
+
+test("Back from the last step lands on each step before it and stays there, on this computer's path", async () => {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "running", installed: true, reachable: true })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install: vi.fn(),
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents", agents_done: true, chosen: CHOSEN }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, speechLanguage: "es", localHostAvailable: true, localHostStatus: { state: "running", installed: true, reachable: true },
+    voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" },
+    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
+  render(<App store={store} />);
+  expect(title()).toHaveTextContent("When your turn ends");
+  expect(await walkBack()).toEqual(["When your turn ends", "Set up voice", "Set up transcription", "Prepare this computer", "Where do you use your agents?", "The basics"]);
+  // And forward again from the choice: this computer ready, its agents' step, not a jump past it.
+  await act(async () => { fireEvent.click(document.querySelector<HTMLButtonElement>("#wizard .wizard-actions .ui-button--primary")!); });
+  expect(title()).toHaveTextContent("Where do you use your agents?");
 }, WHOLE_APP_MS);
