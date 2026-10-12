@@ -188,7 +188,7 @@ test("a foreign Codex row is short, with the why in its (i), and replacing it by
   try {
     render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-    const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+    const foreignRow = screen.getByText("· Another ‘sidevoice’ entry").closest("li") as HTMLElement;
     expect(within(foreignRow).getByRole("button", { name: "About Codex’s status" })).toBeInTheDocument();
     // Never touched by Sidevoice: no Connect, no Disconnect.
     expect(within(foreignRow).queryByRole("button", { name: /^Connect / })).toBeNull();
@@ -222,7 +222,7 @@ test("foreign Codex manual replacement closes and confirms on connect, then stay
   let view: ReturnType<typeof render> | undefined;
   try {
     view = render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
-    const row = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+    const row = screen.getByText("· Another ‘sidevoice’ entry").closest("li") as HTMLElement;
     const reveal = within(row).getByRole("button", { name: "Replace manually" });
     fireEvent.click(reveal);
     expect(reveal).toHaveAttribute("aria-expanded", "true");
@@ -267,7 +267,7 @@ test("foreign rows without host instructions stay read-only while an automatic c
   setActions({ hostAgentAction: vi.fn(async () => {}) });
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
 
-  const foreignRow = screen.getByText("Another ‘sidevoice’ entry").closest("li") as HTMLElement;
+  const foreignRow = screen.getByText("· Another ‘sidevoice’ entry").closest("li") as HTMLElement;
   // Nothing to do on it here, only its (i) to say why.
   expect(foreignRow.querySelectorAll(".host-agent-actions button")).toHaveLength(0);
   expect(within(foreignRow).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["About claude’s status"]);
@@ -290,7 +290,7 @@ test("a row is always its name and one status line: connecting turns that line t
     expect(lines()).toEqual(["Codex is ready for new conversations"]);
     expect(row().querySelector(".host-agent-status")).toHaveClass("host-agent-ok");
     act(() => { vi.advanceTimersByTime(5000); });
-    expect(lines()).toEqual(["Connected to Sidevoice"]);
+    expect(lines()).toEqual(["Connected"]);
     act(() => store.patch({ hostAgents: { fp: ready([notConnected]) } }));
     expect(lines()).toEqual(["Not connected"]);
   } finally { vi.useRealTimers(); }
@@ -370,4 +370,35 @@ test("in Spanish, several commands are Comandos", () => {
     fireEvent.click(within(row).getByText("Lo hago yo"));
     expect(labels(row)).toEqual(["Comandos"]);
   } finally { localStorage.removeItem("sidevoice.settings"); }
+});
+
+test("a row's status is one of three — Connected, Not connected, Needs attention — the last with its reason after it", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  const status = () => row().querySelector(".host-agent-status") as HTMLElement;
+  const reason = () => status().querySelector(".host-agent-reason")?.textContent ?? null;
+  const cases: [Partial<DetectedAgent>, string, string | null, string][] = [
+    [{ registration: "connected" }, "Connected", null, "host-agent-ok"],
+    [{ registration: "not-connected" }, "Not connected", null, "muted"],
+    [{ registration: "not-connected", can: { connect: false, update: false, disconnect: false } }, "Not connected", " · Connect it manually", "muted"],
+    [{ registration: "outdated", actionable: false }, "Needs attention", " · Set up by an older Sidevoice", "host-agent-attention"],
+    [{ registration: "foreign", actionable: false }, "Needs attention", " · Another ‘sidevoice’ entry", "host-agent-attention"],
+    [{ registration: "invalid", actionable: false }, "Needs attention", " · Its MCP settings can’t be read", "host-agent-attention"],
+  ];
+  for (const [changes, state, why, tone] of cases) {
+    act(() => store.patch({ hostAgents: { fp: ready([known("codex", changes)]) } }));
+    expect(status().firstChild?.textContent).toBe(state);
+    expect(reason()).toBe(why);
+    expect(status()).toHaveClass(tone);
+    expect(status()).toHaveAttribute("title", why ? state + why : state);
+    // Needs attention keeps its (i), the why.
+    if (state === "Needs attention") expect(within(row()).getByRole("button", { name: "About Codex’s status" })).toBeInTheDocument();
+  }
+  // Needs attention keeps the row's action: Update where the connector can rewrite it, by hand otherwise.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "outdated", actionable: false })]) } }));
+  expect(within(row()).getByRole("button", { name: "Update Codex’s Sidevoice entry" })).toBeInTheDocument();
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "foreign", actionable: false })]) } }));
+  expect(within(row()).getByRole("button", { name: "Replace manually" })).toBeInTheDocument();
 });

@@ -127,16 +127,18 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
   const errorText = error ? translatedError(t, error.key, error.params) : null;
-  const status: { text: string; tone: "ok" | "error" | "muted" | ""; info?: string } = errorText ? { text: errorText, tone: "error" }
+  // Three states to read at a glance — Connected, Not connected, Needs attention (an entry an older Sidevoice made,
+  // another 'sidevoice' entry, settings that can't be read) — the last with its reason after it, the row's action beside.
+  const status: { text: string; tone: "ok" | "error" | "muted" | "attention" | ""; info?: string; reason?: string } = errorText ? { text: errorText, tone: "error" }
     : busy ? { text: t(`agents.busy.${busy}` as HostMessageKey), tone: "muted" }
     : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
-    : agent.registration === "connected" ? { text: t("agents.connected"), tone: "" }
+    : agent.registration === "connected" ? { text: t("agents.state.connected"), tone: "ok" }
     // Short in the row; what it means and what to do, only in its (i).
-    : agent.registration === "foreign" ? { text: t("agents.foreign"), tone: "muted", info: t("agents.foreign.info", { agent: agent.label }) }
-    : agent.registration === "outdated" ? { text: t("agents.outdated"), tone: "muted", info: t("agents.outdated.info", { agent: agent.label }) }
-    : agent.registration === "invalid" ? { text: t("agents.invalid"), tone: "error", info: t("agents.invalid.info", { agent: agent.label, file: agent.instructions?.file ?? "" }) }
+    : agent.registration === "foreign" ? { text: t("agents.state.attention"), reason: t("agents.foreign"), tone: "attention", info: t("agents.foreign.info", { agent: agent.label }) }
+    : agent.registration === "outdated" ? { text: t("agents.state.attention"), reason: t("agents.outdated"), tone: "attention", info: t("agents.outdated.info", { agent: agent.label }) }
+    : agent.registration === "invalid" ? { text: t("agents.state.attention"), reason: t("agents.invalid"), tone: "attention", info: t("agents.invalid.info", { agent: agent.label, file: agent.instructions?.file ?? "" }) }
     : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
-    : { text: t(manualOnly ? "agents.manualOnly" : "agents.notConnected"), tone: "muted" };
+    : { text: t("agents.state.notConnected"), tone: "muted", ...(manualOnly ? { reason: t("agents.manualOnly") } : {}) };
   const connected = agent.registration === "connected";
   const outdated = agent.registration === "outdated";
   // The confirm goes: the focus goes back to Disconnect (after Remove, to the row's action as it now stands).
@@ -155,8 +157,8 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           {/* Always one status line under the name, so a row never changes height: what went wrong, else a moment of
               "ready" once connected, else where it stands. */}
           <span className="host-agent-status-line">
-            <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted")}
-              role={errorText ? "alert" : "status"} title={status.text}>{status.text}</span>
+            <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted", status.tone === "attention" && "host-agent-attention")}
+              role={errorText ? "alert" : "status"} title={status.reason ? status.text + " · " + status.reason : status.text}>{status.text}{status.reason && <span className="host-agent-reason"> · {status.reason}</span>}</span>
             {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
           </span>
         </span>

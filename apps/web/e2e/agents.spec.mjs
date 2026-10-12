@@ -51,7 +51,7 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
   await openMachines(page, 390, 844);
   const agents = await openAgents(page);
   const foreign = page.locator(".host-agent-row[data-registration='foreign']");
-  await expect(foreign).toContainText("Another ‘sidevoice’ entry");
+  await expect(foreign).toContainText("Needs attention · Another ‘sidevoice’ entry");
   await foreign.getByRole("button", { name: "Replace manually" }).click();
   await expect(foreign.getByText("codex mcp remove sidevoice")).toBeVisible();
   await expect(foreign.getByRole("button", { name: "Connect" })).toHaveCount(0);
@@ -63,7 +63,7 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
   await expect(claudeRow.getByRole("alert")).toHaveText("Sidevoice is not running on this machine.");
   fake.connectMode = "success";
   await claudeRow.getByRole("button", { name: "Connect" }).click();
-  await expect(page.locator(".host-agent-row[data-registration='connected']")).toContainText(/Connected to Sidevoice|is ready for new conversations/);
+  await expect(page.locator(".host-agent-row[data-registration='connected']")).toContainText(/Connected|is ready for new conversations/);
   expect(fake.authorization.length).toBeGreaterThan(0);
   expect(fake.authorization.every((header) => header === "Bearer e2e-device-token")).toBe(true);
 
