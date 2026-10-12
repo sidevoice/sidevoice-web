@@ -355,3 +355,38 @@ test("Back from the last step lands on each step before it and stays there, on t
   await act(async () => { fireEvent.click(document.querySelector<HTMLButtonElement>("#wizard .wizard-actions .ui-button--primary")!); });
   expect(title()).toHaveTextContent("Where do you use your agents?");
 }, WHOLE_APP_MS);
+
+/* Continue without trying goes on without the try, never without the model: in both footers (VARIANTS
+ * `model-step-footer`) and every model step, it is not offered while the step's model is not on this device or is still
+ * downloading, only once it is ready. */
+const TURN_MODEL = { id: "smart-turn-v3.2", family: "smart-turn", capabilities: ["end-of-turn"], languages: ["es"], voices: [], parametersM: 1, license: "MIT", installed: true, builds: [{ id: "smart-turn-v3.2/int8", available: true, reasons: [] }] };
+const MODEL_STEPS = [
+  { title: "Set up transcription", task: "stt", model: "whisper-base", chosen: {} },
+  { title: "Set up voice", task: "tts", model: "kokoro-82m-v1.0", chosen: { stt: CHOSEN.stt } },
+  { title: "When your turn ends", task: "end-of-turn", model: TURN_MODEL.id, chosen: CHOSEN },
+] as const;
+const withTurn = (installed: (id: string) => boolean) => CATALOGS.map((catalog) => ({ ...catalog, models: [...catalog.models, TURN_MODEL].map((model) => installed(model.id) ? model
+  : { ...model, installed: false, recommendedBuild: model.builds![0].id, builds: [{ ...model.builds![0], installed: false, downloadBytes: 9e6 }] }) })) as unknown as CatalogView[];
+
+for (const variant of ["try-first", "in-card"] as const) for (const step of MODEL_STEPS) {
+  test(`${variant}: ${step.title} offers Continue without trying only once its model is ready`, () => {
+    localStorage.setItem("sidevoice.variants", JSON.stringify({ "model-step-footer": variant }));
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: step.chosen }));
+    const store = createRoomStore();
+    act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn" },
+      voiceCatalogue: { state: "ready", catalogs: withTurn((id) => id !== step.model), error: "" } }));
+    render(<App store={store} />);
+    paired(store);
+    expect(title()).toHaveTextContent(step.title);
+    const skip = () => wizard().queryByRole("button", { name: "Continue without trying" });
+    // Not downloaded.
+    expect(skip()).toBeNull();
+    // Downloading (the room reports an end-of-turn download under its own task, wider than the fact's declared type).
+    act(() => store.patch({ voiceInstall: { task: step.task as "stt" | "tts", model: step.model, state: "running", fraction: 0.5, error: "" } }));
+    expect(wizard().getByText("Downloading… 50%")).toBeInTheDocument();
+    expect(skip()).toBeNull();
+    // Ready.
+    act(() => store.patch({ voiceInstall: null, voiceCatalogue: { state: "ready", catalogs: withTurn(() => true), error: "" } }));
+    expect(skip()).toBeInTheDocument();
+  }, WHOLE_APP_MS);
+}

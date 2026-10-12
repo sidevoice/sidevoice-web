@@ -154,7 +154,8 @@ function ModelStepFooter({ variant, reason, tryReason, running, tried, pressed, 
     const early = !pressed && !tried;
     return <>
       {line ?? (early ? <p className="sr-only" id="wizard-stage-reason">{t("wizard.tryFirst")}</p> : null)}
-      {!tried && <Button type="button" variant="secondary" id="wizard-stage-skip" {...blocked(waiting)} onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
+      {/* Only once the model is ready: before, there is nothing to go on without trying. */}
+      {!tried && !waiting && <Button type="button" variant="secondary" id="wizard-stage-skip" onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
       <Button type="button" variant="primary" id="wizard-stage-action" {...blocked(waiting || early)} onClick={goOn}>{t("wizard.continue")}</Button>
     </>;
   }
