@@ -16,7 +16,7 @@ import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, useModelState, useVoiceTry, type ModelState, type SetupTry, type VoiceTry } from "./ModelSetup";
-import { TurnTry, useTurnTryVariant } from "./TurnTry";
+import { TurnTry, useTurnTryVariant, type TurnTryHandle } from "./TurnTry";
 import { useVoiceSwitch } from "../../state/call-model";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
@@ -148,7 +148,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const tryLanguage = draft.stt.language || speechLanguage;
   // Settings' try says the sample sentence; the first-run setup's is the setup's, started from its footer too.
   const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: t("wizard.sampleText"), language: tryLanguage }) });
-  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried} again={setupTry?.tried} t={t} />;
+  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried || !!setupTry.inBody} again={setupTry?.tried} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
@@ -210,7 +210,7 @@ export function SpeechChoices({ draft, setup = false, trial }: SlotProps) {
  *  smart model when it runs here (else why not); and a try of both together (TurnTry), where the `turn-try` variant
  *  puts it: under the end-of-turn choice, or after the choices in a card of its own. `setup`: the first-run setup's;
  *  `active`: in sight (Settings' section on show), a try that runs stopping when it is not. */
-export function TurnChoices({ draft, setup = false, active = true }: { draft: Settings; setup?: boolean; active?: boolean }) {
+export function TurnChoices({ draft, setup = false, active = true, turnTry, turnTried }: { draft: Settings; setup?: boolean; active?: boolean; turnTry?: TurnTryHandle; turnTried?: boolean }) {
   const t = hostTranslator();
   const tryVariant = useTurnTryVariant();
   const choices = useChoices(draft);
@@ -229,7 +229,7 @@ export function TurnChoices({ draft, setup = false, active = true }: { draft: Se
   const turnPending = saved && (saved.end_of_turn !== "smart-turn" || saved.turn_model !== draft.turn_model)
     ? t(saved.end_of_turn === "smart-turn" ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: saved.turn_model ?? "" }) : undefined;
   // In the same place whichever end of turn is chosen, so switching keeps a try that runs, and the focus.
-  const tryIt = <TurnTry variant={tryVariant} draft={draft} smart={smart} smartReady={turn.ready} setup={setup} active={active} />;
+  const tryIt = <TurnTry variant={tryVariant} draft={draft} smart={smart} smartReady={turn.ready} setup={setup} active={active} handle={turnTry} tried={turnTried} />;
   return (
     <Group title={t("settings.call.turn")}>
       <Row label={<>{t("voice.patience")}<InfoTip label={t("voice.patience.infoLabel")}>{t("voice.patience.info")}</InfoTip></>} description={t(current.hint)}>

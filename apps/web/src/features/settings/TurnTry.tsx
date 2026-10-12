@@ -133,17 +133,21 @@ export function useTurnTry({ active, smartBlocked }: { active: boolean; smartBlo
   }, [trial.phase, trial.told]);
   return { trial, running, level, root, start: () => void run(), stop };
 }
+export type TurnTryHandle = ReturnType<typeof useTurnTry>;
 
 /** The try of the end of turn being edited (`draft`), as the `turn-try` variant has it. `smart`: the smart end of turn
  *  is the one chosen, and `smartReady` its model ready; `setup`: the first-run setup's, where nothing says the try uses
  *  what is selected before it is kept, as Settings do; `active`: in sight (Settings' section on show). */
-export function TurnTry({ variant, draft, smart, smartReady, setup = false, active = true }: {
+export function TurnTry({ variant, draft, smart, smartReady, setup = false, active = true, handle, tried = false }: {
   variant: (typeof TURN_TRY)[number]; draft: Settings; smart: boolean; smartReady: boolean; setup?: boolean; active?: boolean;
+  /** The setup's own try (its footer starts it): this shows it, and offers it again here only once tried. */
+  handle?: TurnTryHandle; tried?: boolean;
 }) {
   const t = hostTranslator();
   const stt = useModelState("stt", draft);
   const smartBlocked = smart && !smartReady;
-  const { trial, running, level, root, start, stop } = useTurnTry({ active, smartBlocked });
+  const own = useTurnTry({ active: active && !handle, smartBlocked });
+  const { trial, running, level, root, start, stop } = handle ?? own;
   const reasonId = useId();
   // Why it cannot run now: Smart without its model, or no transcription to hear the turn's words.
   const reason = running ? "" : smartBlocked ? t("turnTry.smartBlocked") : !stt.ready ? t("settings.save.waitTranscription") : "";
@@ -175,13 +179,15 @@ export function TurnTry({ variant, draft, smart, smartReady, setup = false, acti
     <p className="turn-try-adjust">{t(adjust)}</p>
   </div> : null;
   const failure = trial.phase === "failed" ? <p className="stage-try-error" role="alert">{trial.error}</p> : null;
-  const button = <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
+  const button = handle && !tried ? null : <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
     {running ? t("try.stop") : t(trial.attempt ? "turnTry.again" : "turnTry.try")}
   </Button>;
+  // The setup's footer says why it waits: here, only when this offers the try.
+  const showWhy = !handle || tried;
   const said = trial.said ? t(trial.said.key, trial.said.ms != null ? { s: seconds(trial.said.ms) } : undefined) : "";
   // Read out as a whole, and again when the same message comes again (its content then differs by a trailing space).
   const status = <p className="sr-only turn-try-said" role="status">{said && said + (trial.told % 2 ? "\u00a0" : "")}</p>;
-  const why = reason ? <p className="turn-try-reason" id={reasonId}>{reason}</p> : null;
+  const why = reason && showWhy ? <p className="turn-try-reason" id={reasonId}>{reason}</p> : null;
 
   if (variant === "strip") {
     return <div ref={root} className="turn-try" id="turn-try-panel" data-variant="strip" data-phase={trial.phase}>

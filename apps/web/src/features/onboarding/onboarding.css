@@ -46,6 +46,13 @@
 .wizard-actions:not(:has(.ui-button)) { display: none; }
 .wizard-actions .wizard-back { margin-inline-end: auto; }
 .wizard-actions .ui-dialog-reason { margin: 0; }
+/* A model step's footer is always one line, at every width and in every language: Back, then why it waits (cut short,
+   its whole text kept for hover and assistive tech), then its actions, none of them wrapping. */
+.wizard-actions .ui-button { white-space: nowrap; }
+.wizard-actions .wizard-back { gap: var(--sv-space-1); }
+.wizard-actions[data-model-step] { flex-wrap: nowrap; }
+.wizard-actions[data-model-step] > .ui-button { flex: none; }
+.wizard-actions .wizard-reason { flex: 1 1 auto; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: end; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 /* The pairing form's Connect lands here, laid out as one of the footer's own buttons. */
 .wizard-slot { display: contents; }
 
@@ -150,4 +157,9 @@
   .wizard-actions { padding: var(--sv-space-3) var(--sv-space-4) calc(var(--sv-space-3) + env(safe-area-inset-bottom)); }
   .wizard-actions > .ui-button--primary, .wizard-slot > .ui-button { flex: 1 1 auto; }
   .wizard-actions .ui-dialog-reason { flex: 1 0 100%; }
+  /* A model step on a phone keeps its one line: Back is its chevron (its name still said), the actions their own width. */
+  .wizard-actions[data-model-step] > .ui-button--primary { flex: none; }
+  .wizard-actions[data-model-step] .wizard-back { padding-inline: var(--sv-space-2); }
+  .wizard-actions[data-model-step] .wizard-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .wizard-actions[data-model-step] > .ui-button:not(.wizard-back) { padding-inline: var(--sv-space-3); }
 }

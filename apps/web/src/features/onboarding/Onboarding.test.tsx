@@ -105,7 +105,7 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(title()).toHaveTextContent("Set up transcription");
   // Source first, then the model, as in Settings → Voice.
   expect(selectedValue("stt-source")).toBe("local");
-  expect(tryButton()).toHaveTextContent("Speak");
+  expect(tryButton()).toHaveTextContent("Try it");
   // The try is the model's: its hint in its block, and the block offers no second Speak beside the footer's.
   expect(card("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
   expect(document.getElementById("wizard-try-again")).toBeNull();
@@ -130,7 +130,7 @@ test("transcription and voice are this device's: trying them is recommended, and
 
   expect(title()).toHaveTextContent("When your turn ends");
   expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
-  await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
+  await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("You’re all set — talk to your agents");
   // What was set up, read from what the steps wrote, and what to tell an agent.
@@ -154,7 +154,7 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   expect(title()).toHaveTextContent("Set up transcription");
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(stageAction()); });
-  await act(async () => { fireEvent.click(document.getElementById("wizard-turn-continue")!); });
+  await act(async () => { fireEvent.click(stageAction()); });
 
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key) => { if (key === ONBOARDING_STORAGE_KEY) throw new DOMException("blocked", "SecurityError"); });
   await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
@@ -249,8 +249,10 @@ test("a model not on this device is downloaded first, in its block as in Setting
   expect(title()).toHaveTextContent("Set up transcription");
   expect(document.getElementById("stt-model-card")).toHaveTextContent(/Not downloaded\s*148 MB/);
   expect(tryButton()).toHaveAttribute("aria-disabled", "true");
-  expect(stageAction()).toHaveAttribute("aria-disabled", "true");
-  expect(stageAction()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
+  // Waiting for its model: only Try it, blocked, with why in the footer's row; no Continue without trying yet.
+  expect(document.getElementById("wizard-stage-action")).toBeNull();
+  expect(tryButton()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
+  expect(document.getElementById("wizard-stage-reason")).toHaveTextContent("The transcription model isn't ready yet.");
   expect(document.getElementById("stt-language")).toBeNull();
   fireEvent.click(document.getElementById("stt-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("stt");

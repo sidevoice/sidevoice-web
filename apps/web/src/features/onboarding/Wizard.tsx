@@ -3,13 +3,15 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
-import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
+import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, BackIcon } from "../../components/ui/Icons";
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
 import { PairMachine } from "../pairing/PairMachine";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
+import { useTurnTry, type TurnTryHandle } from "../settings/TurnTry";
+import { useVariant } from "../../lib/variants";
 import { Appearance } from "../settings/SettingsDialog";
 import { Group, Row } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
@@ -85,7 +87,7 @@ function BasicsStep({ t }: { t: HostTranslate }) {
 
 /** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience;
  *  and its try, optional — Continue stays the step's action, and leaving the step (Continue, Back, Later) stops it. */
-function TurnStep({ t }: { t: HostTranslate }) {
+function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolean; t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -93,7 +95,7 @@ function TurnStep({ t }: { t: HostTranslate }) {
     <p>{t("wizard.turnIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
-        : <TurnChoices draft={draft} setup />}
+        : <TurnChoices draft={draft} setup turnTry={turnTry} turnTried={tried} />}
   </section>;
 }
 
@@ -138,22 +140,45 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
 /** The voice steps' footer. Once the model is ready — made ready in its own block above (ModelPrepare), as in Settings
  *  — trying it is the main action and going on without it the other; once it worked, Continue is. Trying stays
  *  optional: nothing waits for it but the model. */
-function StageAction({ task, model, running, tried, disabled, onTry, onCancelTry, onContinue, t }: {
-  task: "stt" | "tts"; model: ModelState; running: boolean; tried: boolean; disabled: boolean;
-  onTry(): void; onCancelTry(): void; onContinue(): void; t: HostTranslate;
+/** How the model steps' footer works (VARIANTS `model-step-footer`): `try-first`, Try it is the step's main action
+ *  (Continue without trying beside it once the model is ready, Continue once tried); `in-card`, the try is the model
+ *  card's own, as in Settings, and the footer's Continue waits for it to be pressed. */
+export const MODEL_STEP_FOOTER = ["try-first", "in-card"] as const;
+
+/** The model steps' footer, the same in Transcription, Voice and End of turn, always one line: Back, then what it says
+ *  and its actions. `reason`: the step's model is not ready (said in the row, cut short with its whole text kept);
+ *  `tryReason`: only the try can't run yet (no sentence to say, no transcription to hear a turn). `pressed`: a try was
+ *  started (in-card). Blocked actions stay focusable, saying why (`blockedBy`). */
+function ModelStepFooter({ variant, reason, tryReason, running, tried, pressed, onTry, onStop, onContinue, t }: {
+  variant: (typeof MODEL_STEP_FOOTER)[number]; reason: string; tryReason?: string; running: boolean; tried: boolean; pressed: boolean;
+  onTry(): void; onStop(): void; onContinue(): void; t: HostTranslate;
 }) {
-  const waiting = !model.model || !model.ready;
-  const tryLabel = task === "stt" ? t("wizard.speak") : t("wizard.listen");
+  const waiting = !!reason && !running;
+  const said = waiting ? reason : !running && tryReason ? tryReason : "";
+  const line = said ? <p className="wizard-reason" id="wizard-stage-reason" title={said}>{said}</p> : null;
+  const blocked = (on: boolean) => ({ disabled: on, blockedBy: on ? "wizard-stage-reason" : undefined });
+  const goOn = () => { if (running) onStop(); onContinue(); };
+  if (variant === "in-card") {
+    const early = !pressed && !tried;
+    return <>
+      {line ?? (early ? <p className="sr-only" id="wizard-stage-reason">{t("wizard.tryFirst")}</p> : null)}
+      {!tried && <Button type="button" variant="secondary" id="wizard-stage-skip" {...blocked(waiting)} onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
+      <Button type="button" variant="primary" id="wizard-stage-action" {...blocked(waiting || early)} onClick={goOn}>{t("wizard.continue")}</Button>
+    </>;
+  }
+  if (tried && !running) return <Button type="button" variant="primary" id="wizard-stage-action" onClick={onContinue}>{t("wizard.continue")}</Button>;
   return <>
-    {waiting && <p className="ui-dialog-reason" id="wizard-stage-reason">{t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")}</p>}
-    {tried && !running
-      ? <Button type="button" variant="primary" id="wizard-stage-action" disabled={waiting} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onContinue}>{t("wizard.continue")}</Button>
-      : <>
-        {running ? <Button type="button" variant="secondary" id="wizard-try-cancel" onClick={onCancelTry}>{t("wizard.cancelTrial")}</Button>
-          : <Button type="button" variant="secondary" id="wizard-stage-action" disabled={waiting} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onContinue}>{t("wizard.continueWithoutTrying")}</Button>}
-        <Button type="button" variant="primary" id="wizard-try" loading={running} disabled={disabled || waiting || running} blockedBy={waiting ? "wizard-stage-reason" : undefined} onClick={onTry}>{tryLabel}</Button>
-      </>}
+    {line}
+    {!waiting && <Button type="button" variant="secondary" id="wizard-stage-action" onClick={goOn}>{t("wizard.continueWithoutTrying")}</Button>}
+    <Button type="button" variant="primary" id="wizard-try" {...blocked(waiting || (!running && !!tryReason))} onClick={running ? onStop : onTry}>
+      {running ? t("try.stop") : t("try.tryIt")}</Button>
   </>;
+}
+
+/** Why a step's model holds its footer, in the step's own words; nothing once it is ready. */
+const WAIT_KEY = { stt: "settings.save.waitTranscription", tts: "settings.save.waitVoice", turn: "settings.save.waitTurn" } as const;
+function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: HostTranslate) {
+  return model.model && model.ready ? "" : t(WAIT_KEY[slot]);
 }
 
 export function Wizard() {
@@ -187,6 +212,7 @@ export function Wizard() {
   const hostFailed = hostStatus.state === "failed" || hostStatus.state === "service-failed";
   const prepare = () => { setPreparing(true); localHostInstallController.start("no-machine"); };
   const { step } = onboarding;
+  const footerVariant = useVariant("model-step-footer", MODEL_STEP_FOOTER);
   const stageTask = step === "W4" ? "stt" : step === "W4v" ? "tts" : null;
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const trial = useVoiceTry(stageTask, { onTried: (task) => void onboarding.markTried(task) });
@@ -195,10 +221,17 @@ export function Wizard() {
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const tryAgain = () => void trial.run(stageTask === "stt" ? {} : { text: sample.trim(), language: draft?.stt.language || speechLanguage });
   const tried = !!stageTask && onboarding.tried(stageTask);
-  const stage: StageTry = { ...trial, start: tryAgain, tried, hint: tried ? undefined : t("wizard.tryHint"), sentence: sample, setSentence: setSample };
+  // In-card, the try is the model card's own, offered there from the start, as in Settings.
+  const stage: StageTry = { ...trial, start: tryAgain, tried, inBody: footerVariant === "in-card", hint: tried ? undefined : t("wizard.tryHint"), sentence: sample, setSentence: setSample };
   // The end of turn waits for its model when it is the smart one, as the voice steps wait for theirs.
   const turnModel = useModelState("end-of-turn", draft);
   const turnWaits = !!turnModel.model && !turnModel.ready;
+  // The end of turn's try is the setup's, as the voice steps' are: its footer starts and stops it, the step shows it.
+  // Tried once a turn has ended in it.
+  const turnTry = useTurnTry({ active: onboarding.open && step === "W5", smartBlocked: turnWaits });
+  const [turnTried, setTurnTried] = useState(false);
+  if (turnTry.trial.turn && !turnTried) setTurnTried(true);
+  const sttModel = useModelState("stt", draft);
 
   // W1's preselection: this computer wherever it can host agents, else another machine; what the person picks wins.
   useEffect(() => {
@@ -332,22 +365,24 @@ export function Wizard() {
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
-      {step === "W5" && <TurnStep t={t} />}
+      {step === "W5" && <TurnStep turnTry={turnTry} tried={turnTried || footerVariant === "in-card"} t={t} />}
       {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
       {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>
-    <footer className="wizard-actions">
-      {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}>{t("wizard.back")}</Button>}
+    <footer className="wizard-actions" data-model-step={stageTask || step === "W5" ? "" : undefined}>
+      {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}><BackIcon /><span className="wizard-back-label">{t("wizard.back")}</span></Button>}
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
-      {stageTask && <StageAction task={stageTask} model={model} running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
-        disabled={!draft?.[stageTask].model || (stageTask === "tts" && !sample.trim())}
-        onTry={tryAgain} onCancelTry={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
-      {step === "W5" && <Button type="button" variant="primary" id="wizard-turn-continue" disabled={turnWaits} onClick={() => void finishTurn()}>{t("wizard.continue")}</Button>}
+      {stageTask && <ModelStepFooter variant={footerVariant} reason={waitReason(model, stageTask, t)}
+        tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
+        running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)} pressed={trial.trial.phase !== "idle"}
+        onTry={tryAgain} onStop={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
+      {step === "W5" && <ModelStepFooter variant={footerVariant} reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
+        running={turnTry.running} tried={turnTried} pressed={turnTry.trial.attempt > 0} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}
       {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>
         {error ? t("wizard.retryCompletion") : t("wizard.enter")}<ArrowRightIcon />
       </Button>}
