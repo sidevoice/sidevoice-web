@@ -84,3 +84,11 @@
 .voice-try-controls { display: flex; justify-content: center; }
 .voice-try-play-big { width: 48px; height: 48px; padding: 0; border-radius: 50%; }
 .voice-try-play-big svg { width: 20px; height: 20px; }
+
+/* The transcription try (SttTry): the button and the microphone's level on one row, always; under it an area of a fixed
+   height — listening and the take's length, then what was heard in their place — so nothing below it moves. */
+.stt-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.stt-try-head { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 32px; }
+.stt-try-head .model-try-wave { flex: 1; min-width: 0; }
+.stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-height: 3.75rem; min-width: 0; }
+.stt-try-area .model-try-take { flex: none; width: 100%; }

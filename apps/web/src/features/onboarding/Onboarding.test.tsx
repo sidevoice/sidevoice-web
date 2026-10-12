@@ -110,6 +110,9 @@ test("transcription and voice are this device's: trying them is recommended, and
   // The try has its own block, last and outside the model's card: its hint there, and no second Speak beside the footer's.
   expect(document.querySelector("#wizard #stt-model-card")).not.toContainElement(tryBlock("stt") as HTMLElement);
   expect(tryBlock("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  // One steady layout: the microphone's level on the first row from the start, the hint in the area under it.
+  expect(tryBlock("stt").querySelector(".stt-try-head .voice-wave")).toBeInTheDocument();
+  expect(tryBlock("stt").querySelector(".stt-try-area .model-try-hint")).toBeInTheDocument();
   expect(document.getElementById("wizard-try-again")).toBeNull();
   await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
@@ -122,6 +125,11 @@ test("transcription and voice are this device's: trying them is recommended, and
   // Trying it again is the block's.
   expect(tryBlock("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
   expect(tryBlock("stt").querySelector(".model-try-hint")).toBeNull();
+  // Again beside the level, and what was heard with its time in the area where the hint was.
+  expect(tryBlock("stt").querySelector(".stt-try-head #wizard-try-again")).toBeInTheDocument();
+  expect(tryBlock("stt").querySelector(".stt-try-head .voice-wave")).toBeInTheDocument();
+  expect(tryBlock("stt").querySelector(".stt-try-area #stt-heard")).toBeInTheDocument();
+  expect(tryBlock("stt").querySelector(".stt-try-area #stt-timing")).toBeInTheDocument();
   await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("Set up voice");

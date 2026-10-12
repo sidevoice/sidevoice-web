@@ -191,6 +191,49 @@ test("a try is all in its block — getting ready, listening with the level, wha
   expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-expanded", "false");
 });
 
+test("the transcription try is one steady layout: the button and the level first, then listening or what was heard in one area", async () => {
+  const { actions } = renderPane();
+  const block = document.getElementById("stt-try-block")!;
+  const head = () => block.querySelector(".stt-try-head")!;
+  const area = () => block.querySelector(".stt-try-area")!;
+  // Before any try: the button beside the level, in the first row; no row of its own as the voice's has.
+  expect(head()).toContainElement(document.getElementById("stt-try"));
+  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(block.querySelector(".turn-try-main")).toBeNull();
+  expect(area()).toHaveAttribute("aria-live", "polite");
+  expect(block.querySelector(".model-try-take")).toBeNull();
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  expect(area()).toHaveTextContent("Getting ready…");
+  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  // Listening: what to do and the take's bar, in the area; the level still in the first row, with the button (Stop).
+  act(() => running.told.onListening!());
+  expect(area()).toHaveTextContent("Listening…");
+  expect(area().querySelector(".model-try-take")).toBeInTheDocument();
+  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head()).toContainElement(document.getElementById("stt-try"));
+  expect(document.getElementById("stt-try")).toHaveTextContent("Stop");
+  const shown = area();
+  // Done: the same area holds what was heard and how quick, and no take bar.
+  await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 900, recognition_ms: 420 } }); });
+  expect(area()).toBe(shown);
+  expect(area().querySelector("#stt-heard")).toHaveTextContent("hola");
+  expect(area().querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(area()).not.toHaveTextContent("Listening…");
+  expect(block.querySelector(".model-try-take")).toBeNull();
+  expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(head()).toContainElement(document.getElementById("stt-try"));
+  expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
+});
+
+test("the voice's try keeps its own layout: its button on its row, no level and no transcription area", () => {
+  renderPane();
+  const block = document.getElementById("tts-try-block")!;
+  expect(block.querySelector(".turn-try-main")).toContainElement(document.getElementById("tts-try"));
+  expect(block.querySelector(".stt-try, .stt-try-head, .stt-try-area")).toBeNull();
+  expect(block.querySelector(".voice-wave")).toBeNull();
+});
+
 test("the model's load is said after the try's time only when it had to load (from 1 s), on its line", async () => {
   const { actions } = renderPane();
   const running = pendingTry(actions);

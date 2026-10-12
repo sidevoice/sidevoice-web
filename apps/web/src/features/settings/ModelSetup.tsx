@@ -318,11 +318,44 @@ function VoiceTryPlayer({ handle, t }: { handle: VoiceTry; t: HostTranslate }) {
   </div>;
 }
 
+/** The transcription try, one layout that never jumps. Its first row: the try's button and, beside it, the microphone's
+ *  level, always there — flat until it listens, moving while it does. Its second, of a fixed height: while it listens,
+ *  what to do and the take's length filling to its longest; once done, in its place, what was heard and how quick; or
+ *  why it failed. */
+function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: HostTranslate }) {
+  const { trial } = handle;
+  const running = trial.phase === "running";
+  const listening = running && trial.live;
+  return <div className="model-try stt-try" id="stt-try-panel" data-phase={trial.phase}>
+    <div className="stt-try-head">
+      {button}
+      <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={() => listening ? handle.level.current() / 100 : 0} /></span>
+    </div>
+    <div className="stt-try-area" aria-live="polite">
+      {trial.phase === "idle" && hint && <p className="model-try-hint">{hint}</p>}
+      {running && !trial.live && <p className="model-try-state"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>}
+      {listening && <>
+        <p className="model-try-state">{t("try.listening")}</p>
+        {/* The take's length, filling to its longest (MAX_TAKE_MS), from when it listens. */}
+        <span className="model-try-take" key={trial.attempt} style={{ animationDuration: MAX_TAKE_MS + "ms" }} role="img" aria-label={t("try.takeMax", { s: MAX_TAKE_MS / 1000 })} />
+      </>}
+      {trial.phase === "done" && <>
+        <TryHeard text={trial.text} roomy={false} t={t} />
+        {trial.timings && <TryTiming task="stt" timings={trial.timings} t={t} />}
+      </>}
+      {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
+    </div>
+    {/* The take to listen to, when the voice handed one: outside the live area, read when reached. */}
+    {!running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" t={t} />}
+  </div>;
+}
+
 /** What a try shows in a ready model's block, under its state: all of it. `hint`: a line before any try (the first-run
  *  setup's); `sample`: the sentence to hear, edited in the block. */
-export function TryPanel({ task, handle, model, hint, sample, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; t: HostTranslate }) {
+export function TryPanel({ task, handle, model, hint, sample, button, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; button?: ReactNode; t: HostTranslate }) {
   const { trial } = handle;
   const idle = trial.phase === "idle";
+  if (task === "stt") return <SttTry handle={handle} hint={hint} button={button} t={t} />;
   // The voice's sentence shows once its try starts, with its own Play there (VoiceTryPlayer); not before.
   if (task === "tts" && handle.setSentence) {
     return <div className="model-try" id={task + "-try-panel"} data-phase={trial.phase} data-empty={(idle && !hint) || undefined}>
