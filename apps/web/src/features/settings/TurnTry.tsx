@@ -3,11 +3,14 @@ import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Row } from "../../components/ui/Card";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
-import { seconds, TryHeard, useModelState } from "./ModelSetup";
+import { TryHeard, useModelState } from "./ModelSetup";
+import { seconds } from "./try-time";
+import { TryTake } from "./TryTake";
 import { hostTranslator } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import type { TurnStep } from "../../services/voice-trial.js";
 import type { DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
+import type { VoiceTake } from "../../services/voice-take";
 import "./model-prepare.css";
 import "./turn-try.css";
 
@@ -19,7 +22,11 @@ import "./turn-try.css";
  * Where it stands is always said in words; the waveform is decoration, hidden from screen readers. A screen reader hears
  * a few whole messages from one polite status region — listening, a turn ended (not its words), a turn that did not
  * count, listening again, the stop — and never speaking or a pause: that would be one message per breath, and its
- * speech, heard by the microphone, would open turns of its own. Try and Stop are one button, so the focus stays. */
+ * speech, heard by the microphone, would open turns of its own. Try and Stop are one button, so the focus stays.
+ *
+ * Once it has stopped, its take — what the microphone gave the voice since it last started to listen, with where each
+ * turn's speech started, paused and ended — shows under the result, to play (TryTake), where the voice hands one
+ * (contract gap #40). It is held here only, in memory, until the next try or until this goes away. */
 
 /** Where the try shows (the preview's VARIANTS `turn-try`): a strip under the end-of-turn choice, with no border of its
  *  own (`strip`), or a card of its own after the end-of-turn choices, as a model's try looks (`card`). */
@@ -42,12 +49,14 @@ export type TurnTrial = {
   /** What a notice says for its moment: a turn that did not count, or the new setting listening. */
   notice: "not-a-turn" | "changed" | null;
   error: string;
+  /** Once it has stopped: its take, where the voice hands one (gap #40). */
+  take: VoiceTake | null;
   /** The last message read out, and how many have been: the same one again is read again. */
   said: Said | null;
   told: number;
 };
 
-export const TURN_IDLE: TurnTrial = { phase: "idle", attempt: 0, turn: null, notice: null, error: "", said: null, told: 0 };
+export const TURN_IDLE: TurnTrial = { phase: "idle", attempt: 0, turn: null, notice: null, error: "", take: null, said: null, told: 0 };
 
 const say = (trial: TurnTrial, said: Said) => ({ said, told: trial.told + 1 });
 
@@ -103,6 +112,7 @@ export function useTurnTry({ active, smartBlocked }: { active: boolean; smartBlo
       await window.sidevoiceActions!.tryTurnSettings!({
         onLevel: (value) => level.publish(value * 100),
         onTurnStep: (step) => update((trial) => turnStepped(trial, step)),
+        onTake: (take) => update((trial) => ({ ...trial, take })),
       });
     } catch (error) {
       const { code, message } = error as { code?: string; message: string };
@@ -176,6 +186,7 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
     <p className="turn-try-adjust">{t(adjust)}</p>
   </div> : null;
   const failure = trial.phase === "failed" ? <p className="stage-try-error" role="alert">{trial.error}</p> : null;
+  const take = !running && trial.take ? <TryTake key={trial.attempt} take={trial.take} id="turn-try-take" t={t} /> : null;
   const button = handle && !tried ? null : <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
     {running ? t("try.stop") : t(trial.attempt ? "turnTry.again" : "turnTry.try")}
   </Button>;
@@ -193,10 +204,11 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
         {button}
       </div>
       {why}
-      <div className="model-try" data-phase={trial.phase} data-empty={(!state && !result && !failure) || undefined}>
+      <div className="model-try" data-phase={trial.phase} data-empty={(!state && !result && !failure && !take) || undefined}>
         {state}
         {result}
         {failure}
+        {take}
       </div>
       {status}
     </div>

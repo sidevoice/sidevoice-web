@@ -14,6 +14,10 @@ import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { wordEnd } from "../conversation/KaraokeText";
 import { readingMoves, readingPosition, readOn, type Reading } from "../call/speech-chunks";
 import type { KaraokeRange, TrialTimings } from "../../state/room-types";
+import type { VoiceTake } from "../../services/voice-take";
+import type { HostMessageKey } from "./messages/en";
+import { seconds } from "./try-time";
+import { TryTake } from "./TryTake";
 
 /* A voice slot's chosen model made ready, the same in Settings and in the first-run setup: one of this device's
  * catalogue is downloaded first when it is not on disk (its size said, with progress and cancel), then checked; a
@@ -93,14 +97,18 @@ export type TryState = {
   text: string;
   error: string;
   timings?: TrialTimings | null;
+  /** Transcription's, once it has stopped: what the microphone gave the voice, where the voice hands it (gap #40). */
+  take?: VoiceTake | null;
 };
 
-const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range: null, text: "", error: "" };
+const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range: null, text: "", error: "", take: null };
 
 /** A real try of the settings being edited for `task` (the controller's `tryVoiceSettings`): `keep` makes settings that
  *  work this device's (the setup); `onTried` hears each success. A changed setting clears it; leaving stops it. While
  *  it runs it follows what the try tells (TrialProgress); the microphone's level goes to `level`, drawn from there
- *  frame by frame, never through a render. A try shows all of itself in the model's block (decided 2026-10-12). */
+ *  frame by frame, never through a render. A try shows all of itself in the model's block (decided 2026-10-12). Its
+ *  take, when the voice hands one, is held here only, in memory: a new try, a changed setting, a stop, or this going
+ *  away lets it go. */
 export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?: boolean; onTried?: (task: Task) => void } = {}) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [trial, setTrial] = useState<TryState>(IDLE);
@@ -131,12 +139,14 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
       const result = await window.sidevoiceActions!.tryVoiceSettings!(task, { ...options, keep,
         onListening: () => update((trial) => ({ ...trial, live: true })),
         onLevel: (value) => level.publish(value * 100),
-        onProgress: (range) => update((trial) => ({ ...trial, live: true, range })) });
+        onProgress: (range) => update((trial) => ({ ...trial, live: true, range })),
+        onTake: (take) => update((trial) => ({ ...trial, take })) });
       update((trial) => ({ ...trial, phase: "done", live: false, text: result.text ?? "", timings: result.timings ?? null }));
       if (attempt.current === mine) onTried?.(task);
     } catch (error) {
       const cancelled = (error as { code?: string }).code === "trial-cancelled";
-      update((trial) => ({ ...trial, phase: cancelled ? "idle" : "failed", live: false, error: (error as Error).message }));
+      // Stopped, the try is put away, its take with it; failed, what the microphone gave shows why.
+      update((trial) => ({ ...trial, phase: cancelled ? "idle" : "failed", live: false, error: (error as Error).message, ...(cancelled ? { take: null } : {}) }));
     } finally {
       level.publish(0);
     }
@@ -159,9 +169,6 @@ export type SetupTry = VoiceTry & { tried: boolean; inBody?: boolean; hint?: str
 
 /** Past these, a try is slow for this device: transcribing what was said, or the first sound of a sentence. */
 const SLOW_MS = { stt: 1500, tts: 1500 } as const;
-
-/** A span in seconds as a try says it: one decimal ("0.9"). */
-export const seconds = (ms: number) => new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(ms / 1000);
 
 /** The time that matters after a try, in words: what was said transcribed, or the voice's first sound. */
 const timingMs = (task: Task, timings: TrialTimings) => task === "stt" ? timings.recognition_ms : timings.first_sound_ms;
@@ -251,7 +258,9 @@ export function TryHeard({ text, roomy, t, id = "stt-heard" }: { text: string; r
 
 /** A try as it goes, the same in a model's block and in its dialog: getting ready; then listening, the microphone's
  *  level drawn as it comes, or the sentence lit as it is heard; then what was heard and how quick it was, or why it
- *  failed. `sample`: the sentence to hear, to edit while no try runs (the first-run setup's). */
+ *  failed — and, for transcription, the take to listen to when the voice handed one (outside the live region: it is
+ *  read when reached, not when it appears). `sample`: the sentence to hear, to edit while no try runs (the first-run
+ *  setup's). */
 function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { task: Task; handle: VoiceTry; roomy?: boolean; sample?: ReactNode; quote?: boolean; t: HostTranslate }) {
   const { trial } = handle;
   const running = trial.phase === "running";
@@ -272,6 +281,7 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
       {trial.phase === "done" && trial.timings && <TryTiming task={task} timings={trial.timings} t={t} />}
       {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
     </div>
+    {task === "stt" && !running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" t={t} />}
   </>;
 }
 

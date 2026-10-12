@@ -8,7 +8,7 @@
 import {
   Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
-  PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
+  PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
   Timer, ScrollText, Link, Unlink, Search, ChevronLeft, Eye, EyeOff, Square, Hand, VolumeX, Power,
 } from "lucide-react";
@@ -95,6 +95,9 @@ export const HangupIcon = mark(PhoneOff, 22);
 export const SkipIcon = mark(SkipForward, 22);
 export const DownloadsIcon = mark(Download, 18);
 export const ListenAgainIcon = mark(Play, 14);
+/** A try's recording, played and paused (TryTake). */
+export const PlayRecordingIcon = mark(Play, 16);
+export const PauseRecordingIcon = mark(Pause, 16);
 export const KeyboardIcon = mark(Keyboard, 20);
 /** The record of what was said: unlike the conversations' bubbles, a scroll of text. */
 export const TranscriptIcon = mark(ScrollText, 22);

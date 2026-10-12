@@ -1867,13 +1867,14 @@ async function saveVoiceSettings(){
 // one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
 // whoever shows it (room-types.ts TrialProgress): transcription, that the voice listens and the microphone's level;
 // the voice, the part of `text` sounding, in the page's offsets into it as the room's karaoke has them (`sayingRange`).
+// A try that records the person hands its take (`onTake`, contract gap #40) to whoever shows it, and keeps nothing.
 let voiceTry=null;
 // Never during a call (A), nor with the voice on (B): the try would take its voice.
 function refuseTryInCall(){
  if(VOICE_SWITCH){if(state.voiceOn||state.voiceStarting)throw Object.assign(Error(voiceErrorText({code:'trial-voice-on'})),{code:'trial-voice-on'});return}
  if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
 }
-async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress}={}){
+async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress,onTake}={}){
  refuseTryInCall();
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
@@ -1883,7 +1884,7 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   const host=await voiceHost();
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel})}
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTake})}
    :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
@@ -1904,12 +1905,12 @@ function finishVoiceTry(){if(voiceTryFinish)voiceTryFinish.abort();else cancelVo
 const TURN_FIELDS=['patience','end_of_turn','turn_model'];
 let turnTry=null;
 const turnTrySettings=()=>voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
-async function tryTurnSettings({onLevel,onTurnStep}={}){
+async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
  refuseTryInCall();
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  try{
   const host=await voiceHost();
-  const run=tryEndOfTurn(host,turnTrySettings(),{signal:abort.signal,onLevel,onTurnStep});
+  const run=tryEndOfTurn(host,turnTrySettings(),{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};
   await run.done;
  }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}

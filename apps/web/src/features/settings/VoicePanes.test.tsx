@@ -288,6 +288,35 @@ test("a try that failed says why in its block, and offers it again", async () =>
 });
 
 
+test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes; stopped by the person, it goes", async () => {
+  const { actions } = renderPane();
+  const block = document.getElementById("stt-try-block")!;
+  const take = { sampleRate: 16000, samples: new Float32Array(32000), started_at: 0, ended_at: 2000, turns: [{ turn_id: "t1", speech_ms: 300, pauses: [], end_ms: 1700 }] };
+  let running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  act(() => running.told.onListening!());
+  act(() => running.told.onTake!(take));
+  expect(block.querySelector("#stt-take")).toBeNull();
+  await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 900, audio_ms: 1200, endpoint_silence_ms: 500, recognition_ms: 300 } }); });
+  const shown = block.querySelector("#stt-take")!;
+  expect(shown).toHaveTextContent("2.0 s recorded");
+  expect(shown).toHaveTextContent("speech starts at 0.3 s");
+  expect(shown).toHaveTextContent("turn ends at 1.7 s");
+  expect(shown.closest("[aria-live]")).toBeNull();
+  // After what was heard, and not in the model's card (the try moved out of it, into the try block).
+  expect(block.querySelector("#stt-heard")!.compareDocumentPosition(shown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.getElementById("stt-model-card")!.querySelector("#stt-take")).toBeNull();
+  // The voice's own try records no one: no take.
+  expect(document.getElementById("tts-take")).toBeNull();
+  // Again, and stopped: the try is put away with its take.
+  running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  expect(block.querySelector("#stt-take")).toBeNull();
+  act(() => running.told.onTake!(take));
+  await act(async () => { running.finish(Promise.reject(Object.assign(new Error("The try was stopped."), { code: "trial-cancelled" }))); });
+  expect(block.querySelector("#stt-take")).toBeNull();
+});
+
 test("how a model runs folds under it: each build with what it runs on and its sizes, Automatic the engine's own", () => {
   const { actions } = renderPane();
   const toggle = document.querySelector("#stt-model-card .model-runtime .model-runtime-toggle") as HTMLButtonElement;

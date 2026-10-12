@@ -736,4 +736,13 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "turnTry.changed": "Escuchando de nuevo con el ajuste nuevo",
   "turnTry.quiet": "No se oyó nada en 30 s; la prueba se detuvo.",
   "turnTry.smartBlocked": "Prepara el modelo de fin de turno para probar Inteligente.",
+  "take.title": "Tu grabación",
+  "take.play": "Reproducir tu grabación",
+  "take.position": "Por dónde vas en tu grabación",
+  "take.at": "{at} s de {total} s",
+  "take.length": "{s} s grabados",
+  "take.speech": "empiezas a hablar a los {s} s",
+  "take.pause": "pausa de {from} a {to} s",
+  "take.end": "fin del turno a los {s} s",
+  "take.noSpeech": "no se detectó voz",
 };

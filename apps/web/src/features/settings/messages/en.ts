@@ -735,6 +735,15 @@ export const en = {
   "turnTry.changed": "Listening again with the new setting",
   "turnTry.quiet": "Nothing heard for 30 s, so the try stopped.",
   "turnTry.smartBlocked": "Get the end-of-turn model ready to try Smart.",
+  "take.title": "Your recording",
+  "take.play": "Play your recording",
+  "take.position": "Where you are in your recording",
+  "take.at": "{at} s of {total} s",
+  "take.length": "{s} s recorded",
+  "take.speech": "speech starts at {s} s",
+  "take.pause": "pause from {from} to {to} s",
+  "take.end": "turn ends at {s} s",
+  "take.noSpeech": "no speech detected",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

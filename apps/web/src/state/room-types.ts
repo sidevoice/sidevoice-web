@@ -1,5 +1,6 @@
 import type { DeviceVoiceSettings } from '../services/voice-settings.js';
 import type { TurnStep } from '../services/voice-trial.js';
+import type { VoiceTake } from '../services/voice-take';
 /** The part of a reply sounding now, as offsets into its text; `from` and `to` are the same between its chunks. */
 export interface KaraokeRange {
   from: number;
@@ -241,7 +242,7 @@ export interface SidevoiceActions {
    *  with no speech or a failure of the voice; it never resolves, and rejects with a sentence and why it ended
    *  (`trial-cancelled`, `trial-silence`, the voice's code). A change of the end of turn while it runs restarts it with
    *  the change; Smart without its model ready stops it. */
-  tryTurnSettings?(progress?: Pick<TrialProgress, "onLevel" | "onTurnStep">): Promise<void>;
+  tryTurnSettings?(progress?: Pick<TrialProgress, "onLevel" | "onTurnStep" | "onTake">): Promise<void>;
   /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
   installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
@@ -283,12 +284,15 @@ export interface SidevoiceActions {
  *  second. The voice: `onProgress` from its first sound on, the part of the sentence sounding now, in offsets into that
  *  text as JavaScript indexes it; between parts `from` and `to` meet at the end of what was heard, and the first sound
  *  is `{from: 0, to: 0}`. The end of turn: `onTurnStep`, each step of the person's turns as the voice tells it
- *  (voice-trial.js TurnStep), and `onLevel`. */
+ *  (voice-trial.js TurnStep), and `onLevel`. A try that records the person (transcription, the end of turn): `onTake`,
+ *  once it has stopped, what the microphone gave the voice, kept in memory by whoever shows it and nowhere else —
+ *  contract gap #40, pending in @sidevoice/voice: no voice hands one yet, and then it is never called. */
 export interface TrialProgress {
   onListening?(): void;
   onLevel?(level: number): void;
   onProgress?(range: KaraokeRange): void;
   onTurnStep?(step: TurnStep): void;
+  onTake?(take: VoiceTake): void;
 }
 
 /** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the
