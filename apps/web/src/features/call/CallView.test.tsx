@@ -228,6 +228,11 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
+  // The sidebar's cards show a dot only when connected (room.css hides an empty one that is not in call): one is, and
+  // the others' dots are empty, with no mark to keep.
+  const cardDots = [...document.querySelectorAll(".sidebar-rows .state-dot")];
+  expect(cardDots.filter((d) => d.getAttribute("data-state") === "in-call")).toHaveLength(1);
+  expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
 });
 
 test("an offline conversation on the stage is a wanted poster, in the interface's language", () => {
