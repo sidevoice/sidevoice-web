@@ -720,6 +720,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "updates.restartNamed": "Reiniciar Sidevoice para actualizar",
   "updates.open": "Abrir",
   "updates.openNamed": "Abrir {machine} en Máquinas",
+  "updates.openThisDevice": "Abrir Este dispositivo",
   "updates.none": "Todo está al día.",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "Un fin de turno inteligente",

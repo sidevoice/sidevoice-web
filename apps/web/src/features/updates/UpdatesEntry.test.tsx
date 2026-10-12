@@ -27,3 +27,29 @@ test("nothing waits: no entry; a newer build held in a call is one, and Later pu
   act(() => store.patch({ webUpdate: "b3" } as never));
   expect(screen.getByTestId("items")).toHaveTextContent("web|true");
 });
+
+/** This computer with an update for its Sidevoice, as the desktop app's bridge says it. */
+function withMachineUpdate() {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: async () => ({ state: "running" }), subscribe: () => () => {}, pairing: async () => null,
+    version: async () => ({ update: "available", bundled: { version: "0.9.0" } }), update: async () => undefined,
+  } } } });
+}
+const local = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1, revoked: false };
+
+test("this computer's update opens This device where it has a section of its own, else its page under Machines", async () => {
+  withMachineUpdate();
+  for (const app of [true, false]) {
+    const store = createRoomStore();
+    act(() => store.patch({ inApp: app, localHostAvailable: true, localHostStatus: { state: "running" }, pairings: [local], machinesReady: true } as never));
+    const { unmount } = render(<RoomProvider store={store}><UpdatesEntry /></RoomProvider>);
+    const entry = await screen.findByRole("button", { name: "Updates, 1 waiting" });
+    await act(async () => { entry.click(); });
+    await act(async () => { screen.getByRole("button", { name: app ? "Open This device" : "Open This computer in Machines" }).click(); });
+    const facts = store.getState().facts;
+    expect([facts.settingsSection, facts.settingsLevel]).toEqual([app ? "this-computer" : "machines", "page"]);
+    if (!app) expect(facts.machinesView.machine).toBe(store.getState().machines.find((machine) => machine.local)?.id);
+    unmount();
+  }
+  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+});

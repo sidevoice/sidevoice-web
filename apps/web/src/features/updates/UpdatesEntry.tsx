@@ -8,6 +8,7 @@ import { useVoiceSwitch } from "../../state/call-model";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
+import { useThisComputerSection } from "../../state/this-computer";
 import { appUpdater, updateLater, useUpdates, type UpdateItem } from "./useUpdates";
 import "./updates.css";
 
@@ -23,6 +24,8 @@ function UpdateRow({ item, inCall, t }: { item: UpdateItem; inCall: boolean; t: 
   const why = useId();
   const machines = useRoomStore((state) => state.machines);
   const store = useContext(RoomStoreContext);
+  // This computer in a section of its own (This device): its update is there, not under Remote machines, which leave it out.
+  const ownComputer = useThisComputerSection();
   const waits = inCall && item.kind !== "machine";
   // With the voice switch (call model B) it waits for the voice to be off, not for a call to end.
   const voiceSwitch = useVoiceSwitch();
@@ -31,9 +34,9 @@ function UpdateRow({ item, inCall, t }: { item: UpdateItem; inCall: boolean; t: 
     if (item.kind === "web") window.sidevoiceActions?.reloadToUpdate?.();
     else if (item.kind === "app") void appUpdater()?.restart();
     else {
-      // This computer's machine page, at its update.
+      // This computer's page, at its update: This device, or its machine's page under Machines.
       const local = machines.find((machine) => machine.local);
-      openSettings({ section: "machines", machine: local?.id ?? null }, store);
+      openSettings(ownComputer ? { section: "this-computer" } : { section: "machines", machine: local?.id ?? null }, store);
     }
   };
   return (
@@ -45,7 +48,7 @@ function UpdateRow({ item, inCall, t }: { item: UpdateItem; inCall: boolean; t: 
       <span className="update-row-actions">
         {!item.required && <Button variant="ghost" tone="neutral" size="sm" onClick={() => updateLater(item)}>{t("updates.later")}</Button>}
         <Button size="sm" variant="primary" disabled={waits} aria-describedby={waits ? why : undefined} onClick={act}
-          aria-label={item.kind === "web" ? t("updates.reloadNamed") : item.kind === "app" ? t("updates.restartNamed") : t("updates.openNamed", { machine: t("hosts.thisComputer") })}>
+          aria-label={item.kind === "web" ? t("updates.reloadNamed") : item.kind === "app" ? t("updates.restartNamed") : ownComputer ? t("updates.openThisDevice") : t("updates.openNamed", { machine: t("hosts.thisComputer") })}>
           {item.kind === "web" ? t("updates.reload") : item.kind === "app" ? t("updates.restart") : t("updates.open")}
         </Button>
       </span>

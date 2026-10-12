@@ -720,6 +720,7 @@ export const en = {
   "updates.restartNamed": "Restart Sidevoice to update",
   "updates.open": "Open",
   "updates.openNamed": "Open {machine} in Machines",
+  "updates.openThisDevice": "Open This device",
   "updates.none": "Everything is up to date.",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "A smart end of turn",
