@@ -3,7 +3,7 @@ import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Row } from "../../components/ui/Card";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
-import { TryHeard, useModelState } from "./ModelSetup";
+import { useModelState } from "./ModelSetup";
 import { seconds } from "./try-time";
 import { TryTake } from "./TryTake";
 import { hostTranslator } from "./host-i18n";
@@ -34,7 +34,7 @@ import "./turn-try.css";
 /** How long a notice stays (a turn that did not count, the new setting listening) before the try says it listens. */
 const NOTICE_MS = 2000;
 
-type Phase = "idle" | "starting" | "restarting" | "listening" | "speaking" | "pause" | "ended" | "notice" | "quiet" | "failed";
+type Phase = "idle" | "starting" | "restarting" | "listening" | "speaking" | "pause" | "ended" | "notice" | "quiet" | "failed" | "done";
 const RUNNING: ReadonlySet<Phase> = new Set(["starting", "restarting", "listening", "speaking", "pause", "ended", "notice"]);
 
 /** A message the status region reads out; for a turn that ended, the silence it ended after when the voice said it. */
@@ -108,15 +108,22 @@ export function useTurnTry({ active, smartBlocked }: { active: boolean; smartBlo
     level.publish(0);
     runningNow.current = true;
     setTrial((trial) => ({ ...TURN_IDLE, phase: "starting", attempt: mine, told: trial.told }));
+    // The test is the end of turn itself: the first turn the voice ends and hears ends the try, with when it decided.
+    let decided = false;
     try {
       await window.sidevoiceActions!.tryTurnSettings!({
         onLevel: (value) => level.publish(value * 100),
-        onTurnStep: (step) => update((trial) => turnStepped(trial, step)),
+        onTurnStep: (step) => {
+          update((trial) => turnStepped(trial, step));
+          if (step.step === "heard" && !decided) { decided = true; window.sidevoiceActions?.cancelVoiceTry?.(); }
+        },
         onTake: (take) => update((trial) => ({ ...trial, take })),
       });
     } catch (error) {
       const { code, message } = error as { code?: string; message: string };
-      update((trial) => code === "trial-cancelled"
+      update((trial) => code === "trial-cancelled" && decided && trial.turn
+        ? { ...trial, phase: "done", notice: null, ...say(trial, { key: trial.turn.silenceMs == null ? "turnTry.detectedNow" : "turnTry.detected", ms: trial.turn.silenceMs }) }
+        : code === "trial-cancelled"
         // Stopped: the last turn stays, once it has its words.
         ? { ...trial, phase: "idle", notice: null, turn: trial.turn?.text ? trial.turn : null, ...say(trial, { key: blockedNow.current ? "turnTry.smartBlocked" : "wizard.trial.cancelled" }) }
         : code === "trial-silence" ? { ...trial, phase: "quiet", notice: null, turn: null, ...say(trial, { key: "turnTry.quiet" }) }
@@ -163,10 +170,12 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   live.current = running;
   const wave = useMemo(() => () => live.current ? level.current() / 100 : 0, [level]);
 
-  const ended = trial.turn ? (trial.turn.silenceMs == null ? t("turnTry.endedNow") : t("turnTry.ended", { s: seconds(trial.turn.silenceMs) })) : "";
+  // While it listens, one line whatever the turn is doing; once it decided, one line with when, in the same place.
+  const listeningLine = t("turnTry.listeningSimple");
+  const detected = trial.turn ? (trial.turn.silenceMs == null ? t("turnTry.detectedNow") : t("turnTry.detected", { s: seconds(trial.turn.silenceMs) })) : "";
   const words: Partial<Record<Phase, string>> = {
-    listening: t("turnTry.listening"), speaking: t("turnTry.speaking"), pause: t("turnTry.pause"), ended,
-    notice: t(trial.notice === "changed" ? "turnTry.changed" : "turnTry.notATurn"), quiet: t("turnTry.quiet"), idle: ended,
+    listening: listeningLine, speaking: listeningLine, pause: listeningLine, ended: listeningLine, notice: listeningLine,
+    quiet: t("turnTry.quiet"), done: detected,
   };
   const busy = trial.phase === "starting" || trial.phase === "restarting";
   const state = busy ? <p className="model-try-state turn-try-busy"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>
@@ -175,12 +184,6 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
     <p className="model-try-hint">{t("turnTry.hint")}</p>
     {!setup && <p className="model-try-hint">{t("turnTry.draft")}</p>}
   </div>;
-  // With Silence already at its calmest, the remedy for a cut-off is the smart end of turn.
-  const adjust = !smart && draft.patience === "calm" ? "turnTry.adjustSmart" : "turnTry.adjust";
-  const result = trial.turn?.text ? <div className="turn-try-result">
-    <TryHeard text={trial.turn.text} roomy={false} t={t} id="turn-try-heard" />
-    <p className="turn-try-adjust">{t(adjust)}</p>
-  </div> : null;
   const failure = trial.phase === "failed" ? <p className="stage-try-error" role="alert">{trial.error}</p> : null;
   const take = !running && trial.take ? <TryTake key={trial.attempt} take={trial.take} id="turn-try-take" t={t} /> : null;
   const button = handle && !tried ? null : <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
@@ -205,7 +208,6 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
       <div className="stt-try-area">
         {!trial.attempt && !running && hint}
         {state}
-        {!running && result}
         {failure}
       </div>
       {why}

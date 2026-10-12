@@ -274,7 +274,6 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
       {trial.phase === "done" && trial.timings && <TryTiming task={task} timings={trial.timings} t={t} />}
       {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
     </div>
-    {task === "stt" && !running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" t={t} />}
   </>;
 }
 
