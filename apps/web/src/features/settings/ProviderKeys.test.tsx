@@ -9,7 +9,7 @@ import type { SidevoiceActions } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 
 /* Settings → Providers: a card per provider, its key given and taken back the way being compared (`provider-connect`:
- * a dialog, a row in place, a popover). The host stands in as the controller does: a key kept patches the providers'
+ * a dialog, a row in place, a popover, in place at the same size). The host stands in as the controller does: a key kept patches the providers'
  * keys and the catalogues read with it. The interface speaks English here (the test's system). */
 
 afterEach(() => { localStorage.clear(); delete window.sidevoiceActions; });
@@ -30,7 +30,7 @@ function hostSays(store: RoomStore, provider: string, kept: boolean, reason?: st
   });
 }
 
-function renderKeys(variant?: "dialog" | "row" | "popover", facts: Record<string, unknown> = {}) {
+function renderKeys(variant?: "dialog" | "row" | "popover" | "inline", facts: Record<string, unknown> = {}) {
   if (variant) localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "provider-connect": variant }));
   const store = createRoomStore();
   store.patch({ voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" }, providerKeys: { openai: false, elevenlabs: true }, ...facts });
@@ -272,6 +272,60 @@ test("row: while the provider is asked the row stays — × off, Escape kept —
   expect(actions.saveProviderKey).toHaveBeenCalledWith("elevenlabs", null);
   await settle();
   expect(document.activeElement).toBe(within(card("elevenlabs")).getByRole("button", { name: "Connect ElevenLabs" }));
+});
+
+test("inline: Connect becomes the key's box, Test and save and × on the same line, the card no taller; the line under the name says where to get a key, then testing and refusals", async () => {
+  const { actions } = renderKeys("inline");
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(card("openai")).toHaveAttribute("data-in-place");
+  const entry = within(card("openai")).getByRole("group", { name: "Connect OpenAI" });
+  // On the card's own line, beside the name: no line of its own under it.
+  expect(entry.parentElement).toHaveClass("provider-card-main");
+  const field = within(entry).getByLabelText("OpenAI API key") as HTMLInputElement;
+  expect(document.activeElement).toBe(field);
+  expect(field).toHaveAccessibleDescription(/Get a key at OpenAI/);
+  expect(card("openai").querySelector(".provider-card-purpose")).toHaveTextContent("Get a key at OpenAI");
+  const asked = pending();
+  actions.connectProviderKey.mockImplementationOnce(() => asked.promise);
+  fireEvent.change(field, { target: { value: "sk-bad" } });
+  fireEvent.click(within(entry).getByRole("button", { name: "Test and save" }));
+  expect(card("openai").querySelector(".provider-card-purpose")).toHaveTextContent("Testing…");
+  expect(within(entry).getByRole("button", { name: "Cancel" })).toBeDisabled();
+  fireEvent.keyDown(field, { key: "Escape" });
+  expect(within(card("openai")).getByRole("group", { name: "Connect OpenAI" })).toBeInTheDocument();
+  await act(async () => { asked.reject(Object.assign(new Error("credential-rejected"), { code: "credential-rejected" })); });
+  expect(field).toHaveAttribute("aria-invalid", "true");
+  expect(field).toHaveAccessibleDescription(/OpenAI didn't accept this key\. Check you copied all of it\./);
+  expect(card("openai").querySelector(".provider-key-inline-status")).toHaveAttribute("data-tone", "danger");
+  fireEvent.change(field, { target: { value: "sk-good-7f3a" } });
+  await act(async () => { fireEvent.click(within(entry).getByRole("button", { name: "Test and save" })); });
+  expect(card("openai")).toHaveAttribute("data-state", "connected");
+  expect(card("openai")).not.toHaveAttribute("data-in-place");
+  await settle();
+  expect(document.activeElement).toBe(within(card("openai")).getByRole("button", { name: "More for OpenAI" }));
+});
+
+test("inline: × and Escape put Connect back, focused; on a phone it is the row instead", async () => {
+  renderKeys("inline");
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+  fireEvent.click(within(card("openai")).getByRole("button", { name: "Cancel" }));
+  await settle();
+  expect(document.activeElement).toBe(within(card("openai")).getByRole("button", { name: "Connect OpenAI" }));
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+  expect(fireEvent.keyDown(within(card("openai")).getByLabelText("OpenAI API key"), { key: "Escape" })).toBe(false);
+  await settle();
+  expect(document.activeElement).toBe(within(card("openai")).getByRole("button", { name: "Connect OpenAI" }));
+  cleanup();
+  localStorage.clear();
+  const original = window.matchMedia;
+  window.matchMedia = ((media: string) => ({ ...original(media), matches: media === "(max-width: 599px)" })) as typeof window.matchMedia;
+  try {
+    renderKeys("inline");
+    fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+    expect(card("openai")).not.toHaveAttribute("data-in-place");
+    expect(card("openai")).toHaveAttribute("data-open", "connect");
+  } finally { window.matchMedia = original; }
 });
 
 test("popover: Connect opens a popover by it; while the provider is asked, Escape and a click outside leave it open; Replace opens the same one", async () => {

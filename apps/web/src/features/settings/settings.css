@@ -128,6 +128,21 @@
 .provider-remove-question { margin: 0; font-size: var(--sv-font-sm); font-weight: 600; line-height: 1.25rem; color: var(--sv-text); }
 .provider-remove-inline .provider-key-actions { justify-content: flex-start; }
 .provider-remove-inline .provider-key-status:empty { display: none; }
+/* In place (D): the box, Test and save and × where Connect was, the card no taller; the line under the name says where to
+ * get a key, then what testing said, cut to one line (in full on hover and to assistive tech). */
+.provider-card[data-in-place] .provider-card-copy { flex: 0 1 auto; max-width: 40%; }
+.provider-key-inline { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; justify-content: flex-end; }
+.provider-key-inline .ui-input { flex: 1; min-width: 8rem; }
+.provider-key-inline .ui-button { flex: none; }
+.provider-key-inline-line { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.provider-key-inline-line .provider-key-help { white-space: nowrap; }
+.provider-key-inline-status { display: inline-flex; align-items: center; gap: var(--sv-space-1); min-width: 0; max-width: 100%; }
+.provider-key-inline-status > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.provider-key-inline-status > svg { flex: none; }
+.provider-key-inline-status[data-tone="danger"] { color: var(--sv-danger); }
+.provider-key-needed .ui-row-label .provider-key-inline-status { font-weight: inherit; }
+.provider-key-needed:has(.provider-key-inline) { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.provider-key-needed .ui-row-label:has(.provider-key-inline-status) { display: block; overflow: hidden; }
 @media (max-width: 599px) {
   .provider-key-row-controls { flex-wrap: wrap; }
   .provider-key-row-controls .ui-input { flex: 1 0 100%; }

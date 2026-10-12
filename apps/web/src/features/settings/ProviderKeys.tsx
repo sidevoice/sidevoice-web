@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
@@ -11,13 +11,14 @@ import type { CatalogView } from "../../services/model-catalogs.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import { catalogueShown } from "./ModelSetup";
 import type { HostMessageKey } from "./messages/en";
-import { KeyEntry, KeyRow, keyError, openerState, readHint, reasonState, RemoveDialog, RemoveInline, useFocusBack, useProviderConnect, type KeyOutcome, type KeyState } from "./ProviderConnect";
+import { KeyEntry, KeyInline, KeyRow, keyError, openerState, readHint, reasonState, RemoveDialog, RemoveInline, useFocusBack, useProviderConnect, type KeyOutcome, type KeyState } from "./ProviderConnect";
 
 /* The remote providers, a card each, as apps show an account to connect: its mark, its name, one line on what it is
- * for, and one control. Not connected, Connect opens the key's entry (ProviderConnect: a dialog, a row in place or a
- * popover — the design being compared). Connected, the card says so, shows the key's last four, and keeps Replace key
- * and Remove in its menu; when the provider has a problem with the key, a line says it in words, with the one thing to
- * do about it. A key kept without the provider being reached to check it says so until it is checked. */
+ * for, and one control. Not connected, Connect opens the key's entry (ProviderConnect: a dialog, a row in place, a
+ * popover, or in place at the same size — the design being compared). Connected, the card says so, shows the key's
+ * last four, and keeps Replace key and Remove in its menu; when the provider has a problem with the key, a line says it
+ * in words, with the one thing to do about it. A key kept without the provider being reached to check it says so
+ * until it is checked. */
 
 /** The card's state: where the key stands, or kept but never checked (the provider couldn't be reached on Test and
  *  save). */
@@ -94,6 +95,8 @@ function ProviderCard({ provider, name, catalog, inUse }: { provider: string; na
   }
   const entering = open === "connect" || open === "replace";
   const inline = variant === "row" && open !== null;
+  // In place (D): the entry where the control was, what it says where the use was; the card keeps its size.
+  const inPlace = variant === "inline" && entering;
   const entry = { provider, name, t, replacing: open === "replace" ? last4 ?? "····" : null, onDone: connectedNow, onCancel: close };
   const remove = { provider, name, t, inUse, onDone: removed, onCancel: close };
   const control = connected
@@ -111,22 +114,25 @@ function ProviderCard({ provider, name, catalog, inUse }: { provider: string; na
       </span>
     : <Button ref={connectButton} size="sm" variant="primary" aria-label={t("keys.connectNamed", { provider: name })} {...openerState(variant, entering)}
         onClick={() => show("connect")}>{t("keys.connect")}</Button>;
+  const main = (line: ReactNode, end: ReactNode) => <div className="provider-card-main">
+    <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
+    <div className="provider-card-copy">
+      <span className="provider-card-title"><strong>{name}</strong>{inUse.length > 0 && connected && <Badge tone="accent">{t("keys.inUse")}</Badge>}</span>
+      {line}
+    </div>
+    {end}
+  </div>;
   return (
-    <div className="provider-card" role="group" aria-label={name} data-provider={provider} data-state={state} data-open={inline ? open : undefined}>
-      <div className="provider-card-main">
-        <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
-        <div className="provider-card-copy">
-          <span className="provider-card-title"><strong>{name}</strong>{inUse.length > 0 && connected && <Badge tone="accent">{t("keys.inUse")}</Badge>}</span>
-          {inline ? (open === "remove" ? <RemoveInline {...remove} /> : <KeyRow {...entry} />)
-            : <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>}
-        </div>
-        {!inline && <KeyEntry variant={variant} opener={control} open={entering} {...entry} />}
-      </div>
+    <div className="provider-card" role="group" aria-label={name} data-provider={provider} data-state={state} data-open={inline ? open : undefined} data-in-place={inPlace || undefined}>
+      {inPlace
+        ? <KeyInline {...entry}>{({ controls, line }) => main(<span className="provider-card-purpose">{line}</span>, controls)}</KeyInline>
+        : main(inline ? (open === "remove" ? <RemoveInline {...remove} /> : <KeyRow {...entry} />) : <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>,
+          !inline && <KeyEntry variant={variant} opener={control} open={entering} {...entry} />)}
       {problem && !inline && <div className="provider-card-problem">
         <WarningIcon size={14} />
         <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
           {state !== "unverified" && catalog?.status.detail ? <span className="provider-card-detail"> {catalog.status.detail}</span> : null}</p>
-        {REPLACE_FOR.has(state)
+        {inPlace ? null : REPLACE_FOR.has(state)
           ? <Button variant="secondary" size="sm" onClick={(event) => show("replace", event.currentTarget)} {...openerState(variant, open === "replace")}>{t("keys.replace")}</Button>
           : <Button variant="secondary" size="sm" loading={testing} aria-label={t("keys.testNamed", { provider: name })} onClick={() => void test()}>{t("keys.testAgain")}</Button>}
       </div>}

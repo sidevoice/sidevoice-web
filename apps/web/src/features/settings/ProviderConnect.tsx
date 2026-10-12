@@ -1,4 +1,4 @@
-import { forwardRef, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactElement } from "react";
+import { forwardRef, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { useMedia } from "../../state/call-layout";
@@ -17,18 +17,20 @@ import type { HostMessageKey } from "./messages/en";
  * it first, and the host keeps it only if the provider takes it (or could not be reached to say: then it is kept,
  * unchecked) — with where to get a key and where it is kept. Remove asks first. Providers' cards open them, and so does
  * a voice slot whose provider has no key yet (Settings' Transcription and Voice, the first-run setup), the same way;
- * which way is a design being compared (lib/variants): a small dialog, a row in place, or a popover by the button. The
+ * which way is a design being compared (lib/variants): a small dialog, a row in place, a popover by the button, or in
+ * place at the same size (the key's box where the button was, the button become Test and save). The
  * key goes to the engine's host — the system keychain in the app, this browser's storage on the web — and is never read
  * back: its last four are the page's own note of it. */
 
-export const PROVIDER_CONNECT = ["dialog", "row", "popover"] as const;
+export const PROVIDER_CONNECT = ["dialog", "row", "popover", "inline"] as const;
 export type ProviderConnect = (typeof PROVIDER_CONNECT)[number];
 
-/** The way being compared. A phone has no room for a popover: it gets the dialog, which is the whole screen there. */
+/** The way being compared. A phone has no room for a popover, nor for a box beside the name: the popover gets the
+ *  dialog, which is the whole screen there, and in place gets the row. */
 export function useProviderConnect(): ProviderConnect {
   const variant = useVariant("provider-connect", PROVIDER_CONNECT);
   const phone = useMedia("(max-width: 599px)");
-  return variant === "popover" && phone ? "dialog" : variant;
+  return !phone ? variant : variant === "popover" ? "dialog" : variant === "inline" ? "row" : variant;
 }
 
 /** Where each provider gives its keys. */
@@ -231,6 +233,40 @@ export function KeyRow({ provider, name, t, replacing, onDone, onCancel }: Entry
   </div>;
 }
 
+/** D: in place, at the same size — the key's box, Test and save (where Connect was) and × to call it off, on the line
+ *  that held the button; the line under the name (where the provider's use was) says where to get a key, then what
+ *  testing said: testing, or why it was refused (in full on hover and to assistive tech, cut to the line otherwise).
+ *  The holder lays the parts out (`children`): `status` is that line only while it says something (testing, refused),
+ *  for a holder with nowhere else to say it. Escape cancels, except while the provider is asked. */
+export function KeyInline({ provider, name, t, replacing, onDone, onCancel, children }: EntryProps & {
+  children: (parts: { controls: ReactNode; line: ReactNode; status: ReactNode | null }) => ReactNode;
+}) {
+  const entry = useKeyEntry(provider, name, t, onDone);
+  const lineId = useId();
+  useEffect(() => { entry.field.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const said = entry.testing ? t("keys.testing") : entry.error;
+  const status = said ? <span className="provider-key-inline-status" data-tone={entry.error && !entry.testing ? "danger" : undefined} title={said}>
+    {entry.error && !entry.testing && <WarningIcon size={14} />}<span>{said}</span>
+  </span> : null;
+  const line = <span id={lineId} className="provider-key-inline-line" aria-live="polite">
+    {status ?? (replacing ? <span>{t("keys.replacing", { last4: replacing })}</span> : <KeyHelp provider={provider} name={name} t={t} />)}
+  </span>;
+  const controls = <div className="provider-key-inline" role="group" aria-label={entryTitle(t, name, replacing)}
+    onKeyDown={(event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!entry.testing) onCancel();
+    }}>
+    <Input ref={entry.field} size="sm" type="password" autoComplete="off" spellCheck={false} aria-label={t("keys.label", { provider: name })} invalid={!!entry.error}
+      aria-describedby={lineId} value={entry.value} readOnly={entry.testing} placeholder={t("keys.placeholder.new")}
+      onChange={(event) => entry.setValue(event.target.value)} onKeyDown={entry.enter} />
+    <Button variant="primary" size="sm" disabled={!entry.value.trim()} loading={entry.testing} onClick={() => void entry.submit()}>{t("keys.testAndSave")}</Button>
+    <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("hosts.cancel")} title={t("hosts.cancel")} disabled={entry.testing} onClick={onCancel}><CloseIcon /></Button>
+  </div>;
+  return <>{children({ controls, line, status })}</>;
+}
+
 /** The entry for what `opener` opens: the dialog over the page, or the popover beside `opener`. The row is drawn by
  *  whoever holds the opener, in its place (KeyRow). */
 export function KeyEntry({ variant, opener, open, ...props }: EntryProps & { variant: ProviderConnect; opener: ReactElement; open: boolean }) {
@@ -315,6 +351,10 @@ export function ProviderKeyNeeded({ provider, name, needed, onDone }: { provider
   const entry = { provider, name, t, replacing: null, onDone: done, onCancel: cancel };
   if (!needed && !open) return null;
   if (variant === "row" && open) return <Row label={label} block className="provider-key-needed"><KeyRow {...entry} /></Row>;
+  // In place: the row keeps its height; what testing said takes the label's place while it says something.
+  if (variant === "inline" && open) return <KeyInline {...entry}>
+    {({ controls, status }) => <Row label={status ?? label} className="provider-key-needed">{controls}</Row>}
+  </KeyInline>;
   return <Row label={label} className="provider-key-needed">
     <KeyEntry variant={variant} open={open} {...entry} opener={<Button ref={connect} variant="primary" size="sm" aria-label={t("keys.connectNamed", { provider: name })}
       {...openerState(variant, open)} onClick={() => setOpen(true)}>{t("keys.connect")}</Button>} />
@@ -323,7 +363,7 @@ export function ProviderKeyNeeded({ provider, name, needed, onDone }: { provider
 
 /** What an opener tells assistive tech about what it opens: a dialog (the popover is one too), and whether it is open. */
 export function openerState(variant: ProviderConnect, open: boolean) {
-  return variant === "row" ? {} : { "aria-haspopup": "dialog" as const, "aria-expanded": variant === "popover" ? open : undefined };
+  return variant === "row" || variant === "inline" ? {} : { "aria-haspopup": "dialog" as const, "aria-expanded": variant === "popover" ? open : undefined };
 }
 
 /** Focus back on what opened something once it has closed — the opener as it is drawn then (`target`) — unless focus
