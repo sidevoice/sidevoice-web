@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, type CSSProperties } from "react";
+import { useEffect, useReducer, useRef, useState, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { HandIcon, HarnessIcon } from "../../components/ui/Icons";
@@ -85,16 +85,47 @@ function latestWords(text: string) {
   return "…" + cut.slice(cut.indexOf(" ") + 1);
 }
 
-/** What the person is saying, while they say it: their latest words (or the voice listening), and a way to take it back
- *  before it is sent. No picture of them: the transcript has what they said. */
+/** How long what was sent stays on the stage before it leaves, and how long leaving takes (call-view.css). */
+const SENT_SHOWN_MS = 1600;
+const SENT_LEAVING_MS = 500;
+
+/** The person's turn at the tile's foot: while they speak and while it is transcribed, the voice's bars;
+ *  once transcribed, what is sent, for a moment, then it lifts away toward the agent and fades (a plain fade under
+ *  reduced motion). Only a turn spoken here is shown as sent, never a message typed. */
 function PersonTurn({ conversation, t }: { conversation: ConversationView; t: CallTranslate }) {
-  if (!conversation.pendingText && !conversation.pendingPhase) return null;
-  return (
+  const pending = !!conversation.pendingText || !!conversation.pendingPhase;
+  const lastUser = [...conversation.messages].reverse().find((message) => message.role === "user") ?? null;
+  const lastKey = lastUser ? lastUser.segment ?? String(lastUser.time) : null;
+  const [sent, setSent] = useState<{ text: string; key: string; leaving: boolean } | null>(null);
+  const spoke = useRef(false);
+  const seen = useRef(lastKey);
+  if (pending) spoke.current = true;
+  useEffect(() => {
+    if (lastKey === seen.current) return;
+    seen.current = lastKey;
+    if (!spoke.current || !lastUser?.text.trim()) return;
+    spoke.current = false;
+    setSent({ text: lastUser.text, key: lastKey!, leaving: false });
+  }, [lastKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Its own clock, so a message typed meanwhile cannot stop it leaving.
+  const sentKey = sent?.key;
+  useEffect(() => {
+    if (!sentKey) return;
+    const leave = window.setTimeout(() => setSent((now) => now?.key === sentKey ? { ...now, leaving: true } : now), SENT_SHOWN_MS);
+    const gone = window.setTimeout(() => setSent((now) => now?.key === sentKey ? null : now), SENT_SHOWN_MS + SENT_LEAVING_MS);
+    return () => { window.clearTimeout(leave); window.clearTimeout(gone); };
+  }, [sentKey]);
+  if (pending) return (
     <div className="speech-bubble person-bubble" translate="no">
-      {conversation.pendingText ? <span>{latestWords(conversation.pendingText)}</span>
-        : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}
+      <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />
       {conversation.pendingCancellable && <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
         onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>}
+    </div>
+  );
+  if (!sent) return null;
+  return (
+    <div className="speech-bubble person-bubble" data-sent="" data-leaving={sent.leaving || undefined} translate="no">
+      <span>{latestWords(sent.text)}</span>
     </div>
   );
 }

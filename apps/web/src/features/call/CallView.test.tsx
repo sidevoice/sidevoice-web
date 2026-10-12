@@ -108,7 +108,9 @@ test("the person has no picture on the stage, only a bubble of their own while t
   expect(document.querySelector(".stage-pip")).toBeNull();
   expect(document.querySelector(".person-bubble")).toBeNull();
   patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
-  expect(document.querySelector(".person-bubble")).toHaveTextContent("Split it into two commits.");
+  // What they say is not on the stage while they say it: only the voice's bars (the transcript has the words).
+  expect(document.querySelector(".person-bubble")).not.toHaveTextContent("Split it into two commits.");
+  expect(document.querySelector(".person-bubble .voice-wave")).toHaveAttribute("data-phase", "listening");
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
   expect(stageAgent()).toHaveAttribute("data-mood", "listening");
@@ -119,6 +121,79 @@ test("the person has no picture on the stage, only a bubble of their own while t
   await act(async () => { within(stage).getByRole("button", { name: "Cancel sending" }).click(); });
   expect(window.sidevoiceActions?.cancelInput).toHaveBeenCalledOnce();
 });
+
+const said = (segment: string, text: string, time: number) =>
+  ({ segment, thread: "fp-1|t-login", role: "user" as const, text, name: "You", time, session: "s1" });
+const personBubble = () => document.querySelector<HTMLElement>(".person-bubble");
+const tick = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
+
+test("while the person speaks and while it is transcribed, their bubble holds only the voice's bars", () => {
+  const store = room();
+  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it" });
+  expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "listening");
+  expect(personBubble()).not.toHaveTextContent("Split it");
+  expect(personBubble()).not.toHaveAttribute("data-sent");
+  patch(store, { userLive: false, pendingPhase: "transcribing" });
+  expect(personBubble()!.querySelector(".voice-wave")).toHaveAttribute("data-phase", "transcribing");
+  expect(personBubble()).not.toHaveTextContent("Split it");
+}, WHOLE_APP_MS);
+
+test("what a spoken turn sent stays a moment, then leaves, then is gone", () => {
+  const store = room();
+  vi.useFakeTimers();
+  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening" });
+  patch(store, { userLive: false, pendingPhase: "transcribing" });
+  patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said("u-1", "Split it into two commits.", 2)] } as Partial<SessionFacts>);
+  expect(personBubble()).toHaveAttribute("data-sent");
+  expect(personBubble()).toHaveTextContent("Split it into two commits.");
+  expect(personBubble()!.querySelector(".voice-wave")).toBeNull();
+  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  tick(1599);
+  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  tick(1);
+  expect(personBubble()).toHaveAttribute("data-leaving");
+  tick(499);
+  expect(personBubble()).toHaveTextContent("Split it into two commits.");
+  tick(1);
+  expect(personBubble()).toBeNull();
+}, WHOLE_APP_MS);
+
+test("a message typed, with no spoken turn before it, is not shown as sent", () => {
+  const store = room();
+  vi.useFakeTimers();
+  patch(store, { history: [...store.getState().facts.history, said("u-1", "Typed in the composer.", 2)] });
+  expect(personBubble()).toBeNull();
+  tick(3000);
+  expect(personBubble()).toBeNull();
+}, WHOLE_APP_MS);
+
+test("a second spoken turn arriving while the first leaves starts over cleanly, and a typed one meanwhile does not stop it", () => {
+  const store = room();
+  vi.useFakeTimers();
+  const speak = (segment: string, text: string, time: number) => {
+    patch(store, { userLive: true, userTurn: { id: segment, segment: "turn:" + segment, thread: "fp-1|t-login" }, pendingPhase: "listening" });
+    patch(store, { userLive: false, pendingPhase: "transcribing" });
+    patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said(segment, text, time)] } as Partial<SessionFacts>);
+  };
+  speak("u-1", "First thing.", 2);
+  tick(1800);
+  expect(personBubble()).toHaveAttribute("data-leaving");
+  // The next turn: the bars while spoken, then what it sent, from the start of its moment.
+  patch(store, { userLive: true, userTurn: { id: "u-2", segment: "turn:u-2", thread: "fp-1|t-login" }, pendingPhase: "listening" });
+  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  patch(store, { userLive: false, pendingPhase: "" , userTurn: null, history: [...store.getState().facts.history, said("u-2", "Second thing.", 3)] } as Partial<SessionFacts>);
+  expect(personBubble()).toHaveTextContent("Second thing.");
+  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  tick(1000);
+  // A message typed meanwhile neither shows nor holds it on the stage.
+  patch(store, { history: [...store.getState().facts.history, said("u-3", "Typed meanwhile.", 4)] });
+  expect(personBubble()).toHaveTextContent("Second thing.");
+  tick(600);
+  expect(personBubble()).toHaveAttribute("data-leaving");
+  tick(500);
+  expect(personBubble()).toBeNull();
+}, WHOLE_APP_MS);
 
 test("the preview holds the stage avatar in a mood, with something unheard when it asks, and null gives it back to the room", () => {
   const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });

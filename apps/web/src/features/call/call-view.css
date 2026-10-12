@@ -60,6 +60,14 @@
   background: var(--sv-bubble-self); box-shadow: var(--sv-shadow-sm); color: var(--sv-text); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
 .person-bubble > span { flex: 1 1 8rem; min-width: 0; padding-block: var(--sv-space-1); }
 .person-bubble .cancel-input { flex: none; }
+/* What was sent: a moment on the stage, then it lifts toward the agent, shrinks and fades (a plain fade, reduced). */
+.person-bubble[data-leaving] { animation: person-sent-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
+@keyframes person-sent-out { to { opacity: 0; transform: translateY(-48px) scale(.72); } }
+@media (prefers-reduced-motion: reduce) {
+  /* Its own duration: app.css cuts every animation short under reduced motion, and this fade is the reduced one. */
+  .person-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; }
+  @keyframes person-sent-fade { to { opacity: 0; } }
+}
 .person-bubble .voice-wave { display: block; flex: none; width: 10rem; height: 1.75rem; color: var(--sv-accent); }
 .person-bubble .voice-wave canvas { display: block; width: 100%; height: 100%; }
 .person-bubble .voice-wave[data-phase="transcribing"] canvas { animation: call-wave-rest 1.9s ease-in-out infinite; }
