@@ -77,30 +77,40 @@ const listed = (within: Element | null) => [...(within?.querySelectorAll(".downl
 const withUnused = [{ ...catalogs[0], models: [...catalogs[0].models.filter((entry) => entry.id !== "whisper-small"),
   model("whisper-small", "whisper", "stt"), model("whisper-tiny", "whisper", "stt")] }] as unknown as CatalogView[];
 
-test("Advanced lists the models in use first, by what they are for, then those not in use, which alone can be deleted", async () => {
+test("Advanced lists the models in one list, those in use first, by what they are for; only one not in use can be deleted", async () => {
   const store = open("whisper-base");
   act(() => store.patch({ modelsRemovable: true }));
   const uninstall = vi.fn(async () => {});
   window.sidevoiceActions = { ...window.sidevoiceActions, uninstallVoiceModel: uninstall } as unknown as SidevoiceActions;
   fireEvent.click(document.getElementById("settings-advanced")!);
-  // The default layout: In use (by purpose: transcription, then voice), then Not in use.
-  const inUse = document.getElementById("downloaded-in-use")!.parentElement;
-  expect(listed(inUse)).toEqual([["whisper-base", "transcription"], ["kokoro-82m-v1.0", "voice"]]);
-  expect(inUse?.querySelector(".downloaded-model")).toHaveTextContent("63 MB");
-  expect(inUse?.querySelector(".downloaded-model")).toHaveTextContent("In use");
-  expect(document.getElementById("downloaded-unused")?.parentElement).toHaveTextContent("Nothing to delete: every model here is in use.");
+  const list = document.getElementById("downloaded-models");
+  expect(listed(list)).toEqual([["whisper-base", "transcription"], ["kokoro-82m-v1.0", "voice"]]);
+  expect(list?.querySelector(".downloaded-model")).toHaveTextContent("63 MB");
+  expect(list?.querySelector(".downloaded-model")).toHaveTextContent("In use");
   // In use: not offered for deletion.
   expect(screen.queryByRole("button", { name: "Delete whisper-base from this device" })).toBeNull();
   // Still in use while only the draft moves off it (the saved settings use it); saved elsewhere, it is not.
   const openai = { catalog: "openai", model: "whisper-1", language: null };
   act(() => store.patch({ voiceDraft: { ...store.getState().facts.voiceDraft!, stt: openai } }));
-  expect(document.getElementById("downloaded-in-use")?.parentElement).toHaveTextContent("whisper-base");
+  expect(screen.queryByRole("button", { name: "Delete whisper-base from this device" })).toBeNull();
   act(() => store.patch({ voiceSettings: { ...store.getState().facts.voiceSettings!, stt: openai } }));
-  expect(document.querySelector("#downloaded-unused")?.parentElement).toHaveTextContent("whisper-base");
   fireEvent.click(screen.getByRole("button", { name: "Delete whisper-base from this device" }));
   expect(screen.getByRole("group", { name: "Delete whisper-base from this device" })).toHaveTextContent("whisper-base");
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
   expect(uninstall).toHaveBeenCalledWith("whisper-base");
+});
+
+test("the voice detector comes first, is never deletable, and says why; a row is two lines or one (models-row)", () => {
+  const vad = { ...model("silero-vad", "silero-vad", "vad") };
+  const withVad = [{ ...withUnused[0], models: [...(withUnused[0] as { models: unknown[] }).models, vad] }] as unknown as CatalogView[];
+  const store = open("whisper-base");
+  act(() => store.patch({ modelsRemovable: true, voiceCatalogue: { state: "ready", catalogs: withVad, error: "" } }));
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  const list = document.getElementById("downloaded-models");
+  expect(listed(list).map(([id]) => id)).toEqual(["silero-vad", "whisper-base", "kokoro-82m-v1.0", "whisper-small", "whisper-tiny"]);
+  expect(screen.queryByRole("button", { name: "Delete silero-vad from this device" })).toBeNull();
+  expect(list?.querySelector('[data-model="silero-vad"] .ui-infotip')).not.toBeNull();
+  expect(list).toHaveAttribute("data-row", "two-lines");
 });
 
 test("Remove all deletes every model not in use, asking first with how many and what it frees, and says which one stayed", async () => {
@@ -109,7 +119,6 @@ test("Remove all deletes every model not in use, asking first with how many and 
   const uninstall = vi.fn(async (id: string) => { if (id === "whisper-tiny") throw Object.assign(new Error("busy"), { code: "model-in-use" }); });
   window.sidevoiceActions = { ...window.sidevoiceActions, uninstallVoiceModel: uninstall } as unknown as SidevoiceActions;
   fireEvent.click(document.getElementById("settings-advanced")!);
-  expect(document.getElementById("downloaded-unused")).toHaveTextContent("Not in use · 126 MB");
   fireEvent.click(screen.getByRole("button", { name: "Remove all not in use · 126 MB" }));
   expect(uninstall).not.toHaveBeenCalled();
   expect(screen.getByRole("group", { name: "Remove all" })).toHaveTextContent("Delete 2 models not in use and free 126 MB?");
@@ -118,24 +127,13 @@ test("Remove all deletes every model not in use, asking first with how many and 
   expect(screen.getByText(/^Deleted 1 of 2\. whisper-tiny is running right now/)).toHaveAttribute("role", "status");
 });
 
-test.each(["plain", "purpose", "cards"] as const)("the downloaded models in the %s layout: every one, in use first, and Remove all", (layout) => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "models-list": layout }));
+test("models-row one-line: each model is one line, its purpose and size at its end", () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "models-row": "one-line" }));
   try {
     const store = open("whisper-base");
     act(() => store.patch({ modelsRemovable: true, voiceCatalogue: { state: "ready", catalogs: withUnused, error: "" } }));
     fireEvent.click(document.getElementById("settings-advanced")!);
-    const list = document.getElementById("downloaded-models");
-    expect(list).toHaveAttribute("data-layout", layout);
-    expect(listed(list).map(([id]) => id)).toEqual(layout === "purpose"
-      // A group per purpose, the one in use first in each.
-      ? ["whisper-base", "whisper-small", "whisper-tiny", "kokoro-82m-v1.0"]
-      : ["whisper-base", "kokoro-82m-v1.0", "whisper-small", "whisper-tiny"]);
-    if (layout === "purpose") {
-      expect([...list!.querySelectorAll(".downloaded-purpose-title .model-purpose")].map((chip) => chip.getAttribute("data-purpose"))).toEqual(["transcription", "voice"]);
-      // The group says what they are for; the rows don't repeat it.
-      expect(list!.querySelector(".downloaded-model .model-purpose")).toBeNull();
-    }
-    if (layout === "cards") expect([...list!.querySelectorAll(".downloaded-card[data-in-use]")]).toHaveLength(2);
+    expect(document.getElementById("downloaded-models")).toHaveAttribute("data-row", "one-line");
     expect(screen.getByRole("button", { name: "Remove all not in use · 126 MB" })).toBeInTheDocument();
   } finally { localStorage.removeItem("sidevoice.variants"); }
 });

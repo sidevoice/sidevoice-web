@@ -3,6 +3,7 @@ import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
+import { InfoTip } from "../../components/ui/InfoTip";
 import { CallIcon, EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useVariant } from "../../lib/variants";
 import { Row } from "../../components/ui/Card";
@@ -106,7 +107,9 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
       <div className="downloaded-model-main">
         <span className="downloaded-model-copy">
           <span className="downloaded-model-title"><code className="downloaded-model-name">{model.id}</code>
-            {inUse && <Badge tone="accent">{t("settings.advanced.inUse")}</Badge>}</span>
+            {inUse && <Badge tone="accent">{t("settings.advanced.inUse")}</Badge>}
+            {/* The voice detector: every call needs it, so it is never offered for deletion — said why. */}
+            {inUse && model.purpose === "every-call" && <InfoTip label={t("settings.advanced.vadInfoLabel")}>{t("settings.advanced.vadInfo")}</InfoTip>}</span>
           <span className="downloaded-model-meta">{chip && <PurposeChip purpose={model.purpose} t={t} />}
             <span className="downloaded-model-size">{size}{!inUse && model.lastUsedAt ? " · " + ago(model.lastUsedAt, t) : ""}</span></span>
         </span>
@@ -126,7 +129,7 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
 
 export function DownloadedModels() {
   const t = hostTranslator();
-  const layout = useVariant("models-list", ["grouped", "plain", "purpose", "cards"] as const);
+  const rowLayout = useVariant("models-row", ["two-lines", "one-line"] as const);
   const models = useDownloaded();
   const purposes = usePurposes();
   const removable = useRoomStore((state) => state.facts.modelsRemovable);
@@ -135,8 +138,10 @@ export function DownloadedModels() {
   const [busyAll, setBusyAll] = useState(false);
   const [allNote, setAllNote] = useState("");
   const inUse = (model: Downloaded) => purposes(model.id).length > 0;
-  // In use first (by purpose), then the rest, the largest first, as storage lists are.
-  const order = (list: Downloaded[]) => [...list].sort((x, y) => Number(inUse(y)) - Number(inUse(x))
+  // One plain list: the voice detector first (every call needs it), then the rest in use by purpose, then those not in
+  // use, the largest first, as storage lists are.
+  const rank = (model: Downloaded) => model.purpose === "every-call" && inUse(model) ? 0 : inUse(model) ? 1 : 2;
+  const order = (list: Downloaded[]) => [...list].sort((x, y) => rank(x) - rank(y)
     || (inUse(x) ? PURPOSES.findIndex((p) => p.purpose === x.purpose) - PURPOSES.findIndex((p) => p.purpose === y.purpose) : y.bytes - x.bytes));
   const sorted = order(models);
   const unused = sorted.filter((model) => !inUse(model));
@@ -165,33 +170,9 @@ export function DownloadedModels() {
   return (
     <Row block label={t("settings.advanced.downloaded")}
       description={models.length ? <>{t("settings.advanced.downloadedHint", { total })}{!removable && <> {t("settings.advanced.cantDelete")}</>}</> : t("settings.advanced.downloadedNone")}>
-      {models.length > 0 && <div id="downloaded-models" className="downloaded-models" data-layout={layout} tabIndex={-1}>
-        {layout === "grouped" && <>
-          <section className="downloaded-group" aria-labelledby="downloaded-in-use">
-            <h4 id="downloaded-in-use" className="downloaded-group-title">{t("settings.advanced.inUse")}</h4>
-            {sorted.filter(inUse).map((model) => row(model))}
-          </section>
-          <section className="downloaded-group" aria-labelledby="downloaded-unused">
-            <h4 id="downloaded-unused" className="downloaded-group-title">{unused.length ? t("settings.advanced.notInUseTotal", { size: freed }) : t("settings.advanced.notInUse")}</h4>
-            {unused.length ? unused.map((model) => row(model)) : <p className="downloaded-purpose-label">{t("settings.advanced.allInUse")}</p>}
-            {removeAllControl}
-          </section>
-        </>}
-        {layout === "plain" && <>{sorted.map((model) => row(model))}{removeAllControl}</>}
-        {layout === "purpose" && <>
-          {PURPOSES.map(({ purpose, label }) => {
-            const list = sorted.filter((model) => model.purpose === purpose);
-            return list.length > 0 && <section key={purpose} className="downloaded-group" aria-labelledby={"downloaded-" + purpose}>
-              <h4 id={"downloaded-" + purpose} className="downloaded-group-title downloaded-purpose-title"><PurposeChip purpose={purpose} t={t} /></h4>
-              {list.map((model) => row(model, false))}
-            </section>;
-          })}
-          {removeAllControl}
-        </>}
-        {layout === "cards" && <>
-          <div className="downloaded-cards">{sorted.map((model) => <div key={model.id} className="downloaded-card" data-in-use={inUse(model) || undefined}>{row(model)}</div>)}</div>
-          {removeAllControl}
-        </>}
+      {models.length > 0 && <div id="downloaded-models" className="downloaded-models" data-row={rowLayout} tabIndex={-1}>
+        {sorted.map((model) => row(model))}
+        {removeAllControl}
       </div>}
     </Row>
   );

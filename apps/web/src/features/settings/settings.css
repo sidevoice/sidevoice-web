@@ -80,11 +80,6 @@
 .downloaded-model-copy { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
 .downloaded-model-name { font-size: var(--sv-font-sm); overflow-wrap: anywhere; }
 .downloaded-model-size { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
-.downloaded-group { display: grid; gap: var(--sv-space-2); }
-.downloaded-group + .downloaded-group { margin-top: var(--sv-space-3); }
-.downloaded-group-title { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
-.downloaded-purpose { display: grid; gap: var(--sv-space-1); }
-.downloaded-purpose-label { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
 .downloaded-model .provider-remove { margin: 0; }
 .downloaded-model-error { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-danger); }
 
@@ -147,8 +142,6 @@
 /* A control pointed at (what's new's Set up): its row lit for a moment. */
 .ui-row.settings-highlight { border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); box-shadow: 0 0 0 2px var(--sv-accent); transition: background-color var(--sv-dur-slow) var(--sv-ease); }
 @media (prefers-reduced-motion: reduce) { .ui-row.settings-highlight { transition: none; } }
-.downloaded-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); }
-.downloaded-group-title:focus { outline: none; }
 .downloaded-unused-confirm { margin: 0 0 var(--sv-space-2); }
 /* What a downloaded model is for: a quiet chip with its icon. The list's organisation (VARIANTS models-list) only moves
    rows around; a row stays name and In use, then purpose and size, Delete at its end — on a phone too. */
@@ -158,9 +151,10 @@
 .downloaded-model-copy { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
 .model-purpose { display: inline-flex; align-items: center; gap: 4px; padding: 1px var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1.125rem; white-space: nowrap; }
 .model-purpose svg { width: 13px; height: 13px; }
-.downloaded-purpose-title .model-purpose { font-size: var(--sv-font-sm); background: none; padding: 0; color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
-.downloaded-models[data-layout="plain"] .downloaded-model + .downloaded-model { padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
-.downloaded-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: var(--sv-space-2); }
-.downloaded-card { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
-.downloaded-card[data-in-use] { border-color: color-mix(in srgb, var(--sv-accent) 40%, var(--sv-border)); }
 .downloaded-remove-all { display: grid; gap: var(--sv-space-2); justify-items: start; margin-top: var(--sv-space-2); }
+/* A downloaded model's row (VARIANTS models-row): two lines — its name and In use, then its purpose and size — or one,
+   the name at the start and its purpose and size at the end. */
+.downloaded-models[data-row="one-line"] .downloaded-model-copy { flex-direction: row !important; align-items: center !important; justify-content: space-between; flex: 1 1 auto; gap: var(--sv-space-3) !important; }
+.downloaded-models[data-row="one-line"] .downloaded-model-meta { margin-inline-start: auto; justify-content: flex-end; }
+.downloaded-models .downloaded-model + .downloaded-model { padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
+@media (max-width: 550px) { .downloaded-models[data-row="one-line"] .downloaded-model-copy { flex-wrap: wrap; } }
