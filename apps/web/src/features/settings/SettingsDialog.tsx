@@ -65,7 +65,6 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
 function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslate }) {
   return <Section id={id} title={t(id === "transcription" ? "settings.section.transcription" : "settings.section.voice")}
     description={t(id === "transcription" ? "settings.transcription.description" : "settings.voice.description")}>
-    <RestartNote t={t} />
     <SlotPane task={id === "transcription" ? "stt" : "tts"} />
   </Section>;
 }
@@ -101,8 +100,8 @@ function CallSettings({ t }: { t: HostTranslate }) {
   </Section>;
 }
 
-/** What changing a source, a model or when a turn ends does during a call: the voice restarts for a moment. Said only
- *  while a call is on. */
+/** What switching between Smart and Silence does during a call: the voice restarts for a moment (a source or a model
+ *  changes without a cut — the new one takes over once it is ready). Said only while a call is on, in Call. */
 function RestartNote({ t }: { t: HostTranslate }) {
   const inCall = useRoomStore((state) => !!(state.facts.ws || state.facts.reconnecting));
   return inCall ? <Alert tone="warning" title={t("settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;

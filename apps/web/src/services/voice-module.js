@@ -23,6 +23,80 @@ export async function browserHost(navigator, credentials) {
   };
 }
 
+/** A slot's model as the voice tells one from another: the settings' slot without what applies without reloading it
+ *  (the language; the voice and the speed). */
+const modelOf = ({ language: _language, ...stt }) => stt;
+const speakerOf = ({ voice: _voice, speed: _speed, ...tts }) => tts;
+const modelsKey = (settings) => JSON.stringify([modelOf(settings.stt), speakerOf(settings.tts), settings.turn_model ?? null]);
+
+/**
+ * The voice over `source`, a model changed without a cut (contract gap #31). The voice is given one stable model per
+ * slot — transcriber, speaker, end-of-turn classifier — each calling whichever model is chosen now; a change of model
+ * or source loads the new one and, once it is ready, moves the slot onto it. What was under way finishes on the model
+ * it began with (it holds that one), and the call goes on: the voice is told the settings with the slots it was made
+ * with, so it only takes what applies without reloading (language, voice, speed, patience). A change between Smart and
+ * Silence is the voice's own to make (a stage of its turn logic): that one it still applies by restarting.
+ * @param {(source: import('@sidevoice/voice').VoiceModelSource) => import('@sidevoice/voice').VoiceHost} createVoiceHost
+ * @param {import('@sidevoice/voice').VoiceModelSource} source
+ * @returns {import('@sidevoice/voice').VoiceHost}
+ */
+export function swappingVoiceHost(createVoiceHost, source) {
+  /** The settings being applied: whatever loads, loads these. */
+  let latest = null;
+  /** The settings the voice was made with, or last restarted on: their slots are the ones it is always told. */
+  let held = null;
+  /** The settings whose models the slots call (or will, once loaded). */
+  let applied = null;
+  /** The models the slots call now; null until the voice first loads them. */
+  let current = null;
+  let changes = 0;
+  const slots = {
+    transcriber: { transcribe: (...args) => current.transcriber.transcribe(...args) },
+    speaker: { speak: (...args) => current.speaker.speak(...args) },
+    endOfTurn: { endOfTurn: (...args) => current.endOfTurn.endOfTurn(...args) },
+  };
+  // The voice asks for its models on its first settings and on a change of its own stages; it loads them as it starts
+  // (and again after unloading them while idle): the settings chosen by then. What it gets is the slots, never the
+  // models themselves.
+  const voice = createVoiceHost({
+    async models(settings) {
+      const chosen = await source.models(settings);
+      return {
+        async load() {
+          current = await (latest && latest !== settings ? await source.models(latest) : chosen).load();
+          return { vad: current.vad, transcriber: slots.transcriber, speaker: slots.speaker, ...(current.endOfTurn ? { endOfTurn: slots.endOfTurn } : {}) };
+        },
+      };
+    },
+  });
+  const turnOf = (settings) => settings.end_of_turn ?? 'silence';
+  return Object.freeze({
+    ...voice,
+    async setSettings(settings) {
+      const change = ++changes;
+      latest = settings;
+      // The first settings, or Smart and Silence swapped: the voice's to apply, loading the models chosen now.
+      if (!held || turnOf(held) !== turnOf(settings)) {
+        held = applied = settings;
+        return voice.setSettings(settings);
+      }
+      const asHeld = { ...settings, stt: { ...settings.stt, ...modelOf(held.stt) }, tts: { ...settings.tts, ...speakerOf(held.tts) } };
+      if (modelsKey(applied) !== modelsKey(settings)) {
+        // Another model: refused before anything changes when this device can't run it; loaded, then the slots move
+        // to it — unless a later change came meanwhile, which applies instead.
+        const chosen = await source.models(settings);
+        if (current) {
+          const next = await chosen.load();
+          if (change !== changes) return;
+          current = next;
+        }
+        applied = settings;
+      }
+      await voice.setSettings(asHeld);
+    },
+  });
+}
+
 const loadPackages = () => Promise.all([import('@sidevoice/voice'), import('@sidevoice/engine')]);
 
 /** The packages and this page's one engine, made the first time they are asked for. */
@@ -63,7 +137,7 @@ export function pageVoice({ host: given, load = loadPackages } = {}) {
       const host = appHost();
       if (host?.voice) return host.voice;
       const { voice, engine } = await browser();
-      return voice.createVoiceHost(engineVoiceSource(engine));
+      return swappingVoiceHost(voice.createVoiceHost, engineVoiceSource(engine));
     },
     async catalogs() {
       const host = appHost();

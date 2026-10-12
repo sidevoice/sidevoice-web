@@ -340,7 +340,7 @@ export const en = {
   "voice.endOfTurn.silence": "Silence",
   "voice.endOfTurn.smart": "Smart (recommended)",
   "voice.endOfTurn.none": "No end-of-turn model runs on this device yet: a turn ends with silence.",
-  "voice.restartNote": "During a call, changing a source, a model or the end of turn restarts the voice for a moment: what you are saying is dropped and the reply playing stops. The language, voice, speed and patience apply without a cut.",
+  "voice.restartNote": "During a call, switching between Smart and Silence restarts the voice for a moment: what you are saying is dropped and the reply playing stops. Everything else, models included, applies without a cut.",
   "voice.catalog.noKey": "needs your key",
   "voice.catalog.reason": "unavailable ({code})",
   "voice.catalog.empty": "no models for this",
