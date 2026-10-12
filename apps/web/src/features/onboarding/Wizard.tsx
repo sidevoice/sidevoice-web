@@ -89,7 +89,7 @@ function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolea
   useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return <section className="wizard-turn">
     <p>{t("wizard.turnIntro")}</p>
-    {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
+    {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} details={catalogue.details} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
         : <TurnChoices draft={draft} setup turnTry={turnTry} turnTried={tried} />}
   </section>;
@@ -122,7 +122,7 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
   const trial: SetupTry = stage;
   return <section className="wizard-stage-step">
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
-    {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
+    {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} details={catalogue.details} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
         : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} setup trial={trial} /> : <SpeechChoices draft={draft} setup trial={trial} />}</div>}
   </section>;

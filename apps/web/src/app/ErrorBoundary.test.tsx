@@ -11,7 +11,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("a failing panel is contained, reported to the room, and the rest of the page stays", () => {
+test("a failing panel is contained, said in words with what it threw behind Details, reported to the room, and the rest of the page stays", () => {
   const reports: unknown[] = [];
   window.sidevoiceReportError = (report) => reports.push(report);
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -21,8 +21,12 @@ test("a failing panel is contained, reported to the room, and the rest of the pa
       <ErrorBoundary area="transcript"><Broken /></ErrorBoundary>
     </div>,
   );
-  expect(screen.getByRole("alert")).toHaveTextContent("Esta parte de la sala falló.");
-  expect(screen.getByRole("alert")).toHaveTextContent("name.trim is not a function");
+  const alert = screen.getByRole("alert");
+  expect(alert.querySelector("b")).toHaveTextContent("This part of the room failed.");
+  // What it threw is no sentence for people: closed, behind Details.
+  expect(alert.querySelector("b")).not.toHaveTextContent("name.trim");
+  expect(alert.querySelector("details:not([open]) > summary")).toHaveTextContent("Details");
+  expect(alert.querySelector("details > pre")).toHaveTextContent("name.trim is not a function");
   expect(document.getElementById("live")).not.toBeNull();
   expect(reports).toHaveLength(1);
   const report = reports[0] as { kind: string; message: string; component: string };

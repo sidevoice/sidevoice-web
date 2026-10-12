@@ -182,6 +182,8 @@ export interface JoinStatusView {
   failed: boolean;
   /** A standing note rather than a step (no machine to talk to): no progress dot, and no alert. */
   note?: boolean;
+  /** A failure's raw text, for its Details (error-message.ts). */
+  details?: string;
 }
 
 /** The dialog that pairs this device with a machine, and the sentence it opens with when the page opened it. */

@@ -17,6 +17,8 @@ import type { VoiceTake } from "../../services/voice-take";
 import type { HostMessageKey } from "./messages/en";
 import { seconds } from "./try-time";
 import { TryTake } from "./TryTake";
+import { ErrorText } from "../../components/ui/ErrorText";
+import { voiceFailure, type ErrorMessage } from "./error-message";
 
 /* A voice slot's chosen model made ready, the same in Settings and in the first-run setup: one of this device's
  * catalogue is downloaded first when it is not on disk (its size said, with progress and cancel), then checked; a
@@ -41,6 +43,7 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
   const mine = install && install.task === task && install.model === slot?.model ? install : null;
   const installing = mine?.state === "running";
   const failure = mine?.state === "failed" ? mine.error : "";
+  const failureDetails = mine?.state === "failed" ? mine.details ?? "" : "";
   const ready = !!model && installed;
   // Downloaded in full, it is checked before the install ends; then the catalogues are read again to see it there.
   const status: PrepareStatus | null = !model ? null
@@ -61,7 +64,9 @@ export function useModelState(task: Task | "end-of-turn", draft: Settings | null
     buildChosen: !!chosen,
     installing,
     fraction: installing ? mine!.fraction : null,
+    /** Why its download failed, in words, and what was raw about it (for its Details). */
     failure,
+    failureDetails,
   };
 }
 
@@ -94,13 +99,14 @@ export type TryState = {
   said: string;
   range: KaraokeRange | null;
   text: string;
-  error: string;
+  /** Why it failed, as people read it (error-message.ts). */
+  error: ErrorMessage | null;
   timings?: TrialTimings | null;
   /** Transcription's, once it has stopped: what the microphone gave the voice, where the voice hands it (gap #40). */
   take?: VoiceTake | null;
 };
 
-const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range: null, text: "", error: "", take: null };
+const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range: null, text: "", error: null, take: null };
 
 /** A real try of the settings being edited for `task` (the controller's `tryVoiceSettings`): `keep` makes settings that
  *  work this device's (the setup); `onTried` hears each success. A changed setting clears it; leaving stops it. While
@@ -145,7 +151,7 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
     } catch (error) {
       const cancelled = (error as { code?: string }).code === "trial-cancelled";
       // Stopped, the try is put away, its take with it; failed, what the microphone gave shows why.
-      update((trial) => ({ ...trial, phase: cancelled ? "idle" : "failed", live: false, error: (error as Error).message, ...(cancelled ? { take: null } : {}) }));
+      update((trial) => ({ ...trial, phase: cancelled ? "idle" : "failed", live: false, error: voiceFailure(error, { what: "try" }), ...(cancelled ? { take: null } : {}) }));
     } finally {
       level.publish(0);
     }
@@ -271,7 +277,7 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
       {running && trial.live && task === "tts" && <p className="model-try-state">{t("wizard.playing")}</p>}
       {trial.phase === "done" && task === "stt" && <TryHeard text={trial.text} roomy={roomy} t={t} />}
       {trial.phase === "done" && trial.timings && <TryTiming task={task} timings={trial.timings} t={t} />}
-      {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
+      {trial.phase === "failed" && trial.error && <ErrorText className="stage-try-error" role="alert" message={trial.error} />}
     </div>
   </>;
 }
@@ -301,7 +307,7 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
         <TryHeard text={trial.text} roomy={false} t={t} />
         {trial.timings && <TryTiming task="stt" timings={trial.timings} t={t} />}
       </>}
-      {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
+      {trial.phase === "failed" && trial.error && <ErrorText className="stage-try-error" role="alert" message={trial.error} />}
     </div>
     {/* The take to listen to, when the voice handed one: outside the live area, read when reached. */}
     {!running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" t={t} />}
@@ -343,7 +349,7 @@ function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
         {trial.phase === "idle" && hint && <p className="model-try-hint">{hint}</p>}
         {running && !trial.live && <p className="model-try-state"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>}
         {trial.phase === "done" && trial.timings && <TryTiming task="tts" timings={trial.timings} t={t} />}
-        {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
+        {trial.phase === "failed" && trial.error && <ErrorText className="stage-try-error" role="alert" message={trial.error} />}
       </div>
     </div>
   </div>;

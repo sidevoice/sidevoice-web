@@ -3,20 +3,25 @@ import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/cn";
 import { ChevronIcon, ConnectorIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
 import { Snippet } from "../../components/ui/Snippet";
+import { ErrorDetails } from "../../components/ui/ErrorText";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { AgentManualStep, DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { actionableAgent } from "../../services/host-agents";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
+import { errorMessage, keyFor, type ErrorMessage } from "./error-message";
 import { NewMark } from "../highlights/highlights";
 import { InfoTip } from "../../components/ui/InfoTip";
 import "./host-agents.css";
 
-function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): string {
-  const messageKey = `agents.error.${key}` as HostMessageKey;
-  const message = t(messageKey, params);
-  return message === messageKey ? t("agents.error.unknown") : message;
+/** A machine's failure with its agents, in words (error-message.ts): its key's sentence, else this panel's own generic
+ *  line, the key behind Details. */
+function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): ErrorMessage {
+  return errorMessage({ key }, { t, generic: t("agents.error.unknown"), known: (code) => {
+    const known = keyFor("agents.error.", code);
+    return known ? t(known, params) : null;
+  } });
 }
 
 /** How long ago `value` was, in words ("2 minutes ago"), kept current as time passes. */
@@ -130,7 +135,8 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
 
   const run = (action: "connect" | "disconnect") =>
     void window.sidevoiceActions?.hostAgentAction?.(fp, agent.id, action);
-  const errorText = error ? translatedError(t, error.key, error.params) : null;
+  const failure = error ? translatedError(t, error.key, error.params) : null;
+  const errorText = failure?.text ?? null;
   // Three states to read at a glance — Connected, Not connected, Needs attention (an entry an older Sidevoice made,
   // another 'sidevoice' entry, settings that can't be read) — the last with its reason after it, the row's action beside.
   const status: { text: string; tone: "ok" | "error" | "muted" | "attention" | ""; info?: string; reason?: string } = errorText ? { text: errorText, tone: "error" }
@@ -163,6 +169,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <span className="host-agent-status-line">
             <span className={cn("host-agent-status", status.tone === "ok" && "host-agent-ok", status.tone === "error" && "host-agent-error", status.tone === "muted" && "muted", status.tone === "attention" && "host-agent-attention")}
               role={errorText ? "alert" : "status"} title={status.reason ? status.text + " · " + status.reason : status.text}>{status.text}{status.reason && <span className="host-agent-reason"> · {status.reason}</span>}</span>
+            {failure && <ErrorDetails details={failure.details} />}
             {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
           </span>
         </span>
@@ -218,10 +225,15 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
   );
 }
 
-function scanError(t: HostTranslate, key: string, params?: Record<string, string | number>) {
-  if (key === "no-connector") return t("agents.noConnector");
-  if (key === "unreachable" || key === "timeout") return t("agents.unreachable");
+function scanError(t: HostTranslate, key: string, params?: Record<string, string | number>): ErrorMessage {
+  if (key === "no-connector") return { text: t("agents.noConnector") };
+  if (key === "unreachable" || key === "timeout") return { text: t("agents.unreachable") };
   return translatedError(t, key, params);
+}
+
+/** Why a search failed, quietly, with its Details. */
+function ScanError({ why }: { why: ErrorMessage }) {
+  return <div><p className="muted">{why.text}</p><ErrorDetails details={why.details} /></div>;
 }
 
 export function HostAgentsPanel({ fp }: { fp: string | null }) {
@@ -240,7 +252,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
     <section className="host-agents" aria-labelledby="host-agents-title">
       <div className="host-agents-heading"><h4 id="host-agents-title" tabIndex={-1}>{t("agents.heading")}</h4></div>
       <div className="host-agent-problem-quiet">
-        <p className="muted">{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
+        <ScanError why={scanError(t, listing.error?.key ?? "unknown", listing.error?.params)} />
         <Button size="sm" variant="secondary" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
       </div>
     </section>

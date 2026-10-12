@@ -20,12 +20,15 @@ export interface SessionFacts {
  userTurn: {id: string; segment: string; thread: string | null} | null; pendingPhase: '' | 'listening' | 'transcribing'; pendingUserText: string;
  cancelledInput: boolean; textSending: boolean; micEnabled: boolean;
  voiceState: VoiceState | null;
- joinStep: string | null; joinFailure: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
+ /** A join that failed: its sentence, and what was raw about it, for its Details (error-message.ts). */
+ joinStep: string | null; joinFailure: string; joinFailureDetails: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
  screenLock: {state: string; note: string}; holding: boolean; userQuietAt: number; liveNote: string;
  harness: Record<string, boolean>; turns: Record<string, {session: string; thread: string; status?: string; settled?: boolean; harnessEnded?: boolean; readyAt?: number}>;
  /** The reply being said, and where the voice is in it: the part of `segment`'s text sounding now (`from`, `to`;
   *  both the end of what was heard between its chunks). */
- now: number; karaokeState: (KaraokeRange & {segment: string}) | null; bootError: string | null;
+ now: number; karaokeState: (KaraokeRange & {segment: string}) | null;
+ /** The room's error above the stage, as people read it (error-message.ts). */
+ bootError: import('../components/ui/ErrorText').ErrorMessage | null;
  /** The machines this device is paired with (never their tokens), and the clock they were read at. */
  pairings: PairingSummary[]; machinesAt: number; machinesReady: boolean;
  /** Per-fingerprint host agent listings. A late response remains attached to its host. */
@@ -36,6 +39,8 @@ export interface SessionFacts {
    *  Machines the machine `machinesView` names): the list at each opening, unless what opens it asks for a page. A
    *  desktop shows its sections beside the page and reads `settingsSection` alone. */
   settingsLevel: 'list' | 'page';
+  /** What failed while Settings was open (applying a choice, opening it), as people read it; null when nothing did. */
+  settingsError: import('../components/ui/ErrorText').ErrorMessage | null;
   /** When a setting was last kept (there is no Save: each applies as it changes), for a moment's "Saved". */
   settingsSavedAt: number;
   /** The interface language this device keeps; '' is Automatic (the system's, followed as it is). */
@@ -67,7 +72,7 @@ export interface SessionFacts {
  /** The voice settings this device keeps, the ones the settings pane is editing, the engine's catalogues, and whether a
   *  key is kept for each remote provider. */
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;
- voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string};
+ voiceCatalogue: {state: 'idle' | 'loading' | 'ready' | 'failed'; catalogs: import('../services/model-catalogs.js').CatalogView[]; error: string; details?: string};
  /** Whether this device's engine can take a model off it (`uninstallVoiceModel`). */
  modelsRemovable: boolean;
  /** How long a downloaded model not used is kept, in days; null: forever (model-housekeeping.js). */
@@ -78,11 +83,11 @@ export interface SessionFacts {
  /** Whether this browser refuses the page any storage (site data blocked): found once at start. */
  storageBlocked: boolean;
  /** A model of this device being installed for a voice slot: how far it has got, or why it failed. */
- voiceInstall: {task: 'stt' | 'tts'; model: string; state: 'running' | 'failed'; fraction: number | null; error: string} | null;
+ voiceInstall: {task: 'stt' | 'tts'; model: string; state: 'running' | 'failed'; fraction: number | null; error: string; details?: string} | null;
  /** Call model B (VARIANTS `call-model`): the voice switch — on, turning on, and why it last turned itself off (with a
   *  failure's words) —, the idle warning, the agents' mute and what set it, the conversation a "Hear it" is asking (by
   *  its key), and the conversation a move to another machine is taking the session to. */
- voiceOn: boolean; voiceStarting: boolean; voiceOffReason: VoiceOffReason | null; voiceOffDetail: string; voiceIdleWarning: boolean;
+ voiceOn: boolean; voiceStarting: boolean; voiceOffReason: VoiceOffReason | null; voiceOffDetail: string; voiceOffDetails: string; voiceIdleWarning: boolean;
  agentsMuted: boolean; agentsMutedBy: 'person' | 'output-lost' | null;
  hearing: {thread: string; state: 'asking' | 'no-answer'} | null; movingTo: string | null;
  /** The floating call card (briefs/FLOATING-CARD-SPEC.md). The call model this page runs, as the runtime read it once
@@ -128,7 +133,7 @@ export interface SessionSnapshot {
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string};
- bootError: string | null; machines: MachineView[]; pairing: PairingPromptView;
+ bootError: import('../components/ui/ErrorText').ErrorMessage | null; machines: MachineView[]; pairing: PairingPromptView;
 }
 /** One device to choose, as the card lists it. `system` is the system's own choice, `number` a device the system lists
  *  without a name (its place, from 1), `missing` the chosen one, no longer connected: the card words those itself. */

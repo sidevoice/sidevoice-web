@@ -36,8 +36,9 @@ export interface ModelPrepareProps {
   size?: number | null;
   /** How far the download is, 0–1; none while not known. */
   fraction?: number | null;
-  /** Why it failed, in one sentence. */
+  /** Why it failed, in one sentence; and what was raw about it, behind Details (error-message.ts). */
   error?: string;
+  errorDetails?: string;
   /** What a ready model offers beside its state: its try. */
   readyAction?: ReactNode;
   /** Under a ready model's state, in the block: how its try goes and how it went. */
@@ -51,7 +52,7 @@ export interface ModelPrepareProps {
   actionIds?: string;
 }
 
-export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, readyAction, readyPanel, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = hostTranslator();
   const hintId = useId();
@@ -95,6 +96,7 @@ export function ModelPrepare({ pending, runtime, status, model, pickers, meta, s
           {onAddKey && <Button size="sm" variant="ghost" onClick={onAddKey}>{t("voice.prepare.addKey")}</Button>}
         </>}
         {status === "failed" && <Alert tone="danger" live className="model-prepare-alert" title={t("voice.prepare.failed", { model })}
+          details={errorDetails}
           action={<Button size="sm" id={actionId("retry")} onClick={onRetry}>{t("voice.prepare.retry")}</Button>}>{error}</Alert>}
       </div>}
       {status === "ready" && readyPanel}

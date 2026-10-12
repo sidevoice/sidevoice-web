@@ -5,6 +5,7 @@ import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desk
 import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
+import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
@@ -17,7 +18,7 @@ import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeepi
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
-import {refusalText as sayRefusal} from './refusals.js';
+import {refusalError} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 /* The call model this page runs (VARIANTS `call-model`, lib/variants.ts; briefs/CALL-MODEL-B-SPEC.md): A, a call that is
@@ -35,53 +36,37 @@ roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.
 void probeSiteStorage().then(probe=>roomStore.patch({storageBlocked:probe.blocked}),()=>{});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
 const $=id=>document.getElementById(id);
-function setRoomError(message){const value=message||null;if(window.sidevoiceUI)window.sidevoiceUI.setBootError(value);else $("error").textContent=value||""}
+// The room's error above the stage: a failure as people read it (`ErrorMessage`, error-message.ts), never a raw text.
+function setRoomError(message){const value=message||null;if(window.sidevoiceUI)window.sidevoiceUI.setBootError(value);else $("error").textContent=value?typeof value==='string'?value:errorLine(value):""}
 /* One quiet line from the tap until this browser is in the room, naming the step the join is on.
  * It reuses the events that already existed — the voice starting, the room's hello, the conversation this tab goes
  * back to — and measures nothing of its own. A step that fails leaves its reason, and what to do about it, in the
  * same place. */
-function joinStatus(step,{detail='',progress=null,subject=''}={}){roomStore.patch({joinStep:step,joinFailure:'',joinDetail:detail?String(detail).slice(0,80):'',joinProgress:progress==null?null:Number(progress),joinSubject:subject})}
-function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinDetail:'',joinProgress:null,joinSubject:'',liveNote:''})}
-function failJoin(text){roomStore.patch({joinStep:null,joinFailure:text||'',joinDetail:'',joinProgress:null,joinSubject:''})}
+function joinStatus(step,{detail='',progress=null,subject=''}={}){roomStore.patch({joinStep:step,joinFailure:'',joinFailureDetails:'',joinDetail:detail?String(detail).slice(0,80):'',joinProgress:progress==null?null:Number(progress),joinSubject:subject})}
+function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinFailureDetails:'',joinDetail:'',joinProgress:null,joinSubject:'',liveNote:''})}
+// A join that failed, in words (`ErrorMessage`): its sentence on the join line, what was raw about it behind Details.
+function failJoin(message){roomStore.patch({joinStep:null,joinFailure:message?errorLine(message):'',joinFailureDetails:message?.details||'',joinDetail:'',joinProgress:null,joinSubject:''})}
 // Why a call (A) ended without the person ending it, for the desktop card's exit notice (FLOATING-CARD-SPEC FC7): idle,
-// its machine gone (`detail`: the conversation's title) or refused (`detail`: the words the room shows). Said before the
-// call ends, so the snapshot that says the call is over already says why; cleared as a call starts; a hang-up never sets it.
+// its machine gone (`detail`: the conversation's title) or refused (`detail`: the sentence the join line shows). Said
+// before the call ends, so the snapshot that says the call is over already says why; cleared as a call starts; a hang-up
+// never sets it.
 function callEndedBy(reason,detail){if(!VOICE_SWITCH)roomStore.patch({callEnded:{reason,detail:detail||''}})}
 // What this tab already calls the conversation it is going back to; the room is not asked again for a title.
 function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||'tu conversación'}
-/* The failures the person can do something about, by the voice's code. Any other code is quoted as it is, because
- * inventing a remedy for it would be worse than quoting it. */
-const VOICE_FAILURES={
- 'microphone-denied':()=>state.inApp?'El micrófono está bloqueado para Sidevoice. Dale permiso en los ajustes del sistema y vuelve a pulsar para entrar.'
-  :'El micrófono está bloqueado para esta página. Dale permiso en el navegador y vuelve a pulsar para entrar.',
- 'microphone-unavailable':()=>'No se pudo usar el micrófono. Conéctalo o elige otro en el sistema, y vuelve a entrar.',
- 'speaker-unavailable':()=>'No se pudo usar el altavoz. Conéctalo o elige otro en el sistema, y vuelve a entrar.',
- 'audio-device-unavailable':()=>'Falta el dispositivo de audio de la llamada. Conéctalo y vuelve a entrar.',
- 'audio-device-failed':()=>'El dispositivo de audio de la llamada falló. Conéctalo de nuevo y vuelve a entrar.',
- 'voice-module-unavailable':()=>'La voz de la llamada aún no está disponible en esta versión de la página.',
- 'catalogs-unavailable':()=>'Esta versión de la app aún no da a la página la lista de modelos.',
- 'end-of-turn-unavailable':()=>'El fin de turno inteligente aún no está disponible: el turno termina con el silencio.',
- 'credential-missing':()=>'Falta la clave del proveedor. Añádela en Configuración → Proveedores.',
- 'model-unknown':()=>'Ese modelo no está en el catálogo de la voz.',
- 'model-unfit':()=>'Ese modelo no se puede ejecutar en este dispositivo. Elige otro.',
-};
-// What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
-// A provider's own words, when it is the one refusing, follow as it said them.
-// A browser's own refusal (a DOMException) is said by its name, never by its legacy number; one that blocks the page's
-// storage is the message of a blocked site.
-function voiceErrorText(error){
- const code=failureCode(error,''),t=hostTranslator();
- if(code==='storage-blocked'||code==='SecurityError')return t('storage.blocked');
- if(code==='trial-voice-on')return t('wizard.trial.voiceOn');
- if(/^trial-[a-z-]+$/.test(code))return t('wizard.trial.'+code.slice(6));
- const text=VOICE_FAILURES[code]?.()||(/^[A-Z][A-Za-z]*Error$/.test(code)?t('voice.error.browser',{name:code}):'La voz de la llamada falló'+(code?' ('+code+')':'')+'.');
- return error?.detail?text+' '+String(error.detail):text;
-}
-function joinFailureText(step,error){
- if(step==='voice')return voiceErrorText(error);
- const message=String(error?.message||error||'');
- return message+(/[.!?…]$/.test(message)?'':'.');
-}
+/* What failed in the voice, its models or the room, as the person reads it (error-message.ts): a known code in the
+ * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
+ * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
+ * follow the sentence. `what` names what failed. */
+function voiceError(error,what='voice'){return voiceFailure(error,{what,inApp:!!state.inApp,t:hostTranslator()})}
+function roomError(error,what='room',generic){return roomFailure(error,{what,generic,t:hostTranslator()})}
+// A sentence of this page's bundle, as a failure.
+const bundled=(key,params)=>({text:hostTranslator()(key,params)});
+function joinError(step,error){return step==='voice'?voiceError(error):roomError(error)}
+// A failure of the voice handed to the interface: its code kept (for what the interface does about it), its words
+// with it (`words`, what error-message.ts says of it).
+function voiceRefused(error,what='voice'){const words=voiceError(error,what);return Object.assign(Error(words.text),{code:failureCode(error,''),words})}
+// A download of a model that failed, as the slot's install says it (`voiceInstall`): its sentence, and its Details.
+function installFailure(error){const words=voiceError(error,'download');return {error:errorLine(words),details:words.details||''}}
 
 // The room holds several browsers at once, so every question this page asks the
 // room carries its own session: the answer is about this browser and no other. Only the call's machine knows it.
@@ -293,18 +278,18 @@ async function locate(fp,{move=!(fp===state.callNode&&inCallNow()),fresh=false,h
 function settleLink(fp,found,reach){
  const link=linkOf(fp),base=found?.base??null,moved=base!==link.base;
  link.base=base;link.reach=found?'ok':reach;link.via=found?(found.via==='room'?'room':'node'):'';
- if(found&&reachFailure&&(reachFailure.node==null||reachFailure.node===fp)&&state.joinFailure===reachFailure.text){state.joinFailure='';reachFailure=null}
+ if(found&&reachFailure&&(reachFailure.node==null||reachFailure.node===fp)&&state.joinFailure===reachFailure.text){roomStore.patch({joinFailure:'',joinFailureDetails:''});reachFailure=null}
  publishLinks();
  if(moved&&base!=null){if(fp===state.callNode)void refresh();void refreshPeople(fp);void refreshHistory(fp)}
 }
-function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
+function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(reachNote(state)||NO_MACHINE);return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
 function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
 // Every request to a machine carries the token of that machine's pairing — never another's; one the machine refuses
 // means that pairing is gone. An address that stops answering is looked at again on the next beat.
 const request=async(path,options,fp=state.callNode)=>{
  const url=routed(path,fp);if(!isNodePath(path))return fetch(url,options);
- const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw Error(NO_MACHINE);
+ const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw worded(NO_MACHINE);
  let response;
  try{response=await fetch(url,withToken(options,pairing.token))}catch(error){if(link&&link.base===base)link.doubted=base;throw error}
  if(response.status===401)pairingRefused(fp,{token:pairing.token});
@@ -400,8 +385,9 @@ function targetId(){return conversationKey(state.callNode,state.roomBinding?.thr
 function targetThread(){return state.roomBinding?.thread_id||null}
 function historyThreadId(){return state.viewedThread||targetId()}
 
-// A refusal is a sentence, or a key with its English sentence (sidevoice-core's newer refusals): the sentence is said.
-async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw Error(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw Error(sayRefusal(d.detail,'No se pudo completar la operación'));return d}
+// A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
+// to say by its key — the sentence, in whatever language it came, only behind Details.
+async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw worded(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
 const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},fp);
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
@@ -519,7 +505,7 @@ function partial(text){state.pendingUserText=text||''}
 // it, voice or not; its placeholder, which says why when it cannot, is React's (Composer, features/call/voice-view.ts).
 function activeCanReceive(){const person=state.people.find(p=>personKey(p)===targetId());return !!person&&!!person.available&&(person.reach?.state||'listening')==='listening'&&state.machineLinks?.[state.callNode]?.reach==='ok'}
 function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;if(VOICE_SWITCH){const ready=!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching&&activeCanReceive();input.disabled=!ready;send.disabled=!ready||state.textSending;return}const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;input.placeholder=ready?'Envía un mensaje':'Únete a la llamada para escribir';}
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(e.message||'No se pudo confirmar el envío. El texto se conserva.')}finally{state.textSending=false;updateComposer()}}
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -539,7 +525,7 @@ async function select(key){
  if(!to||state.switching||key===targetId()||!state.sessionId)return;
  if(to.node!==state.callNode)return moveCall(to.node,to.thread);
  state.switching=true;
- try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){setRoomError(e.message)}finally{state.switching=false}
+ try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){setRoomError(roomError(e))}finally{state.switching=false}
 }
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
@@ -567,7 +553,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on.
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
- const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(call.error);});
+ const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
  applyMicState();
  // The page follows the build of whoever serves it: this answer's only when the machine itself served the page.
  if(target===''&&linkBase(fp)==='')followServedBuild(d.room?.web_build);
@@ -674,7 +660,7 @@ function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  if(!onCall&&!asked)return;
  // Said of the machine that refused, whichever one the call is on.
  const text=reachNote({...roomStore.getState().facts,callNode:fp});
- if(onCall){callEndedBy('failed',text);disconnect();reachFailure={text,node:fp};failJoin(text)}
+ if(onCall){callEndedBy('failed',text);disconnect();reachFailure={text,node:fp};failJoin({text})}
  openPairing(text);
 }
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
@@ -830,7 +816,7 @@ const renameBody=name=>({method:'PATCH',headers:{'Content-Type':'application/jso
 async function renameMachineDevice(fp,id,name){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 async function renameLocalHostDevice(id,name){await localHostApi('/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
-function callProtocols(fp){const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing?.token||pairing.revoked)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+pairing.token]}
+function callProtocols(fp){const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing?.token||pairing.revoked)throw worded(NO_MACHINE);return ['sidevoice','sidevoice.token.'+pairing.token]}
 async function reselectRemembered(){
  // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
  const wanted=rememberedThread();
@@ -1207,7 +1193,7 @@ function recordMessage(raw, socket) {
             flushOutbox();
             return;
         }
-        setRoomError(sayRefusal(d, d.error || 'Error de conexión'));
+        setRoomError(roomError(refusalError(d)));
     }
 }
 /* ----- the voice's reports -----
@@ -1247,7 +1233,7 @@ function voiceFailed(error){
  // With the voice switch (B) a microphone lost or blocked mid-session turns the voice off, saying why (the spec's D4).
  const code=failureCode(error,'');
  if(VOICE_SWITCH&&(state.voiceOn||state.voiceStarting)&&['microphone-lost','microphone-denied'].includes(code)){void setVoice(false,voiceOffReasonFor(code));reportClientError({kind:'voice',message:code});return}
- setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:code})
+ setRoomError(voiceError(error));reportClientError({kind:'voice',message:code})
 }
 function voiceStateChanged(next){
  roomStore.batch(()=>{
@@ -1283,8 +1269,7 @@ function receiveReply(d){
  // A reply that arrives while the call leaves its machine is written, never said: the person has moved on.
  if(!replies.has(d.utterance_id)&&!moving)sayReply(d);
 }
-function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw Error(reachNote(state)||NO_MACHINE);return callSocketUrl(base,location)}
-const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.';
+function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(reachNote(state)||NO_MACHINE);return callSocketUrl(base,location)}
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
  * can lose both: a phone read only «La sala rechazó la conexión» while the room had written that it
@@ -1294,38 +1279,41 @@ const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espe
  * is a truthful answer to a question asked a moment too late, and it costs only the generic line. */
 async function roomRefusal(){try{const answer=await request('/api/presentation/admission',{cache:'no-store'});if(!answer.ok)return null;const admission=await answer.json();return admission&&typeof admission==='object'?admission:{}}catch{return null}}
 const NODE_AWAY=new Set(['node_offline','node_unreachable','node_timeout','choose_node']);
-function refusalText(admission,broken){
- if(admission===null)return 'No se pudo conectar con la sala';
- if(admission.reason==='room_is_full')return ROOM_IS_FULL;   // the room's reason, in this page's language
- if(admission.admitted===false&&admission.message)return admission.message;
- return broken?'No se pudo conectar con la sala':'La sala rechazó la conexión';
+// Why the room refused, in this page's words: its reason by its key; a refusal this page has no words for is the room
+// refusing, its own sentence behind Details.
+function admissionFailure(admission,broken){
+ if(admission===null)return bundled('room.failure.unreachable');
+ if(admission.reason==='room_is_full')return bundled('room.failure.full');
+ if(admission.admitted===false&&(admission.message||admission.key||admission.reason))return refusedBy(refusalError(admission));
+ return bundled(broken?'room.failure.unreachable':'room.failure.rejected');
 }
+const refusedBy=refusal=>roomError(refusal,'room',bundled('room.failure.refused').text);
 // The room speaks first: its call id and how this call is resumed. Anything else arriving meanwhile is an ordinary room event.
-function openSession(socket,hello={},fp=state.callNode,token=null){return new Promise((resolve,reject)=>{const fail=(text,forGood=false)=>{clearTimeout(timer);const error=Error(text);error.refused=forGood;reject(error)};let timer=setTimeout(()=>lateFail(),25000),refusal=null,refused=null,broken=false;const lateFail=()=>{
+function openSession(socket,hello={},fp=state.callNode,token=null){return new Promise((resolve,reject)=>{const fail=(words,forGood=false)=>{clearTimeout(timer);reject(Object.assign(Error(words.text),{words,refused:forGood}))};let timer=setTimeout(()=>lateFail(),25000),refusal=null,refused=null,broken=false;const lateFail=()=>{
   // Asking why keeps the same short patience as after a close: a room that never answered the hello may not answer this either.
-  timer=setTimeout(()=>fail('Este dispositivo tardó demasiado en entrar. Vuelve a intentarlo.'),3000);
-  roomRefusal().then(admission=>fail(admission&&admission.admitted?'Este dispositivo tardó demasiado en entrar. Vuelve a intentarlo.':refusalText(admission,false),admission?.admitted===false))};socket.onopen=()=>socket.send(JSON.stringify({label:'rtvi-ai',type:'client-ready',id:crypto.randomUUID(),data:hello}));
+  timer=setTimeout(()=>fail(bundled('room.failure.slow')),3000);
+  roomRefusal().then(admission=>fail(admission&&admission.admitted?bundled('room.failure.slow'):admissionFailure(admission,false),admission?.admitted===false))};socket.onopen=()=>socket.send(JSON.stringify({label:'rtvi-ai',type:'client-ready',id:crypto.randomUUID(),data:hello}));
  // An error event is always followed by a close event, and the close is the one that can find out
  // why: failing here would answer «no se pudo conectar» to a room that knows it is full.
  socket.onerror=()=>{broken=true};
  socket.onclose=event=>{clearTimeout(timer);timer=null;
   // The machine no longer knows this device's token: final, and the pairing is what has to change.
-  if(event?.code===4401){pairingRefused(fp,{call:true,token});return fail(reachNote(state)||NO_MACHINE,true)}
+  if(event?.code===4401){pairingRefused(fp,{call:true,token});return fail({text:reachNote(state)||NO_MACHINE},true)}
   // However the reason arrived — the close code, the frame's own name for it, the frame's sentence —
   // the person reads one sentence for one reason.
   // A room that answered and said no is not a room that is away: these are the refusals a reconnection
   // must not insist on. Everything else — no answer at all — is worth another try.
   // A room whose relay cannot reach the machine says so with the same close code as a full room, and a
   // machine that is restarting is not a refusal: its own sentence, and the next attempt may find it back.
-  if(NODE_AWAY.has(refused))return fail(refusal||'La máquina no está conectada a la sala ahora mismo.',false);
+  if(NODE_AWAY.has(refused))return fail(bundled('room.failure.machineAway'),false);
   // A frame that named another reason is that reason, whatever the close code: 1013 alone means full.
-  if(refused==='room_is_full'||event?.code===1013&&!refused)return fail(ROOM_IS_FULL,true);
-  if(refusal)return fail(refusal,true);
+  if(refused==='room_is_full'||event?.code===1013&&!refused)return fail(bundled('room.failure.full'),true);
+  if(refusal)return fail(refusedBy(refusal),true);
   // The question keeps a short patience of its own: a room that does not answer it cannot say why
   // either, and nobody is left looking at a join line while a request hangs.
-  timer=setTimeout(()=>fail('La sala rechazó la conexión'),3000);
-  roomRefusal().then(admission=>fail(refusalText(admission,broken),admission?.admitted===false))};
- socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=sayRefusal(m.data,m.data?.error||refusal);refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
+  timer=setTimeout(()=>fail(bundled('room.failure.rejected')),3000);
+  roomRefusal().then(admission=>fail(admissionFailure(admission,broken),admission?.admitted===false))};
+ socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
 function disconnect() {
     window.sidevoiceTelemetry?.endCall?.('left');
     // A hang-up ends what the call still owed its session.
@@ -1414,7 +1402,7 @@ function audioDevicesChanged(devices){
 async function setAudioDevices(choice){
  const host=await voiceHost();
  let devices;
- try{devices=await host.setAudioDevices(choice)}catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ try{devices=await host.setAudioDevices(choice)}catch(error){throw voiceRefused(error,'devices')}
  // Kept for this device; the system's default keeps nothing.
  const kept=storedAudio();
  for(const kind of ['input','output'])if(kind in choice){if(choice[kind]==null)delete kept[kind];else kept[kind]=choice[kind]}
@@ -1448,7 +1436,7 @@ async function toggleCall(){
   const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
   // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said.
   state.callNode=fp;
-  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw Error(text)}
+  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
   await next.setSettings(voiceSettingsHere(state.voiceSettings,state.voiceCatalogue.catalogs));
@@ -1464,7 +1452,7 @@ async function toggleCall(){
   const remembered=rememberedThread();if(rememberedOn(fp))joinStatus('conversation',{subject:conversationTitle(remembered)});
   await refresh();await refreshPeople(fp);
   if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}
- }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}
+ }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinError(failed,e))}}
  finally{if(epoch===connectEpoch)state.connecting=false}
 }
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
@@ -1496,7 +1484,7 @@ async function joinRoom(epoch,context){
  catch(error){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}if(state.ws===socket)state.ws=null;throw error}
  if(epoch!==connectEpoch){socket.close(1000);return null}
  socket.onerror=null;
- if(socket.readyState!==WebSocket.OPEN)throw Error('La sala cerró la conexión');
+ if(socket.readyState!==WebSocket.OPEN)throw worded(bundled('room.failure.dropped').text);
  socket.onclose=event=>{if(state.ws===socket)lostConnection(event,epoch,socket.token)};
  socket.onmessage=e=>{if(state.ws===socket)message(e.data,socket)};
  // Every session and every resume hands over a fresh single-use token: the newest is the one a drop will name.
@@ -1534,7 +1522,7 @@ async function lostConnection(event,epoch,token=null){
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
  // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
  if(event?.code===4401){pairingRefused(state.callNode,{call:true,token});return}
- if(!shouldReconnect(event)){const text='La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.';callEndedBy('failed',text);disconnect();failJoin(text);return}
+ if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect();failJoin(message);return}
  state.reconnecting=true;
  // The first seconds of a drop are the network's, not the person's: no line, no control held. One that outlasts the
  // grace is said.
@@ -1551,7 +1539,7 @@ async function lostConnection(event,epoch,token=null){
    catch(e){
     if(epoch!==connectEpoch)return;
     ++current;const pending=state.ws;state.ws=null;try{pending?.close()}catch{}
-    if(refusedForGood(e)){const text=e.message||'La sala no deja entrar a este dispositivo.';callEndedBy('failed',text);disconnect();failJoin(text);return}
+    if(refusedForGood(e)){const message=roomError(e,'room',bundled('room.failure.refused').text);callEndedBy('failed',message.text);disconnect();failJoin(message);return}
     continue;
    }
    if(epoch!==connectEpoch||!session)return;
@@ -1601,7 +1589,7 @@ async function moveCall(fp,thread){
   state.callNode=fp;syncLinks();
   if(linkBase(fp)==null)await locate(fp,{move:true,fresh:true});
   if(epoch!==connectEpoch)return;
-  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw Error(text)}
+  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const session=await joinRoom(epoch,{});
   if(epoch!==connectEpoch||!session)return;
   // In the call again: what the room still has to say of it (the binding, the conversations) never holds it in a move.
@@ -1611,8 +1599,8 @@ async function moveCall(fp,thread){
   if(epoch!==connectEpoch)return;
   // With the voice switch (B) the voice stays: the session opens again on the active conversation's machine once it
   // answers (followActive), and meanwhile the line says why.
-  if(VOICE_SWITCH){roomRefused=refusedForGood(e);failJoin(joinFailureText('room',e))}
-  else{const text=joinFailureText('room',e),gone=reachFailure?.node===fp;callEndedBy(gone?'offline':'failed',gone?conversationTitle(conversationKey(fp,thread)):text);disconnect();failJoin(text)}
+  if(VOICE_SWITCH){roomRefused=refusedForGood(e);failJoin(joinError('room',e))}
+  else{const message=joinError('room',e),gone=reachFailure?.node===fp;callEndedBy(gone?'offline':'failed',gone?conversationTitle(conversationKey(fp,thread)):message.text);disconnect();failJoin(message)}
  }
  finally{if(epoch===connectEpoch){state.switching=false;moving=false;state.movingTo=null;applyMicState()}}
 }
@@ -1646,7 +1634,7 @@ async function replayReply(historyId){
  // A reply is said again by the call's session: only one of the call's machine can be.
  if(!state.history.some(r=>r.segment===historyId&&conversationOf(r.thread)?.node===state.callNode))return;
  try{await post('/api/presentation/replay',{session_id:state.sessionId,history_id:historyId})}
- catch(error){setRoomError(error.message||'No se pudo volver a reproducir.')}
+ catch(error){setRoomError(roomError(error,'room',bundled('room.failure.replay').text))}
 }
 
 /* ----- call model B: the room always open, the voice a switch (briefs/CALL-MODEL-B-SPEC.md) -----
@@ -1688,14 +1676,14 @@ async function openRoom(){
   state.callNode=fp;syncLinks();
   if(linkBase(fp)==null)return;
   const session=await joinRoom(epoch,{resume:storedTicket(fp)});if(epoch!==connectEpoch||!session)return;
-  if(state.joinFailure)roomStore.patch({joinFailure:''});
+  if(state.joinFailure)roomStore.patch({joinFailure:'',joinFailureDetails:''});
   reachFailure=null;updateMic();
   await refresh();await refreshPeople(fp);
   if(epoch!==connectEpoch)return;
   state.connecting=false;flushOutbox();applyMicState();
   // Open, it goes on to the active conversation if that one is elsewhere (a pick made while it opened).
   followActive();
- }catch(e){if(epoch===connectEpoch){roomRefused=refusedForGood(e);failJoin(joinFailureText('room',e))}}
+ }catch(e){if(epoch===connectEpoch){roomRefused=refusedForGood(e);failJoin(joinError('room',e))}}
  finally{if(epoch===connectEpoch)state.connecting=false}
 }
 /** On the machines' beat, and once the room is open: the session opened when it is not, and on the active conversation
@@ -1725,7 +1713,7 @@ function makeActive(key){
 async function leaveBinding(){
  const binding=state.roomBinding;if(!state.sessionId||!binding?.thread_id||!binding.binding_id)return;
  cancelCurrentInput();
- try{await post('/api/presentation/leave',{session_id:state.sessionId,binding_id:binding.binding_id});await refresh()}catch(e){setRoomError(e.message)}
+ try{await post('/api/presentation/leave',{session_id:state.sessionId,binding_id:binding.binding_id});await refresh()}catch(e){setRoomError(roomError(e))}
  applyMicState();updateComposer();
 }
 /** The voice stops: the microphone and the speaker at once, the system's microphone light out. What it was saying or had
@@ -1775,7 +1763,8 @@ async function setVoice(on,reason=null){
   if(epoch!==voiceEpoch)return;
   ++voiceEpoch;stopVoice('voice_off');
   const code=failureCode(error,'');
-  roomStore.patch({voiceOn:false,voiceStarting:false,voiceOffReason:voiceOffReasonFor(code),voiceOffDetail:voiceErrorText(error)});
+  const words=voiceError(error);
+  roomStore.patch({voiceOn:false,voiceStarting:false,voiceOffReason:voiceOffReasonFor(code),voiceOffDetail:errorLine(words),voiceOffDetails:words.details||''});
   reportClientError({kind:'voice',message:code});
  }
 }
@@ -1818,7 +1807,7 @@ async function hearIt(key){
    roomStore.patch({hearing:{thread:key,state:'no-answer'}});
    hearTimer=setTimeout(()=>{if(state.hearing?.thread===key)setHearing(null)},HEAR_NO_ANSWER_MS);
   },HEAR_WAIT_MS);
- }catch(e){if(state.hearing?.thread===key)setHearing(null);setRoomError(e.message)}
+ }catch(e){if(state.hearing?.thread===key)setHearing(null);setRoomError(roomError(e))}
 }
 /** A reply started to sound: the "Hear it" asking its conversation is answered. */
 function heardStarted(reply){if(state.hearing?.thread===conversationKey(state.callNode,reply.thread_id)&&state.hearing.state==='asking')setHearing(null)}
@@ -1845,7 +1834,7 @@ async function loadVoiceCatalogue(){
   // A model chosen while it was not here yet is put in use once it is.
   if(state.voiceDraft)void applyVoiceSettings();
   void deleteUnusedModels(models,catalogs)}
- catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
+ catch(error){const words=voiceError(error,'models');roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:errorLine(words),details:words.details||''}})}
 }
 // Settings apply as they change (there is no Save): the draft is what was chosen, and what of it is ready is put in use
 // at once; a model still to download waits in the draft, the one in use stays, and it switches once it is ready (the
@@ -1858,7 +1847,7 @@ function editVoice(patch){
 }
 let applying=Promise.resolve();
 function applyVoiceSettings(){
- applying=applying.then(saveVoiceSettings).catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)});
+ applying=applying.then(saveVoiceSettings).catch(error=>{roomStore.patch({settingsError:voiceError(error)})});
  return applying;
 }
 // The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
@@ -1868,7 +1857,7 @@ async function saveVoiceSettings(){
  if(JSON.stringify(next)===JSON.stringify(saved))return;
  const host=await voiceHost().catch(()=>null);
  if(host)await host.setSettings(voiceSettingsHere(next,state.voiceCatalogue.catalogs));
- writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now()});$('settings-error').textContent='';
+ writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now(),settingsError:null});
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
 // one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
@@ -1878,8 +1867,8 @@ async function saveVoiceSettings(){
 let voiceTry=null;
 // Never during a call (A), nor with the voice on (B): the try would take its voice.
 function refuseTryInCall(){
- if(VOICE_SWITCH){if(state.voiceOn||state.voiceStarting)throw Object.assign(Error(voiceErrorText({code:'trial-voice-on'})),{code:'trial-voice-on'});return}
- if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
+ if(VOICE_SWITCH){if(state.voiceOn||state.voiceStarting)throw voiceRefused({code:'trial-voice-on'},'try');return}
+ if(state.ws||state.connecting||state.reconnecting)throw voiceRefused({code:'trial-in-call'},'try');
 }
 async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress,onTake}={}){
  refuseTryInCall();
@@ -1896,7 +1885,7 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
- }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
 }
 let voiceTryFinish=null;
@@ -1920,7 +1909,7 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
   const run=tryEndOfTurn(host,turnTrySettings(),{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};
   await run.done;
- }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(turnTry?.abort===abort)turnTry=null}
 }
 function retuneTurnTry(){
@@ -1944,7 +1933,7 @@ async function installVoiceModel(task){
   const models=await modelCatalogs();
   await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
   roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
- }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,error:voiceErrorText(error)}})}
+ }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,...installFailure(error)}})}
  finally{if(voiceInstall===abort)voiceInstall=null}
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
@@ -1964,7 +1953,7 @@ async function setDeleteUnusedModels(days){
 // Its code stays on what it throws, for the pane to say a model in use as such.
 async function uninstallVoiceModel(model){
  const models=await modelCatalogs();
- try{await models.uninstall(model)}catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ try{await models.uninstall(model)}catch(error){throw voiceRefused(error,'delete')}
  await loadVoiceCatalogue();
 }
 // A key changes what a provider lists: its catalogue is read again with it.
@@ -1995,8 +1984,8 @@ async function connectProviderKey(provider,key){
  if(status?.reason&&KEY_REFUSALS.has(status.reason.code)){if(!had)await saveProviderKey(provider,null);throw refused({...status.reason,detail:status.detail})}
 }
 async function saveProviderKey(provider,key){
- let models;
- try{models=await modelCatalogs();await models.setCredential(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
+ // What the engine refuses goes as it is, its code and a provider's words with it: the dialog says it (ProviderConnect).
+ const models=await modelCatalogs();await models.setCredential(provider,key||null);
  // A key just given is checked with the provider at once, past any list kept from the key before.
  if(key)await models.refresh?.(provider).catch(()=>undefined);
  const catalogs=await models.catalogs().catch(()=>null);
@@ -2015,9 +2004,9 @@ $('settings-open').onclick=()=>{try{
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
  // Empty is Automatic: the system's language, followed as it is rather than kept.
  roomStore.patch({uiLanguage:storedPreferences().ui_language||''});
- $('settings-error').textContent='';
+ roomStore.patch({settingsError:null});
  if(!$('language-settings').open)$('language-settings').showModal();
-}catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
+}catch(e){const words=roomError(e,'settings');roomStore.patch({settingsError:words});setRoomError(words)}};
 // Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
 // (no machine yet) or on an agent waiting to be connected — that section's own page on a phone, not the list of them.
 function settingsSection(name){roomStore.patch({settingsSection:name,settingsLevel:'page'})}
@@ -2089,7 +2078,7 @@ window.sidevoiceActions={
   try{await post('/api/presentation/close',{thread_id:to.thread},to.node)}
   catch(e){
    // The room does not know it (it was closed elsewhere, or the room restarted): only this page remembered it.
-   if(!/No se encuentra/.test(e.message||'')){setRoomError(e.message);throw e}
+   if(!/No se encuentra/.test(e.message||'')){setRoomError(roomError(e));throw e}
    forgetThread(key)
   }
   if(to.node===state.callNode)await refresh();await refreshPeople(to.node);await refreshHistory(to.node)
@@ -2233,7 +2222,7 @@ function checkIdle(){
  const quiet=Date.now()-lastPersonSignal;
  if(quiet>=IDLE_MS){
   idleWarned=false;callEndedBy('idle','');disconnect();
-  failJoin('Saliste de la llamada: '+Math.round(IDLE_MS/60000)+' minutos sin señales tuyas. Pulsa para volver a entrar.');
+  failJoin(bundled('room.failure.idle',{minutes:Math.round(IDLE_MS/60000)}));
   return;
  }
  if(!idleWarned&&quiet>=IDLE_MS-IDLE_WARN_MS){

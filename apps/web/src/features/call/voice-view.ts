@@ -57,14 +57,14 @@ export function voiceMicReason(facts: SessionFacts, rows: ParticipantView[], t: 
 /** The line above the bar in call model B (§2.7): the voice getting ready, a move to another machine, the room being
  *  reconnected past its grace, the room's refusal, or the standing note of no machine to talk to. Never "joining the
  *  room": the room opens by itself. Why the voice failed is the switch's note, not this. */
-export function voiceJoinLine(facts: SessionFacts, rows: ParticipantView[], t: CallTranslate): { text: string; state: "busy" | "note" | "failed" } | null {
+export function voiceJoinLine(facts: SessionFacts, rows: ParticipantView[], t: CallTranslate): { text: string; state: "busy" | "note" | "failed"; details?: string } | null {
   if (facts.voiceStarting) {
     const step = t("voice.step.preparing");
     return { text: facts.joinProgress != null ? t("voice.step.progress", { step, percent: Math.round(facts.joinProgress) }) : step, state: "busy" };
   }
   if (facts.movingTo) return { text: t("room.switching", { title: titleOf(facts.movingTo, rows) }), state: "busy" };
   if (facts.reconnectShown) return { text: t("room.reconnecting"), state: "busy" };
-  if (facts.joinFailure) return { text: facts.joinFailure, state: "failed" };
+  if (facts.joinFailure) return { text: facts.joinFailure, state: "failed", ...(facts.joinFailureDetails ? { details: facts.joinFailureDetails } : {}) };
   const note = !facts.ws && !facts.connecting ? reachNote(facts) : "";
   return note ? { text: note, state: "note" } : null;
 }

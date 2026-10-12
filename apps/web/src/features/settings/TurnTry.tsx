@@ -2,11 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Row } from "../../components/ui/Card";
+import { ErrorText } from "../../components/ui/ErrorText";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { useModelState } from "./ModelSetup";
 import { seconds } from "./try-time";
 import { TryTake } from "./TryTake";
 import { hostTranslator } from "./host-i18n";
+import { voiceFailure, type ErrorMessage } from "./error-message";
 import type { HostMessageKey } from "./messages/en";
 import type { TurnStep } from "../../services/voice-trial.js";
 import type { DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
@@ -48,7 +50,8 @@ export type TurnTrial = {
   turn: { text: string; silenceMs: number | null } | null;
   /** What a notice says for its moment: a turn that did not count, or the new setting listening. */
   notice: "not-a-turn" | "changed" | null;
-  error: string;
+  /** Why it failed, as people read it (error-message.ts). */
+  error: ErrorMessage | null;
   /** Once it has stopped: its take, where the voice hands one (gap #40). */
   take: VoiceTake | null;
   /** The last message read out, and how many have been: the same one again is read again. */
@@ -56,7 +59,7 @@ export type TurnTrial = {
   told: number;
 };
 
-export const TURN_IDLE: TurnTrial = { phase: "idle", attempt: 0, turn: null, notice: null, error: "", take: null, said: null, told: 0 };
+export const TURN_IDLE: TurnTrial = { phase: "idle", attempt: 0, turn: null, notice: null, error: null, take: null, said: null, told: 0 };
 
 const say = (trial: TurnTrial, said: Said) => ({ said, told: trial.told + 1 });
 
@@ -120,14 +123,14 @@ export function useTurnTry({ active, smartBlocked }: { active: boolean; smartBlo
         onTake: (take) => update((trial) => ({ ...trial, take })),
       });
     } catch (error) {
-      const { code, message } = error as { code?: string; message: string };
+      const { code } = error as { code?: string };
       update((trial) => code === "trial-cancelled" && decided && trial.turn
         ? { ...trial, phase: "done", notice: null, ...say(trial, { key: trial.turn.silenceMs == null ? "turnTry.detectedNow" : "turnTry.detected", ms: trial.turn.silenceMs }) }
         : code === "trial-cancelled"
         // Stopped: the last turn stays, once it has its words.
         ? { ...trial, phase: "idle", notice: null, turn: trial.turn?.text ? trial.turn : null, ...say(trial, { key: blockedNow.current ? "turnTry.smartBlocked" : "wizard.trial.cancelled" }) }
         : code === "trial-silence" ? { ...trial, phase: "quiet", notice: null, turn: null, ...say(trial, { key: "turnTry.quiet" }) }
-        : { ...trial, phase: "failed", notice: null, turn: null, error: message });
+        : { ...trial, phase: "failed", notice: null, turn: null, error: voiceFailure(error, { what: "try" }) });
     } finally {
       level.publish(0);
     }
@@ -184,7 +187,7 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
     <p className="model-try-hint">{t("turnTry.hint")}</p>
     {!setup && <p className="model-try-hint">{t("turnTry.draft")}</p>}
   </div>;
-  const failure = trial.phase === "failed" ? <p className="stage-try-error" role="alert">{trial.error}</p> : null;
+  const failure = trial.phase === "failed" && trial.error ? <ErrorText className="stage-try-error" role="alert" message={trial.error} /> : null;
   const take = !running && trial.take ? <TryTake key={trial.attempt} take={trial.take} id="turn-try-take" t={t} /> : null;
   const button = handle && !tried ? null : <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
     {running ? t("try.stop") : t(trial.attempt ? "turnTry.again" : "turnTry.try")}

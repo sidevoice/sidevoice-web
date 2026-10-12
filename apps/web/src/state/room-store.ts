@@ -22,7 +22,8 @@ export function useRoomStore<T>(selector: (state: RoomViewState) => T): T {
 export function installRoomBridge(store: RoomStore) {
   window.sidevoiceUI = {
     store,
-    setBootError: (bootError) => store.patch({ bootError }),
+    // A sentence already worded for people, or a failure as error-message.ts words it.
+    setBootError: (value) => store.patch({ bootError: !value ? null : typeof value === "string" ? { text: value } : value }),
     micLevel: createMicLevelChannel(),
     caption: createCaptionChannel(),
   };

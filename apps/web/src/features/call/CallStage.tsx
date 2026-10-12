@@ -22,6 +22,7 @@ import { StageHearIt } from "./HearIt";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
 import { Tooltip } from "../../components/ui/Tooltip";
+import { errorLine } from "../settings/error-message";
 
 /** A harness by its product name, for the badge's tooltip; one not known, as it is reported. */
 function harnessName(id: string | null | undefined) {
@@ -73,11 +74,11 @@ function PersonTurn({ conversation, t }: { conversation: ConversationView; t: Ca
   );
 }
 
-/** The room's errors, above the stage (#error is the runtime's id). The box stays in the page so what appears in it is
- *  read out at once. */
+/** The room's errors, above the stage (#error is the runtime's id), as people read them: what was raw about one is
+ *  behind its Details. The box stays in the page so what appears in it is read out at once. */
 function BootError() {
   const error = useRoomStore((state) => state.bootError);
-  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={error} />}</div>;
+  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={errorLine(error)} details={error.details} />}</div>;
 }
 
 function posterWords(t: CallTranslate): PosterWords {

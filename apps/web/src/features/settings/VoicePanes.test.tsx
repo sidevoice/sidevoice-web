@@ -130,8 +130,12 @@ test("while it downloads the card shows how far it has got, and the download can
   fireEvent.click(document.getElementById("tts-model-cancel")!);
   expect(actions.cancelVoiceInstall).toHaveBeenCalled();
   cleanup();
-  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceInstall: { task: "tts", model: "piper-es", state: "failed", fraction: null, error: "The download failed." } });
-  expect(screen.getByRole("alert")).toHaveTextContent("The download failed.");
+  renderPane({ voiceSettings: withVoiceModel("piper-es"), voiceInstall: { task: "tts", model: "piper-es", state: "failed", fraction: null,
+    error: "The model could not be downloaded. Check the connection and try again.", details: "download-failed" } });
+  const alert = screen.getByRole("alert");
+  expect(alert.querySelector(".ui-alert-body")).toHaveTextContent(/^The model could not be downloaded\. Check the connection and try again\.$/);
+  // What the engine said is behind Details, closed.
+  expect(alert.querySelector("details:not([open]) > pre")).toHaveTextContent("download-failed");
 });
 
 test("once it is here its voices appear, and it can be tried without saving; a provider's model needs no download", async () => {
@@ -224,6 +228,12 @@ test("the transcription try is one steady layout: the button and the level first
   expect(head().querySelector(".voice-wave canvas")).toBeInTheDocument();
   expect(head()).toContainElement(document.getElementById("stt-try"));
   expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
+  // A failure with no words here: the generic line, never what it said, which is behind Details.
+  actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("format model whisper-q5 unsupported"), { code: "wasm-trap" }));
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  const failed = within(document.getElementById("stt-try-block")!).getByRole("alert");
+  expect(failed.querySelector("p")).toHaveTextContent(/^Something went wrong with the try\.$/);
+  expect(failed.querySelector("details > pre")!.textContent).toBe("wasm-trap\nformat model whisper-q5 unsupported");
 });
 
 test("the model's load is said after the try's time only when it had to load (from 1 s), on its line", async () => {

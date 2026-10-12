@@ -1,6 +1,7 @@
 import type { LocalHostBridge, LocalHostBridgeError, LocalHostStatus, LocalHostStatusName } from "../../services/desktop-host";
 import { localHostBridge } from "../../services/desktop-host";
 import type { HostMessageKey } from "./messages/en";
+import { errorMessage, type ErrorMessage } from "./error-message";
 
 export type HostTranslate = (key: HostMessageKey, params?: Record<string, string | number>) => string;
 
@@ -124,11 +125,13 @@ const INSTALL_CHECKS: Record<string, HostMessageKey> = {
   "archive-type": "localInstall.check.archiveType",
 };
 
-export function localHostBridgeErrorText(error: LocalHostBridgeError, t: HostTranslate) {
-  const key = INSTALL_CAUSES[error.key] ?? "localInstall.error.unknown";
+/** A failure of this computer's setup or update, in words (error-message.ts): its cause's sentence, else the setup's own
+ *  generic line, the key behind Details. */
+export function localHostBridgeError(error: LocalHostBridgeError, t: HostTranslate): ErrorMessage {
   const checkKey = typeof error.params?.check === "string" ? INSTALL_CHECKS[error.params.check] : undefined;
   const check = checkKey ? t(checkKey) : t("localInstall.error.verificationCheck");
-  return t(key, { check });
+  return errorMessage({ key: error.key }, { t, generic: t("localInstall.error.unknown"),
+    known: (code) => INSTALL_CAUSES[code] ? t(INSTALL_CAUSES[code], { check }) : null });
 }
 
 export function hostCause(status: LocalHostStatus, t: HostTranslate) {

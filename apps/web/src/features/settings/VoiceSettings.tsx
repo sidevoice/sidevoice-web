@@ -10,7 +10,7 @@ import { voiceChoices, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceV
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
-import { ProviderKeyNeeded } from "./ProviderConnect";
+import { PROVIDER_SAYS, ProviderKeyNeeded, reasonState } from "./ProviderConnect";
 import { NewMark } from "../highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
@@ -39,15 +39,18 @@ function languageName(tag: string) {
 /** A family as people read it: its id with a capital ("whisper" → "Whisper"); families are products' own names. */
 const familyName = (family: string) => family.charAt(0).toUpperCase() + family.slice(1);
 
-/** What the pane says about a choice, in words: its message, why a model does not run here, a provider's own words. */
+/** What the pane says about a choice, in words: its message, why a model does not run here, a catalogue's reason by its
+ *  code, and a provider's own words after a reason that is the provider answering. */
 function noteText(t: HostTranslate, note: Note | null | undefined) {
   if (!note) return "";
   const reasons = note.reasons?.map((code) => t(("voice.unfit." + code) as HostMessageKey)).join("; ");
-  const code = note.key === "voice.catalog.reason" ? note.params?.code : null;
+  const code = note.key === "voice.catalog.reason" ? String(note.params?.code ?? "") : "";
+  const state = code ? reasonState(code) : null;
   const text = code === "credential-missing" ? t("voice.catalog.noKey")
     : code === "storage-blocked" ? t("storage.blocked")
+    : state && state !== "problem" && state !== "connected" ? t(("voice.catalog.why." + state) as HostMessageKey)
     : t(note.key as HostMessageKey, { ...note.params, ...(reasons ? { reasons } : {}) });
-  return note.detail ? text + " — " + note.detail : text;
+  return note.detail && state && PROVIDER_SAYS.has(state) ? text + " — " + note.detail : text;
 }
 
 type Source = { id: string; local: boolean; name: string | null; disabled: boolean; note: Note | null };
@@ -177,7 +180,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       </Row>
       {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={() => keyKept(remote.name ?? remote.id)} />}
       <Row label={t("voice.model")} block>
-        <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
+        <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure} errorDetails={model.failureDetails}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
           runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
           onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />
@@ -257,7 +260,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry, turn
           options={[{ value: "smart-turn", label: t("voice.endOfTurn.smart"), disabled: !choices.endOfTurn.smartTurn }, { value: "silence", label: t("voice.endOfTurn.silence") }]} />
       </Row>
       {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
-        <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
+        <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure} errorDetails={turn.failureDetails}
           pickers={(locked) => <Field label={t("voice.model")}>
             {/* Just the models: one today, more later; no families, sizes or runtime here. */}
             <Select id="turn-model" value={turn.model!.id} disabled={locked} onValueChange={(model) => edit({ turn_model: model })}
@@ -301,7 +304,7 @@ export function SlotPane({ task }: { task: Task }) {
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   return <>
     {!catalogueShown(catalogue) && (catalogue.state === "loading" || catalogue.state === "idle") ? <p className="muted" role="status">{t("voice.loading")}</p> : null}
-    {catalogue.state === "failed" ? <Alert tone="danger" title={catalogue.error} action={<Button id={task + "-catalogue-retry"} size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /> : null}
+    {catalogue.state === "failed" ? <Alert tone="danger" title={catalogue.error} details={catalogue.details} action={<Button id={task + "-catalogue-retry"} size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /> : null}
     {catalogueShown(catalogue) && draft ? (task === "stt" ? <TranscriptionChoices draft={draft} /> : <SpeechChoices draft={draft} />) : null}
   </>;
 }

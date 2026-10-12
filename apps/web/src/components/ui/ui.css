@@ -137,6 +137,13 @@
 .ui-alert[data-tone="positive"] { background: var(--sv-positive-soft); border-color: color-mix(in srgb, var(--sv-positive) 30%, transparent); }
 .ui-alert[data-tone="positive"] > svg { color: var(--sv-positive); }
 
+/* ----- A failure's sentence, and what was raw about it closed behind "Details" (ErrorText.tsx). */
+.ui-error-text > p { margin: 0; }
+.ui-error-said { color: var(--sv-text-muted); }
+.ui-error-details { margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
+.ui-error-details > summary { width: fit-content; cursor: pointer; border-radius: var(--sv-radius-sm); }
+.ui-error-details > pre { margin: var(--sv-space-1) 0 0; max-height: 8rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sv-text-muted); }
+
 /* ----- Tabs (views of one thing) and Segmented (one value of a few). */
 .ui-tabs { display: flex; gap: var(--sv-space-1); min-width: 0; overflow-x: auto; border-bottom: 1px solid var(--sv-border); scrollbar-width: none; }
 .ui-tab {

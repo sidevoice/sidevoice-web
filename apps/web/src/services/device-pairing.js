@@ -57,10 +57,11 @@ export function base64ToBytes(text) {
 export function utf8(text) { return new TextEncoder().encode(text); }
 function webCrypto(subtle) {
     const found = subtle ?? globalThis.crypto?.subtle;
-    if (!found) throw Error(NO_WEBCRYPTO);
+    if (!found) throw Object.assign(Error(NO_WEBCRYPTO), { code: 'no-webcrypto' });
     return found;
 }
-export function pairingError(message) { const error = Error(message); error.pairing = true; return error; }
+/** Why a code was not redeemed: its stable `code` (what the pairing screen says it by) and a sentence for the log. */
+export function pairingError(message, code = message) { const error = Error(message); error.pairing = true; error.code = code; return error; }
 function httpUrl(value) {
     if (typeof value !== 'string') return null;
     try {
@@ -121,36 +122,36 @@ const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y 
  *  sentence it was sent in: the `SV1.` token is found either way. */
 function readPairingCode(code) {
     const raw = String(code ?? ''), compact = raw.replace(/\s+/g, '');
-    if (!compact) throw pairingError('Pega el código que te dio la máquina.');
+    if (!compact) throw pairingError('Pega el código que te dio la máquina.', 'code-empty');
     const text = /^SV1\.[A-Za-z0-9_-]+$/.test(compact) ? compact : raw.match(/SV1\.[A-Za-z0-9_-]+/)?.[0];
-    if (!text) throw pairingError('Eso no es un código de emparejamiento de Sidevoice: empieza por «SV1.».');
+    if (!text) throw pairingError('Eso no es un código de emparejamiento de Sidevoice: empieza por «SV1.».', 'code-invalid');
     let payload;
     try { payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(base64ToBytes(text.slice(PAIRING_CODE_PREFIX.length)))); }
-    catch { throw pairingError(DAMAGED); }
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw pairingError(DAMAGED);
-    if (payload.v !== 1) throw pairingError('Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.');
+    catch { throw pairingError(DAMAGED, 'code-damaged'); }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw pairingError(DAMAGED, 'code-damaged');
+    if (payload.v !== 1) throw pairingError('Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.', 'code-version');
     const { fp, host, urls, rv, secret, exp } = payload;
     const urlList = Array.isArray(urls) ? urls.map(httpUrl) : null;
     const room = rv === null ? null : rv && typeof rv === 'object' && typeof rv.node === 'string' && rv.node ? { url: httpUrl(rv.url), node: rv.node } : undefined;
     if (typeof fp !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(fp) || !(host === null || typeof host === 'string') ||
         !urlList || urlList.includes(null) || room === undefined || (room && !room.url) ||
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
-        throw pairingError(DAMAGED);
+        throw pairingError(DAMAGED, 'code-damaged');
     return { fp, host, urls: urlList, room, secret, exp };
 }
 const EXPIRED = 'Este código ya caducó: duran 10 minutos. Pide uno nuevo.';
 /** What a pasted code says, or why it cannot be used, in one sentence the person can act on. */
 export function decodePairingCode(code, now = Date.now(), { address = null } = {}) {
     const { fp, host, urls: urlList, room, secret, exp } = readPairingCode(code);
-    if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
+    if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.', 'code-no-address');
     // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
     // left with none cannot be used from here.
     const secureUrls = urlList.filter(url => secureBase(url)), secureRoom = room && secureBase(room.url) ? room : null;
-    if (!secureUrls.length && !secureRoom && !address) throw pairingError(PLAINTEXT);
+    if (!secureUrls.length && !secureRoom && !address) throw pairingError(PLAINTEXT, 'code-plaintext');
     // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
     // address is probed.
-    if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
-    if (exp * 1000 <= now) throw pairingError(EXPIRED);
+    if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED, 'code-damaged');
+    if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
     return { v: 1, fp, host: host || null, urls: secureUrls, rv: secureRoom, secret, exp };
 }
 /** What a code says as it is pasted, before anything is sent anywhere: whose it is (`host`), until when (`exp`, in
@@ -160,8 +161,8 @@ export function decodePairingCode(code, now = Date.now(), { address = null } = {
  *  cannot be used wherever its machine is. */
 export function previewPairingCode(code, now = Date.now()) {
     const { host, urls, room, exp } = readPairingCode(code);
-    if (urls.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
-    if (exp * 1000 <= now) throw pairingError(EXPIRED);
+    if (urls.length > MAX_CODE_URLS) throw pairingError(DAMAGED, 'code-damaged');
+    if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
     const away = urls.map(url => new URL(url)).filter(url => !LOOPBACK.has(url.hostname));
     return {
         host: host || null, exp,
@@ -270,21 +271,21 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
         if (privateAddress && /^https:/.test(origin || globalThis.location?.origin || '')) throw pairingError(PAIRING_HTTP_BLOCKED);
         if (await answersPlainHttp(secureTyped, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
     }
-    if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.');
+    if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');
     let response, answer = null;
     try {
         // Never redirected: a 307 would hand the secret, in the body, to wherever it pointed.
         response = await get(place.base + '/api/device/pair', { method: 'POST', headers: { 'Content-Type': 'application/json', accept: 'application/json' },
             body: JSON.stringify({ secret: payload.secret, name: clampDeviceName(name || '') || deviceName() }), cache: 'no-store', redirect: 'error' });
-    } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.'); }
+    } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.', 'unreachable'); }
     try { answer = await response.json(); } catch { /* no body */ }
-    if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.');
+    if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.', 'code-spent');
     const node = answer?.node;
     if (!response.ok || typeof answer?.token !== 'string' || typeof answer?.device_id !== 'string' || typeof node?.public_key !== 'string')
-        throw pairingError(answer?.detail || 'La máquina no aceptó el emparejamiento. Vuelve a intentarlo.');
+        throw pairingError(answer?.detail || 'La máquina no aceptó el emparejamiento. Vuelve a intentarlo.', 'pair-refused');
     let fp = null;
     try { fp = await fingerprintOf(base64ToBytes(node.public_key), crypto); } catch { /* not a key */ }
-    if (fp !== payload.fp) throw pairingError('La máquina que respondió no es la del código. No se ha guardado nada.');
+    if (fp !== payload.fp) throw pairingError('La máquina que respondió no es la del código. No se ha guardado nada.', 'identity-mismatch');
     return {
         pairing: { fp, public_key: node.public_key, host: node.host || payload.host, urls: payload.urls, rv: payload.rv,
             device_id: answer.device_id, token: answer.token, paired_at: Math.floor(now / 1000), ...(payload.insecure ? { insecure: true } : {}) },

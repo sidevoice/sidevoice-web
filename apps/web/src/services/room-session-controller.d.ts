@@ -19,7 +19,8 @@ declare global {
     sidevoiceSessionId?: () => string | null;
     sidevoiceUI?: {
       store?: import("../state/room-store").RoomStore;
-      setBootError(value: string | null): void;
+      /** The room's error above the stage: a sentence worded for people, or a failure as error-message.ts words it. */
+      setBootError(value: string | import("../components/ui/ErrorText").ErrorMessage | null): void;
       /** The microphone's level as the meter measures it (state/mic-level.ts). */
       micLevel?: import("../state/mic-level").MicLevelChannel;
       /** The words being said, for the floating call card (state/card-caption.ts). */

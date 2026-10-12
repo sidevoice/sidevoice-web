@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
+import { ErrorText } from "../../components/ui/ErrorText";
 import { Field } from "../../components/ui/Field";
 import { Select } from "../../components/ui/Select";
 import { ChevronIcon, CloseIcon, RefreshIcon } from "../../components/ui/Icons";
@@ -8,6 +9,7 @@ import { MicWave } from "./CallIndicators";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import type { CallMessageKey } from "./messages/en";
 import { useVoiceSwitch } from "../../state/call-model";
+import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
 
 /* The microphone and the speaker, as the old call bar had them: a chevron joined to the microphone's button opens a
  * bar above the call's controls with a Microphone select, a Speaker select and a refresh. The voice says what there is
@@ -33,13 +35,15 @@ function deviceName(label: string, index: number, kind: "mic" | "speaker", t: Ca
   return label || t(kind === "mic" ? "devices.unnamedMic" : "devices.unnamedSpeaker", { n: index + 1 });
 }
 
-function errorText(error: unknown, t: CallTranslate) {
-  const code = (error as { code?: string } | null)?.code ?? "";
+/** Why a device could not be chosen: the microphone's and the speaker's own reasons in this list's words; anything else
+ *  as the voice says it (error-message.ts), else this list's generic line, what it said behind Details. */
+function devicesError(error: unknown, t: CallTranslate): ErrorMessage {
   const known: Record<string, CallMessageKey> = {
     "microphone-denied": "devices.error.micDenied", "microphone-unavailable": "devices.error.micUnavailable",
     "audio-output-unselectable": "devices.error.outputUnselectable", "audio-output-failed": "devices.error.outputFailed",
   };
-  return known[code] ? t(known[code]) : t("devices.error.other");
+  const key = known[failureParts(error).code];
+  return key ? { text: t(key) } : errorMessage(error, { generic: t("devices.error.other") });
 }
 
 export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boolean; onClose(): void }) {
@@ -51,7 +55,7 @@ export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boole
   const lost = useRoomStore((state) => (voiceSwitch ? null : state.facts.audioLost));
   const store = useContext(RoomStoreContext);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorMessage | null>(null);
   // Opened, it reads the list again (a device plugged in since).
   useEffect(() => { if (open) void window.sidevoiceActions?.refreshAudioDevices?.(); }, [open]);
   useEffect(() => {
@@ -63,14 +67,14 @@ export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boole
   }, [open, onClose]);
   if (!open) return null;
   const choose = async (choice: { input?: string | null; output?: string | null }) => {
-    setBusy(true); setError("");
+    setBusy(true); setError(null);
     try { await window.sidevoiceActions?.setAudioDevices?.(choice); }
-    catch (failure) { setError(errorText(failure, t)); }
+    catch (failure) { setError(devicesError(failure, t)); }
     finally { setBusy(false); }
   };
   const refresh = async () => {
-    setBusy(true); setError("");
-    try { await window.sidevoiceActions?.refreshAudioDevices?.(); } catch (failure) { setError(errorText(failure, t)); }
+    setBusy(true); setError(null);
+    try { await window.sidevoiceActions?.refreshAudioDevices?.(); } catch (failure) { setError(devicesError(failure, t)); }
     finally { setBusy(false); }
   };
   const dismissLost = () => store?.patch({ audioLost: null });
@@ -94,7 +98,7 @@ export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boole
         {t(lost.input && lost.output ? "devices.lostBoth" : lost.input ? "devices.lostInput" : "devices.lostOutput")}
         <Button variant="ghost" tone="neutral" size="sm" onClick={dismissLost}>{t("devices.gotIt")}</Button>
       </p>}
-      {error && <p className="audio-devices-error" role="alert">{error}</p>}
+      {error && <ErrorText className="audio-devices-error" role="alert" message={error} />}
     </div>
   );
 }

@@ -30,7 +30,8 @@ export function Field({ label, hint, error, aside, className, children }: FieldP
       </div>
       <div className="ui-field-control">
         {control}
-        {error && <p className="ui-field-error" id={id + "-error"}><WarningIcon />{error}</p>}
+        {/* A block: a failure's Details (ErrorText.tsx) may be part of what it says. */}
+        {error && <div className="ui-field-error" id={id + "-error"}><WarningIcon />{error}</div>}
         {hint && <p className="ui-field-hint" id={id + "-hint"}>{hint}</p>}
       </div>
     </div>

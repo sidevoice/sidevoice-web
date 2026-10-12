@@ -4,6 +4,7 @@ import { act } from "react";
 import { PairingDialog } from "./PairingDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
+import { PAIRING_HTTP_BLOCKED, PAIRING_HTTP_ONLY, PAIRING_HTTP_PRIVATE, pairingError } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -132,7 +133,7 @@ test("a spent code says so, with the command that prints another; what was paste
   const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   try {
-    const { element } = dialog(vi.fn().mockRejectedValue(new Error("Unknown, used or expired pairing code.")));
+    const { element } = dialog(vi.fn().mockRejectedValue(pairingError("Unknown, used or expired pairing code.", "code-spent")));
     const pasted = pairingCode();
     paste(pasted);
     await connect();
@@ -149,8 +150,24 @@ test("a spent code says so, with the command that prints another; what was paste
   }
 });
 
+test("a machine that refuses the pairing says so in words, its own sentence only behind Details; any other failure is the generic line", async () => {
+  const refused = "The pairing secret is invalid.";
+  const pairDevice = vi.fn().mockRejectedValue(pairingError(refused, "pair-refused"));
+  dialog(pairDevice);
+  paste(pairingCode());
+  await connect();
+  const alert = screen.getByRole("alert");
+  expect(alert.querySelector(".ui-alert-title")).toHaveTextContent("The machine did not accept the pairing. Try again.");
+  expect(alert.querySelector(".ui-alert-title")).not.toHaveTextContent(refused);
+  expect(alert.querySelector("details:not([open]) > pre")).toHaveTextContent(refused);
+  pairDevice.mockRejectedValue(new TypeError("format model is not a function"));
+  await connect();
+  expect(screen.getByRole("alert").querySelector(".ui-alert-title")).toHaveTextContent("Something went wrong with the pairing.");
+  expect(screen.getByRole("alert").querySelector("details > pre")).toHaveTextContent("TypeError format model is not a function");
+});
+
 test("a machine its code's addresses don't reach is asked for by its address, the focus staying on Connect", async () => {
-  const pairDevice = vi.fn().mockRejectedValue(new Error("No se pudo llegar a «nuc»: ni directamente ni a través de la sala."));
+  const pairDevice = vi.fn().mockRejectedValue(pairingError("No se pudo llegar a «nuc»: ni directamente ni a través de la sala.", "unreachable"));
   dialog(pairDevice);
   const pasted = pairingCode();
   paste(pasted);
@@ -192,7 +209,7 @@ test("a code that doesn't say where its machine is needs its address; one it lis
 });
 
 test("a machine that answers only without encryption: refused at a public address, out of a secure page's reach", async () => {
-  const pairDevice = vi.fn().mockRejectedValue(new Error("pairing-http-only"));
+  const pairDevice = vi.fn().mockRejectedValue(pairingError(PAIRING_HTTP_ONLY));
   dialog(pairDevice);
   paste(pairingCode());
   fireEvent.click(screen.getByRole("button", { name: "Use a different address" }));
@@ -201,7 +218,7 @@ test("a machine that answers only without encryption: refused at a public addres
   await connect();
   expect(screen.getByRole("alert")).toHaveTextContent("“nuc” only answers without encryption, at a public address. Put an HTTPS proxy or tunnel in front of that machine, then get a new code.");
   expect(screen.getByRole("alert")).toHaveAttribute("data-tone", "danger");
-  pairDevice.mockRejectedValue(new Error("pairing-http-blocked"));
+  pairDevice.mockRejectedValue(pairingError(PAIRING_HTTP_BLOCKED));
   await connect();
   expect(screen.getByRole("alert")).toHaveTextContent("This machine only answers without encryption, which a secure page can't reach. Pair from the Sidevoice desktop app, or put an HTTPS proxy or tunnel in front of that machine.");
   expect(screen.getByRole("alert")).toHaveAttribute("data-tone", "warning");
@@ -210,7 +227,7 @@ test("a machine that answers only without encryption: refused at a public addres
 
 test("a machine on a private network that answers only without encryption is reached so once the person agrees", async () => {
   let finish!: (value: unknown) => void;
-  const pairDevice = vi.fn().mockRejectedValueOnce(new Error("pairing-http-private")).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  const pairDevice = vi.fn().mockRejectedValueOnce(pairingError(PAIRING_HTTP_PRIVATE)).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   dialog(pairDevice);
   const pasted = pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] });
   paste(pasted);
@@ -241,7 +258,7 @@ test("a machine on a private network that answers only without encryption is rea
 });
 
 test("agreeing holds for that code and address only, Connect and Enter never go without encryption, and a failure replaces the warning", async () => {
-  const pairDevice = vi.fn().mockRejectedValue(new Error("pairing-http-private"));
+  const pairDevice = vi.fn().mockRejectedValue(pairingError(PAIRING_HTTP_PRIVATE));
   dialog(pairDevice);
   paste(pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] }));
   await connect();
@@ -259,7 +276,7 @@ test("agreeing holds for that code and address only, Connect and Enter never go 
   expect(document.querySelector(".pairing-consent")).toBeNull();
   // Agreed to, and failing: what failed replaces the warning, and the focus goes back to Connect.
   await connect();
-  pairDevice.mockRejectedValueOnce(new Error("No se pudo llegar a «other» para emparejar. Vuelve a intentarlo."));
+  pairDevice.mockRejectedValueOnce(pairingError("No se pudo llegar a «other» para emparejar. Vuelve a intentarlo.", "unreachable"));
   await act(async () => { screen.getByRole("button", { name: "Connect without encryption" }).click(); });
   expect(pairDevice).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), "192.168.1.21:8768", { insecure: true });
   expect(document.querySelector(".pairing-consent")).toBeNull();

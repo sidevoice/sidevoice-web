@@ -1,15 +1,17 @@
-/* What a refusal says to a person. The room refuses with {key, message, ...params}: its message is already in the
- * call's language, so it is said as it comes; a key this page words itself is looked up first. */
-/** Keys this page words itself. */
-export const REFUSALS={
- host_unreachable:()=>'No se pudo contactar con la máquina.',
-};
-/** A refusal (an object with a key, an Error carrying one, or plain text) as the sentence to show. */
-export function refusalText(refusal,fallback=''){
+/* A refusal of the room or a machine, as a failure this page words (features/settings/error-message.ts `roomFailure`).
+ * The room refuses with {key, message, ...params} (a socket's error frame, its admission); a machine's HTTP refusal is
+ * {"detail": <sentence>}, a sentence with no key. The key is what this page says it by; the sentence, in whatever
+ * language it came, is only ever a detail. */
+/**
+ * A refusal (an object with a key, an Error carrying one, or plain text) as an Error with its `key` and its sentence.
+ * @param {unknown} refusal
+ * @returns {Error & {key?: string}}
+ */
+export function refusalError(refusal){
  if(refusal&&typeof refusal==='object'){
-  const say=typeof refusal.key==='string'&&REFUSALS[refusal.key];
-  if(say)return say(refusal);
-  if(refusal.message)return String(refusal.message);
+  const {key,message,error,reason}=/** @type {{key?: unknown, message?: unknown, error?: unknown, reason?: unknown}} */ (refusal);
+  const named=typeof key==='string'&&key?key:typeof reason==='string'&&reason?reason:'';
+  return Object.assign(new Error(String(message||error||'')),named?{key:named}:{});
  }
- return typeof refusal==='string'&&refusal?refusal:fallback;
+ return new Error(typeof refusal==='string'?refusal:'');
 }
