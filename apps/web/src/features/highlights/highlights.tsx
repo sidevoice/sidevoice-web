@@ -14,7 +14,8 @@ import "./highlights.css";
  * when resolved. Seeing the thing clears it (half of it in view for a second), and the dots above it go once nothing
  * new is under them; it also goes on its own two weeks after it was first shown. At most three show at once, the rest
  * waiting their turn. Each "New" also has a × to clear it without looking, for as long as it shows. What was seen is
- * this device's.
+ * this device's. A setting is new only while it is on the page (Settings keeps every section rendered): one not there
+ * (Language, before a transcription model is ready) shows no dot anywhere until it appears — nothing to hunt for.
  *
  * Today: agents a machine found and Sidevoice could connect, and — where What's new shows as dots (VARIANTS
  * `whats-new`) — the settings a release added. */
@@ -47,16 +48,35 @@ function write(next: Seen) {
 }
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); };
 
+/** The "New" marks on the page now, by id (each NewMark says so while mounted, shown or not), and who listens. */
+const present = new Map<string, number>();
+let presentVersion = 0;
+const presentListeners = new Set<() => void>();
+const subscribePresent = (listener: () => void) => { presentListeners.add(listener); return () => presentListeners.delete(listener); };
+const presentNow = () => presentVersion;
+function announce(id: string) {
+  present.set(id, (present.get(id) ?? 0) + 1);
+  presentVersion++;
+  for (const listener of [...presentListeners]) listener();
+  return () => {
+    const left = (present.get(id) ?? 1) - 1;
+    if (left) present.set(id, left); else present.delete(id);
+    presentVersion++;
+    for (const listener of [...presentListeners]) listener();
+  };
+}
+
 /** Everything new now, before the record says what was seen or is past its time. */
 function useCandidates(): Highlight[] {
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const pairings = useRoomStore((state) => state.facts.pairings);
   const dots = useWhatsNewPlace() === "dots";
   const features = useWhatsNew().items;
+  useSyncExternalStore(subscribePresent, presentNow, presentNow);
   const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
   const agents = Object.entries(hostAgents).filter(([fp, listing]) => active.has(fp) && !!listing.value)
     .flatMap(([fp, listing]) => (listing.value?.agents ?? []).filter(actionableAgent).map((agent) => ({ id: `agent:${fp}:${agent.id}`, section: "machines", machine: fp })));
-  return [...agents, ...(dots ? features.map((feature) => ({ id: `feature:${feature.id}`, section: feature.section })) : [])];
+  return [...agents, ...(dots ? features.filter((feature) => present.has(`feature:${feature.id}`)).map((feature) => ({ id: `feature:${feature.id}`, section: feature.section })) : [])];
 }
 
 /** What shows as new now: not seen, not past its two weeks, at most three. Each is recorded as shown the first time. */
@@ -98,6 +118,7 @@ export function NewMark({ id }: { id: string }) {
   const [showing, setShowing] = useState(isNew);
   if (isNew && !showing) setShowing(true);
   const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => announce(id), [id]);
   // Seen by looking, it stays in view until this view goes; cleared by its ×, it goes at once.
   const dismiss = () => { clear(); setShowing(false); };
   const clear = () => {
