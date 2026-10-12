@@ -7,9 +7,8 @@ import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../serv
 import type { HostTranslate } from "./host-i18n";
 import type { PrepareStatus } from "./ModelPrepare";
 import { MAX_TAKE_MS } from "../../services/voice-trial.js";
-import { useVariant } from "../../lib/variants";
 import { Textarea } from "../../components/ui/Input";
-import { EditIcon, PlayIcon, StopIcon } from "../../components/ui/Icons";
+import { EditIcon } from "../../components/ui/Icons";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { wordEnd } from "../conversation/KaraokeText";
 import { readingMoves, readingPosition, readOn, type Reading } from "../call/speech-chunks";
@@ -158,10 +157,6 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
 /** A try as it is offered: `start` runs it; for the voice, `sentence` is what it says, edited in the try itself. */
 export type VoiceTry = ReturnType<typeof useVoiceTry> & { start(): void; sentence?: string; setSentence?(sentence: string): void };
 
-/** How the voice's try looks once started (VARIANTS `voice-try`): one row, Play and the sentence inline (`row`), or a
- *  small player — the sentence quoted with Edit, a big Play/Stop, how quick under it (`player`). */
-export const VOICE_TRY = ["row", "player"] as const;
-
 /** The first-run setup's try, shown in the slot's block: its first one started from the setup's footer, `tried`
  *  already (then the block offers it again), a line before it (`hint`), and the sentence to hear, to edit (`sample`). */
 /** The setup's try: `inBody`, offered in the model's card from the start (as in Settings), not only once tried. */
@@ -201,8 +196,6 @@ const AGAIN = { stt: "try.speakAgain", tts: "try.listenAgain" } as const;
 export function TryButton({ task, handle, id, offered = true, again = false, t }: { task: Task; handle: VoiceTry; id: string; offered?: boolean; again?: boolean; t: HostTranslate }) {
   const running = handle.trial.phase === "running";
   if (!offered) return null;
-  // The voice's try, once started, is played from its own Play beside its sentence.
-  if (task === "tts" && handle.setSentence && handle.trial.phase !== "idle") return null;
   return <Button size="sm" id={id} onClick={running ? handle.finish : handle.start}>
     {running ? t("try.stop") : t(again || handle.trial.phase !== "idle" ? AGAIN[task] : FIRST[task])}
   </Button>;
@@ -285,39 +278,6 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
   </>;
 }
 
-/** The voice's try once started: the sentence it says, editable to hear something else, and Play (Stop while it
- *  plays), in one of two looks (VOICE_TRY). What it is doing and how quick it was follow, as for any try. */
-function VoiceTryPlayer({ handle, t }: { handle: VoiceTry; t: HostTranslate }) {
-  const look = useVariant("voice-try", VOICE_TRY);
-  const [editing, setEditing] = useState(false);
-  const { trial } = handle;
-  const running = trial.phase === "running";
-  const text = handle.sentence ?? "";
-  const play = <Button size={look === "player" ? "lg" : "sm"} variant={look === "player" ? "primary" : "secondary"} id="tts-play"
-    className={look === "player" ? "voice-try-play-big" : undefined} disabled={!running && !text.trim()}
-    aria-label={running ? t("try.stop") : t("voiceTry.play")} onClick={running ? handle.finish : handle.start}>
-    {running ? <StopIcon /> : <PlayIcon />}{look === "row" && (running ? t("try.stop") : t("voiceTry.play"))}
-  </Button>;
-  const field = <Textarea id="tts-sentence" className="voice-try-text" minRows={1} maxRows={4} maxLength={200} value={text} readOnly={running}
-    aria-label={t("voiceTry.sentence")} onChange={(event) => handle.setSentence?.(event.target.value)} />;
-  if (look === "row") return <div className="voice-try" data-look="row">
-    <div className="voice-try-row">{play}{field}</div>
-    <TryBody task="tts" handle={handle} quote={false} t={t} />
-  </div>;
-  return <div className="voice-try" data-look="player">
-    <div className="voice-try-quote">
-      {editing && !running ? field
-        // Lit as it plays, and after while it is still the sentence played; edited since, the sentence as it is now.
-        : running || (trial.phase === "done" && trial.said === text.trim()) ? <TrySentence key={trial.attempt} text={trial.said || text} range={trial.range} sounding={running && trial.live} done={!running} />
-        : <q className="voice-try-said">{text}</q>}
-      {!running && <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t(editing ? "voiceTry.done" : "voiceTry.edit")} title={t(editing ? "voiceTry.done" : "voiceTry.edit")}
-        aria-pressed={editing} onClick={() => setEditing(!editing)}><EditIcon /></Button>}
-    </div>
-    <div className="voice-try-controls">{play}</div>
-    <TryBody task="tts" handle={handle} quote={false} t={t} />
-  </div>;
-}
-
 /** The transcription try, one layout that never jumps. Its first row: the try's button and, beside it, the microphone's
  *  level, always there — flat until it listens, moving while it does. Its second, of a fixed height: while it listens,
  *  what to do and the take's length filling to its longest; once done, in its place, what was heard and how quick; or
@@ -350,19 +310,54 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
   </div>;
 }
 
+/** The voice's try, laid out as the transcription's. Its first row: the try's button and, beside it, the voice's level —
+ *  always there, flat while silent, moving while it speaks (the voice gives no output level: it follows the playing,
+ *  not a measure of it). Its second, of a fixed height: the sentence it says, editable (its pencil, or a click on it)
+ *  while it does not speak, lit as it is heard; under it, getting ready, then how quick its first sound was, or why it
+ *  failed. Play says what is there. */
+function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: HostTranslate }) {
+  const [editing, setEditing] = useState(false);
+  const { trial } = handle;
+  const running = trial.phase === "running";
+  const sounding = running && trial.live;
+  const text = handle.sentence ?? "";
+  const started = useRef(0);
+  if (sounding && !started.current) started.current = performance.now();
+  if (!sounding) started.current = 0;
+  const moving = () => sounding ? 0.35 + 0.3 * Math.abs(Math.sin((performance.now() - started.current) / 140)) : 0;
+  const lit = running || (trial.phase === "done" && trial.said === text.trim());
+  return <div className="model-try tts-try" id="tts-try-panel" data-phase={trial.phase}>
+    <div className="stt-try-head">
+      {button}
+      <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={moving} /></span>
+    </div>
+    <div className="stt-try-area tts-try-area">
+      <div className="tts-try-sentence">
+        {editing && !running
+          ? <Textarea id="tts-sentence" className="voice-try-text" minRows={1} maxRows={3} maxLength={200} value={text} autoFocus
+              aria-label={t("voiceTry.sentence")} onChange={(event) => handle.setSentence?.(event.target.value)} onBlur={() => setEditing(false)} />
+          : lit ? <TrySentence key={trial.attempt} text={trial.said || text} range={trial.range} sounding={sounding} done={!running} />
+          : <button type="button" className="tts-try-said" aria-label={t("voiceTry.edit")} onClick={() => setEditing(true)}>{text}</button>}
+        {!running && !editing && <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("voiceTry.edit")} title={t("voiceTry.edit")}
+          onClick={() => setEditing(true)}><EditIcon /></Button>}
+      </div>
+      <div className="model-try-live" aria-live="polite">
+        {trial.phase === "idle" && hint && <p className="model-try-hint">{hint}</p>}
+        {running && !trial.live && <p className="model-try-state"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>}
+        {trial.phase === "done" && trial.timings && <TryTiming task="tts" timings={trial.timings} t={t} />}
+        {trial.phase === "failed" && <p className="stage-try-error" role="alert">{trial.error}</p>}
+      </div>
+    </div>
+  </div>;
+}
+
 /** What a try shows in a ready model's block, under its state: all of it. `hint`: a line before any try (the first-run
  *  setup's); `sample`: the sentence to hear, edited in the block. */
 export function TryPanel({ task, handle, model, hint, sample, button, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; button?: ReactNode; t: HostTranslate }) {
   const { trial } = handle;
   const idle = trial.phase === "idle";
   if (task === "stt") return <SttTry handle={handle} hint={hint} button={button} t={t} />;
-  // The voice's sentence shows once its try starts, with its own Play there (VoiceTryPlayer); not before.
-  if (task === "tts" && handle.setSentence) {
-    return <div className="model-try" id={task + "-try-panel"} data-phase={trial.phase} data-empty={(idle && !hint) || undefined}>
-      {idle && hint && <p className="model-try-hint">{hint}</p>}
-      {!idle && <VoiceTryPlayer handle={handle} t={t} />}
-    </div>;
-  }
+  if (handle.setSentence) return <TtsTry handle={handle} hint={hint} button={button} t={t} />;
   return <div className="model-try" id={task + "-try-panel"} data-phase={trial.phase} data-empty={(idle && !hint && !sample) || undefined}>
     {idle && hint && <p className="model-try-hint">{hint}</p>}
     <TryBody task={task} handle={handle} sample={sample} t={t} />

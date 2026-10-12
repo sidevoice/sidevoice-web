@@ -152,7 +152,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: tryLanguage }),
     ...(task === "tts" ? { sentence, setSentence } : {}) });
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried || !!setupTry.inBody} again={setupTry?.tried} t={t} />;
-  const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={task === "stt" ? tryButton : undefined} t={t} />;
+  const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
   // A key kept from here: said, and the focus on the slot's source (its box, found in this slot's group: the setup and
@@ -194,8 +194,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       {/* The try, last, after all of the slot's settings: the same place and the same block as End of turn's. */}
       {model.ready && handle && <Row label={t(task === "stt" ? "try.title.stt" : "try.title.tts")} block>
         <div className="turn-try turn-try-card" id={task + "-try-block"}>
-          {/* The transcription try lays out its own button, beside the microphone's level (SttTry). */}
-          {task === "tts" && tryButton && <div className="turn-try-main"><span />{tryButton}</div>}
+          {/* Each try lays out its own button, beside its level (SttTry, TtsTry). */}
           {tryPanel}
         </div>
       </Row>}

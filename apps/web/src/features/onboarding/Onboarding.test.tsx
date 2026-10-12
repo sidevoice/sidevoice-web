@@ -186,33 +186,33 @@ function pendingTry() {
   return running;
 }
 
-test("the voice's try is all in its block — its sentence and Play shown once started, edited there, then how quick and Play again", async () => {
+test("the voice's try is all in its block — its sentence shown and editable before it, lit while it speaks, then how quick and Play again", async () => {
   const store = room();
   paired(store);
   await act(async () => { fireEvent.click(stageAction()); });
   expect(title()).toHaveTextContent("Set up voice");
-  // Before the try, no sentence and no Play: the footer's try starts it.
-  expect(tryBlock("tts").querySelector("#tts-sentence")).toBeNull();
-  expect(tryBlock("tts").querySelector("#tts-play")).toBeNull();
+  // Before the try: the sentence, editable, and the level's bars; the footer's try starts it.
+  expect(tryBlock("tts").querySelector("button.tts-try-said")).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(tryBlock("tts").querySelector(".stt-try-head .voice-wave canvas")).toBeInTheDocument();
   expect(tryBlock("tts").querySelector("#wizard-sample")).toBeNull();
   const running = pendingTry();
   await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies.", keep: true }));
   expect(tryBlock("tts")).toHaveTextContent("Getting ready…");
-  // Playing: the sentence beside Play, not editable while it plays; the block's own Play is Stop.
+  // Playing: the sentence lit as heard, not editable; the footer's is the one Stop.
   act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
-  expect(tryBlock("tts").querySelector("#tts-sentence")).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
-  expect(tryBlock("tts").querySelector("#tts-sentence")).toHaveAttribute("readonly");
-  expect(tryBlock("tts").querySelector("#tts-play")).toHaveAccessibleName("Stop");
+  expect(tryBlock("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hi!$/);
+  expect(tryBlock("tts").querySelector("#tts-sentence, button.tts-try-said")).toBeNull();
   expect(tryBlock("tts").querySelector("#wizard-try-again")).toBeNull();
   await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
-  expect(tryBlock("tts").querySelector("#tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
-  expect(tryBlock("tts").querySelector("#tts-play")).toHaveAccessibleName("Play");
+  expect(tryBlock("tts").querySelector(".tts-try-area #tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
+  expect(tryBlock("tts").querySelector(".stt-try-head #wizard-try-again")).toHaveTextContent(/^Play again$/);
   expect(stageAction()).toHaveTextContent(/^Continue$/);
-  // The sentence edited there is what Play says next.
+  // The sentence edited there (its pencil: the one played stays lit) is what Play again says next.
+  fireEvent.click(within(tryBlock("tts") as HTMLElement).getByRole("button", { name: "Edit the sentence" }));
   fireEvent.change(tryBlock("tts").querySelector("#tts-sentence")!, { target: { value: "Hola, qué tal." } });
   const again = pendingTry();
-  await act(async () => { fireEvent.click(tryBlock("tts").querySelector("#tts-play")!); });
+  await act(async () => { fireEvent.click(tryBlock("tts").querySelector("#wizard-try-again")!); });
   expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
   await act(async () => { again.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
 });

@@ -119,7 +119,7 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
     if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue();
     window.sidevoiceActions?.editVoice({});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // The voice's sentence is the try's own: shown, and editable, once the try starts (VoiceTryPlayer).
+  // The voice's sentence is the try's own, shown and editable in it (TtsTry).
   const trial: SetupTry = stage;
   return <section className="wizard-stage-step">
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
