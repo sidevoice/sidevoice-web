@@ -15,9 +15,10 @@ export function LocalHostBanner() {
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const selected = machines.find((machine) => machine.inUse) ?? null;
+  // Every machine is live at once: this computer not answering is worth a banner when nothing else answers either.
   const onlyLocalMachine = !!local && machines.every((machine) => machine.local);
-  if (!local || status.reachable === true || (!local.inUse && !onlyLocalMachine && selected)) return null;
+  const otherAnswering = machines.some((machine) => !machine.local && machine.state === "connected");
+  if (!local || status.reachable === true || (!onlyLocalMachine && otherAnswering)) return null;
   const action: LocalHostAction | null = status.state === "incompatible" ? null : status.state === "stopped-by-person" ? "start"
     : status.state === "not-installed" ? "serviceInstall"
       : status.state === "refused" ? "reconnect" : "restart";

@@ -317,50 +317,37 @@ function validPairing(p) {
     return !!p && typeof p === 'object' && typeof p.fp === 'string' && typeof p.token === 'string' && typeof p.public_key === 'string' &&
         typeof p.device_id === 'string' && Array.isArray(p.urls) && (p.rv === null || (p.rv && typeof p.rv.url === 'string' && typeof p.rv.node === 'string'));
 }
-/** Several pairings, one in use: `{inUse, list}`, newest first. What storage cannot give back is no pairing. */
+/** Several pairings, every one of them live: `{list}`, newest first. What storage cannot give back is no pairing. */
 export function readPairings(storage) {
     return projectPairings(readPairingState(storage), null);
 }
-/** Stored pairings never contain the desktop-owned local host. Keep its selected fingerprint long enough to
- *  project that host before validating `in_use` (the pointer may name it). */
+/** Stored pairings never contain the desktop-owned local host: the bridge projects it (`projectPairings`). */
 export function readPairingState(storage) {
     try {
         const stored = JSON.parse(storage?.getItem(PAIRINGS_KEY) || 'null');
-        const list = Array.isArray(stored?.pairings) ? stored.pairings.filter(validPairing) : [];
-        return { inUse: typeof stored?.in_use === 'string' ? stored.in_use : null, list };
-    } catch { return { inUse: null, list: [] }; }
+        return { list: Array.isArray(stored?.pairings) ? stored.pairings.filter(validPairing) : [] };
+    } catch { return { list: [] }; }
 }
-/** The desktop's verified local pairing wins over a stale code pairing with the same fingerprint. */
+/** The desktop's verified local pairing wins over a stale code pairing with the same fingerprint, and comes first. */
 export function projectPairings(stored, localPairing) {
     const fp = localPairing?.local ? localPairing.fp : null;
     const remote = (stored?.list || []).filter(p => !p.local && p.fp !== fp);
-    const list = localPairing?.local ? [localPairing, ...remote] : remote;
-    const inUse = list.some(p => p.fp === stored?.inUse) ? stored.inUse : list[0]?.fp ?? null;
-    return { inUse, list };
+    return { list: localPairing?.local ? [localPairing, ...remote] : remote };
 }
 export function writePairings(storage, pairings) {
-    try { storage.setItem(PAIRINGS_KEY, JSON.stringify({ in_use: pairings.inUse, pairings: pairings.list.filter(p => !p.local) })); return true; }
+    try { storage.setItem(PAIRINGS_KEY, JSON.stringify({ pairings: pairings.list.filter(p => !p.local) })); return true; }
     catch { return false; }
 }
-/** A new pairing replaces any older one with the same node, and becomes the one in use unless told not to. */
-export function withPairing(pairings, pairing, { use = true } = {}) {
-    const list = [pairing, ...pairings.list.filter(p => p.fp !== pairing.fp)];
-    return { inUse: use || !pairings.inUse ? pairing.fp : pairings.inUse, list };
+/** A new pairing replaces any older one with the same node. */
+export function withPairing(pairings, pairing) {
+    return { list: [pairing, ...pairings.list.filter(p => p.fp !== pairing.fp)] };
 }
-/** Forgetting the one in use hands the use to the newest one left, if any. */
 export function withoutPairing(pairings, fp) {
-    const list = pairings.list.filter(p => p.fp !== fp);
-    return { inUse: pairings.inUse === fp || !list.some(p => p.fp === pairings.inUse) ? list[0]?.fp ?? null : pairings.inUse, list };
-}
-export function usingPairing(pairings, fp) {
-    return pairings.list.some(p => p.fp === fp) ? { ...pairings, inUse: fp } : pairings;
+    return { list: pairings.list.filter(p => p.fp !== fp) };
 }
 /** The node said this token is no longer one of its devices: kept, saying so, until the person pairs again or forgets it. */
 export function revokedPairing(pairings, fp) {
     return { ...pairings, list: pairings.list.map(p => p.fp === fp ? { ...p, revoked: true } : p) };
-}
-export function pairingInUse(pairings) {
-    return pairings.list.find(p => p.fp === pairings.inUse) || null;
 }
 /** A pairing as the interface may see it: everything but the token. */
 export function pairingSummary(p) {

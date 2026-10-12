@@ -26,7 +26,7 @@ test("the call bar says what the session facts say, and asks the runtime to act"
   // In a call with no conversation selected there is nobody to speak to: the microphone is off and says why.
   act(() => { store.patch({ ws: {}, micEnabled: true, roomBinding: null }); });
   expect(screen.getByRole("button", { name: "Elige una conversación para hablar" })).toBeDisabled();
-  act(() => { store.patch({ ws: {}, micEnabled: false, roomBinding: { thread_id: "a", binding_id: "b" } }); });
+  act(() => { store.patch({ ws: {}, micEnabled: false, callNode: "n", roomBinding: { thread_id: "a", binding_id: "b" } }); });
   expect(mute()).toHaveAttribute("aria-label", "Activar micrófono");
   expect(mute()).toHaveAttribute("aria-pressed", "true");
   expect(document.getElementById("mic-control")).toHaveAttribute("data-muted", "true");

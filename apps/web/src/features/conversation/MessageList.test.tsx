@@ -85,7 +85,6 @@ test("keeps the active transcribed draft cancellable after listening text disapp
     toggleCall: vi.fn().mockResolvedValue(undefined),
     selectParticipant: vi.fn(),
     closeParticipant: vi.fn(),
-    chooseMachine: vi.fn(),
     forgetMachine: vi.fn(),
     pairDevice: vi.fn(),
     openPairing: vi.fn(),

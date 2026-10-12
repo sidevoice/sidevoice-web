@@ -2,12 +2,12 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),asse
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null,localHost=null,localHostSelected=false,indexedDB=null,outboxScope=null}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-recognition','stats-response'])elements.set(id,new Element(id))}
- const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
+ const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // The outbox's storage across reloads, and this tab's scope in it.
@@ -31,7 +31,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const loaded=imports(source,sourceRoot+'/services');
  vm.runInContext('"use strict";\n'+loaded,context);
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
- if(paired)vm.runInContext("nodeBase='';verified.set('',Date.now());roomStore.patch({node:pairings.inUse,nodeReach:'ok'})",context);
+ // Paired: the first machine proved itself at the page's own origin, and the call is on it.
+ if(paired)vm.runInContext("verified.set('',Date.now());callNode=pairings.list[0]?.fp??null;if(callNode){const link=linkOf(callNode);link.base='';link.reach='ok';link.via='node';publishLinks()}",context);
  vm.runInContext("roomBinding={thread_id:'a',title:'A'};sessionId='s'",context);
  // An event dispatched to the document, as one bubbles up from `target`: every listener there hears it.
  const dispatch=(name,event)=>Promise.all((documentHandlers[name]||[]).map(fn=>fn({preventDefault(){},...event})));
@@ -63,23 +64,24 @@ test('The controller publishes serializable snapshots through the React store br
   setLanguageModels:value=>snapshots.languageModels=value,
   setBootError:value=>snapshots.bootError=value
  };
- s.run("add('assistant','Hola','voice:1','a');markHistorySeen();people=[{thread_id:'a',title:'Agente',available:true}];rosterSignature=''");
+ s.run("add('assistant','Hola','voice:1','fp-mac|a');markHistorySeen();people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true}];rosterSignature=''");
  assert.equal(snapshots.conversation.messages[0].text,'Hola');
- assert.equal(snapshots.conversation.messages[0].thread,'a');
- assert.equal(snapshots.participants[0].threadId,'a');
+ assert.equal(snapshots.conversation.messages[0].thread,'fp-mac|a','a conversation is its machine and its thread');
+ assert.equal(snapshots.participants[0].threadId,'fp-mac|a');
+ assert.equal(snapshots.participants[0].machine,'macbook','grouped under the paired machine, as this device names it');
  assert.equal(snapshots.participants[0].selected,true);
  assert.match(snapshots.participants[0].activityNote,/No sabemos/,'an undeclared capability remains unknown');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported'}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported'}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/no informa/,'unsupported is explained explicitly');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported'}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported'}}];rosterSignature=''");
  assert.equal(snapshots.participants[0].activityNote,null,'supported activity needs no warning');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported',deliver:'supported',experimental:['deliver']}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported',deliver:'supported',experimental:['deliver']}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/Entrega experimental/,'an experimental delivery is said');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported',deliver:'supported',sessionIdentity:'supported',experimental:['deliver','sessionIdentity']}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported',deliver:'supported',sessionIdentity:'supported',experimental:['deliver','sessionIdentity']}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/Identificación experimental/,'an experimental identity is said too');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,harness:'cursor',route:'cursor-editor-view'}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,harness:'cursor',route:'cursor-editor-view'}];rosterSignature=''");
  assert.equal(snapshots.participants[0].harness,'cursor'); assert.equal(snapshots.participants[0].route,'tarjeta (experimental)');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,harness:'cursor'}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,harness:'cursor'}];rosterSignature=''");
  assert.equal(snapshots.participants[0].route,null,'a room that does not say the route leaves the harness name alone');
  assert.equal(s.run("setRoomError('fallo')"),undefined);
  assert.equal(snapshots.bootError,'fallo');
@@ -116,13 +118,17 @@ test('Delivery tick is immediate, follows the matching receipt and does not impl
  assert.equal(s.run('history[0].delivery'),'delivered');
 });
 test('A joined empty room selects its only listening conversation automatically',async()=>{
- const s=setup();s.run("roomBinding=null;ws={};people=[{thread_id:'only',available:true,reach:{state:'listening'}}];closedThreads=[];var chosen=null;select=async id=>{chosen=id}");
+ const s=setup();s.run("roomBinding=null;ws={};people=[{node:'fp-mac',thread_id:'only',available:true,reach:{state:'listening'}}];closedThreads=[];var chosen=null;select=async id=>{chosen=id}");
  assert.equal(await s.run('selectOnlyListeningConversation()'),true);
- assert.equal(s.run('chosen'),'only');
+ assert.equal(s.run('chosen'),'fp-mac|only','by its key: the machine the call is on, and the thread');
  // With several and none remembered, the first in the list: joining always lands somewhere (2026-09-26).
- s.run("people.unshift({thread_id:'first',available:true,reach:{state:'listening'}});chosen=null");
+ s.run("people.unshift({node:'fp-mac',thread_id:'first',available:true,reach:{state:'listening'}});chosen=null");
  assert.equal(await s.run('selectOnlyListeningConversation()'),true);
- assert.equal(s.run('chosen'),'first');
+ assert.equal(s.run('chosen'),'fp-mac|first');
+ // Another machine's conversation is not where a join on this one lands: moving the call is the person's pick.
+ s.run("people=[{node:'fp-pc',thread_id:'there',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'here',available:true,reach:{state:'listening'}}];chosen=null");
+ assert.equal(await s.run('selectOnlyListeningConversation()'),true);
+ assert.equal(s.run('chosen'),'fp-mac|here');
  // With none, the list opens by itself, once per call.
  const opened=[];s.context.Event=class{constructor(type){this.type=type}};s.context.window.dispatchEvent=event=>{opened.push(event.type);return true};
  s.run("people=[];chosen=null;sessionId='call-1'");
@@ -163,11 +169,11 @@ test('A delivery receipt never fabricates a typing or working indicator',()=>{
 test('Background history arrives without changing focus and has an unread badge',async()=>{
  const s=setup();s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'old:voice:reply',thread:'b',role:'assistant',text:'Listo B',name:'B',time:1,seq:5,status:'text_only'}]})});
  await s.run('refreshHistory()');
- assert.equal(s.run('targetId()'),'a');assert.equal(s.run("SessionState.unreadCount(state,'b')"),1);
+ assert.equal(s.run('targetId()'),'fp-mac|a');assert.equal(s.run("SessionState.unreadCount(state,'fp-mac|b')"),1);
  assert.equal(s.run("history[0].text"),'Listo B');
- s.run("viewedThread='b';markHistorySeen()");
- assert.equal(s.run("SessionState.unreadCount(state,'b')"),0);
- assert.equal(s.run('targetId()'),'a');
+ s.run("viewedThread='fp-mac|b';markHistorySeen()");
+ assert.equal(s.run("SessionState.unreadCount(state,'fp-mac|b')"),0);
+ assert.equal(s.run('targetId()'),'fp-mac|a');
  await s.run('refreshHistory()');assert.equal(s.run('history.length'),1);
 });
 
@@ -231,7 +237,7 @@ test('Microphone preference can be toggled before joining',()=>{
  assert.equal(s.run('SessionState.micView(state).pressed'),false);
 });
 test('The call socket follows the page scheme and host',()=>{
- const s=setup();assert.equal(s.run('roomSocketUrl()'),'wss://room.example/api/presentation/ws');
+ const s=setup();assert.equal(s.run('roomSocketUrl(callNode)'),'wss://room.example/api/presentation/ws');
 });
 test('The screen is left to the device unless keeping it on was chosen',async()=>{
  const s=setup();let requests=0;
@@ -421,7 +427,7 @@ test('Aggregates keep one row per stage, named as the last-turn view names them'
 test('Copying the aggregates puts a plain-text table on the clipboard and says so',async()=>{
  const s=setup();const copied=[];
  s.context.navigator={clipboard:{writeText:async text=>{copied.push(text)}}};
- s.run("people=[{thread_id:'a',title:'Claude'},{thread_id:'b',title:'Astra'}]");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Claude'},{node:'fp-mac',thread_id:'b',title:'Astra'}]");
  s.run(`renderLatencyStats({replies:[
  {thread_id:'a',reply_revision:1,input_ms:{endpoint_silence_ms:600},server_ms:{input_queued_to_reply_received_ms:3000}},
  {thread_id:'b',reply_revision:2,server_ms:{input_queued_to_reply_received_ms:21000}}
@@ -454,12 +460,12 @@ test('Selecting a conversation is this tab\'s own choice: it names the session, 
  s.context.fetch=async(path,init)=>{posted.push([path,init?.body?JSON.parse(init.body):null]);
   if(path.includes('/select'))return {ok:true,json:async()=>({status:'activated',binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'}})};
   return {ok:true,json:async()=>({binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'},room:{revision:1},clients:[],call:null})}};
- s.run("sessionId='sess-1';ws={readyState:1};roomBinding=null;people=[{thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'}},{thread_id:'t-2',title:'Dos',available:true,reach:{state:'listening'}}]");
- await s.run('select')('t-1');
+ s.run("sessionId='sess-1';ws={readyState:1};roomBinding=null;people=[{node:'fp-mac',thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'t-2',title:'Dos',available:true,reach:{state:'listening'}}]");
+ await s.run('select')('fp-mac|t-1');
  const select=posted.find(([path])=>path.endsWith('/api/presentation/select'));
- assert.deepEqual(select[1],{thread_id:'t-1',session_id:'sess-1'},'the room is told which browser chose');
- assert.equal(store['sidevoice.selected'],'t-1','remembered for this tab only');
- assert.equal(s.run('rememberedThread')(),'t-1');
+ assert.deepEqual(select[1],{thread_id:'t-1',session_id:'sess-1'},'the room is told which browser chose, by its own name for the thread');
+ assert.equal(store['sidevoice.selected'],'fp-mac|t-1','remembered for this tab only, with its machine');
+ assert.equal(s.run('rememberedThread')(),'fp-mac|t-1');
  // A new socket for this tab (reload, reconnect) goes back to the same conversation and never picks another.
  posted.length=0;s.run("roomBinding=null;sessionId='sess-2'");
  assert.equal(await s.run('reselectRemembered')(),true);
@@ -616,7 +622,7 @@ function network({at={},target=null,roomSays=null,refuse=false}={}){
   if(path.startsWith('/api/device/identity?nonce='))return reply(200,{fingerprint:node.fp,public_key:node.public_key,host:node.host,signature:await node.sign(decodeURIComponent(path.split('nonce=')[1]))});
   if(path==='/api/device/pair'){const body=JSON.parse(init.body);if(body.secret!=='fresh')return reply(403,{detail:'Código de emparejamiento desconocido, usado o caducado.'});node.tokens.add('tok-new');return reply(200,{device_id:'dev-9',token:'tok-new',node:{fingerprint:node.fp,public_key:node.public_key,host:node.host}})}
   if(refuse||!node.tokens.has(String(auth).replace('Bearer ','')))return reply(401,{detail:'Dispositivo no emparejado con esta máquina.'});
-  return reply(200,{binding:null,participants:[],messages:[],room:{revision:0},clients:[],call:null});
+  return reply(200,{binding:null,participants:node.people||[],messages:node.messages||[],room:{revision:0},clients:[],call:null});
  };
  return {get,asked};
 }
@@ -631,70 +637,63 @@ function socketsOf(s){
 }
 const stored=s=>JSON.parse(s.saved['sidevoice.pairings']||'null');
 
-test('The machine in use is reached at the first of its addresses that proves it is that machine, and the token goes nowhere else',async()=>{
+test('A machine is reached at the first of its addresses that proves it is that machine, and the token goes nowhere else',async()=>{
  const node=await fakeNode(),squatter=await fakeNode('squatter');node.tokens.add('tok-1');
- const s=setup({paired:false,stored:{in_use:node.fp,pairings:[pairingOf(node)]}});
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node)]}});s.context.__fp=node.fp;s.run('callNode=__fp');
  // The loopback URL answers as someone else; the machine is behind its room.
  const net=network({at:{'http://127.0.0.1:8768':squatter,'https://room.example/nodes/mac':node}});s.context.fetch=net.get;
- await s.run('locate({move:true,fresh:true})');
- assert.equal(s.run('nodeBase'),'https://room.example/nodes/mac');
- assert.equal(s.run('state.rendezvous'),'room');
+ await s.run('locate(__fp,{move:true,fresh:true})');
+ assert.equal(s.run('linkBase(__fp)'),'https://room.example/nodes/mac');
+ assert.equal(s.run('state.machineLinks[__fp].via'),'room');
  assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
  assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
  await s.run('refresh()');
  assert.ok(net.asked.some(r=>r.url==='https://room.example/nodes/mac/api/presentation?session_id=s'&&r.auth==='Bearer tok-1'));
  assert.equal(net.asked.filter(r=>r.url.startsWith('http://127.0.0.1')&&r.auth).length,0,'nothing carrying the token went to the address that could not prove itself');
  // Within a few minutes a proven address is not asked to prove itself again.
- net.asked.length=0;await s.run('locate()');
+ net.asked.length=0;await s.run('locate(__fp)');
  assert.equal(net.asked.length,0);
  // Once the machine answers directly, a fresh look prefers it: the contract's order, not the fastest.
  const direct=network({at:{'http://127.0.0.1:8768':node,'https://room.example/nodes/mac':node}});s.context.fetch=direct.get;
- await s.run('locate({move:true,fresh:true})');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:8768');
+ await s.run('locate(__fp,{move:true,fresh:true})');
+ assert.equal(s.run('linkBase(__fp)'),'http://127.0.0.1:8768');
  assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
  assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
 });
 
-test('The native local pairing is projected before selection validation and uses only its per-launch proxy',async()=>{
+test('The native local pairing is one more machine, listed first, and uses only its per-launch proxy',async()=>{
  const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
- const s=setup({paired:false,stored:{in_use:'fp-local',pairings:[PAIRED]},localHost:bridge}),asked=[];
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge}),asked=[];
  s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return {ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
  await new Promise(resolve=>setTimeout(resolve,10));
  const snapshot=s.run('roomStore.getState()');
- assert.equal(snapshot.facts.pairingInUse,'fp-local');
  assert.equal(snapshot.facts.machinesReady,true);
- assert.equal(snapshot.facts.nodeReach,'ok');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
+ assert.equal(snapshot.facts.machineLinks['fp-local'].reach,'ok');
+ assert.equal(s.run("linkBase('fp-local')"),'http://127.0.0.1:43127');
  assert.equal(JSON.stringify(snapshot.machines.map(machine=>[machine.id,machine.local])),JSON.stringify([['local-host',true],[PAIRED.fp,false]]));
  assert.equal(asked.some(([url])=>url.startsWith('http://127.0.0.1:43127/')&&url.includes('/api/device/identity?nonce=')),false,'native already verified the local identity over its peer-checked socket');
  assert.ok(asked.every(([url,options])=>!options.headers?.Authorization||url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy; other paired hosts may receive unauthenticated identity probes');
  const saved=JSON.parse(s.saved['sidevoice.pairings']);
- assert.equal(saved.in_use,'fp-local');
+ assert.equal('in_use' in saved,false,'no machine is "the one in use"');
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
  assert.equal(JSON.stringify(saved).includes('local-session-secret'),false,'the proxy credential never reaches page storage');
 });
 
-test('A local row survives reload with no native pairing or stored local fingerprint',async()=>{
+test('A local row survives reload with no native pairing',async()=>{
  const status={state:'backoff',reachable:false,attempts:3,limit:8};
  const bridge={state:()=>status,subscribe:()=>()=>{},pairing:()=>null};
- const s=setup({paired:false,stored:{in_use:'@sidevoice/local-host',pairings:[PAIRED]},localHost:bridge,localHostSelected:true});
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
  await new Promise(resolve=>setTimeout(resolve,10));
  const snapshot=s.run('roomStore.getState()'),local=snapshot.machines.find(machine=>machine.local);
  assert.ok(local,'the native failure still projects a local machine row');
  assert.equal(local.id,'local-host');
- assert.equal(local.inUse,true);
- assert.equal(local.selectable,false);
- assert.equal(snapshot.facts.localHostSelected,true);
- assert.equal(snapshot.facts.pairingInUse,'@sidevoice/local-host');
- assert.equal(s.run('nodeBase'),null);
- assert.equal(snapshot.facts.nodeReach,'away');
+ assert.equal(local.state,'offline');
+ assert.equal(local.pairingId,undefined,'with no pairing to route through');
  assert.equal(JSON.stringify(local).includes('127.0.0.1'),false);
  assert.equal(JSON.stringify(local).includes('local-session-secret'),false);
  const saved=JSON.parse(s.saved['sidevoice.pairings']);
- assert.equal(saved.in_use,'@sidevoice/local-host');
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
- assert.equal(s.saved['sidevoice.local-host-selected'],'true');
 });
 
 test('A native status event that wins the initial state read still completes machine readiness',async()=>{
@@ -718,12 +717,12 @@ test('A lost local pairing clears its per-launch locator and a reachable non-run
  const nextLocal={...oldLocal,token:'new-launch-secret',urls:['http://127.0.0.1:43218']};
  let status={state:'running',reachable:true,installed:true,service:'launchd'},pairing=oldLocal,onStatus=()=>{},pendingPairing=null;
  const bridge={state:()=>status,subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>pendingPairing||pairing};
- const s=setup({paired:false,stored:{in_use:'fp-local',pairings:[]},localHost:bridge});
+ const s=setup({paired:false,stored:{pairings:[]},localHost:bridge});
  const asked=[];
  s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return{ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
  await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
- assert.equal(s.run('state.nodeReach'),'ok');
+ assert.equal(s.run("linkBase('fp-local')"),'http://127.0.0.1:43127');
+ assert.equal(s.run("state.machineLinks['fp-local'].reach"),'ok');
 
  let resolveStalePairing;
  pendingPairing=new Promise(resolve=>{resolveStalePairing=resolve});
@@ -733,12 +732,10 @@ test('A lost local pairing clears its per-launch locator and a reachable non-run
  resolveStalePairing(oldLocal);
  await new Promise(resolve=>setTimeout(resolve,0));
  let snapshot=s.run('roomStore.getState()');
- assert.equal(s.run('nodeBase'),null,'the per-launch proxy is cleared as soon as reachability is lost');
- assert.equal(snapshot.facts.node,null);
- assert.equal(snapshot.facts.nodeReach,'away');
+ assert.equal(s.run("linkBase('fp-local')"),null,'the per-launch proxy is cleared as soon as reachability is lost');
+ assert.equal(snapshot.facts.machineLinks['fp-local'].reach,'away','its conversations stay listed, unreachable');
  assert.equal(snapshot.machines[0].id,'local-host');
- assert.equal(snapshot.machines[0].inUse,true);
- assert.equal(snapshot.machines[0].selectable,false);
+ assert.equal(snapshot.machines[0].state,'offline');
  assert.equal(JSON.stringify(snapshot).includes('old-launch-secret'),false);
  assert.equal(JSON.stringify(snapshot).includes('127.0.0.1:43127'),false);
  assert.equal(JSON.stringify(JSON.parse(s.saved['sidevoice.pairings'])).includes('old-launch-secret'),false);
@@ -746,14 +743,14 @@ test('A lost local pairing clears its per-launch locator and a reachable non-run
  status={state:'stopped-by-person',reachable:true,installed:true,service:'launchd'};pairing=nextLocal;onStatus(status);
  await new Promise(resolve=>setTimeout(resolve,10));
  snapshot=s.run('roomStore.getState()');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:43218');
- assert.equal(snapshot.facts.nodeReach,'ok');
+ assert.equal(s.run("linkBase('fp-local')"),'http://127.0.0.1:43218');
+ assert.equal(snapshot.facts.machineLinks['fp-local'].reach,'ok');
  assert.equal(snapshot.machines[0].state,'connected','native reachable remains usable although the service state is not running');
- assert.equal(snapshot.machines[0].selectable,true);
- assert.deepEqual([...s.run('callProtocols()')],['sidevoice','sidevoice.token.new-launch-secret']);
+ assert.deepEqual([...s.run("callProtocols('fp-local')")],['sidevoice','sidevoice.token.new-launch-secret']);
  assert.equal(asked.some(([url])=>url.includes('/api/device/identity?nonce=')),false,'native already verified this local identity');
  const requestsBeforeRecovery=asked.length;
- await s.run("refreshPeople()");
+ await s.run("refreshPeople('fp-local')");
+ assert.ok(asked.length>requestsBeforeRecovery,'its conversations are asked for again');
  assert.ok(asked.slice(requestsBeforeRecovery).every(([url,options])=>!options.headers?.Authorization||options.headers.Authorization==='Bearer new-launch-secret'), 'only the current per-launch secret is sent after recovery');
 });
 
@@ -783,35 +780,45 @@ test('A code is redeemed where its machine proves itself, and the page starts ta
  assert.equal(answer.host,'macbook');
  const pair=net.asked.find(r=>r.url==='http://127.0.0.1:8768/api/device/pair'&&JSON.parse(r.init.body).secret==='fresh');
  assert.deepEqual(JSON.parse(pair.init.body),{secret:'fresh',name:'Mi portátil'});
- assert.equal(stored(s).in_use,node.fp);
+ assert.equal('in_use' in stored(s),false,'no machine is "the one in use": every one is live');
  assert.equal(stored(s).pairings[0].token,'tok-new','the token is kept on this device');
  assert.doesNotMatch(JSON.stringify(s.run('roomStore.getState().facts.pairings')),/tok-new/,'and never reaches the interface\'s store');
  assert.equal(s.run('roomStore.getState().pairing.open'),false,'the dialog closes');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:8768','the address that proved itself is the one used');
- assert.equal(s.run('roomStore.getState().machines[0].inUse'),true);
- await s.run('refresh()');
+ s.context.__fp=node.fp;
+ assert.equal(s.run('linkBase(__fp)'),'http://127.0.0.1:8768','the address that proved itself is the one used');
+ assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
+ await s.run('refreshPeople(__fp)');
  assert.equal(net.asked.at(-1).auth,'Bearer tok-new');
 });
 
-test('Usar changes machine: it hangs up, joins the other machine\'s call, and the choice is kept on this device',async()=>{
- const mac=await fakeNode('macbook'),pc=await fakeNode('linux');
- const s=setup({stored:{in_use:mac.fp,pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',urls:['http://10.0.0.9:8768']})]}});
- s.run(`people=[{thread_id:'a',title:'A',available:true}];ws={readyState:1};var calls=[];disconnect=()=>{calls.push('hang-up');ws=null};toggleCall=async()=>{calls.push('join '+pairings.inUse.slice(0,4))}`);
- s.run(`window.sidevoiceActions.chooseMachine(${JSON.stringify(pc.fp)})`);
- assert.equal(JSON.stringify(s.run('calls')),JSON.stringify(['hang-up','join '+pc.fp.slice(0,4)]),'hung up first, then joined the other one\'s call');
- assert.equal(stored(s).in_use,pc.fp);
- assert.equal(s.run('people.length'),0,'the other machine\'s conversations are not this one\'s');
- assert.equal(s.run('roomBinding'),null);
- assert.equal(s.run('nodeBase'),null,'the other machine proves where it is before anything is asked of it');
- // The one in use, or one this device is not paired with, changes nothing.
- s.run("calls.length=0;ws={readyState:1}");
- s.run(`window.sidevoiceActions.chooseMachine(${JSON.stringify(pc.fp)});window.sidevoiceActions.chooseMachine('gone')`);
- assert.equal(s.run('calls.length'),0);
+test('Every paired machine at once: each at its own address with its own token, their conversations in one list by machine',async()=>{
+ const mac=await fakeNode('macbook'),pc=await fakeNode('linux');mac.tokens.add('tok-1');pc.tokens.add('tok-pc');
+ // The same thread name on both machines is two conversations.
+ mac.people=[{thread_id:'t',title:'Mac',available:true,reach:{state:'listening'}}];pc.people=[{thread_id:'t',title:'PC',available:true,reach:{state:'listening'}}];
+ pc.messages=[{id:'pc:voice:1',thread:'t',role:'assistant',text:'Hecho en el PC',time:1,seq:3,status:'text_only'}];
+ const s=setup({paired:false,stored:{pairings:[pairingOf(mac,{rv:null}),pairingOf(pc,{token:'tok-pc',urls:['https://pc.example'],rv:null})]}});
+ const net=network({at:{'http://127.0.0.1:8768':mac,'https://pc.example':pc}});s.context.fetch=net.get;
+ s.run('sessionId=null;roomBinding=null');
+ await s.run('Promise.all(liveMachines().map(fp=>locate(fp,{fresh:true})))');
+ s.context.__mac=mac.fp;s.context.__pc=pc.fp;
+ await s.run('Promise.all([refreshPeople(__mac),refreshPeople(__pc),refreshHistory(__pc)])');
+ const rows=s.run('roomStore.getState().participants');
+ assert.deepEqual(plain(rows.map(row=>[row.threadId,row.machine,row.title])),[[mac.fp+'|t','macbook','Mac'],[pc.fp+'|t','linux','PC']]);
+ assert.equal(rows[1].unread,1,'unread is each machine\'s own');assert.equal(rows[0].unread,0);
+ for(const [base,token] of [['http://127.0.0.1:8768','tok-1'],['https://pc.example','tok-pc']])
+  assert.ok(net.asked.filter(r=>r.url.startsWith(base+'/api/presentation')).every(r=>r.auth==='Bearer '+token),'each machine is asked with its own token, never another\'s');
+ assert.deepEqual(plain(s.run('roomStore.getState().machines').map(m=>m.state)),['connected','connected']);
+ // A machine that stops answering keeps its conversations listed, unreachable; the other is untouched.
+ s.run('settleLink(__pc,null,"away")');
+ const after=s.run('roomStore.getState().participants');
+ assert.deepEqual(plain(after.map(row=>[row.available,row.reach])),[[true,'listening'],[false,'offline']]);
 });
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
  const mac=await fakeNode('macbook'),pc=await fakeNode('linux'),squatter=await fakeNode('squatter');
- const s=setup({stored:{in_use:mac.fp,pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
+ const s=setup({stored:{pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
+ // A call on the Mac, and conversations of both machines listed.
+ s.context.__pc=pc.fp;s.run(`ws={readyState:1,close(){}};var hungUp=0;const hangUp=disconnect;disconnect=()=>{hungUp++;hangUp()};people=[{node:callNode,thread_id:'a',title:'A',available:true},{node:__pc,thread_id:'b',title:'B',available:true}];history=[{thread:callNode+'|a',role:'assistant',text:'x',seq:1},{thread:__pc+'|b',role:'assistant',text:'y',seq:1}]`);
  const net=network({at:{'':mac,'http://10.0.0.9:8768':squatter}});s.context.fetch=net.get;
  s.run(`roomStore.patch({hostAgents:{[${JSON.stringify(mac.fp)}]:{status:'ready',value:{agents:[{id:'codex',present:true,registration:'not-connected',actionable:true}],scanned_at:1},error:null,busy:{},actionErrors:{}}}})`);
  // The one in use, at the address that proved itself a moment ago.
@@ -820,7 +827,10 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  assert.equal(revoke.url,'/api/device/devices/dev-1');
  assert.equal(revoke.auth,'Bearer tok-1');
  assert.deepEqual(stored(s).pairings.map(p=>p.fp),[pc.fp]);
- assert.equal(stored(s).in_use,pc.fp,'the one left is the one in use');
+ assert.equal(s.run('hungUp'),1,'the call was on it: it ends');
+ assert.equal(s.run('callNode'),null);
+ assert.deepEqual(plain(s.run('people').map(p=>p.thread_id)),['b'],'what the page knew of it goes with it, the other machine\'s stays');
+ assert.deepEqual(plain(s.run('history').map(r=>r.text)),['y']);
  assert.equal(s.run('roomStore.getState().machines.length'),1);
  assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(mac.fp)}]`),undefined,'forgetting a host clears its connector state');
  // The other one's only address answers as somebody else: forgotten here, and its token sent nowhere.
@@ -828,8 +838,9 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(pc.fp)})`);
  assert.equal(net.asked.filter(r=>r.method==='DELETE').length,0);
  assert.equal(net.asked.filter(r=>r.auth==='Bearer tok-pc').length,0);
- assert.deepEqual(stored(s),{in_use:null,pairings:[]});
- assert.equal(s.run('state.nodeReach'),'unpaired');
+ assert.deepEqual(stored(s),{pairings:[]});
+ assert.equal(s.run('hungUp'),1,'no call was on it: nothing hung up');
+ assert.match(s.run('roomStore.getState().join.text'),/no está emparejado con ninguna máquina/);
 });
 
 test('A machine the room cannot reach is not a full room: its own sentence, and not a refusal to stop at',async()=>{
@@ -889,13 +900,13 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
  s.handlers.beforeunload();
  assert.equal(first.readyState,3);
  assert.equal(first.closedWith,undefined,'not 1000: the room parks the call');
- assert.deepEqual(JSON.parse(c.store['sidevoice.resume']),{session_id:'s1',token:'tok-a',last_seq:2});
+ assert.deepEqual(JSON.parse(c.store['sidevoice.resume']),{session_id:'s1',token:'tok-a',last_seq:2,node:'fp-mac'},'kept with the machine it is for');
  // The next load of the same tab joins with it.
  const next=setup(),{sockets,tap}=joining(next);
  next.context.sessionStorage=storageOf(c.store);next.context.crypto={randomUUID:()=>'hello-id'};
  const joined=tap();
  const socket=await firstSocket(sockets);socket.readyState=1;socket.onopen();
- assert.deepEqual(plain(JSON.parse(socket.sent[0]).data.resume),{session_id:'s1',token:'tok-a',last_seq:2});
+ assert.deepEqual(plain(JSON.parse(socket.sent[0]).data.resume),{session_id:'s1',token:'tok-a',last_seq:2},'the room gets the ticket, not which machine this page kept it for');
  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true}})});
  await joined;
  assert.equal(next.run('sessionId'),'s1','the same session, taken back');
@@ -936,20 +947,20 @@ function withVoice(s,voice,engine){const desktop=s.context.window.__sidevoiceDes
 function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,max:8},start,voice=fakeVoice({start})}={}){
  const sockets=socketsOf(s);
  s.context.crypto={randomUUID:()=>'hello-id'};
- s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
+ s.context.sessionStorage={getItem:key=>key==='sidevoice.selected'?'fp-mac|t-1':null,setItem(){},removeItem(){}};
  s.context.fetch=async path=>{if(admission==='unreachable'&&path.includes('/admission'))throw Error('Failed to fetch');return {ok:true,json:async()=>
   path.includes('/admission')?admission
   :path.includes('/participants')?{participants:[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]}
   :{binding:null,room:{revision:0},clients:[],call:null,participants:[]}}};
  withVoice(s,voice);
- s.run("keepScreenAwake=()=>{};people=[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
+ s.run("keepScreenAwake=()=>{};people=[{node:'fp-mac',thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
-async function callOnRoom({timers=null,indexedDB=null,outboxScope=null}={}){
- const s=setup({indexedDB,outboxScope});const sockets=socketsOf(s);let ids=0;
+async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=undefined}={}){
+ const s=setup({indexedDB,outboxScope,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
- const store={'sidevoice.selected':'a'};s.context.sessionStorage=storageOf(store);
+ const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  const voice=withVoice(s,fakeVoice());
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
@@ -1216,11 +1227,6 @@ test('Messages a reload kept go once the outbox has them back, though the call f
  c.s.run('disconnect()');
 });
 
-test('An in-use fingerprint no pairing knows does not select the local host by itself',()=>{
- const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd'}),subscribe:()=>()=>{},pairing:()=>null};
- const s=setup({paired:false,stored:{in_use:'obsolete-fingerprint',pairings:[]},localHost:bridge});
- assert.equal(s.run('localHostSelected'),false,'only the page\'s own selection selects it');
-});
 test('A hang-up while the settings are taken never starts the microphone, and one while starting stops it',async()=>{
  const s=setup();let release;
  const pending=new Promise(resolve=>{release=resolve});
@@ -1250,8 +1256,8 @@ test('A move to another conversation leaves its replies to the room, which withd
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'old-reply',revision:1,reply_revision:1,thread_id:'a',history_id:'row',text:'old conversation'}});
  const before=voice.calls.length;
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
- await s.run("select('b')");await settleSoon();
- assert.equal(s.run('targetId()'),'b');
+ await s.run("select('fp-mac|b')");await settleSoon();
+ assert.equal(s.run('targetId()'),'fp-mac|b');
  assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),[],'not stopped: what is stale is the room\'s to say');
  c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['old-reply'],reason:'focus_changed'}});
  assert.equal(voice.said[0].cancelled,true);
@@ -1363,7 +1369,7 @@ test('Storage the browser refuses is found once at start and said on top',async(
 
 test('the Agents API accepts and reuses a proved same-origin empty base',async()=>{
  const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
- const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];
+ const s=setup({stored:{pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];
  s.context.location.origin='http://127.0.0.1:8768';
  s.context.fetch=async(url,init={})=>{
   if(String(url).startsWith('/api/host/agents')){
@@ -1373,7 +1379,7 @@ test('the Agents API accepts and reuses a proved same-origin empty base',async()
   return net.get(String(url),init);
  };
 
- await s.run('locate({move:true,fresh:true})');
+ await s.run(`locate(${JSON.stringify(node.fp)},{move:true,fresh:true})`);
  assert.equal(s.run(`hostAgentBases.get(${JSON.stringify(node.fp)})`),'','rendezvous identifies the page origin as the paired host');
  const identityProofs=net.asked.filter(request=>request.url.includes('/api/device/identity?nonce=')).length;
 
@@ -1472,12 +1478,176 @@ test('A model chosen before it is on this device waits: the one in use stays, an
  assert.equal(s.run('voiceSettings.stt.model'),'whisper-small','switched once it is here');
 });
 
+// ----- several machines at once: the call follows the conversation picked -----
+const PC={...PAIRED,fp:'fp-pc',host:'pc',urls:['https://pc.example'],rv:null,device_id:'dev-pc',token:'tok-pc'};
+// A call on the Mac, the PC answering at its own address, and a conversation of each listed.
+async function callWithTwoMachines(){
+ const c=await callOnRoom({stored:{pairings:[PAIRED,PC]}});
+ c.s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node';publishLinks()}");
+ c.s.run("people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-pc',thread_id:'p',title:'P',available:true,reach:{state:'listening'}}]");
+ c.first.close=function(code){this.closedWith=code;this.readyState=3};
+ return c;
+}
+test('Picking another machine\'s conversation moves the call there: the open turn is cancelled, its replies stopped and told, then a new session',async()=>{
+ const c=await callWithTwoMachines();const {s,voice,first}=c;
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r1',revision:1,reply_revision:1,thread_id:'a',history_id:'row-r1',text:'Sigo en el Mac'}});
+ voice.said[0].step({type:'playing'});
+ voice.emit('turn',started('u1'));
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(s.run('state.switching'),true);
+ assert.ok(voice.calls.some(([name])=>name==='cancelInput'),'what was being said was for the conversation left');
+ assert.equal(voice.said[0].cancelled,true,'the reply sounding is stopped');
+ assert.equal(voice.calls.filter(([name,muted])=>name==='mute').at(-1)[1],true,'nobody hears the person while the call moves');
+ voice.said[0].step({type:'done',outcome:{status:'interrupted',heard_chars:4}});
+ // The Mac acknowledges what it is owed; only then is its socket closed, as a hang-up.
+ await c.until(()=>sentOf(c,first,'voice-playback').some(d=>d.utterance_id==='r1'&&d.status!=='playing'),'the stopped reply told to its machine');
+ for(const frame of c.frames(first).filter(m=>m.data?.client_msg_id))c.push(first,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
+ await c.until(()=>c.sockets.length===2,'a socket on the PC');
+ assert.equal(first.closedWith,1000,'the Mac\'s session ends as a hang-up');
+ const second=c.sockets[1];
+ // The PC's room binds the new session to the conversation picked.
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'p',title:'P',binding_id:'bp'},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
+ assert.equal(second.url,'wss://pc.example/api/presentation/ws');
+ assert.deepEqual([...second.protocols],['sidevoice','sidevoice.token.tok-pc'],'the PC\'s own token');
+ const {hello}=await c.answer({session_id:'s2',resume:{token:'tok-p',seconds:60},resumed:false});
+ assert.equal(hello.data.conversation,'p','the conversation picked, by the PC\'s own name for it');
+ assert.equal(hello.data.resume,undefined,'no ticket of the Mac\'s goes to the PC');
+ await moved;
+ assert.equal(s.run('callNode'),'fp-pc');assert.equal(s.run('sessionId'),'s2');assert.equal(s.run('state.switching'),false);
+ assert.equal(voice.calls.some(([name])=>name==='stop'),false,'the voice goes on: no new microphone, no model loaded again');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'and hears the person again');
+ assert.equal(JSON.parse(c.store['sidevoice.resume']).node,'fp-pc');
+ assert.equal(c.store['sidevoice.selected'],'fp-pc|p');assert.equal(s.run('targetId()'),'fp-pc|p');
+ s.run('disconnect()');
+});
+test('A reply that arrives while the call leaves its machine is written, never said; unacknowledged debts are let go in time',async()=>{
+ const c=await callWithTwoMachines();const {s,voice,first}=c;
+ s.run('MOVE_DRAIN_MS=60');
+ // A turn said to the Mac that the Mac never acknowledges.
+ voice.emit('turn',started('u7'));voice.emit('turn',finished('u7','Para el Mac'));
+ const reported=[];s.context.window.sidevoiceTelemetry=null;const report=s.run('reportClientError');s.context.__report=e=>{reported.push(e);report(e)};s.run('reportClientError=__report');
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:2,reply_revision:2,thread_id:'a',history_id:'row-late',text:'Tarde'}});
+ assert.equal(voice.said.length,0,'not said: the person has moved on');
+ assert.ok(s.run("history.some(r=>r.text==='Tarde'&&r.thread==='fp-mac|a')"),'but written in its own conversation');
+ await c.until(()=>c.sockets.length===2,'the move does not wait for ever');
+ assert.ok(turnSent(c,first,'u7','finished').length,'what the Mac was owed was said to the Mac');
+ assert.equal(s.run("outbox.list().filter(entry=>entry.node==='fp-mac').length"),0,'and let go once its time was up');
+ assert.ok(reported.some(entry=>entry.kind==='move'),'saying so in the machine\'s log');
+ await c.answer({session_id:'s2',resume:{token:'t',seconds:60},resumed:false});await moved;
+ assert.equal(s.run('callNode'),'fp-pc');
+ assert.equal(sentOf(c,c.sockets[1],'voice-user-turn').length,0,'nothing of the Mac\'s goes to the PC');
+ s.run('disconnect()');
+});
+test('A conversation of a machine that does not answer is only looked at: the call stays where it is',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;
+ s.run("settleLink('fp-pc',null,'offline')");
+ s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(s.run('viewedThread'),'fp-pc|p');
+ assert.equal(s.run('state.switching'),false);assert.equal(c.sockets.length,1);assert.equal(s.run('callNode'),'fp-mac');
+ assert.match(s.run('SessionState.reachNote(state)'),/«macbook»|^$/,'the note speaks of the call\'s machine');
+ s.run('disconnect()');
+});
+test('A machine that refuses this device while merely watched says so in its row; the call on another goes on',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;
+ s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
+ await s.run("refreshPeople('fp-pc')");
+ assert.equal(s.run('roomStore.getState().machines.find(m=>m.id===\'fp-pc\').state'),'revoked');
+ assert.ok(s.run('state.ws'),'the call on the Mac goes on');
+ assert.equal(s.run('roomStore.getState().pairing.open'),false,'met while merely watching it: nobody is asked for a code');
+ assert.deepEqual(plain(s.run('roomStore.getState().participants').map(row=>[row.threadId,row.reach])),[['fp-mac|a','listening'],['fp-pc|p','offline']]);
+ // The person's own act on that machine's page is answered: a new code is asked for, about that machine.
+ s.run("pairings={list:pairings.list.map(p=>p.fp==='fp-pc'?{...p,revoked:false}:p)};hostAgentBases.set('fp-pc','https://pc.example');verified.set('https://pc.example',Date.now())");
+ await assert.rejects(s.run("hostApi('fp-pc','/api/host/agents')"));
+ assert.equal(s.run('roomStore.getState().pairing.open'),true);
+ assert.match(s.run('roomStore.getState().pairing.note'),/«pc» ya no reconoce este dispositivo/);
+ assert.ok(s.run('state.ws'),'and the call on the Mac still goes on');
+ s.run('disconnect()');
+});
+test('A join goes to the machine of the conversation looked at, and a ticket kept for another machine is not used there',async()=>{
+ const s=setup({stored:{pairings:[PAIRED,PC]}});const {sockets,tap}=joining(s);
+ const store={'sidevoice.selected':'fp-mac|a','sidevoice.resume':JSON.stringify({session_id:'old',token:'tok-old',last_seq:4,node:'fp-mac'})};
+ s.context.sessionStorage=storageOf(store);
+ s.run("disconnect();{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';publishLinks()};viewedThread='fp-pc|p'");
+ const joined=tap();
+ const socket=await firstSocket(sockets);
+ assert.equal(socket.url,'wss://pc.example/api/presentation/ws');
+ socket.readyState=1;socket.onopen();
+ const hello=JSON.parse(socket.sent[0]).data;
+ assert.equal(hello.resume,undefined,'the Mac\'s ticket is the Mac\'s');assert.equal(hello.conversation,null);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'n1',resume:{token:'x',seconds:60},resumed:false}})});
+ await joined;
+ assert.equal(s.run('callNode'),'fp-pc');
+ s.run('disconnect()');
+});
+// What the adversarial review of the move found (GPT-6 Astra), each kept from coming back.
+test('Words the voice transcribes late, after the call moved, never reach the other machine',async()=>{
+ const c=await callWithTwoMachines();const {s,voice,first}=c;
+ voice.emit('turn',started('u1'));
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ for(const frame of c.frames(first).filter(m=>m.data?.client_msg_id))c.push(first,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
+ await c.until(()=>c.sockets.length===2,'a socket on the PC');
+ await c.answer({session_id:'s2',resume:{token:'t',seconds:60},resumed:false});await moved;
+ voice.emit('turn',finished('u1','Dicho al Mac'));await settleSoon();
+ assert.equal(c.frames(c.sockets[1]).some(m=>JSON.stringify(m).includes('Dicho al Mac')),false,'not sent to the PC');
+ assert.equal(s.run("history.some(r=>r.text==='Dicho al Mac')"),false,'nor written in its conversation');
+ s.run('disconnect()');
+});
+test('A row of one machine is never another\'s, even under the same id',async()=>{
+ const c=await callWithTwoMachines();const {s,first}=c;
+ s.run("history=[{segment:'shared',thread:'fp-pc|p',role:'assistant',text:'Del PC',seq:1}]");
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r9',revision:1,reply_revision:1,thread_id:'a',history_id:'shared',text:'Del Mac'}});
+ assert.deepEqual(plain(s.run('history').map(r=>[r.thread,r.text])),[['fp-pc|p','Del PC'],['fp-mac|a','Del Mac']]);
+ s.run("karaokeState={segment:'shared',from:0,to:3}");
+ const lit=s.run("SessionState.conversationView({...roomStore.getState().facts,viewedThread:'fp-pc|p'}).messages[0].karaoke");
+ assert.equal(lit,null,'the reply sounding is the call machine\'s, not the other row');
+ s.run('disconnect()');
+});
+test('A machine looked for again stays unreachable until it answers: picking it does not move the call',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;
+ s.run("settleLink('fp-pc',null,'offline')");
+ s.context.fetch=()=>new Promise(()=>{});
+ void s.run("locate('fp-pc',{fresh:true})");await settleSoon();
+ assert.equal(s.run("state.machineLinks['fp-pc'].reach"),'offline');
+ assert.equal(s.run('roomStore.getState().participants')[1].reach,'offline');
+ s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(c.sockets.length,1);assert.equal(s.run('callNode'),'fp-mac');assert.equal(c.first.closedWith,undefined);
+ s.run('disconnect()');
+});
+test('A move given up leaves the next call\'s debts alone, and takes over a join still on its way',async()=>{
+ const c=await callWithTwoMachines();const {s,voice}=c;
+ s.run('MOVE_DRAIN_MS=80;state.connecting=true');
+ voice.emit('turn',started('u3'));voice.emit('turn',finished('u3','Sin acuse'));
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(s.run('state.connecting'),false,'the move owns the call now');
+ // Hung up mid-move, and a new call on the Mac owes its machine something.
+ s.run("disconnect();callNode='fp-mac';sessionId='s9';keepMessage('playback','voice-playback',{utterance_id:'nueva'})");
+ await new Promise(resolve=>setTimeout(resolve,200));await moved;
+ assert.ok(s.run("outbox.list().some(entry=>entry.payload.data.utterance_id==='nueva')"),'the abandoned drain deleted nothing of it');
+ s.run('disconnect()');
+});
+test('A refusal of a credential a new pairing has replaced does not revoke the new one',()=>{
+ const s=setup();
+ s.run("pairingRefused('fp-mac',{token:'tok-old'})");
+ assert.equal(s.run("pairings.list[0].revoked"),undefined);
+ s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ assert.equal(s.run("pairings.list[0].revoked"),true);
+});
+test('No more machines are watched than the bound, and the call\'s always is',()=>{
+ const many=Array.from({length:9},(_,i)=>({...PAIRED,fp:'fp-'+i,device_id:'d'+i}));
+ const s=setup({stored:{pairings:many}});
+ assert.equal(s.run('liveMachines().length'),s.run('MAX_LINKS'));
+ s.run("callNode='fp-8'");
+ assert.ok(s.run("liveMachines().includes('fp-8')"));
+ s.run("pairingRefused('fp-1')");
+ assert.equal(s.run("liveMachines().includes('fp-1')"),false,'a revoked one is not watched');
+});
+
 test('The first answer from the room asks for the conversations at once, not on their slower beat',async()=>{
  const s=setup();const asked=[];
  s.context.fetch=async path=>{asked.push(String(path));return {ok:true,json:async()=>path.includes('/participants')
   ?{participants:[{thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'},engine:{model:'claude-opus-5-5',effort:'high'}}]}
   :{binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'},room:{revision:1},clients:[],call:null}}};
- s.run("nodeBase=''");
  await s.run('refresh')();await settleSoon();
  assert.ok(asked.some(path=>path.includes('/api/presentation/participants')),'asked with the first answer');
  assert.equal(s.run('people[0].engine.model'),'claude-opus-5-5');

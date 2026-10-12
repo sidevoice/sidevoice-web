@@ -31,11 +31,11 @@ function dateText(value: string | number | null | undefined) {
 function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTranslate) {
   const name = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
   const subtitle = machine.local
-    ? machine.selectable && status.reachable === true ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
+    ? machine.state === "connected" ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
     : machine.state === "checking" ? t("hosts.checking")
       : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
       ? t("hosts.remoteNoResponse") : t("hosts.connected");
-  const reachable = machine.local ? machine.selectable && status.reachable === true : machine.state === "connected";
+  const reachable = machine.state === "connected";
   // Paired without encryption, it is said with its name wherever the name alone would not show it.
   const spoken = machine.insecure ? t("hosts.notEncryptedNamed", { host: name }) : name;
   return { name, spoken, subtitle, reachable };
@@ -81,7 +81,7 @@ export function MachineNav({ current }: { current: boolean }) {
         const state = machineState(machine, copy, t);
         return (
           <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.spoken + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.spoken}, ${state.label} · ${copy.subtitle}${notice(machine) ? t("highlights.navNew") : ""}`}
-            data-name={copy.name} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined}
+            data-name={copy.name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
             {/* This computer, an icon before its name; the name cut short when long (whole in the title); a warning sign
@@ -177,7 +177,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
           {/* Renamed here: whose name it really is, and the way back to it. */}
           {machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
             <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
-          <p className="muted">{[machine.inUse ? t("hosts.inUse") : "", copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
+          <p className="muted">{[copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>
         <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
         {/* Reached without encryption, as the person agreed when pairing: said for as long as it is so. */}
@@ -437,7 +437,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const deviceEpoch = useRef(0);
   const bridge = localHostBridge();
   const local = !!machine.local;
-  const usable = local ? status.reachable === true && machine.selectable === true : machine.state === "connected" && !!machine.pairingId;
+  const usable = machine.state === "connected" && !!machine.pairingId;
   const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
   // This device by the name it has here (its setting, else its default), however the machine last heard it.
   useRoomStore((state) => state.facts.deviceName);

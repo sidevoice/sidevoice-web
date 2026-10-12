@@ -60,20 +60,18 @@ export function useOnboarding() {
   return value;
 }
 
-/** The machine in use, when it is paired, selectable and answering. */
-function machineInUse(room: RoomViewState) {
-  const fp = room.facts.pairingInUse;
-  const machine = room.machines.find((candidate) => candidate.pairingId === fp && candidate.selectable && !candidate.revoked);
-  return machine && room.facts.node === fp && room.facts.nodeReach === "ok" ? machine : null;
+/** A paired machine this device reaches now (its link answers), local or not. */
+function answering(room: RoomViewState, local: boolean) {
+  return room.machines.find((machine) => machine.local === local && !!machine.pairingId && !machine.revoked
+    && room.facts.machineLinks[machine.pairingId]?.reach === "ok") ?? null;
 }
 
-/** What resume reads of the room: the machine in use, and the device's kept voice settings. */
+/** What resume reads of the room: which machines answer, and the device's kept voice settings. */
 function liveFacts(room: RoomViewState) {
-  const machine = machineInUse(room);
   const kept = room.facts.voiceSettings;
   return {
-    localReady: !!machine?.local && room.facts.localHostStatus.state === "running",
-    remoteReady: !!machine && !machine.local,
+    localReady: !!answering(room, true) && room.facts.localHostStatus.state === "running",
+    remoteReady: !!answering(room, false),
     sttKey: kept ? trialKey(kept.stt) : null,
     ttsKey: kept ? trialKey(kept.tts) : null,
   };

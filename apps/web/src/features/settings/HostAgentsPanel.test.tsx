@@ -100,7 +100,7 @@ test("P11 an agent new on a machine marks the gear, opens Settings at that machi
   const pending = ready([known("cursor", { actionable: true, label: "Cursor" })]);
   const openAgentSettings = vi.fn((fp: string | null) => store.patch({ settingsAgentRequest: { fp, id: 1 } }));
   setActions({ openAgentSettings });
-  act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: pending } }));
+  act(() => store.patch({ pairings: [host], machinesReady: true, hostAgents: { [host.fp]: pending } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   const gear = settingsEntry();
@@ -123,7 +123,7 @@ test("the runtime's Settings handler on the menu entry survives the header's ren
   const host = pairing("fp-nuc", "NUC");
   const openAgentSettings = vi.fn();
   setActions({ openAgentSettings });
-  act(() => store.patch({ pairings: [host], pairingInUse: host.fp, machinesReady: true, hostAgents: { [host.fp]: ready([known("cursor", { actionable: true })]) } }));
+  act(() => store.patch({ pairings: [host], machinesReady: true, hostAgents: { [host.fp]: ready([known("cursor", { actionable: true })]) } }));
   render(<RoomProvider store={store}><RoomHeader /></RoomProvider>);
   // The runtime wires the entry once it loads, as room-session-controller.js does.
   const openSettings = vi.fn();
@@ -143,7 +143,7 @@ test("agents new on two machines: the gear counts them, Settings opens at the fi
   const hosts = [pairing("fp-nuc", "NUC"), pairing("fp-laptop", "Laptop")];
   const openAgentSettings = vi.fn((fp: string | null) => store.patch({ settingsAgentRequest: { fp, id: 2 } }));
   setActions({ openAgentSettings });
-  act(() => store.patch({ pairings: hosts, pairingInUse: hosts[0].fp, machinesReady: true,
+  act(() => store.patch({ pairings: hosts, machinesReady: true,
     hostAgents: { "fp-nuc": ready([known("cursor", { actionable: true })]), "fp-laptop": ready([known("claude", { actionable: true })]) } }));
 
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);

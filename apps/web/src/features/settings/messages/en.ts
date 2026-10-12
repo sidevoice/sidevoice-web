@@ -4,7 +4,6 @@ export const en = {
   "hosts.unnamed": "Unnamed machine",
   "hosts.add": "Add a machine",
   "hosts.use": "Use {machine}",
-  "hosts.inUse": "In use",
   "hosts.thisComputer": "This computer",
   "hosts.connected": "Connected",
   "hosts.checking": "Not checked yet",
@@ -509,7 +508,7 @@ export const en = {
   "voice.endOfTurn.hint": "What decides that you have finished speaking.",
   "keys.browserTitle": "Kept in this browser",
   // Machines, in either layout (MachineList).
-  "hosts.description": "The computers where your agents run. Sidevoice talks to the one in use; open one to see its agents and devices.",
+  "hosts.description": "The computers where your agents run. Sidevoice talks to all of them at once; open one to see its agents and devices.",
   "hosts.pick": "Machine",
   "hosts.online": "Online",
   "hosts.useShort": "Use",

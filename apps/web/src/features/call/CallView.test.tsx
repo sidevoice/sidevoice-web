@@ -15,22 +15,25 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 const WHOLE_APP_MS = 15_000;
 
 const REPLY = "Okay. I'll start with the login and then look at the cart tests. I'll tell you as soon as I have something.";
+// Each row comes from the machine it runs on (`node`); the page knows it by machine and thread ("fp-1|t-login").
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
-  ({ thread_id, title, available: true, reach: { state: "listening" }, machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
+  ({ thread_id, title, available: true, reach: { state: "listening" }, node: "fp-1", machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
+const pairing = (fp: string, host: string | null) => ({ fp, host, urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false });
+const live = (...fps: string[]) => Object.fromEntries(fps.map((fp) => [fp, { reach: "ok" as const, via: "node" as const }]));
 
 function room(extra: Partial<SessionFacts> = {}) {
   const store = createRoomStore();
   act(() => store.patch({
-    machinesReady: true, pairings: [{ fp: "fp-1", host: "Laptop", urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false }],
-    pairingInUse: "fp-1", ws: {}, sessionId: "s1", roomBinding: { thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" },
+    machinesReady: true, pairings: [pairing("fp-1", "Laptop"), pairing("fp-2", "Home server")], machineLinks: live("fp-1", "fp-2"),
+    callNode: "fp-1", ws: {}, sessionId: "s1", roomBinding: { thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" },
     people: [
       person("t-login", "Fix the slow login"),
       person("t-pay", "Migrate the payments API", { harness: "codex" }),
-      person("t-backup", "Review the nightly backups", { machine: { host: "Home server", id: "m2" } }),
-      person("t-week", "Plan the week", { available: false, reach: { state: "offline" }, machine: { host: "Home server", id: "m2" } }),
+      person("t-backup", "Review the nightly backups", { node: "fp-2", machine: { host: "Home server", id: "m2" } }),
+      person("t-week", "Plan the week", { available: false, reach: { state: "offline" }, node: "fp-2", machine: { host: "Home server", id: "m2" } }),
     ],
-    harness: { "t-pay": true },
-    history: [{ segment: "h-2", thread: "t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }],
+    harness: { "fp-1|t-pay": true },
+    history: [{ segment: "h-2", thread: "fp-1|t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }],
     ...extra,
   }));
   render(<App store={store} />);
@@ -73,7 +76,7 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Between turns the bubble goes, and what the agent is doing stands in its place.
-  patch(store, { botLive: false, karaokeState: null, harness: { "t-login": true } });
+  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true } });
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-visible");
   expect(document.querySelector(".stage-activity")).toHaveTextContent("Working…");
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
@@ -86,7 +89,7 @@ test("the stage plays what the agent says as a karaoke bubble, the chunk before 
   expect(stageAgent()).not.toHaveAttribute("data-idle");
 
   // With nothing to do and its turn over, it rests: waiting for you is idle now.
-  patch(store, { harness: { "t-login": false } });
+  patch(store, { harness: { "fp-1|t-login": false } });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
   expect(stageAgent()).not.toHaveAttribute("data-work");
   expect(stageAgent()).not.toHaveAttribute("data-desk");
@@ -103,7 +106,7 @@ test("the person has no picture on the stage, only a bubble of their own while t
   const store = room();
   expect(document.querySelector(".stage-pip")).toBeNull();
   expect(document.querySelector(".person-bubble")).toBeNull();
-  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
+  patch(store, { userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening", pendingUserText: "Split it into two commits." });
   expect(document.querySelector(".person-bubble")).toHaveTextContent("Split it into two commits.");
   // The agent listens to the person meanwhile, and goes on listening while it is transcribed.
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "listening");
@@ -136,7 +139,7 @@ test("state dots and small avatars follow each conversation's state, grouped by 
 });
 
 test("an offline conversation on the stage is a wanted poster, in the interface's language", () => {
-  const store = room({ viewedThread: "t-week" });
+  const store = room({ viewedThread: "fp-2|t-week" });
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "offline");
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "offline");
   expect(stageAgent()).toHaveAttribute("data-mood", "idle");
@@ -151,13 +154,13 @@ test("an offline conversation on the stage is a wanted poster, in the interface'
   expect(poster.querySelector(".w-photo .sv-avatar")).toHaveAttribute("data-mood", "speaking");
   expect(document.querySelector(".stage-desk")).toBeInTheDocument();
   // Back within reach, the poster goes.
-  patch(store, { viewedThread: "t-login" });
+  patch(store, { viewedThread: "fp-1|t-login" });
   expect(document.querySelector(".wanted")).toBeNull();
 });
 
 test("the poster speaks Spanish on a device set to it", () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
-  room({ viewedThread: "t-week" });
+  room({ viewedThread: "fp-2|t-week" });
   expect(document.querySelector(".wanted")).toHaveTextContent("VIVO O EN PAUSA");
   expect(document.querySelector(".wanted .w-bounty")?.textContent).toMatch(/^\d{3}\.000\.000-$/);
   expect(stageAgent()).toHaveAccessibleName("Plan the week · Desconectada");
@@ -166,15 +169,15 @@ test("the poster speaks Spanish on a device set to it", () => {
 test("a conversation that is holding does not react to the person talking", () => {
   room({
     people: [person("t-login", "Fix the slow login", { reach: { state: "holding" } })],
-    userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "t-login" }, pendingPhase: "listening",
+    userLive: true, userTurn: { id: "u1", segment: "turn:u1", thread: "fp-1|t-login" }, pendingPhase: "listening",
   });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "idle");
 });
 
 test("replies this browser has not seen put the unread cue on that conversation's avatar", () => {
   room({ history: [
-    { segment: "h-2", thread: "t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" },
-    { segment: "p-1", thread: "t-backup", role: "assistant", text: "The backups ran.", name: "Review the nightly backups", time: 2, session: "s1", seq: 4 },
+    { segment: "h-2", thread: "fp-1|t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" },
+    { segment: "p-1", thread: "fp-2|t-backup", role: "assistant", text: "The backups ran.", name: "Review the nightly backups", time: 2, session: "s1", seq: 4 },
   ] });
   expect(rowOf("Review the nightly backups").querySelector(".sv-avatar")).toHaveAttribute("data-unread");
   expect(rowOf("Migrate the payments API").querySelector(".sv-avatar")).not.toHaveAttribute("data-unread");
@@ -196,13 +199,13 @@ test("a phone's header avatars switch the call at a tap, and the chevron brings 
   const chevron = () => within(document.querySelector<HTMLElement>(".room-header")!).getByRole("button", { name: "All conversations (4)" });
   // A tap on one moves the call to it, without the list.
   await act(async () => { fireEvent.click(others[0]); });
-  expect(selectParticipant).toHaveBeenCalledWith("t-backup");
+  expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
   // The whole list comes down from the chevron after them; picking one there switches too.
   await act(async () => { fireEvent.click(chevron()); });
   expect(sidebar).toHaveAttribute("data-open");
   await act(async () => { fireEvent.click(rowOf("Migrate the payments API")); });
-  expect(selectParticipant).toHaveBeenLastCalledWith("t-pay");
+  expect(selectParticipant).toHaveBeenLastCalledWith("fp-1|t-pay");
   expect(sidebar).not.toHaveAttribute("data-open");
 
   // The close button, a tap outside and Escape put it away too.
@@ -266,7 +269,7 @@ test("out of a call the room's binding is not a call: no conversation is in call
 });
 
 test("the transcript opens on its latest message, whatever arrived while it was closed", async () => {
-  const lines = Array.from({ length: 30 }, (_, index) => ({ segment: "m-" + index, thread: "t-login", role: index % 2 ? "assistant" as const : "user" as const,
+  const lines = Array.from({ length: 30 }, (_, index) => ({ segment: "m-" + index, thread: "fp-1|t-login", role: index % 2 ? "assistant" as const : "user" as const,
     text: "Line " + index, name: "x", time: index + 1, session: "s1", audio: "heard" }));
   const store = room({ history: lines.slice(0, 5) });
   patch(store, { history: lines });
@@ -277,9 +280,9 @@ test("the transcript opens on its latest message, whatever arrived while it was 
 
 test("two machines with the same name, or none, are two groups, each with its own conversations", () => {
   const errors = vi.spyOn(console, "error");
-  room({ people: [
-    person("t-a", "On the laptop"), person("t-b", "On the other laptop", { machine: { host: "Laptop", id: "m3" } }),
-    person("t-c", "Nameless one", { machine: { host: null, id: "m4" } }), person("t-d", "Nameless two", { machine: { host: null, id: "m5" } }),
+  room({ pairings: [pairing("fp-1", "Laptop"), pairing("fp-3", "Laptop"), pairing("fp-4", null), pairing("fp-5", null)], machineLinks: live("fp-1", "fp-3", "fp-4", "fp-5"), people: [
+    person("t-a", "On the laptop"), person("t-b", "On the other laptop", { node: "fp-3", machine: { host: "Laptop", id: "m3" } }),
+    person("t-c", "Nameless one", { node: "fp-4", machine: { host: null, id: "m4" } }), person("t-d", "Nameless two", { node: "fp-5", machine: { host: null, id: "m5" } }),
   ], roomBinding: { thread_id: "t-a", title: "On the laptop", binding_id: "b" } });
   const groups = [...document.querySelectorAll(".sidebar-group")].map((group) => [group.querySelector(".sidebar-group-label")?.textContent,
     [...group.querySelectorAll(".person-name")].map((name) => name.textContent)]);
@@ -360,7 +363,7 @@ test("on a phone the conversations panel is a dialog: focus goes in, and back to
   // Picking a conversation gives focus back too.
   await act(async () => { fireEvent.click(pill); });
   await act(async () => { fireEvent.click(rowOf("Review the nightly backups")); });
-  expect(selectParticipant).toHaveBeenCalledWith("t-backup");
+  expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
   expect(document.activeElement).toBe(pill);
 });
 
@@ -460,7 +463,7 @@ test("the transcript button wears a dot for what arrives while it is closed; ope
   expect(button).toHaveAccessibleName("Show transcript");
   expect(button.querySelector(".transcript-entry-dot")).toBeNull();
   patch(store, { history: [...store.getState().facts.history,
-    { segment: "h-3", thread: "t-login", role: "assistant", text: "Shall I also add a retry?", name: "Fix the slow login", time: 2, session: "s1" }] });
+    { segment: "h-3", thread: "fp-1|t-login", role: "assistant", text: "Shall I also add a retry?", name: "Fix the slow login", time: 2, session: "s1" }] });
   expect(button).toHaveAccessibleName("Show transcript, 1 unread");
   expect(button.querySelector(".transcript-entry-dot")).not.toBeNull();
   await act(async () => { fireEvent.click(button); });

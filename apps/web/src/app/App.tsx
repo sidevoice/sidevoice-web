@@ -42,11 +42,10 @@ function RoomContent() {
       pendingLocalSelection.current = false;
       return;
     }
+    // Installed, this computer is one more machine, live with the rest once it answers: nothing to choose.
     if (install.phase === "succeeded" && pendingLocalSelection.current) {
-      const localMachine = machines.find((machine) => machine.local && machine.selectable && machine.pairingId);
-      const chooseMachine = window.sidevoiceActions?.chooseMachine;
-      if (!localMachine?.pairingId || typeof chooseMachine !== "function") return;
-      chooseMachine(localMachine.pairingId);
+      const localMachine = machines.find((machine) => machine.local && machine.state === "connected" && machine.pairingId);
+      if (!localMachine?.pairingId) return;
       pendingLocalSelection.current = false;
       localHostInstallController.clear();
     }

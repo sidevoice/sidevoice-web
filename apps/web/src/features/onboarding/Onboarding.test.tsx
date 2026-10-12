@@ -33,7 +33,7 @@ beforeEach(() => {
   // Past the basics, unless a test is about them.
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
-    openPairing: vi.fn(), chooseMachine: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
+    openPairing: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
     tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
   };
@@ -55,7 +55,7 @@ const stageAction = () => document.getElementById("wizard-stage-action") as HTML
 const tryButton = () => document.getElementById("wizard-try") as HTMLButtonElement;
 // Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
 const card = (task: "stt" | "tts") => document.querySelector("#wizard #" + task + "-model-card")!;
-const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], pairingInUse: NUC.fp, node: NUC.fp, nodeReach: "ok", rendezvous: "node" }));
+const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }));
 
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
   const store = room();
@@ -71,6 +71,9 @@ test("a browser starts by pairing another machine, shown how to prepare it, and 
   // How to get a code starts unfolded here, and Connect is the step's own action, in its footer.
   expect(screen.getByRole("button", { name: "How do I get a code?" })).toHaveAttribute("aria-expanded", "true");
   expect(document.querySelector("#wizard .wizard-actions button[type=submit][form=wizard-pairing-form]")).toHaveTextContent("Connect");
+  // Paired is not answering: the setup waits for the machine's link to say so.
+  act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "checking", via: "" } } }));
+  expect(title()).toHaveTextContent("Connect to your machine");
   paired(store);
   expect(title()).toHaveTextContent("Set up transcription");
 });
@@ -272,7 +275,7 @@ test("preparing this computer never offers Prepare again: the install, then wait
   expect(title()).toHaveTextContent("Prepare this computer");
   await act(async () => { fireEvent.click(document.getElementById("wizard-prepare")!); });
   expect(document.getElementById("wizard-prepare")).toBeNull();
-  // Installed: the room chooses this computer's machine and lets the install's state go, before this device reaches it.
+  // Installed: the room lets the install's state go, nothing to choose, before this device reaches it.
   await act(async () => { finish({ state: "starting", installed: true, reachable: false }); await Promise.resolve(); });
   act(() => { localHostInstallController.clear(); store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }); });
   expect(document.getElementById("wizard-prepare")).toBeNull();
@@ -280,9 +283,9 @@ test("preparing this computer never offers Prepare again: the install, then wait
   act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true } }));
   expect(screen.getByText("Checking that this computer answers…")).toBeInTheDocument();
   expect(document.getElementById("wizard-prepare")).toBeNull();
-  // Answering, in use: its agents, in the same step.
+  // Answering: its agents, in the same step.
   act(() => store.patch({ pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
-    pairingInUse: "fp-local", node: "fp-local", nodeReach: "ok" }));
+    machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
   expect(screen.getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
   act(() => localHostInstallController.clear());
 });

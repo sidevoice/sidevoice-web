@@ -6,7 +6,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.unnamed": "Máquina sin nombre",
   "hosts.add": "Añadir una máquina",
   "hosts.use": "Usar {machine}",
-  "hosts.inUse": "En uso",
   "hosts.thisComputer": "Este ordenador",
   "hosts.connected": "Conectada",
   "hosts.checking": "Sin comprobar",
@@ -511,7 +510,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "voice.endOfTurn.hint": "Lo que decide que has terminado de hablar.",
   "keys.browserTitle": "Guardada en este navegador",
   // Machines, in either layout (MachineList).
-  "hosts.description": "Los ordenadores donde se ejecutan tus agentes. Sidevoice habla con el que está en uso; abre uno para ver sus agentes y dispositivos.",
+  "hosts.description": "Los ordenadores donde se ejecutan tus agentes. Sidevoice habla con todos a la vez; abre uno para ver sus agentes y dispositivos.",
   "hosts.pick": "Máquina",
   "hosts.online": "En línea",
   "hosts.useShort": "Usar",

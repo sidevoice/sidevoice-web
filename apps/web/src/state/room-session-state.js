@@ -4,7 +4,7 @@ export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 // line, no control held), and only a drop that outlasts it says the call is reconnecting.
 export const RECONNECT_GRACE_MS = 30000;
 export const JOIN_STEPS = { voice: 'Preparando la voz', room: 'Entrando en la sala', conversation: 'Volviendo a ', reconnect: 'Reconectando con la sala…' };
-export const NO_MACHINE = 'Ninguna máquina disponible. Enciende la que usas, o empareja una en Configuración › Máquinas.';
+export const NO_MACHINE = 'Ninguna máquina disponible. Enciende alguna de las tuyas, o empareja una en Configuración › Máquinas.';
 export const UNPAIRED = 'Este dispositivo no está emparejado con ninguna máquina. Emparéjalo para poder entrar.';
 export function initialSessionFacts() {
     return {
@@ -20,17 +20,17 @@ export function initialSessionFacts() {
         joinStep: null, joinFailure: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0, liveNote: '',
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
-        // The machines this device is paired with (never their tokens), the one in use, and the clock of the
-        // moment they were read so a row can say "hace 3 días" without reading one.
-        pairings: [], pairingInUse: null, machinesAt: 0, machinesReady: false, remoteHostStatus: {},
-        // Host-owned agent state is keyed by fingerprint, never by the machine currently in use.
+        // The machines this device is paired with (never their tokens) and the clock of the moment they were read so a
+        // row can say "hace 3 días" without reading one. Every one of them is live at once (`machineLinks`).
+        pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
+        // Host-owned agent state is keyed by fingerprint.
         hostAgents: {}, settingsAgentRequest: null,
         // The section Settings shows (SettingsDialog).
         settingsSection: 'general', machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
-        localHostAvailable: false, localHostSelected: false, localHostStatus: { state: 'absent' },
-        // How the node base in use is reached ('room' through a relay, 'node' directly; '' with none), the
-        // machine it belongs to, and — with none — why: 'unpaired', 'revoked', 'offline', 'away'.
-        rendezvous: '', node: null, nodeReach: '',
+        localHostAvailable: false, localHostStatus: { state: 'absent' },
+        // How each paired machine is reached, by fingerprint: `{reach, via}` — reach 'ok', 'checking', 'away', 'offline'
+        // or 'revoked'; via 'room' (through a relay) or 'node' (directly). And the machine the call is with, if any.
+        machineLinks: {}, callNode: null,
         // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
         pairingOpen: false, pairingNote: '',
         // The language this device speaks in a call, and whether this page runs inside the desktop app.
@@ -44,7 +44,18 @@ export function initialSessionFacts() {
         voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, deviceName: null, providerKeys: {},
     };
 }
-export function selectedThread(s) { return s.roomBinding?.thread_id || null; }
+/* A conversation is a thread on a machine: the page knows it by both (`conversationKey`), and only the requests and
+ * frames to that machine use the room's own `thread_id`. A fingerprint is base64url, so it never holds the separator. */
+const KEY_SEPARATOR = '|';
+export function conversationKey(node, thread) { return node && thread ? node + KEY_SEPARATOR + thread : null; }
+export function conversationOf(key) {
+    const at = typeof key === 'string' ? key.indexOf(KEY_SEPARATOR) : -1;
+    return at > 0 ? { node: key.slice(0, at), thread: key.slice(at + 1) } : null;
+}
+/** A row of a machine's conversations, as the page keeps it: the room's own, and the machine it came from. */
+export function personKey(p) { return conversationKey(p?.node, p?.thread_id); }
+/** The conversation the call is on: the call's machine and the thread its binding names. */
+export function selectedThread(s) { return conversationKey(s.callNode, s.roomBinding?.thread_id); }
 // A call whose socket is being reopened is still a call: the person is not told otherwise until the grace is over.
 function inCall(s) { return !!(s.ws || s.reconnecting); }
 export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
@@ -75,7 +86,7 @@ export function callCardView(s) {
     const selected = selectedThread(s);
     const agentSpeaking = !!s.botLive;
     const agent = agentSpeaking ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
-    const row = selected ? s.people.find(p => p.thread_id === selected) : null;
+    const row = selected ? s.people.find(p => personKey(p) === selected) : null;
     return { agent, youTalking: !!s.userLive, canSkip: false, conversation: selected,
         title: row?.title || s.roomBinding?.title || '' };
 }
@@ -117,14 +128,14 @@ export function viewedTitle(s) {
     const id = viewedThread(s);
     if (!id)
         return 'Conversación en directo';
-    return s.people.find(p => p.thread_id === id)?.title
+    return s.people.find(p => personKey(p) === id)?.title
         || s.history.find(r => r.thread === id && r.role === 'assistant')?.name
         || s.roomBinding?.title || 'Conversación en directo';
 }
 /** Who is answering: the agent's own model and effort, exactly as its harness reports them. */
 export function enginePanel(s) {
     const rows = [];
-    const engine = s.people?.find(person => person.thread_id === selectedThread(s))?.engine;
+    const engine = s.people?.find(person => personKey(person) === selectedThread(s))?.engine;
     if (engine?.model)
         rows.push({ id: 'agent', label: 'LLM',
             value: [engine.model, engine.effort].filter(Boolean).join(' · '),
@@ -146,7 +157,7 @@ export function capabilityPanel(s) {
 }
 /** Whether the voice is saying reply `r` now. */
 function saying(s, r) {
-    return !!s.karaokeState && s.karaokeState.segment === r.segment;
+    return !!s.karaokeState && s.karaokeState.segment === r.segment && conversationOf(r.thread)?.node === s.callNode;
 }
 export function playbackState(r, s) {
     if (r.role !== 'assistant')
@@ -176,7 +187,8 @@ export function conversationView(s) {
         ahead.set(r, sounding);
         sounding += Number(r.role === 'assistant' && ['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause', 'playing'].includes(r.audio));
     }
-    return { messages: records.map(r => ({ ...r, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
+    // A reply is said again through the call: one of another machine is not offered.
+    return { messages: records.map(r => ({ ...r, replayable: !!r.replayable && conversationOf(r.thread)?.node === s.callNode, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
             audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
             playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null })),
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
@@ -194,23 +206,30 @@ export function experimentalNote(p) {
         marked.includes('sessionIdentity') ? 'Identificación experimental: la conversación es la que muestra la tarjeta de Sidevoice.' : null].filter(Boolean).join(' ') || null;
 }
 export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? 'Este harness no informa cuándo está trabajando; los puntos siguen lo que dice la conversación.' : 'No sabemos si este harness informa cuándo está trabajando.'; }
+/** Whether a machine this device is paired with cannot be reached now: its conversations cannot hear anybody. */
+function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok'; }
+/** What this device calls a paired machine: its alias here, else the machine's own name. */
+function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }
 export function participantsView(s) {
     const selected = selectedThread(s), entries = [...s.people];
-    if (selected && !entries.some(p => p.thread_id === selected))
-        entries.unshift({ thread_id: selected, title: s.roomBinding.title, available: true });
-    return entries.map(p => {
-        const unread = unreadCount(s, p.thread_id);
+    if (selected && !entries.some(p => personKey(p) === selected))
+        entries.unshift({ thread_id: s.roomBinding.thread_id, node: s.callNode, title: s.roomBinding.title, available: true });
+    return entries.map(person => {
+        // A machine that does not answer leaves its conversations listed as it last said them, none of them reachable.
+        const p = machineDown(s, person.node) ? { ...person, available: false, reach: { state: 'offline' } } : person;
+        const key = personKey(p), unread = unreadCount(s, key);
         const reach = p.reach?.state || (p.available ? 'listening' : 'offline');
         const base = reach === 'listening' ? (unread ? unread + ' nuevas' : 'Escuchando') : reach === 'holding' ? 'No puede recibir' : p.available ? 'Sin poder recibir' : 'Desconectada';
-        const busy = working(s, p.thread_id);
+        const busy = working(s, key);
         // The dot already says "listening"; the line under the title says only what the dot cannot: where the
         // conversation runs, that it is thinking, what is waiting to be read, and a reach that is not normal.
         const subtitle = [unread ? unread + ' nuevas' : null,
             reach === 'holding' ? 'No puede recibir' : reach === 'offline' && !p.available ? 'Desconectada' : reach === 'offline' ? 'Sin poder recibir' : null]
             .filter(Boolean).join(' · ');
-        return { threadId: p.thread_id, title: p.title, selected: p.thread_id === selected, available: !!p.available, switching: s.switching,
+        // Grouped by the paired machine it runs on (one room each), named as this device names that machine.
+        return { threadId: key, title: p.title, selected: key === selected, available: !!p.available, switching: s.switching,
             unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
-            machine: p.machine?.host || null, machineId: p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
+            machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             model: p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
@@ -232,54 +251,57 @@ export function sinceText(seconds, now) {
     const days = Math.round(hours / 24);
     return days === 1 ? 'hace 1 día' : 'hace ' + days + ' días';
 }
-/** The machines this device is paired with, each as one row: its name, whether it is the one in use, where
- *  this device reaches it, and since when. A pairing the machine revoked stays listed, saying so, until the
- *  person pairs again or forgets it — a row that vanished would leave nothing to read about why. */
+/** The machines this device is paired with, each as one row: its name, how this device reaches it, and since when.
+ *  Every one of them is live at once: none is "the one in use". A pairing the machine revoked stays listed, saying so,
+ *  until the person pairs again or forgets it — a row that vanished would leave nothing to read about why. */
 export function machinesView(s) {
     const local = (s.pairings || []).find(p => p.local);
     const localStatus = s.localHostStatus?.state || 'absent';
     const showLocal = !!local || (s.localHostAvailable && localStatus !== 'absent');
     const localRow = showLocal ? {
         fp: local?.fp || 'local-host', host: local?.host || null, local: true, alias: !!local?.alias, machine_host: local?.machine_host ?? null,
-        inUse: !!s.localHostSelected || (!!local && s.pairingInUse === local.fp),
-        selectable: !!local && s.localHostStatus?.reachable === true,
         localStatus,
     } : null;
     const rows = [
         ...(localRow ? [localRow] : []),
-        ...(s.pairings || []).filter(p => !p.local && p.fp !== local?.fp).map(p => ({ ...p, inUse: !s.localHostSelected && p.fp === s.pairingInUse, localStatus: null, selectable: true })),
+        ...(s.pairings || []).filter(p => !p.local && p.fp !== local?.fp).map(p => ({ ...p, localStatus: null })),
     ];
     return rows.map(p => {
-        const inUse = !!p.inUse;
         const status = p.local ? s.localHostStatus : null;
         const localStatus = p.local ? status?.state || 'absent' : null;
-        const knownRemote = s.remoteHostStatus?.[p.fp];
-        const remoteReach = inUse && s.node === p.fp ? s.nodeReach === 'ok' ? 'connected'
-            : ['away', 'offline'].includes(s.nodeReach) ? 'offline' : 'checking' : knownRemote?.state || 'checking';
+        const link = s.machineLinks?.[p.fp];
+        const remoteReach = link?.reach === 'ok' ? 'connected' : ['away', 'offline'].includes(link?.reach) ? 'offline' : 'checking';
         const reachableLocal = p.local && status?.reachable === true && !!local?.fp;
         const reach = p.revoked ? 'revoked' : p.local ? reachableLocal ? 'direct'
             : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'offline' : 'checking'
-            : remoteReach === 'connected' ? s.node === p.fp && s.rendezvous === 'room' ? 'room'
-                : s.node === p.fp && s.rendezvous === 'node' ? 'direct' : 'idle'
+            : remoteReach === 'connected' ? link.via === 'room' ? 'room' : 'direct'
             : remoteReach === 'offline' ? 'offline' : 'checking';
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
-        return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', inUse, revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, selectable: p.selectable, alias: !!p.alias, machineHost: p.machine_host ?? null, insecure: p.insecure === true,
+        return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', revoked: !!p.revoked, reach,
+            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null, insecure: p.insecure === true,
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
-/** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). */
+/** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). The
+ *  machine it speaks of is the call's, else the one of the conversation being looked at, else the only one paired. */
 export function reachNote(s) {
-    const p = (s.pairings || []).find(x => x.fp === s.pairingInUse), called = p?.host ? '«' + p.host + '»' : 'la máquina';
-    const Called = called[0].toUpperCase() + called.slice(1);
-    if (s.nodeReach === 'unpaired')
-        return UNPAIRED;
-    if (s.nodeReach === 'revoked')
+    const pairings = s.pairings || [];
+    if (!pairings.length)
+        return s.machinesReady ? UNPAIRED : '';
+    const fp = s.callNode || conversationOf(viewedThread(s))?.node || (pairings.length === 1 ? pairings[0].fp : null);
+    if (!fp) {
+        // Several machines and none chosen: only when every one of them has answered that it is not there.
+        const links = pairings.map(p => s.machineLinks?.[p.fp]?.reach);
+        return links.every(reach => ['away', 'offline', 'revoked'].includes(reach)) ? NO_MACHINE : '';
+    }
+    const p = pairings.find(x => x.fp === fp), called = p?.host ? '«' + p.host + '»' : 'la máquina';
+    const Called = called[0].toUpperCase() + called.slice(1), reach = p?.revoked ? 'revoked' : s.machineLinks?.[fp]?.reach;
+    if (reach === 'revoked')
         return Called + ' ya no reconoce este dispositivo: se revocó el emparejamiento. Vuelve a emparejarlo con un código nuevo.';
-    if (s.nodeReach === 'offline')
-        return Called + ' no está conectada a la sala ahora mismo. Enciéndela, o usa otra en Configuración › Máquinas.';
-    if (s.nodeReach === 'away')
+    if (reach === 'offline')
+        return Called + ' no está conectada a la sala ahora mismo. Comprueba que está encendida.';
+    if (reach === 'away')
         return 'No se llega a ' + called + ' ni directamente ni a través de la sala. Comprueba que está encendida.';
     return '';
 }
@@ -313,7 +335,7 @@ export function recordReceipt(s, id, status, at) {
 export function recordReply(s, d) {
     const id = (d.session_id || s.sessionId) + ':user-turn:' + (d.reply_revision ?? d.revision);
     const previous = s.turns[id] || {};
-    return { ...s.turns, [id]: { ...previous, session: d.session_id || s.sessionId, thread: d.thread_id, settled: true } };
+    return { ...s.turns, [id]: { ...previous, session: d.session_id || s.sessionId, thread: conversationKey(s.callNode, d.thread_id), settled: true } };
 }
 // A single store is shared by React and the runtime adapter. The writable facade records top-level
 // facts; batch() makes a synchronous protocol transition observable only once. Nested records are

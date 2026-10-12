@@ -37,7 +37,6 @@ export type PairingSummary = Omit<Pairing, "token" | "public_key" | "paired_at" 
   /** Renamed on this device: `host` is the person's name for it, `machine_host` the machine's own. */
   alias?: boolean; machine_host?: string | null };
 export interface Pairings {
-  inUse: string | null;
   list: Pairing[];
 }
 export interface CandidateBase {
@@ -103,9 +102,7 @@ export function readPairings(storage: Pick<Storage, "getItem"> | null | undefine
 export function readPairingState(storage: Pick<Storage, "getItem"> | null | undefined): Pairings;
 export function projectPairings(stored: Pairings, localPairing: Pairing | null): Pairings;
 export function writePairings(storage: Pick<Storage, "setItem">, pairings: Pairings): boolean;
-export function withPairing(pairings: Pairings, pairing: Pairing, options?: { use?: boolean }): Pairings;
+export function withPairing(pairings: Pairings, pairing: Pairing): Pairings;
 export function withoutPairing(pairings: Pairings, fp: string): Pairings;
-export function usingPairing(pairings: Pairings, fp: string): Pairings;
 export function revokedPairing(pairings: Pairings, fp: string): Pairings;
-export function pairingInUse(pairings: Pairings): Pairing | null;
 export function pairingSummary(pairing: Pairing): PairingSummary;
