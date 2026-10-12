@@ -5,6 +5,7 @@ import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
+import { TranscriptEntry } from "./TranscriptEntry";
 import { callTranslator } from "./call-i18n";
 import { useVoiceSwitch } from "../../state/call-model";
 import { MuteAgentsButton, VoiceMuteButton, VoiceNote, VoiceSwitch } from "./VoiceControls";
@@ -41,6 +42,7 @@ export function CallToolbar() {
 function CallButtonToolbar() {
   const t = callTranslator();
   const [devicesOpen, setDevicesOpen] = useState(false);
+  const narrow = useMedia(NARROW_QUERY);
   return (
     <footer className="call-bar">
       <AudioDevicesBar id="audio-devices" open={devicesOpen} onClose={() => setDevicesOpen(false)} />
@@ -57,6 +59,8 @@ function CallButtonToolbar() {
           <CallMenu />
         </div>
       </div>
+      {/* On a desktop, the transcript's button at the bar's right end, a round button as the bar's, level with them. */}
+      {!narrow && <div className="call-bar-end"><TranscriptEntry /></div>}
     </footer>
   );
 }
@@ -86,6 +90,8 @@ function VoiceSwitchToolbar() {
           {!narrow && <CallMenu />}
         </div>
       </div>
+      {/* On a desktop, the transcript's button at the bar's right end, a round button as the bar's, level with them. */}
+      {!narrow && <div className="call-bar-end"><TranscriptEntry /></div>}
     </footer>
   );
 }

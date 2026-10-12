@@ -86,6 +86,7 @@
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-surface); box-shadow: var(--sv-shadow-md); }
 .call-bar-end { grid-column: 3; grid-row: 1; justify-self: end; display: flex; align-items: center; gap: var(--sv-space-2); padding-bottom: calc(var(--sv-space-2) + 1px); }
 .call-bar-end:empty { display: none; }
+.call-bar-end .transcript-entry { position: static; width: var(--sv-call-button); height: var(--sv-call-button); }
 
 /* Centred, its mark inline with the first line however many lines it takes. */
 .join-status { grid-row: 1; align-self: end; max-width: min(100%, 30rem); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); text-align: center; color: var(--sv-text-muted); }

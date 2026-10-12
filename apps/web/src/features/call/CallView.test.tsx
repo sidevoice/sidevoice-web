@@ -445,17 +445,42 @@ test("the header menu gives focus back to its button however it closes, unless a
   await waitFor(() => expect(document.activeElement).toBe(button));
 });
 
-test("exactly one way into the transcript, the button in the tile, on a phone and a desktop, with or without a conversation on the stage", () => {
+test("exactly one way into the transcript: on a phone in the tile, on a desktop at the bar's right end; with or without a conversation on the stage", () => {
   for (const narrow of [false, true]) for (const binding of [{ thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" }, null]) {
     viewport({ narrow });
     room({ roomBinding: binding });
     const ways = document.querySelectorAll("#transcript-toggle");
     expect([narrow, !!binding, ways.length]).toEqual([narrow, !!binding, 1]);
-    expect(ways[0].closest(".stage-tile")).not.toBeNull();
+    if (narrow) {
+      expect(ways[0].closest(".stage-tile")).not.toBeNull();
+      expect(ways[0].closest(".call-bar")).toBeNull();
+    } else {
+      expect(ways[0].closest(".call-bar-end")).not.toBeNull();
+      expect(ways[0].closest(".call-bar-card")).toBeNull();
+      expect(ways[0].closest(".stage-tile")).toBeNull();
+    }
     cleanup();
     vi.restoreAllMocks();
   }
 });
+
+test("on a desktop the bar's transcript button opens and closes the panel and wears the unread dot", async () => {
+  viewport({ narrow: false });
+  const store = room();
+  const button = document.querySelector(".call-bar-end #transcript-toggle")!;
+  expect(button).not.toBeNull();
+  patch(store, { history: [...store.getState().facts.history,
+    { segment: "h-3", thread: "fp-1|t-login", role: "assistant", text: "Shall I also add a retry?", name: "Fix the slow login", time: 2, session: "s1" }] });
+  expect(button.querySelector(".transcript-entry-dot")).not.toBeNull();
+  await act(async () => { fireEvent.click(button); });
+  expect(button).toHaveAttribute("aria-expanded", "true");
+  expect(document.getElementById("transcript")).toHaveAttribute("data-open");
+  await act(async () => { fireEvent.click(button); });
+  expect(button).toHaveAttribute("aria-expanded", "false");
+  expect(document.getElementById("transcript")).not.toHaveAttribute("data-open");
+  expect(button.querySelector(".transcript-entry-dot")).toBeNull();
+  expect(document.querySelectorAll("#transcript-toggle")).toHaveLength(1);
+}, WHOLE_APP_MS);
 
 test("the transcript button wears a dot for what arrives while it is closed; opening it reads them", async () => {
   const store = room();

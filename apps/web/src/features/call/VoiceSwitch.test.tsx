@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY } from "../../state/call-layout";
@@ -258,4 +258,34 @@ test("the announcer is one polite region, there only in B", () => {
   expect(region).toHaveAttribute("role", "status");
   expect(region).toHaveAttribute("aria-live", "polite");
   expect(region).toHaveClass("sr-only");
+}, WHOLE_APP_MS);
+
+const said = (segment: string, time: number) => ({ segment, thread: "fp-1|t-login", role: "assistant", text: "Done.", name: "Fix the slow login", time, session: "s1" });
+
+test("B: the transcript's one button is at the bar's right end on a desktop, in the tile on a phone", async () => {
+  for (const narrow of [false, true]) {
+    phone(narrow);
+    const store = room({ history: [said("r1", 1)] } as never);
+    const ways = document.querySelectorAll("#transcript-toggle");
+    expect([narrow, ways.length]).toEqual([narrow, 1]);
+    const button = ways[0];
+    if (narrow) {
+      expect(button.closest(".stage-tile")).not.toBeNull();
+      expect(button.closest(".call-bar")).toBeNull();
+    } else {
+      expect(button.closest(".call-bar-end")).not.toBeNull();
+      expect(button.closest(".call-bar-card")).toBeNull();
+      expect(button.closest(".stage-tile")).toBeNull();
+      patch(store, { history: [said("r1", 1), said("r2", 2)] } as never);
+      expect(button.querySelector(".transcript-entry-dot")).not.toBeNull();
+      await act(async () => { fireEvent.click(button); });
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      expect(document.getElementById("transcript")).toHaveAttribute("data-open");
+      await act(async () => { fireEvent.click(button); });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(button.querySelector(".transcript-entry-dot")).toBeNull();
+    }
+    cleanup();
+    vi.restoreAllMocks();
+  }
 }, WHOLE_APP_MS);

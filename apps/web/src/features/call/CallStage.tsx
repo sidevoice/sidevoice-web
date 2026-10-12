@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { HandIcon, HarnessIcon } from "../../components/ui/Icons";
-import { useCallLayout } from "../../state/call-layout";
+import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
@@ -123,6 +123,8 @@ export function CallStage() {
   const label = voiceSwitch ? t("stage.labelActive") : t("stage.label");
   const heading = voiceSwitch ? -1 : undefined;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
+  // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
+  const narrow = useMedia(NARROW_QUERY);
 
   if (!stage.threadId) {
     return (
@@ -131,7 +133,7 @@ export function CallStage() {
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
-          <TranscriptEntry />
+          {narrow && <TranscriptEntry />}
         </div>
       </section>
     );
@@ -173,7 +175,7 @@ export function CallStage() {
           </Tooltip>}
         </div>
         <PersonTurn conversation={conversation} t={t} />
-        <TranscriptEntry />
+        {narrow && <TranscriptEntry />}
       </div>
     </section>
   );
