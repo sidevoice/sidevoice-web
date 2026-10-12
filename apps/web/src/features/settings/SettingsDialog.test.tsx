@@ -100,7 +100,7 @@ test("Advanced lists the models in one list, those in use first, by what they ar
   expect(uninstall).toHaveBeenCalledWith("whisper-base");
 });
 
-test("the voice detector comes first, is never deletable, and says why; a row is two lines or one (models-row)", () => {
+test("the voice detector comes first, is never deletable, and says why after its tags; a row's tags are purpose then In use, or the other way (models-row)", () => {
   const vad = { ...model("silero-vad", "silero-vad", "vad") };
   const withVad = [{ ...withUnused[0], models: [...(withUnused[0] as { models: unknown[] }).models, vad] }] as unknown as CatalogView[];
   const store = open("whisper-base");
@@ -110,7 +110,9 @@ test("the voice detector comes first, is never deletable, and says why; a row is
   expect(listed(list).map(([id]) => id)).toEqual(["silero-vad", "whisper-base", "kokoro-82m-v1.0", "whisper-small", "whisper-tiny"]);
   expect(screen.queryByRole("button", { name: "Delete silero-vad from this device" })).toBeNull();
   expect(list?.querySelector('[data-model="silero-vad"] .ui-infotip')).not.toBeNull();
-  expect(list).toHaveAttribute("data-row", "two-lines");
+  expect(list).toHaveAttribute("data-row", "chip-first");
+  const tags = (id: string) => [...list!.querySelector(`[data-model="${id}"] .downloaded-model-title`)!.children].map((tag) => tag.matches(".ui-infotip") ? "ui-infotip" : tag.className.split(" ")[0]);
+  expect(tags("silero-vad")).toEqual(["downloaded-model-name", "model-purpose", "ui-badge", "ui-infotip"]);
 });
 
 test("Remove all deletes every model not in use, asking first with how many and what it frees, and says which one stayed", async () => {
@@ -127,13 +129,15 @@ test("Remove all deletes every model not in use, asking first with how many and 
   expect(screen.getByText(/^Deleted 1 of 2\. whisper-tiny is running right now/)).toHaveAttribute("role", "status");
 });
 
-test("models-row one-line: each model is one line, its purpose and size at its end", () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "models-row": "one-line" }));
+test("models-row badge-first: In use comes before the purpose", () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "models-row": "badge-first" }));
   try {
     const store = open("whisper-base");
     act(() => store.patch({ modelsRemovable: true, voiceCatalogue: { state: "ready", catalogs: withUnused, error: "" } }));
     fireEvent.click(document.getElementById("settings-advanced")!);
-    expect(document.getElementById("downloaded-models")).toHaveAttribute("data-row", "one-line");
+    expect(document.getElementById("downloaded-models")).toHaveAttribute("data-row", "badge-first");
+    const title = document.querySelector('[data-model="whisper-base"] .downloaded-model-title')!;
+    expect([...title.children].map((tag) => tag.className.split(" ")[0])).toEqual(["downloaded-model-name", "ui-badge", "model-purpose"]);
     expect(screen.getByRole("button", { name: "Remove all not in use · 126 MB" })).toBeInTheDocument();
   } finally { localStorage.removeItem("sidevoice.variants"); }
 });

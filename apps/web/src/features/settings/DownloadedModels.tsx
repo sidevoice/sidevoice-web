@@ -83,7 +83,10 @@ async function deleteAll(ids: string[]) {
   return { done, kept };
 }
 
-function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: Downloaded; inUse: boolean; removable: boolean; chip?: boolean; t: HostTranslate }) {
+/** The order of a row's tags after the name (VARIANTS `models-row`): its purpose then In use, or In use then its purpose. */
+export const MODELS_ROW = ["chip-first", "badge-first"] as const;
+
+function DownloadedModel({ model, inUse, removable, chip = true, order, t }: { model: Downloaded; inUse: boolean; removable: boolean; chip?: boolean; order: (typeof MODELS_ROW)[number]; t: HostTranslate }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -107,11 +110,12 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
       <div className="downloaded-model-main">
         <span className="downloaded-model-copy">
           <span className="downloaded-model-title"><code className="downloaded-model-name">{model.id}</code>
-            {inUse && <Badge tone="accent">{t("settings.advanced.inUse")}</Badge>}
-            {/* The voice detector: every call needs it, so it is never offered for deletion — said why. */}
+            {order === "badge-first" && inUse && <Badge tone="accent">{t("settings.advanced.inUse")}</Badge>}
+            {chip && <PurposeChip purpose={model.purpose} t={t} />}
+            {order === "chip-first" && inUse && <Badge tone="accent">{t("settings.advanced.inUse")}</Badge>}
+            {/* The voice detector: every call needs it, so it is never offered for deletion — said why, after the tags. */}
             {inUse && model.purpose === "every-call" && <InfoTip label={t("settings.advanced.vadInfoLabel")}>{t("settings.advanced.vadInfo")}</InfoTip>}</span>
-          <span className="downloaded-model-meta">{chip && <PurposeChip purpose={model.purpose} t={t} />}
-            <span className="downloaded-model-size">{size}{!inUse && model.lastUsedAt ? " · " + ago(model.lastUsedAt, t) : ""}</span></span>
+          <span className="downloaded-model-size">{size}{!inUse && model.lastUsedAt ? " · " + ago(model.lastUsedAt, t) : ""}</span>
         </span>
         {removable && !inUse && !asking && <Button ref={deleteButton} variant="ghost" tone="danger" size="sm" aria-label={t("settings.advanced.deleteNamed", { model: model.id })} onClick={() => setAsking(true)}>{t("settings.advanced.delete")}</Button>}
       </div>
@@ -129,7 +133,7 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
 
 export function DownloadedModels() {
   const t = hostTranslator();
-  const rowLayout = useVariant("models-row", ["two-lines", "one-line"] as const);
+  const tagOrder = useVariant("models-row", MODELS_ROW);
   const models = useDownloaded();
   const purposes = usePurposes();
   const removable = useRoomStore((state) => state.facts.modelsRemovable);
@@ -154,7 +158,7 @@ export function DownloadedModels() {
       : t("settings.advanced.deleteAllFailed", { done, count: unused.length, model: kept.id, reason: kept.message }));
     document.getElementById("downloaded-models")?.focus();
   }
-  const row = (model: Downloaded, chip = true) => <DownloadedModel key={model.id} model={model} inUse={inUse(model)} removable={removable} chip={chip} t={t} />;
+  const row = (model: Downloaded, chip = true) => <DownloadedModel key={model.id} model={model} inUse={inUse(model)} removable={removable} chip={chip} order={tagOrder} t={t} />;
   // Remove all, and its question: with the models not in use, wherever the design puts them.
   const removeAllControl = removable && unused.length > 1 && <div className="downloaded-remove-all">
     {!askingAll ? <Button variant="ghost" tone="danger" size="sm" id="downloaded-remove-all" onClick={() => setAskingAll(true)}>{t("settings.advanced.deleteAllUnusedSized", { size: freed })}</Button>
@@ -170,7 +174,7 @@ export function DownloadedModels() {
   return (
     <Row block label={t("settings.advanced.downloaded")}
       description={models.length ? <>{t("settings.advanced.downloadedHint", { total })}{!removable && <> {t("settings.advanced.cantDelete")}</>}</> : t("settings.advanced.downloadedNone")}>
-      {models.length > 0 && <div id="downloaded-models" className="downloaded-models" data-row={rowLayout} tabIndex={-1}>
+      {models.length > 0 && <div id="downloaded-models" className="downloaded-models" data-row={tagOrder} tabIndex={-1}>
         {sorted.map((model) => row(model))}
         {removeAllControl}
       </div>}

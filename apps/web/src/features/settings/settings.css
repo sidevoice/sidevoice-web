@@ -128,18 +128,15 @@
 .ui-row.settings-highlight { border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); box-shadow: 0 0 0 2px var(--sv-accent); transition: background-color var(--sv-dur-slow) var(--sv-ease); }
 @media (prefers-reduced-motion: reduce) { .ui-row.settings-highlight { transition: none; } }
 .downloaded-unused-confirm { margin: 0 0 var(--sv-space-2); }
-/* What a downloaded model is for: a quiet chip with its icon. The list's organisation (VARIANTS models-list) only moves
-   rows around; a row stays name and In use, then purpose and size, Delete at its end — on a phone too. */
+/* A downloaded model is one line: its name with its tags right after it (what it is for, a quiet chip with its icon,
+   and In use, in the order VARIANTS models-row says), its size at the end, and Delete. On a narrow screen the size
+   wraps under the name. */
 .downloaded-models:focus { outline: none; }
+.downloaded-model-copy { flex: 1 1 auto; justify-content: space-between; gap: var(--sv-space-3); }
 .downloaded-model-title { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
-.downloaded-model-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
-.downloaded-model-copy { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
+.downloaded-model-size { margin-inline-start: auto; white-space: nowrap; }
 .model-purpose { display: inline-flex; align-items: center; gap: 4px; padding: 1px var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1.125rem; white-space: nowrap; }
 .model-purpose svg { width: 13px; height: 13px; }
 .downloaded-remove-all { display: grid; gap: var(--sv-space-2); justify-items: start; margin-top: var(--sv-space-2); }
-/* A downloaded model's row (VARIANTS models-row): two lines — its name and In use, then its purpose and size — or one,
-   the name at the start and its purpose and size at the end. */
-.downloaded-models[data-row="one-line"] .downloaded-model-copy { flex-direction: row !important; align-items: center !important; justify-content: space-between; flex: 1 1 auto; gap: var(--sv-space-3) !important; }
-.downloaded-models[data-row="one-line"] .downloaded-model-meta { margin-inline-start: auto; justify-content: flex-end; }
 .downloaded-models .downloaded-model + .downloaded-model { padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
-@media (max-width: 550px) { .downloaded-models[data-row="one-line"] .downloaded-model-copy { flex-wrap: wrap; } }
+
