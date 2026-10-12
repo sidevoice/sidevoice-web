@@ -1434,6 +1434,35 @@ test('A try tells whoever shows it how it goes: the voice listening and the micr
  assert.deepEqual(plain(told),[{from:0,to:0},{from:10,to:18},{from:18,to:18}]);
 });
 
+test('A try that records the person hands on the take its voice gives once stopped (contract gap #40); a voice without one is asked for none',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const takes=[];s.context.takes=takes;
+ const ask=async task=>{
+  const tried=s.run("window.sidevoiceActions."+task);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+  await tried;
+ };
+ await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop']);
+ assert.deepEqual(takes,[],'0.3.x hands none');
+ // A voice with a take: asked for one as it starts, and it is handed on once the voice has stopped.
+ const listeners=new Set();voice.calls.length=0;
+ voice.start=async options=>{voice.calls.push(['start',options])};
+ voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
+ voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
+ await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop']]);
+ assert.deepEqual([...takes],[1]);
+ assert.equal(listeners.size,0,'and the voice is let go');
+ // The end of turn's too, once stopped.
+ const turn=s.run("window.sidevoiceActions.tryTurnSettings({onTake:take=>takes.push(take.ended_at+1)})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.run('window.sidevoiceActions.cancelVoiceTry()');
+ await assert.rejects(turn,{code:'trial-cancelled'});
+ assert.deepEqual([...takes],[1,2]);
+});
+
 // ----- a model of this device installed for a voice slot -----
 test('A model the slot names but that is not on this device installs, its progress in the store, and the catalogues are read again',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');

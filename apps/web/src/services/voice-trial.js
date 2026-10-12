@@ -11,6 +11,27 @@
 /** A monotonic clock where there is one (pages, workers), else the wall clock. */
 const now = () => globalThis.performance?.now?.() ?? Date.now();
 
+/**
+ * The take of a try (voice-take.ts, contract gap #40): asked of the voice only where it can hand one (its `onTake`) and
+ * someone wants it (`onTake` given). `listening()` starts the voice, with a take when it is asked; each listening
+ * stretch's take is kept as it comes — unless `dropping()`, a stretch the try leaves behind — and `hand()` gives the
+ * latest to `onTake` once the try has stopped the voice; `stop()` lets the voice go. A voice with no take
+ * (@sidevoice/voice 0.3.x, the desktop app's) is asked nothing and hands nothing: the try shows none.
+ * @param {import('./voice-take').TakingVoiceHost} voice
+ * @param {((take: import('./voice-take').VoiceTake) => void) | undefined} onTake
+ * @param {() => boolean} [dropping]
+ */
+function takeOf(voice, onTake, dropping = () => false) {
+  const asked = !!onTake && typeof voice.onTake === 'function';
+  let latest = null;
+  const stop = asked ? voice.onTake((take) => { if (!dropping()) latest = take; }) : () => {};
+  return {
+    listening: () => (asked ? voice.start({ take: true }) : voice.start()),
+    hand() { const take = latest; latest = null; if (take) onTake(take); },
+    stop,
+  };
+}
+
 /** A step of the person's turns as a try of the end of turn tells it (`tryEndOfTurn`): `listening` once the voice
  * listens (`again` after other settings restarted it), `restarting` while they do; within a turn, `speaking` and
  * `pause` (the voice no longer hears speech, and the turn has not ended); `ended`, the moment the voice decided the turn
@@ -43,12 +64,15 @@ function bounded(promise, { signal, timeoutMs }) {
  * `onTimings`, once heard: how long the voice took to be ready, and the turn's own (the speech, the pause waited for,
  * the recognition). As it goes: `onListening` once the voice hears the microphone (its models loaded, the microphone
  * open), and `onLevel`, the microphone's level from 0 to 1 as the voice measures it.
- * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void}} [options]
+ * `onTake`, once the voice has stopped (heard, failed or cancelled): what the microphone gave it, where the voice hands
+ * one (contract gap #40).
+ * @param {{signal?: AbortSignal, timeoutMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTake?: (take: import('./voice-take').VoiceTake) => void}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState, onTimings, onListening, onLevel } = {}) {
+export async function tryTranscription(voice, settings, { signal, timeoutMs = 20000, onState, onTimings, onListening, onLevel, onTake } = {}) {
   const stops = [];
   let readyMs = null;
+  const take = takeOf(voice, onTake);
   try {
     await voice.setSettings(settings);
     const heard = new Promise((resolve, reject) => {
@@ -65,10 +89,12 @@ export async function tryTranscription(voice, settings, { signal, timeoutMs = 20
     if (onState) stops.push(voice.onState(onState));
     if (onLevel) stops.push(voice.onLevel(onLevel));
     const starting = now();
-    return await bounded(voice.start().then(() => { readyMs = Math.round(now() - starting); onListening?.(); return heard; }), { signal, timeoutMs });
+    return await bounded(take.listening().then(() => { readyMs = Math.round(now() - starting); onListening?.(); return heard; }), { signal, timeoutMs });
   } finally {
     for (const stop of stops) stop();
     await voice.stop().catch(() => {});
+    take.stop();
+    take.hand();
   }
 }
 
@@ -116,19 +142,24 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
  * one tells late. A pause is the voice's state going from speaking back to listening within a turn; the end, its count
  * of turns in transcription rising (or the turn finishing, where that never shows). It listens until `signal` aborts
  * (`trial-cancelled`), `quietMs` pass with no speech (`trial-silence`) or the voice fails (its error); then the voice
- * stops, whatever happens. `onLevel`: the microphone's level from 0 to 1, as the voice measures it.
+ * stops, whatever happens. `onLevel`: the microphone's level from 0 to 1, as the voice measures it. `onTake`, once the
+ * voice has stopped: what the microphone gave it since it last started to listen, where the voice hands one (contract
+ * gap #40); what it heard before other settings is theirs, and goes with them.
  *
  * `retune` puts other settings in place while it runs: the voice takes a patience or an end of turn only as it starts,
  * so the turn in progress is dropped, the voice stops, takes them, and listens again. Asked again while it does, it
  * goes on with the latest; the same settings change nothing.
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
- * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void}} [options]
+ * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('./voice-take').VoiceTake) => void}} [options]
  * @returns {{done: Promise<void>, retune: (settings: import('@sidevoice/voice').VoiceSettings) => Promise<void>}} `done`
  *   settles once the try is over and the voice stopped, rejecting with why it ended.
  */
-export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel, onTurnStep } = {}) {
+export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel, onTurnStep, onTake } = {}) {
   const tell = (step) => onTurnStep?.(step);
+  // While the voice stops for other settings: the take it hands then is theirs.
+  let retuning = false;
+  const take = takeOf(voice, onTake, () => retuning);
   /** @type {(reason: unknown) => void} */
   let end = () => {};
   const over = new Promise((_, reject) => { end = reject; });
@@ -190,9 +221,12 @@ export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel
     turn = null;
     hush();
     for (;;) {
-      if (again) await voice.stop();
+      if (again) {
+        retuning = true;
+        await voice.stop().finally(() => { retuning = false; });
+      }
       await voice.setSettings(current);
-      await voice.start();
+      await take.listening();
       if (!wanted) break;
       current = wanted;
       wanted = null;
@@ -228,6 +262,8 @@ export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel
       signal?.removeEventListener('abort', abort);
       for (const stop of stops) stop();
       await voice.stop().catch(() => {});
+      take.stop();
+      take.hand();
     }
   })();
   return { done, retune };
