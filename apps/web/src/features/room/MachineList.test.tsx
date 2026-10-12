@@ -609,7 +609,7 @@ test("this computer's machine is marked in the list; stopped, it says Start brin
 test("a machine paired without encryption says so on its page, with why, and its entry carries a sign heard with its name", async () => {
   actions();
   const remote = { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 }, "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } };
-  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8765"], rv: null }), paired()], { remoteHostStatus: remote });
+  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8768"], rv: null }), paired()], { remoteHostStatus: remote });
   await act(async () => { entry("Lab box").click(); });
   const page = screen.getByRole("region", { name: "Lab box" });
   const badge = within(page.querySelector("header")!).getByText("Not encrypted");

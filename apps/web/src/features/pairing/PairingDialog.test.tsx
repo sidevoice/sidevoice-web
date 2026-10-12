@@ -22,7 +22,7 @@ function dialog(pairDevice: (...args: unknown[]) => Promise<unknown> = vi.fn()) 
 }
 /** A code as `sidevoice pair-device` prints it, for "nuc", valid for ten minutes from now. */
 function pairingCode(extra: Record<string, unknown> = {}) {
-  const payload = { v: 1, fp: "A".repeat(43), host: "nuc", urls: ["http://127.0.0.1:8765", "https://nuc.example:8765"], rv: null, secret: "s3cret",
+  const payload = { v: 1, fp: "A".repeat(43), host: "nuc", urls: ["http://127.0.0.1:8768", "https://nuc.example:8768"], rv: null, secret: "s3cret",
     exp: Math.floor(Date.now() / 1000) + 600, ...extra };
   return "SV1." + Buffer.from(JSON.stringify(payload)).toString("base64url");
 }
@@ -161,17 +161,17 @@ test("a machine its code's addresses don't reach is asked for by its address, th
   expect(address()).toHaveAccessibleName("Machine address (optional)");
   expect(screen.getByRole("button", { name: "About the address" })).toBeInTheDocument();
   // Typed as host:port; an https:// pasted with it goes.
-  fireEvent.change(address(), { target: { value: "https://192.168.1.20:8765" } });
-  expect(address().value).toBe("192.168.1.20:8765");
+  fireEvent.change(address(), { target: { value: "https://192.168.1.20:8768" } });
+  expect(address().value).toBe("192.168.1.20:8768");
   await connect();
-  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8765");
-  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach 192.168.1.20:8765 over https. Check the address and port.");
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
+  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach 192.168.1.20:8768 over https. Check the address and port.");
 });
 
 test("a code that doesn't say where its machine is needs its address; one it lists over plain http on a private network is filled in", async () => {
   const pairDevice = vi.fn().mockResolvedValue({ host: "nuc" });
   dialog(pairDevice);
-  paste(pairingCode({ urls: ["http://127.0.0.1:8765"] }));
+  paste(pairingCode({ urls: ["http://127.0.0.1:8768"] }));
   expect(address()).toHaveAccessibleName("Machine address");
   expect(address()).toBeRequired();
   expect(address()).toHaveAccessibleDescription("This code doesn't say where the machine is. Enter its address.");
@@ -180,11 +180,11 @@ test("a code that doesn't say where its machine is needs its address; one it lis
   expect(address()).toHaveAttribute("aria-invalid", "true");
   expect(document.activeElement).toBe(address());
   // Listed over plain http on a private network: the address starts there, for https first and then the person's say.
-  paste(pairingCode({ urls: ["http://127.0.0.1:8765", "http://192.168.1.20:8765"] }));
-  expect(address().value).toBe("192.168.1.20:8765");
+  paste(pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] }));
+  expect(address().value).toBe("192.168.1.20:8768");
   expect(address()).not.toHaveAccessibleDescription(/doesn't say/);
   // Plain http written to another machine is said under the address, and nothing is sent.
-  fireEvent.change(address(), { target: { value: "http://10.0.0.5:8765" } });
+  fireEvent.change(address(), { target: { value: "http://10.0.0.5:8768" } });
   await connect();
   expect(address()).toHaveAccessibleDescription("Pairing goes over HTTPS. Write the address without http://.");
   expect(document.activeElement).toBe(address());
@@ -197,13 +197,13 @@ test("a machine that answers only without encryption: refused at a public addres
   paste(pairingCode());
   fireEvent.click(screen.getByRole("button", { name: "Use a different address" }));
   expect(document.activeElement).toBe(address());
-  fireEvent.change(address(), { target: { value: "203.0.113.5:8765" } });
+  fireEvent.change(address(), { target: { value: "203.0.113.5:8768" } });
   await connect();
-  expect(screen.getByRole("alert")).toHaveTextContent("“nuc” only answers without encryption, at a public address. Turn on HTTPS in Sidevoice on that machine, then get a new code.");
+  expect(screen.getByRole("alert")).toHaveTextContent("“nuc” only answers without encryption, at a public address. Put an HTTPS proxy or tunnel in front of that machine, then get a new code.");
   expect(screen.getByRole("alert")).toHaveAttribute("data-tone", "danger");
   pairDevice.mockRejectedValue(new Error("pairing-http-blocked"));
   await connect();
-  expect(screen.getByRole("alert")).toHaveTextContent("This machine only answers without encryption, which a secure page can't reach. Pair from the Sidevoice desktop app, or turn on HTTPS in Sidevoice on that machine.");
+  expect(screen.getByRole("alert")).toHaveTextContent("This machine only answers without encryption, which a secure page can't reach. Pair from the Sidevoice desktop app, or put an HTTPS proxy or tunnel in front of that machine.");
   expect(screen.getByRole("alert")).toHaveAttribute("data-tone", "warning");
   expect(screen.getAllByRole("alert")).toHaveLength(1);
 });
@@ -212,11 +212,11 @@ test("a machine on a private network that answers only without encryption is rea
   let finish!: (value: unknown) => void;
   const pairDevice = vi.fn().mockRejectedValueOnce(new Error("pairing-http-private")).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   dialog(pairDevice);
-  const pasted = pairingCode({ urls: ["http://127.0.0.1:8765", "http://192.168.1.20:8765"] });
+  const pasted = pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] });
   paste(pasted);
   submit().focus();
   await connect();
-  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8765");
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
   const warning = document.querySelector<HTMLElement>(".pairing-consent")!;
   expect(warning).toHaveAttribute("data-tone", "warning");
   expect(warning).toHaveTextContent("This machine only answers without encryption. Anyone on this network could read the pairing code and this device's access token.");
@@ -225,7 +225,7 @@ test("a machine on a private network that answers only without encryption is rea
   expect(document.activeElement).toHaveAttribute("tabindex", "-1");
   const agree = within(warning).getByRole("button", { name: "Connect without encryption" });
   await act(async () => { agree.click(); });
-  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8765", { insecure: true });
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768", { insecure: true });
   // Only this button is busy, saying so; Connect waits, the fields are read-only, and the warning stays.
   expect(agree).toHaveAttribute("aria-busy", "true");
   expect(agree).toHaveTextContent("Connecting without encryption…");
@@ -243,7 +243,7 @@ test("a machine on a private network that answers only without encryption is rea
 test("agreeing holds for that code and address only, Connect and Enter never go without encryption, and a failure replaces the warning", async () => {
   const pairDevice = vi.fn().mockRejectedValue(new Error("pairing-http-private"));
   dialog(pairDevice);
-  paste(pairingCode({ urls: ["http://127.0.0.1:8765", "http://192.168.1.20:8765"] }));
+  paste(pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] }));
   await connect();
   expect(document.querySelector(".pairing-consent")).not.toBeNull();
   // Connect, or Enter, again: https again.
@@ -252,16 +252,16 @@ test("agreeing holds for that code and address only, Connect and Enter never go 
   expect(pairDevice).toHaveBeenCalledTimes(3);
   expect(pairDevice.mock.calls.every((call) => call.length === 3)).toBe(true);
   // Another address, or another code, and the warning is gone.
-  fireEvent.change(address(), { target: { value: "192.168.1.21:8765" } });
+  fireEvent.change(address(), { target: { value: "192.168.1.21:8768" } });
   expect(document.querySelector(".pairing-consent")).toBeNull();
   await connect();
-  paste(pairingCode({ urls: ["http://192.168.1.20:8765"], host: "other" }));
+  paste(pairingCode({ urls: ["http://192.168.1.20:8768"], host: "other" }));
   expect(document.querySelector(".pairing-consent")).toBeNull();
   // Agreed to, and failing: what failed replaces the warning, and the focus goes back to Connect.
   await connect();
   pairDevice.mockRejectedValueOnce(new Error("No se pudo llegar a «other» para emparejar. Vuelve a intentarlo."));
   await act(async () => { screen.getByRole("button", { name: "Connect without encryption" }).click(); });
-  expect(pairDevice).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), "192.168.1.21:8765", { insecure: true });
+  expect(pairDevice).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), "192.168.1.21:8768", { insecure: true });
   expect(document.querySelector(".pairing-consent")).toBeNull();
   expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach “other”. Check it's running and on your network, or enter its address.");
   expect(document.activeElement).toBe(submit());
