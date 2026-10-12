@@ -6,6 +6,7 @@ import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from 
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
 import type { SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
+import { headerRowWidth } from "../../test/header-row";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -185,27 +186,28 @@ test("replies this browser has not seen put the unread cue on that conversation'
 
 test("a phone's header avatars switch the call at a tap, and the chevron brings the whole list down", async () => {
   viewport({ narrow: true });
+  // A row with room for two avatars beside "+" and the chevron.
+  headerRowWidth(190);
   room();
-  const others = [...document.querySelectorAll(".header-avatar")];
-  // From the left as many as fit (three on this phone): the one waiting for you, the one working, then the rest; none
-  // left over, so the chevron counts none.
-  expect(others.map((button) => button.getAttribute("aria-label")?.split(" · ")[0])).toEqual([
-    "Review the nightly backups", "Migrate the payments API", expect.any(String),
-  ]);
-  expect(others[1].getAttribute("aria-label")).toBe("Migrate the payments API · Working");
-  expect(document.querySelector(".conversations-rest")).toBeNull();
+  const avatars = [...document.querySelectorAll(".header-avatar")];
+  // From the left, in the room's order, as many as fit: the one on the stage marked where it is; the chevron counts
+  // the rest.
+  expect(avatars.map((button) => button.getAttribute("aria-label")?.split(" · ")[0])).toEqual(["Fix the slow login", "Migrate the payments API"]);
+  expect(avatars.map((button) => button.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
+  expect(avatars[1].getAttribute("aria-label")).toBe("Migrate the payments API · Working");
+  expect(document.querySelector(".conversations-rest")).toHaveTextContent("+2");
   const sidebar = document.getElementById("conversations")!;
   // Asked of the header alone: a role query over the whole page costs a third of a second each under jsdom.
   const chevron = () => within(document.querySelector<HTMLElement>(".room-header")!).getByRole("button", { name: "All conversations (4)" });
   // A tap on one moves the call to it, without the list.
-  await act(async () => { fireEvent.click(others[0]); });
-  expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
+  await act(async () => { fireEvent.click(avatars[1]); });
+  expect(selectParticipant).toHaveBeenCalledWith("fp-1|t-pay");
   expect(sidebar).not.toHaveAttribute("data-open");
   // The whole list comes down from the chevron after them; picking one there switches too.
   await act(async () => { fireEvent.click(chevron()); });
   expect(sidebar).toHaveAttribute("data-open");
-  await act(async () => { fireEvent.click(rowOf("Migrate the payments API")); });
-  expect(selectParticipant).toHaveBeenLastCalledWith("fp-1|t-pay");
+  await act(async () => { fireEvent.click(rowOf("Review the nightly backups")); });
+  expect(selectParticipant).toHaveBeenLastCalledWith("fp-2|t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
 
   // The close button, a tap outside and Escape put it away too.
@@ -345,9 +347,11 @@ test("Escape closes only the topmost: a dialog, a menu or a handler above the tr
   expect(transcript).not.toHaveAttribute("data-open");
 });
 
-test("on a phone the conversations panel is a dialog: focus goes in, and back to what opened it", async () => {
+test("on a phone the conversations panel is a dialog: focus goes in, and back to what opened it, or to the one chosen", async () => {
   viewport({ narrow: true });
-  room();
+  headerRowWidth(190);
+  const store = room();
+  selectParticipant.mockImplementation((threadId: string) => store.patch({ viewedThread: threadId }));
   const sidebar = document.getElementById("conversations")!;
   const pill = screen.getByRole("button", { name: "All conversations (4)" });
   expect(sidebar).not.toHaveAttribute("role");
@@ -360,11 +364,14 @@ test("on a phone the conversations panel is a dialog: focus goes in, and back to
   expect(sidebar).not.toHaveAttribute("data-open");
   expect(sidebar).not.toHaveAttribute("role");
   expect(document.activeElement).toBe(pill);
-  // Picking a conversation gives focus back too.
+  // A conversation picked there is in the header's row (its last slot), and focus goes to its avatar.
   await act(async () => { fireEvent.click(pill); });
   await act(async () => { fireEvent.click(rowOf("Review the nightly backups")); });
   expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
-  expect(document.activeElement).toBe(pill);
+  const chosen = [...document.querySelectorAll<HTMLElement>(".room-header .header-avatar")].at(-1)!;
+  expect(chosen.getAttribute("aria-label")).toMatch(/^Review the nightly backups · /);
+  expect(chosen).toHaveAttribute("aria-pressed", "true");
+  expect(document.activeElement).toBe(chosen);
 });
 
 test("on a phone the transcript is a dialog too, and gives focus back to its button", async () => {

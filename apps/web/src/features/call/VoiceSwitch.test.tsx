@@ -6,6 +6,7 @@ import { NARROW_QUERY } from "../../state/call-layout";
 import type { SessionFacts } from "../../state/room-session-state.js";
 import { VARIANTS_KEY } from "../../lib/variants";
 import { markSetUp } from "../../test/onboarding";
+import { headerRowWidth } from "../../test/header-row";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -232,19 +233,23 @@ test("working shows on the stage with the voice off; the box writes without voic
   expect(box()).toHaveAttribute("placeholder", "Choose a conversation to write to");
 }, WHOLE_APP_MS);
 
-test("a phone's header ranks marks first, names B's states, and a tap sends focus to the stage's heading", async () => {
+test("a phone's header keeps the room's order and names B's states; a tap leaves focus on it; a mark behind the chevron is on it", async () => {
   phone(true);
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  headerRowWidth(190);
   room();
   const avatars = [...document.querySelectorAll<HTMLElement>(".header-avatar")];
-  expect(avatars.map((avatar) => avatar.getAttribute("aria-label"))).toEqual([
-    "Write the docs · Waiting for you", "Migrate the payments API · Working", "Plan the week · Can't receive",
-  ]);
-  await act(async () => { avatars[0].click(); });
-  expect(actions.selectParticipant).toHaveBeenCalledWith("fp-1|t-docs");
-  act(() => { vi.runAllTimers(); });
-  expect(document.activeElement?.tagName).toBe("H2");
-  expect(document.activeElement?.closest(".call-stage")).not.toBeNull();
+  // No ranking: the room's order, the one on the stage marked where it is.
+  expect(avatars.map((avatar) => avatar.getAttribute("aria-label"))).toEqual(["Fix the slow login · Ready", "Migrate the payments API · Working"]);
+  expect(avatars[0]).toHaveAttribute("aria-pressed", "true");
+  // Waiting for you behind the chevron: its filled hand on it, and said.
+  const chevron = document.querySelector<HTMLElement>(".conversations-toggle")!;
+  expect(chevron.querySelector(".conversations-cue")).toHaveAttribute("data-cue", "waiting-for-you");
+  expect(chevron).toHaveAccessibleName("All conversations (4), 1 hidden with something new");
+  // A tap selects it in place: it stays in the row, and the focus with it.
+  avatars[1].focus();
+  await act(async () => { avatars[1].click(); });
+  expect(actions.selectParticipant).toHaveBeenCalledWith("fp-1|t-pay");
+  expect(document.activeElement).toBe(avatars[1]);
 }, WHOLE_APP_MS);
 
 test("a reply unheard because the agents were muted says so in the transcript", () => {

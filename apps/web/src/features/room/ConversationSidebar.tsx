@@ -34,7 +34,7 @@ export const OPEN_CONVERSATIONS = "sidevoice-conversations-open";
  * was left; with the transcript docked and no room for both, it is the rail, and opening it puts the transcript away.
  * On a phone (2026-10-10) there is no room for it beside the call: the header carries a few avatars, and this same
  * list drops from it as a dialog over the dimmed call — choosing a conversation, the chevron, a tap outside or Escape
- * puts it away, and focus goes back to what opened it. */
+ * puts it away, and focus goes back to what opened it, or, a conversation chosen, to its avatar in the header. */
 export function ConversationSidebar() {
   // The conversation on the stage is the one marked in the list, whether or not the call has moved to it yet.
   const onStage = useStageConversation().threadId;
@@ -69,15 +69,24 @@ export function ConversationSidebar() {
     const header = document.querySelector(".room-header");
     if (header) panel.current?.style.setProperty("--conversations-top", header.getBoundingClientRect().bottom + "px");
   }, [modal]);
+  // Chosen on a phone, a conversation is in the header's row (its last slot if need be): focus goes to its avatar there,
+  // not back to the chevron.
+  const chosen = useRef<string | null>(null);
   useSurface({
     open: modal, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".participant-row[data-selected] .person:not(:disabled)")
       ?? panel.current?.querySelector<HTMLElement>(".person:not(:disabled)") ?? panel.current?.querySelector<HTMLElement>(".sidebar-close"),
-    fallbackFocus: () => document.querySelector<HTMLElement>("button.conversations-toggle"),
+    fallbackFocus: () => document.querySelector<HTMLElement>("button.conversations-toggle") ?? document.querySelector<HTMLElement>(".room-header .header-new"),
+    returnFocus: () => {
+      const threadId = chosen.current;
+      chosen.current = null;
+      return threadId ? [...document.querySelectorAll<HTMLElement>(".room-header .header-avatar")].find((avatar) => avatar.dataset.thread === threadId) : null;
+    },
   });
 
   const select = (threadId: string) => {
     window.sidevoiceActions?.selectParticipant(threadId);
+    if (modal) chosen.current = threadId;
     close();
   };
   // One toggle. Opening the rail opens the sidebar; with the docked transcript in the way, the transcript makes room.

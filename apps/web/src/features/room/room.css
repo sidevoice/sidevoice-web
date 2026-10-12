@@ -91,15 +91,34 @@
   /* No brand on a phone: the heading stays, for a screen reader only. */
   .room-header .brand { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  /* The other conversations from the left, as many as fit, then the chevron with the count of the rest. */
+  /* The conversations from the left, as many as fit (header-row.ts measures the row), then "+", then the chevron with
+     the count of the rest. */
   .header-conversations { display: flex; align-items: center; gap: var(--sv-space-1); flex: 1; min-width: 0; }
   .conversations-toggle { gap: 2px; padding-inline: var(--sv-space-2); }
   .conversations-rest { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
-  .header-avatar { display: grid; place-items: center; flex: none; margin: 0; padding: 2px; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .header-avatar { position: relative; display: grid; place-items: center; flex: none; margin: 0; padding: 2px; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .header-avatar .conversation-avatar { width: 34px; height: 34px; }
   .header-avatar:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 0; }
-  .header-avatar:disabled { cursor: default; opacity: .6; }
-  @media (hover: hover) { .header-avatar:not(:disabled):hover { background: var(--sv-hover); } }
+  .header-avatar[aria-disabled="true"] { cursor: default; opacity: .6; }
+  @media (hover: hover) { .header-avatar:not([aria-disabled="true"], [aria-pressed="true"]):hover { background: var(--sv-hover); } }
+  /* The one on the stage, marked where it is: the accent's soft circle behind it, as the column's chosen row, and a short
+     bar under it — a shape, not a colour alone. Neither is the focus ring, nor touches the state's dot. */
+  .header-avatar[aria-pressed="true"] { --dot-ring: var(--sv-accent-soft); background: var(--sv-accent-soft); }
+  .header-avatar[aria-pressed="true"]::after { content: ""; position: absolute; top: calc(100% + 3px); left: 50%; width: 16px; height: 3px; margin-left: -8px; border-radius: var(--sv-radius-pill); background: var(--sv-accent); }
+  /* A new conversation: a slot of its own, an empty avatar's dashed circle — never read as the chevron's "+3". Solid in
+     the accent while its panel is open. */
+  .header-new { display: grid; place-items: center; flex: none; width: 38px; height: 38px; margin: 0; padding: 0; border: 1.5px dashed var(--sv-border-strong); border-radius: 50%;
+    background: none; color: var(--sv-text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .header-new[aria-expanded="true"] { border-style: solid; border-color: var(--sv-accent); color: var(--sv-accent-text); }
+  .header-new:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+  @media (hover: hover) { .header-new:hover { background: var(--sv-hover); color: var(--sv-text); } }
+  /* What a conversation behind the chevron needs, as one cue on its corner, the most pressing: an avatar's own amber
+     hand (waiting for you, filled; wanting to talk, outlined), else the accent's dot for something unread. */
+  .conversations-cue { position: absolute; top: 6px; right: 6px; box-sizing: content-box; border: 2px solid var(--sv-bg); border-radius: 50%; pointer-events: none; }
+  .conversations-cue[data-cue="unread"] { width: 8px; height: 8px; background: var(--sv-accent); }
+  .conversations-cue:is([data-cue="waiting-for-you"], [data-cue="wants-to-talk"]) { display: grid; place-items: center; top: 2px; right: 2px; width: 16px; height: 16px;
+    box-sizing: border-box; border-width: 1.5px; background: var(--sv-voice-soft); color: var(--sv-voice-text); }
+  .conversations-cue svg { display: block; }
 
   /* The chevron after the avatars, wherever the variant puts them: it drops the list, and turns up while it is down. */
   .conversations-toggle svg { transition: transform var(--sv-dur-base) var(--sv-ease); }

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "./call-i18n";
-import { conversationState, headerConversations, machineGroups, moodText, personMood, smallAvatarMood, stageMood, stateText } from "./conversation-state";
+import { conversationState, machineGroups, moodText, personMood, smallAvatarMood, stageMood, stateText } from "./conversation-state";
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
@@ -28,8 +28,6 @@ test("the room's binding before a join or after a hang-up is not a call: no conv
   expect(smallAvatarMood(bound)).toBe("idle");
   expect(stateText(bound, false, en)).toBe("Waiting for you · 2 new");
   expect(stateText(bound, true, en)).toBe("In call");
-  // Out of the call it may sit in the header like any other conversation waiting for you.
-  expect(headerConversations([bound, row("b", { working: true })], null, false).map((item) => item.threadId)).toEqual(["a", "b"]);
 });
 
 test("a small avatar is offline, working or idle: waiting for you is idle, and the dot says it hears you", () => {
@@ -74,25 +72,6 @@ test("the person in the picture-in-picture keeps their own moves; the stage says
   expect(personMood({ inCall: false, speaking: true })).toBe("idle");
   expect(["offline", "speaking", "listening", "working", "idle"].map((mood) => moodText(mood as never, en)))
     .toEqual(["Offline", "Speaking", "Listening to you", "Working", "Resting"]);
-});
-
-test("a phone's header shows at most two others: waiting for you first, then working; never idle ones or the stage's", () => {
-  const rows = [
-    row("stage", { selected: true }),
-    row("busy-1", { working: true }),
-    row("off", { available: false, reach: "offline" }),
-    row("busy-2", { working: true }),
-    row("waits", {}),
-  ];
-  expect(headerConversations(rows, "stage", true).map((item) => item.threadId)).toEqual(["waits", "busy-1"]);
-  expect(headerConversations(rows.filter((item) => item.threadId !== "waits"), "stage", true).map((item) => item.threadId)).toEqual(["busy-1", "busy-2"]);
-  // Within a state, the one with more to read comes first; otherwise the room's order.
-  const waiting = [row("w1"), row("w2", { unread: 3 }), row("w3", { unread: 1 })];
-  expect(headerConversations(waiting, null, true).map((item) => item.threadId)).toEqual(["w2", "w3"]);
-  expect(headerConversations([row("stage", { selected: true }), row("off", { reach: "holding" })], "stage", true)).toEqual([]);
-  // A header with room for more, and everyone: the idle ones after, up to the limit.
-  expect(headerConversations([...rows, row("off", { reach: "holding" })], "stage", true, 4, true).map((item) => item.threadId)).toEqual(["waits", "busy-1", "busy-2", "off"]);
-  expect(headerConversations([...rows, row("off", { reach: "holding" })], "stage", true, 3, true)).toHaveLength(3);
 });
 
 test("the state line says the state in words, with what is unread beside a conversation that is not in the call", () => {

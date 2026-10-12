@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { initialSessionFacts, type SessionFacts } from "../../state/room-session-state.js";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "./call-i18n";
-import { voiceSwitchHeader, voiceSwitchStageMood, voiceSwitchState, voiceSwitchStateText } from "./conversation-state";
+import { voiceSwitchStageMood, voiceSwitchState, voiceSwitchStateText } from "./conversation-state";
 import { hearActionKey, voiceJoinLine, voiceMicReason, voiceNote, voiceNoteText, voicePosition, waitingBadge } from "./voice-view";
 import { composerPlaceholder } from "../conversation/composer-view";
 import { conversationTranslator } from "../conversation/conversation-i18n";
@@ -30,14 +30,6 @@ test("a row says the first state that applies: unreachable, a mark, speaking, wo
   expect(voiceSwitchStateText(row("m|a", { reach: "offline", available: false }), t)).toBe("Offline");
   // In Spanish, the idle-but-reachable state is "Lista": never "Esperándote", which is a mark.
   expect(voiceSwitchStateText(row("m|a"), callTranslator("es"))).toBe("Lista");
-});
-
-test("a phone's header ranks waiting for you, then wanting to talk, then working — more unread first — never the stage's", () => {
-  const rows = [row("m|ready"), row("m|working", { agentWorking: true }), row("m|wants", { mark: "wants-to-talk" }),
-    row("m|waits", { mark: "waiting-for-you" }), row("m|waits2", { mark: "waiting-for-you", unread: 3 }), row("m|stage", { mark: "waiting-for-you" })];
-  expect(voiceSwitchHeader(rows, "m|stage", 4).map((candidate) => candidate.threadId)).toEqual(["m|waits2", "m|waits", "m|wants", "m|working"]);
-  expect(voiceSwitchHeader(rows, "m|stage", 9, true).map((candidate) => candidate.threadId).at(-1)).toBe("m|ready");
-  expect(voiceSwitchHeader(rows, "m|stage", 9).map((candidate) => candidate.threadId)).not.toContain("m|ready");
 });
 
 test("the stage: offline, then speaking and listening with the voice on, then working whatever the voice, else idle", () => {

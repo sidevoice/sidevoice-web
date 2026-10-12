@@ -9,6 +9,8 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "header.showConversations": "Ver las conversaciones",
   "header.otherConversation": "{title} · {state}",
   "header.allConversations": "Todas las conversaciones ({n})",
+  "header.allConversationsNews.one": "Todas las conversaciones ({n}), 1 oculta con novedades",
+  "header.allConversationsNews.other": "Todas las conversaciones ({n}), {k} ocultas con novedades",
 
   "sidebar.title": "Conversaciones",
   "sidebar.collapse": "Contraer las conversaciones",

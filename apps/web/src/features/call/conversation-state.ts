@@ -3,8 +3,8 @@ import type { AvatarMood } from "../avatar/avatar-spec";
 import type { CallTranslate } from "./call-i18n";
 
 /* What the call view says about a conversation, derived in one place from the room's own row (participantsView)
- * and whether this page is in the call: the dot beside its avatar, the line under its title, how its avatar moves,
- * and which ones earn a place in a phone's header. Nothing here reads a clock or the DOM. */
+ * and whether this page is in the call: the dot beside its avatar, the line under its title, and how its avatar moves.
+ * Nothing here reads a clock or the DOM. */
 
 export type { AvatarMood };
 
@@ -68,23 +68,6 @@ export function personMood({ inCall, speaking }: { inCall: boolean; speaking: bo
   return speaking ? "speaking" : "present";
 }
 
-const HEADER_RANK: Partial<Record<ConversationState, number>> = { waiting: 0, working: 1 };
-const HEADER_LIMIT = 2;
-/** With `everyone`, the others rank after those waiting and working: a header that has room shows them too. */
-const OTHERS_RANK = 2;
-
-/** A phone's header has room for two other conversations: those waiting for you first, then those working — the
- *  more unread first within each, the room's order otherwise. Idle ones, and the one on the stage, are not there;
- *  the pill beside them opens all of them. */
-export function headerConversations(rows: ParticipantView[], onStage: string | null, inCall: boolean, limit = HEADER_LIMIT, everyone = false): ParticipantView[] {
-  return rows
-    .map((row, index) => ({ row, index, rank: HEADER_RANK[conversationState(row, inCall)] ?? (everyone ? OTHERS_RANK : undefined) }))
-    .filter((entry): entry is { row: ParticipantView; index: number; rank: number } => entry.rank !== undefined && entry.row.threadId !== onStage)
-    .sort((a, b) => a.rank - b.rank || b.row.unread - a.row.unread || a.index - b.index)
-    .slice(0, limit)
-    .map((entry) => entry.row);
-}
-
 /** The words for a conversation's state, with what is waiting to be read when it is not the call's. */
 export function stateText(row: ParticipantView, inCall: boolean, t: CallTranslate): string {
   const state = conversationState(row, inCall);
@@ -124,19 +107,6 @@ export function voiceSwitchStateText(row: ParticipantView, t: CallTranslate): st
 export function voiceSwitchAvatarMood(row: Pick<ParticipantView, "reach" | "agentWorking">): AvatarMood {
   if (row.reach === "offline") return "offline";
   return row.agentWorking ? "working" : "idle";
-}
-
-const VOICE_SWITCH_HEADER_RANK: Partial<Record<VoiceSwitchState, number>> = { "waiting-for-you": 0, "wants-to-talk": 1, working: 2 };
-
-/** A phone's header in call model B: waiting for you, then wanting to talk, then working — the more unread first within
- *  each, the room's order otherwise — and, with `everyone`, the rest after them. Never the one on the stage. */
-export function voiceSwitchHeader(rows: ParticipantView[], onStage: string | null, limit = HEADER_LIMIT, everyone = false): ParticipantView[] {
-  return rows
-    .map((row, index) => ({ row, index, rank: VOICE_SWITCH_HEADER_RANK[voiceSwitchState(row)] ?? (everyone ? 3 : undefined) }))
-    .filter((entry): entry is { row: ParticipantView; index: number; rank: number } => entry.rank !== undefined && entry.row.threadId !== onStage)
-    .sort((a, b) => a.rank - b.rank || b.row.unread - a.row.unread || a.index - b.index)
-    .slice(0, limit)
-    .map((entry) => entry.row);
 }
 
 export interface VoiceSwitchStageFacts {

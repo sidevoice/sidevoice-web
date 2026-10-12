@@ -33,11 +33,13 @@ export interface SurfaceOptions {
   initialFocus?(): HTMLElement | null | undefined;
   /** Where focus goes back when what opened it is gone. */
   fallbackFocus?(): HTMLElement | null | undefined;
+  /** Where focus goes as it closes, rather than back to what opened it (what was chosen in it, now elsewhere). */
+  returnFocus?(): HTMLElement | null | undefined;
 }
 
-export function useSurface({ open, close, container, modal, initialFocus, fallbackFocus }: SurfaceOptions) {
-  const latest = useRef({ close, initialFocus, fallbackFocus });
-  latest.current = { close, initialFocus, fallbackFocus };
+export function useSurface({ open, close, container, modal, initialFocus, fallbackFocus, returnFocus }: SurfaceOptions) {
+  const latest = useRef({ close, initialFocus, fallbackFocus, returnFocus });
+  latest.current = { close, initialFocus, fallbackFocus, returnFocus };
 
   useEffect(() => {
     if (!open) return;
@@ -75,7 +77,7 @@ export function useSurface({ open, close, container, modal, initialFocus, fallba
       const now = document.activeElement;
       // Back only from inside, or from nowhere: never pulled away from where the person has since moved it.
       if (now && now !== document.body && !node?.contains(now)) return;
-      (opener?.isConnected ? opener : latest.current.fallbackFocus?.())?.focus({ preventScroll: true });
+      (latest.current.returnFocus?.() ?? (opener?.isConnected ? opener : latest.current.fallbackFocus?.()))?.focus({ preventScroll: true });
     };
   }, [open, modal, container]);
 }

@@ -8,6 +8,8 @@ export const en = {
   "header.showConversations": "Show conversations",
   "header.otherConversation": "{title} · {state}",
   "header.allConversations": "All conversations ({n})",
+  "header.allConversationsNews.one": "All conversations ({n}), 1 hidden with something new",
+  "header.allConversationsNews.other": "All conversations ({n}), {k} hidden with something new",
 
   "sidebar.title": "Conversations",
   "sidebar.collapse": "Collapse conversations",
