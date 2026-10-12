@@ -111,15 +111,3 @@ test("the design-system page can keep one in a state", () => {
   expect(screen.getByRole("button", { name: "Quote" })).toHaveAttribute("data-state", "failed");
 });
 
-test("how visible the copy button is follows the copy-button variant, always visible by default", () => {
-  const view = render(<><Snippet text="a" /><Quote text="b" /></>);
-  const roots = () => [...document.querySelectorAll(".ui-copy")].map((root) => root.getAttribute("data-copy-button"));
-  expect(roots()).toEqual(["visible", "visible"]);
-  view.unmount();
-  for (const value of ["faint", "hover"]) {
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ "copy-button": value }));
-    const next = render(<><Snippet text="a" /><Quote text="b" /></>);
-    expect(roots()).toEqual([value, value]);
-    next.unmount();
-  }
-});

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useVariant } from "../../lib/variants";
 import { CheckIcon, CopyIcon, WarningIcon } from "./Icons";
 import { uiTranslator } from "./ui-i18n";
 
@@ -11,10 +10,8 @@ import { uiTranslator } from "./ui-i18n";
  * selected for the person to copy, and "Select and copy" shows by the button — in words, on a phone too — for about four
  * seconds. A tap or a click on the text selects all of it, too.
  *
- * How visible the button is waits on the preview's variant (VARIANTS `copy-button`): always; faint until the pointer is
- * over the snippet; or not shown until then, though always on a touch screen. Keyboard focus always shows it. */
+ * The button is faint until the pointer is over the snippet or the keyboard is in it, then solid. */
 
-export const COPY_BUTTON = ["visible", "faint", "hover"] as const;
 
 /** How long the button says how the copy went before it is the copy button again: a failure, longer — it asks for
  *  something. */
@@ -95,10 +92,9 @@ function CopyButton({ text, label, feedback: pinned, target }: CopyProps & { tar
 
 /** A command for a terminal, or a file's lines (JSON, TOML), in monospace. */
 export function Snippet(props: CopyProps) {
-  const variant = useVariant("copy-button", COPY_BUTTON);
   const text = useRef<HTMLElement>(null);
   return (
-    <div className="ui-copy ui-snippet" data-copy-button={variant}>
+    <div className="ui-copy ui-snippet">
       <pre className="ui-snippet-text"><code ref={text}>{props.text}</code></pre>
       <CopyButton {...props} target={text} />
     </div>
@@ -107,10 +103,9 @@ export function Snippet(props: CopyProps) {
 
 /** A phrase to say to an agent, quoted. */
 export function Quote(props: CopyProps) {
-  const variant = useVariant("copy-button", COPY_BUTTON);
   const text = useRef<HTMLParagraphElement>(null);
   return (
-    <div className="ui-copy ui-quote" data-copy-button={variant}>
+    <div className="ui-copy ui-quote">
       <blockquote className="ui-quote-box"><p className="ui-quote-text" ref={text}>{props.text}</p></blockquote>
       <CopyButton {...props} target={text} />
     </div>

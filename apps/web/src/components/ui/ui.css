@@ -329,8 +329,8 @@
  * focus is in it. Hover: not shown until then — but always on a touch screen, which has no pointer over anything. Never
  * while it says how a copy went; and keyboard focus (focus-within) always shows it, so it is only ever made transparent,
  * never taken out of the tab order. */
-.ui-copy[data-copy-button="faint"]:not(:hover, :focus-within) .ui-copy-button:not([data-state]) { background: transparent; color: var(--sv-text-subtle); }
-@media (hover: hover) { .ui-copy[data-copy-button="hover"]:not(:hover, :focus-within) .ui-copy-button:not([data-state]) { opacity: 0; } }
+/* Faint until the pointer is over the snippet or the keyboard is in it. */
+.ui-copy:not(:hover, :focus-within) .ui-copy-button:not([data-state]) { background: transparent; color: var(--sv-text-subtle); }
 /* What the button says to a screen reader, out of sight. */
 .ui-copy-failed { position: absolute; z-index: 1; inset-block-start: calc(100% + 4px); inset-inline-end: 0; padding: 2px var(--sv-space-2); border-radius: var(--sv-radius-sm); background: var(--sv-danger-soft); color: var(--sv-danger); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); white-space: nowrap; pointer-events: none; }
 .ui-copy-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }

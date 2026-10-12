@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { CloseIcon } from "../../components/ui/Icons";
-import { useVariant } from "../../lib/variants";
 import { actionableAgent } from "../../services/host-agents";
 import { useRoomStore } from "../../state/room-store";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
@@ -14,8 +13,8 @@ import "./highlights.css";
  * not amber — what needs an action (a model to download, a key missing) keeps its own attention style and clears only
  * when resolved. Seeing the thing clears it (half of it in view for a second), and the dots above it go once nothing
  * new is under them; it also goes on its own two weeks after it was first shown. At most three show at once, the rest
- * waiting their turn. Whether each also has a × to clear it without looking is a design to compare (VARIANTS
- * `new-dismiss`). What was seen is this device's.
+ * waiting their turn. Each "New" also has a × to clear it without looking, for as long as it shows. What was seen is
+ * this device's.
  *
  * Today: agents a machine found and Sidevoice could connect, and — where What's new shows as dots (VARIANTS
  * `whats-new`) — the settings a release added. */
@@ -90,12 +89,11 @@ export function NewOnIcon({ icon, isNew, label }: { icon: ReactNode; isNew: bool
 }
 
 /** "New" on the thing itself. Seen (half of it in view for a second) it is cleared, but stays on screen until this view
- *  goes; with VARIANTS new-dismiss "with", a × clears it at once. */
+ *  goes; its × clears it at once, while it shows. */
 export function NewMark({ id }: { id: string }) {
   const t = hostTranslator();
   const items = useHighlights();
   const onboarding = useOnboardingIfAny();
-  const dismissable = useVariant("new-dismiss", ["with", "without"] as const) === "with";
   const isNew = items.some((item) => item.id === id);
   const [showing, setShowing] = useState(isNew);
   if (isNew && !showing) setShowing(true);
@@ -121,6 +119,6 @@ export function NewMark({ id }: { id: string }) {
   if (!showing) return null;
   return <span className="new-mark" ref={ref} data-highlight={id}>
     <Badge tone="accent">{t("highlights.new")}</Badge>
-    {dismissable && isNew && <button type="button" className="new-mark-dismiss" aria-label={t("highlights.dismiss")} title={t("highlights.dismiss")} onClick={dismiss}><CloseIcon size={12} /></button>}
+    {<button type="button" className="new-mark-dismiss" aria-label={t("highlights.dismiss")} title={t("highlights.dismiss")} onClick={dismiss}><CloseIcon size={12} /></button>}
   </span>;
 }
