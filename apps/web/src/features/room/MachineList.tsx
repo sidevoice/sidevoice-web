@@ -160,9 +160,15 @@ export function ThisComputerSettings() {
   const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
   const notice = useNotice();
   const copy = local ? machineCopy(local, status, t) : null;
+  const store = useContext(RoomStoreContext);
+  // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
+  const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const rename = () => store?.patch({ settingsSection: "general", settingsFocus: "device-name" });
   return (
-    <Section id="this-computer" title={t("settings.section.thisDevice")}>
-      {local && copy ? <HostDetail machine={local} copy={copy} notice={notice(local)} />
+    <Section id="this-computer" title={<span className="this-device-title">{name}
+      <Button variant="ghost" tone="neutral" size="icon-sm" className="this-device-rename" aria-label={t("hosts.renameDevice")} title={t("hosts.renameDevice")} onClick={rename}><EditIcon size={14} /></Button>
+    </span>}>
+      {local && copy ? <HostDetail machine={local} copy={copy} notice={notice(local)} untitled />
         : <div className="this-computer-prepare">
             <p>{t("localInstall.description")}</p>
             <LocalHostInstallEntry showCta source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
@@ -182,7 +188,7 @@ function reachText(machine: MachineView, t: HostTranslate) {
 
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
  *  paired with it, and forgetting it. */
-function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean }) {
+function HostDetail({ machine, copy, notice, untitled = false }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; untitled?: boolean }) {
   const t = hostTranslator();
   // Renaming the machine on this device: the name being typed, or null.
   const [naming, setNaming] = useState<string | null>(null);
@@ -199,7 +205,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true">{machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />}</span>
         <div className="host-detail-copy">
-          {naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
+          {untitled ? null : naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
               <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } if (event.key === "Enter") { event.preventDefault(); saveAlias(); } }} />
               <Button size="sm" variant="primary" onClick={saveAlias}>{t("hosts.devices.renameSave")}</Button>
@@ -210,7 +216,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
                 onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
             </h3>}
           {/* Renamed here: whose name it really is, and the way back to it. */}
-          {machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
+          {!untitled && machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
             <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
           <p className="muted">{[copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
         </div>

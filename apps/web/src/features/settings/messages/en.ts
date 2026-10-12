@@ -89,6 +89,7 @@ export const en = {
   "hosts.state.revoked": "No longer paired",
   "hosts.notEncrypted": "Not encrypted",
   "hosts.rename": "Rename {machine} on this device",
+  "hosts.renameDevice": "Rename this device",
   "hosts.renameLabel": "Name on this device",
   "hosts.aliasOf": "Its own name: {name}",
   "hosts.aliasReset": "Reset to the machine’s name",

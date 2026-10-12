@@ -91,6 +91,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.state.revoked": "Ya no está emparejado",
   "hosts.notEncrypted": "Sin cifrar",
   "hosts.rename": "Cambiar el nombre de {machine} en este dispositivo",
+  "hosts.renameDevice": "Cambiar el nombre de este dispositivo",
   "hosts.renameLabel": "Nombre en este dispositivo",
   "hosts.aliasOf": "Su propio nombre: {name}",
   "hosts.aliasReset": "Volver al nombre de la máquina",

@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { waitFor } from "@testing-library/react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -7,7 +8,7 @@ import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostStatus } from "../../services/desktop-host";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
-afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.settings"); });
+afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.settings"); localStorage.removeItem("sidevoice.deviceName"); });
 
 /* This device (decided 2026-10-12): in the desktop app, where it can host, a section of its own before Providers, and
  * Machines is Remote machines; anywhere else (a browser, even one talking to a local Sidevoice, or a phone) neither. */
@@ -46,7 +47,6 @@ test("in the desktop app: This device right before Providers, Remote machines af
   expect(navIcon("this-computer")).toHaveClass("lucide-laptop");
   expect(navIcon("machines")).toHaveClass("lucide-server");
   expect(navIcon("machines")).not.toHaveClass("lucide-monitor");
-  expect(document.querySelector("#pane-this-computer .ui-section-title")).toHaveTextContent(/^This device$/);
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Remote machines$/);
   expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add a remote machine"]);
 });
@@ -58,7 +58,6 @@ test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then 
   expect(names.indexOf("Este dispositivo")).toBe(names.indexOf("Proveedores") - 1);
   expect(names.indexOf("Máquinas remotas")).toBe(names.indexOf("Proveedores") + 1);
   expect(names).not.toContain("Máquinas");
-  expect(document.querySelector("#pane-this-computer .ui-section-title")).toHaveTextContent(/^Este dispositivo$/);
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Máquinas remotas$/);
   expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Añadir una máquina remota"]);
 });
@@ -86,6 +85,25 @@ test("in a browser talking to a local Sidevoice (it can host, but it isn't the a
   expect(navIcon("machines")).toHaveClass("lucide-monitor");
   expect(machinesNav()).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
   expect(machinesPane().querySelector('.machine-entry[data-name="MacBook"]')).not.toBeNull();
+});
+
+test("This device's page is titled with this device's name; its pencil renames it in General, the one place", async () => {
+  localStorage.setItem("sidevoice.deviceName", "Ana’s MacBook");
+  const store = open([local, paired()], { settingsSection: "this-computer" });
+  const pane = document.getElementById("pane-this-computer")!;
+  expect(pane.querySelector(".ui-section-title")).toHaveTextContent(/^Ana’s MacBook$/);
+  // The machine's page inside has no name, rename or alias of its own.
+  expect(pane.querySelector(".host-detail .host-name")).toBeNull();
+  expect(pane.querySelector(".host-rename-open")).toBeNull();
+  expect(within(pane).queryByRole("button", { name: /^Rename MacBook/ })).toBeNull();
+  await act(async () => { within(pane).getByRole("button", { name: "Rename this device" }).click(); });
+  expect(store.getState().facts.settingsSection).toBe("general");
+  await waitFor(() => expect(document.activeElement).toBe(document.getElementById("device-name")));
+  expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
+  cleanup();
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  open([local], { settingsSection: "this-computer" });
+  expect(screen.getByRole("button", { name: "Cambiar el nombre de este dispositivo" })).toBeInTheDocument();
 });
 
 test("with this computer prepared: This device shows its page; Remote machines lists the others alone", async () => {
