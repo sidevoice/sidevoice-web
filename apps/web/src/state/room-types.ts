@@ -1,4 +1,5 @@
 import type { DeviceVoiceSettings } from '../services/voice-settings.js';
+import type { TurnStep } from '../services/voice-trial.js';
 /** The part of a reply sounding now, as offsets into its text; `from` and `to` are the same between its chunks. */
 export interface KaraokeRange {
   from: number;
@@ -211,6 +212,12 @@ export interface SidevoiceActions {
    *  that work become this device's (`keep`). Resolves with the words heard and how long each phase took (voice-trial.js's
    *  TrialTimings); rejects with a sentence and the failure's `code`. What it tells while it runs: TrialProgress. */
   tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean } & TrialProgress): Promise<{ text?: string; timings?: TrialTimings | null }>;
+  /** Tries the end of turn being edited (Smart or Silence, with its patience), outside any call: it listens, telling each
+   *  step of the person's turns (TrialProgress `onTurnStep`) and the microphone's level, until `cancelVoiceTry`, 30 s
+   *  with no speech or a failure of the voice; it never resolves, and rejects with a sentence and why it ended
+   *  (`trial-cancelled`, `trial-silence`, the voice's code). A change of the end of turn while it runs restarts it with
+   *  the change; Smart without its model ready stops it. */
+  tryTurnSettings?(progress?: Pick<TrialProgress, "onLevel" | "onTurnStep">): Promise<void>;
   /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
   installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
@@ -249,11 +256,13 @@ export interface SidevoiceActions {
  *  microphone (its models loaded, the microphone open), and `onLevel`, the microphone's level from 0 to 1, many times a
  *  second. The voice: `onProgress` from its first sound on, the part of the sentence sounding now, in offsets into that
  *  text as JavaScript indexes it; between parts `from` and `to` meet at the end of what was heard, and the first sound
- *  is `{from: 0, to: 0}`. */
+ *  is `{from: 0, to: 0}`. The end of turn: `onTurnStep`, each step of the person's turns as the voice tells it
+ *  (voice-trial.js TurnStep), and `onLevel`. */
 export interface TrialProgress {
   onListening?(): void;
   onLevel?(level: number): void;
   onProgress?(range: KaraokeRange): void;
+  onTurnStep?(step: TurnStep): void;
 }
 
 /** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the

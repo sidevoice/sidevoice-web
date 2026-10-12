@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { tryTranscription, tryVoice } from "./voice-trial.js";
+import { tryEndOfTurn, tryTranscription, tryVoice, type TurnStep } from "./voice-trial.js";
 
 /* A try of the device's voice settings, through a voice that records what it was asked. */
 
@@ -125,4 +125,164 @@ test("while it runs a try tells how it goes: the voice listening and the microph
   await tryVoice(said as unknown as Voice, SETTINGS as never, "Hola", { onProgress: (step: unknown) => progress.push(step) });
   // The first sound is the start of it.
   expect(progress).toEqual([{ sounding: null, heard_chars: 0 }, { sounding: [0, 4], heard_chars: 0 }, { sounding: null, heard_chars: 4 }]);
+});
+
+/* The end of turn tried: the voice listens until stopped, and tells the latest of the person's turns step by step. */
+
+/** The voice's state as it tells it: whether it hears speech, and how many turns wait for or are in transcription. */
+const callState = (listening: string, recognising = 0) => ({ listening, recognising, playback: "idle", microphone: "live" });
+
+/** A try of the end of turn through `voice`, and the steps it told. */
+function tryTurns(voice: ReturnType<typeof fakeVoice>, options: { quietMs?: number; signal?: AbortSignal; settings?: unknown } = {}) {
+  const steps: TurnStep[] = [];
+  const run = tryEndOfTurn(voice as unknown as Voice, (options.settings ?? SETTINGS) as never, { ...options, onTurnStep: (step) => steps.push(step) });
+  return { run, steps };
+}
+
+test("a try of the end of turn tells the turn as it goes: speaking, a pause within it, its end the moment it is decided, then its words and the silence the voice waited", async () => {
+  const voice = fakeVoice();
+  const { run, steps } = tryTurns(voice);
+  await vi.waitFor(() => expect(steps).toEqual([{ step: "listening", again: false }]));
+  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"]]);
+  // Speech heard before its turn is told: the turn is what starts it.
+  voice.emit("state", callState("speaking"));
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("listening"));
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening"));
+  voice.emit("state", callState("listening", 1));
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: " hola, ¿me oyes? ", timings: { audio_ms: 2400, endpoint_silence_ms: 900, recognition_ms: 300 } });
+  expect(steps.slice(1)).toEqual([{ step: "speaking" }, { step: "pause" }, { step: "speaking" }, { step: "pause" }, { step: "ended" },
+    { step: "heard", text: "hola, ¿me oyes?", endpoint_silence_ms: 900 }]);
+  // The voice ends speech and decides the end in one state: the end, with no pause before it.
+  steps.length = 0;
+  voice.emit("state", callState("listening", 0));
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  voice.emit("state", callState("speaking"));
+  voice.emit("state", callState("listening", 1));
+  expect(steps).toEqual([{ step: "speaking" }, { step: "ended" }]);
+  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"]]);
+  void run.done.catch(() => {});
+});
+
+test("only the latest turn counts: one that starts drops what an earlier one tells late; a turn with no words or dropped by the voice did not count, one joined into the next says nothing", async () => {
+  const voice = fakeVoice();
+  const { steps } = tryTurns(voice);
+  await vi.waitFor(() => expect(steps).toHaveLength(1));
+  // Ended, and then the person goes on: the next turn is the evidence of a cut-off.
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", callState("listening", 1));
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  voice.emit("state", callState("speaking", 1));
+  voice.emit("turn", { phase: "cancelled", turn_id: "t1", merged: true });
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "late", timings: { audio_ms: 1, endpoint_silence_ms: 1, recognition_ms: 1 } });
+  voice.emit("state", callState("listening", 0));
+  voice.emit("state", callState("listening", 1));
+  voice.emit("turn", { phase: "finished", turn_id: "t2", text: "y luego sigo", merged: true, timings: { audio_ms: 4000, endpoint_silence_ms: 1300, recognition_ms: 400 } });
+  voice.emit("turn", { phase: "started", turn_id: "t3" });
+  voice.emit("turn", { phase: "finished", turn_id: "t3", text: "  " });
+  voice.emit("turn", { phase: "started", turn_id: "t4" });
+  voice.emit("turn", { phase: "cancelled", turn_id: "t4", merged: false });
+  voice.emit("turn", { phase: "started", turn_id: "t5" });
+  voice.emit("turn", { phase: "cancelled", turn_id: "t5", merged: true });
+  expect(steps.slice(1)).toEqual([
+    { step: "speaking" }, { step: "ended" },
+    { step: "speaking" }, { step: "pause" }, { step: "ended" }, { step: "heard", text: "y luego sigo", endpoint_silence_ms: 1300 },
+    { step: "speaking" }, { step: "not-a-turn" },
+    { step: "speaking" }, { step: "not-a-turn" },
+    { step: "speaking" },
+  ]);
+});
+
+test("it listens until stopped, or until a stretch with no speech; while the person speaks the quiet does not run out", async () => {
+  vi.useFakeTimers();
+  const voice = fakeVoice();
+  const { run, steps } = tryTurns(voice, { quietMs: 1000 });
+  let over = false;
+  const quiet = expect(run.done.finally(() => { over = true; })).rejects.toMatchObject({ code: "trial-silence" });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(steps).toEqual([{ step: "listening", again: false }]);
+  voice.emit("state", callState("speaking"));
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(over).toBe(false);
+  // The quiet starts over each time speech stops.
+  voice.emit("state", callState("listening", 1));
+  await vi.advanceTimersByTimeAsync(600);
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola", timings: { audio_ms: 1, endpoint_silence_ms: 600, recognition_ms: 1 } });
+  await vi.advanceTimersByTimeAsync(999);
+  expect(over).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await quiet;
+  expect(voice.calls.at(-1)).toEqual(["stop"]);
+  expect(listeners(voice)).toBe(0);
+});
+
+test("stopped, failed or never started: the try ends with why, and the voice stops and is let go", async () => {
+  const abort = new AbortController();
+  const stopped = fakeVoice();
+  stopped.on.level = new Set();
+  const levels: number[] = [];
+  const run = tryEndOfTurn({ ...stopped, onLevel: (listener: (value: unknown) => void) => { stopped.on.level.add(listener); return () => stopped.on.level.delete(listener); } } as unknown as Voice,
+    SETTINGS as never, { signal: abort.signal, onLevel: (level) => levels.push(level) });
+  await vi.waitFor(() => expect(stopped.calls).toContainEqual(["start"]));
+  stopped.emit("level", 0.3);
+  abort.abort();
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+  expect(levels).toEqual([0.3]);
+  expect(stopped.calls.at(-1)).toEqual(["stop"]);
+  expect(listeners(stopped)).toBe(0);
+
+  const broken = fakeVoice();
+  const erred = tryTurns(broken);
+  await vi.waitFor(() => expect(erred.steps).toHaveLength(1));
+  broken.emit("error", { code: "transcription-failed" });
+  await expect(erred.run.done).rejects.toMatchObject({ code: "transcription-failed" });
+  expect(broken.calls.at(-1)).toEqual(["stop"]);
+
+  const missing = fakeVoice({ startFails: { code: "end-of-turn-missing" } });
+  await expect(tryTurns(missing).run.done).rejects.toMatchObject({ code: "end-of-turn-missing" });
+  expect(missing.calls.at(-1)).toEqual(["stop"]);
+  expect(listeners(missing)).toBe(0);
+
+  const gone = new AbortController();
+  gone.abort();
+  await expect(tryTurns(fakeVoice(), { signal: gone.signal }).run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+});
+
+test("other settings while it runs: the turn in progress is dropped, the voice stops, takes them and listens again; the same ones change nothing", async () => {
+  const voice = fakeVoice();
+  const { run, steps } = tryTurns(voice);
+  await vi.waitFor(() => expect(steps).toHaveLength(1));
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  const calm = { ...SETTINGS, patience: "calm" };
+  const retuned = run.retune(calm as never);
+  // Stopping, the voice cancels the turn it had: that is not a turn that did not count.
+  voice.emit("turn", { phase: "cancelled", turn_id: "t1", merged: false });
+  voice.emit("state", callState("idle"));
+  await retuned;
+  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"], ["stop"], ["setSettings", calm], ["start"]]);
+  expect(steps.slice(1)).toEqual([{ step: "speaking" }, { step: "restarting" }, { step: "listening", again: true }]);
+  await run.retune({ ...calm } as never);
+  expect(voice.calls).toHaveLength(5);
+  // Listening again, it follows the turns as before.
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  expect(steps.at(-1)).toEqual({ step: "speaking" });
+});
+
+test("settings asked for while the voice starts are put in place once it has, the latest only", async () => {
+  const voice = fakeVoice();
+  let release = () => {};
+  voice.start = async () => { voice.calls.push(["start"]); await new Promise<void>((done) => { release = done; }); };
+  const { run, steps } = tryTurns(voice);
+  await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
+  const fast = { ...SETTINGS, patience: "fast" }, smart = { ...SETTINGS, end_of_turn: "smart-turn" };
+  void run.retune(fast as never);
+  const latest = run.retune(smart as never);
+  release();
+  await vi.waitFor(() => expect(voice.calls).toHaveLength(5));
+  release();
+  await latest;
+  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"], ["stop"], ["setSettings", smart], ["start"]]);
+  expect(steps).toEqual([{ step: "listening", again: true }]);
 });

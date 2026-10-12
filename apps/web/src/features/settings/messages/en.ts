@@ -719,6 +719,23 @@ export const en = {
   "wizard.prepareStarting": "Starting Sidevoice on this computer…",
   "wizard.prepareAnswering": "Checking that this computer answers…",
   "wizard.prepareRetry": "Try again",
+  // Trying the end of turn (TurnTry): where it stands, what ended the turn, and what to change.
+  "turnTry.title": "Try the end of turn",
+  "turnTry.hint": "Talk as you would to the agent, pausing to think. Headphones help.",
+  "turnTry.draft": "Uses what's selected, even before saving.",
+  "turnTry.try": "Try it",
+  "turnTry.again": "Try again",
+  "turnTry.listening": "Listening — start talking",
+  "turnTry.speaking": "You're talking…",
+  "turnTry.pause": "Pause — still your turn",
+  "turnTry.ended": "Turn ended after {s} s of silence — the agent would answer now",
+  "turnTry.endedNow": "Turn ended — the agent would answer now",
+  "turnTry.adjust": "Cut you off? Choose Calm. Slow to end? Choose Fast.",
+  "turnTry.adjustSmart": "Cut you off? Try Smart.",
+  "turnTry.notATurn": "That didn't count as a turn — still listening",
+  "turnTry.changed": "Listening again with the new setting",
+  "turnTry.quiet": "Nothing heard for 30 s, so the try stopped.",
+  "turnTry.smartBlocked": "Get the end-of-turn model ready to try Smart.",
 } as const;
 
 export type HostMessageKey = keyof typeof en;

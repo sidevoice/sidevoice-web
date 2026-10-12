@@ -7,14 +7,14 @@ import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
-import {tryTranscription,tryVoice} from './voice-trial.js';
+import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
@@ -1602,6 +1602,8 @@ async function loadVoiceCatalogue(){
 // catalogues read again after its install). A download cancelled or failed leaves the one in use as it was.
 function editVoice(patch){
  roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)});
+ // A try of the end of turn that runs takes a change of it at once, before the voice is given the settings to keep.
+ if(turnTry&&TURN_FIELDS.some(key=>key in patch))retuneTurnTry();
  void applyVoiceSettings();
 }
 let applying=Promise.resolve();
@@ -1640,6 +1642,31 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
  finally{if(voiceTry===abort)voiceTry=null}
 }
 function cancelVoiceTry(){voiceTry?.abort()}
+// A try of the end of turn being edited (`voice-trial.js` tryEndOfTurn), as `tryVoiceSettings` tries the rest: through
+// the page's voice, outside any call, in the same place (one try at a time, stopped by `cancelVoiceTry`). It listens
+// until stopped, 30 s with no speech or a failure of the voice, telling whoever shows it each step of the person's
+// turns (TrialProgress `onTurnStep`) and the microphone's level. A change of the end of turn while it runs (`editVoice`)
+// restarts it with the change; the smart one without its model ready stops it. It keeps nothing: settings apply as
+// they change.
+const TURN_FIELDS=['patience','end_of_turn','turn_model'];
+let turnTry=null;
+const turnTrySettings=()=>voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
+async function tryTurnSettings({onLevel,onTurnStep}={}){
+ if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
+ voiceTry?.abort();const abort=voiceTry=new AbortController();
+ try{
+  const host=await voiceHost();
+  const run=tryEndOfTurn(host,turnTrySettings(),{signal:abort.signal,onLevel,onTurnStep});
+  turnTry={abort,run};
+  await run.done;
+ }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
+ finally{if(voiceTry===abort)voiceTry=null;if(turnTry?.abort===abort)turnTry=null}
+}
+function retuneTurnTry(){
+ const settings=turnTrySettings();
+ if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs)){turnTry.abort.abort();return}
+ void turnTry.run.retune(settings);
+}
 // A model of this device's catalogue the slot names but that is not on disk: installed on this device (the build the
 // slot names, else its recommended one), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
 let voiceInstall=null;
@@ -1798,6 +1825,7 @@ window.sidevoiceActions={
   if(to.node===state.callNode)await refresh();await refreshPeople(to.node);await refreshHistory(to.node)
  },
  tryVoiceSettings,
+ tryTurnSettings,
  cancelVoiceTry,
  installVoiceModel,
  cancelVoiceInstall,

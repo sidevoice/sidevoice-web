@@ -162,7 +162,8 @@ export type SetupTry = VoiceTry & { tried: boolean; hint?: string; sample?: Reac
 /** Past these, a try is slow for this device: transcribing what was said, or the first sound of a sentence. */
 const SLOW_MS = { stt: 1500, tts: 1500 } as const;
 
-const seconds = (ms: number) => new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(ms / 1000);
+/** A span in seconds as a try says it: one decimal ("0.9"). */
+export const seconds = (ms: number) => new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(ms / 1000);
 
 /** The time that matters after a try, in words: what was said transcribed, or the voice's first sound. */
 const timingMs = (task: Task, timings: TrialTimings) => task === "stt" ? timings.recognition_ms : timings.first_sound_ms;
@@ -223,8 +224,9 @@ function TrySentence({ text, range, sounding, done }: { text: string; range: Kar
   </p>;
 }
 
-/** What was heard, quoted: two lines at most in the block, the rest a "See all" away; in full in the dialog (`roomy`). */
-function TryHeard({ text, roomy, t }: { text: string; roomy: boolean; t: HostTranslate }) {
+/** What was heard, quoted: two lines at most in the block, the rest a "See all" away; in full in the dialog (`roomy`).
+ *  `id` is the quote's, and `<id>-all` its See all. */
+export function TryHeard({ text, roomy, t, id = "stt-heard" }: { text: string; roomy: boolean; t: HostTranslate; id?: string }) {
   const quote = useRef<HTMLQuoteElement>(null);
   const [cut, setCut] = useState(false);
   useLayoutEffect(() => {
@@ -239,8 +241,8 @@ function TryHeard({ text, roomy, t }: { text: string; roomy: boolean; t: HostTra
   }, [text, roomy]);
   return <figure className="model-try-heard">
     <figcaption>{t("wizard.transcript")}</figcaption>
-    <blockquote ref={quote} id="stt-heard" data-clamped={!roomy || undefined}>{text}</blockquote>
-    {cut && <Popover label={t("wizard.transcript")} trigger={<Button variant="ghost" size="sm" className="model-try-all" id="stt-heard-all">{t("try.seeAll")}</Button>}>
+    <blockquote ref={quote} id={id} data-clamped={!roomy || undefined}>{text}</blockquote>
+    {cut && <Popover label={t("wizard.transcript")} trigger={<Button variant="ghost" size="sm" className="model-try-all" id={id + "-all"}>{t("try.seeAll")}</Button>}>
       <p className="model-try-full">{text}</p>
     </Popover>}
   </figure>;
