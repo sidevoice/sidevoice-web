@@ -109,7 +109,8 @@ test("P11 an agent new on a machine marks the gear, opens Settings at that machi
   await act(async () => { fireEvent.click(gear); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
-  expect(entry("NUC")!.querySelector(".new-dot")).toHaveTextContent(", new");
+  expect(entry("NUC")!.querySelector(".new-on-icon-dot")).not.toBeNull();
+  expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
   expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
   expect(document.getElementById("host-agents-title")).toHaveTextContent("Agents");
   // Cursor is connected by the connector itself (it edits Cursor's file): Connect, and "New" on the row.
@@ -151,8 +152,10 @@ test("agents new on two machines: the gear counts them, Settings opens at the fi
   await act(async () => { fireEvent.click(settingsEntry()); });
   expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
   // Each machine under Machines carries the dot, said in words to a screen reader.
-  expect(entry("NUC")!.querySelector(".new-dot")).toHaveTextContent(", new");
-  expect(entry("Laptop")!.querySelector(".new-dot")).toHaveTextContent(", new");
+  expect(entry("NUC")!.querySelector(".new-on-icon-dot")).not.toBeNull();
+  expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
+  expect(entry("Laptop")!.querySelector(".new-on-icon-dot")).not.toBeNull();
+  expect(entry("Laptop")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
 });
 
 test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", () => {
