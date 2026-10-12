@@ -100,7 +100,8 @@
   --sv-voice-soft: #fbf0d4;
   --sv-voice-text: #7d5300;
   --sv-disabled-bg: #efebf4;
-  --sv-disabled-text: #8e8a98;
+  /* 3:1 on the disabled fill, as the dark theme's: what a disabled control draws still reads as a shape. */
+  --sv-disabled-text: #85818f;
   --sv-scrim: rgb(27 18 40 / 45%);
   --sv-tooltip-bg: #2a1a40;
   --sv-tooltip-text: #ffffff;

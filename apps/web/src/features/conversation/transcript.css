@@ -75,7 +75,8 @@
 .chat-meta .ui-button.listen-again::after { content: ""; position: absolute; inset: -6px; }
 .chat-meta .receipt { display: inline-flex; color: var(--sv-text-subtle); }
 .chat-meta .receipt[data-state="read"] { color: var(--sv-accent-text); }
-.chat-meta .receipt[data-state="unconfirmed"] { opacity: .6; }
+/* Written but never acknowledged: a quieter grey than delivered, still 3:1 on the bubble (an opacity fell under it). */
+.chat-meta .receipt[data-state="unconfirmed"] { color: var(--sv-disabled-text); }
 .chat-meta .receipt:is([data-state="uncertain"], [data-state="not_sent"]) { color: var(--sv-danger); }
 .chat-audio-note { display: block; margin-top: var(--sv-space-1); font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); white-space: normal; }
 
@@ -104,9 +105,10 @@
 /* ----- the text box, always there, as a call app's chat has it: a rounded field pinned at the panel's foot, set apart
  * from the messages by space rather than a line, Send an icon inside its end, waiting for something to send. */
 .text-composer { flex: none; min-width: 0; padding: var(--sv-space-2) var(--sv-space-4) var(--sv-space-4); background: var(--sv-bg); }
+/* The field's edge is an input's own (ui.css), 3:1 on the panel: its fill alone hardly parts from it in either theme. */
 .composer-field {
   display: flex; align-items: flex-end; gap: var(--sv-space-1); min-width: 0; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-4);
-  border: 1px solid transparent; border-radius: 22px; background: var(--sv-bg-sunken); transition: border-color var(--sv-dur-fast) var(--sv-ease);
+  border: 1px solid var(--sv-border-strong); border-radius: 22px; background: var(--sv-bg-sunken); transition: border-color var(--sv-dur-fast) var(--sv-ease);
 }
 [data-theme="dark"] .composer-field { background: var(--sv-surface-raised); }
 .composer-field:focus-within { border-color: var(--sv-focus); }
@@ -155,12 +157,13 @@
 .karaoke-text:is([data-playback="pending"], [data-playback="playing"]:not([data-progress])) { color: var(--sv-text-subtle); }
 .karaoke-text[data-progress] .karaoke-upcoming { color: var(--sv-text-subtle); }
 
-/* One beat each, at the pace of the presence pulse. */
+/* One beat each, at the pace of the presence pulse. Between beats a dot rests at .7, the least that keeps it 3:1 on the
+ * agent's bubble in the light theme: fainter, the dots that say it is working all but vanish. */
 .thinking-dots { display: inline-flex; align-items: center; gap: 5px; }
-.thinking-dots i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .35; animation: thinking-dot 1.2s infinite ease-in-out; }
+.thinking-dots i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; animation: thinking-dot 1.2s infinite ease-in-out; }
 .thinking-dots i:nth-child(2) { animation-delay: .16s; }
 .thinking-dots i:nth-child(3) { animation-delay: .32s; }
-@keyframes thinking-dot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+@keyframes thinking-dot { 0%, 60%, 100% { opacity: .7; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 
 @media (prefers-reduced-motion: reduce) {
   .voice-wave[data-phase="transcribing"] canvas { animation: none; opacity: .6; }
