@@ -6,13 +6,14 @@ import { UpdatesEntry, useUpdatesEntry, useUpdatesWaiting } from "../updates/Upd
 /** A phone wide enough for four of the other conversations in its header. */
 const ROOMY_PHONE_QUERY = "(min-width: 390px)";
 import { RoomStoreContext, useRoomStore, type RoomStore } from "../../state/room-store";
-import { useContext } from "react";
+import { useContext, useReducer, useRef } from "react";
 import { useHighlights, type Highlight as NewThing } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator, type CallTranslate } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { headerConversations, stateText } from "../call/conversation-state";
-import { selectInCall, useStageConversation } from "../call/stage-view";
+import { headerConversations, stateText, voiceSwitchHeader, voiceSwitchStateText } from "../call/conversation-state";
+import { focusStageHeading, selectInCall, useStageConversation } from "../call/stage-view";
+import { useVoiceSwitch } from "../../state/call-model";
 import { hostTranslator } from "../settings/host-i18n";
 import "./room.css";
 
@@ -58,6 +59,19 @@ function ConversationsToggle({ t, rest }: { t: CallTranslate; rest: number }) {
   );
 }
 
+/** The avatars as ranked, held where they were while a pointer is down on them (call model B, §2.9): nothing moves
+ *  under a finger. Each keeps its row as it is now. */
+function useHeldWhilePressed(ranked: ParticipantView[], rows: ParticipantView[], enabled: boolean): [ParticipantView[], { start(): void; end(): void }] {
+  const held = useRef<string[] | null>(null);
+  const [, release] = useReducer((n: number) => n + 1, 0);
+  const start = () => { if (enabled) held.current = ranked.map((row) => row.threadId); };
+  // Let go once the tap's click has landed on what was under the finger.
+  const end = () => { if (held.current) setTimeout(() => { held.current = null; release(); }, 0); };
+  const order = held.current;
+  const shown = order ? order.flatMap((id) => rows.filter((row) => row.threadId === id)) : ranked;
+  return [shown, { start, end }];
+}
+
 /* A tap on one moves the call there; with the list down (the header stays above it) it also puts the list away, as
  * choosing in the list does. */
 function HeaderConversations({ t }: { t: CallTranslate }) {
@@ -67,14 +81,25 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   const closeConversations = useCallLayout((state) => state.closeConversations);
   // As many as a phone's width has room for beside the gear: four, or three on the narrowest.
   const roomy = useMedia(ROOMY_PHONE_QUERY);
-  const shown = headerConversations(participants, stage.threadId, inCall, roomy ? 4 : 3, true);
+  const voiceSwitch = useVoiceSwitch();
+  // With the voice switch (call model B): those waiting for you, then those wanting to talk, then those working; the
+  // order holds still while a finger is down, so what is tapped is what was aimed at.
+  const ranked = voiceSwitch ? voiceSwitchHeader(participants, stage.threadId, roomy ? 4 : 3, true)
+    : headerConversations(participants, stage.threadId, inCall, roomy ? 4 : 3, true);
+  const [shown, hold] = useHeldWhilePressed(ranked, participants, voiceSwitch);
   const rest = participants.filter((row) => row.threadId !== stage.threadId).length - shown.length;
-  const label = (row: ParticipantView) => t("header.otherConversation", { title: row.title, state: stateText(row, inCall, t) });
+  const label = (row: ParticipantView) => t("header.otherConversation", { title: row.title, state: voiceSwitch ? voiceSwitchStateText(row, t) : stateText(row, inCall, t) });
+  const pick = (row: ParticipantView) => {
+    window.sidevoiceActions?.selectParticipant(row.threadId);
+    closeConversations();
+    // The avatar tapped leaves the header for the stage: focus goes with it, to the stage's heading (§3).
+    if (voiceSwitch) setTimeout(focusStageHeading, 0);
+  };
   return (
-    <div className="header-conversations">
+    <div className="header-conversations" onPointerDown={hold.start} onPointerUp={hold.end} onPointerCancel={hold.end}>
       {shown.map((row) => (
         <button type="button" key={row.threadId} className="header-avatar" aria-label={label(row)} title={label(row)}
-          disabled={row.switching} onClick={() => { window.sidevoiceActions?.selectParticipant(row.threadId); closeConversations(); }}>
+          disabled={row.switching} onClick={() => pick(row)}>
           <ConversationAvatar row={row} />
         </button>
       ))}

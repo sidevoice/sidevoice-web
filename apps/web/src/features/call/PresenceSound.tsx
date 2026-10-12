@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { readCallPreferences, subscribeCallPreferences } from "../../services/call-preferences";
 import { selectInCall, useStageConversation } from "./stage-view";
+import { useVoiceSwitch } from "../../state/call-model";
 
 /* While the agent works on your turn in a call, a soft breath says so: for a call that goes on with the screen off — a
  * phone in a pocket, in the car, headphones on — where nothing else would. Settings → Advanced says when: never, only
  * while the screen is off, or always. It is drawn here (a filtered noise breathing slowly, quiet), so it can later be
- * swapped for recorded "working" sounds without touching who decides when it plays. */
+ * swapped for recorded "working" sounds without touching who decides when it plays. With the voice switch (call model B)
+ * it plays while the voice is on, and Mute agents silences it too (D6). */
 
 const LEVEL = 0.035;
 const BREATH_SECONDS = 3.2;
@@ -54,7 +56,8 @@ function useScreenOff() {
 }
 
 export function PresenceSound() {
-  const inCall = useRoomStore(selectInCall);
+  const voiceSwitch = useVoiceSwitch();
+  const inCall = useRoomStore((state) => (voiceSwitch ? state.facts.voiceOn && !state.facts.agentsMuted : selectInCall(state)));
   const working = useStageConversation().mood === "working";
   const screenOff = useScreenOff();
   const [presence, setPresence] = useState(() => readCallPreferences().presence);

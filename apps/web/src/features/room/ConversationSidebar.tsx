@@ -10,7 +10,9 @@ import { useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { conversationState, machineGroups, stateText } from "../call/conversation-state";
+import { conversationState, machineGroups, stateText, voiceSwitchState, voiceSwitchStateText } from "../call/conversation-state";
+import { useVoiceSwitch } from "../../state/call-model";
+import { RowHearIt } from "../call/HearIt";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
@@ -39,6 +41,7 @@ export function ConversationSidebar() {
   const t = callTranslator();
   const participants = useRoomStore((state) => state.participants);
   const inCall = useRoomStore(selectInCall);
+  const voiceSwitch = useVoiceSwitch();
   const collapsed = useCallLayout((state) => state.sidebarCollapsed);
   const open = useCallLayout((state) => state.conversationsOpen);
   const transcriptOpen = useCallLayout((state) => state.transcriptOpen);
@@ -84,7 +87,11 @@ export function ConversationSidebar() {
     if (crowded) closeTranscript();
   };
   // The unread count is the row's badge, so the line under the title says the state alone; the tooltip says both.
-  const unread = (row: ParticipantView) => row.unread > 0 && conversationState(row, inCall) !== "in-call";
+  const unread = (row: ParticipantView) => row.unread > 0 && (voiceSwitch || conversationState(row, inCall) !== "in-call");
+  // With the voice switch (call model B) each row says B's states — marks, working on every row, ready — and a row with
+  // a mark offers "Hear it" between its unread badge and ⋯ (not in the rail: its avatar's hand says it there).
+  const state = (row: ParticipantView) => (voiceSwitch ? voiceSwitchState(row) : conversationState(row, inCall));
+  const words = (row: ParticipantView) => (voiceSwitch ? voiceSwitchStateText(row, t) : stateText(row, inCall, t));
 
   return (
     <>
@@ -114,19 +121,20 @@ export function ConversationSidebar() {
                   rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
-                  tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
+                  tooltip={(row) => [row.title + " · " + words(row), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
                   sub={(row) => (
-                    <span className="sidebar-state" data-state={conversationState(row, inCall)}>
+                    <span className="sidebar-state" data-state={state(row)}>
                       {row.harness && <HarnessIcon harness={row.harness} size={12} />}
-                      <span className="sidebar-state-text">{stateText({ ...row, unread: 0 }, inCall, t)}</span>
+                      <span className="sidebar-state-text">{words({ ...row, unread: 0 })}</span>
                     </span>
                   )}
                   end={(row) => unread(row) && <Badge tone="accent" className="sidebar-unread">{t("state.unread", { n: row.unread })}</Badge>}
-                  aside={(row) => (
+                  aside={(row) => (<>
+                    {voiceSwitch && !(rail && !narrow) && <RowHearIt row={row} />}
                     <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" tone="neutral" size="icon-sm" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
                       <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</DropdownMenuItem>
                     </DropdownMenu>
-                  )}
+                  </>)}
                 />
               </section>
             );
@@ -139,6 +147,11 @@ export function ConversationSidebar() {
             opens upward from here. */}
         {!narrow && <div className="sidebar-foot"><UpdatesEntry compact={rail} /><SidebarSettings rail={rail} onOpen={close} /></div>}
         {narrow && updatesHere === "panel" && <div className="sidebar-foot sidebar-foot--updates"><UpdatesEntry side="top" /></div>}
+        {/* With the voice switch (call model B) a phone's call bar has no ⋮: its connection statistics are here, under the
+            same id the runtime opens them by. */}
+        {narrow && voiceSwitch && <div className="sidebar-foot sidebar-foot--stats">
+          <Button id="stats-open" variant="ghost" tone="neutral" size="md" block onClick={close}>{t("header.stats")}</Button>
+        </div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />
     </>

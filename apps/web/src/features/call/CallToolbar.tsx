@@ -4,8 +4,10 @@ import { AudioDevicesBar, AudioDevicesToggle } from "./AudioDevices";
 import { CallButton, MicControl, MuteButton, SkipButton } from "./CallIndicators";
 import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon } from "../../components/ui/Icons";
-import { useCallLayout } from "../../state/call-layout";
+import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { callTranslator } from "./call-i18n";
+import { useVoiceSwitch } from "../../state/call-model";
+import { MuteAgentsButton, VoiceMuteButton, VoiceNote, VoiceSwitch } from "./VoiceControls";
 
 /* The call's secondary actions, behind ⋮ beside the call's own, opening upwards. Its id and class are the runtime's:
  * it binds the statistics dialog to #stats-open, closes the menu when the statistics open, and closes it on a click
@@ -33,6 +35,10 @@ function CallMenu() {
 /* The call's controls in the middle — the microphone with its level, skip, the call, and ⋮ — in one tray under the
  * join's line, and the transcript's button at the right edge. */
 export function CallToolbar() {
+  return useVoiceSwitch() ? <VoiceSwitchToolbar /> : <CallButtonToolbar />;
+}
+
+function CallButtonToolbar() {
   const t = callTranslator();
   const [devicesOpen, setDevicesOpen] = useState(false);
   return (
@@ -49,6 +55,35 @@ export function CallToolbar() {
           <SkipButton />
           <CallButton />
           <CallMenu />
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* Call model B's bar (VARIANTS `call-model`; briefs/CALL-MODEL-B-SPEC.md §2.1): the microphone with its devices, Mute
+ * agents, skip, and the voice switch in the call's slot — its note above it, just before it for Tab — then ⋮ on a
+ * desktop. A phone has no ⋮ (its statistics are at the conversations' foot), so the switch is its rightmost control,
+ * where the thumb is. */
+function VoiceSwitchToolbar() {
+  const t = callTranslator();
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const narrow = useMedia(NARROW_QUERY);
+  return (
+    <footer className="call-bar" data-model="voice-switch">
+      <AudioDevicesBar id="audio-devices" open={devicesOpen} onClose={() => setDevicesOpen(false)} />
+      <div className="controls" id="call-controls">
+        <JoinStatus />
+        <div className="call-actions">
+          <MicControl>
+            <span id="mic-level-meter" className="sr-only" role="meter" aria-label={t("toolbar.micLevel")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} />
+            <AudioDevicesToggle open={devicesOpen} controls="audio-devices" onToggle={() => setDevicesOpen((was) => !was)} />
+            <VoiceMuteButton />
+          </MicControl>
+          <MuteAgentsButton />
+          <SkipButton />
+          <span className="voice-switch-wrap"><VoiceNote /><VoiceSwitch /></span>
+          {!narrow && <CallMenu />}
         </div>
       </div>
     </footer>

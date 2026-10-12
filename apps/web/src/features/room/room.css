@@ -145,3 +145,18 @@
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row { border-color: transparent; background: none; box-shadow: none; }
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row[data-selected] { background: var(--sv-accent-soft); }
 }
+
+/* ----- call model B (VARIANTS `call-model`, the voice switch): its states on the same dot. Ready is the accent, working
+ * and speaking the voice's mustard; a mark is an amber hand in the dot's place, cut out of the avatar like the dot —
+ * filled while its agent waits for you, outlined while it wants to talk. */
+.state-dot[data-state="ready"] { background: var(--sv-accent); }
+.state-dot:is([data-state="working"], [data-state="speaking"]) { background: var(--sv-voice); }
+.state-dot:is([data-state="waiting-for-you"], [data-state="wants-to-talk"]) { display: grid; place-items: center; right: -3px; bottom: -3px; width: 16px; height: 16px;
+  border-width: 1.5px; background: var(--sv-voice-soft); color: var(--sv-voice-text); box-sizing: border-box; }
+.state-dot svg { display: block; }
+/* "Hear it" on a row with a mark: between the unread badge and ⋯, always shown (a mark is the point), 28px to touch. */
+.sidebar-rows .row-hear { flex: none; width: 28px; height: 28px; color: var(--sv-voice-text); }
+.sidebar-rows .row-hear + .participant-more { margin-inline-start: 0; }
+@media (min-width: 900px) { .conversation-sidebar[data-collapsed] .row-hear { display: none; } }
+/* A phone's connection statistics, at the panel's foot (the bar has no ⋮ there). */
+.sidebar-foot--stats #stats-open { justify-content: flex-start; }

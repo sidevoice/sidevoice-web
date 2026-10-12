@@ -27,6 +27,13 @@ export const en = {
   "wave.listeningTitle": "Listening…",
   "wave.transcribing": "Transcribing what you said",
   "wave.transcribingTitle": "Transcribing…",
+
+  // Call model B (VARIANTS `call-model`, the voice switch): the box, and why a reply had no audio.
+  "composer.noConversation": "Choose a conversation to write to",
+  "composer.cantReceive": "{title} can't receive messages right now",
+  "composer.switching": "Switching to {title}…",
+  "audio.agentsMuted": "Agents were muted",
+  "audio.voiceOff": "Voice was off",
 } as const;
 
 export type ConversationMessageKey = keyof typeof en;

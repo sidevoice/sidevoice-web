@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { HarnessIcon } from "../../components/ui/Icons";
+import { HandIcon, HarnessIcon } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
@@ -15,6 +15,8 @@ import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
 import { moodText } from "./conversation-state";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
+import { useVoiceSwitch } from "../../state/call-model";
+import { StageHearIt } from "./HearIt";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -115,11 +117,16 @@ export function CallStage() {
   const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
+  // With the voice switch (call model B) the stage is the active conversation's, and its heading takes focus when a
+  // "Hear it" that had it goes, or a phone's header avatar is picked (§3).
+  const voiceSwitch = useVoiceSwitch();
+  const label = voiceSwitch ? t("stage.labelActive") : t("stage.label");
+  const heading = voiceSwitch ? -1 : undefined;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
 
   if (!stage.threadId) {
     return (
-      <section className="call-stage" aria-label={t("stage.label")}>
+      <section className="call-stage" aria-label={label}>
         <BootError />
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
@@ -132,11 +139,11 @@ export function CallStage() {
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
   return (
-    <section className="call-stage" aria-label={t("stage.label")}>
+    <section className="call-stage" aria-label={label}>
       <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <header className="stage-title" translate="no">
-        <h2 title={stage.title}>{stage.title}</h2>
+        <h2 title={stage.title} tabIndex={heading}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
       </header>
       <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} style={avatarTone(tone) as CSSProperties}>
@@ -148,13 +155,14 @@ export function CallStage() {
           <StageDesk seed={stage.threadId} />
         </div>
         <div className="stage-name" translate="no">
-          <h2 title={stage.title}>{stage.title}</h2>
+          <h2 title={stage.title} tabIndex={heading}>{stage.title}</h2>
           {stage.row?.machine && <span>{stage.row.machine}</span>}
         </div>
         <VoiceModels />
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
           {stage.mood === "working" && <p className="stage-activity" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
+          {voiceSwitch && stage.row && <StageHearIt row={stage.row} hand={<HandIcon size={16} filled={stage.row.mark !== "wants-to-talk"} />} />}
         </div>
         <div className="stage-tags">
           {(stage.row?.harness || stage.row?.model) && <Tooltip content={[harnessName(stage.row?.harness), stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}>

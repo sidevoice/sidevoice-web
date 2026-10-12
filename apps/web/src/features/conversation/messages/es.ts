@@ -28,4 +28,11 @@ export const es: Partial<Record<ConversationMessageKey, string>> = {
   "wave.listeningTitle": "Escuchando…",
   "wave.transcribing": "Transcribiendo tu intervención",
   "wave.transcribingTitle": "Transcribiendo…",
+
+  // Modelo de llamada B (el interruptor de voz).
+  "composer.noConversation": "Elige una conversación para escribir",
+  "composer.cantReceive": "{title} no puede recibir mensajes ahora",
+  "composer.switching": "Cambiando a {title}…",
+  "audio.agentsMuted": "Tenías los agentes silenciados",
+  "audio.voiceOff": "Tenías la voz desactivada",
 };

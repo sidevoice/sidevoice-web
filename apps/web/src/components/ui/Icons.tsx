@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search,
+  Timer, ScrollText, Link, Unlink, Search, Hand, VolumeX, Power,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -73,6 +73,15 @@ export const UnlinkIcon = mark(Unlink, 16);
 /** Searching a list. */
 export const SearchIcon = mark(Search, 16);
 export const SpeakerIcon = mark(Volume2, 20);
+/** The agents muted (call model B's Mute agents): the speaker crossed out, as the microphone is. */
+export const SpeakerOffIcon = mark(VolumeX, 20);
+/** Turning the voice off from the desktop card (call model B): never the handset, never red. */
+export const PowerIcon = mark(Power, 18);
+/** A conversation that has something you did not hear (call model B's marks): filled while its agent waits for you,
+ *  outlined while it works or nobody knows. */
+export function HandIcon({ className, size = 12, filled = false }: IconProps & { filled?: boolean }) {
+  return <Hand className={className} size={size} strokeWidth={filled ? 1.6 : 2} fill={filled ? "currentColor" : "none"} aria-hidden />;
+}
 export const CallIcon = mark(Phone, 22);
 export const HangupIcon = mark(PhoneOff, 22);
 export const SkipIcon = mark(SkipForward, 22);
@@ -161,6 +170,11 @@ export function ProviderLogo({ provider, size = 20 }: { provider: string; size?:
  *  other voice, always in mustard. */
 export function SidevoiceMark({ className, size = 22 }: IconProps) {
   return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><rect x="1.5" y="9" width="3" height="6" rx="1.5" /><rect x="6" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="1.5" width="3" height="21" rx="1.5" /><rect x="15" y="6" width="3" height="12" rx="1.5" style={{ fill: "var(--sv-voice)" }} /><rect x="19.5" y="9" width="3" height="6" rx="1.5" /></svg>;
+}
+
+/** The voice (call model B's voice switch): the brand's five bars in one colour, the mark drawn as an icon. */
+export function VoiceIcon({ className, size = 22 }: IconProps) {
+  return <svg className={className} viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true"><rect x="1.5" y="9" width="3" height="6" rx="1.5" /><rect x="6" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="1.5" width="3" height="21" rx="1.5" /><rect x="15" y="6" width="3" height="12" rx="1.5" /><rect x="19.5" y="9" width="3" height="6" rx="1.5" /></svg>;
 }
 
 /** The logo for what a machine said it runs, from the first word of its platform line; a machine we
