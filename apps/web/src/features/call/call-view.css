@@ -17,7 +17,6 @@
 @container stage (max-width: 480px) { .stage-tile > * { --stage-inset: var(--sv-space-3); } }
 /* Speaking: a quiet ring in the accent around the whole tile. */
 .stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-accent) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 20%, transparent); }
-.stage-agent { width: min(46%, 260px, 34dvh); aspect-ratio: 1; }
 
 /* The conversation's name and its machine, in the tile's top corner as a call names whoever is on screen. */
 .stage-name { position: absolute; z-index: 2; top: var(--stage-inset); left: calc(var(--stage-inset) + var(--sv-space-1)); display: grid; max-width: min(60%, calc(100% - 2 * var(--stage-inset))); }

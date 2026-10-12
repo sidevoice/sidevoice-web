@@ -62,7 +62,10 @@ export function useStageConversation(): StageConversation {
   const pendingPhase = useRoomStore((state) => state.conversation.pendingPhase);
   const voiceSwitch = useVoiceSwitch();
   const voiceOn = useRoomStore((state) => state.facts.voiceOn);
-  return stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase, voiceSwitch, voiceOn });
+  const preview = useRoomStore((state) => state.facts.avatarPreview);
+  const stage = stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase, voiceSwitch, voiceOn });
+  // The preview holding the avatar in a mood (the playground's card): that mood, and something unheard when it says.
+  return preview ? { ...stage, mood: preview.mood, unread: preview.unread ? Math.max(1, stage.unread) : 0 } : stage;
 }
 
 /** Whether the voice is live: in a call (A), or the voice on or turning on (B). What keeps "reload to update" and the

@@ -110,7 +110,7 @@ test("opened from the gear it is the list of sections, under Settings: each a ro
   expect(summary("transcription")).toBe("whisper-base");
   expect(summary("voice")).toBe("kokoro-82m-v1.0");
   expect(summary("providers")).toBe("OpenAI");
-  expect(summary("machines")).toBe("NUC · Online");
+  expect(summary("machines")).toBe("NUC · Connected");
   expect([summary("general"), summary("call"), summary("advanced")]).toEqual([null, null, null]);
   expect(nav().querySelector("[aria-current]")).toBeNull();
   expect(screen.getByRole("navigation", { name: "Settings sections" }).querySelector("ul > li > button")).toBe(row("general"));
@@ -118,7 +118,7 @@ test("opened from the gear it is the list of sections, under Settings: each a ro
   expect(pushed()).toBe(1);
 });
 
-test("the lines say what is not known yet as nothing, no model chosen, no provider, and how many machines are online", async () => {
+test("the lines say what is not known yet as nothing, no model chosen, no provider, and how many machines are connected", async () => {
   const store = room({ voiceCatalogue: { state: "loading", catalogs: [], error: "" } });
   await open();
   expect(summary("transcription")).toBe("");
@@ -129,7 +129,7 @@ test("the lines say what is not known yet as nothing, no model chosen, no provid
   act(() => store.patch({ pairings: [] }));
   expect(summary("machines")).toBe("None paired yet");
   act(() => store.patch({ pairings: [NUC, LAB, paired("fp-w", "Workstation")], machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-w": { reach: "ok", via: "node" } } }));
-  expect(summary("machines")).toBe("3 machines · 2 online");
+  expect(summary("machines")).toBe("3 machines · 2 connected");
 });
 
 test("a row opens its section's page under the list; Back, Escape and the system's back go up, and from the list close Settings", async () => {
@@ -212,7 +212,10 @@ test("Machines is a list, each machine's state in words; a machine is a page of 
   expect(title()).toHaveTextContent(/^Machines$/);
   const list = document.querySelector<HTMLElement>(".machines-menu")!;
   expect([...list.querySelectorAll(".settings-menu-row")].map((entry) => [entry.querySelector(".settings-menu-label")?.textContent, entry.querySelector(".settings-menu-summary")?.textContent ?? null]))
-    .toEqual([["NUC", "Online"], ["Lab box", "Unavailable · Not encrypted"], ["Add a machine", null]]);
+    .toEqual([["NUC", "Connected"], ["Lab box", "Not connected"], ["Add a machine", null]]);
+  // Not encrypted: its open lock after the name, and said in its name.
+  expect(list.querySelector('[data-machine="fp-lab"] .machine-nav-insecure')).not.toBeNull();
+  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Not connected, not encrypted");
   // Add a machine opens a dialog, not a page: no chevron; and no chips at the page's head.
   expect(list.querySelector(".settings-menu-row--add .settings-menu-chevron")).toBeNull();
   expect(document.querySelector(".machines-inline")).toBeNull();

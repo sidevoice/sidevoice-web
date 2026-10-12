@@ -51,6 +51,11 @@
 }
 /* A section whose chosen model is not ready says so in the nav, in words. */
 .ui-nav-badge { margin-inline-start: auto; }
+/* This device's entry: a machine's two lines (MachineEntryCopy), "This device" in the other sections' size and its
+   service's state under it. A phone's menu says it on its row's line (settings-levels.tsx). */
+.ui-nav-item.this-device-entry { height: auto; min-height: 52px; padding-block: 6px; }
+.ui-nav-item.this-device-entry:has(.machine-state-pill) { min-height: 54px; }
+.this-device-entry .machine-nav-name { font-size: var(--sv-font-md); line-height: 1.375rem; }
 
 /* Advanced → Downloaded models: one line each, its size, and Delete asking in place. */
 .downloaded-models { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
@@ -175,16 +180,18 @@
   .settings-menu-row:active { background: var(--sv-hover); }
   .settings-menu-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
   .settings-menu-icon { display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; color: var(--sv-text-muted); }
-  .settings-menu-icon .new-on-icon-dot { border-color: var(--sv-surface); }
+  .settings-menu-icon .new-on-icon { --new-ground: var(--sv-surface); }
   .settings-menu-text { display: grid; flex: 1; min-width: 0; }
   .settings-menu-label { font-size: var(--sv-font-md); line-height: 1.375rem; font-weight: var(--sv-weight-medium); color: var(--sv-text); overflow-wrap: anywhere; }
   .settings-menu-summary { min-height: 1.25rem; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+  .settings-menu-summary .machine-state { font-size: var(--sv-font-sm); line-height: 1.25rem; }
   .settings-menu-row > .ui-badge { flex: none; }
   .settings-menu-chevron { display: inline-grid; flex: none; color: var(--sv-text-subtle); }
   .settings-menu-chevron svg:dir(rtl) { transform: scaleX(-1); }
   /* Add a machine opens a dialog, not a page: the accent's words, no chevron. A machine's name, unlike a label, is cut. */
   .settings-menu-row--add .settings-menu-icon, .settings-menu-row--add .settings-menu-label { color: var(--sv-accent-text); }
-  .machines-menu .settings-menu-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .machines-menu .settings-menu-label { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
+  .machines-menu .settings-menu-label .machine-nav-name { min-width: 0; overflow: hidden; font-size: var(--sv-font-md); line-height: 1.375rem; white-space: nowrap; text-overflow: ellipsis; }
 
   /* Machines' list and a machine's page, in the one place of the page they share. */
   .settings-sublevels { display: grid; min-width: 0; }

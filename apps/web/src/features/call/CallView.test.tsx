@@ -120,6 +120,22 @@ test("the person has no picture on the stage, only a bubble of their own while t
   expect(window.sidevoiceActions?.cancelInput).toHaveBeenCalledOnce();
 });
 
+test("the preview holds the stage avatar in a mood, with something unheard when it asks, and null gives it back to the room", () => {
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
+  for (const mood of ["idle", "listening", "working", "present", "offline"] as const) {
+    patch(store, { avatarPreview: { mood } });
+    expect(stageAgent()).toHaveAttribute("data-avatar-state", mood);
+    expect(stageAgent()).not.toHaveAttribute("data-unread");
+  }
+  patch(store, { avatarPreview: { mood: "present", unread: true } });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "present");
+  expect(stageAgent()).toHaveAttribute("data-unread");
+  patch(store, { avatarPreview: null });
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
+  expect(stageAgent()).not.toHaveAttribute("data-unread");
+}, WHOLE_APP_MS);
+
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
   room();
   const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");

@@ -13,7 +13,7 @@ import { Quote, Snippet, type CopyFeedback } from "../components/ui/Snippet";
 import { Switch } from "../components/ui/Switch";
 import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ProviderLogo, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
 import { callTranslator } from "../features/call/call-i18n";
-import { NewOnIcon } from "../features/highlights/highlights";
+import { GearNewMark, NewAtEnd, NewBadge, NewOnIcon } from "../features/highlights/highlights";
 import { CONNECTOR_INSTALL } from "../features/pairing/connector-commands";
 import { hostTranslator } from "../features/settings/host-i18n";
 import { ModelPrepare, type PrepareStatus } from "../features/settings/ModelPrepare";
@@ -173,17 +173,19 @@ function Badges() {
   </div>;
 }
 
-/* "New" (features/highlights): information, never a warning. A dot (accent) on the icon of each thing that leads to it —
- * the gear, the Settings section, the machine — never a dot of its own beside a state dot; and the word "New" on the thing itself, which seeing clears (half of it in view
- * for a second); the dots above go once nothing new is under them. It goes on its own two weeks after first shown; at
- * most three at once. Rules: only for what is genuinely new to this person or needs nothing but a look — never
- * marketing or tips; what needs an action (a model to download, a key) uses the attention style (amber) and clears only
- * when resolved; the dot is never the only cue: containers say ", new" to screen readers, the gear its count. */
+/* "New" (features/highlights): information, never a warning. A mark (accent) on what leads to it — the gear, the
+ * Settings section, the machine — and the word "New" on the thing itself, which seeing clears (half of it in view for a
+ * second); the marks above go once nothing new is under them. Which mark is VARIANTS `new-mark`: a sparkle (A), "New"
+ * at an entry's end and a count on the gear (B), a dot on Settings' icons and a count on the gear (C) — never a dot
+ * beside a state, never on a state's line. It goes on its own two weeks after first shown; at most three at once.
+ * Rules: only for what is genuinely new to this person or needs nothing but a look — never marketing or tips; what
+ * needs an action (a model to download, a key) uses the attention style (amber) and clears only when resolved; the
+ * mark is never the only cue: entries say ", new" to screen readers (or show "New"), the gear its count. */
 function NewHighlights() {
   return <div className="ds-row">
-    <NewOnIcon icon={<SettingsIcon size={20} />} isNew label=", new" />
-    <span className="ui-nav-item" style={{ width: 200 }}><NewOnIcon icon={<MachinesIcon size={18} />} isNew label=", new" /><span>Machines</span></span>
-    <span>Codex <Badge tone="accent">New</Badge></span>
+    <span className="ds-gear"><SettingsIcon size={20} /><GearNewMark count={1} /></span>
+    <span className="ui-nav-item" style={{ width: 200 }}><NewOnIcon icon={<MachinesIcon size={18} />} isNew /><span>Machines</span><NewAtEnd isNew spoken=", new" /></span>
+    <span>Codex <NewBadge /></span>
     <Badge tone="warning" dot>Needs a key</Badge>
   </div>;
 }

@@ -9,14 +9,16 @@ import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
-import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary, useThisComputerSummary } from "../room/MachineList";
+import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary } from "../room/MachineList";
 import { useThisComputerSection } from "../../state/this-computer";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DeviceNameField } from "./DeviceNameField";
-import { NewOnIcon, useHighlights } from "../highlights/highlights";
+import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
+import { machineStatus, type MachineStatus } from "./machine-status";
+import { MachineEntryCopy, MachineState, machineEntryName } from "./MachineState";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
@@ -153,20 +155,19 @@ function Pane({ id, current, children }: { id: string; current: string; children
 }
 
 /** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
- *  set up and working: the model chosen, This device's service, the providers connected, the machines. Blank while it
- *  is not known yet (the catalogue loading or failed); none for a section of preferences. */
-function useSummaries(t: HostTranslate): Record<string, string | undefined> {
+ *  set up and working: the model chosen, This device's service (as its entry words it), the providers connected, the
+ *  machines. Blank while it is not known yet (the catalogue loading or failed); none for a section of preferences. */
+function useSummaries(t: HostTranslate, thisDevice: MachineStatus): Record<string, ReactNode> {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   const keys = useRoomStore((state) => state.facts.providerKeys);
   const machines = useMachinesSummary();
-  const thisComputer = useThisComputerSummary();
   const known = catalogueShown(catalogue);
   // The model's id, as the slot's own model list names it.
   const model = (task: "stt" | "tts") => !known ? "" : draft?.[task].model || t("settings.summary.noModel");
   const connected = remoteProviders(catalogue.catalogs).filter((provider: { id: string }) => keys[provider.id] === true).map((provider: { name: string }) => provider.name);
   return {
-    transcription: model("stt"), voice: model("tts"), "this-computer": thisComputer,
+    transcription: model("stt"), voice: model("tts"), "this-computer": <MachineState status={thisDevice} />,
     providers: !known ? "" : connected.length ? connected.join(", ") : t("settings.summary.providersNone"),
     machines,
   };
@@ -189,7 +190,11 @@ export function SettingsDialog() {
   useEffect(() => { if (!phone) content.current?.scrollTo?.({ top: 0 }); }, [current, machine]); // eslint-disable-line react-hooks/exhaustive-deps
   const waits = useVoiceReadiness();
   const news = useHighlights();
-  const summaries = useSummaries(t);
+  // This device's state, as its section's entry says it (only shown where the app reads its service).
+  const localMachine = useRoomStore((state) => state.machines.find((item) => item.local) ?? null);
+  const localStatus = useRoomStore((state) => state.facts.localHostStatus);
+  const thisDevice = machineStatus(localMachine, localStatus, true, t);
+  const summaries = useSummaries(t, thisDevice);
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
   // A control asked for (This device's rename): in view, focused, and lit for a moment, once its section is drawn.
@@ -247,19 +252,27 @@ export function SettingsDialog() {
               {phone ? <ul className="settings-menu">
                   {sections.map((section) => <li key={section.id}>
                     <MenuRow id={"settings-" + section.id} aria-controls={"pane-" + section.id} icon={<NewOnIcon icon={icon(section.id, 20)} isNew={isNew(section.id)} />}
-                      label={label(section.id)} summary={summaries[section.id]} badge={badge(section.id)} newLabel={isNew(section.id) ? t("highlights.navNew") : undefined}
+                      // This device is a machine's entry too, named as one: its name, its service's state, new.
+                      aria-label={section.id === "this-computer" ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
+                      label={label(section.id)} summary={summaries[section.id]} badge={badge(section.id)} end={<NewAtEnd isNew={isNew(section.id)} spoken={t("highlights.navNew")} />}
                       onClick={() => levels.open(section.id)} />
                   </li>)}
                 </ul>
-                : sections.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
-                  aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
-                  onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
-                  <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id)} label={t("highlights.navNew")} /><span>{label(section.id)}</span>
-                  {badge(section.id)}
-                </button>
-                {/* Each machine under Machines, and Add a machine after them. */}
-                {section.id === "machines" && <MachineNav current={current === "machines"} />}
-                </Fragment>)}
+                : sections.map((section) => {
+                  // This device is a machine's entry too: its name, and its service's state under it, said in its name.
+                  const device = section.id === "this-computer";
+                  return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : "ui-nav-item"} aria-controls={"pane-" + section.id}
+                    aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
+                    onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
+                    <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id)} />
+                    {device ? <MachineEntryCopy name={label(section.id)} status={thisDevice} isNew={isNew(section.id)} /> : <span>{label(section.id)}</span>}
+                    {badge(section.id)}
+                    {!device && <NewAtEnd isNew={isNew(section.id)} spoken={t("highlights.navNew")} />}
+                  </button>
+                  {/* Each machine under Machines, and Add a machine after them. */}
+                  {section.id === "machines" && <MachineNav current={current === "machines"} />}
+                  </Fragment>;
+                })}
             </nav>
             <div className="settings-content" ref={content} hidden={!pageShown} inert={motionOf(across, 2)?.startsWith("out") || undefined} data-motion={motionOf(across, 2)}>
               <div className="settings-column">

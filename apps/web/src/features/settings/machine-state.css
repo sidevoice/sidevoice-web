@@ -1,0 +1,17 @@
+/* A machine's state (MachineState): a word in its tone, as the agents' status line colours it (VARIANTS
+ * `machine-state` A), or a pill in its tone, as the Providers' Connected (B). Never the accent: that means new (and
+ * selected), so the current entry's own colour never reaches it. */
+.machine-state { font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-medium); white-space: nowrap; color: var(--sv-text-muted); }
+.machine-state[data-tone="positive"] { color: var(--sv-positive); }
+.machine-state[data-tone="warning"] { color: var(--sv-warning); }
+.machine-state[data-tone="danger"] { color: var(--sv-danger); }
+.ui-badge.machine-state-pill { justify-self: start; height: 20px; padding: 0 6px; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); font-weight: var(--sv-weight-semibold); }
+
+/* An entry's words (MachineEntryCopy): the name on its line — it gives way (an ellipsis), the lock and "New" after it
+ * never — and the state on the next, whole. */
+.machine-entry-copy { display: grid; flex: 1 1 auto; justify-items: start; gap: 2px; min-width: 0; text-align: start; }
+.machine-entry-line { display: flex; align-items: center; gap: var(--sv-space-1); width: 100%; min-width: 0; }
+.machine-entry-line .machine-nav-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.machine-nav-insecure { display: inline-grid; place-items: center; flex: none; color: var(--sv-warning); }
+.ui-nav-item .machine-nav-insecure svg { width: 14px; height: 14px; }
+.machine-entry-line .new-nav-pill { margin-inline-start: auto; }

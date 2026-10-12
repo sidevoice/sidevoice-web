@@ -34,7 +34,7 @@ export function initialSessionFacts() {
         // The pairing dialog, and the sentence it opens with when the page opened it (a revoked pairing).
         pairingOpen: false, pairingNote: '',
         // The language this device speaks in a call, and whether this page runs inside the desktop app.
-        speechLanguage: 'en', inApp: false,
+        speechLanguage: 'en', inApp: false, avatarPreview: null,
         // Whether this browser refuses the page any storage (site data blocked), found once at start.
         storageBlocked: false,
         // A model of this device being installed for a voice slot, how far it has got, or why it failed.

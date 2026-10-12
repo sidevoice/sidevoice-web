@@ -47,17 +47,16 @@ function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   return store;
 }
 
-test("the local host is This device's; every remote row says Connected without revealing a route, and no machine is to be chosen", async () => {
+test("the local host is This device's; every remote row says how it is reached without revealing a route, and no machine is to be chosen", async () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "room" }, "fp-other": { reach: "ok", via: "node" } } });
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
   expect(rows).toHaveLength(2);
-  expect(rows[0].getAttribute("aria-label")).toMatch(/NUC/);
-  expect(rows[0].getAttribute("aria-label")).toMatch(/Connected/);
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Through the room");
   expect(rows[0].getAttribute("aria-label")).not.toMatch(/room\.example|nuc-1|fingerprint|relay/i);
-  expect(rows[1].getAttribute("aria-label")).toMatch(/Other PC.*Connected/);
+  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
   expect(rows.some((row) => row.hasAttribute("data-in-use"))).toBe(false);
   // Every machine is live at once: no page says In use or offers Use.
   for (const name of ["NUC", "Other PC"]) {
@@ -67,11 +66,11 @@ test("the local host is This device's; every remote row says Connected without r
   }
 });
 
-test("an unreachable remote machine only says No response, and can still be forgotten, told when it's back", () => {
+test("an unreachable remote machine only says Not connected, and can still be forgotten, told when it's back", () => {
   const done = { ...actions(), machineDevices: vi.fn(), forgetMachine: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
-  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toMatch(/No response/);
+  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toBe("NUC, Not connected");
   expect(screen.queryByRole("button", { name: /Retry NUC/ })).toBeNull();
   // Its list can't be read, so no row of this device's: Forget is offered on its own, and never waits on the machine.
   expect(done.machineDevices).not.toHaveBeenCalled();
@@ -124,15 +123,13 @@ test("a failed local R1 host stays on the existing machine path instead of the n
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
 });
 
-test("a remote that does not answer says No response while another answers: each row says its own link", () => {
+test("a remote that does not answer says Not connected while another answers: each row says its own link", () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "offline", via: "" }, "fp-other": { reach: "ok", via: "node" } } });
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
-  expect(rows[0].getAttribute("aria-label")).toMatch(/NUC/);
-  expect(rows[0].getAttribute("aria-label")).toMatch(/No response/);
-  expect(rows[1].getAttribute("aria-label")).toMatch(/Other PC/);
-  expect(rows[1].getAttribute("aria-label")).toMatch(/Connected/);
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Not connected");
+  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
 });
 
 test("local F6 status shows only supported service actions", async () => {
@@ -294,7 +291,7 @@ test("stopping the local host while calls are active asks first, and Cancel leav
   expect(screen.getByText("Stop Sidevoice on this computer? Active calls will end.")).toBeInTheDocument();
   expect(stop).not.toHaveBeenCalled();
   await act(async () => { screen.getByRole("button", { name: "Cancel" }).click(); });
-  expect(screen.getByText("Running")).toBeInTheDocument();
+  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent("Running");
   expect(stop).not.toHaveBeenCalled();
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
@@ -503,13 +500,14 @@ test("a lost native pairing keeps This device's page and recovery action, with n
   expect(restart).toHaveBeenCalledOnce();
 });
 
-test("a reachable local core stays Connected when its service state is not running and hides the warning", () => {
+test("a reachable local core whose service the person stopped says Not running, as its card, and hides the warning", () => {
   actions();
   const store = createRoomStore();
   act(() => { store.patch({ pairings: [local], localHostAvailable: true, inApp: true,
     localHostStatus: { state: "stopped-by-person", reachable: true }, machinesReady: true }); });
   render(<RoomProvider store={store}><Panes /><LocalHostBanner /></RoomProvider>);
-  expect(thisDevice().querySelector(".host-detail-copy > p.muted")).toHaveTextContent("Connected");
+  expect(thisDevice().querySelector(".host-detail-state")).toHaveTextContent(/^Not running$/);
+  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Not running$/);
   expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
 });
 
@@ -528,10 +526,10 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   expect(done.machineDevices).toHaveBeenCalledWith("fp-nuc");
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   const rows = [...document.querySelectorAll<HTMLElement>(".host-device-row")];
-  // This device's row: its name, "This device", and forgetting the machine — never revoking itself.
+  // This device's row: its name and "This device" — never revoking itself, nor forgetting the machine (the page's foot).
   expect(rows[0]).toHaveTextContent("Ana’s laptop");
   expect(within(rows[0]).getByText("This device")).toBeInTheDocument();
-  expect(within(rows[0]).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  expect(within(rows[0]).queryByRole("button", { name: "Forget NUC" })).toBeNull();
   expect(screen.queryByRole("button", { name: /^Revoke (Chrome on Mac|Ana’s laptop)/ })).toBeNull();
   // The machine's own Sidevoice, paired with itself, is never listed; every other device has Revoke.
   expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual(["Ana’s laptop", "Phone", "Tablet"]);
@@ -581,7 +579,7 @@ test("a devices list that couldn't be read offers Retry, which reads it again", 
   await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
   expect(machineDevices).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
-  expect(within(document.querySelector(".host-device-row") as HTMLElement).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  expect(within(document.querySelector(".host-device-row") as HTMLElement).queryByRole("button", { name: "Forget NUC" })).toBeNull();
 });
 
 test("the remote machines are entries under Remote machines, Add a remote machine last; an entry shows its machine's whole page", async () => {
@@ -593,7 +591,7 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   const nav = machines.querySelector(".machines-inline .machine-nav")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
   expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add a remote machine"]);
-  expect(entry("NUC")).toHaveAccessibleName("NUC, Online · Connected");
+  expect(entry("NUC")).toHaveAccessibleName("NUC, Connected");
   // Each a server, as Remote machines' own icon is: in its entry and in its page's header.
   expect(entry("NUC").querySelector("svg")).toHaveClass("lucide-server");
   expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
@@ -639,19 +637,99 @@ test("this computer is not among the remote machines; stopped, its page says Sta
 test("a machine paired without encryption says so on its page, with why, and its entry carries a sign heard with its name", async () => {
   actions();
   const remote = { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 }, "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } };
-  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8768"], rv: null }), paired()], { remoteHostStatus: remote });
+  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8768"], rv: null }), paired()], { remoteHostStatus: remote,
+    machineLinks: { "fp-lab": { reach: "ok", via: "node" }, "fp-nuc": { reach: "ok", via: "node" } } });
   await act(async () => { entry("Lab box").click(); });
   const page = screen.getByRole("region", { name: "Lab box" });
-  const badge = within(page.querySelector("header")!).getByText("Not encrypted");
-  expect(badge.closest(".ui-badge")).toHaveAttribute("data-tone", "warning");
-  expect(badge.closest(".ui-badge")!.querySelector("svg")).not.toBeNull();
+  // On its page, after its state, in words with an open lock, and why in its (i).
+  const words = within(page.querySelector("header")!).getByText("Not encrypted");
+  expect(words.closest(".host-detail-state")).toHaveTextContent(/^Connected directly·Not encrypted/);
+  expect(words.querySelector("svg")).toHaveClass("lucide-lock-open");
   expect(within(page).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
-  // In the list, a sign after the name (which gives way, the sign never), and in words to a screen reader.
-  expect(entry("Lab box").querySelector(".machine-nav-name + .machine-nav-insecure svg")).not.toBeNull();
-  expect(entry("Lab box").getAttribute("aria-label")).toMatch(/^Lab box, not encrypted, /);
+  // In the list, an open lock after the name (which gives way, the lock never), and in words to a screen reader.
+  expect(entry("Lab box").querySelector(".machine-nav-name + .machine-nav-insecure svg")).toHaveClass("lucide-lock-open");
+  expect(entry("Lab box").getAttribute("aria-label")).toBe("Lab box, Connected, not encrypted");
+  expect(entry("Lab box")).toHaveAttribute("title", "Lab box · Connected directly · Not encrypted");
   // One paired over https says nothing of the kind.
   expect(entry("NUC").querySelector(".machine-nav-insecure")).toBeNull();
   expect(entry("NUC").getAttribute("aria-label")).not.toMatch(/not encrypted/);
   await act(async () => { entry("NUC").click(); });
   expect(screen.queryByText("Not encrypted")).toBeNull();
+});
+
+/** The devices list on a remote machine's page, and the action at that page's foot. */
+const devicesPanel = () => document.querySelector<HTMLElement>("#machines .host-devices-panel")!;
+const forgetFoot = () => document.querySelector<HTMLElement>("#machines .host-forget");
+
+test("forgetting a machine is never in its devices list, online or offline: it is the page's foot", async () => {
+  const devices: HostDeviceView[] = [{ device_id: "d-nuc", name: "Chrome on Mac", current: true }, { device_id: "d-phone", name: "Phone", kind: "code" }];
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue(devices), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  // Online: this device's row is there, "This device", with no Forget.
+  room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  await waitFor(() => expect(screen.getByText("Phone")).toBeInTheDocument());
+  expect(within(devicesPanel()).getByText("This device")).toBeInTheDocument();
+  expect(within(devicesPanel()).queryByRole("button", { name: /Forget/ })).toBeNull();
+  expect(within(forgetFoot()!).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  // After the devices: the page's last section.
+  expect(document.querySelector('#machines .host-detail[aria-label="NUC"]')!.lastElementChild).toBe(forgetFoot());
+  cleanup();
+  // Offline: the list can't be read, and still offers no Forget of its own.
+  room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
+  expect(within(devicesPanel()).queryByRole("button", { name: /Forget/ })).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Forget NUC" })).toHaveLength(1);
+  expect(within(forgetFoot()!).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+});
+
+test("only a remote machine's page has Forget at its foot; this device's page never does", () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([local, paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  expect(thisDevice().querySelector(".host-forget")).toBeNull();
+  expect(within(thisDevice()).queryByRole("button", { name: /^Forget/ })).toBeNull();
+  expect(forgetFoot()).not.toBeNull();
+  expect(screen.getAllByRole("button", { name: /^Forget/ }).map((button) => button.textContent)).toEqual(["Forget NUC"]);
+});
+
+test("Forget at a machine's foot is a danger button that asks first: the hint, then the online line; Yes forgets it", () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } },
+    remoteHostStatus: { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 } } });
+  const open = within(forgetFoot()!).getByRole("button", { name: "Forget NUC" });
+  expect(open).toHaveClass("ui-button--danger");
+  fireEvent.click(open);
+  const confirm = within(forgetFoot()!).getByRole("group", { name: "Forget NUC" });
+  expect([...confirm.querySelectorAll("p")].map((line) => line.textContent)).toEqual([
+    "Unpairs this device from NUC: its conversations and calls stop here until you pair it again with a new code.",
+    "Forget this machine? You will need a new code to use it again."]);
+  expect(within(confirm).getByRole("button", { name: "Cancel" })).toHaveFocus();
+  expect(done.forgetMachine).not.toHaveBeenCalled();
+  fireEvent.click(within(confirm).getByRole("button", { name: "Yes, forget" }));
+  expect(done.forgetMachine).toHaveBeenCalledExactlyOnceWith("fp-nuc");
+});
+
+test("Forget asked of a machine that doesn't answer says it will be told when it's back; Yes still forgets it", () => {
+  const done = { ...actions(), machineDevices: vi.fn(), forgetMachine: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
+  fireEvent.click(within(forgetFoot()!).getByRole("button", { name: "Forget NUC" }));
+  const confirm = within(forgetFoot()!).getByRole("group", { name: "Forget NUC" });
+  expect([...confirm.querySelectorAll("p")].map((line) => line.textContent)).toEqual([
+    "Unpairs this device from NUC: its conversations and calls stop here until you pair it again with a new code.",
+    "Forget this machine? You will need a new code to use it again. NUC is offline: it will be told when it’s back."]);
+  fireEvent.click(within(confirm).getByRole("button", { name: "Yes, forget" }));
+  expect(done.forgetMachine).toHaveBeenCalledExactlyOnceWith("fp-nuc");
+  expect(done.machineDevices).not.toHaveBeenCalled();
+});
+
+test("Cancel closes Forget's question without forgetting, and the focus goes back to Forget", async () => {
+  const done = { ...actions(), machineDevices: vi.fn().mockResolvedValue([]), forgetMachine: vi.fn(), loadHostAgents: vi.fn() };
+  window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
+  room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+  fireEvent.click(within(forgetFoot()!).getByRole("button", { name: "Forget NUC" }));
+  fireEvent.click(within(forgetFoot()!).getByRole("button", { name: "Cancel" }));
+  expect(within(forgetFoot()!).queryByRole("group")).toBeNull();
+  await waitFor(() => expect(within(forgetFoot()!).getByRole("button", { name: "Forget NUC" })).toHaveFocus());
+  expect(done.forgetMachine).not.toHaveBeenCalled();
 });

@@ -67,6 +67,9 @@ function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; 
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.hostAgents[fp]?.status ?? "idle");
   const steps = manualSteps(agent, kind);
+  // On another machine the steps are run there, and said so; on this device, nothing to say.
+  const machine = useRoomStore((state) => state.machines.find((entry) => entry.pairingId === fp) ?? null);
+  const remoteName = machine && !machine.local ? machine.host || t("hosts.unnamed") : null;
   useEffect(() => {
     if (!steps.length || status === "loading") return;
     const timer = window.setInterval(() => {
@@ -79,6 +82,7 @@ function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; 
       {!steps.length ? <p className="muted">{t("agents.manual.none")}</p> : <>
         {/* The connector's steps, in order, each one to copy: commands one after another are one step, one per line,
             copied at once; anything else (a file to edit, a snippet to paste) is a step of its own. */}
+        {remoteName && <p className="host-agent-where">{t("agents.manual.runOn", { machine: remoteName })}</p>}
         <ol className="host-agent-steps">{groupedSteps(steps).map((step, index) => <li key={index}>
           {step.command?.trim() && <><p className="host-agent-howto-label">{t(step.command.includes("\n") ? "agents.manual.commands" : "agents.manual.command")}</p><Snippet text={step.command} /></>}
           {step.snippet?.trim() && <><p className="host-agent-howto-label">{step.file ? t("agents.manual.file", { file: step.file }) : t("agents.manual.snippet")}</p><Snippet text={step.snippet} /></>}

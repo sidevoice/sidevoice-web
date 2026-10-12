@@ -29,8 +29,18 @@
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
 .host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
-.host-insecure { display: inline-flex; align-items: center; gap: 2px; flex: none; }
-.host-insecure .ui-badge svg { width: 12px; height: 12px; }
+/* Its state at length under its name — a word in its tone, semibold (VARIANTS `machine-state` A), or a pill (B) — and
+   Not encrypted after it, with its (i); what to do about it, when there is something, on the line under. */
+.host-detail-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); min-height: 1.25rem; }
+.host-detail-state .machine-state { font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); }
+.host-detail-state .ui-badge.machine-state-pill { height: 22px; padding: 0 var(--sv-space-2); }
+.host-detail-sep { color: var(--sv-text-muted); }
+.host-insecure { display: inline-flex; align-items: center; gap: var(--sv-space-1); flex: none; }
+span.host-insecure { color: var(--sv-warning); font-weight: var(--sv-weight-semibold); line-height: 1.25rem; }
+.host-insecure svg { flex: none; width: 14px; height: 14px; }
+.ui-badge.host-insecure svg { width: 12px; height: 12px; }
+.host-detail-state .ui-infotip { margin-inline-start: calc(-1 * var(--sv-space-1)); }
+.host-detail-hint { color: var(--sv-text-muted); line-height: 1.25rem; }
 /* Its sections one under another, each headed, a rule between them: everything a machine has, none behind a tab. */
 .host-section { display: grid; gap: var(--sv-space-3); min-width: 0; padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); scroll-margin-top: var(--sv-space-4); }
 .host-section > h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
@@ -72,23 +82,20 @@
   .machine-actions { padding-inline-start: 68px; }
 }
 @media (max-width: 480px) {
-  /* A narrow page keeps the state beside the name, under the icon's column: a grid, not a wrapping row. */
+  /* A narrow page keeps the state under the name, beside the icon's column: a grid, not a wrapping row. */
   .host-detail-header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sv-space-3); row-gap: var(--sv-space-2); }
-  .host-detail-header > .ui-badge, .host-detail-header > .ui-button, .host-detail-header > .host-insecure { grid-column: 2; justify-self: start; }
+  .host-detail-header > .host-detail-copy { grid-column: 2; min-width: 0; }
 }
 
-/* The machines under Machines in Settings' navigation: a dot for each one's state, Add a machine last. A phone lists
- * them on Machines' own page instead (MachineList), its words saying the state the dot repeats (settings.css). */
+/* The machines under Machines in Settings' navigation: each one's name, and its state in words on the line under it
+ * (machine-state.css), Add a machine last. A phone lists them on Machines' own page instead, a row each (MachineList,
+ * settings.css). Never a dot for a state: the colour only repeats the word. */
 .machine-nav { display: grid; gap: 2px; margin: 2px 0 var(--sv-space-2) var(--sv-space-6); }
 .ui-nav-item--sub { min-height: 34px; font-size: var(--sv-font-sm); }
-.machine-entry { min-width: 0; max-width: 100%; overflow: hidden; }
-.machine-nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.ui-nav-item.machine-entry { height: auto; min-height: 46px; padding-block: 6px; min-width: 0; max-width: 100%; overflow: hidden; }
+.ui-nav-item.machine-entry:has(.machine-state-pill) { min-height: 50px; }
+.machine-entry .machine-nav-name { font-size: var(--sv-font-sm); line-height: 18px; }
 .machine-nav-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
-/* Reached without encryption: its sign after the name, never pushed out by it. */
-.machine-nav-insecure { display: inline-grid; place-items: center; flex: none; color: var(--sv-warning); }
-.machine-nav-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-text-subtle); }
-.machine-nav-dot[data-tone="positive"] { background: var(--sv-positive); }
-.machine-nav-dot[data-tone="danger"] { background: var(--sv-danger); }
 .machine-nav-add { color: var(--sv-text-muted); }
 .machine-nav-add svg { width: 16px; height: 16px; }
 .machines-inline { display: none; }
@@ -101,7 +108,8 @@
 /* This computer's own machine, marked in the list. */
 
 /* This computer's service as a status card (LocalHostStatusPanel): its title and state (a dot and a word) first, its
-   facts compact, Start at sign-in as a switch, its actions at the foot. */
+   facts compact, Start at sign-in as a switch, its actions at the foot. Another machine's card has its title and its
+   version alone: its state is its page's header's. */
 .host-status-card { display: grid; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4) var(--sv-space-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); }
 [data-theme="dark"] .host-status-card { background: var(--sv-surface-raised); }
 .host-status-card p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
@@ -139,3 +147,8 @@
 
 /* This device's page: its name as the title, a pencil after it that takes you to where it is renamed (General). */
 .this-device-title { display: inline-flex; align-items: center; gap: var(--sv-space-1); }
+
+/* Forgetting a remote machine: its own action at the page's foot, asked first. */
+.host-forget { display: grid; justify-items: start; gap: var(--sv-space-2); }
+.host-forget p { margin: 0; }
+.host-forget-actions { display: flex; gap: var(--sv-space-2); }

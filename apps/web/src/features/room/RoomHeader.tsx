@@ -4,7 +4,7 @@ import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { UpdatesEntry, useUpdatesEntry, useUpdatesWaiting } from "../updates/UpdatesEntry";
 import { useRoomStore } from "../../state/room-store";
 import { useLayoutEffect, useReducer, useRef, useState, type RefObject } from "react";
-import { useHighlights } from "../highlights/highlights";
+import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator, type CallTranslate } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -167,7 +167,7 @@ function SettingsButton({ t }: { t: CallTranslate }) {
   return (
     <span className="header-settings">
       <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label}>
-        <SettingsIcon size={20} />{news.length > 0 && <span className="settings-notice-dot" aria-hidden="true" />}
+        <SettingsIcon size={20} /><GearNewMark count={news.length} />
       </Button>
     </span>
   );
