@@ -158,10 +158,10 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   const reasonId = useId();
   // Why it cannot run now: Smart without its model, or no transcription to hear the turn's words.
   const reason = running ? "" : smartBlocked ? t("turnTry.smartBlocked") : !stt.ready ? t("settings.save.waitTranscription") : "";
-  // The waveform moves only while the person speaks; listening, it is flat.
-  const speaking = useRef(false);
-  speaking.current = trial.phase === "speaking";
-  const wave = useMemo(() => () => speaking.current ? level.current() / 100 : 0, [level]);
+  // The microphone's level, always drawn: flat while the try does not listen, live while it does.
+  const live = useRef(false);
+  live.current = running;
+  const wave = useMemo(() => () => live.current ? level.current() / 100 : 0, [level]);
 
   const ended = trial.turn ? (trial.turn.silenceMs == null ? t("turnTry.endedNow") : t("turnTry.ended", { s: seconds(trial.turn.silenceMs) })) : "";
   const words: Partial<Record<Phase, string>> = {
@@ -170,10 +170,6 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   };
   const busy = trial.phase === "starting" || trial.phase === "restarting";
   const state = busy ? <p className="model-try-state turn-try-busy"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>
-    : running ? <div className="model-try-listening">
-      <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={wave} /></span>
-      <p className="turn-try-state">{words[trial.phase]}</p>
-    </div>
     : words[trial.phase] ? <p className="turn-try-state">{words[trial.phase]}</p> : null;
   const hint = <div className="turn-try-hint">
     <p className="model-try-hint">{t("turnTry.hint")}</p>
@@ -197,19 +193,23 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   const status = <p className="sr-only turn-try-said" role="status">{said && said + (trial.told % 2 ? "\u00a0" : "")}</p>;
   const why = reason && showWhy ? <p className="turn-try-reason" id={reasonId}>{reason}</p> : null;
 
+  // Laid out as the other tries: the button and the microphone's level on one row, always; under it an area of a fixed
+  // height — where the turn stands while it listens, then when it decided the turn ended and what was heard, in the
+  // same place — and the recorded take under that.
   return <Row label={t("turnTry.title")} block>
-    <div ref={root} className="turn-try turn-try-card" id="turn-try-panel" data-variant="card" data-phase={trial.phase}>
-      <div className="turn-try-main">
-        <div className="turn-try-lead">{hint}</div>
+    <div ref={root} className="turn-try turn-try-card stt-try" id="turn-try-panel" data-variant="card" data-phase={trial.phase}>
+      <div className="stt-try-head">
         {button}
+        <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={wave} /></span>
+      </div>
+      <div className="stt-try-area">
+        {!trial.attempt && !running && hint}
+        {state}
+        {!running && result}
+        {failure}
       </div>
       {why}
-      <div className="model-try" data-phase={trial.phase} data-empty={(!state && !result && !failure && !take) || undefined}>
-        {state}
-        {result}
-        {failure}
-        {take}
-      </div>
+      {take}
       {status}
     </div>
   </Row>;

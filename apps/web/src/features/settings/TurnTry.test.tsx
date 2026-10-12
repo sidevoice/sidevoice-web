@@ -84,12 +84,12 @@ test.each(variants)("%s: before a try, what to do and that it uses what is selec
   expect(panel()).toHaveTextContent("Turn ended — the agent would answer now");
   step({ step: "heard", text: "Quiero que revises… el PR de ayer", endpoint_silence_ms: 900 });
   expect(panel()).toHaveTextContent("Turn ended after 0.9 s of silence — the agent would answer now");
-  expect(document.getElementById("turn-try-heard")).toHaveTextContent("Quiero que revises… el PR de ayer");
-  expect(panel()).toHaveTextContent("Cut you off? Choose Calm. Slow to end? Choose Fast.");
+  // What was heard shows once the try stops, in the same place.
+  expect(document.getElementById("turn-try-heard")).toBeNull();
   // Only the latest turn: the next one starting takes its place.
   step({ step: "speaking" });
-  expect(document.getElementById("turn-try-heard")).toBeNull();
   expect(panel()).toHaveTextContent("You're talking…");
+  expect(panel().querySelector(".stt-try-area")).not.toHaveTextContent("Turn ended");
   // The waveform is decoration.
   expect(panel().querySelector(".voice-wave, .voice-bars")?.closest("[aria-hidden]")).not.toBeNull();
 });
@@ -199,6 +199,7 @@ test("with Silence already at Calm, a cut-off's remedy is the smart end of turn"
   const { step, start } = renderTurn({ settings: { end_of_turn: "silence", patience: "calm" } });
   await start();
   step({ step: "heard", text: "hola", endpoint_silence_ms: 3500 });
+  await act(async () => { fireEvent.click(button()); });
   expect(panel()).toHaveTextContent("Cut you off? Try Smart.");
   expect(panel()).not.toHaveTextContent("Choose Calm");
 });
@@ -227,7 +228,7 @@ test("the card is its own block, titled, after the model's block (Smart) or afte
   const row = card.closest(".ui-row")!;
   expect(row.querySelector(".ui-row-label")).toHaveTextContent("Try the end of turn");
   expect(row.previousElementSibling).toContainElement(document.getElementById("turn-model-card"));
-  expect(card.querySelector(".model-try")).toHaveAttribute("data-phase", "idle");
+  expect(card).toHaveAttribute("data-phase", "idle");
   act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } }));
   expect(panel()).toBe(card);
   expect(card.closest(".ui-row")!.previousElementSibling).toContainElement(document.getElementById("voice-end-of-turn"));
@@ -273,4 +274,41 @@ test("a voice that hands no take shows none (@sidevoice/voice 0.3.x, the desktop
   await end(Object.assign(new Error("The try was stopped."), { code: "trial-cancelled" }));
   expect(document.getElementById("turn-try-heard")).toHaveTextContent("hola");
   expect(document.getElementById("turn-try-take")).toBeNull();
+});
+
+test("laid out as the other tries: the button and the level on one row, then one area for the hint, the state and the result, then the take", async () => {
+  const { step, start, end, take } = renderTurn();
+  const head = () => panel().querySelector(".stt-try-head")!;
+  const area = () => panel().querySelector(".stt-try-area")!;
+  const wave = () => head().querySelector(".model-try-wave .voice-wave, .model-try-wave .voice-bars");
+  expect(panel().querySelector(".turn-try-main, .model-try, .model-try-listening")).toBeNull();
+  // Before a try: the button and the level, and the hint in the area.
+  expect(head()).toContainElement(button());
+  expect(wave()).not.toBeNull();
+  expect(area()).toHaveTextContent("Talk as you would to the agent, pausing to think.");
+  await start();
+  expect(head()).toContainElement(button());
+  expect(wave()).not.toBeNull();
+  step({ step: "listening", again: false });
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent("Listening — start talking");
+  expect(area()).not.toHaveTextContent("Talk as you would to the agent");
+  step({ step: "speaking" });
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent("You're talking…");
+  expect(wave()).not.toBeNull();
+  step({ step: "heard", text: "Quiero que revises el PR", endpoint_silence_ms: 900 });
+  expect(area()).toHaveTextContent("Turn ended after 0.9 s of silence — the agent would answer now");
+  take({ sampleRate: 16000, samples: new Float32Array(16000), started_at: 0, ended_at: 1000, turns: [] });
+  await end(Object.assign(new Error("The try was stopped."), { code: "trial-cancelled" }));
+  // Stopped: the result in the same area, the button and the level still on their row, the take after the area.
+  const result = area().querySelector(".turn-try-result")!;
+  expect(result).toContainElement(document.getElementById("turn-try-heard"));
+  expect(result).toHaveTextContent("Quiero que revises el PR");
+  expect(result).toHaveTextContent("Cut you off? Choose Calm. Slow to end? Choose Fast.");
+  expect(head()).toContainElement(button());
+  expect(button()).toHaveTextContent("Try again");
+  expect(wave()).not.toBeNull();
+  const recorded = document.getElementById("turn-try-take")!;
+  expect(recorded).not.toBeNull();
+  expect(area()).not.toContainElement(recorded);
+  expect(area().compareDocumentPosition(recorded) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
