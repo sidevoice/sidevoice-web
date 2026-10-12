@@ -411,6 +411,8 @@ export const en = {
   "try.slow": "Slow on this device — a smaller model may suit it better.",
   "try.timing.details": "How long each part took",
   "try.phase.ready": "Model ready: {s} s",
+  "try.phase.speech": "Your speech: {s} s",
+  "try.phase.pause": "Waiting for your pause: {s} s",
   "try.phase.recognition": "Transcribing: {s} s",
   "try.phase.firstSound": "To the first sound: {s} s",
   "try.starting": "Getting ready…",

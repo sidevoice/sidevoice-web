@@ -413,6 +413,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "try.slow": "Lento en este dispositivo: un modelo más pequeño puede irle mejor.",
   "try.timing.details": "Cuánto tardó cada parte",
   "try.phase.ready": "Modelo listo: {s} s",
+  "try.phase.speech": "Tu voz: {s} s",
+  "try.phase.pause": "Esperando tu pausa: {s} s",
   "try.phase.recognition": "Transcribiendo: {s} s",
   "try.phase.firstSound": "Hasta el primer sonido: {s} s",
   "try.starting": "Preparando…",
