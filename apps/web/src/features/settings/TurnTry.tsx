@@ -2,7 +2,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Row } from "../../components/ui/Card";
-import { useVariant } from "../../lib/variants";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { seconds, TryHeard, useModelState } from "./ModelSetup";
 import { hostTranslator } from "./host-i18n";
@@ -24,8 +23,6 @@ import "./turn-try.css";
 
 /** Where the try shows (the preview's VARIANTS `turn-try`): a strip under the end-of-turn choice, with no border of its
  *  own (`strip`), or a card of its own after the end-of-turn choices, as a model's try looks (`card`). */
-export const TURN_TRY = ["strip", "card"] as const;
-export const useTurnTryVariant = () => useVariant("turn-try", TURN_TRY);
 
 /** How long a notice stays (a turn that did not count, the new setting listening) before the try says it listens. */
 const NOTICE_MS = 2000;
@@ -138,8 +135,8 @@ export type TurnTryHandle = ReturnType<typeof useTurnTry>;
 /** The try of the end of turn being edited (`draft`), as the `turn-try` variant has it. `smart`: the smart end of turn
  *  is the one chosen, and `smartReady` its model ready; `setup`: the first-run setup's, where nothing says the try uses
  *  what is selected before it is kept, as Settings do; `active`: in sight (Settings' section on show). */
-export function TurnTry({ variant, draft, smart, smartReady, setup = false, active = true, handle, tried = false }: {
-  variant: (typeof TURN_TRY)[number]; draft: Settings; smart: boolean; smartReady: boolean; setup?: boolean; active?: boolean;
+export function TurnTry({ draft, smart, smartReady, setup = false, active = true, handle, tried = false }: {
+  draft: Settings; smart: boolean; smartReady: boolean; setup?: boolean; active?: boolean;
   /** The setup's own try (its footer starts it): this shows it, and offers it again here only once tried. */
   handle?: TurnTryHandle; tried?: boolean;
 }) {
@@ -189,18 +186,6 @@ export function TurnTry({ variant, draft, smart, smartReady, setup = false, acti
   const status = <p className="sr-only turn-try-said" role="status">{said && said + (trial.told % 2 ? "\u00a0" : "")}</p>;
   const why = reason && showWhy ? <p className="turn-try-reason" id={reasonId}>{reason}</p> : null;
 
-  if (variant === "strip") {
-    return <div ref={root} className="turn-try" id="turn-try-panel" data-variant="strip" data-phase={trial.phase}>
-      <div className="turn-try-main">
-        <div className="turn-try-lead">{state ?? hint}</div>
-        {button}
-      </div>
-      {why}
-      {result}
-      {failure}
-      {status}
-    </div>;
-  }
   return <Row label={t("turnTry.title")} block>
     <div ref={root} className="turn-try turn-try-card" id="turn-try-panel" data-variant="card" data-phase={trial.phase}>
       <div className="turn-try-main">

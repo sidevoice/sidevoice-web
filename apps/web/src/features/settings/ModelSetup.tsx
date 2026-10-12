@@ -2,9 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useStat
 import { useRoomStore } from "../../state/room-store";
 import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
-import { Dialog } from "../../components/ui/Dialog";
 import { Popover } from "../../components/ui/Popover";
-import { useVariant } from "../../lib/variants";
 import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import type { HostTranslate } from "./host-i18n";
 import type { PrepareStatus } from "./ModelPrepare";
@@ -81,11 +79,6 @@ export function sizeText(bytes: number | null, language = document.documentEleme
 export const downloadModel = (task: Task | "end-of-turn") => void window.sidevoiceActions?.installVoiceModel?.(task);
 export const cancelDownload = () => window.sidevoiceActions?.cancelVoiceInstall?.();
 
-/** How a try shows (the preview's VARIANTS `try-result`): all of it in the model's block (`card`), or in a small dialog
- *  the try opens, the block keeping a line on how the last one went (`dialog`). */
-export const TRY_RESULT = ["card", "dialog"] as const;
-export const useTryResult = () => useVariant("try-result", TRY_RESULT);
-
 export type TryState = {
   phase: "idle" | "running" | "done" | "failed";
   /** Which try this is: what an earlier one tells late is not this one's. */
@@ -105,15 +98,12 @@ const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range
 /** A real try of the settings being edited for `task` (the controller's `tryVoiceSettings`): `keep` makes settings that
  *  work this device's (the setup); `onTried` hears each success. A changed setting clears it; leaving stops it. While
  *  it runs it follows what the try tells (TrialProgress); the microphone's level goes to `level`, drawn from there
- *  frame by frame, never through a render. `open` is the try's dialog (`try-result` `dialog`): a try opens it there, and
- *  `close` shuts it, stopping a try that runs. */
+ *  frame by frame, never through a render. A try shows all of itself in the model's block (decided 2026-10-12). */
 export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?: boolean; onTried?: (task: Task) => void } = {}) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [trial, setTrial] = useState<TryState>(IDLE);
   const trialRef = useRef(trial);
   trialRef.current = trial;
-  const [open, setOpen] = useState(false);
-  const inDialog = useTryResult() === "dialog";
   const attempt = useRef(0);
   const level = useMemo(createMicLevelChannel, []);
   const slot = JSON.stringify(task && draft ? draft[task] : null);
@@ -132,7 +122,6 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
     const mine = ++attempt.current;
     const update = (next: (trial: TryState) => TryState) => setTrial((trial) => trial.attempt === mine ? next(trial) : trial);
     level.publish(0);
-    setOpen(inDialog);
     setTrial({ ...IDLE, phase: "running", attempt: mine, said: options.text ?? "" });
     try {
       const result = await window.sidevoiceActions!.tryVoiceSettings!(task, { ...options, keep,
@@ -148,8 +137,7 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
       level.publish(0);
     }
   }
-  const close = () => { if (trial.phase === "running") cancel(); setOpen(false); };
-  return { trial, run, cancel, level, open, close };
+  return { trial, run, cancel, level };
 }
 
 /** A try with what it starts with (the sentence, its language), for whatever shows it. */
@@ -273,43 +261,13 @@ function TryBody({ task, handle, roomy = false, sample, t }: { task: Task; handl
   </>;
 }
 
-/** The try's own dialog (`try-result` `dialog`): what the block would show, with Stop while it runs, then again or
- *  done. Closed, a running try stops. */
-function TryDialog({ task, handle, model, t }: { task: Task; handle: VoiceTry; model: string; t: HostTranslate }) {
-  const titleId = useId();
-  const running = handle.trial.phase === "running";
-  return <Dialog id={task + "-try-dialog"} open={handle.open} size="sm" titleId={titleId} eyebrow={model} closeId={task + "-try-close"}
-    title={t(task === "stt" ? "try.dialog.stt" : "try.dialog.tts")} onClose={handle.close}
-    footer={running ? <Button id={task + "-try-stop"} onClick={handle.close}>{t("try.stop")}</Button>
-      : <><Button id={task + "-try-repeat"} onClick={handle.start}>{t(AGAIN[task])}</Button>
-        <Button variant="primary" id={task + "-try-done"} onClick={handle.close}>{t("try.done")}</Button></>}>
-    <div className="model-try" data-phase={handle.trial.phase}><TryBody task={task} handle={handle} roomy t={t} /></div>
-  </Dialog>;
-}
-
-/** What a try shows in a ready model's block, under its state, as the `try-result` variant has it: all of it
- *  (`card`), or a line on how the last one went while its dialog does the rest (`dialog`). `hint`: a line before
- *  any try (the first-run setup's); `sample`: the sentence to hear, edited in the block (`card` only). */
+/** What a try shows in a ready model's block, under its state: all of it. `hint`: a line before any try (the first-run
+ *  setup's); `sample`: the sentence to hear, edited in the block. */
 export function TryPanel({ task, handle, model, hint, sample, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; t: HostTranslate }) {
-  const variant = useTryResult();
   const { trial } = handle;
   const idle = trial.phase === "idle";
-  if (variant === "card") {
-    return <div className="model-try" id={task + "-try-panel"} data-phase={trial.phase} data-empty={(idle && !hint && !sample) || undefined}>
-      {idle && hint && <p className="model-try-hint">{hint}</p>}
-      <TryBody task={task} handle={handle} sample={sample} t={t} />
-    </div>;
-  }
-  const ms = trial.phase === "done" && trial.timings ? timingMs(task, trial.timings) : null;
-  const heard = trial.phase === "done" && task === "stt" ? trial.text : "";
-  const summary = !handle.open && (trial.phase === "failed" || heard || ms != null);
-  return <>
-    {(summary || (idle && hint)) && <div className="model-try" id={task + "-try-panel"} data-phase={trial.phase}>
-      {idle && hint && <p className="model-try-hint">{hint}</p>}
-      {summary && <p className="model-try-summary" data-failed={trial.phase === "failed" || undefined}>
-        {trial.phase === "failed" ? trial.error : <>{heard && <q>{heard}</q>}{heard && ms != null && " · "}{ms != null && timingText(task, ms, t)}</>}
-      </p>}
-    </div>}
-    <TryDialog task={task} handle={handle} model={model} t={t} />
-  </>;
+  return <div className="model-try" id={task + "-try-panel"} data-phase={trial.phase} data-empty={(idle && !hint && !sample) || undefined}>
+    {idle && hint && <p className="model-try-hint">{hint}</p>}
+    <TryBody task={task} handle={handle} sample={sample} t={t} />
+  </div>;
 }

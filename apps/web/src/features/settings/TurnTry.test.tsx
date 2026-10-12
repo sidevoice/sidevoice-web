@@ -9,7 +9,7 @@ import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { TurnStep } from "../../services/voice-trial.js";
 
-/* Trying the end of turn where it is chosen, in both places the `turn-try` variant puts it: the actions stand in for
+/* Trying the end of turn where it is chosen, in its card after the choices: the actions stand in for
  * the voice, and tell the try's steps as the controller would (voice-trial.js TurnStep). The interface speaks English
  * here (the test's system). */
 
@@ -24,11 +24,10 @@ const catalogs = (turnInstalled = true, sttInstalled = true) => [{ id: "local", 
   local("smart-turn-v3.2", "smart-turn", ["end-of-turn"], turnInstalled ? {} : { installed: false, builds: [build("smart-turn-v3.2/int8", { installed: false })] }),
 ] }] as unknown as CatalogView[];
 
-const variants = ["strip", "card"] as const;
+const variants = ["card"] as const;
 
 /** The end-of-turn choices with their try, on `settings`; the try runs until the test tells it why it ended. */
-function renderTurn({ variant = "strip" as (typeof variants)[number], settings = {} as Partial<DeviceVoiceSettings>, turnInstalled = true, sttInstalled = true, setup = false } = {}) {
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "turn-try": variant }));
+function renderTurn({ variant: _variant = "card" as (typeof variants)[number], settings = {} as Partial<DeviceVoiceSettings>, turnInstalled = true, sttInstalled = true, setup = false } = {}) {
   const store = createRoomStore();
   store.patch({ voiceSettings: { ...defaultVoiceSettings(), ...settings }, voiceCatalogue: { state: "ready", catalogs: catalogs(turnInstalled, sttInstalled), error: "" } });
   installRoomBridge(store);
@@ -218,22 +217,8 @@ test.each(variants)("%s: leaving stops a try that runs — its section hidden, i
   expect(actions.cancelVoiceTry).toHaveBeenCalledTimes(3);
 });
 
-test("the strip sits right under the end-of-turn choice, above the model's block, and stays put when the choice changes", async () => {
-  const { store, step, start } = renderTurn({ variant: "strip" });
-  const strip = panel();
-  expect(strip).toHaveAttribute("data-variant", "strip");
-  expect(document.getElementById("voice-end-of-turn")!.closest(".ui-row")!.nextElementSibling).toBe(strip);
-  expect(strip.nextElementSibling).toContainElement(document.getElementById("turn-model-card"));
-  await start();
-  step({ step: "listening", again: false });
-  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } }));
-  expect(panel()).toBe(strip);
-  expect(document.getElementById("turn-model-card")).toBeNull();
-  expect(panel()).toHaveTextContent("Listening — start talking");
-});
-
 test("the card is its own block, titled, after the model's block (Smart) or after the choice (Silence), and stays put when the choice changes", async () => {
-  const { store } = renderTurn({ variant: "card" });
+  const { store } = renderTurn();
   const card = panel();
   expect(card).toHaveAttribute("data-variant", "card");
   const row = card.closest(".ui-row")!;

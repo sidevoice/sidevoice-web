@@ -15,7 +15,7 @@ import { useVariant } from "../../lib/variants";
 import { Appearance } from "../settings/SettingsDialog";
 import { Group, Row } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
-import { useModelState, useTryResult, useVoiceTry, type ModelState, type SetupTry, catalogueShown } from "../settings/ModelSetup";
+import { useModelState, useVoiceTry, type ModelState, type SetupTry, catalogueShown } from "../settings/ModelSetup";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { hostStatusText } from "../settings/local-host-status";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -118,7 +118,6 @@ type StageTry = SetupTry & { sentence: string; setSentence(value: string): void 
 function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
-  const inCard = useTryResult() === "card";
   useEffect(() => {
     if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue();
     window.sidevoiceActions?.editVoice({});
@@ -127,13 +126,12 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
     <Textarea id="wizard-sample" minRows={2} maxRows={4} maxLength={SAMPLE_MAX} value={stage.sentence} placeholder={t("wizard.samplePlaceholder")}
       onChange={(event) => stage.setSentence(event.target.value)} />
   </Field> : null;
-  const trial: SetupTry = { ...stage, sample: inCard && sample ? sample : undefined };
+  const trial: SetupTry = { ...stage, sample: sample ?? undefined };
   return <section className="wizard-stage-step">
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
         : <div className="wizard-stage">{task === "stt" ? <TranscriptionChoices draft={draft} setup trial={trial} /> : <SpeechChoices draft={draft} setup trial={trial} />}</div>}
-    {!inCard && sample}
   </section>;
 }
 

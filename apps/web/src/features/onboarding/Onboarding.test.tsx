@@ -176,7 +176,7 @@ function pendingTry() {
   return running;
 }
 
-test("try-result card: the voice's try is all in its block — the sentence edited there, lit as it is heard, then how quick and Listen again", async () => {
+test("the voice's try is all in its block — the sentence edited there, lit as it is heard, then how quick and Listen again", async () => {
   const store = room();
   paired(store);
   await act(async () => { fireEvent.click(stageAction()); });
@@ -202,32 +202,6 @@ test("try-result card: the voice's try is all in its block — the sentence edit
   expect(stageAction()).toHaveTextContent(/^Continue$/);
 });
 
-test("try-result dialog: the footer's Speak opens the try's dialog — listening, then what was heard; its Escape is its own, and the block keeps a line", async () => {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "try-result": "dialog" }));
-  const store = room();
-  paired(store);
-  const running = pendingTry();
-  await act(async () => { fireEvent.click(tryButton()); });
-  const dialog = document.querySelector("#wizard #stt-try-dialog")!;
-  expect(dialog).toHaveAttribute("open");
-  expect(dialog).toHaveTextContent("Try transcription");
-  act(() => running.told.onListening!());
-  expect(dialog).toHaveTextContent("Listening… say a short sentence");
-  expect(dialog.querySelector(".voice-wave canvas")).toBeInTheDocument();
-  await act(async () => { running.finish({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }); });
-  expect(dialog.querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
-  expect(dialog.querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
-  // Escape closes the try's dialog alone: the setup is not put off, and stays on its step.
-  await act(async () => { fireEvent(dialog, new Event("cancel", { cancelable: true })); });
-  expect(dialog).not.toHaveAttribute("open");
-  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at).toBeFalsy();
-  expect(title()).toHaveTextContent("Set up transcription");
-  // The block keeps how it went in a line, and offers it again; the footer goes on.
-  expect(card("stt").querySelector(".model-try-summary")).toHaveTextContent("hola, ¿me oyes? · Transcribed in 0.4 s");
-  expect(document.querySelector("#wizard #stt-heard")).toBeNull();
-  expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
-  expect(stageAction()).toHaveTextContent(/^Continue$/);
-});
 
 test("put off, the setup leaves one action that resumes it where it stands", async () => {
   const store = room();

@@ -1,6 +1,5 @@
 /* Trying the end of turn (TurnTry.tsx): where it stands in words, a small waveform beside them while the voice listens,
-   Try and Stop as one button; then the latest turn's words and what to change. The strip (`strip`) sits in the
-   end-of-turn group with no border of its own, as the end of the row above it; the card (`card`) is a block of its own,
+   Try and Stop as one button; then the latest turn's words and what to change. A block of its own after the choices,
    framed as a model's block is, its try under a line as a model's try is (model-prepare.css). */
 .turn-try { display: grid; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .turn-try-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-width: 0; min-height: 36px; }
@@ -12,9 +11,6 @@
 .turn-try-reason, .turn-try-adjust { margin: 0; color: var(--sv-text-muted); }
 .turn-try-result { display: grid; gap: var(--sv-space-2); min-width: 0; }
 
-.turn-try[data-variant="strip"] { padding: 0 var(--sv-space-5) 14px; }
-/* The row after the strip keeps its line: the strip belongs to the row above it. */
-.turn-try[data-variant="strip"] + .ui-row { border-top: 1px solid var(--sv-border); }
 
 .turn-try-card { gap: var(--sv-space-3); margin-top: var(--sv-space-3); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
 .turn-try-card > .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
