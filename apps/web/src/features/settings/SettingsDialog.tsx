@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -9,7 +9,7 @@ import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
-import { MachineList, MachineNav, ThisComputerSettings } from "../room/MachineList";
+import { MachineList, MachineNav, machineName, ThisComputerSettings, useMachinesSummary, useThisComputerSummary } from "../room/MachineList";
 import { useThisComputerSection } from "../../state/this-computer";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
@@ -24,22 +24,27 @@ import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { useVoiceSwitch } from "../../state/call-model";
+import { remoteProviders } from "../../services/voice-settings.js";
+import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
+import { MenuRow } from "./SettingsMenu";
 import "./settings.css";
 
-/* Settings: a screen of their own, its sections beside its content (above it on a phone), and Save at the foot. The
- * runtime opens and closes it by its ids (#language-settings, #settings-close) and saves it on the form's submit
- * (#language-form); which section shows is the store's `settingsSection`, which the runtime also sets (no machine yet,
- * an agent waiting). Save waits while a chosen model is not ready yet, and says so. */
+/* Settings: a screen of their own, its sections beside its content on a desktop; on a phone a menu of them, each
+ * section a page of its own under it (settings-levels.tsx). The runtime opens and closes it by its ids
+ * (#language-settings, #settings-close) and writes what fails under its header (#settings-error), whatever shows; which
+ * section shows is the store's `settingsSection`, which the runtime also sets (no machine yet, an agent waiting). There
+ * is no Save: every setting applies as it changes. */
 
-const SECTIONS: { id: string; label: HostMessageKey; icon: ReactNode }[] = [
-  { id: "general", label: "settings.section.general", icon: <GeneralIcon /> },
-  { id: "transcription", label: "settings.section.transcription", icon: <TranscriptionIcon /> },
-  { id: "voice", label: "settings.section.voice", icon: <VoicesIcon /> },
-  { id: "call", label: "settings.section.call", icon: <CallSettingsIcon /> },
-  { id: "this-computer", label: "settings.section.thisDevice", icon: <ThisComputerIcon size={18} /> },
-  { id: "providers", label: "settings.section.providers", icon: <IntegrationsIcon /> },
-  { id: "machines", label: "settings.section.machines", icon: <MachinesIcon /> },
-  { id: "advanced", label: "settings.section.advanced", icon: <AdvancedIcon /> },
+/** Each section in the nav's order, its icon drawn at the size asked (the nav's, by default; a phone's row, 20px). */
+const SECTIONS: { id: string; label: HostMessageKey; icon: (size?: number) => ReactNode }[] = [
+  { id: "general", label: "settings.section.general", icon: (size) => <GeneralIcon size={size} /> },
+  { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
+  { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
+  { id: "call", label: "settings.section.call", icon: (size) => <CallSettingsIcon size={size} /> },
+  { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
+  { id: "providers", label: "settings.section.providers", icon: (size) => <IntegrationsIcon size={size} /> },
+  { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
+  { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
 ];
 
 export function Appearance({ t }: { t: HostTranslate }) {
@@ -77,8 +82,9 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslat
 function CallSettings({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const ready = useRoomStore((state) => catalogueShown(state.facts.voiceCatalogue));
-  // Every section is drawn, one shown: another section shown stops a try of the end of turn here.
-  const shown = useRoomStore((state) => (state.facts.settingsSection || "general") === "call");
+  // Every section is drawn, one shown: another section shown (or, on a phone, the list of them, or Settings closed)
+  // stops a try of the end of turn here.
+  const shown = useSectionShown("call");
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
   const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));
@@ -145,21 +151,47 @@ function Pane({ id, current, children }: { id: string; current: string; children
   return <div id={"pane-" + id} className="settings-pane" role="tabpanel" aria-labelledby={"settings-" + id} hidden={id !== current}><ErrorBoundary area={"settings:" + id}>{children}</ErrorBoundary></div>;
 }
 
+/** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
+ *  set up and working: the model chosen, This device's service, the providers connected, the machines. Blank while it
+ *  is not known yet (the catalogue loading or failed); none for a section of preferences. */
+function useSummaries(t: HostTranslate): Record<string, string | undefined> {
+  const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
+  const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
+  const keys = useRoomStore((state) => state.facts.providerKeys);
+  const machines = useMachinesSummary();
+  const thisComputer = useThisComputerSummary();
+  const known = catalogueShown(catalogue);
+  // The model's id, as the slot's own model list names it.
+  const model = (task: "stt" | "tts") => !known ? "" : draft?.[task].model || t("settings.summary.noModel");
+  const connected = remoteProviders(catalogue.catalogs).filter((provider: { id: string }) => keys[provider.id] === true).map((provider: { name: string }) => provider.name);
+  return {
+    transcription: model("stt"), voice: model("tts"), "this-computer": thisComputer,
+    providers: !known ? "" : connected.length ? connected.join(", ") : t("settings.summary.providersNone"),
+    machines,
+  };
+}
+
 export function SettingsDialog() {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
   // This computer as a section of its own, where this device can host.
   const ownComputer = useThisComputerSection();
-  // A section changed (or a machine within Machines) starts at its top, not where the last one was scrolled to.
   const content = useRef<HTMLDivElement>(null);
+  const nav = useRef<HTMLElement>(null);
+  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  const { levels, said } = useSettingsLevelsOf(dialog, { nav, content });
+  const { phone, level, motion } = levels;
   const machine = useRoomStore((state) => state.facts.machinesView?.machine ?? null);
-  useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [current, machine]);
+  // A section changed (or a machine within Machines) starts at its top, not where the last one was scrolled to. A
+  // phone's levels keep and restore their own.
+  useEffect(() => { if (!phone) content.current?.scrollTo?.({ top: 0 }); }, [current, machine]); // eslint-disable-line react-hooks/exhaustive-deps
   const waits = useVoiceReadiness();
   const news = useHighlights();
+  const summaries = useSummaries(t);
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
-  // A control asked for (what's new's Set up): in view, focused, and lit for a moment, once its section is drawn.
+  // A control asked for (This device's rename): in view, focused, and lit for a moment, once its section is drawn.
   useEffect(() => {
     if (!focus) return;
     let tries = 0;
@@ -177,29 +209,58 @@ export function SettingsDialog() {
     let timer = window.setTimeout(find, 0);
     return () => window.clearTimeout(timer);
   }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  // This device's page shown on a phone when this device stops having it (no longer able to host): the list, its title.
+  useEffect(() => {
+    if (phone && level === 2 && current === "this-computer" && !ownComputer) levels.back({ instantly: true, focus: "title" });
+  }, [phone, level, current, ownComputer]); // eslint-disable-line react-hooks/exhaustive-deps
   const show = (section: string) => store?.patch({ settingsSection: section });
+  const sections = SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer);
+  const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
+  const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} /> : SECTIONS.find((section) => section.id === id)!.icon(size);
+  const isNew = (id: string) => news.some((item) => item.section === id);
+  const notReady = (id: string) => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn);
+  const badge = (id: string) => notReady(id) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>;
+  // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.
+  const shownMachine = useRoomStore((state) => state.machines.find((entry) => entry.id === machine) ?? null);
+  const title = !phone || level === 1 ? t("settings.title") : level === 3 && shownMachine ? machineName(shownMachine, t) : label(current);
+  const parent = level === 3 ? label("machines") : t("settings.title");
+  // A slide between the list and a page moves them both; between Machines' list and a machine's page, only what is in it.
+  const across = motion && (motion.from === 1 || motion.to === 1) ? motion : null;
+  const navShown = !phone || level === 1 || !!across;
+  const pageShown = !phone || level > 1 || !!across;
   return (
-    <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" aria-labelledby="settings-title">
+    <dialog ref={setDialog} id="language-settings" className="ui-dialog settings-page" data-layout="page" data-phone={phone || undefined}
+      // Named Settings at every level (a deep link to Call is not "Call, dialog"); the title says the level.
+      aria-labelledby={phone ? undefined : "settings-title"} aria-label={phone ? t("settings.title") : undefined}>
       <OverlayPortalProvider container={dialog}>
-        <DialogSurface titleId="settings-title" closeId="settings-close" closeable flush closeLabel={t("settings.close")}
-          title={t("settings.title")}
->
-          {/* No Save: every setting applies as it changes; what fails says so here. */}
+        <SettingsLevelsProvider value={levels}>
+        <DialogSurface titleId="settings-title" closeId="settings-close" closeable flush closeLabel={t("settings.close")} title={title} titleFocusable={phone}
+          leading={phone && level > 1 ? <Button variant="ghost" tone="neutral" size="icon" className="settings-back" aria-label={t("settings.backTo", { page: parent })} title={t("settings.back")}
+            onClick={() => levels.back()}><BackIcon size={20} /></Button> : undefined}>
+          {/* No Save: every setting applies as it changes. */}
           <form id="language-form" className="settings-layout">
-            <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
-              {SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer).map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
-                aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
-                onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
-                <NewOnIcon icon={ownComputer && section.id === "machines" ? <OtherMachineIcon size={18} /> : section.icon} isNew={news.some((item) => item.section === section.id)} label={t("highlights.navNew")} /><span>{t(ownComputer && section.id === "machines" ? "settings.section.remoteMachines" : section.label)}</span>
-                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
-              </button>
-              {/* Each machine under Machines, and Add a machine after them. */}
-              {section.id === "machines" && <MachineNav current={current === "machines"} />}
-              </Fragment>)}
+            {/* What fails says so here, under the header, whichever level shows. */}
+            <p id="settings-error" className="settings-error" role="alert" />
+            <nav ref={nav} className="ui-nav settings-nav" aria-label={t("settings.sections")} hidden={!navShown}
+              inert={motionOf(across, 1)?.startsWith("out") || undefined} data-motion={motionOf(across, 1)}>
+              {phone ? <ul className="settings-menu">
+                  {sections.map((section) => <li key={section.id}>
+                    <MenuRow id={"settings-" + section.id} aria-controls={"pane-" + section.id} icon={<NewOnIcon icon={icon(section.id, 20)} isNew={isNew(section.id)} />}
+                      label={label(section.id)} summary={summaries[section.id]} badge={badge(section.id)} newLabel={isNew(section.id) ? t("highlights.navNew") : undefined}
+                      onClick={() => levels.open(section.id)} />
+                  </li>)}
+                </ul>
+                : sections.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
+                  aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
+                  onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
+                  <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id)} label={t("highlights.navNew")} /><span>{label(section.id)}</span>
+                  {badge(section.id)}
+                </button>
+                {/* Each machine under Machines, and Add a machine after them. */}
+                {section.id === "machines" && <MachineNav current={current === "machines"} />}
+                </Fragment>)}
             </nav>
-            <div className="settings-content" ref={content}>
-              <p id="settings-error" className="settings-error" role="alert" />
+            <div className="settings-content" ref={content} hidden={!pageShown} inert={motionOf(across, 2)?.startsWith("out") || undefined} data-motion={motionOf(across, 2)}>
               <div className="settings-column">
                 <Pane id="general" current={current}><GeneralSettings t={t} /></Pane>
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
@@ -211,8 +272,11 @@ export function SettingsDialog() {
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
               </div>
             </div>
+            {/* Settings' own polite region (a machine forgotten), never the call's. */}
+            <p className="sr-only" role="status">{said}</p>
           </form>
         </DialogSurface>
+        </SettingsLevelsProvider>
       </OverlayPortalProvider>
     </dialog>
   );

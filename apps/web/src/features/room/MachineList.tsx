@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, EditIcon, OtherMachineIcon, ThisComputerIcon, WarningIcon } from "../../components/ui/Icons";
@@ -20,6 +20,8 @@ import { useThisComputerSection } from "../../state/this-computer";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewOnIcon, useHighlights } from "../highlights/highlights";
+import { motionOf, useSettingsLevels } from "../settings/settings-levels";
+import { MenuRow } from "../settings/SettingsMenu";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -28,9 +30,14 @@ function dateText(value: string | number | null | undefined) {
   return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(navigator.language, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+/** A machine's name as this device knows it: its alias here, else its own; this computer, or unnamed, without one. */
+export function machineName(machine: MachineView, t: HostTranslate) {
+  return machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
+}
+
 /** A machine's name, and what its row says about it: this computer, connected, not checked, no response. */
 function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTranslate) {
-  const name = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
+  const name = machineName(machine, t);
   const subtitle = machine.local
     ? machine.state === "connected" ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
     : machine.state === "checking" ? t("hosts.checking")
@@ -47,7 +54,8 @@ function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTrans
  * machine chosen has its page in the pane (MachineList): its state, this computer's service (the local one), its
  * agents, the devices paired with it (pairing goes from a device to the machine: Add a machine, and pair-device on
  * the machine), and forgetting it. Machines itself is the first machine, or, with
- * none, a word and Add. On a phone, whose sections are a strip, the machines come at the pane's head instead. */
+ * none, a word and Add. On a phone, whose Settings is a menu of levels (settings-levels.tsx), Machines is always a
+ * list — each machine a row with its state in words, Add a machine last — and a machine a page of its own under it. */
 
 /** A machine's state for its dot and its words. */
 function machineState(machine: MachineView, copy: ReturnType<typeof machineCopy>, t: HostTranslate) {
@@ -66,6 +74,26 @@ function useListedMachines() {
   const own = useThisComputerSection();
   const machines = useRoomStore((state) => state.machines);
   return own ? machines.filter((machine) => !machine.local) : machines;
+}
+
+/** What Machines' row says under its name in a phone's Settings: none yet; the one machine and its state; how many, and
+ *  how many of them online. */
+export function useMachinesSummary() {
+  const t = hostTranslator();
+  const machines = useListedMachines();
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  if (!machines.length) return t("settings.summary.machinesNone");
+  if (machines.length > 1) return t("settings.summary.machines", { n: machines.length, online: machines.filter((machine) => machine.state === "connected").length });
+  const copy = machineCopy(machines[0], status, t);
+  return t("settings.summary.machine", { machine: copy.name, state: machineState(machines[0], copy, t).label });
+}
+
+/** What This device's row says under its name: its Sidevoice service's state, or that it is not prepared yet. */
+export function useThisComputerSummary() {
+  const t = hostTranslator();
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const prepared = useRoomStore((state) => state.machines.some((machine) => machine.local));
+  return prepared ? t(serviceState(status).label) : t("settings.summary.notPrepared");
 }
 
 /** The machine shown: the one chosen, else the first. */
@@ -136,17 +164,71 @@ export function MachineList() {
     if (picked !== machine.id) store?.patch({ machinesView: { machine: machine.id } });
   }, [agentRequest, machines, picked]);
 
+  const levels = useSettingsLevels();
+  // The machine whose page a phone shows went (forgotten here, or revoked elsewhere): back to the list, without a slide —
+  // what it showed is gone — and, forgotten here, said so: its page and its control went with it.
+  const forgetting = useRef<{ id: string; name: string } | null>(null);
+  const gone = levels.phone && levels.level === 3 && !!picked && !machines.some((machine) => machine.id === picked);
+  useEffect(() => {
+    if (!gone) return;
+    if (forgetting.current?.id === picked) levels.say(t("settings.machineForgotten", { machine: forgetting.current.name }));
+    forgetting.current = null;
+    levels.back({ instantly: true });
+  }, [gone]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const empty = machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
+    <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</Button></div>;
+  // Preparing this computer is its own section's, when it has one.
+  const install = !own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />;
+  if (levels.phone) {
+    const page = picked ? machines.find((machine) => machine.id === picked) ?? null : null;
+    const pageCopy = page ? machineCopy(page, status, t) : null;
+    // The list and a machine's page share the pane's scroll: during a slide both are drawn, the one left held where it
+    // was scrolled (`shift`).
+    const sub = levels.motion && levels.motion.from > 1 && levels.motion.to > 1 ? levels.motion : null;
+    const held = (level: 2 | 3) => (motionOf(sub, level)?.startsWith("out") ? { "--level-shift": `${sub!.shift}px` } as CSSProperties : undefined);
+    return (
+      <Section id="machines" title={t(own ? "hosts.titleRemote" : "hosts.title")}>
+        <div className="settings-sublevels">
+          <div className="settings-sublevel" hidden={levels.level !== 2 && !sub} inert={motionOf(sub, 2)?.startsWith("out") || undefined} data-motion={motionOf(sub, 2)} style={held(2)}>
+            <p className="ui-section-description">{t("hosts.description")}</p>
+            {machines.length > 0 && <ul className="settings-menu machines-menu">
+              {machines.map((machine) => {
+                const copy = machineCopy(machine, status, t);
+                const state = machineState(machine, copy, t);
+                // Its state in words (a touch screen shows no tooltip), the dot repeating it as the desktop's list does.
+                const line = [state.label, machine.insecure ? t("hosts.notEncrypted") : "", machine.local && !own ? t("hosts.thisComputer") : ""].filter(Boolean).join(" · ");
+                return <li key={machine.id}>
+                  <MenuRow className="machine-entry" data-machine={machine.id} data-name={copy.name} data-state={machine.state} data-local={machine.local || undefined}
+                    icon={<NewOnIcon icon={machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />} isNew={notice(machine)} />}
+                    label={copy.name} summary={line} newLabel={notice(machine) ? t("highlights.navNew") : undefined}
+                    badge={<span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />}
+                    onClick={() => levels.open("machines", machine.id)} />
+                </li>;
+              })}
+              {/* A dialog, not a page: no chevron. A machine paired there joins the list above it. */}
+              <li><MenuRow className="settings-menu-row--add" icon={<AddIcon size={20} />} label={t(own ? "hosts.addRemote" : "hosts.add")} chevron={false}
+                onClick={() => window.sidevoiceActions?.openPairing()} /></li>
+            </ul>}
+            {empty}
+            {install}
+          </div>
+          <div className="settings-sublevel" hidden={levels.level !== 3 && !sub} inert={motionOf(sub, 3)?.startsWith("out") || undefined} data-motion={motionOf(sub, 3)} style={held(3)}>
+            {page && pageCopy && <HostDetail machine={page} copy={pageCopy} notice={notice(page)} onForget={() => { forgetting.current = { id: page.id, name: pageCopy.name }; }} />}
+          </div>
+        </div>
+      </Section>
+    );
+  }
   const shown = shownMachine(machines, picked);
   const copy = shown ? machineCopy(shown, status, t) : null;
   return (
     <Section id="machines" title={t(own ? "hosts.titleRemote" : "hosts.title")} description={t("hosts.description")}>
-      {/* A phone's sections are a strip across the top, with no room for the machines: they come with the pane. */}
+      {/* Hidden on a desktop, where the machines are under Machines in Settings' own navigation. */}
       <div className="machines-inline"><MachineNav current /></div>
-      {machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
-        <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</Button></div>}
+      {empty}
       {shown && copy && <HostDetail machine={shown} copy={copy} notice={notice(shown)} />}
-      {/* Preparing this computer is its own section's, when it has one. */}
-      {!own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />}
+      {install}
     </Section>
   );
 }
@@ -188,7 +270,7 @@ function reachText(machine: MachineView, t: HostTranslate) {
 
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
  *  paired with it, and forgetting it. */
-function HostDetail({ machine, copy, notice, untitled = false }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; untitled?: boolean }) {
+function HostDetail({ machine, copy, notice, untitled = false, onForget }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; untitled?: boolean; onForget?: () => void }) {
   const t = hostTranslator();
   // Renaming the machine on this device: the name being typed, or null.
   const [naming, setNaming] = useState<string | null>(null);
@@ -236,7 +318,7 @@ function HostDetail({ machine, copy, notice, untitled = false }: { machine: Mach
         <HostAgentsPanel fp={machine.pairingId ?? null} />
       </section>
       <section className="host-section">
-        <MachineDevicesPanel machine={machine} name={copy.name} />
+        <MachineDevicesPanel machine={machine} name={copy.name} onForget={onForget} />
       </section>
     </section>
   );
@@ -265,7 +347,7 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
 }
 
 /** Where this computer's service stands, as one word and its dot. */
-function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } {
+export function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } {
   switch (status.state) {
     case "running": return { tone: "positive", label: "hosts.state.running" };
     case "starting": case "installing": case "backoff": return { tone: "warning", label: "hosts.state.starting" };
@@ -466,7 +548,8 @@ function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
   );
 }
 
-function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: string }) {
+/** `onForget`: told as this machine is forgotten here (a phone's Settings says so once it is gone). */
+function MachineDevicesPanel({ machine, name, onForget }: { machine: MachineView; name: string; onForget?: () => void }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [devices, setDevices] = useState<HostDeviceView[]>([]);
@@ -486,6 +569,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
   const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name || t("hosts.devices.thisDevice");
   const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
+  const forget = () => { onForget?.(); void window.sidevoiceActions?.forgetMachine(machine.pairingId!); };
   // A machine's own Sidevoice (paired with itself) is never listed: on this computer's page that is this device itself.
   const visibleDevices = usable && devicesFor === pairingKey ? devices.filter((device) => device.kind !== "local") : [];
 
@@ -537,7 +621,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           back (the controller keeps what it needs to). */}
       {!usable && !local && machine.pairingId && (confirmId === "forget" ? <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
           <span className="muted">{t("hosts.confirmForgetOffline", { machine: name })}</span>
-          <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
+          <Button variant="danger" size="sm" onClick={forget}>{t("hosts.forgetConfirm")}</Button>
           <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
         </span>
         : <div className="host-forget-row"><Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId("forget")}>{t("hosts.forget", { machine: name })}</Button></div>)}
@@ -561,7 +645,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
             {device.current && !local && machine.pairingId && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
                 <span className="muted">{machine.state === "connected" ? t("hosts.confirmForget") : t("hosts.confirmForgetOffline", { machine: name })}</span>
-                <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
+                <Button variant="danger" size="sm" onClick={forget}>{t("hosts.forgetConfirm")}</Button>
                 <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
               </span>
             ) : <Tooltip content={t("hosts.forgetHint", { machine: name })}>

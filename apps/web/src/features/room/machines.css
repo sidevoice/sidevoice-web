@@ -77,8 +77,8 @@
   .host-detail-header > .ui-badge, .host-detail-header > .ui-button, .host-detail-header > .host-insecure { grid-column: 2; justify-self: start; }
 }
 
-/* The machines under Machines in Settings' navigation: a dot for each one's state, Add a machine last; on a phone, at the
- * pane's head as a row of chips instead. */
+/* The machines under Machines in Settings' navigation: a dot for each one's state, Add a machine last. A phone lists
+ * them on Machines' own page instead (MachineList), its words saying the state the dot repeats (settings.css). */
 .machine-nav { display: grid; gap: 2px; margin: 2px 0 var(--sv-space-2) var(--sv-space-6); }
 .ui-nav-item--sub { min-height: 34px; font-size: var(--sv-font-sm); }
 .machine-entry { min-width: 0; max-width: 100%; overflow: hidden; }
@@ -93,13 +93,6 @@
 .machine-nav-add svg { width: 16px; height: 16px; }
 .machines-inline { display: none; }
 .machines-empty { display: grid; justify-items: start; gap: var(--sv-space-3); }
-@media (max-width: 767px) {
-  .settings-nav .machine-nav { display: none; }
-  .machines-inline { display: block; margin-bottom: var(--sv-space-3); }
-  .machines-inline .machine-nav { display: flex; flex-wrap: wrap; gap: var(--sv-space-1); margin: 0; }
-  .machines-inline { min-width: 0; }
-  .machines-inline .ui-nav-item--sub { width: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); padding-inline: var(--sv-space-3); }
-}
 
 /* Pairing another device, in its own small dialog: the code large and selectable, its time left under it. */
 .pair-device-dialog { display: grid; justify-items: start; gap: var(--sv-space-3); }

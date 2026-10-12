@@ -234,7 +234,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   // list already shown (a rescan while connecting by hand blipped), the list stays and the header says it.
   if (listing?.status === "failed" && !value) return (
     <section className="host-agents" aria-labelledby="host-agents-title">
-      <div className="host-agents-heading"><h4 id="host-agents-title">{t("agents.heading")}</h4></div>
+      <div className="host-agents-heading"><h4 id="host-agents-title" tabIndex={-1}>{t("agents.heading")}</h4></div>
       <div className="host-agent-problem-quiet">
         <p className="muted">{scanError(t, listing.error?.key ?? "unknown", listing.error?.params)}</p>
         <Button size="sm" variant="secondary" onClick={() => void window.sidevoiceActions?.loadHostAgents?.(fp, { rescan: true })}>{t("agents.refresh")}</Button>
@@ -250,7 +250,7 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
     <section className="host-agents" aria-labelledby="host-agents-title">
       {/* The heading, when the list was searched (in words, as time passes), and searching again as an icon. */}
       <div className="host-agents-heading">
-        <h4 id="host-agents-title">{t("agents.heading")}</h4>
+        <h4 id="host-agents-title" tabIndex={-1}>{t("agents.heading")}</h4>
         {/* Not a live region: it changes every minute, and with each rescan while connecting by hand. */}
         <span className="host-agents-scanned" data-failed={failed || undefined}>{scanning ? t("agents.searching") : failed ? t("agents.searchFailed") : searchedAgo ? t("agents.searchedAgo", { time: searchedAgo }) : ""}</span>
         <Tooltip content={t("agents.searchAgain")}>

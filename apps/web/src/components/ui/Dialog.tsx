@@ -25,9 +25,11 @@ interface SurfaceProps extends PropsWithChildren {
   flush?: boolean;
   /** The text of the close button, for the title when it is not plain text. */
   closeLabel?: string;
+  /** Focus can be put on the title (never by Tab): a page whose content changes under the one header says where it is. */
+  titleFocusable?: boolean;
 }
 
-export function DialogSurface({ titleId, title, eyebrow, leading, footer, closeId, onClose, closeable = false, flush = false, closeLabel, children }: SurfaceProps) {
+export function DialogSurface({ titleId, title, eyebrow, leading, footer, closeId, onClose, closeable = false, flush = false, closeLabel, titleFocusable = false, children }: SurfaceProps) {
   const t = uiTranslator();
   return (
     <div className="ui-dialog-surface">
@@ -35,7 +37,7 @@ export function DialogSurface({ titleId, title, eyebrow, leading, footer, closeI
         {leading}
         <div className="ui-dialog-titles">
           {eyebrow && <span className="ui-dialog-eyebrow">{eyebrow}</span>}
-          <h2 className="ui-dialog-title" id={titleId}>{title}</h2>
+          <h2 className="ui-dialog-title" id={titleId} tabIndex={titleFocusable ? -1 : undefined}>{title}</h2>
         </div>
         {(onClose || closeable) && <Button id={closeId} variant="ghost" size="icon" className="ui-dialog-close" aria-label={closeLabel ?? (typeof title === "string" ? t("ui.closeNamed", { name: title }) : t("ui.close"))}
           title={t("ui.close")} onClick={onClose} tone="neutral"><CloseIcon /></Button>}

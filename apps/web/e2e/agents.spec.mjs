@@ -20,11 +20,13 @@ async function openMachines(page, width, height) {
 }
 
 async function openAgents(page) {
-  // The machine's entry under Machines (at the pane's head on a phone) shows its page.
-  const open = page.locator(".machines-inline .machine-entry[data-name='E2E Host']");
+  // A phone's Machines is a list: the machine's row opens its page, under its name.
+  const open = page.locator(".machines-menu .machine-entry[data-name='E2E Host']");
   await expect(open).toBeVisible();
+  await expect(open).toContainText("Online");
   await open.click();
-  await expect(open).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#settings-title")).toHaveText("E2E Host");
+  await expect(page.getByRole("button", { name: "Back to Machines" })).toBeVisible();
   // Every part of the machine on its page, its agents among them.
   const agents = page.getByRole("heading", { name: "Agents", exact: true });
   await expect(agents).toBeVisible();
@@ -67,11 +69,10 @@ test("a machine's Agents at phone widths: a foreign one replaced by hand, a conn
   expect(fake.authorization.length).toBeGreaterThan(0);
   expect(fake.authorization.every((header) => header === "Bearer e2e-device-token")).toBe(true);
 
-  // The smallest phone: every action still on screen.
+  // The smallest phone: every action still on screen, the way back to Machines among them.
   await page.setViewportSize({ width: 320, height: 568 });
-  const reviewAgents = page.locator(".machines-inline .machine-entry[data-name='E2E Host']");
-  await expectInsideViewport(reviewAgents, 320, 568);
-  await expect(reviewAgents).toHaveAttribute("aria-current", "page");
+  await expectInsideViewport(page.getByRole("button", { name: "Back to Machines" }), 320, 568);
+  await expect(page.locator("#settings-title")).toHaveText("E2E Host");
   await expectInsideViewport(agents, 320, 568);
   // The row stayed open in place, its hand-made replacement still shown: closing and opening it again fits too.
   const close = foreign.getByRole("button", { name: "Close" }).first();

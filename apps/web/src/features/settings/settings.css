@@ -1,10 +1,12 @@
-/* Settings (SettingsDialog): a full-screen page — its sections beside the content on a desktop, a scrolling row of
- * them above it on a phone — on the design system's dialog shell (components/ui/ui.css `.ui-dialog`). */
+/* Settings (SettingsDialog): a full-screen page — its sections beside the content on a desktop, a menu of them on a
+ * phone, each section a page of its own under it (settings-levels.tsx) — on the design system's dialog shell
+ * (components/ui/ui.css `.ui-dialog`). What fails is said in one line under the header (#settings-error), outside both:
+ * at the content's head on a desktop, the whole width on a phone, whichever level shows. */
 
 .settings-page .ui-dialog-body--flush { display: flex; min-height: 0; }
-.settings-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; margin: 0; }
-.settings-nav { min-height: 0; padding: var(--sv-space-3); overflow: auto; border-inline-end: 1px solid var(--sv-border); background: var(--sv-bg-subtle); }
-.settings-content { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.settings-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; margin: 0; }
+.settings-nav { grid-column: 1; grid-row: 1 / -1; min-height: 0; padding: var(--sv-space-3); overflow: auto; border-inline-end: 1px solid var(--sv-border); background: var(--sv-bg-subtle); }
+.settings-content { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .settings-column { width: 100%; max-width: 760px; padding: var(--sv-space-8) var(--sv-space-10) var(--sv-space-12); }
 .settings-pane { min-width: 0; }
 .settings-note { margin-top: var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; }
@@ -34,12 +36,6 @@
 .voice-speed input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sv-accent); }
 .voice-speed output { min-width: 3.5em; font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; text-align: end; color: var(--sv-text-muted); }
 
-@media (max-width: 767px) {
-  .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .settings-nav { display: flex; gap: var(--sv-space-1); padding: var(--sv-space-2); overflow-x: auto; overflow-y: hidden; border-inline-end: 0; border-bottom: 1px solid var(--sv-border); scrollbar-width: none; }
-  .settings-nav .ui-nav-item { width: auto; flex: none; }
-  .settings-column { padding: var(--sv-space-5) var(--sv-space-4) var(--sv-space-8); }
-}
 
 .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; font-size: var(--sv-font-sm); font-weight: 600; color: var(--sv-accent-text); text-decoration: none; }
@@ -122,7 +118,7 @@
 
 /* "Saved", beside the title for a moment; the error line at the content's head. */
 .settings-saved { display: inline-flex; align-items: center; gap: var(--sv-space-1); margin-inline-start: var(--sv-space-3); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); vertical-align: middle; }
-.settings-content > .settings-error { margin: var(--sv-space-3) var(--sv-space-10) 0; }
+.settings-layout > .settings-error { grid-column: 2; grid-row: 1; margin: var(--sv-space-3) var(--sv-space-10) 0; }
 .settings-saved svg { color: var(--sv-positive); }
 
 /* A control pointed at (what's new's Set up): its row lit for a moment. */
@@ -141,3 +137,74 @@
 .downloaded-remove-all { display: grid; gap: var(--sv-space-2); justify-items: start; margin-top: var(--sv-space-2); }
 .downloaded-models .downloaded-model + .downloaded-model { padding-top: var(--sv-space-2); border-top: 1px solid var(--sv-border); }
 
+
+/* ----- a phone: Settings as a menu of levels (settings-levels.tsx). One level shows at a time, in one place under the
+ * header and the error line; the one left is hidden once its slide ends (never only covered or transparent: what is new
+ * on it would be taken as seen). Every edge keeps clear of the screen's own (viewport-fit=cover). */
+@media (max-width: 767px) {
+  .ui-dialog.settings-page[data-layout] .ui-dialog-head { gap: var(--sv-space-2); min-height: var(--sv-header-height);
+    padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) max(var(--sv-space-4), env(safe-area-inset-right)) var(--sv-space-3) max(var(--sv-space-4), env(safe-area-inset-left)); }
+  /* One line, cut short when long (a machine's name: whole on its page). Focus goes to it, never by Tab. */
+  .settings-page .ui-dialog-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .settings-page .ui-dialog-title:focus { outline: none; }
+  .settings-back { flex: none; width: 44px; height: 44px; margin-inline-start: calc(-1 * var(--sv-space-2)); }
+  .settings-back svg:dir(rtl) { transform: scaleX(-1); }
+
+  .settings-layout { grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+  .settings-layout > .settings-error { grid-column: 1; margin: 0; padding: var(--sv-space-2) max(var(--sv-space-4), env(safe-area-inset-right)) var(--sv-space-2) max(var(--sv-space-4), env(safe-area-inset-left));
+    border-bottom: 1px solid var(--sv-border); }
+  .settings-nav, .settings-content { grid-column: 1; grid-row: 2; background: var(--sv-bg); }
+  .settings-layout > .settings-nav { display: block; padding: var(--sv-space-4) max(var(--sv-space-4), env(safe-area-inset-right)) calc(var(--sv-space-8) + env(safe-area-inset-bottom)) max(var(--sv-space-4), env(safe-area-inset-left));
+    overflow: hidden auto; overscroll-behavior: contain; border: 0; }
+  .settings-column { padding: var(--sv-space-5) max(var(--sv-space-4), env(safe-area-inset-right)) calc(var(--sv-space-8) + env(safe-area-inset-bottom)) max(var(--sv-space-4), env(safe-area-inset-left)); }
+  .settings-layout > .settings-nav[hidden], .settings-layout > .settings-content[hidden], .settings-sublevel[hidden] { display: none; }
+  /* The header says the section: its title is not repeated on the page (it still names it), its description stays as
+     the page's first paragraph. This device's page keeps its own: this device's name, and its rename. */
+  .settings-pane:not(#pane-this-computer) > .ui-section > .ui-section-head .ui-section-title { display: none; }
+  .settings-pane:not(#pane-this-computer) > .ui-section > .ui-section-head:not(:has(.ui-section-description, .ui-section-actions)) { display: none; }
+
+  /* A menu: one card of rows, a hairline between them from the label on. A row: its icon (with the "new" dot), its
+     label over its line, its badge or its state's dot, and the chevron of a page of its own. The label never gives
+     way; the line does first. */
+  .settings-menu { margin: 0; padding: 0; list-style: none; overflow: hidden; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+  .settings-menu > li { position: relative; }
+  .settings-menu > li + li::before { content: ""; position: absolute; z-index: 1; top: 0; inset-inline: calc(var(--sv-space-4) + 20px + var(--sv-space-3)) 0; border-top: 1px solid var(--sv-border); pointer-events: none; }
+  .settings-menu-row { display: flex; align-items: center; gap: var(--sv-space-3); width: 100%; min-height: 56px; margin: 0; padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-2) var(--sv-space-4);
+    border: 0; background: none; color: var(--sv-text); font: inherit; text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .settings-menu-row[data-lines="2"] { min-height: 64px; }
+  .settings-menu-row:active { background: var(--sv-hover); }
+  .settings-menu-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+  .settings-menu-icon { display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; color: var(--sv-text-muted); }
+  .settings-menu-icon .new-on-icon-dot { border-color: var(--sv-surface); }
+  .settings-menu-text { display: grid; flex: 1; min-width: 0; }
+  .settings-menu-label { font-size: var(--sv-font-md); line-height: 1.375rem; font-weight: var(--sv-weight-medium); color: var(--sv-text); overflow-wrap: anywhere; }
+  .settings-menu-summary { min-height: 1.25rem; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+  .settings-menu-row > .ui-badge { flex: none; }
+  .settings-menu-chevron { display: inline-grid; flex: none; color: var(--sv-text-subtle); }
+  .settings-menu-chevron svg:dir(rtl) { transform: scaleX(-1); }
+  /* Add a machine opens a dialog, not a page: the accent's words, no chevron. A machine's name, unlike a label, is cut. */
+  .settings-menu-row--add .settings-menu-icon, .settings-menu-row--add .settings-menu-label { color: var(--sv-accent-text); }
+  .machines-menu .settings-menu-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+  /* Machines' list and a machine's page, in the one place of the page they share. */
+  .settings-sublevels { display: grid; min-width: 0; }
+  .settings-sublevel { display: grid; align-content: start; gap: var(--sv-space-4); grid-area: 1 / 1; min-width: 0; background: var(--sv-bg); }
+  .settings-sublevel > .ui-section-description { margin: 0; }
+
+  /* The slide: the next level in from the inline end, the one left a quarter of the way out; back is its mirror. The one
+     left by a slide inside a page stays where it was scrolled (--level-shift). */
+  .settings-layout { --level-way: 1; }
+  .settings-layout:dir(rtl) { --level-way: -1; }
+  .settings-page [data-motion] { animation: var(--sv-dur-slow) var(--sv-ease) both; }
+  .settings-page [data-motion="in-forward"] { z-index: 1; animation-name: settings-level-in; }
+  .settings-page [data-motion="out-forward"] { animation-name: settings-level-out; }
+  .settings-page [data-motion="in-back"] { animation-name: settings-level-back-in; }
+  .settings-page [data-motion="out-back"] { z-index: 1; animation-name: settings-level-back-out; }
+  .settings-sublevel[data-motion^="out"] { translate: 0 var(--level-shift, 0px); }
+}
+@keyframes settings-level-in { from { transform: translateX(calc(100% * var(--level-way, 1))); } }
+@keyframes settings-level-out { to { transform: translateX(calc(-25% * var(--level-way, 1))); } }
+@keyframes settings-level-back-in { from { transform: translateX(calc(-25% * var(--level-way, 1))); } }
+@keyframes settings-level-back-out { to { transform: translateX(calc(100% * var(--level-way, 1))); } }
+/* No slide under reduced motion: the levels swap at once (settings-levels.tsx never starts one; this is its guard). */
+@media (prefers-reduced-motion: reduce) { .settings-page [data-motion] { animation: none; } }

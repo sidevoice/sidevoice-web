@@ -18,6 +18,8 @@ import { InfoTip } from "../../components/ui/InfoTip";
 import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, useModelState, useVoiceTry, type ModelState, type SetupTry, type VoiceTry } from "./ModelSetup";
 import { TurnTry, type TurnTryHandle } from "./TurnTry";
 import { useVoiceSwitch } from "../../state/call-model";
+import { useMedia } from "../../state/call-layout";
+import { SETTINGS_PHONE_QUERY, useSectionShown } from "./settings-levels";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -135,6 +137,11 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
     ? t("voice.prepare.willSwitch", { model: inUse.model }) : undefined;
   const speechLanguage = useRoomStore((state) => state.facts.speechLanguage);
   const own = useVoiceTry(setup ? null : task, { keep: false });
+  // On a phone, Settings' section left for the list of them, or Settings closed, stops its try: it is out of sight.
+  const phone = useMedia(SETTINGS_PHONE_QUERY);
+  const shown = useSectionShown(task === "stt" ? "transcription" : "voice");
+  const away = phone && !shown;
+  useEffect(() => { if (!setup && away && own.trial.phase === "running") own.cancel(); }, [away]); // eslint-disable-line react-hooks/exhaustive-deps
   // A provider that only lacks its key can be chosen, and asks for it below.
   const sources = slot.sources.map((source) => keyless(source.note) ? { ...source, disabled: false } : source);
   const sourceNote = slot.sources.find((source) => source.id === draft[task].catalog)?.note;
