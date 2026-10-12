@@ -16,6 +16,7 @@ import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { cancelDownload, catalogueShown, downloadModel, TryButton, TryPanel, useModelState, useVoiceTry, type ModelState, type SetupTry, type VoiceTry } from "./ModelSetup";
+import { TurnTry, useTurnTryVariant } from "./TurnTry";
 
 /* The call's voice as the person chooses it, for what transcribes and for what speaks: where it runs — this device, or
  * a remote provider — then, on this device, a family of models and one of them, made ready here (ModelPrepare); then
@@ -205,9 +206,12 @@ export function SpeechChoices({ draft, setup = false, trial }: SlotProps) {
 }
 
 /** When the person's turn ends: how long a pause may be (fast, normal, calm), and what decides it — silence, or the
- *  smart model when it runs here (else why not). Part of what Save keeps. */
-export function TurnChoices({ draft }: { draft: Settings }) {
+ *  smart model when it runs here (else why not); and a try of both together (TurnTry), where the `turn-try` variant
+ *  puts it: under the end-of-turn choice, or after the choices in a card of its own. `setup`: the first-run setup's;
+ *  `active`: in sight (Settings' section on show), a try that runs stopping when it is not. */
+export function TurnChoices({ draft, setup = false, active = true }: { draft: Settings; setup?: boolean; active?: boolean }) {
   const t = hostTranslator();
+  const tryVariant = useTurnTryVariant();
   const choices = useChoices(draft);
   const patience: { value: Settings["patience"]; label: HostMessageKey; hint: HostMessageKey }[] = [
     { value: "fast", label: "voice.patience.fastShort", hint: "voice.patience.fast" },
@@ -223,6 +227,8 @@ export function TurnChoices({ draft }: { draft: Settings }) {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const turnPending = saved && (saved.end_of_turn !== "smart-turn" || saved.turn_model !== draft.turn_model)
     ? t(saved.end_of_turn === "smart-turn" ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: saved.turn_model ?? "" }) : undefined;
+  // In the same place whichever end of turn is chosen, so switching keeps a try that runs, and the focus.
+  const tryIt = <TurnTry variant={tryVariant} draft={draft} smart={smart} smartReady={turn.ready} setup={setup} active={active} />;
   return (
     <Group title={t("settings.call.turn")}>
       <Row label={<>{t("voice.patience")}<InfoTip label={t("voice.patience.infoLabel")}>{t("voice.patience.info")}</InfoTip></>} description={t(current.hint)}>
@@ -234,6 +240,7 @@ export function TurnChoices({ draft }: { draft: Settings }) {
         <Select id="voice-end-of-turn" aria-label={t("voice.endOfTurn")} value={smart ? "smart-turn" : "silence"} onValueChange={(value) => edit({ end_of_turn: value as Settings["end_of_turn"] })}
           options={[{ value: "smart-turn", label: t("voice.endOfTurn.smart"), disabled: !choices.endOfTurn.smartTurn }, { value: "silence", label: t("voice.endOfTurn.silence") }]} />
       </Row>
+      {tryVariant === "strip" && tryIt}
       {smart && turn.model && <Row label={t("voice.endOfTurn.model")} description={t("voice.endOfTurn.modelHint")} block>
         <ModelPrepare id="turn-model-card" actionIds="turn-model" pending={turnPending} status={turn.status} model={turn.model.id} size={turn.size} fraction={turn.fraction} error={turn.failure}
           pickers={(locked) => <Field label={t("voice.model")}>
@@ -243,6 +250,7 @@ export function TurnChoices({ draft }: { draft: Settings }) {
           </Field>}
           onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
       </Row>}
+      {tryVariant === "card" && tryIt}
     </Group>
   );
 }

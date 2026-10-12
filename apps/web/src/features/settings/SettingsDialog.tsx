@@ -75,6 +75,8 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslat
 function CallSettings({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const ready = useRoomStore((state) => catalogueShown(state.facts.voiceCatalogue));
+  // Every section is drawn, one shown: another section shown stops a try of the end of turn here.
+  const shown = useRoomStore((state) => (state.facts.settingsSection || "general") === "call");
   const [prefs, setPrefs] = useState(readCallPreferences);
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
   const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));
@@ -84,7 +86,7 @@ function CallSettings({ t }: { t: HostTranslate }) {
   ];
   return <Section id="call" title={t("settings.section.call")} description={t("settings.call.description")}>
     <RestartNote t={t} />
-    {ready && draft ? <TurnChoices draft={draft} /> : <p className="muted" role="status">{t("voice.loading")}</p>}
+    {ready && draft ? <TurnChoices draft={draft} active={shown} /> : <p className="muted" role="status">{t("voice.loading")}</p>}
     <Group title={t("settings.call.working")}>
       <Row label={t("settings.call.presence")} description={t(prefs.presence === "off" ? "settings.call.presence.offHint" : prefs.presence === "hidden" ? "settings.call.presence.hiddenHint" : "settings.call.presence.alwaysHint")}>
         <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}

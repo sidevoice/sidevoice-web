@@ -83,7 +83,8 @@ function BasicsStep({ t }: { t: HostTranslate }) {
   </section>;
 }
 
-/** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience. */
+/** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience;
+ *  and its try, optional — Continue stays the step's action, and leaving the step (Continue, Back, Later) stops it. */
 function TurnStep({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
@@ -92,7 +93,7 @@ function TurnStep({ t }: { t: HostTranslate }) {
     <p>{t("wizard.turnIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
-        : <TurnChoices draft={draft} />}
+        : <TurnChoices draft={draft} setup />}
   </section>;
 }
 
