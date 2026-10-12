@@ -401,7 +401,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "wizard.back": "Atrás",
   "wizard.continue": "Continuar",
   "wizard.continueSetup": "Continuar la configuración",
-  "wizard.installRemote": "Usar otra máquina",
   "wizard.agentsSkip": "Ahora no",
   "wizard.noAgentsConnected": "No hay agentes conectados. Puedes añadir uno más adelante en la configuración de esta máquina.",
   "wizard.continueWithoutTrying": "Continuar sin probar",
@@ -658,7 +657,6 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "runtime.device.cores": "{n} núcleos",
   "settings.section.notReady": "No listo",
   "runtime.advanced": "Avanzado: cómo se ejecuta",
-  "runtime.infoLabel": "¿Qué es esto?",
   "runtime.info": "Qué motor y formato ejecutan este modelo en tu equipo (p. ej. MLX en Apple silicon). Lo recomendado ya es lo mejor para este equipo: cámbialo solo si sabes por qué.",
   // The smart end of turn's model (TurnChoices).
   "settings.save.waitTurn": "El modelo de fin de turno aún no está listo.",
@@ -721,6 +719,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "wizard.prepareRetry": "Reintentar",
   // Trying the end of turn (TurnTry).
   "turnTry.title": "Prueba el fin de turno",
+  "try.title.stt": "Prueba la transcripción",
+  "try.title.tts": "Prueba la voz",
   "turnTry.hint": "Habla como al agente, con pausas para pensar. Mejor con auriculares.",
   "turnTry.draft": "Usa lo elegido, aunque no hayas guardado.",
   "turnTry.try": "Probar",

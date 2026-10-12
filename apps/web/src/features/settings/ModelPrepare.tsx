@@ -22,6 +22,8 @@ export type PrepareStatus = "absent" | "downloading" | "verifying" | "loading" |
 export interface ModelPrepareProps {
   /** A line under the status: here, that the model in use stays until this one is ready ("Will switch when ready"). */
   pending?: string;
+  /** How it runs (ModelRuntime): after the model is chosen and before its download, since it changes what is downloaded. */
+  runtime?: ReactNode;
   /** None while no model is chosen (or the chosen one is not listed): the pickers and their note alone. */
   status: PrepareStatus | null;
   /** The model's name, for what is said about it. */
@@ -49,7 +51,7 @@ export interface ModelPrepareProps {
   actionIds?: string;
 }
 
-export function ModelPrepare({ pending, status, model, pickers, meta, size = null, fraction = null, error, readyAction, readyPanel, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
+export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, readyAction, readyPanel, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
   const t = hostTranslator();
   const hintId = useId();
@@ -61,6 +63,7 @@ export function ModelPrepare({ pending, status, model, pickers, meta, size = nul
       {pickers && <div className="model-prepare-pickers" aria-describedby={locked ? hintId : undefined}>{pickers(locked)}</div>}
       {locked && pickers && <p className="model-prepare-meta" id={hintId}>{t("voice.prepare.lockedHint")}</p>}
       {!locked && meta && <p className="model-prepare-meta">{meta}</p>}
+      {runtime}
       {status && <div className="model-prepare-status" role={status === "failed" ? undefined : "status"} aria-live="polite">
         {status === "absent" && <>
           <div className="model-prepare-state"><Badge>{t("voice.prepare.badge.absent")}</Badge>{sized && <span className="model-prepare-note">{sized}</span>}</div>

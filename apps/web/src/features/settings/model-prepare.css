@@ -48,7 +48,7 @@
 /* How a model runs (ModelRuntime): folded under its block; this device's capabilities, then each build to choose. */
 .model-runtime { margin-top: var(--sv-space-2); }
 .model-runtime-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sv-space-1); min-width: 0; }
-.model-runtime-head .ui-infotip { margin-block: -4px; }
+.model-runtime-info { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .model-runtime-toggle { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); max-width: 100%; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-1); border: 0; border-radius: var(--sv-radius-sm); background: none; color: var(--sv-text-muted); font: 600 var(--sv-font-sm) / 1.25rem var(--sv-font-sans); cursor: pointer; }
 .model-runtime-toggle:hover { background: var(--sv-hover); color: var(--sv-text); }
 .model-runtime-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }

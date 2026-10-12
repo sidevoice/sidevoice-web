@@ -399,7 +399,6 @@ export const en = {
   "wizard.back": "Back",
   "wizard.continue": "Continue",
   "wizard.continueSetup": "Continue setup",
-  "wizard.installRemote": "Use another machine instead",
   "wizard.agentsSkip": "Not now",
   "wizard.noAgentsConnected": "No agents are connected. You can add one later in this machine’s settings.",
   "wizard.continueWithoutTrying": "Continue without trying",
@@ -657,7 +656,6 @@ export const en = {
   "runtime.device.cores": "{n} cores",
   "settings.section.notReady": "Not ready",
   "runtime.advanced": "Advanced: how it runs",
-  "runtime.infoLabel": "What is this?",
   "runtime.info": "Which engine and format run this model on your device (e.g. MLX on Apple silicon). The recommended choice is already the best for this device — change it only if you know why.",
   // The smart end of turn's model (TurnChoices).
   "settings.save.waitTurn": "The end-of-turn model isn't ready yet.",
@@ -720,6 +718,8 @@ export const en = {
   "wizard.prepareRetry": "Try again",
   // Trying the end of turn (TurnTry): where it stands, what ended the turn, and what to change.
   "turnTry.title": "Try the end of turn",
+  "try.title.stt": "Try transcription",
+  "try.title.tts": "Try the voice",
   "turnTry.hint": "Talk as you would to the agent, pausing to think. Headphones help.",
   "turnTry.draft": "Uses what's selected, even before saving.",
   "turnTry.try": "Try it",
