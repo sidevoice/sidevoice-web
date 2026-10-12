@@ -64,6 +64,8 @@
    y 93.5 (work.ts DESK_Y, where its props rest) meets the desk's top edge at y 306.65 of the frame. */
 .stage-tile[data-mood=working] .stage-agent { transform:translateY(calc(var(--fig) * .1042 - 50.35px)) scale(1.133) }
 .stage-tile[data-mood=offline] .stage-agent { opacity:0 }
+/* Idle, the agent a touch larger (--stage-avatar-idle), from its feet: still on the ground. */
+.stage-tile[data-mood=idle] .stage-agent { transform:scale(var(--stage-avatar-idle, 1.1)) }
 /* The desk drawing is 420 × 150 at the frame's foot (scale 1.05, its top edge 133.35 above the foot); beside it the
    desk's top and front run on to the edges in the drawing's own colours, at the same heights (its gradients'
    colours where the drawing ends). */
