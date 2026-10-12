@@ -85,6 +85,8 @@ export interface SessionFacts {
  voiceOn: boolean; voiceStarting: boolean; voiceOffReason: VoiceOffReason | null; voiceOffDetail: string; voiceIdleWarning: boolean;
  agentsMuted: boolean; agentsMutedBy: 'person' | 'output-lost' | null;
  hearing: {thread: string; state: 'asking' | 'no-answer'} | null; movingTo: string | null;
+ /** The call model this page runs, as the runtime read it once (`call` is A, `voice-switch` B). */
+ callModel: 'call' | 'voice-switch';
 }
 /** Why the voice turned itself off (call model B). */
 export type VoiceOffReason = 'idle' | 'micLost' | 'micBlocked' | 'micUnavailable' | 'failed' | 'reloaded';
@@ -121,6 +123,8 @@ export interface CallCardView {
 /** The card's view in the store, call model B's facts on top (contract gap #38, G9). */
 export interface CallCardSnapshotView extends CallCardView {
  voiceOn: boolean; agentsMuted: boolean; wantToTalk: number; voiceOffReason: VoiceOffReason | null;
+ /** The call model: the card follows it, and so does the app's `run()`. */
+ callModel: 'call' | 'voice-switch';
 }
 export function callCardView(s: SessionFacts): CallCardView;
 export interface SessionStore {

@@ -16,7 +16,7 @@ function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
     version: 2, ready: true, joined: true, busy: false, micEnabled: false, micDisabled: false, title: "web", agent: "idle",
     youTalking: false, canSkip: false, since: Date.now() - 60_000, devices: null,
     participants: [row("web", { selected: true }), row("docs", { mark: "waiting-for-you" }), row("release", { mark: "wants-to-talk" })],
-    voiceOn: true, agentsMuted: false, wantToTalk: 2, voiceOffReason: null, ...overrides,
+    callModel: "voice-switch", voiceOn: true, agentsMuted: false, wantToTalk: 2, voiceOffReason: null, ...overrides,
   };
 }
 function fakeHost(call: CallSnapshot) {
@@ -75,8 +75,9 @@ test("the picker marks the conversations with something unheard, in words and wi
   expect(rows[0].querySelector(".card-mark")).toBeNull();
 });
 
-test("a room that runs the call model A keeps today's card", () => {
-  const host = fakeHost(snapshot({ voiceOn: undefined, agentsMuted: undefined, wantToTalk: undefined, voiceOffReason: undefined }));
+test("a room that runs the call model A keeps today's card, though its snapshot carries the voice's fields too", () => {
+  // The room projects voiceOn in both models: guessing B from it gave an A room B's card.
+  const host = fakeHost(snapshot({ callModel: "call", voiceOn: false }));
   render(<CallCard host={host} t={t} />);
   ready();
   expect(screen.getByRole("button", { name: "Hang up" })).toBeInTheDocument();

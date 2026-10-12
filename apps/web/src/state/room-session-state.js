@@ -48,6 +48,9 @@ export function initialSessionFacts() {
         // state: 'asking' | 'no-answer'}`), and the conversation a move to another machine is taking the session to.
         voiceOn: false, voiceStarting: false, voiceOffReason: null, voiceOffDetail: '', voiceIdleWarning: false,
         agentsMuted: false, agentsMutedBy: null, hearing: null, movingTo: null,
+        // The call model this page runs, as the runtime read it once ('call' is A, 'voice-switch' B): the desktop card is
+        // told it, never left to guess it from what the snapshot carries.
+        callModel: 'call',
     };
 }
 /* ----- call model B: the voice switch (CALL-MODEL-B-SPEC.md) -----
@@ -122,7 +125,8 @@ export function callCardView(s) {
     const agentSpeaking = !!s.botLive;
     const agent = agentSpeaking ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
     const row = selected ? s.people.find(p => personKey(p) === selected) : null;
-    return { agent, youTalking: !!s.userLive, canSkip: false, conversation: selected,
+    // Skip stops what is sounding, as the room's own Skip does.
+    return { agent, youTalking: !!s.userLive, canSkip: !!s.botLive, conversation: selected,
         title: row?.title || s.roomBinding?.title || '' };
 }
 export function joinView(s) {
@@ -395,7 +399,7 @@ export function createRoomSessionStore(seed = {}) {
         // The desktop card's view, and call model B's on top (gap #38, G9): whether the voice is on, the agents muted,
         // how many conversations want to talk, and why the voice last turned itself off.
         const callCard = { ...callCardView(facts), voiceOn: !!facts.voiceOn, agentsMuted: !!facts.agentsMuted, wantToTalk: wantToTalk(participants),
-            voiceOffReason: facts.voiceOffReason };
+            voiceOffReason: facts.voiceOffReason, callModel: facts.callModel === 'voice-switch' ? 'voice-switch' : 'call' };
         return { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
             join: joinView(facts), live: liveText(facts),
             mic: micView(facts), call: callView(facts), callCard, title: viewedTitle(facts), screenLock: facts.screenLock,

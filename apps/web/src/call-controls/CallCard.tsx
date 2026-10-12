@@ -176,8 +176,9 @@ function conversationSub(row: ParticipantView, t: Translate) {
   );
 }
 
-/** Whether the room runs call model B, the voice switch: its card is about the voice, not a call (contract gap #38). */
-const voiceSwitch = (call: CallSnapshot) => typeof call.voiceOn === "boolean";
+/** Whether the room runs call model B, the voice switch: its card is about the voice, not a call (contract gap #38). The
+ *  snapshot says it; whether it carries `voiceOn` does not (the room projects it in both models). */
+const voiceSwitch = (call: CallSnapshot) => call.callModel === "voice-switch";
 
 export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
   const state = useHostState(host);

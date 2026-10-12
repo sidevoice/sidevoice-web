@@ -29,7 +29,7 @@ function callModel(){try{const value=JSON.parse(localStorage.getItem('sidevoice.
 const VOICE_SWITCH=callModel()==='b';
 window.addEventListener('storage',event=>{if((event.key===null||event.key==='sidevoice.variants')&&callModel()!==(VOICE_SWITCH?'b':'a'))location.reload()});
 // What this browser speaks in a call: the language of its system, among those the voice handles.
-roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.voice});
+roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.voice,callModel:VOICE_SWITCH?'voice-switch':'call'});
 // Whether this browser lets the page keep anything: when it does not, one message says so, rather than each store
 // failing on its own (`site-storage.js`).
 void probeSiteStorage().then(probe=>roomStore.patch({storageBlocked:probe.blocked}),()=>{});

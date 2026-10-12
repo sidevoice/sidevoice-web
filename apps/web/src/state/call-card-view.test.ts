@@ -23,9 +23,16 @@ test("the agent works while the person's turn is transcribed, even when its harn
   expect(store.getState().callCard.agent).toBe("idle");
 });
 
-test("a reply sounding is the agent speaking; the call's voice offers nothing to skip", () => {
+test("a reply sounding is the agent speaking, and Skip can stop it, as the room's own Skip", () => {
   const store = createRoomSessionStore({ ...base, botLive: true } as never);
-  expect(store.getState().callCard).toMatchObject({ agent: "speaking", canSkip: false });
+  expect(store.getState().callCard).toMatchObject({ agent: "speaking", canSkip: true });
+  store.patch({ botLive: false });
+  expect(store.getState().callCard.canSkip).toBe(false);
+});
+
+test("the card is told the call model, in both models", () => {
+  expect(createRoomSessionStore(base as never).getState().callCard).toMatchObject({ callModel: "call", voiceOn: false });
+  expect(createRoomSessionStore({ ...base, callModel: "voice-switch" } as never).getState().callCard.callModel).toBe("voice-switch");
 });
 
 test("the card names the conversation the call is on, not a transcript being browsed", () => {

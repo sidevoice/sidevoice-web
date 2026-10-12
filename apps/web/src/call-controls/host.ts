@@ -46,6 +46,9 @@ export interface CallSnapshot {
   wantToTalk?: number;
   /** Why the voice last turned itself off; the room's window says it, the card hides. */
   voiceOffReason?: string | null;
+  /** The call model the room runs: A (`call`) unless it says B (`voice-switch`). Said, never guessed: the room projects
+   *  `voiceOn` in both models. */
+  callModel?: "call" | "voice-switch";
 }
 
 export interface CallControlsState {
