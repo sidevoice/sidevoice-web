@@ -83,7 +83,8 @@
 .provider-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 .provider-row-copy { display: grid; gap: 2px; flex: 1; min-width: 0; min-height: 40px; align-content: center; }
 .provider-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
-.provider-row-title .ui-badge svg { width: 12px; height: 12px; }
+/* Its pills small and soft: a quiet border in their own colour, as a tag rather than a button. */
+.provider-row-title .ui-badge { height: 20px; padding: 0 var(--sv-space-2); font-weight: 500; letter-spacing: .01em; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); }
 .provider-row-line, .provider-card-purpose { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-row-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
 .provider-row-problem > svg { flex: none; color: var(--sv-warning); }
@@ -91,10 +92,12 @@
 .provider-row[data-state="rejected"] .provider-row-problem > svg, .provider-row[data-state="unreadable"] .provider-row-problem > svg { color: var(--sv-danger); }
 .provider-key-detail { color: var(--sv-text-muted); }
 .provider-row-action { flex: none; margin-top: 4px; }
-/* As many across as fit at 11rem each (three in Settings' column), so a narrow window takes two rather than squeezing. */
-.provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); align-items: start; gap: var(--sv-space-3); }
-.provider-card { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
-.provider-card-head { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; overflow-wrap: anywhere; }
+/* As many across as fit with the name and Connect on one line (three where the column is wide), one on a phone. */
+.provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--sv-space-3); }
+/* A provider is one line, as a row of Your providers is: its mark, its name over what it offers, Connect at the end. */
+.provider-card { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
+.provider-card-copy { display: grid; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.provider-card-action { flex: none; }
 .provider-search { position: relative; display: flex; align-items: center; flex: none; width: 14rem; }
 .provider-search .ui-input { width: 100%; padding-inline: 32px; }
 .provider-search .ui-input::-webkit-search-cancel-button { appearance: none; }
@@ -114,10 +117,6 @@
   .providers-card { padding: var(--sv-space-4); }
   .providers-card-head { flex-direction: column; align-items: stretch; }
   .provider-search { width: 100%; }
-  /* The row's text takes the width beside the mark; Disconnect goes under it, aligned with it. */
-  .provider-row { flex-wrap: wrap; }
-  .provider-row-copy { flex-basis: calc(100% - 52px); }
-  .provider-row-action { margin: 0 0 0 52px; }
 }
 
 /* "Saved", beside the title for a moment; the error line at the content's head. */

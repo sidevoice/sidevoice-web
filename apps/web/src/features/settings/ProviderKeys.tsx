@@ -5,7 +5,7 @@ import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Alert } from "../../components/ui/Alert";
 import { Section } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
-import { CheckIcon, CloseIcon, LinkIcon, ProviderLogo, SearchIcon, UnlinkIcon, WarningIcon } from "../../components/ui/Icons";
+import { CloseIcon, LinkIcon, ProviderLogo, SearchIcon, UnlinkIcon, WarningIcon } from "../../components/ui/Icons";
 import { remoteProviders } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
@@ -35,11 +35,14 @@ const TONE: Record<KeyState, BadgeTone> = {
  *  the provider again. */
 const REPLACE_FOR: ReadonlySet<KeyState> = new Set(["rejected", "permission", "unreadable"]);
 
-/** What a provider is used for, in a few words: its own where we have them, else from the models it lists. */
+/** What each known provider offers, in its own order (it lists nothing until it has a key). */
+const OFFERS: Record<string, ("stt" | "tts")[]> = { openai: ["stt", "tts"], elevenlabs: ["tts", "stt"] };
+
+/** What a provider offers, in one short line ("Transcription · Voice"): known, else from the models it lists. */
 function usedFor(provider: string, catalog: CatalogView | undefined, t: HostTranslate) {
-  if (provider === "openai" || provider === "elevenlabs") return t(`keys.purpose.${provider}` as HostMessageKey);
   const caps = new Set((catalog?.models ?? []).flatMap((model) => model.capabilities));
-  return caps.has("stt") && caps.has("tts") ? t("keys.use.both") : caps.has("stt") ? t("keys.use.stt") : caps.has("tts") ? t("keys.use.tts") : t("keys.purpose.other");
+  const offers = OFFERS[provider] ?? (["stt", "tts"] as const).filter((task) => caps.has(task));
+  return offers.length ? offers.map((task) => t(`keys.use.${task}` as HostMessageKey)).join(" · ") : t("keys.purpose.other");
 }
 
 /** Text as search compares it: trimmed, any case, any accents. */
@@ -78,7 +81,7 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
     else setNote(t(("keys.why." + after) as HostMessageKey, { provider: name, last4: last4 ?? "" }));
   }
   const pill = testing ? <Badge tone="neutral">{t("keys.state.checking")}</Badge>
-    : state === "connected" ? <Badge tone="positive"><CheckIcon size={12} />{t("keys.state.connected")}</Badge>
+    : state === "connected" ? <Badge tone="positive">{t("keys.state.connected")}</Badge>
     : <Badge tone={TONE[state]} dot>{t(("keys.state." + state) as HostMessageKey)}</Badge>;
   return (
     <div ref={row} className="provider-row" role="group" aria-label={name} data-provider={provider} data-state={state} tabIndex={-1}>
@@ -86,7 +89,7 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
       <div className="provider-row-copy">
         <span className="provider-row-title"><strong>{name}</strong>{pill}
           {inUse.length > 0 && <Badge tone="accent">{t("keys.inUseFor", { uses: listed(inUse) })}</Badge>}</span>
-        <span className="provider-row-line">{usedFor(provider, catalog, t)}{last4 && <> · {t("keys.keyEndsIn", { last4 })}</>}</span>
+        <span className="provider-row-line">{usedFor(provider, catalog, t)}</span>
         {problem && <div className="provider-row-problem">
           <WarningIcon size={14} />
           <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
@@ -114,11 +117,11 @@ function AvailableCard({ provider, name, catalog, onConnected }: ProviderProps &
   const focusBack = useFocusBack(() => connect.current);
   return (
     <div className="provider-card" role="group" aria-label={name} data-provider={provider}>
-      <div className="provider-card-head">
-        <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
+      <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
+      <div className="provider-card-copy">
         <strong>{name}</strong>
+        <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>
       </div>
-      <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>
       <Button ref={connect} id={`provider-connect-${provider}`} className="provider-card-action" variant="secondary" size="sm"
         aria-label={t("keys.connectNamed", { provider: name })} aria-haspopup="dialog" onClick={() => setOpen(true)}><LinkIcon />{t("keys.connect")}</Button>
       {open && <KeyDialog provider={provider} name={name} replacing={null} onDone={() => { setOpen(false); onConnected(); }} onCancel={() => { setOpen(false); focusBack(); }} />}

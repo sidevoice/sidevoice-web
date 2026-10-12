@@ -60,7 +60,8 @@ test("connected providers are rows in Your providers — the name with Connected
   const eleven = row("elevenlabs")!;
   expect(yours()).toContainElement(eleven);
   expect(within(eleven).getByText("Connected").closest(".provider-row-title")).toHaveTextContent(/^ElevenLabs\s*Connected/);
-  expect(eleven).toHaveTextContent("Voices and transcription · Key ending in 9xyz");
+  expect(eleven.querySelector(".provider-row-line")).toHaveTextContent(/^Voice · Transcription$/);
+  expect(card("openai")!.querySelector(".provider-card-purpose")).toHaveTextContent(/^Transcription · Voice$/);
   expect(within(eleven).getByRole("button", { name: "Disconnect ElevenLabs" })).toHaveAttribute("aria-haspopup", "dialog");
   expect(row("openai")).toBeNull();
   expect(add()).toContainElement(card("openai"));
@@ -102,7 +103,6 @@ test("Connect opens the key's dialog, its field focused; a refused key says why 
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(yours()).toContainElement(row("openai"));
   expect(card("openai")).toBeNull();
-  expect(row("openai")).toHaveTextContent("Key ending in 7f3a");
   expect(document.activeElement).toBe(row("openai"));
   expect(screen.getByText("OpenAI connected.")).toHaveAttribute("role", "status");
 });
@@ -191,7 +191,7 @@ test("a kept key with a problem says it in words, its state in place of Connecte
   fireEvent.change(within(replace).getByLabelText("API key"), { target: { value: "sk-new-1234" } });
   await act(async () => { fireEvent.click(within(replace).getByRole("button", { name: "Replace key" })); });
   expect(actions.connectProviderKey).toHaveBeenCalledWith("elevenlabs", "sk-new-1234");
-  expect(row("elevenlabs")).toHaveTextContent("Key ending in 1234");
+  expect(JSON.parse(localStorage.getItem("sidevoice.provider-key-hint.elevenlabs")!).last4).toBe("1234");
   act(() => hostSays(store, "elevenlabs", true, "provider-unreachable"));
   await act(async () => { fireEvent.click(within(row("elevenlabs")!).getByRole("button", { name: "Test the ElevenLabs connection" })); });
   expect(actions.testProviderKey).toHaveBeenCalledWith("elevenlabs");
