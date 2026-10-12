@@ -495,7 +495,7 @@ export const en = {
   "settings.summary.machine": "{machine} · {state}",
   "settings.summary.machines": "{n} machines · {online} online",
   "settings.machineForgotten": "{machine} forgotten",
-  "settings.section.waiting": "A model chosen here is not on this device yet: Save waits for it.",
+  "settings.section.waiting": "A model chosen here is not on this device yet: the one in use stays until it is ready.",
   "settings.general.description": "How Sidevoice looks and speaks to you on this device.",
   "settings.appearance": "Appearance",
   "settings.appearance.hint": "Applied at once, on this device.",

@@ -495,7 +495,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "settings.summary.machine": "{machine} · {state}",
   "settings.summary.machines": "{n} máquinas · {online} en línea",
   "settings.machineForgotten": "Se ha olvidado {machine}",
-  "settings.section.waiting": "Un modelo elegido aquí aún no está en este dispositivo: Guardar lo espera.",
+  "settings.section.waiting": "Un modelo elegido aquí aún no está en este dispositivo: el que está en uso sigue hasta que esté listo.",
   "settings.general.description": "Cómo se ve Sidevoice y en qué idioma te habla en este dispositivo.",
   "settings.appearance": "Apariencia",
   "settings.appearance.hint": "Se aplica al momento, en este dispositivo.",
