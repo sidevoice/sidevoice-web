@@ -45,6 +45,9 @@ function usedFor(provider: string, catalog: CatalogView | undefined, t: HostTran
   return offers.length ? offers.map((task) => t(`keys.use.${task}` as HostMessageKey)).join(" · ") : t("keys.purpose.other");
 }
 
+/** From how many providers to add a search is offered: below it, they are all in sight. */
+const SEARCH_FROM = 8;
+
 /** Text as search compares it: trimmed, any case, any accents. */
 const folded = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
@@ -168,7 +171,9 @@ export function ProviderKeys() {
   const uses = (provider: string) => [settings?.stt.catalog === provider ? t("settings.section.transcription") : "", settings?.tts.catalog === provider ? t("settings.section.voice") : ""].filter(Boolean);
   const yours = providers.filter((provider) => keys[provider.id] === true);
   const rest = providers.filter((provider) => keys[provider.id] !== true);
-  const wanted = folded(query);
+  const searchable = rest.length >= SEARCH_FROM;
+  // A search taken away (fewer to add than SEARCH_FROM) takes its filter with it.
+  const wanted = searchable ? folded(query) : "";
   const matches = (provider: Provider) => folded(`${provider.name} ${usedFor(provider.id, provider.catalog, t)}`).includes(wanted);
   const shown = wanted ? rest.filter(matches) : rest;
   // Nothing to add matches, but one already connected does: said, rather than "no match" under its row.
@@ -186,7 +191,7 @@ export function ProviderKeys() {
     setMoved({ provider: provider.id, to: "connect", said: t("keys.disconnected", { provider: provider.name }) });
   };
   return (
-    <Section id="providers" title={t("keys.title")} description={t("keys.intro")}>
+    <Section id="providers" title={t("keys.title")}>
       <div ref={pane} className="providers">
         {/* Where the keys are kept, in a line: the keychain in the app; this browser, unencrypted, on the web. */}
         <p id="provider-keys-where" className="provider-keys-where" role="note" data-where={inApp ? "app" : "browser"}>
@@ -200,18 +205,16 @@ export function ProviderKeys() {
             action={<Button id="provider-keys-retry" size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /></div>
         ) : null}
         {catalogueShown(catalogue) && !providers.length ? <p className="muted" id="provider-keys-none">{t("keys.none")}</p> : null}
-        {catalogueShown(catalogue) && yours.length > 0 && <section className="ui-card providers-card" aria-labelledby="providers-yours">
-          <header className="providers-card-head">
-            <div><h3 id="providers-yours">{t("keys.section.yours")}</h3><p>{t("keys.section.yoursIntro")}</p></div>
-          </header>
-          <div className="provider-rows">
+        {catalogueShown(catalogue) && providers.length > 0 && <section className="ui-card providers-card" aria-labelledby="providers-yours">
+          <header className="providers-card-head"><h3 id="providers-yours">{t("keys.section.yours")}</h3></header>
+          {yours.length ? <div className="provider-rows">
             {yours.map((provider) => <ConnectedRow key={provider.id} provider={provider.id} name={provider.name} catalog={provider.catalog} inUse={uses(provider.id)} onDisconnected={() => disconnected(provider)} />)}
-          </div>
+          </div> : <p className="muted" id="providers-yours-none">{t("keys.section.yoursNone")}</p>}
         </section>}
         {catalogueShown(catalogue) && providers.length > 0 && <section className="ui-card providers-card" aria-labelledby="providers-add">
           <header className="providers-card-head">
-            <div><h3 id="providers-add">{t("keys.section.add")}</h3><p>{t("keys.section.addIntro")}</p></div>
-            {rest.length > 0 && <ProviderSearch query={query} onQuery={setQuery} matches={shown.length} t={t} />}
+            <h3 id="providers-add">{t("keys.section.add")}</h3>
+            {searchable && <ProviderSearch query={query} onQuery={setQuery} matches={shown.length} t={t} />}
           </header>
           {!rest.length ? <p className="muted">{t("keys.section.allConnected")}</p>
             : !shown.length ? <p className="muted">{connectedMatch ? t("keys.search.connected", { provider: connectedMatch.name }) : t("keys.search.none", { query: query.trim() })}</p>

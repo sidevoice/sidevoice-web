@@ -71,13 +71,13 @@
  * each: mark, name with how its key stands right after it, what it is for, and Disconnect at the end — and "Add a
  * provider": a search at its head and the rest as cards in a grid, three across, each its own height, one across on a
  * phone. Connect and Disconnect weigh the same. */
-.providers { display: grid; gap: var(--sv-space-4); }
+.providers { display: grid; gap: var(--sv-space-5); }
 .provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-keys-where svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
 .providers-card { display: grid; gap: var(--sv-space-4); padding: var(--sv-space-5); }
 .providers-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-4); }
 .providers-card-head h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
-.providers-card-head p { margin: 2px 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.providers-card-head { align-items: center; min-height: 32px; }
 .providers-card > .muted { margin: 0; font-size: var(--sv-font-sm); }
 .provider-row .provider-mark, .provider-card .provider-mark { width: 40px; height: 40px; border-radius: var(--sv-radius-md); }
 .provider-rows { display: grid; gap: var(--sv-space-2); }
