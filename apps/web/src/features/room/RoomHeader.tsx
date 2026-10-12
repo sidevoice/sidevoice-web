@@ -84,14 +84,6 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
 }
 
 
-/** Settings, opened at what is new first: a machine's agents (its own way in), else the section of a new setting —
- *  after Settings' own opening, which picks a section of its own. Nothing new, as it opens. */
-export function openAtHighlight(news: NewThing[], store: RoomStore | null) {
-  const first = news[0];
-  if (!first) return;
-  if (first.machine) window.sidevoiceActions?.openAgentSettings?.(first.machine);
-  else queueMicrotask(() => store?.patch({ settingsSection: first.section }));
-}
 
 /** Settings from the conversations' foot, where it sits on a desktop: the header's own button, which the runtime opens
  *  Settings from, pressed — kept in the header (shown only on a phone, which has no column), so it is the only one. */
@@ -105,11 +97,10 @@ export function openSettings() {
  * then opens at theirs. */
 function SettingsButton({ t }: { t: CallTranslate }) {
   const hosts = hostTranslator();
-  const store = useContext(RoomStoreContext);
   const news = useHighlights();
   const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
-    <span className="header-settings" onClick={() => openAtHighlight(news, store)}>
+    <span className="header-settings">
       <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label}>
         <SettingsIcon size={20} />{news.length > 0 && <span className="settings-notice-dot" aria-hidden="true" />}
       </Button>

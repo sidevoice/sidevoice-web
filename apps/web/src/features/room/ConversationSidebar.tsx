@@ -14,7 +14,7 @@ import { conversationState, machineGroups, stateText } from "../call/conversatio
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
-import { openAtHighlight, openSettings } from "./RoomHeader";
+import { openSettings } from "./RoomHeader";
 import { hostTranslator } from "../settings/host-i18n";
 import { UpdatesEntry, useUpdatesEntry } from "../updates/UpdatesEntry";
 import "./room.css";
@@ -149,11 +149,10 @@ export function ConversationSidebar() {
 function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
   const t = callTranslator();
   const hosts = hostTranslator();
-  const store = useContext(RoomStoreContext);
   const news = useHighlights();
   const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
-    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); openAtHighlight(news, store); }}>
+    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); }}>
       <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}{news.length > 0 && <span className="settings-notice-dot" aria-hidden="true" />}
     </Button>
   );

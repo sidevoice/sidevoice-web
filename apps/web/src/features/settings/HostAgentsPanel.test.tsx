@@ -107,7 +107,8 @@ test("P11 an agent new on a machine marks the gear, opens Settings at that machi
   expect(gear).toHaveAttribute("aria-label", "Settings, 1 new");
   expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
-  expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
+  // Opening Settings never jumps to what is new: the dots on the icons lead there.
+  expect(openAgentSettings).not.toHaveBeenCalled();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
   expect(entry("NUC")!.querySelector(".new-on-icon-dot")).not.toBeNull();
   expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
@@ -136,7 +137,8 @@ test("the runtime's Settings handler on the menu entry survives the header's ren
   expect(settingsEntry().onclick).toBe(openSettings);
   await act(async () => { fireEvent.click(settingsEntry()); });
   expect(openSettings).toHaveBeenCalledTimes(1);
-  expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
+  // Opening Settings never jumps to what is new: the dots on the icons lead there.
+  expect(openAgentSettings).not.toHaveBeenCalled();
 });
 
 test("agents new on two machines: the gear counts them, Settings opens at the first, and each machine's entry has the dot", async () => {
@@ -150,7 +152,8 @@ test("agents new on two machines: the gear counts them, Settings opens at the fi
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   expect(settingsEntry()).toHaveAttribute("aria-label", "Settings, 2 new");
   await act(async () => { fireEvent.click(settingsEntry()); });
-  expect(openAgentSettings).toHaveBeenCalledWith("fp-nuc");
+  // Opening Settings never jumps to what is new: the dots on the icons lead there.
+  expect(openAgentSettings).not.toHaveBeenCalled();
   // Each machine under Machines carries the dot, said in words to a screen reader.
   expect(entry("NUC")!.querySelector(".new-on-icon-dot")).not.toBeNull();
   expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
