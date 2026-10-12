@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,NO_MACHINE,reachNote,conversationKey,conversationOf,personKey} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,NO_MACHINE,reachNote,conversationKey,conversationOf,personKey,speechOf,voiceOffReasonFor,HEAR_WAIT_MS,HEAR_NO_ANSWER_MS} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -20,6 +20,14 @@ import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalText as sayRefusal} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
+/* The call model this page runs (VARIANTS `call-model`, lib/variants.ts; briefs/CALL-MODEL-B-SPEC.md): A, a call that is
+ * joined and left; B, the voice switch — the room always open, the voice turned on and off on its own. It decides the
+ * session's whole lifecycle, which cannot change under a live page: it is read once, and a change of it from the
+ * preview's panel loads the page again. Every other variant follows the panel live. */
+const CALL_MODEL_KEY='call-model';
+function callModel(){try{const value=JSON.parse(localStorage.getItem('sidevoice.variants')||'{}')?.[CALL_MODEL_KEY];return value==='b'?'b':'a'}catch{return 'a'}}
+const VOICE_SWITCH=callModel()==='b';
+window.addEventListener('storage',event=>{if((event.key===null||event.key==='sidevoice.variants')&&callModel()!==(VOICE_SWITCH?'b':'a'))location.reload()});
 // What this browser speaks in a call: the language of its system, among those the voice handles.
 roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.__sidevoiceDesktop?.host?.voice});
 // Whether this browser lets the page keep anything: when it does not, one message says so, rather than each store
@@ -60,6 +68,7 @@ const VOICE_FAILURES={
 function voiceErrorText(error){
  const code=failureCode(error,''),t=hostTranslator();
  if(code==='storage-blocked'||code==='SecurityError')return t('storage.blocked');
+ if(code==='trial-voice-on')return t('wizard.trial.voiceOn');
  if(/^trial-[a-z-]+$/.test(code))return t('wizard.trial.'+code.slice(6));
  const text=VOICE_FAILURES[code]?.()||(/^[A-Z][A-Za-z]*Error$/.test(code)?t('voice.error.browser',{name:code}):'La voz de la llamada falló'+(code?' ('+code+')':'')+'.');
  return error?.detail?text+' '+String(error.detail):text;
@@ -333,12 +342,18 @@ const relay=createTurnRelay();
 // selected nothing is heard (2026-09-26).
 // Nor while the call moves to another machine (`moveCall`): nobody is there to hear it.
 let moving=false;
-function applyMicState(){voice?.mute(!state.micEnabled||moving||!!(state.ws&&!targetId()))}
+// With the voice switch (B) the voice may be on before the room has bound a conversation, or while the active one
+// cannot hear: nobody would hear it either.
+function applyMicState(){voice?.mute(!state.micEnabled||moving||!!((VOICE_SWITCH||state.ws)&&!targetId()))}
 function showScreenLock(lockState,note){state.screenLock={state:lockState,note}}
+// What keeps the screen on, the headset's button and "reload to update" waiting: the call (A), or the voice (B) — the
+// room open with the voice off is not.
+function voiceLive(){return VOICE_SWITCH?!!state.voiceOn:!!state.ws}
+function voiceLiveOrStarting(){return VOICE_SWITCH?!!(state.voiceOn||state.voiceStarting):!!(state.ws||state.connecting||state.reconnecting)}
 async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
  // call, and by the end of the preparation chain that gesture has expired.
- if(!(state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
+ if(!(VOICE_SWITCH?state.voiceOn||state.voiceStarting:state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
  // Settings → Advanced may leave the screen to the system: a call that goes on with it off.
  if(!readCallPreferences().keepAwake)return;
  if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','Este dispositivo no permite mantener la pantalla encendida.');return}
@@ -353,7 +368,7 @@ async function keepScreenAwake(){
    lock.addEventListener('release',()=>{
     if(screenWakeLock!==lock)return;
     screenWakeLock=null;showScreenLock('off','La pantalla puede apagarse; vuelve a la sala para mantenerla activa.');
-    if(state.ws&&!document.hidden&&wakeRetries<3){++wakeRetries;setTimeout(()=>{if(state.ws&&!document.hidden)keepScreenAwake()},1000)}
+    if(voiceLive()&&!document.hidden&&wakeRetries<3){++wakeRetries;setTimeout(()=>{if(voiceLive()&&!document.hidden)keepScreenAwake()},1000)}
    });
   }catch{showScreenLock('off','No se pudo mantener la pantalla activa. El móvil podría suspender la llamada.')}
  })();
@@ -453,7 +468,7 @@ function sayReply(reply){
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
   // From `playing` to `done` the reply is being said: where the voice is in it lights its words.
-  if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
+  if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0});if(VOICE_SWITCH)heardStarted(reply)}
   else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
   else if(event.type==='done'){
    replies.delete(reply.utterance_id);
@@ -496,7 +511,10 @@ function cancelCurrentInput(){if(!state.userTurn||state.cancelledInput)return;vo
 function cancelDraft(turn){state.cancelledInput=true;state.history=state.history.filter(r=>!(r.segment===turn.segment&&r.thread===turn.thread));save();partial('');markHistorySeen()}
 function partial(text){state.pendingUserText=text||''}
 // The text box comes and goes with the call view: with none mounted there is nothing to update.
-function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;input.placeholder=ready?'Envía un mensaje':'Únete a la llamada para escribir';}
+// With the voice switch (B) the box writes to the active conversation whenever it can receive and the session is bound to
+// it, voice or not; its placeholder, which says why when it cannot, is React's (Composer, features/call/voice-view.ts).
+function activeCanReceive(){const person=state.people.find(p=>personKey(p)===targetId());return !!person&&!!person.available&&(person.reach?.state||'listening')==='listening'&&state.machineLinks?.[state.callNode]?.reach==='ok'}
+function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;if(VOICE_SWITCH){const ready=!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching&&activeCanReceive();input.disabled=!ready;send.disabled=!ready||state.textSending;return}const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;input.placeholder=ready?'Envía un mensaje':'Únete a la llamada para escribir';}
 async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(e.message||'No se pudo confirmar el envío. El texto se conserva.')}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
@@ -529,7 +547,7 @@ function followServedBuild(served){
  const page=window.sidevoiceBuildId||'dev';
  if(!served||page==='dev'||served===page)return;
  // In a call it waits, said in the updates' list too (webUpdate), and loads after the hang-up.
- if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
+ if(voiceLiveOrStarting()){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
  try{if(sessionStorage.getItem('sidevoice.reloadedFor')===served)return;sessionStorage.setItem('sidevoice.reloadedFor',served)}catch{}
  const query=new URLSearchParams(location.search);query.set('v',served);
  location.replace(location.pathname+'?'+query);
@@ -539,7 +557,9 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
- if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
+ // With the voice switch (B) the conversation looked at is the active one, the person's choice: a binding that changes —
+ // or goes, when the active one cannot hear — never takes it.
+ if(changed){if(VOICE_SWITCH)state.viewedThread=state.viewedThread||targetId();else state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on.
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
@@ -598,6 +618,10 @@ catch { } }
 let emptyListShownFor=null;
 async function selectOnlyListeningConversation(){
  if(targetId()||state.switching||!state.ws)return false;
+ // With the voice switch (B) an active conversation that cannot hear stays the active one: nothing falls back to another.
+ // One this machine no longer lists at all (closed) is not one.
+ const active=VOICE_SWITCH?state.viewedThread||rememberedThread():null;
+ if(active&&(conversationOf(active)?.node!==state.callNode||state.people.some(person=>personKey(person)===active)))return false;
  const listening=state.people.filter(person=>person.node===state.callNode&&person.available&&person.reach?.state==='listening');
  if(!listening.length){
   if(emptyListShownFor!==state.sessionId){emptyListShownFor=state.sessionId;window.dispatchEvent(new Event('sidevoice-conversations-open'))}
@@ -613,6 +637,7 @@ async function refreshPeople(fp=state.callNode){
   const data=await api(roomQuery('/api/presentation/participants',fp),undefined,fp);
   if(links.get(fp)!==link||link.base!==base||!Array.isArray(data?.participants))return;
   link.peopleAnswered=true;link.people=data.participants.map(person=>({...person,node:fp}));mergePeople();
+  if(VOICE_SWITCH){applyMicState();updateComposer()}
   if(fp===state.callNode)await reselectRemembered()||await selectOnlyListeningConversation();
  }catch{}
 }
@@ -621,6 +646,7 @@ async function refreshPeople(fp=state.callNode){
  * own quicker beat (`callBeat`). */
 function machinesBeat(){
  roomStore.patch({machinesAt:Date.now()});
+ followActive();
  for(const fp of liveMachines()){
   const link=links.get(fp),fresh=link?.base!=null&&Date.now()-(verified.get(link.base)||0)<VERIFIED_FOR_MS&&link.doubted!==link.base;
   if(!link||link.base==null||!fresh&&!pairings.list.find(p=>p.fp===fp)?.local)void locate(fp);
@@ -803,6 +829,7 @@ async function reselectRemembered(){
  const wanted=rememberedThread();
  if(!wanted||targetId()||state.switching||!state.ws||conversationOf(wanted)?.node!==state.callNode)return false;
  if(!state.people.some(person=>personKey(person)===wanted&&person.available))return false;
+ if(VOICE_SWITCH&&!hears(wanted))return false;
  await select(wanted);return true;
 }
 // Stats poll only while the modal is open; each opening owns its requests.
@@ -1035,13 +1062,17 @@ function stopConnectionStats(){
  ++statsEpoch;clearTimeout(statsTimer);statsTimer=null;statsRequest?.abort();statsRequest=null;$('stats-refresh').disabled=false;
 }
 function openConnectionStats(){
- stopConnectionStats();$('call-menu').open=false;resetStats();
+ // ⋮ holds it on a desktop; with the voice switch (B) a phone has it at the conversations' foot, and no ⋮.
+ stopConnectionStats();const menu=$('call-menu');if(menu)menu.open=false;resetStats();
  $('stats-status').textContent='Recogiendo mediciones…';
  if(!$('connection-stats').open)$('connection-stats').showModal();
  return refreshConnectionStats();
 }
 $('stats-aggregates-copy').onclick=copyLatencyAggregates;
-$('stats-open').onclick=openConnectionStats;
+// The button is ⋮'s in the call bar; with the voice switch (B) it moves to the conversations' foot on a phone, so it is
+// found where the click lands rather than bound once.
+if(VOICE_SWITCH)document.addEventListener('click',event=>{if(event.target?.closest?.('#stats-open'))void openConnectionStats()});
+else $('stats-open').onclick=openConnectionStats;
 $('stats-close').onclick=()=>$('connection-stats').close();
 $('stats-refresh').onclick=()=>{clearTimeout(statsTimer);return refreshConnectionStats()};
 $('connection-stats').addEventListener('close',stopConnectionStats);
@@ -1205,7 +1236,12 @@ function voiceTurn(turn){
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 // Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
 // be acted on, and in the machine's log.
-function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
+function voiceFailed(error){
+ // With the voice switch (B) a microphone lost or blocked mid-session turns the voice off, saying why (the spec's D4).
+ const code=failureCode(error,'');
+ if(VOICE_SWITCH&&(state.voiceOn||state.voiceStarting)&&['microphone-lost','microphone-denied'].includes(code)){void setVoice(false,voiceOffReasonFor(code));reportClientError({kind:'voice',message:code});return}
+ setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:code})
+}
 function voiceStateChanged(next){
  roomStore.batch(()=>{
   state.voiceState=next;
@@ -1234,6 +1270,9 @@ function receiveReply(d){
  state.roomRevision=Math.max(state.roomRevision,d.revision);
  if(!d.replay)state.turns=recordReply(state,d);
  add('assistant',d.text,'voice:'+d.utterance_id,conversationKey(state.callNode,d.thread_id),{history_id:d.history_id,session:d.session_id,revision:d.revision});
+ // With the voice switch (B) a reply that comes while nobody here would hear it — the voice off, the agents muted: the room
+ // was told, and this one crossed it — is written and reported unheard at once, for that reason.
+ if(VOICE_SWITCH&&!speechOf(state).on&&!replies.has(d.utterance_id)){keepMessage('playback','voice-playback',{utterance_id:d.utterance_id,status:'unplayed',heard_chars:0,reason:speechOf(state).reason});flushOutbox();return}
  // A reply that arrives while the call leaves its machine is written, never said: the person has moved on.
  if(!replies.has(d.utterance_id)&&!moving)sayReply(d);
 }
@@ -1323,6 +1362,12 @@ function disconnect() {
     updateMic();
     applyLockScreen(false);
     syncLinks();
+    // With the voice switch (B) the voice went with it.
+    if (VOICE_SWITCH) {
+        ++voiceEpoch;
+        rememberVoice(false);
+        roomStore.patch({ voiceOn: false, voiceStarting: false, voiceIdleWarning: false, hearing: null, movingTo: null });
+    }
 }
 // The voice's reports, for as long as this call has it.
 const voiceListeners=[];
@@ -1348,6 +1393,13 @@ async function watchAudioDevices(){
  if(devices)audioDevicesChanged(devices);
 }
 function audioDevicesChanged(devices){
+ // With the voice switch (B) a microphone that goes turns the voice off: a headset's never silently becomes the
+ // laptop's (D4). A speaker that goes — the one chosen, or the system default's device (gap #37, G8) — mutes the agents:
+ // speech never moves to the speakers by itself.
+ if(VOICE_SWITCH){
+  if(devices.lost?.input&&(state.voiceOn||state.voiceStarting))void setVoice(false,'micLost');
+  if(devices.lost?.output||devices.defaultLost?.output)setAgentsMuted(true,'output-lost');
+ }
  if(devices.lost){const kept=storedAudio();if(devices.lost.input)delete kept.input;if(devices.lost.output)delete kept.output;keepAudio(kept)}
  roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
   ...(devices.lost?{audioLost:devices.lost}:{})});
@@ -1377,7 +1429,11 @@ async function callMachine(epoch){
  if(pick()==null)await Promise.all(live.map(fp=>locate(fp,{move:true,fresh:true})));
  return epoch===connectEpoch?pick()??wanted??live[0]??null:null;
 }
-async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
+async function toggleCall(){
+ // With the voice switch (B) there is no call to join or leave: what asks for one (the desktop app's tray and card, until
+ // they speak of the voice: contract gap #38) turns the voice on or off.
+ if(VOICE_SWITCH)return setVoice(!(state.voiceOn||state.voiceStarting));
+ if(state.ws||state.connecting||state.reconnecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
  personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
@@ -1426,7 +1482,7 @@ async function joinRoom(epoch,context){
  // The hello carries this browser's call span, so the room's own spans are inside it instead of
  // being a second trace about the same call. With no collector configured there is no span to carry.
  const traceparent=window.sidevoiceTelemetry?.startCall?.({});
- try{session=await openSession(socket,{conversation:rememberedOn(fp),ui_language:devicePreferences().ui_language,...(context.resume?{resume:context.resume}:{}),...(traceparent?{telemetry:{traceparent}}:{})},fp,socket.token)}
+ try{session=await openSession(socket,{conversation:rememberedOn(fp),ui_language:devicePreferences().ui_language,...switchHello(),...(context.resume?{resume:context.resume}:{}),...(traceparent?{telemetry:{traceparent}}:{})},fp,socket.token)}
  // A join that failed leaves nothing behind. A room that is not told keeps the seat for the length of its keepalive
  // budget while the page tries again, so one local failure became a reconnect loop that ate the room's seats one every
  // thirty seconds (2026-09-22).
@@ -1524,12 +1580,13 @@ async function moveCall(fp,thread){
  if(!state.ws&&!state.reconnecting)return;
  const from=state.callNode,epoch=++connectEpoch,socket=state.ws;
  // From here the call is the move's: a join or a reconnection still on its way is not any more.
- roomStore.batch(()=>{state.switching=true;state.connecting=state.reconnecting=state.reconnectShown=false});
+ roomStore.batch(()=>{state.switching=true;state.connecting=state.reconnecting=state.reconnectShown=false;state.movingTo=conversationKey(fp,thread)});
  moving=true;applyMicState();
  joinStatus('conversation',{subject:conversationTitle(conversationKey(fp,thread))});
  try{
   cancelCurrentInput();
-  for(const said of replies.values())said.saying.cancel();
+  // With the voice switch (B) a reply cut by the move is one the person did not hear: a mark on the conversation left.
+  for(const said of replies.values()){if(VOICE_SWITCH)said.withdrawn='focus_changed';said.saying.cancel()}
   await drainOutbox(from,MOVE_DRAIN_MS,()=>epoch===connectEpoch&&state.ws===socket);
   if(epoch!==connectEpoch)return;
   leaveSession();
@@ -1543,8 +1600,14 @@ async function moveCall(fp,thread){
   // In the call again: what the room still has to say of it (the binding, the conversations) never holds it in a move.
   moving=false;state.switching=false;applyMicState();clearJoinStatus();
   void settleRejoin(epoch,null);
- }catch(e){if(epoch===connectEpoch){disconnect();failJoin(joinFailureText('room',e))}}
- finally{if(epoch===connectEpoch){state.switching=false;moving=false;applyMicState()}}
+ }catch(e){
+  if(epoch!==connectEpoch)return;
+  // With the voice switch (B) the voice stays: the session opens again on the active conversation's machine once it
+  // answers (followActive), and meanwhile the line says why.
+  if(VOICE_SWITCH){roomRefused=refusedForGood(e);failJoin(joinFailureText('room',e))}
+  else{disconnect();failJoin(joinFailureText('room',e))}
+ }
+ finally{if(epoch===connectEpoch){state.switching=false;moving=false;state.movingTo=null;applyMicState()}}
 }
 // What the call still owes a machine it is leaving, given a moment to be acknowledged on its open socket: the
 // person's finished turns, and what became of each reply stopped. A stopped reply reports itself as it ends.
@@ -1577,6 +1640,186 @@ async function replayReply(historyId){
  if(!state.history.some(r=>r.segment===historyId&&conversationOf(r.thread)?.node===state.callNode))return;
  try{await post('/api/presentation/replay',{session_id:state.sessionId,history_id:historyId})}
  catch(error){setRoomError(error.message||'No se pudo volver a reproducir.')}
+}
+
+/* ----- call model B: the room always open, the voice a switch (briefs/CALL-MODEL-B-SPEC.md) -----
+ * The page opens a room session as it loads, on the active conversation's machine and without voice (`openRoom`), and
+ * keeps it: the list, the transcripts, the box, every conversation's working state and the marks work with the voice
+ * off. A conversation picked becomes the active one — the session follows it, and one that cannot hear is the active
+ * one all the same, the last one no longer hearing the person (`makeActive`). The voice turns on and off on its own
+ * (`setVoice`): by the person's hand, or by itself — idle, the microphone lost or blocked — saying why, and never on by
+ * itself. The agents are muted apart (`setAgentsMuted`), by the person or by the speaker going away. The room is told
+ * whether this session hears speech (contract gap #32); what it said that nobody heard here is a mark on its
+ * conversation, never played, and "Hear it" asks the agent for a fresh reply (`hearIt`, gap #35). */
+let voiceEpoch=0,roomRefused=false,hearTimer=null;
+// Whether the voice was on in this tab (a reload turns it off, and says so: D7), and the agents' mute, kept for the tab.
+const VOICE_ON_KEY='sidevoice.voice-on',AGENTS_MUTED_KEY='sidevoice.agents-muted';
+function rememberVoice(on){try{if(on)sessionStorage.setItem(VOICE_ON_KEY,'1');else sessionStorage.removeItem(VOICE_ON_KEY)}catch{}}
+/** The hello's part of the voice switch: whether this session hears speech (gap #32, G1), and no note offered by itself
+ *  on a select, a join or a resume — only "Hear it" asks (gap #36, G5). */
+function switchHello(){return VOICE_SWITCH?{speech:speechOf(state),notes:'on-request'}:{}}
+/** The room told, on the open socket, whether this session hears speech (gap #32, G1); a socket opened later says it in
+ *  its hello. */
+function sendSpeech(){
+ if(!VOICE_SWITCH||state.ws?.readyState!==WebSocket.OPEN||!state.sessionId)return;
+ try{state.ws.send(JSON.stringify({type:'voice-speech',data:{session_id:state.sessionId,...speechOf(state)}}))}catch{}
+}
+/** Whether the conversation `key` hears the person now: listed, listening, on a machine that proved where it is. */
+function hears(key){
+ const to=conversationOf(key),person=state.people.find(p=>personKey(p)===key);
+ return !!person?.available&&(person.reach?.state||'listening')==='listening'&&state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
+}
+/** The room session, opened without voice on the active conversation's machine (else the first that answers with a
+ *  conversation listening). Silently: no join line — a machine not there is the reach note, a refusal the line's failure,
+ *  and one refused for good is not asked again until the person does something. */
+async function openRoom(){
+ if(!VOICE_SWITCH||state.ws||state.connecting||state.reconnecting||moving||roomRefused)return;
+ if(!pairings.list.some(p=>!p.revoked))return;
+ state.connecting=true;const epoch=++connectEpoch;
+ try{
+  const fp=await callMachine(epoch);if(epoch!==connectEpoch||fp==null)return;
+  state.callNode=fp;syncLinks();
+  if(linkBase(fp)==null)return;
+  const session=await joinRoom(epoch,{resume:storedTicket(fp)});if(epoch!==connectEpoch||!session)return;
+  if(state.joinFailure)roomStore.patch({joinFailure:''});
+  reachFailure=null;updateMic();
+  await refresh();await refreshPeople(fp);
+  if(epoch!==connectEpoch)return;
+  state.connecting=false;flushOutbox();applyMicState();
+  // Open, it goes on to the active conversation if that one is elsewhere (a pick made while it opened).
+  followActive();
+ }catch(e){if(epoch===connectEpoch){roomRefused=refusedForGood(e);failJoin(joinFailureText('room',e))}}
+ finally{if(epoch===connectEpoch)state.connecting=false}
+}
+/** On the machines' beat, and once the room is open: the session opened when it is not, and on the active conversation
+ *  when that one hears and the session is elsewhere — a move that failed, a conversation back from offline. */
+function followActive(){
+ if(!VOICE_SWITCH||state.connecting||state.reconnecting||moving)return;
+ if(!state.ws){void openRoom();return}
+ const active=state.viewedThread||rememberedThread();
+ if(state.switching||!state.sessionId||!active||active===targetId())return;
+ if(hears(active))void select(active);
+}
+/** A conversation picked, by its key, becomes the active one (R2): the session goes to it — on its machine, or moving
+ *  there. One that cannot hear (offline, holding) is the active one all the same: the last one stops hearing the person,
+ *  the microphone and the box say why, and nothing falls back to another (D5). */
+function makeActive(key){
+ const to=conversationOf(key);if(!to)return;
+ roomRefused=false;
+ state.viewedThread=key;rememberThread(key);markHistorySeen();updateComposer();
+ if(key===targetId())return;
+ if(!hears(key)){void leaveBinding();applyMicState();return}
+ // With no session yet it opens on this one's machine; one opening elsewhere follows it once it is open.
+ if(!state.sessionId){if(!state.connecting)void openRoom();return}
+ void select(key);
+}
+/** The session stops hearing the person on the conversation it is bound to (`POST /api/presentation/leave`, which core
+ *  has): the room withdraws what was playing for it. */
+async function leaveBinding(){
+ const binding=state.roomBinding;if(!state.sessionId||!binding?.thread_id||!binding.binding_id)return;
+ cancelCurrentInput();
+ try{await post('/api/presentation/leave',{session_id:state.sessionId,binding_id:binding.binding_id});await refresh()}catch(e){setRoomError(e.message)}
+ applyMicState();updateComposer();
+}
+/** The voice stops: the microphone and the speaker at once, the system's microphone light out. What it was saying or had
+ *  queued ends unheard for `why` (the room is told, and marks it); a turn the person had open is dropped. The room stays. */
+function stopVoice(why){
+ const current=voice;voice=null;
+ for(const stop of voiceListeners.splice(0))stop();
+ const turn=state.userTurn;
+ if(turn&&!state.cancelledInput){current?.cancelInput();cancelDraft(turn);keepMessage('user-turn','voice-user-turn',turnMessage({phase:'cancelled',turn_id:turn.id,merged:false}));flushOutbox()}
+ for(const said of replies.values()){said.withdrawn=why;said.saying.cancel()}
+ current?.stop().catch(()=>{});
+ releaseScreenWakeLock();applyLockScreen(false);
+ roomStore.batch(()=>{state.userLive=state.botLive=false;state.userTurn=null;state.pendingPhase='';partial('');state.voiceState=null;state.karaokeState=null;state.holding=false});
+ holding=spaceDown=false;voiceLevel(0);
+}
+/** The voice switch (R3). On: the voice starts — its models, the microphone, the speaker — and the room is told this
+ *  session hears speech; pressed again while it starts, it is cancelled. Off: it stops at once and the room stays; turned
+ *  off by itself it keeps `reason` (VOICE_OFF_REASONS) for its note, which stays until it is on again. With no machine
+ *  paired, it asks for a code instead, as the call does. */
+async function setVoice(on,reason=null){
+ if(!VOICE_SWITCH)return;
+ if(!on){
+  const was=state.voiceOn||state.voiceStarting;
+  ++voiceEpoch;idleWarned=false;
+  if(!was)return;
+  stopVoice('voice_off');rememberVoice(false);
+  roomStore.patch({voiceOn:false,voiceStarting:false,voiceIdleWarning:false,voiceOffReason:reason,voiceOffDetail:''});
+  sendSpeech();
+  return;
+ }
+ if(state.voiceOn||state.voiceStarting)return;
+ if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
+ personSignal();primeNowPlaying();roomRefused=false;
+ const epoch=++voiceEpoch;
+ roomStore.patch({voiceStarting:true,voiceOffReason:null,voiceOffDetail:'',voiceIdleWarning:false});
+ keepScreenAwake();
+ try{
+  const next=await voiceHost();if(epoch!==voiceEpoch)return;
+  voice=next;attachVoice(next);
+  await next.setSettings(voiceSettingsHere(state.voiceSettings,state.voiceCatalogue.catalogs));if(epoch!==voiceEpoch)return;
+  await next.start();if(epoch!==voiceEpoch)return;
+  lastPersonSignal=Date.now();idleWarned=false;
+  roomStore.patch({voiceOn:true,voiceStarting:false});
+  applyMicState();applyLockScreen(true);rememberVoice(true);sendSpeech();keepScreenAwake();
+  if(!state.ws)followActive();
+ }catch(error){
+  if(epoch!==voiceEpoch)return;
+  ++voiceEpoch;stopVoice('voice_off');
+  const code=failureCode(error,'');
+  roomStore.patch({voiceOn:false,voiceStarting:false,voiceOffReason:voiceOffReasonFor(code),voiceOffDetail:voiceErrorText(error)});
+  reportClientError({kind:'voice',message:code});
+ }
+}
+/** The agents muted (R4): what plays stops and what was queued goes — those replies end unheard, marks — and the room is
+ *  told (gap #32); unmuted, what comes next speaks, and what was held stays a mark. `by`: the person, or the speaker
+ *  going away. Kept for this tab. */
+function setAgentsMuted(muted,by='person'){
+ if(!VOICE_SWITCH)return;
+ if(muted===state.agentsMuted&&(!muted||by===state.agentsMutedBy))return;
+ roomStore.patch({agentsMuted:muted,agentsMutedBy:muted?by:null});
+ try{if(muted)sessionStorage.setItem(AGENTS_MUTED_KEY,by);else sessionStorage.removeItem(AGENTS_MUTED_KEY)}catch{}
+ if(muted)for(const said of replies.values()){said.withdrawn='agents_muted';said.saying.cancel()}
+ sendSpeech();
+}
+function setHearing(value){clearTimeout(hearTimer);hearTimer=null;roomStore.patch({hearing:value})}
+/** Resolves once the session is bound to `key`, or false past `ms`. */
+function boundTo(key,ms){return new Promise(resolve=>{const until=Date.now()+ms;const check=()=>{if(targetId()===key&&state.sessionId)resolve(true);else if(Date.now()>=until)resolve(false);else setTimeout(check,100)};check()})}
+const BIND_WAIT_MS=8000;
+/** "Hear it" (D3, gap #35, G4): the conversation is asked for a fresh reply about what the person missed — the old one is
+ *  never played again. What it needs first is done first: the voice turned on inside the person's tap, the conversation
+ *  made the active one, the agents unmuted. Asking until the reply starts to sound; with none in HEAR_WAIT_MS it did not
+ *  answer by voice, said for HEAR_NO_ANSWER_MS, and the mark is the room's again. */
+async function hearIt(key){
+ if(!VOICE_SWITCH)return;
+ const to=conversationOf(key);if(!to||state.hearing?.thread===key&&state.hearing.state==='asking')return;
+ personSignal();
+ setHearing({thread:key,state:'asking'});
+ const voiceReady=state.voiceOn?null:setVoice(true);
+ if(key!==targetId())makeActive(key);
+ if(state.agentsMuted)setAgentsMuted(false);
+ try{
+  await voiceReady;
+  // A voice that did not start says why in its own note; a conversation that could not be reached, in its row.
+  if(!state.voiceOn||!await boundTo(key,BIND_WAIT_MS)){if(state.hearing?.thread===key)setHearing(null);return}
+  const answer=await post('/api/presentation/hear',{session_id:state.sessionId,thread_id:to.thread});
+  if(state.hearing?.thread!==key)return;
+  if(answer?.status!=='asked'){setHearing(null);return}
+  hearTimer=setTimeout(()=>{
+   if(state.hearing?.thread!==key)return;
+   roomStore.patch({hearing:{thread:key,state:'no-answer'}});
+   hearTimer=setTimeout(()=>{if(state.hearing?.thread===key)setHearing(null)},HEAR_NO_ANSWER_MS);
+  },HEAR_WAIT_MS);
+ }catch(e){if(state.hearing?.thread===key)setHearing(null);setRoomError(e.message)}
+}
+/** A reply started to sound: the "Hear it" asking its conversation is answered. */
+function heardStarted(reply){if(state.hearing?.thread===conversationKey(state.callNode,reply.thread_id)&&state.hearing.state==='asking')setHearing(null)}
+if(VOICE_SWITCH){
+ // A reload turns the voice off (autoplay needs a tap) and says so; the agents' mute is the tab's.
+ let reloaded=false,muted=null;
+ try{reloaded=sessionStorage.getItem(VOICE_ON_KEY)==='1';sessionStorage.removeItem(VOICE_ON_KEY);muted=sessionStorage.getItem(AGENTS_MUTED_KEY)}catch{}
+ roomStore.patch({voiceOffReason:reloaded?'reloaded':null,agentsMuted:!!muted,agentsMutedBy:muted?(muted==='output-lost'?'output-lost':'person'):null});
 }
 
 /* ----- the voice's settings and the remote providers' keys: this device's, never the room's -----
@@ -1625,8 +1868,13 @@ async function saveVoiceSettings(){
 // whoever shows it (room-types.ts TrialProgress): transcription, that the voice listens and the microphone's level;
 // the voice, the part of `text` sounding, in the page's offsets into it as the room's karaoke has them (`sayingRange`).
 let voiceTry=null;
-async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress}={}){
+// Never during a call (A), nor with the voice on (B): the try would take its voice.
+function refuseTryInCall(){
+ if(VOICE_SWITCH){if(state.voiceOn||state.voiceStarting)throw Object.assign(Error(voiceErrorText({code:'trial-voice-on'})),{code:'trial-voice-on'});return}
  if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
+}
+async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress}={}){
+ refuseTryInCall();
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
  try{
@@ -1652,7 +1900,7 @@ const TURN_FIELDS=['patience','end_of_turn','turn_model'];
 let turnTry=null;
 const turnTrySettings=()=>voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
 async function tryTurnSettings({onLevel,onTurnStep}={}){
- if(state.ws||state.connecting||state.reconnecting)throw Object.assign(Error(voiceErrorText({code:'trial-in-call'})),{code:'trial-in-call'});
+ refuseTryInCall();
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  try{
   const host=await voiceHost();
@@ -1792,7 +2040,7 @@ window.sidevoiceActions={
  interfaceLanguage:()=>storedPreferences().ui_language||'',
  // The newer build the room serves, loaded now (the updates' Reload): out of a call only.
  reloadToUpdate(){
-  const served=state.webUpdate;if(!served||state.ws||state.connecting||state.reconnecting)return;
+  const served=state.webUpdate;if(!served||voiceLiveOrStarting())return;
   const query=new URLSearchParams(location.search);query.set('v',served);location.replace(location.pathname+'?'+query);
  },
  setInterfaceLanguage(value){saveLanguage(value||'')},
@@ -1801,10 +2049,17 @@ window.sidevoiceActions={
  replayReply,
  toggleMic,
  toggleCall,
+ // Call model B (the voice switch): the voice, the agents' mute, "Hear it", and the idle warning's "Keep voice on".
+ setVoice:on=>setVoice(!!on),
+ setAgentsMuted:muted=>setAgentsMuted(!!muted),
+ hearIt,
+ keepVoiceOn:()=>personSignal(),
  // A conversation picked, by its key: looked at at once; the call goes to it when it can hear — on its machine, moving
  // the call there when it is another's. Out of a call it is the one the next join goes to. Picked while a join is still
  // on its way to another machine, that join is left and the call joined afresh, inside the person's own tap.
  selectParticipant(key){
+  // With the voice switch (B) a conversation picked is always the active one (makeActive).
+  if(VOICE_SWITCH){makeActive(key);return}
   const participant=state.people.find(item=>personKey(item)===key),to=conversationOf(key);
   state.viewedThread=key;markHistorySeen();
   if(!state.sessionId)rememberThread(key);
@@ -1899,7 +2154,7 @@ function applyLockScreen(on){
   for(const [action,run] of Object.entries(handlers)){
    try{session.setActionHandler(action,on?run:null)}catch{}
   }
-  try{session.metadata=on?new MediaMetadata({title:'Sidevoice',artist:conversationTitle(targetId())||'Llamada'}):null}catch{}
+  try{session.metadata=on?new MediaMetadata({title:'Sidevoice',artist:VOICE_SWITCH?(targetId()?conversationTitle(targetId()):'Sidevoice'):conversationTitle(targetId())||'Llamada'}):null}catch{}
  }
  syncNowPlaying();
 }
@@ -1908,7 +2163,9 @@ function typing(e){return e.target instanceof Element&&!!e.target.closest('input
 window.addEventListener('keydown',e=>{personSignal();
  if(typing(e)||e.altKey)return;
  if(e.code==='KeyD'&&(e.metaKey||e.ctrlKey)&&!e.shiftKey){e.preventDefault();if(!e.repeat)toggleMic();return}
- if(voice&&e.code==='Space'&&!e.ctrlKey&&!e.metaKey&&!e.target.closest('summary')){
+ // With the voice switch (B) Space is left to whatever has focus that takes it — a button, a link, a switch, a field —
+ // instead of being swallowed (WCAG 2.1.1); A keeps its own.
+ if(voice&&e.code==='Space'&&!e.ctrlKey&&!e.metaKey&&!e.target.closest(VOICE_SWITCH?'summary,button,a[href],[role=switch],[role=button],input,textarea,select':'summary')){
   e.preventDefault();
   if(spaceDown)return;
   spaceDown=true;
@@ -1928,12 +2185,13 @@ if(rememberedThread())state.viewedThread=rememberedThread();
 function startInitialLocate(){
  publishPairings();
  scanPairedAgents();
- void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>window.roomI18n?.setLanguage(devicePreferences().ui_language));
+ // With the voice switch (B) the room opens as soon as the machines are found.
+ void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>{window.roomI18n?.setLanguage(devicePreferences().ui_language);followActive()});
 }
 if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
 else{void refreshLocalHost();startInitialLocate()}
 setInterval(callBeat,1500);setInterval(machinesBeat,6000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&voiceLive())keepScreenAwake()});
 setupIdleWatch();
 
 // ----- a call nobody is using ends itself, for this browser only -----
@@ -1944,9 +2202,18 @@ setupIdleWatch();
 // a sign of anybody: an agent can talk to an empty car for ever.
 function personSignal(){
  lastPersonSignal=Date.now();
- if(idleWarned){idleWarned=false;state.liveNote=''}
+ if(idleWarned){idleWarned=false;state.liveNote='';if(VOICE_SWITCH)roomStore.patch({voiceIdleWarning:false})}
 }
 function checkIdle(){
+ // With the voice switch (B) it is the voice that nobody is using: warned a minute before, then turned off, the room
+ // left open; the warning is shown (and its "Keep voice on" is a sign of the person).
+ if(VOICE_SWITCH){
+  if(!state.voiceOn){idleWarned=false;return}
+  const quiet=Date.now()-lastPersonSignal;
+  if(quiet>=IDLE_MS){idleWarned=false;void setVoice(false,'idle');return}
+  if(!idleWarned&&quiet>=IDLE_MS-IDLE_WARN_MS){idleWarned=true;roomStore.patch({voiceIdleWarning:true})}
+  return;
+ }
  if(!state.ws){idleWarned=false;return}
  const quiet=Date.now()-lastPersonSignal;
  if(quiet>=IDLE_MS){
@@ -1961,8 +2228,9 @@ function checkIdle(){
 }
 function setupIdleWatch(){
  // Keys and touches are counted where the page already listens for them (the keyboard shortcuts and the
- // output owner), so no second listener competes with those.
+ // output owner), so no second listener competes with those. With the voice switch (B) a tap or a click counts too.
  idleTimer=setInterval(checkIdle,5000);
+ if(VOICE_SWITCH)document.addEventListener('pointerdown',()=>{if(state.voiceOn)personSignal()},{capture:true,passive:true});
 }
 function stopIdleWatch(){lastPersonSignal=Date.now();idleWarned=false}
 

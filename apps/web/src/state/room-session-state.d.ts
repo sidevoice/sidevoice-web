@@ -71,7 +71,26 @@ export interface SessionFacts {
  storageBlocked: boolean;
  /** A model of this device being installed for a voice slot: how far it has got, or why it failed. */
  voiceInstall: {task: 'stt' | 'tts'; model: string; state: 'running' | 'failed'; fraction: number | null; error: string} | null;
+ /** Call model B (VARIANTS `call-model`): the voice switch — on, turning on, and why it last turned itself off (with a
+  *  failure's words) —, the idle warning, the agents' mute and what set it, the conversation a "Hear it" is asking (by
+  *  its key), and the conversation a move to another machine is taking the session to. */
+ voiceOn: boolean; voiceStarting: boolean; voiceOffReason: VoiceOffReason | null; voiceOffDetail: string; voiceIdleWarning: boolean;
+ agentsMuted: boolean; agentsMutedBy: 'person' | 'output-lost' | null;
+ hearing: {thread: string; state: 'asking' | 'no-answer'} | null; movingTo: string | null;
 }
+/** Why the voice turned itself off (call model B). */
+export type VoiceOffReason = 'idle' | 'micLost' | 'micBlocked' | 'micUnavailable' | 'failed' | 'reloaded';
+export const VOICE_OFF_REASONS: VoiceOffReason[];
+export const HEAR_WAIT_MS: number;
+export const HEAR_NO_ANSWER_MS: number;
+export function voiceOffReasonFor(code: string): VoiceOffReason;
+/** This session's speech as the room is told it (contract gap #32). */
+export function speechOf(s: Pick<SessionFacts, 'voiceOn' | 'agentsMuted'>): {on: true; reason?: undefined} | {on: false; reason: 'voice_off' | 'agents_muted'};
+export function wantToTalk(rows: Pick<ParticipantView, 'mark' | 'available'>[]): number;
+export function audioReasonKey(r: Pick<ChatMessage, 'role' | 'audio' | 'audio_reason'>): 'agentsMuted' | 'voiceOff' | null;
+export function participantsView(s: SessionFacts): ParticipantView[];
+export function conversationView(s: SessionFacts): ConversationView;
+export function initialSessionFacts(): SessionFacts;
 export interface SessionStatus {
  speaker: 'user' | 'room' | 'nobody'; conversation: 'idle' | 'working' | 'speaking';
  tab: 'out' | 'listening' | 'transcribing' | 'reconnecting' | 'switching';
@@ -82,7 +101,7 @@ export interface SessionSnapshot {
  join: JoinStatusView | null; live: string;
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
- callCard: CallCardView;
+ callCard: CallCardSnapshotView;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string};
@@ -90,6 +109,10 @@ export interface SessionSnapshot {
 }
 export interface CallCardView {
  agent: 'idle' | 'working' | 'speaking'; youTalking: boolean; canSkip: boolean; conversation: string | null; title: string;
+}
+/** The card's view in the store, call model B's facts on top (contract gap #38, G9). */
+export interface CallCardSnapshotView extends CallCardView {
+ voiceOn: boolean; agentsMuted: boolean; wantToTalk: number; voiceOffReason: VoiceOffReason | null;
 }
 export function callCardView(s: SessionFacts): CallCardView;
 export interface SessionStore {

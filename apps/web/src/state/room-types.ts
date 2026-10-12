@@ -23,6 +23,8 @@ export interface ChatMessage {
   delivery?: string;
   audio?: string;
   audioNote?: string;
+  /** Why it had no audio, when it is a reason of call model B's (the agents muted, the voice off): said after audioNote. */
+  audioReason?: "agentsMuted" | "voiceOff" | null;
   /** Said while the call had no room, and taken when it came back. */
   offline?: string | boolean | null;
   /** Said under input the room never handed to the conversation, and never will. */
@@ -71,6 +73,19 @@ export interface ParticipantView {
   /** How that harness is reached, when the room says it (Cursor: its editor card, its CLI under persist, or
    *  listening only); null against a room that does not. */
   route?: string | null;
+  /** Call model B. Whether its agent is working, on every row: the call's own conversation as it reports it, any
+   *  other as the room lists it (contract gap #33, G2); null where nobody says. */
+  agentWorking?: boolean | null;
+  /** What it said that this device could not play, still untold to its agent (contract gap #34, G3): how many replies,
+   *  and since when (ms since the epoch). */
+  unheard?: { count: number; since: number } | null;
+  /** Its mark: something unheard, while its agent is idle (waiting for you) or working or unknown (wants to talk). Hidden
+   *  on the active conversation while the person's turn to it is open or it speaks. */
+  mark?: "waiting-for-you" | "wants-to-talk" | null;
+  /** It is the active conversation and its reply is sounding. */
+  speaking?: boolean;
+  /** A "Hear it" for it: asking, or it did not answer by voice. */
+  hearing?: "asking" | "no-answer" | null;
 }
 
 /** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
@@ -196,6 +211,15 @@ export interface SidevoiceActions {
   replayReply(historyId: string | null): Promise<void>;
   toggleMic(): void;
   toggleCall(): Promise<void>;
+  /** Call model B: turns the voice on (the microphone and the speaker) or off; the room stays open either way. */
+  setVoice?(on: boolean): Promise<void>;
+  /** Call model B: mutes the agents — what plays stops, and their replies come in writing — or lets them speak again. */
+  setAgentsMuted?(muted: boolean): void;
+  /** Call model B: asks a conversation for a fresh reply about what the person missed (contract gap #35, G4): it makes
+   *  it the active one, turns the voice on and unmutes the agents first, as each is needed. */
+  hearIt?(threadId: string): Promise<void>;
+  /** Call model B: a sign of the person (the idle warning's "Keep voice on"). */
+  keepVoiceOn?(): void;
   /** A conversation by its key (machine and thread, ParticipantView.threadId): looked at, and the call goes to it — on
    *  another machine the call moves there. */
   selectParticipant(threadId: string): void;
