@@ -15,6 +15,7 @@ import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
 import { moodText } from "./conversation-state";
 import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 import { useStageConversation } from "./stage-view";
+import { useVariant } from "../../lib/variants";
 import { useVoiceSwitch } from "../../state/call-model";
 import { StageHearIt } from "./HearIt";
 import { TranscriptEntry } from "./TranscriptEntry";
@@ -156,6 +157,7 @@ export function CallStage() {
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
+  const workingBadge = useVariant("working-badge", ["show", "hide"] as const);
 
   if (!stage.threadId) {
     return (
@@ -194,7 +196,8 @@ export function CallStage() {
         <VoiceModels />
         <div className="stage-top">
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
-          {stage.mood === "working" && <p className="stage-activity" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
+          {/* Working, said over the agent's head (VARIANTS `working-badge`: shown, or only to assistive tech — the desk says it). */}
+          {stage.mood === "working" && <p className={workingBadge === "show" ? "stage-activity" : "sr-only"} role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
           {voiceSwitch && stage.row && <StageHearIt row={stage.row} hand={<HandIcon size={16} filled={stage.row.mark !== "wants-to-talk"} />} />}
         </div>
         <div className="stage-tags">

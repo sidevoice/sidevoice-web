@@ -7,6 +7,7 @@ import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
 import type { SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
 import { headerRowWidth } from "../../test/header-row";
+import { VARIANTS_KEY } from "../../lib/variants";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -598,3 +599,55 @@ test("the transcript button wears a dot for what arrives while it is closed; ope
   await act(async () => { fireEvent.click(button); });
   expect(button).toHaveAccessibleName("Show transcript");
 });
+
+/* VARIANTS `working-badge`: the stage's "Working…" line over the agent while it works — shown, or only to assistive
+ * tech (the desk says it to the eye). Either way it is the same status, so a screen reader hears it. */
+const workingLine = () => document.querySelector<HTMLElement>(".stage-top > p[role='status']");
+const setWorkingBadge = (value: string) => act(() => {
+  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "working-badge": value }));
+  window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY }));
+});
+
+test.each([["by default", null], ["chosen", "show"]])("working-badge show (%s): the Working… line stands over the agent while it works, a status", (_, value) => {
+  if (value) localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "working-badge": value }));
+  const store = room();
+  expect(workingLine()).toBeNull();
+  patch(store, { harness: { "fp-1|t-login": true } });
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
+  expect(workingLine()).toHaveClass("stage-activity");
+  expect(workingLine()).not.toHaveClass("sr-only");
+  expect(workingLine()).toHaveTextContent("Working…");
+  expect(workingLine()!.querySelector(".ui-spinner")).toHaveAttribute("aria-hidden", "true");
+  // The work over, the line goes.
+  patch(store, { harness: { "fp-1|t-login": false } });
+  expect(workingLine()).toBeNull();
+}, WHOLE_APP_MS);
+
+test("working-badge hide: the Working… line is only for assistive tech — sr-only, still a status — and nothing shows in its place", () => {
+  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "working-badge": "hide" }));
+  const store = room();
+  patch(store, { harness: { "fp-1|t-login": true } });
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
+  expect(document.querySelector(".stage-activity")).toBeNull();
+  expect(workingLine()).toHaveClass("sr-only");
+  expect(workingLine()).toHaveTextContent("Working…");
+  expect(screen.getAllByRole("status")).toContain(workingLine());
+  // The desk still says it to the eye.
+  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
+  patch(store, { harness: { "fp-1|t-login": false } });
+  expect(workingLine()).toBeNull();
+}, WHOLE_APP_MS);
+
+test("working-badge follows the preview's panel live: shown, hidden, shown again, on the same work", () => {
+  const store = room();
+  patch(store, { harness: { "fp-1|t-login": true } });
+  expect(workingLine()).toHaveClass("stage-activity");
+  setWorkingBadge("hide");
+  expect(workingLine()).toHaveClass("sr-only");
+  expect(workingLine()).toHaveTextContent("Working…");
+  setWorkingBadge("show");
+  expect(workingLine()).toHaveClass("stage-activity");
+  // A value it does not know is the default.
+  setWorkingBadge("sideways");
+  expect(workingLine()).toHaveClass("stage-activity");
+}, WHOLE_APP_MS);
