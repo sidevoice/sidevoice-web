@@ -56,6 +56,9 @@ export interface SessionFacts {
  pairingOpen: boolean; pairingNote: string;
  /** The language this device speaks in a call, and whether this page runs inside the desktop app. */
  speechLanguage: string; inApp: boolean;
+ /** The preview's own: the stage avatar held in a mood (and with something unheard) by the playground's card, null to
+  *  let the room drive it. Nothing in the app sets it. */
+ avatarPreview: { mood: import('../features/avatar/avatar-spec').AvatarMood; unread?: boolean } | null;
  /** The voice settings this device keeps, the ones the settings pane is editing, the engine's catalogues, and whether a
   *  key is kept for each remote provider. */
  voiceSettings: import('../services/voice-settings.js').DeviceVoiceSettings | null; voiceDraft: import('../services/voice-settings.js').DeviceVoiceSettings | null;

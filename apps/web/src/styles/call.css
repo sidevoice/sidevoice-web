@@ -46,7 +46,11 @@
    scene keeps that frame — 440px tall, as wide as the tile at that height, pinned to the tile's bottom centre — and
    scales it to the tile by --k (the tile's height over 440, kept by useSceneScale), so the agent stands on the
    backdrop's ground, the poster hangs from its mount and the desk meets the agent where the lab put them. */
-.stage-scene { position:absolute;left:50%;bottom:0;width:calc(100% / var(--k, 1));height:440px;transform:translateX(-50%) scale(var(--k, 1));transform-origin:50% 100%;container-type:size;--fig:min(300px, 46cqw) }
+.stage-scene { position:absolute;left:50%;bottom:0;width:calc(100% / var(--k, 1));height:440px;transform:translateX(-50%) scale(var(--k, 1));transform-origin:50% 100%;container-type:size;
+  /* The agent at a video call's size: a share of the tile's shorter side (--stage-avatar-share), up to a most on large
+     screens (--stage-avatar-max, on screen). The scene is drawn 440px tall and scaled to the tile (--k), so both are
+     taken back into its own units. */
+  --fig:min(calc(var(--stage-avatar-share, .56) * min(100cqw, 440px)), calc(var(--stage-avatar-max, 420px) / var(--k, 1))) }
 .stage-backdrop { position:absolute;inset:0;transition:opacity .5s }
 /* Resting, the scene dims a little and holds still; offline it holds still and brings out what the poster hangs from. */
 .stage-tile[data-mood=idle] .stage-backdrop { opacity:.72 }
