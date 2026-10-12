@@ -195,11 +195,12 @@ export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimi
 const FIRST = { stt: "voice.try.speak", tts: "voice.try.listen" } as const;
 const AGAIN = { stt: "try.speakAgain", tts: "try.listenAgain" } as const;
 
-/** The try's button, beside a ready model's state: try it, Stop while it runs, then again. `offered`: shown while no
- *  try runs (the first-run setup offers the first one in its footer); `again`: tried already, before this visit. */
+/** The try's button, beside a ready model's state: try it, Stop while it runs, then again. `offered`: shown at all,
+ *  running or not (the first-run setup offers the first one in its footer, and stops it there); `again`: tried
+ *  already, before this visit. */
 export function TryButton({ task, handle, id, offered = true, again = false, t }: { task: Task; handle: VoiceTry; id: string; offered?: boolean; again?: boolean; t: HostTranslate }) {
   const running = handle.trial.phase === "running";
-  if (!running && !offered) return null;
+  if (!offered) return null;
   // The voice's try, once started, is played from its own Play beside its sentence.
   if (task === "tts" && handle.setSentence && handle.trial.phase !== "idle") return null;
   return <Button size="sm" id={id} onClick={running ? handle.finish : handle.start}>

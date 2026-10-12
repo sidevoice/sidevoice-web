@@ -60,7 +60,8 @@ function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHos
   return null;
 }
 
-/** The basics: how it looks, the interface's language and the one the person speaks; Automatic and System by default. */
+/** The basics: how it looks, this device's name, the interface's language and the one the person speaks; Automatic and
+ *  System by default. */
 function BasicsStep({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [language, setLanguage] = useState(() => window.sidevoiceActions?.interfaceLanguage?.() ?? "");
@@ -70,10 +71,10 @@ function BasicsStep({ t }: { t: HostTranslate }) {
     <p>{t("wizard.basics.body")}</p>
     <Group>
       <Row label={t("settings.appearance")} description={t("settings.appearance.hint")}><Appearance t={t} /></Row>
+      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="wizard-device-name"><DeviceNameField id="wizard-device-name" /></Row>
       <Row label={t("wizard.basics.uiLanguage")} htmlFor="wizard-ui-language">
         <Select id="wizard-ui-language" value={language} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
       </Row>
-      <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="wizard-device-name"><DeviceNameField id="wizard-device-name" /></Row>
       <Row label={t("wizard.basics.speech")} description={t("wizard.basics.speechHint")} htmlFor="wizard-speech-language">
         <Select id="wizard-speech-language" value={draft?.stt.language ?? ""} onValueChange={(next) => window.sidevoiceActions?.editVoice({ stt: { language: next || null } })} options={languages} />
       </Row>
@@ -296,11 +297,11 @@ export function Wizard() {
   const remoteName = remoteMachine?.host ?? "";
 
   /** Preparing this computer: its action, then its progress in its place (downloading, preparing, starting…), with
-   *  what failed and Retry. `alternative`: the way to another machine instead, where the step is this alone. */
-  const prepareBlock = (alternative: boolean) => <>
+   *  what failed and Retry. Another machine instead is Back's, to the choice. */
+  const prepareBlock = () => <>
     <p>{t("localInstall.description")}</p>
     {!preparing && install.offered && <Button type="button" variant="primary" id="wizard-prepare" onClick={prepare}>{t("wizard.prepare")}</Button>}
-    <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="wizard-install-entry" />
+    <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess anotherMachine={false} className="wizard-install-entry" />
     {/* Installed, it waits for this computer to answer: never back to Prepare in between (the install's own state is
         cleared once its machine is chosen, before this device reaches it). */}
     {preparing && installSnapshot.phase !== "installing" && installSnapshot.phase !== "failed" && installSnapshot.phase !== "cancelled" && !onboarding.localReady && (
@@ -309,7 +310,6 @@ export function Wizard() {
             <Button type="button" variant="primary" id="wizard-prepare-retry" onClick={prepare}>{t("wizard.prepareRetry")}</Button></div>
         : <p className="wizard-loading wizard-prepare-wait" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />
             {t(hostStatus.state === "running" ? "wizard.prepareAnswering" : "wizard.prepareStarting")}</p>)}
-    {alternative && <Button type="button" variant="ghost" size="sm" className="wizard-alternative" onClick={() => void choosePath("remote")}>{t("wizard.installRemote")}</Button>}
   </>;
   /** This computer's agents, to connect and disconnect. */
   const agentsBlock = <>
@@ -350,7 +350,7 @@ export function Wizard() {
         </div>
       </section>}
       {step === "W0" && <BasicsStep t={t} />}
-      {step === "W2" && <section className="wizard-prepare">{prepareBlock(true)}</section>}
+      {step === "W2" && <section className="wizard-prepare">{prepareBlock()}</section>}
       {step === "W2r" && <section>
         <PairMachine idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}

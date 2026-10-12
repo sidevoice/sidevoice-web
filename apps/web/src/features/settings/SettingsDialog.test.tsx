@@ -46,6 +46,12 @@ test("the sections are General, Transcription, Voice, Call, Providers, Machines 
   expect(screen.getByRole("radiogroup", { name: "Thinking sound" })).toBeInTheDocument();
 });
 
+test("General: appearance, this device's name, then the interface's language", () => {
+  open("whisper-base");
+  expect([...document.querySelectorAll("#pane-general .ui-row-label")].map((label) => label.textContent))
+    .toEqual(["Appearance", "This device’s name", "Language"]);
+});
+
 test("no Save: a model chosen that is not here says the one in use stays until it is ready", () => {
   open("whisper-small");
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();

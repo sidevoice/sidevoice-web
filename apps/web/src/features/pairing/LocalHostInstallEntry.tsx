@@ -44,8 +44,11 @@ export function LocalHostInstallEntry({
   className = "",
   holdSuccess = false,
   source = "machines",
+  anotherMachine = true,
 }: {
   showCta: boolean;
+  /** Whether it offers connecting to another machine instead; not in the setup's This computer path, where Back does. */
+  anotherMachine?: boolean;
   controller?: LocalHostInstallController;
   className?: string;
   holdSuccess?: boolean;
@@ -130,7 +133,7 @@ export function LocalHostInstallEntry({
               onClick={() => void controller.cancel()}>{t("localInstall.cancel")}</Button>}
             {(snapshot.phase === "failed" || snapshot.phase === "cancelled") && <Button variant="primary" size="sm" onClick={start}>{t("localInstall.retry")}</Button>}
             {snapshot.phase === "failed" && <Button size="sm" onClick={() => void copyDetails()}>{t("localInstall.copyDetails")}</Button>}
-            <Button variant="ghost" size="sm" onClick={() => void connectAnotherMachine()}>{t("localInstall.connectAnother")}</Button>
+            {anotherMachine && <Button variant="ghost" size="sm" onClick={() => void connectAnotherMachine()}>{t("localInstall.connectAnother")}</Button>}
           </div>
           {note && <p className="muted" role="status">{note}</p>}
         </section>
