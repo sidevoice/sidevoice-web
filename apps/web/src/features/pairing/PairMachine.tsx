@@ -69,9 +69,9 @@ function CopyCommand() {
 /** The pairing screen's content: the code, the machine's address when it is needed, and what came of connecting, and how
  *  to get one. Its Connect sits at the end of the form, or, given `submitIn`, in the footer of whatever
  *  holds it (the dialog's, the setup's), still submitting it through its `form` attribute; `null` while that footer is
- *  not there. `howOpen`: how to get a code starts unfolded. */
-export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, howOpen = false, rows = 3, submitIn }: {
-  idPrefix?: string; autoFocus?: boolean; howOpen?: boolean; rows?: number; submitIn?: HTMLElement | null;
+ *  not there. */
+export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, rows = 3, submitIn }: {
+  idPrefix?: string; autoFocus?: boolean; rows?: number; submitIn?: HTMLElement | null;
 }) {
   const t = hostTranslator();
   const [code, setCode] = useState("");
@@ -86,7 +86,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
   // What a screen reader hears once when a code is recognised; the line under the field counts the minutes down quietly.
   const [heard, setHeard] = useState("");
   const [now, setNow] = useState(() => Date.now());
-  const [how, setHow] = useState(howOpen);
+  const [how, setHow] = useState(false);
   // The address the code itself filled in, replaced when the code changes unless the person wrote their own.
   const prefilled = useRef("");
   const focusAddress = useRef(false);

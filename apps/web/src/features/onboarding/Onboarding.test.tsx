@@ -60,7 +60,10 @@ const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.pa
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
   const store = room();
   expect(title()).toHaveTextContent("Connect to your machine");
-  // Each command a Snippet: monospace, with its copy button.
+  // How to get a code starts folded, as everywhere; unfolded, each command a Snippet: monospace, with its copy button.
+  const how = screen.getByRole("button", { name: "How do I get a code?" });
+  expect(how).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(how);
   expect([...document.querySelectorAll("#wizard .ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
   expect(screen.getByRole("button", { name: "Copy setup command" })).toHaveClass("ui-copy-button");
   // The room, its settings and its call bar stay out of reach behind the setup.
@@ -68,8 +71,7 @@ test("a browser starts by pairing another machine, shown how to prepare it, and 
   // The code is entered right here, not in another dialog on top.
   expect(document.getElementById("wizard-pairing-code")).toBeInTheDocument();
   expect(actions.openPairing).not.toHaveBeenCalled();
-  // How to get a code starts unfolded here, and Connect is the step's own action, in its footer.
-  expect(screen.getByRole("button", { name: "How do I get a code?" })).toHaveAttribute("aria-expanded", "true");
+  // Connect is the step's own action, in its footer.
   expect(document.querySelector("#wizard .wizard-actions button[type=submit][form=wizard-pairing-form]")).toHaveTextContent("Connect");
   // Paired is not answering: the setup waits for the machine's link to say so.
   act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "checking", via: "" } } }));

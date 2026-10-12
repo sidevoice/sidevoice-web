@@ -320,7 +320,7 @@ export function Wizard() {
       {step === "W0" && <BasicsStep t={t} />}
       {step === "W2" && <section className="wizard-prepare">{prepareBlock(true)}</section>}
       {step === "W2r" && <section>
-        <PairMachine idPrefix="wizard-pairing" rows={2} howOpen submitIn={onboarding.remoteReady ? null : footerSlot} />
+        <PairMachine idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
