@@ -1688,10 +1688,11 @@ async function testProviderKey(provider){
  const catalogs=await models.catalogs();
  roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
-// A key that the provider refuses is not kept: tried first where the host can (`testCredential`), else kept, checked,
-// and taken back when the provider refuses it and there was none before. A refusal throws its code, and the provider's
-// words; any other trouble (no credit, too many requests, unreachable) keeps the key and the card says it.
-const KEY_REFUSALS=new Set(['credential-rejected','listing-not-permitted']);
+// Only a key the provider takes is kept: tried first where the host can (`testCredential`), else kept, checked, and
+// taken back when it was not taken and there was none before. A key the provider refuses, or one it could not be asked
+// about (unreachable), throws its code and the provider's words; one taken that hits a limit (no credit, too many
+// requests) is kept, and the provider's card says it.
+const KEY_REFUSALS=new Set(['credential-rejected','listing-not-permitted','provider-unreachable','listing-failed']);
 async function connectProviderKey(provider,key){
  const refused=reason=>Object.assign(Error(reason.code),{code:reason.code,detail:reason.detail??''});
  const models=await modelCatalogs();

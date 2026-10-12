@@ -2,7 +2,6 @@ import { TooltipProvider } from "../../components/ui/Tooltip";
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SlotPane, TurnChoices } from "./VoiceSettings";
-import { VARIANTS_KEY } from "../../lib/variants";
 import { StorageBlockedBanner } from "./StorageBlockedBanner";
 import { createRoomStore, installRoomBridge, RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
@@ -257,17 +256,15 @@ test("the smart end of turn has its model chosen like the others — just the mo
   expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");
 });
 
-test.each(["dialog", "row", "popover"] as const)("%s: a provider chosen without its key says so in a row with Connect, which opens the key's entry as Providers does; kept, the row goes, the slot says so and its source has the focus", async (variant) => {
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "provider-connect": variant }));
-  try {
+test("a provider chosen without its key says so in a row with Connect, which opens the key's dialog as Providers does; kept, the row goes, the slot says so and its source has the focus", async () => {
+  {
     const { actions, store } = renderPane({ voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "openai", model: "", language: null } } });
     // Kept where Providers keeps it: the host has the key, and OpenAI lists with it.
     actions.saveProviderKey.mockImplementation(async (provider: string) => store.patch({ providerKeys: { openai: true, elevenlabs: true },
       voiceCatalogue: { state: "ready", error: "", catalogs: catalogs.map((catalog) => catalog.id === provider ? { ...catalog, status: { stale: false } } : catalog) } }));
     const row = screen.getByText("OpenAI needs a key").closest(".ui-row") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Connect OpenAI" }));
-    const field = variant === "row" ? within(row).getByLabelText("OpenAI API key") : within(screen.getByRole("dialog", { name: "Connect OpenAI" })).getByLabelText("API key");
-    if (variant !== "row") expect(screen.getByRole("dialog")).toHaveClass(variant === "popover" ? "ui-popover" : "ui-dialog");
+    const field = within(screen.getByRole("dialog", { name: "Connect OpenAI" })).getByLabelText("API key");
     expect(document.activeElement).toBe(field);
     fireEvent.change(field, { target: { value: "sk-test-1234" } });
     await act(async () => { fireEvent.keyDown(field, { key: "Enter" }); });
@@ -276,6 +273,6 @@ test.each(["dialog", "row", "popover"] as const)("%s: a provider chosen without 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText("OpenAI connected.")).toHaveAttribute("role", "status");
     expect(document.activeElement).toBe(document.getElementById("stt-source"));
-  } finally { localStorage.removeItem(VARIANTS_KEY); }
+  }
 });
 

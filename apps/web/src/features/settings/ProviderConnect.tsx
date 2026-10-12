@@ -1,37 +1,21 @@
-import { forwardRef, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactElement, type ReactNode } from "react";
+import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import { useMedia } from "../../state/call-layout";
-import { useVariant } from "../../lib/variants";
+import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Field } from "../../components/ui/Field";
 import { Input, type InputProps } from "../../components/ui/Input";
-import { Popover } from "../../components/ui/Popover";
 import { Row } from "../../components/ui/Card";
-import { CloseIcon, ExternalLinkIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
+import { ExternalLinkIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 
-/* How a provider's key is given, and taken back. The entry: paste the key, Test and save — the provider is asked with
- * it first, and the host keeps it only if the provider takes it (or could not be reached to say: then it is kept,
- * unchecked) — with where to get a key and where it is kept. Remove asks first. Providers' cards open them, and so does
- * a voice slot whose provider has no key yet (Settings' Transcription and Voice, the first-run setup), the same way;
- * which way is a design being compared (lib/variants): a small dialog, a row in place, a popover by the button, or in
- * place at the same size (the key's box where the button was, the button become Test and save). The
- * key goes to the engine's host — the system keychain in the app, this browser's storage on the web — and is never read
- * back: its last four are the page's own note of it. */
-
-export const PROVIDER_CONNECT = ["dialog", "row", "popover", "inline"] as const;
-export type ProviderConnect = (typeof PROVIDER_CONNECT)[number];
-
-/** The way being compared. A phone has no room for a popover, nor for a box beside the name: the popover gets the
- *  dialog, which is the whole screen there, and in place gets the row. */
-export function useProviderConnect(): ProviderConnect {
-  const variant = useVariant("provider-connect", PROVIDER_CONNECT);
-  const phone = useMedia("(max-width: 599px)");
-  return !phone ? variant : variant === "popover" ? "dialog" : variant === "inline" ? "row" : variant;
-}
+/* How a provider's key is given, and taken back: one small dialog everywhere (Settings › Providers, and a voice slot
+ * whose provider has no key yet, in Settings and the first-run setup). Paste the key, Connect: the provider is asked
+ * with it first, and only a key it takes is kept — one it refuses, or that could not be checked because it could not be
+ * reached, is said in the dialog, which stays open to fix it. Disconnecting forgets the key, after asking. The key goes
+ * to the engine's host — the system keychain in the app, this browser's storage on the web — and is never read back:
+ * its last four are the page's own note of it. */
 
 /** Where each provider gives its keys. */
 const KEY_PAGES: Record<string, string> = {
@@ -66,72 +50,17 @@ export function reasonState(code: string | undefined): KeyState {
   return "problem";
 }
 
-/** What went wrong with a key: the provider's refusal in words (and its own after them), else the failure. `typed`: a
- *  key just typed, which the provider would not take — said as what to check in it. */
-export function keyError(t: HostTranslate, error: unknown, name: string, typed = false) {
+/** What went wrong with a key, in words, and the provider's own words after them (`detail`, when it gave any).
+ *  `typed`: a key just typed — said as what to check in it, or that it could not be checked. */
+export function keyError(t: HostTranslate, error: unknown, name: string, typed = false): { words: string; detail: string } {
   const failure = error as { code?: string; detail?: string; message?: string } | null;
   const state = reasonState(failure?.code);
   const words = typed && state === "rejected" ? t("keys.entry.rejected", { provider: name })
+    : typed && state === "unreachable" ? t("keys.entry.unreachable", { provider: name })
     : state !== "connected" && state !== "problem" ? t(("keys.why." + state) as HostMessageKey, { provider: name, last4: "" })
     : failure?.code ? t("keys.failed", { code: failure.code }) : failure?.message || t("keys.failedPlain");
-  return failure?.detail ? `${words} ${failure.detail}` : words;
+  return { words, detail: failure?.detail ?? "" };
 }
-
-/** How Test and save ended: the provider took the key, or could not be reached to check it (the key is kept). */
-export type KeyOutcome = "connected" | "unverified";
-
-/** The entry while it is open: the key typed, shown or not, and what testing it said. A refusal leaves the key there,
- *  selected, with the field marked and focused, to paste it again over it. */
-function useKeyEntry(provider: string, name: string, t: HostTranslate, onDone: (outcome: KeyOutcome) => void) {
-  const store = useContext(RoomStoreContext);
-  const [value, setValue] = useState("");
-  const [shown, setShown] = useState(false);
-  const [error, setError] = useState("");
-  const [testing, setTesting] = useState(false);
-  const field = useRef<HTMLInputElement>(null);
-  async function submit() {
-    const key = value.trim();
-    if (!key || testing) return;
-    setTesting(true); setError("");
-    try {
-      const actions = window.sidevoiceActions;
-      await (actions?.connectProviderKey ?? actions?.saveProviderKey)?.(provider, key);
-    } catch (failure) {
-      setTesting(false);
-      setError(keyError(t, failure, name, true));
-      field.current?.focus();
-      field.current?.select();
-      return;
-    }
-    writeHint(provider, key);
-    setTesting(false);
-    // Kept: the catalogues were read again with it, and say whether the provider could be asked.
-    const code = store?.getState().facts.voiceCatalogue.catalogs.find((catalog) => catalog.id === provider)?.status.reason?.code;
-    onDone(reasonState(code) === "unreachable" ? "unverified" : "connected");
-  }
-  // No form of its own (it can sit in Settings' form): Enter tests the key, and never submits what is around it.
-  const enter = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    void submit();
-  };
-  return { value, setValue, shown, setShown, error, testing, field, submit, enter };
-}
-type Entry = ReturnType<typeof useKeyEntry>;
-
-export type EntryProps = {
-  provider: string;
-  name: string;
-  t: HostTranslate;
-  /** The kept key's last four ("····" when they aren't known) when this replaces it; null when connecting. */
-  replacing: string | null;
-  onDone: (outcome: KeyOutcome) => void;
-  /** Cancelled (Cancel, ×, Escape, a click outside); never while the provider is being asked. */
-  onCancel: () => void;
-};
-
-const entryTitle = (t: HostTranslate, name: string, replacing: string | null) =>
-  replacing ? t("keys.replaceTitle", { provider: name }) : t("keys.connectNamed", { provider: name });
 
 /** Where to get a key, and where it is kept: one muted line. */
 function KeyHelp({ provider, name, t }: { provider: string; name: string; t: HostTranslate }) {
@@ -147,228 +76,144 @@ function KeyHelp({ provider, name, t }: { provider: string; name: string; t: Hos
 /** The key's box and Show beside it. Field gives the box its id and what describes it; they go to the input. */
 const KeyInput = forwardRef<HTMLInputElement, InputProps & { shown: boolean; onReveal: () => void; t: HostTranslate }>(function KeyInput({ shown, onReveal, t, ...input }, ref) {
   return <div className="provider-key-input">
-    <Input ref={ref} {...input} type={shown ? "text" : "password"} autoComplete="off" spellCheck={false} />
-    <Button variant="ghost" tone="neutral" size="sm" onClick={onReveal}>{shown ? t("keys.hide") : t("keys.show")}</Button>
+    <Input ref={ref} {...input} type={shown ? "text" : "password"} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+    <Button variant="ghost" tone="neutral" size="sm" aria-pressed={shown} onClick={onReveal}>{shown ? t("keys.hide") : t("keys.show")}</Button>
   </div>;
 });
 
-/** The entry's field, as the dialog and the popover show it: labelled, its error under it, then the help line. */
-function KeyField({ entry, provider, name, t }: { entry: Entry; provider: string; name: string; t: HostTranslate }) {
-  return <Field label={t("keys.apiKey")} error={entry.error || undefined} hint={<KeyHelp provider={provider} name={name} t={t} />}>
-    <KeyInput ref={entry.field} shown={entry.shown} onReveal={() => entry.setShown(!entry.shown)} t={t} value={entry.value} readOnly={entry.testing}
-      placeholder={t("keys.placeholder.new")} onChange={(event) => entry.setValue(event.target.value)} onKeyDown={entry.enter} />
-  </Field>;
-}
+export type KeyDialogProps = {
+  provider: string;
+  name: string;
+  /** The kept key's last four ("····" when they aren't known) when this replaces it; null when connecting. */
+  replacing: string | null;
+  /** Kept: the provider took it. */
+  onDone: () => void;
+  /** Cancelled (Cancel, ×, Escape); never while the provider is being asked. */
+  onCancel: () => void;
+};
 
-/** A: a small dialog. It is drawn on the page's top layer, so it opens above Settings (a dialog itself) and above the
- *  setup, and Escape closes only it. Its field takes the focus; while the provider is asked it can't be closed — the
- *  question can't be called off. */
-function KeyDialog({ provider, name, t, replacing, onDone, onCancel }: EntryProps) {
-  const entry = useKeyEntry(provider, name, t, onDone);
+/** The key's dialog, drawn on the page's top layer — above Settings (a dialog itself) and the setup; Escape closes
+ *  only it. Its field takes the focus; pasting fills it and Enter connects. While the provider is asked nothing closes
+ *  it — the question can't be called off — and it says what it is doing. A refusal leaves the key there, selected,
+ *  with the field marked and focused, to paste another over it; editing clears what was said. */
+export function KeyDialog({ provider, name, replacing, onDone, onCancel }: KeyDialogProps) {
+  const t = hostTranslator();
+  const [value, setValue] = useState("");
+  const [shown, setShown] = useState(false);
+  const [error, setError] = useState<{ words: string; detail: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
   const titleId = useId();
+  async function submit() {
+    const key = value.trim();
+    if (!key || testing) return;
+    setTesting(true); setError(null);
+    try {
+      const actions = window.sidevoiceActions;
+      await (actions?.connectProviderKey ?? actions?.saveProviderKey)?.(provider, key);
+    } catch (failure) {
+      setTesting(false);
+      setError(keyError(t, failure, name, true));
+      // After the render that gives the field back (it is read-only while testing).
+      window.setTimeout(() => { field.current?.focus(); field.current?.select(); }, 0);
+      return;
+    }
+    writeHint(provider, key);
+    setTesting(false);
+    onDone();
+  }
+  // Settings around it is a form: Enter connects, and never submits what is around it.
+  const enter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    void submit();
+  };
   return createPortal(
-    <Dialog open size="sm" className="provider-key-dialog" titleId={titleId} title={entryTitle(t, name, replacing)} initialFocus={entry.field}
+    <Dialog open size="sm" className="provider-key-dialog" titleId={titleId} initialFocus={field}
+      title={replacing ? t("keys.replaceTitle", { provider: name }) : t("keys.connectNamed", { provider: name })}
       leading={<span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={18} /></span>}
-      onClose={entry.testing ? undefined : onCancel}
+      onClose={testing ? undefined : onCancel}
       footer={<>
-        <p className="ui-dialog-reason" role="status">{entry.testing ? t("keys.testing") : ""}</p>
-        <Button variant="ghost" tone="neutral" disabled={entry.testing} onClick={onCancel}>{t("hosts.cancel")}</Button>
-        <Button variant="primary" disabled={!entry.value.trim()} loading={entry.testing} onClick={() => void entry.submit()}>{t("keys.testAndSave")}</Button>
+        <p className="ui-dialog-reason" role="status">{testing ? t("keys.testingWith", { provider: name }) : ""}</p>
+        <Button variant="ghost" tone="neutral" disabled={testing} onClick={onCancel}>{t("hosts.cancel")}</Button>
+        <Button variant="primary" disabled={!value.trim()} loading={testing} onClick={() => void submit()}>{t(replacing ? "keys.replace" : "keys.connect")}</Button>
       </>}>
       {replacing && <p className="provider-key-replacing">{t("keys.replacing", { last4: replacing })}</p>}
-      <KeyField entry={entry} provider={provider} name={name} t={t} />
+      <Field label={t("keys.apiKey")} error={error ? <>{error.words}{error.detail && <span className="provider-key-detail"> {error.detail}</span>}</> : undefined}
+        hint={<KeyHelp provider={provider} name={name} t={t} />}>
+        <KeyInput ref={field} shown={shown} onReveal={() => setShown(!shown)} t={t} value={value} readOnly={testing} placeholder={t("keys.placeholder.new")}
+          onChange={(event) => { setValue(event.target.value); setError(null); }} onKeyDown={enter} />
+      </Field>
     </Dialog>, document.body);
 }
 
-/** C: a popover by what opened it (`anchor`). While the provider is asked, nothing closes it — not Escape, not a click
- *  outside. */
-function KeyPopover({ anchor, open, ...props }: EntryProps & { anchor: ReactElement; open: boolean }) {
-  const testing = useRef(false);
-  return <Popover anchor={anchor} open={open} label={entryTitle(props.t, props.name, props.replacing)} side="bottom" align="end" className="provider-key-popover"
-    onOpenChange={(next) => { if (!next && !testing.current) props.onCancel(); }}>
-    <KeyPopoverBody {...props} testing={testing} />
-  </Popover>;
-}
-
-function KeyPopoverBody({ provider, name, t, replacing, onDone, testing }: EntryProps & { testing: MutableRefObject<boolean> }) {
-  const entry = useKeyEntry(provider, name, t, onDone);
-  useEffect(() => { testing.current = entry.testing; }, [entry.testing, testing]);
-  return <>
-    <p className="ui-popover-title">{entryTitle(t, name, replacing)}</p>
-    {replacing && <p className="provider-key-replacing">{t("keys.replacing", { last4: replacing })}</p>}
-    <KeyField entry={entry} provider={provider} name={name} t={t} />
-    <div className="provider-key-actions">
-      <p className="provider-key-status" role="status">{entry.testing ? t("keys.testing") : ""}</p>
-      <Button variant="primary" size="sm" disabled={!entry.value.trim()} loading={entry.testing} onClick={() => void entry.submit()}>{t("keys.testAndSave")}</Button>
-    </div>
-  </>;
-}
-
-/** B: a row in place of what opened it — the key's box, Test and save, and × — with where to get a key and where it is
- *  kept under it. Escape cancels (and stays here: Settings around it stays open), except while the provider is asked. */
-export function KeyRow({ provider, name, t, replacing, onDone, onCancel }: EntryProps) {
-  const entry = useKeyEntry(provider, name, t, onDone);
-  const help = useId();
-  const error = useId();
-  useEffect(() => { entry.field.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  return <div className="provider-key-row" role="group" aria-label={entryTitle(t, name, replacing)}
-    onKeyDown={(event) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (!entry.testing) onCancel();
-    }}>
-    <div className="provider-key-row-controls">
-      <Input ref={entry.field} type="password" autoComplete="off" spellCheck={false} aria-label={t("keys.label", { provider: name })} invalid={!!entry.error}
-        aria-describedby={entry.error ? `${error} ${help}` : help} value={entry.value} readOnly={entry.testing} placeholder={t("keys.placeholder.new")}
-        onChange={(event) => entry.setValue(event.target.value)} onKeyDown={entry.enter} />
-      <Button variant="primary" disabled={!entry.value.trim()} loading={entry.testing} onClick={() => void entry.submit()}>{t("keys.testAndSave")}</Button>
-      <Button variant="ghost" tone="neutral" size="icon" aria-label={t("hosts.cancel")} title={t("hosts.cancel")} disabled={entry.testing} onClick={onCancel}><CloseIcon /></Button>
-    </div>
-    {entry.error && <p className="provider-key-error" id={error}><WarningIcon size={16} />{entry.error}</p>}
-    <p className="provider-key-line" id={help}>
-      <span className="provider-key-status" role="status">{entry.testing ? t("keys.testing") : ""}</span>
-      {!entry.testing && <>{replacing && <span>{t("keys.replacing", { last4: replacing })} </span>}<KeyHelp provider={provider} name={name} t={t} /></>}
-    </p>
-  </div>;
-}
-
-/** D: in place, at the same size — the key's box, Test and save (where Connect was) and × to call it off, on the line
- *  that held the button; the line under the name (where the provider's use was) says where to get a key, then what
- *  testing said: testing, or why it was refused (in full on hover and to assistive tech, cut to the line otherwise).
- *  The holder lays the parts out (`children`): `status` is that line only while it says something (testing, refused),
- *  for a holder with nowhere else to say it. Escape cancels, except while the provider is asked. */
-export function KeyInline({ provider, name, t, replacing, onDone, onCancel, children }: EntryProps & {
-  children: (parts: { controls: ReactNode; line: ReactNode; status: ReactNode | null }) => ReactNode;
+/** Disconnecting, asked first in a small dialog with Cancel focused: what stops working (where the provider is in use),
+ *  that the key is forgotten here, and that it still works at the provider. The host forgets it, and the page its last
+ *  four. A failure says so and stays. */
+export function DisconnectDialog({ provider, name, last4, inUse, onDone, onCancel }: {
+  provider: string; name: string; last4: string | null; inUse: string[]; onDone: () => void; onCancel: () => void;
 }) {
-  const entry = useKeyEntry(provider, name, t, onDone);
-  const lineId = useId();
-  useEffect(() => { entry.field.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const said = entry.testing ? t("keys.testing") : entry.error;
-  const status = said ? <span className="provider-key-inline-status" data-tone={entry.error && !entry.testing ? "danger" : undefined} title={said}>
-    {entry.error && !entry.testing && <WarningIcon size={14} />}<span>{said}</span>
-  </span> : null;
-  const line = <span id={lineId} className="provider-key-inline-line" aria-live="polite">
-    {status ?? (replacing ? <span>{t("keys.replacing", { last4: replacing })}</span> : <KeyHelp provider={provider} name={name} t={t} />)}
-  </span>;
-  const controls = <div className="provider-key-inline" role="group" aria-label={entryTitle(t, name, replacing)}
-    onKeyDown={(event) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (!entry.testing) onCancel();
-    }}>
-    <Input ref={entry.field} size="sm" type="password" autoComplete="off" spellCheck={false} aria-label={t("keys.label", { provider: name })} invalid={!!entry.error}
-      aria-describedby={lineId} value={entry.value} readOnly={entry.testing} placeholder={t("keys.placeholder.new")}
-      onChange={(event) => entry.setValue(event.target.value)} onKeyDown={entry.enter} />
-    <Button variant="primary" size="sm" disabled={!entry.value.trim()} loading={entry.testing} onClick={() => void entry.submit()}>{t("keys.testAndSave")}</Button>
-    <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("hosts.cancel")} title={t("hosts.cancel")} disabled={entry.testing} onClick={onCancel}><CloseIcon /></Button>
-  </div>;
-  return <>{children({ controls, line, status })}</>;
-}
-
-/** The entry for what `opener` opens: the dialog over the page, or the popover beside `opener`. The row is drawn by
- *  whoever holds the opener, in its place (KeyRow). */
-export function KeyEntry({ variant, opener, open, ...props }: EntryProps & { variant: ProviderConnect; opener: ReactElement; open: boolean }) {
-  if (variant === "popover") return <KeyPopover anchor={opener} open={open} {...props} />;
-  return <>{opener}{open && variant === "dialog" && <KeyDialog {...props} />}</>;
-}
-
-type RemoveProps = { provider: string; name: string; t: HostTranslate; inUse: string[]; onDone: () => void; onCancel: () => void };
-
-/** Removing the key: the host forgets it, and the page its last four. */
-function useRemoveKey(provider: string, name: string, t: HostTranslate, onDone: () => void) {
-  const [removing, setRemoving] = useState(false);
+  const t = hostTranslator();
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  async function remove() {
-    if (removing) return;
-    setRemoving(true); setError("");
-    try { await window.sidevoiceActions?.saveProviderKey(provider, null); }
-    catch (failure) { setRemoving(false); setError(keyError(t, failure, name)); return; }
-    writeHint(provider, null);
-    setRemoving(false);
-    onDone();
-  }
-  return { removing, error, remove };
-}
-
-const removeNote = (t: HostTranslate, name: string, inUse: string[]) => inUse.length ? t("keys.removeInUse", { provider: name, uses: inUse.join(", ") }) : null;
-
-/** Remove's question in a small dialog (the dialog and popover ways), Cancel focused. */
-export function RemoveDialog({ provider, name, t, inUse, onDone, onCancel }: RemoveProps) {
-  const { removing, error, remove } = useRemoveKey(provider, name, t, onDone);
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
-  const note = removeNote(t, name, inUse);
+  async function disconnect() {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await window.sidevoiceActions?.saveProviderKey(provider, null); }
+    catch (failure) {
+      setBusy(false);
+      const { detail } = keyError(t, failure, name);
+      setError(`${t("keys.disconnectFailed", { provider: name })}${detail ? " " + detail : ""}`);
+      return;
+    }
+    writeHint(provider, null);
+    setBusy(false);
+    onDone();
+  }
+  const uses = listed(inUse);
   return createPortal(
-    <Dialog open size="sm" className="provider-remove-dialog" titleId={titleId} title={t("keys.removeConfirm", { provider: name })} initialFocus={cancel}
-      onClose={removing ? undefined : onCancel}
+    <Dialog open size="sm" className="provider-disconnect-dialog" titleId={titleId} title={t("keys.disconnectTitle", { provider: name })} initialFocus={cancel}
+      onClose={busy ? undefined : onCancel}
       footer={<>
-        <p className="ui-dialog-reason" role="status">{removing ? t("keys.removing") : ""}</p>
-        <Button ref={cancel} variant="ghost" tone="neutral" disabled={removing} onClick={onCancel}>{t("hosts.cancel")}</Button>
-        <Button variant="danger" loading={removing} onClick={() => void remove()}>{t("keys.remove")}</Button>
+        <p className="ui-dialog-reason" role="status">{busy ? t("keys.disconnecting") : ""}</p>
+        <Button ref={cancel} variant="ghost" tone="neutral" disabled={busy} onClick={onCancel}>{t("hosts.cancel")}</Button>
+        <Button variant="danger" loading={busy} onClick={() => void disconnect()}>{t("keys.disconnect")}</Button>
       </>}>
-      {note && <p>{note}</p>}
+      {inUse.length > 0 && <p className="provider-disconnect-in-use"><WarningIcon size={16} />
+        {t(inUse.length > 1 ? "keys.disconnectInUse.many" : "keys.disconnectInUse.one", { uses, provider: name })}</p>}
+      <p>{last4 ? t("keys.disconnectForget", { last4, provider: name }) : t("keys.disconnectForgetPlain", { provider: name })}</p>
+      <p className="muted">{t("keys.disconnectRevoke", { provider: name })}</p>
       {error && <p className="provider-key-error" role="alert"><WarningIcon size={16} />{error}</p>}
     </Dialog>, document.body);
 }
 
-/** Remove's question in place of the card's line (the row way), Cancel focused; Escape cancels. */
-export function RemoveInline({ provider, name, t, inUse, onDone, onCancel }: RemoveProps) {
-  const { removing, error, remove } = useRemoveKey(provider, name, t, onDone);
-  const note = removeNote(t, name, inUse);
-  return <div className="provider-remove-inline" role="group" aria-label={t("keys.removeConfirm", { provider: name })}
-    onKeyDown={(event) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (!removing) onCancel();
-    }}>
-    <p className="provider-remove-question">{t("keys.removeConfirm", { provider: name })}</p>
-    {note && <p className="provider-key-line">{note}</p>}
-    {error && <p className="provider-key-error" role="alert"><WarningIcon size={16} />{error}</p>}
-    <div className="provider-key-actions">
-      <p className="provider-key-status" role="status">{removing ? t("keys.removing") : ""}</p>
-      <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={removing} onClick={onCancel}>{t("hosts.cancel")}</Button>
-      <Button variant="danger" size="sm" loading={removing} onClick={() => void remove()}>{t("keys.remove")}</Button>
-    </div>
-  </div>;
+/** Section names as one phrase ("Transcription and Voice"), in the page's language. */
+export function listed(names: string[]) {
+  const locale = document.documentElement.lang || undefined;
+  try { return new Intl.ListFormat(locale, { type: "conjunction" }).format(names); } catch { return names.join(", "); }
 }
 
-/** A voice slot's provider while it has no key (`needed`): "OpenAI needs a key" and Connect, which opens the entry as
- *  Providers does (and keeps the key where Providers keeps it). Its entry stays open while the provider is asked, even
- *  if the key is kept for a moment meanwhile (a host that keeps it to test it). Once kept, the row goes: `onDone` says
- *  how it went, for the slot to say so and take the focus. */
-export function ProviderKeyNeeded({ provider, name, needed, onDone }: { provider: string; name: string; needed: boolean; onDone: (outcome: KeyOutcome) => void }) {
+/** A voice slot's provider while it has no key (`needed`): "OpenAI needs a key" and Connect, which opens the key's
+ *  dialog (keeping the key where Providers keeps it). Its dialog stays open while the provider is asked, even if the
+ *  slot stops needing it meanwhile. Once kept, the row goes: `onDone` is for the slot to say so and take the focus. */
+export function ProviderKeyNeeded({ provider, name, needed, onDone }: { provider: string; name: string; needed: boolean; onDone: () => void }) {
   const t = hostTranslator();
-  const variant = useProviderConnect();
   const [open, setOpen] = useState(false);
   const connect = useRef<HTMLButtonElement>(null);
   const focusBack = useFocusBack(() => connect.current);
-  const label = t("keys.needsKey", { provider: name });
-  const cancel = () => { setOpen(false); focusBack(); };
-  const done = (outcome: KeyOutcome) => { setOpen(false); onDone(outcome); };
-  const entry = { provider, name, t, replacing: null, onDone: done, onCancel: cancel };
   if (!needed && !open) return null;
-  if (variant === "row" && open) return <Row label={label} block className="provider-key-needed"><KeyRow {...entry} /></Row>;
-  // In place: the row keeps its height; what testing said takes the label's place while it says something.
-  if (variant === "inline" && open) return <KeyInline {...entry}>
-    {({ controls, status }) => <Row label={status ?? label} className="provider-key-needed">{controls}</Row>}
-  </KeyInline>;
-  return <Row label={label} className="provider-key-needed">
-    <KeyEntry variant={variant} open={open} {...entry} opener={<Button ref={connect} variant="primary" size="sm" aria-label={t("keys.connectNamed", { provider: name })}
-      {...openerState(variant, open)} onClick={() => setOpen(true)}>{t("keys.connect")}</Button>} />
+  return <Row label={t("keys.needsKey", { provider: name })} className="provider-key-needed">
+    <Button ref={connect} variant="primary" size="sm" aria-label={t("keys.connectNamed", { provider: name })} aria-haspopup="dialog"
+      onClick={() => setOpen(true)}>{t("keys.connect")}</Button>
+    {open && <KeyDialog provider={provider} name={name} replacing={null} onDone={() => { setOpen(false); onDone(); }} onCancel={() => { setOpen(false); focusBack(); }} />}
   </Row>;
 }
 
-/** What an opener tells assistive tech about what it opens: a dialog (the popover is one too), and whether it is open. */
-export function openerState(variant: ProviderConnect, open: boolean) {
-  return variant === "row" || variant === "inline" ? {} : { "aria-haspopup": "dialog" as const, "aria-expanded": variant === "popover" ? open : undefined };
-}
-
 /** Focus back on what opened something once it has closed — the opener as it is drawn then (`target`) — unless focus
- *  went somewhere else meanwhile (a click outside a popover): only when what had it is gone. Looked at on the next
- *  tick: a popover leaves the page a render after it closes. */
+ *  went somewhere else meanwhile: only when what had it is gone. Looked at on the next tick, after the render that
+ *  closed it. */
 export function useFocusBack(target: () => HTMLElement | null) {
   const [asked, setAsked] = useState(0);
   const to = useRef(target);

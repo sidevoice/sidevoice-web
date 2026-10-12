@@ -42,23 +42,7 @@
   .settings-column { padding: var(--sv-space-5) var(--sv-space-4) var(--sv-space-8); }
 }
 
-/* Providers as connected accounts: a row each — mark, name and state, what it is for and the key's last four, its
- * actions — and the key's form or the removal's question opening under it. */
-.provider-row { display: grid; gap: var(--sv-space-3); padding: var(--sv-space-4) var(--sv-space-5); }
-.provider-row + .provider-row { border-top: 1px solid var(--sv-border); }
-.provider-row-main { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
-.provider-row-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
-.provider-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
-.provider-row-title .ui-badge svg { width: 12px; height: 12px; }
-.provider-row-detail { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.provider-row-problem { display: flex; align-items: center; gap: var(--sv-space-1-5); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
-.provider-row-problem svg { flex: none; color: var(--sv-warning); }
-.provider-row[data-state="rejected"] .provider-row-problem svg, .provider-row[data-state="unreadable"] .provider-row-problem svg { color: var(--sv-danger); }
-.provider-row-actions { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; }
-.provider-row-note { margin: 0; font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
-.provider-row-note:empty { display: none; }
-.provider-row .provider-mark { width: 36px; height: 36px; border-radius: var(--sv-radius-md); }
-.provider-row > .provider-key, .provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.provider-remove { margin: 0 0 0 48px; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
 .provider-key-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; font-size: var(--sv-font-sm); font-weight: 600; color: var(--sv-accent-text); text-decoration: none; }
 .provider-key-link:hover { text-decoration: underline; }
 .provider-key-input { display: flex; align-items: center; gap: var(--sv-space-2); }
@@ -66,9 +50,7 @@
 .provider-key-cost, .provider-key-replacing { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-remove p { margin: 0 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
 @media (max-width: 767px) {
-  .provider-row-main { flex-wrap: wrap; }
-  .provider-row-actions { width: 100%; padding-inline-start: 48px; }
-  .provider-row > .provider-key, .provider-remove { margin-inline-start: 0; }
+  .provider-remove { margin-inline-start: 0; }
 }
 /* A section whose chosen model is not ready says so in the nav, in words. */
 .ui-nav-badge { margin-inline-start: auto; }
@@ -83,70 +65,60 @@
 .downloaded-model .provider-remove { margin: 0; }
 .downloaded-model-error { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-danger); }
 
-/* Providers as cards: the mark, the name, one line on what it is for, and one control — Connect; connected, the
- * state, the key's last four and its menu. A problem with the key is a line under them, with the one thing to do.
- * Where keys are kept, in one line above them. */
-.provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0 0 var(--sv-space-4); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+/* Settings › Providers, as a catalogue of connections: where keys are kept in one line, then "Your providers" — a row
+ * each: mark, name with how its key stands right after it, what it is for, and Disconnect at the end — and "Add a
+ * provider": a search at its head and the rest as cards in a grid, three across, each its own height, one across on a
+ * phone. Connect and Disconnect weigh the same. */
+.providers { display: grid; gap: var(--sv-space-4); }
+.provider-keys-where { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-keys-where svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
-.provider-cards { display: grid; gap: var(--sv-space-3); }
-.provider-card { display: grid; gap: var(--sv-space-3); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); }
-.provider-card-main { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
-.provider-card .provider-mark { width: 40px; height: 40px; border-radius: var(--sv-radius-md); }
-.provider-card-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
-.provider-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
-.provider-card-purpose { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.provider-card-control { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; }
-.provider-card-control .ui-badge svg { width: 12px; height: 12px; }
-.provider-card-masked { font-family: var(--sv-font-mono); font-size: var(--sv-font-sm); letter-spacing: .04em; color: var(--sv-text-muted); }
-.provider-card-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); padding-inline-start: 52px; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
-.provider-card-problem > svg { flex: none; color: var(--sv-warning); }
-.provider-card-problem p { flex: 1 1 16rem; margin: 0; }
-.provider-card[data-state="rejected"] .provider-card-problem > svg, .provider-card[data-state="unreadable"] .provider-card-problem > svg { color: var(--sv-danger); }
-.provider-card-detail { color: var(--sv-text-muted); }
-/* The row way: the entry, or Remove's question, in place of the line and the control, under the name. */
-.provider-card[data-open] .provider-card-main { align-items: flex-start; }
-.provider-card[data-open] .provider-card-copy { gap: var(--sv-space-2); }
-@media (max-width: 640px) {
-  .provider-card-problem { padding-inline-start: 0; }
-}
-
-/* The key's entry (ProviderConnect). Its box with Show beside it; under it, where to get a key and where it is kept, in
- * one muted line; what testing said, beside Test and save. */
+.providers-card { display: grid; gap: var(--sv-space-4); padding: var(--sv-space-5); }
+.providers-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-4); }
+.providers-card-head h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.providers-card-head p { margin: 2px 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.providers-card > .muted { margin: 0; font-size: var(--sv-font-sm); }
+.provider-row .provider-mark, .provider-card .provider-mark { width: 40px; height: 40px; border-radius: var(--sv-radius-md); }
+.provider-rows { display: grid; gap: var(--sv-space-2); }
+.provider-row { display: flex; align-items: flex-start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
+.provider-row:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.provider-row-copy { display: grid; gap: 2px; flex: 1; min-width: 0; min-height: 40px; align-content: center; }
+.provider-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); }
+.provider-row-title .ui-badge svg { width: 12px; height: 12px; }
+.provider-row-line, .provider-card-purpose { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.provider-row-problem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.provider-row-problem > svg { flex: none; color: var(--sv-warning); }
+.provider-row-problem p { flex: 1 1 14rem; margin: 0; }
+.provider-row[data-state="rejected"] .provider-row-problem > svg, .provider-row[data-state="unreadable"] .provider-row-problem > svg { color: var(--sv-danger); }
+.provider-key-detail { color: var(--sv-text-muted); }
+.provider-row-action { flex: none; margin-top: 4px; }
+.provider-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: var(--sv-space-3); }
+.provider-card { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
+.provider-card-head { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.provider-card-copy { display: grid; gap: 2px; min-width: 0; }
+.provider-search { position: relative; display: flex; align-items: center; flex: none; width: 14rem; }
+.provider-search .ui-input { width: 100%; padding-inline: 32px; }
+.provider-search .ui-input::-webkit-search-cancel-button { appearance: none; }
+.provider-search-icon { position: absolute; inset-inline-start: 10px; color: var(--sv-text-subtle); pointer-events: none; }
+.provider-search-clear { position: absolute; inset-inline-end: 2px; }
+/* The key's dialog: the box with Show beside it; under it, where to get a key and where it is kept; the provider's own
+ * words after a refusal, muted. */
 .provider-key-help { display: inline; }
 .provider-key-help .provider-key-link { display: inline-flex; vertical-align: bottom; }
-.provider-key-status { margin: 0 auto 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .provider-key-error { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-danger); }
 .provider-key-error svg { flex: none; margin-top: 2px; }
-.provider-key-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sv-space-1); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.provider-key-line .provider-key-status { margin: 0; }
-.provider-key-line .provider-key-status:empty { display: none; }
-.provider-key-dialog .ui-dialog-reason:empty, .provider-remove-dialog .ui-dialog-reason:empty { flex: 0 0 0; }
-/* The row: the box, Test and save and × on one line; on a phone, the box alone on its line and the button under it. */
-.provider-key-row, .provider-remove-inline { display: grid; gap: var(--sv-space-2); min-width: 0; }
-.provider-key-row-controls { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
-.provider-key-row-controls .ui-input { flex: 1; min-width: 0; }
-.provider-remove-question { margin: 0; font-size: var(--sv-font-sm); font-weight: 600; line-height: 1.25rem; color: var(--sv-text); }
-.provider-remove-inline .provider-key-actions { justify-content: flex-start; }
-.provider-remove-inline .provider-key-status:empty { display: none; }
-/* In place (D): the box, Test and save and × where Connect was, the card no taller; the line under the name says where to
- * get a key, then what testing said, cut to one line (in full on hover and to assistive tech). */
-.provider-card[data-in-place] .provider-card-copy { flex: 0 1 auto; max-width: 40%; }
-.provider-key-inline { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; justify-content: flex-end; }
-.provider-key-inline .ui-input { flex: 1; min-width: 8rem; }
-.provider-key-inline .ui-button { flex: none; }
-.provider-key-inline-line { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.provider-key-inline-line .provider-key-help { white-space: nowrap; }
-.provider-key-inline-status { display: inline-flex; align-items: center; gap: var(--sv-space-1); min-width: 0; max-width: 100%; }
-.provider-key-inline-status > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.provider-key-inline-status > svg { flex: none; }
-.provider-key-inline-status[data-tone="danger"] { color: var(--sv-danger); }
-.provider-key-needed .ui-row-label .provider-key-inline-status { font-weight: inherit; }
-.provider-key-needed:has(.provider-key-inline) { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
-.provider-key-needed .ui-row-label:has(.provider-key-inline-status) { display: block; overflow: hidden; }
+.provider-key-dialog .ui-dialog-reason:empty, .provider-disconnect-dialog .ui-dialog-reason:empty { flex: 0 0 0; }
+.provider-disconnect-dialog p { margin: 0 0 var(--sv-space-3); }
+.provider-disconnect-in-use { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); }
+.provider-disconnect-in-use svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
+@media (max-width: 760px) { .provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 599px) {
-  .provider-key-row-controls { flex-wrap: wrap; }
-  .provider-key-row-controls .ui-input { flex: 1 0 100%; }
-  .provider-key-row-controls .ui-button--primary { flex: 1; }
+  .providers-card { padding: var(--sv-space-4); }
+  .providers-card-head { flex-direction: column; align-items: stretch; }
+  .provider-search { width: 100%; }
+  .provider-row { flex-wrap: wrap; }
+  .provider-row-action { margin: 0 0 0 52px; }
+  .provider-grid { grid-template-columns: minmax(0, 1fr); }
+  .provider-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: stretch; }
 }
 
 /* "Saved", beside the title for a moment; the error line at the content's head. */

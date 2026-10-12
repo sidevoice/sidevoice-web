@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
-  Timer, ScrollText,
+  Timer, ScrollText, Link, Unlink, Search,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -67,6 +67,11 @@ export const MicrophoneOffIcon = mark(MicOff, 24);
 export const OpenAppIcon = mark(ExternalLink, 16);
 /** A link that opens somewhere else, in a new tab. */
 export const ExternalLinkIcon = mark(ExternalLink, 14);
+/** Connecting something (a provider's key), and taking it back. */
+export const LinkIcon = mark(Link, 16);
+export const UnlinkIcon = mark(Unlink, 16);
+/** Searching a list. */
+export const SearchIcon = mark(Search, 16);
 export const SpeakerIcon = mark(Volume2, 20);
 export const CallIcon = mark(Phone, 22);
 export const HangupIcon = mark(PhoneOff, 22);

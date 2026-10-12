@@ -1,28 +1,23 @@
-import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Alert } from "../../components/ui/Alert";
 import { Section } from "../../components/ui/Card";
-import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
-import { CheckIcon, MoreIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
+import { Input } from "../../components/ui/Input";
+import { CheckIcon, CloseIcon, LinkIcon, ProviderLogo, SearchIcon, UnlinkIcon, WarningIcon } from "../../components/ui/Icons";
 import { remoteProviders } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import { catalogueShown } from "./ModelSetup";
 import type { HostMessageKey } from "./messages/en";
-import { KeyEntry, KeyInline, KeyRow, keyError, openerState, readHint, reasonState, RemoveDialog, RemoveInline, useFocusBack, useProviderConnect, type KeyOutcome, type KeyState } from "./ProviderConnect";
+import { DisconnectDialog, KeyDialog, keyError, listed, readHint, reasonState, useFocusBack, type KeyState } from "./ProviderConnect";
 
-/* The remote providers, a card each, as apps show an account to connect: its mark, its name, one line on what it is
- * for, and one control. Not connected, Connect opens the key's entry (ProviderConnect: a dialog, a row in place, a
- * popover, or in place at the same size — the design being compared). Connected, the card says so, shows the key's
- * last four, and keeps Replace key and Remove in its menu; when the provider has a problem with the key, a line says it
- * in words, with the one thing to do about it. A key kept without the provider being reached to check it says so
- * until it is checked. */
-
-/** The card's state: where the key stands, or kept but never checked (the provider couldn't be reached on Test and
- *  save). */
-type State = KeyState | "unverified";
+/* The remote providers, as a catalogue of connections: "Your providers" lists those with a key — the mark, the name with
+ * how its key stands right after it, what it is for, and Disconnect — and "Add a provider" offers the rest as cards in a
+ * grid, each with Connect, searched by name. Connect opens the key's dialog; a provider connected moves up to its
+ * row, which takes the focus, and one disconnected moves back down, its Connect focused. When the provider has a
+ * problem with a kept key, its row says it in words, with the one thing to do about it. */
 
 /** Where a provider's key stands: what the host keeps, and what the provider said last about it. */
 function keyState(kept: boolean | null | undefined, catalog: CatalogView | undefined): KeyState {
@@ -31,14 +26,14 @@ function keyState(kept: boolean | null | undefined, catalog: CatalogView | undef
   return reasonState(catalog?.status.reason?.code);
 }
 
-const TONE: Record<State, BadgeTone> = {
+const TONE: Record<KeyState, BadgeTone> = {
   absent: "neutral", connected: "positive", rejected: "danger", permission: "warning", quota: "warning",
-  limited: "warning", unreachable: "neutral", unreadable: "danger", unknown: "neutral", problem: "warning", unverified: "neutral",
+  limited: "warning", unreachable: "neutral", unreadable: "danger", unknown: "neutral", problem: "warning",
 };
 
 /** The one thing to do about a key's problem: another key where this one is refused or can't do the job; else asking
  *  the provider again. */
-const REPLACE_FOR: ReadonlySet<State> = new Set(["rejected", "permission", "unreadable"]);
+const REPLACE_FOR: ReadonlySet<KeyState> = new Set(["rejected", "permission", "unreadable"]);
 
 /** What a provider is used for, in a few words: its own where we have them, else from the models it lists. */
 function usedFor(provider: string, catalog: CatalogView | undefined, t: HostTranslate) {
@@ -47,125 +42,182 @@ function usedFor(provider: string, catalog: CatalogView | undefined, t: HostTran
   return caps.has("stt") && caps.has("tts") ? t("keys.use.both") : caps.has("stt") ? t("keys.use.stt") : caps.has("tts") ? t("keys.use.tts") : t("keys.purpose.other");
 }
 
-type Open = "connect" | "replace" | "remove" | null;
+/** Text as search compares it: trimmed, any case, any accents. */
+const folded = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
-/** One provider's card. What is open (the entry, Remove's question) is the card's; focus comes back to its control as
- *  it closes — Connect, or the menu once connected. */
-function ProviderCard({ provider, name, catalog, inUse }: { provider: string; name: string; catalog: CatalogView | undefined; inUse: string[] }) {
+type Provider = { id: string; name: string; catalog: CatalogView | undefined };
+type ProviderProps = { provider: string; name: string; catalog: CatalogView | undefined };
+/** What the pane says, and where the focus goes, once a provider has moved between the two lists. */
+type Moved = { provider: string; to: "row" | "connect"; said: string };
+
+/** A provider with a key: its row in "Your providers". What it opens (Replace key's dialog, Disconnect's question) is
+ *  its own; focus comes back to what opened it, or to the row. */
+function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: ProviderProps & { inUse: string[]; onDisconnected: () => void }) {
   const t = hostTranslator();
-  const variant = useProviderConnect();
   const store = useContext(RoomStoreContext);
   const kept = useRoomStore((state) => state.facts.providerKeys[provider]);
-  const [open, setOpen] = useState<Open>(null);
+  const [open, setOpen] = useState<"replace" | "disconnect" | null>(null);
   const [testing, setTesting] = useState(false);
-  const [unverified, setUnverified] = useState(false);
   const [note, setNote] = useState("");
-  const [hint, setHint] = useState(() => readHint(provider));
-  // A menu item's choice, opened once the menu has closed and given focus back to its trigger.
-  const chosen = useRef<Open>(null);
-  const connectButton = useRef<HTMLButtonElement>(null);
-  const more = useRef<HTMLButtonElement>(null);
-  // What opened it when it is neither (the problem line's Replace key): focus goes back there while it is still drawn.
+  const row = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const focusBack = useFocusBack(() => (opener.current?.isConnected ? opener.current : null) ?? more.current ?? connectButton.current);
-  const show = (next: Open, from: HTMLElement | null = null) => { opener.current = from; setOpen(next); };
-  const base = keyState(kept, catalog);
-  const connected = kept === true;
-  const state: State = unverified && base === "unreachable" ? "unverified" : base;
-  // Checked since (it answered, or said something else): no longer unchecked.
-  useEffect(() => { if (base !== "unreachable" && !testing) setUnverified(false); }, [base, testing]);
-  const last4 = connected ? hint?.last4 ?? null : null;
-  const problem = connected && state !== "connected" && state !== "unknown";
+  const focusBack = useFocusBack(() => (opener.current?.isConnected ? opener.current : null) ?? row.current);
+  const show = (next: "replace" | "disconnect", from: HTMLElement) => { opener.current = from; setOpen(next); };
   const close = () => { setOpen(null); focusBack(); };
-  const connectedNow = (outcome: KeyOutcome) => {
-    setHint(readHint(provider));
-    setUnverified(outcome === "unverified");
-    setNote(outcome === "unverified" ? t("keys.why.unverified", { provider: name }) : t("keys.connected", { provider: name }));
-    close();
-  };
-  const removed = () => { setHint(null); setUnverified(false); setNote(t("keys.removed")); close(); };
+  const state = keyState(kept, catalog);
+  // The page's note of the key, read as drawn: the dialog writes it once the key is kept, after this row appears.
+  const last4 = readHint(provider)?.last4 ?? null;
+  const problem = state !== "connected" && state !== "unknown";
   async function test() {
     setTesting(true); setNote("");
     try { await window.sidevoiceActions?.testProviderKey?.(provider); }
-    catch (failure) { setTesting(false); setNote(keyError(t, failure, name)); return; }
+    catch (failure) { setTesting(false); setNote(keyError(t, failure, name).words); return; }
     setTesting(false);
     const after = reasonState(store?.getState().facts.voiceCatalogue.catalogs.find((entry) => entry.id === provider)?.status.reason?.code);
-    if (after === "connected") { setNote(t("keys.tested")); focusBack(); }
-    else setNote(t(("keys.why." + (after === "unreachable" && unverified ? "unverified" : after)) as HostMessageKey, { provider: name, last4: last4 ?? "" }));
+    if (after === "connected") { setNote(t("keys.tested")); row.current?.focus(); }
+    else setNote(t(("keys.why." + after) as HostMessageKey, { provider: name, last4: last4 ?? "" }));
   }
-  const entering = open === "connect" || open === "replace";
-  const inline = variant === "row" && open !== null;
-  // In place (D): the entry where the control was, what it says where the use was; the card keeps its size.
-  const inPlace = variant === "inline" && entering;
-  const entry = { provider, name, t, replacing: open === "replace" ? last4 ?? "····" : null, onDone: connectedNow, onCancel: close };
-  const remove = { provider, name, t, inUse, onDone: removed, onCancel: close };
-  const control = connected
-    ? <span className="provider-card-control">
-        {testing ? <Badge tone="neutral">{t("keys.state.checking")}</Badge>
-          : state === "connected" ? <Badge tone="positive"><CheckIcon size={12} />{t("keys.state.connected")}</Badge>
-          : <Badge tone={TONE[state]} dot>{t(("keys.state." + state) as HostMessageKey)}</Badge>}
-        {last4 && <span className="provider-card-masked"><span aria-hidden="true">••••{last4}</span><span className="sr-only">{t("keys.endsIn", { last4 })}</span></span>}
-        <DropdownMenu label={t("keys.more", { provider: name })}
-          trigger={<Button ref={more} variant="ghost" tone="neutral" size="icon-sm" aria-label={t("keys.more", { provider: name })}><MoreIcon /></Button>}
-          onCloseAutoFocus={() => { const next = chosen.current; chosen.current = null; if (next) show(next); }}>
-          <DropdownMenuItem onSelect={() => { chosen.current = "replace"; }}>{t("keys.replace")}</DropdownMenuItem>
-          <DropdownMenuItem danger onSelect={() => { chosen.current = "remove"; }}>{t("keys.remove")}</DropdownMenuItem>
-        </DropdownMenu>
-      </span>
-    : <Button ref={connectButton} size="sm" variant="primary" aria-label={t("keys.connectNamed", { provider: name })} {...openerState(variant, entering)}
-        onClick={() => show("connect")}>{t("keys.connect")}</Button>;
-  const main = (line: ReactNode, end: ReactNode) => <div className="provider-card-main">
-    <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
-    <div className="provider-card-copy">
-      <span className="provider-card-title"><strong>{name}</strong>{inUse.length > 0 && connected && <Badge tone="accent">{t("keys.inUse")}</Badge>}</span>
-      {line}
-    </div>
-    {end}
-  </div>;
+  const pill = testing ? <Badge tone="neutral">{t("keys.state.checking")}</Badge>
+    : state === "connected" ? <Badge tone="positive"><CheckIcon size={12} />{t("keys.state.connected")}</Badge>
+    : <Badge tone={TONE[state]} dot>{t(("keys.state." + state) as HostMessageKey)}</Badge>;
   return (
-    <div className="provider-card" role="group" aria-label={name} data-provider={provider} data-state={state} data-open={inline ? open : undefined} data-in-place={inPlace || undefined}>
-      {inPlace
-        ? <KeyInline {...entry}>{({ controls, line }) => main(<span className="provider-card-purpose">{line}</span>, controls)}</KeyInline>
-        : main(inline ? (open === "remove" ? <RemoveInline {...remove} /> : <KeyRow {...entry} />) : <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>,
-          !inline && <KeyEntry variant={variant} opener={control} open={entering} {...entry} />)}
-      {problem && !inline && <div className="provider-card-problem">
-        <WarningIcon size={14} />
-        <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
-          {state !== "unverified" && catalog?.status.detail ? <span className="provider-card-detail"> {catalog.status.detail}</span> : null}</p>
-        {inPlace ? null : REPLACE_FOR.has(state)
-          ? <Button variant="secondary" size="sm" onClick={(event) => show("replace", event.currentTarget)} {...openerState(variant, open === "replace")}>{t("keys.replace")}</Button>
-          : <Button variant="secondary" size="sm" loading={testing} aria-label={t("keys.testNamed", { provider: name })} onClick={() => void test()}>{t("keys.testAgain")}</Button>}
-      </div>}
-      {open === "remove" && variant !== "row" && <RemoveDialog {...remove} />}
+    <div ref={row} className="provider-row" role="group" aria-label={name} data-provider={provider} data-state={state} tabIndex={-1}>
+      <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
+      <div className="provider-row-copy">
+        <span className="provider-row-title"><strong>{name}</strong>{pill}
+          {inUse.length > 0 && <Badge tone="accent">{t("keys.inUseFor", { uses: listed(inUse) })}</Badge>}</span>
+        <span className="provider-row-line">{usedFor(provider, catalog, t)}{last4 && <> · {t("keys.keyEndsIn", { last4 })}</>}</span>
+        {problem && <div className="provider-row-problem">
+          <WarningIcon size={14} />
+          <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
+            {catalog?.status.detail ? <span className="provider-key-detail"> {catalog.status.detail}</span> : null}</p>
+          {REPLACE_FOR.has(state)
+            ? <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={(event) => show("replace", event.currentTarget)}>{t("keys.replace")}</Button>
+            : <Button variant="secondary" size="sm" loading={testing} aria-label={t("keys.testNamed", { provider: name })} onClick={() => void test()}>{t("keys.testAgain")}</Button>}
+        </div>}
+      </div>
+      <Button className="provider-row-action" variant="secondary" size="sm" aria-label={t("keys.disconnectNamed", { provider: name })} aria-haspopup="dialog"
+        onClick={(event) => show("disconnect", event.currentTarget)}><UnlinkIcon />{t("keys.disconnect")}</Button>
+      {open === "replace" && <KeyDialog provider={provider} name={name} replacing={last4 ?? "····"}
+        onDone={() => { setNote(t("keys.replaced", { provider: name })); setOpen(null); row.current?.focus(); }} onCancel={close} />}
+      {open === "disconnect" && <DisconnectDialog provider={provider} name={name} last4={last4} inUse={inUse} onDone={() => { setOpen(null); onDisconnected(); }} onCancel={close} />}
       <p className="sr-only" role="status">{note}</p>
     </div>
   );
+}
+
+/** A provider without a key: its card in "Add a provider", Connect opening the key's dialog. */
+function AvailableCard({ provider, name, catalog, onConnected }: ProviderProps & { onConnected: () => void }) {
+  const t = hostTranslator();
+  const [open, setOpen] = useState(false);
+  const connect = useRef<HTMLButtonElement>(null);
+  const focusBack = useFocusBack(() => connect.current);
+  return (
+    <div className="provider-card" role="group" aria-label={name} data-provider={provider}>
+      <div className="provider-card-head">
+        <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
+        <div className="provider-card-copy">
+          <strong>{name}</strong>
+          <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>
+        </div>
+      </div>
+      <Button ref={connect} id={`provider-connect-${provider}`} className="provider-card-action" variant="secondary" size="sm"
+        aria-label={t("keys.connectNamed", { provider: name })} aria-haspopup="dialog" onClick={() => setOpen(true)}><LinkIcon />{t("keys.connect")}</Button>
+      {open && <KeyDialog provider={provider} name={name} replacing={null} onDone={() => { setOpen(false); onConnected(); }} onCancel={() => { setOpen(false); focusBack(); }} />}
+    </div>
+  );
+}
+
+/** "Add a provider"'s search: filters the cards as it is typed; × or Escape clears it (Escape then stays here). How
+ *  many match is said once typing pauses. */
+function ProviderSearch({ query, onQuery, matches, t }: { query: string; onQuery: (query: string) => void; matches: number; t: HostTranslate }) {
+  const field = useRef<HTMLInputElement>(null);
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    if (!query.trim()) { setSaid(""); return; }
+    const timer = window.setTimeout(() => setSaid(matches === 0 ? t("keys.search.none", { query: query.trim() })
+      : matches === 1 ? t("keys.search.one") : t("keys.search.many", { count: matches })), 500);
+    return () => window.clearTimeout(timer);
+  }, [query, matches, t]);
+  const keys = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") event.preventDefault();
+    if (event.key === "Escape" && query) { event.preventDefault(); event.stopPropagation(); onQuery(""); }
+  };
+  return <div className="provider-search">
+    <SearchIcon className="provider-search-icon" />
+    <Input ref={field} type="search" size="sm" value={query} aria-label={t("keys.search.label")} placeholder={t("keys.search.label")}
+      autoComplete="off" spellCheck={false} onChange={(event) => onQuery(event.target.value)} onKeyDown={keys} />
+    {query && <Button className="provider-search-clear" variant="ghost" tone="neutral" size="icon-sm" aria-label={t("keys.search.clear")} title={t("keys.search.clear")}
+      onClick={() => { onQuery(""); field.current?.focus(); }}><CloseIcon /></Button>}
+    <p className="sr-only" role="status">{said}</p>
+  </div>;
 }
 
 export function ProviderKeys() {
   const t = hostTranslator();
   const inApp = useRoomStore((state) => state.facts.inApp);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
+  const keys = useRoomStore((state) => state.facts.providerKeys);
   const settings = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
-  const providers = remoteProviders(catalogue.catalogs);
+  const [query, setQuery] = useState("");
+  const [moved, setMoved] = useState<Moved | null>(null);
+  const pane = useRef<HTMLDivElement>(null);
+  const providers: Provider[] = remoteProviders(catalogue.catalogs).map((provider) =>
+    ({ id: provider.id, name: provider.name, catalog: catalogue.catalogs.find((catalog) => catalog.id === provider.id) }));
   const uses = (provider: string) => [settings?.stt.catalog === provider ? t("settings.section.transcription") : "", settings?.tts.catalog === provider ? t("settings.section.voice") : ""].filter(Boolean);
+  const yours = providers.filter((provider) => keys[provider.id] === true);
+  const rest = providers.filter((provider) => keys[provider.id] !== true);
+  const wanted = folded(query);
+  const shown = wanted ? rest.filter((provider) => folded(`${provider.name} ${usedFor(provider.id, provider.catalog, t)}`).includes(wanted)) : rest;
+  // Moved between the lists: once drawn where it now is, its row (connected) or its Connect (disconnected) takes the focus.
+  useEffect(() => {
+    if (!moved) return;
+    const target = moved.to === "row" ? pane.current?.querySelector<HTMLElement>(`.provider-row[data-provider='${moved.provider}']`)
+      : document.getElementById(`provider-connect-${moved.provider}`);
+    target?.focus();
+  }, [moved]);
+  const disconnected = (provider: Provider) => {
+    // Its card must be there to take the focus: a search that would hide it is cleared.
+    if (wanted && !folded(`${provider.name} ${usedFor(provider.id, provider.catalog, t)}`).includes(wanted)) setQuery("");
+    setMoved({ provider: provider.id, to: "connect", said: t("keys.disconnected", { provider: provider.name }) });
+  };
   return (
     <Section id="providers" title={t("keys.title")} description={t("keys.intro")}>
-      {/* Where the keys are kept, in a line: the keychain in the app; this browser, unencrypted, on the web. */}
-      <p id="provider-keys-where" className="provider-keys-where" role="note" data-where={inApp ? "app" : "browser"}>
-        {!inApp && <WarningIcon size={14} />}{inApp ? t("keys.inApp") : t("keys.browserShort")}
-      </p>
-      {/* The providers are the engine's remote catalogues: while they load, or when they could not be read, it says so
-          rather than listing none. */}
-      {!catalogueShown(catalogue) && (catalogue.state === "loading" || catalogue.state === "idle") ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
-      {catalogue.state === "failed" ? (
-        <div id="provider-keys-failed" role="alert"><Alert tone="danger" title={catalogue.error}
-          action={<Button id="provider-keys-retry" size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /></div>
-      ) : null}
-      {catalogueShown(catalogue) ? (providers.length
-        ? <div className="provider-cards">{providers.map((provider) => <ProviderCard key={provider.id} provider={provider.id} name={provider.name}
-            catalog={catalogue.catalogs.find((catalog) => catalog.id === provider.id)} inUse={uses(provider.id)} />)}</div>
-        : <p className="muted" id="provider-keys-none">{t("keys.none")}</p>) : null}
+      <div ref={pane} className="providers">
+        {/* Where the keys are kept, in a line: the keychain in the app; this browser, unencrypted, on the web. */}
+        <p id="provider-keys-where" className="provider-keys-where" role="note" data-where={inApp ? "app" : "browser"}>
+          {!inApp && <WarningIcon size={14} />}{inApp ? t("keys.inApp") : t("keys.browserShort")}
+        </p>
+        {/* The providers are the engine's remote catalogues: while they load, or when they could not be read, it says so
+            rather than listing none. */}
+        {!catalogueShown(catalogue) && (catalogue.state === "loading" || catalogue.state === "idle") ? <p className="muted" role="status" id="provider-keys-loading">{t("keys.loading")}</p> : null}
+        {catalogue.state === "failed" ? (
+          <div id="provider-keys-failed" role="alert"><Alert tone="danger" title={catalogue.error}
+            action={<Button id="provider-keys-retry" size="sm" onClick={() => void window.sidevoiceActions?.loadVoiceCatalogue()}>{t("voice.retry")}</Button>} /></div>
+        ) : null}
+        {catalogueShown(catalogue) && !providers.length ? <p className="muted" id="provider-keys-none">{t("keys.none")}</p> : null}
+        {catalogueShown(catalogue) && yours.length > 0 && <section className="ui-card providers-card" aria-labelledby="providers-yours">
+          <header className="providers-card-head">
+            <div><h3 id="providers-yours">{t("keys.section.yours")}</h3><p>{t("keys.section.yoursIntro")}</p></div>
+          </header>
+          <div className="provider-rows">
+            {yours.map((provider) => <ConnectedRow key={provider.id} provider={provider.id} name={provider.name} catalog={provider.catalog} inUse={uses(provider.id)} onDisconnected={() => disconnected(provider)} />)}
+          </div>
+        </section>}
+        {catalogueShown(catalogue) && providers.length > 0 && <section className="ui-card providers-card" aria-labelledby="providers-add">
+          <header className="providers-card-head">
+            <div><h3 id="providers-add">{t("keys.section.add")}</h3><p>{t("keys.section.addIntro")}</p></div>
+            {rest.length > 0 && <ProviderSearch query={query} onQuery={setQuery} matches={shown.length} t={t} />}
+          </header>
+          {!rest.length ? <p className="muted">{t("keys.section.allConnected")}</p>
+            : !shown.length ? <p className="muted">{t("keys.search.none", { query: query.trim() })}</p>
+            : <div className="provider-grid">
+                {shown.map((provider) => <AvailableCard key={provider.id} provider={provider.id} name={provider.name} catalog={provider.catalog}
+                  onConnected={() => setMoved({ provider: provider.id, to: "row", said: t("keys.connected", { provider: provider.name }) })} />)}
+              </div>}
+        </section>}
+        <p className="sr-only" role="status">{moved?.said ?? ""}</p>
+      </div>
     </Section>
   );
 }

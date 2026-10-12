@@ -10,7 +10,7 @@ import { voiceChoices, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceV
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
-import { ProviderKeyNeeded, type KeyOutcome } from "./ProviderConnect";
+import { ProviderKeyNeeded } from "./ProviderConnect";
 import { NewMark } from "../highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
 import { ModelRuntime } from "./ModelRuntime";
@@ -154,8 +154,8 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   // Settings may both be drawn, each with its own).
   const announce = useRef<HTMLParagraphElement>(null);
   const [keyNote, setKeyNote] = useState("");
-  const keyKept = (name: string, outcome: KeyOutcome) => {
-    setKeyNote(outcome === "unverified" ? t("keys.why.unverified", { provider: name }) : t("keys.connected", { provider: name }));
+  const keyKept = (name: string) => {
+    setKeyNote(t("keys.connected", { provider: name }));
     announce.current?.closest(".ui-group")?.querySelector<HTMLElement>(`#${task}-source`)?.focus();
   };
   return (
@@ -163,7 +163,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       <Row label={t("voice.source")} description={sourceNote && !provider ? noteText(t, sourceNote) : undefined} htmlFor={task + "-source"}>
         <SourceSelect id={task + "-source"} value={draft[task].catalog} sources={sources} onChange={(catalog) => edit({ [task]: { catalog } })} t={t} />
       </Row>
-      {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={(outcome) => keyKept(remote.name ?? remote.id, outcome)} />}
+      {remote && <ProviderKeyNeeded key={remote.id} provider={remote.id} name={remote.name ?? remote.id} needed={!!provider} onDone={() => keyKept(remote.name ?? remote.id)} />}
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}

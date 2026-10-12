@@ -8,7 +8,6 @@ import { localHostInstallController } from "../../services/local-host-install";
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { chooseOption, selectedValue } from "../../test/select";
-import { VARIANTS_KEY } from "../../lib/variants";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -324,7 +323,7 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
   expect(title()).toHaveTextContent("Set up transcription");
   const wizard = document.getElementById("wizard")!;
   const deferred = () => JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at ?? null;
-  // The default way: a small dialog, above the setup's (not inside it).
+  // A small dialog, above the setup's (not inside it).
   fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
   const entry = screen.getByRole("dialog", { name: "Connect OpenAI" });
   expect(wizard.contains(entry)).toBe(false);
@@ -332,18 +331,4 @@ test("a provider chosen without its key asks for it in the setup as Settings doe
   expect(screen.queryByRole("dialog", { name: "Connect OpenAI" })).toBeNull();
   expect(document.querySelector("#wizard[open]")).toBe(wizard);
   expect(deferred()).toBeNull();
-  // The row way: in the step itself; Escape stays in it.
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "provider-connect": "row" }));
-  act(() => { window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })); });
-  try {
-    fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
-    const field = screen.getByLabelText("OpenAI API key");
-    expect(wizard.contains(field)).toBe(true);
-    let notCancelled = true;
-    await act(async () => { notCancelled = fireEvent.keyDown(field, { key: "Escape" }); });
-    expect(notCancelled).toBe(false);
-    expect(screen.queryByLabelText("OpenAI API key")).toBeNull();
-    expect(document.querySelector("#wizard[open]")).toBe(wizard);
-    expect(deferred()).toBeNull();
-  } finally { localStorage.removeItem(VARIANTS_KEY); }
 }, WHOLE_APP_MS);
