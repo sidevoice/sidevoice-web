@@ -19,6 +19,10 @@ const CATALOGS = [
   { id: "elevenlabs", name: "ElevenLabs", status: status(), models: [] },
   { id: "openai", name: "OpenAI", status: status("credential-missing"), models: [] },
 ] as unknown as CatalogView[];
+/** Six more providers: with OpenAI and ElevenLabs, eight to add — enough for a search. */
+const MORE = ["Deepgram", "AssemblyAI", "Cartesia", "Groq", "Mistral", "Speechmatics"].map((name) =>
+  ({ id: name.toLowerCase(), name, status: status("credential-missing"), models: [] })) as unknown as CatalogView[];
+const MANY = { state: "ready", catalogs: [...CATALOGS, ...MORE], error: "" };
 
 /** The store as the controller leaves it: `provider`'s key kept (or not), and what the provider said of it. */
 function hostSays(store: RoomStore, provider: string, kept: boolean, reason?: string) {
@@ -67,12 +71,12 @@ test("connected providers are rows in Your providers — the name with Connected
   expect(add()).toContainElement(card("openai"));
   expect(within(card("openai")!).getByRole("button", { name: "Connect OpenAI" })).toHaveTextContent("Connect");
   expect(card("elevenlabs")).toBeNull();
-  expect(within(add()).getByRole("searchbox", { name: "Search providers" })).toBeInTheDocument();
 });
 
-test("with nothing connected there is no Your providers; with everything connected Add a provider says so, with no search", () => {
+test("with nothing connected Your providers says none yet; with everything connected Add a provider says so, with no search", () => {
   renderKeys({ providerKeys: { openai: false, elevenlabs: false } });
-  expect(yours()).toBeNull();
+  expect(yours()).toHaveTextContent(/^Your providers\s*None connected yet\.$/);
+  expect(document.getElementById("providers-yours-none")).toBeInTheDocument();
   expect(within(add()).getAllByRole("button", { name: /^Connect / })).toHaveLength(2);
   cleanup();
   renderKeys({ providerKeys: { openai: true, elevenlabs: true } });
@@ -156,8 +160,33 @@ test("Disconnect asks first — what stops, that the key is forgotten, Cancel fo
   expect(screen.getByText("OpenAI disconnected. Its key was forgotten.")).toHaveAttribute("role", "status");
 });
 
+test("the search shows from eight providers to add: up to seven are all in sight, with none", () => {
+  renderKeys();
+  expect(screen.queryByRole("searchbox")).toBeNull();
+  cleanup();
+  renderKeys({ voiceCatalogue: MANY, providerKeys: { openai: false, elevenlabs: true } });
+  expect(within(add()).getAllByRole("button", { name: /^Connect / })).toHaveLength(7);
+  expect(screen.queryByRole("searchbox")).toBeNull();
+  cleanup();
+  renderKeys({ voiceCatalogue: MANY, providerKeys: { openai: false, elevenlabs: false } });
+  expect(within(add()).getAllByRole("button", { name: /^Connect / })).toHaveLength(8);
+  expect(within(add()).getByRole("searchbox", { name: "Search providers" })).toBeInTheDocument();
+});
+
+test("connecting one found by search, down to seven to add, takes the search away and its filter with it", async () => {
+  renderKeys({ voiceCatalogue: MANY, providerKeys: { openai: false, elevenlabs: false } });
+  fireEvent.change(screen.getByRole("searchbox", { name: "Search providers" }), { target: { value: "open" } });
+  fireEvent.click(screen.getByRole("button", { name: "Connect OpenAI" }));
+  const dialog = screen.getByRole("dialog", { name: "Connect OpenAI" });
+  fireEvent.change(within(dialog).getByLabelText("API key"), { target: { value: "sk-good-7f3a" } });
+  await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Connect" })); });
+  expect(yours()).toContainElement(row("openai"));
+  expect(screen.queryByRole("searchbox")).toBeNull();
+  expect(within(add()).getAllByRole("button", { name: /^Connect / })).toHaveLength(7);
+});
+
 test("search filters Add a provider by name or use, any case or accent; none says so; × and Escape clear it", () => {
-  renderKeys({ providerKeys: { openai: false, elevenlabs: false } });
+  renderKeys({ voiceCatalogue: MANY, providerKeys: { openai: false, elevenlabs: false } });
   const search = screen.getByRole("searchbox", { name: "Search providers" });
   fireEvent.change(search, { target: { value: "ELÉVEN" } });
   expect(card("elevenlabs")).toBeInTheDocument();
@@ -172,7 +201,7 @@ test("search filters Add a provider by name or use, any case or accent; none say
   expect(search).toHaveValue("");
   expect(card("elevenlabs")).toBeInTheDocument();
   cleanup();
-  renderKeys();
+  renderKeys({ voiceCatalogue: { ...MANY, catalogs: [...MANY.catalogs, { id: "rime", name: "Rime", status: status("credential-missing"), models: [] }] } });
   fireEvent.change(screen.getByRole("searchbox", { name: "Search providers" }), { target: { value: "eleven" } });
   expect(add()).toHaveTextContent("ElevenLabs is already connected, under Your providers.");
 });
@@ -204,13 +233,12 @@ test("in the app the key is said to be kept in the system keychain", () => {
   expect(screen.getByRole("dialog")).toHaveTextContent("Kept in the system keychain.");
 });
 
-test("in a browser one line says where the key lives and to cap the spend; in the app it names the keychain", () => {
+test("one line says where the keys are kept: unencrypted in this browser, or the system keychain in the app", () => {
   renderKeys();
-  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/unencrypted in this browser/);
-  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/spending limit/);
+  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/^Keys are stored unencrypted in this browser\.$/);
   cleanup();
   renderKeys({ inApp: true });
-  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/system keychain/);
+  expect(document.getElementById("provider-keys-where")).toHaveTextContent(/^Keys stay in the system keychain\.$/);
 });
 
 test("the providers are the catalogues: while they load it says so, and when they could not be read it says why, never an empty list", () => {

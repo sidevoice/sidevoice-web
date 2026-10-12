@@ -17,6 +17,7 @@ function fakeVoice({ outcome = { status: "heard" } as Record<string, unknown>, s
     setSettings: async (settings: unknown) => { calls.push(["setSettings", settings]); },
     start: async () => { calls.push(["start"]); if (startFails) throw startFails; },
     stop: async () => { calls.push(["stop"]); },
+    mute: (muted: boolean) => { calls.push(["mute", muted]); },
     say: (text: string, options: unknown) => { calls.push(["say", text, options]); return { id: "s1", cancel: () => calls.push(["cancel"]), onEvent() {}, outcome: Promise.resolve(outcome) }; },
     onTurn: sub("turn"), onState: sub("state"), onError: sub("error"),
   };
@@ -34,16 +35,17 @@ test("the first turn finished with words is what was heard; one with none is not
   voice.emit("turn", { phase: "finished", turn_id: "t2", text: "  " });
   voice.emit("turn", { phase: "finished", turn_id: "t3", text: " hola, ¿me oyes? " });
   await expect(heard).resolves.toBe("hola, ¿me oyes?");
-  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"], ["stop"]]);
+  expect(voice.calls).toEqual([["setSettings", { ...SETTINGS, end_of_turn: "silence", patience: "fast" }], ["start"], ["stop"]]);
   expect(listeners(voice)).toBe(0);
 });
 
 test("nothing heard in time, a cancel, a voice error or a start that fails: each is the try's failure, and the voice stops", async () => {
   vi.useFakeTimers();
   const silent = fakeVoice();
-  const late = tryTranscription(silent as unknown as Voice, SETTINGS as never, { timeoutMs: 1000 });
+  // A silent microphone is not a take too long: past the longest take, it is still the try's own timeout.
+  const late = tryTranscription(silent as unknown as Voice, SETTINGS as never, { timeoutMs: 1000, maxTakeMs: 100 });
   const failed = expect(late).rejects.toMatchObject({ code: "trial-silence" });
-  await vi.advanceTimersByTimeAsync(1000);
+  await vi.advanceTimersByTimeAsync(1100);
   await failed;
   expect(silent.calls.at(-1)).toEqual(["stop"]);
   vi.useRealTimers();
@@ -77,6 +79,70 @@ test("a sentence said through the settings, in its language, heard to its end; c
     .rejects.toMatchObject({ code: "credential-missing" });
 });
 
+test("a transcription try ends its take on a short silence, whatever the person's end of turn is", async () => {
+  for (const turn of [{ end_of_turn: "smart-turn", patience: "patient", turn_model: "smart-turn-v3" }, { end_of_turn: "silence", patience: "relaxed" }, {}]) {
+    const voice = fakeVoice();
+    const heard = tryTranscription(voice as unknown as Voice, { ...SETTINGS, ...turn } as never);
+    await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
+    voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
+    await heard;
+    expect(voice.calls[0]).toEqual(["setSettings", { ...SETTINGS, ...turn, end_of_turn: "silence", patience: "fast" }]);
+  }
+});
+
+test("still talking at the longest take, the take ends there by muting, what was said is the result, and it is unmuted after", async () => {
+  vi.useFakeTimers();
+  const long = fakeVoice();
+  const heard = tryTranscription(long as unknown as Voice, SETTINGS as never, { maxTakeMs: 100 });
+  await vi.advanceTimersByTimeAsync(0);
+  long.emit("turn", { phase: "started", turn_id: "t1" });
+  long.emit("state", { listening: "speaking", recognising: 0 });
+  await vi.advanceTimersByTimeAsync(99);
+  expect(long.calls).not.toContainEqual(["mute", true]);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(long.calls.at(-1)).toEqual(["mute", true]);
+  long.emit("turn", { phase: "finished", turn_id: "t1", text: " una frase muy larga " });
+  await expect(heard).resolves.toBe("una frase muy larga");
+  expect(long.calls.slice(-2)).toEqual([["mute", false], ["stop"]]);
+  expect(listeners(long)).toBe(0);
+});
+
+test("a take already being transcribed at the longest take is not muted", async () => {
+  vi.useFakeTimers();
+  const ended = fakeVoice();
+  const heard = tryTranscription(ended as unknown as Voice, SETTINGS as never, { maxTakeMs: 100 });
+  await vi.advanceTimersByTimeAsync(0);
+  ended.emit("state", { listening: "speaking", recognising: 0 });
+  await vi.advanceTimersByTimeAsync(50);
+  ended.emit("state", { listening: "listening", recognising: 1 });
+  await vi.advanceTimersByTimeAsync(200);
+  ended.emit("turn", { phase: "finished", turn_id: "t1", text: "una frase" });
+  await expect(heard).resolves.toBe("una frase");
+  expect(ended.calls.filter(([name]) => name === "mute")).toEqual([]);
+});
+
+test("Stop ends the take with what was said, and it is transcribed; before anything was said, Stop is a cancel", async () => {
+  const spoken = fakeVoice();
+  const finish = new AbortController();
+  const heard = tryTranscription(spoken as unknown as Voice, SETTINGS as never, { finish: finish.signal });
+  await vi.waitFor(() => expect(spoken.calls).toContainEqual(["start"]));
+  spoken.emit("turn", { phase: "started", turn_id: "t1" });
+  finish.abort();
+  expect(spoken.calls.at(-1)).toEqual(["mute", true]);
+  spoken.emit("turn", { phase: "finished", turn_id: "t1", text: "hasta aquí" });
+  await expect(heard).resolves.toBe("hasta aquí");
+  expect(spoken.calls.slice(-2)).toEqual([["mute", false], ["stop"]]);
+
+  const quiet = fakeVoice();
+  const early = new AbortController();
+  const nothing = tryTranscription(quiet as unknown as Voice, SETTINGS as never, { finish: early.signal });
+  await vi.waitFor(() => expect(quiet.calls).toContainEqual(["start"]));
+  early.abort();
+  await expect(nothing).rejects.toMatchObject({ code: "trial-cancelled" });
+  expect(quiet.calls.filter(([name]) => name === "mute")).toEqual([]);
+  expect(quiet.calls.at(-1)).toEqual(["stop"]);
+});
+
 test("a try says how long each phase took, once it is heard", async () => {
 
   const turns: Array<(turn: unknown) => void> = [];
@@ -94,7 +160,8 @@ test("a try says how long each phase took, once it is heard", async () => {
   await new Promise((done) => setTimeout(done, 0));
   turns[0]({ phase: "finished", text: "hola", timings: { audio_ms: 1200, endpoint_silence_ms: 600, recognition_ms: 300 } });
   expect(await text).toBe("hola");
-  expect(heard[0]).toMatchObject({ audio_ms: 1200, endpoint_silence_ms: 600, recognition_ms: 300 });
+  // Its own times only: not the speech, nor the pause the take ended on.
+  expect(heard[0]).toEqual({ ready_ms: expect.any(Number), recognition_ms: 300 });
   expect(typeof (heard[0] as { ready_ms: number }).ready_ms).toBe("number");
   const said: unknown[] = [];
   await tryVoice(voice as never, {} as never, "hola", { onTimings: (timings: unknown) => said.push(timings) });
@@ -310,7 +377,7 @@ test("a voice with no take is asked for none, and the try hands none (@sidevoice
   await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
   voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
   await heard;
-  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"], ["stop"]]);
+  expect(voice.calls).toEqual([["setSettings", { ...SETTINGS, end_of_turn: "silence", patience: "fast" }], ["start"], ["stop"]]);
   expect(takes).toEqual([]);
 });
 
@@ -321,7 +388,7 @@ test("a voice that hands a take is asked for one; the try hands it once the voic
   await vi.waitFor(() => expect(voice.calls).toContainEqual(["start", { take: true }]));
   voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
   await expect(heard).resolves.toBe("hola");
-  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start", { take: true }], ["stop"]]);
+  expect(voice.calls).toEqual([["setSettings", { ...SETTINGS, end_of_turn: "silence", patience: "fast" }], ["start", { take: true }], ["stop"]]);
   expect(told).toEqual([["take", 100]]);
   expect(listeners(voice)).toBe(0);
   // Not wanted, not asked for.

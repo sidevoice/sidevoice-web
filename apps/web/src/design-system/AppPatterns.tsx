@@ -313,7 +313,7 @@ function PairingForm({ error = false }: { error?: boolean }) {
   const t = hostTranslator();
   return (
     <form className="pt-stack" onSubmit={(event) => event.preventDefault()}>
-      <Field label={t("pairing.address")} hint={t("pairing.addressHint")}><Input placeholder={t("pairing.addressPlaceholder")} defaultValue="192.168.1.20:8765" inputMode="url" /></Field>
+      <Field label={t("pairing.address")} hint={t("pairing.addressHint")}><Input placeholder={t("pairing.addressPlaceholder")} defaultValue="192.168.1.20:8768" inputMode="url" /></Field>
       <Field label={t("pairing.code")} error={error ? t("pairing.expired") : undefined}><Textarea minRows={2} maxRows={4} className="pt-mono" defaultValue="SV1.eyJhIjoiMTkyLjE2OC4xLjIwOjg3NjUiLCJjIjoiOGY0MiJ9" /></Field>
     </form>
   );

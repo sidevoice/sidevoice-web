@@ -1877,20 +1877,25 @@ function refuseTryInCall(){
 async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress,onTake}={}){
  refuseTryInCall();
  voiceTry?.abort();const abort=voiceTry=new AbortController();
+ // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
+ const finish=voiceTryFinish=new AbortController();
  const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
  try{
   const host=await voiceHost();
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,onTimings,onListening,onLevel,onTake})}
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTake})}
    :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
  }catch(error){throw Object.assign(Error(voiceErrorText(error)),{code:failureCode(error,'')})}
- finally{if(voiceTry===abort)voiceTry=null}
+ finally{if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
 }
+let voiceTryFinish=null;
 function cancelVoiceTry(){voiceTry?.abort()}
+// Stop on a try that records: its take ends with what was said, and is transcribed; any other try is cancelled.
+function finishVoiceTry(){if(voiceTryFinish)voiceTryFinish.abort();else cancelVoiceTry()}
 // A try of the end of turn being edited (`voice-trial.js` tryEndOfTurn), as `tryVoiceSettings` tries the rest: through
 // the page's voice, outside any call, in the same place (one try at a time, stopped by `cancelVoiceTry`). It listens
 // until stopped, 30 s with no speech or a failure of the voice, telling whoever shows it each step of the person's
@@ -2082,7 +2087,7 @@ window.sidevoiceActions={
  },
  tryVoiceSettings,
  tryTurnSettings,
- cancelVoiceTry,
+ cancelVoiceTry,finishVoiceTry,
  installVoiceModel,
  cancelVoiceInstall,
  uninstallVoiceModel,

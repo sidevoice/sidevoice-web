@@ -33,7 +33,7 @@ beforeEach(() => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true }));
   actions = {
     openPairing: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
-    tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
+    tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
     installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
@@ -54,7 +54,8 @@ const title = () => wizard().getByRole("heading", { level: 2 });
 const stageAction = () => document.getElementById("wizard-stage-action") as HTMLButtonElement;
 const tryButton = () => document.getElementById("wizard-try") as HTMLButtonElement;
 // Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
-const card = (task: "stt" | "tts") => document.querySelector("#wizard #" + task + "-model-card")!;
+// The try, last in the slot, in its own block after the slot's settings (outside the model's card).
+const tryBlock = (task: "stt" | "tts") => document.querySelector("#wizard #" + task + "-try-block")!;
 const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }));
 
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
@@ -106,20 +107,21 @@ test("transcription and voice are this device's: trying them is recommended, and
   // Source first, then the model, as in Settings → Voice.
   expect(selectedValue("stt-source")).toBe("local");
   expect(tryButton()).toHaveTextContent("Try it");
-  // The try is the model's: its hint in its block, and the block offers no second Speak beside the footer's.
-  expect(card("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
+  // The try has its own block, last and outside the model's card: its hint there, and no second Speak beside the footer's.
+  expect(document.querySelector("#wizard #stt-model-card")).not.toContainElement(tryBlock("stt") as HTMLElement);
+  expect(tryBlock("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
   expect(document.getElementById("wizard-try-again")).toBeNull();
   await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
-  expect(card("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
+  expect(tryBlock("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
   // Tried: Continue is the main action now, and how quick it was is said in a line, in the block.
   expect(stageAction()).toHaveTextContent(/^Continue$/);
   expect(stageAction()).toHaveClass("ui-button--primary");
-  expect(card("stt").querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
-  expect(card("stt").querySelector("#stt-timing")).not.toHaveTextContent("smaller model");
+  expect(tryBlock("stt").querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(tryBlock("stt").querySelector("#stt-timing")).not.toHaveTextContent("smaller model");
   // Trying it again is the block's.
-  expect(card("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
-  expect(card("stt").querySelector(".model-try-hint")).toBeNull();
+  expect(tryBlock("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
+  expect(tryBlock("stt").querySelector(".model-try-hint")).toBeNull();
   await act(async () => { fireEvent.click(stageAction()); });
 
   expect(title()).toHaveTextContent("Set up voice");
@@ -150,7 +152,7 @@ test("a failed try says why and keeps the step; a completion that is not stored 
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
   await act(async () => { fireEvent.click(tryButton()); });
   expect(wizard().getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
-  expect(card("stt")).toContainElement(wizard().getByRole("alert"));
+  expect(tryBlock("stt")).toContainElement(wizard().getByRole("alert"));
   expect(title()).toHaveTextContent("Set up transcription");
   await act(async () => { fireEvent.click(stageAction()); });
   await act(async () => { fireEvent.click(stageAction()); });
@@ -176,30 +178,35 @@ function pendingTry() {
   return running;
 }
 
-test("the voice's try is all in its block — the sentence edited there, lit as it is heard, then how quick and Listen again", async () => {
+test("the voice's try is all in its block — its sentence and Play shown once started, edited there, then how quick and Play again", async () => {
   const store = room();
   paired(store);
   await act(async () => { fireEvent.click(stageAction()); });
   expect(title()).toHaveTextContent("Set up voice");
-  // The sentence to hear is the block's, where it is then heard.
-  const sample = card("tts").querySelector("#wizard-sample") as HTMLTextAreaElement;
-  expect(sample).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
-  fireEvent.change(sample, { target: { value: "Hola, qué tal." } });
+  // Before the try, no sentence and no Play: the footer's try starts it.
+  expect(tryBlock("tts").querySelector("#tts-sentence")).toBeNull();
+  expect(tryBlock("tts").querySelector("#tts-play")).toBeNull();
+  expect(tryBlock("tts").querySelector("#wizard-sample")).toBeNull();
   const running = pendingTry();
   await act(async () => { fireEvent.click(tryButton()); });
-  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
-  expect(card("tts")).toHaveTextContent("Getting ready…");
-  // Playing: the sentence in the field's place, lit up to what was heard; Stop is the block's too.
-  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 5, to: 5 }); });
-  expect(card("tts").querySelector("#wizard-sample")).toBeNull();
-  expect(card("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hola,$/);
-  expect(card("tts").querySelector(".model-try-unsaid")).toHaveTextContent("qué tal.");
-  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Stop");
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies.", keep: true }));
+  expect(tryBlock("tts")).toHaveTextContent("Getting ready…");
+  // Playing: the sentence beside Play, not editable while it plays; the block's own Play is Stop.
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
+  expect(tryBlock("tts").querySelector("#tts-sentence")).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(tryBlock("tts").querySelector("#tts-sentence")).toHaveAttribute("readonly");
+  expect(tryBlock("tts").querySelector("#tts-play")).toHaveAccessibleName("Stop");
+  expect(tryBlock("tts").querySelector("#wizard-try-again")).toBeNull();
   await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
-  expect(card("tts").querySelector("#tts-timing")).toHaveTextContent("Starts speaking in 0.3 s");
-  expect(card("tts").querySelector("#wizard-try-again")).toHaveTextContent("Listen again");
-  expect(card("tts").querySelector("#wizard-sample")).toHaveValue("Hola, qué tal.");
+  expect(tryBlock("tts").querySelector("#tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
+  expect(tryBlock("tts").querySelector("#tts-play")).toHaveAccessibleName("Play");
   expect(stageAction()).toHaveTextContent(/^Continue$/);
+  // The sentence edited there is what Play says next.
+  fireEvent.change(tryBlock("tts").querySelector("#tts-sentence")!, { target: { value: "Hola, qué tal." } });
+  const again = pendingTry();
+  await act(async () => { fireEvent.click(tryBlock("tts").querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
+  await act(async () => { again.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
 });
 
 

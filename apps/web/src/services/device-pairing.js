@@ -92,7 +92,7 @@ export function privateHost(hostname) {
     }
     return host.includes(':') && /^f[cd][0-9a-f]{0,2}:/.test(host);
 }
-/** The address a person typed for a machine (`192.168.1.20:8765`, `https://mac.example`), as a base: https unless
+/** The address a person typed for a machine (`192.168.1.20:8768`, `https://mac.example`), as a base: https unless
  *  it says otherwise, and only one a pairing secret may travel to (`secureBase`). Empty is null: the code's own
  *  addresses are used. */
 export const ADDRESS_INVALID = 'address-invalid';

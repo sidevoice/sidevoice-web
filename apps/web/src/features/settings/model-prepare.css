@@ -23,7 +23,11 @@
 .model-try-hint, .model-try-state { margin: 0; color: var(--sv-text-muted); }
 .model-try-state { display: flex; align-items: center; gap: var(--sv-space-2); }
 .model-try-state .ui-spinner { color: var(--sv-accent-text); }
-.model-try-listening { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+.model-try-listening { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+/* How long the take has run, filling to its longest (MAX_TAKE_MS, set as its animation's length) from when it listens. */
+.model-try-take { flex: 1 0 100%; height: 3px; border-radius: 2px; background: var(--sv-accent) no-repeat 0 0 / 0% 100%; background-color: var(--sv-bg-sunken);
+  background-image: linear-gradient(var(--sv-accent), var(--sv-accent)); animation: model-try-take linear forwards; }
+@keyframes model-try-take { to { background-size: 100% 100%; } }
 .model-try-wave { display: inline-flex; flex: none; color: var(--sv-accent-text); }
 .model-try .voice-wave { width: min(9rem, 36vw); height: 28px; }
 /* The voice's sentence: what was heard in the text's colour, the rest quieter until it is. */
@@ -43,6 +47,8 @@
 
 /* How a model runs (ModelRuntime): folded under its block; this device's capabilities, then each build to choose. */
 .model-runtime { margin-top: var(--sv-space-2); }
+.model-runtime-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sv-space-1); min-width: 0; }
+.model-runtime-info { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .model-runtime-toggle { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); max-width: 100%; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-1); border: 0; border-radius: var(--sv-radius-sm); background: none; color: var(--sv-text-muted); font: 600 var(--sv-font-sm) / 1.25rem var(--sv-font-sans); cursor: pointer; }
 .model-runtime-toggle:hover { background: var(--sv-hover); color: var(--sv-text); }
 .model-runtime-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
@@ -65,3 +71,16 @@
 
 /* The model in use stays until this one is ready (there is no Save: it switches by itself). */
 .model-prepare-pending { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+
+/* The voice's try once started (VoiceTryPlayer, VARIANTS voice-try): `row`, Play and the sentence on one line, the box
+   growing with it; `player`, the sentence quoted with Edit beside it, a big round Play/Stop under it, then how quick. */
+.voice-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.voice-try-row { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; }
+.voice-try-row .voice-try-text { flex: 1; min-width: 0; }
+.voice-try-row > .ui-button { flex: none; }
+.voice-try-quote { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; }
+.voice-try-quote > :first-child { flex: 1; min-width: 0; }
+.voice-try-said { display: block; font-size: var(--sv-font-md); line-height: 1.5rem; color: var(--sv-text); quotes: "“" "”"; }
+.voice-try-controls { display: flex; justify-content: center; }
+.voice-try-play-big { width: 48px; height: 48px; padding: 0; border-radius: 50%; }
+.voice-try-play-big svg { width: 20px; height: 20px; }

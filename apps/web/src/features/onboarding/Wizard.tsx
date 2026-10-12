@@ -2,9 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
-import { Field } from "../../components/ui/Field";
 import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, BackIcon } from "../../components/ui/Icons";
-import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
 import { PairMachine } from "../pairing/PairMachine";
@@ -47,8 +45,6 @@ const TITLES: Record<OnboardingStep, HostMessageKey> = {
   W0: "wizard.title.basics", W1: "wizard.title.where", W2: "wizard.title.install", W2r: "wizard.title.pair", W3: "wizard.title.install",
   W4: "wizard.title.stt", W4v: "wizard.title.tts", W5: "wizard.title.turn", W6: "wizard.title.ready",
 };
-
-const SAMPLE_MAX = 200;
 
 /** The steps in the order they come, for the side a new one slides in from. */
 const ORDER: OnboardingStep[] = ["W0", "W1", "W2", "W2r", "W3", "W4", "W4v", "W5", "W6"];
@@ -122,11 +118,8 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
     if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue();
     window.sidevoiceActions?.editVoice({});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const sample = task === "tts" ? <Field className="wizard-sample" label={t("wizard.sample")} aside={t("wizard.sampleCount", { count: stage.sentence.length, max: SAMPLE_MAX })}>
-    <Textarea id="wizard-sample" minRows={2} maxRows={4} maxLength={SAMPLE_MAX} value={stage.sentence} placeholder={t("wizard.samplePlaceholder")}
-      onChange={(event) => stage.setSentence(event.target.value)} />
-  </Field> : null;
-  const trial: SetupTry = { ...stage, sample: sample ?? undefined };
+  // The voice's sentence is the try's own: shown, and editable, once the try starts (VoiceTryPlayer).
+  const trial: SetupTry = stage;
   return <section className="wizard-stage-step">
     <p>{t(task === "stt" ? "wizard.sttIntro" : "wizard.ttsIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} />
@@ -378,7 +371,7 @@ export function Wizard() {
       {stageTask && <ModelStepFooter variant={footerVariant} reason={waitReason(model, stageTask, t)}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)} pressed={trial.trial.phase !== "idle"}
-        onTry={tryAgain} onStop={trial.cancel} onContinue={() => void finishStage(stageTask)} t={t} />}
+        onTry={tryAgain} onStop={trial.finish} onContinue={() => void finishStage(stageTask)} t={t} />}
       {step === "W5" && <ModelStepFooter variant={footerVariant} reason={turnWaits ? waitReason(turnModel, "turn", t) : ""} tryReason={sttModel.ready ? undefined : t("settings.save.waitTranscription")}
         running={turnTry.running} tried={turnTried} pressed={turnTry.trial.attempt > 0} onTry={turnTry.start} onStop={turnTry.stop} onContinue={() => void finishTurn()} t={t} />}
       {ready && <Button type="button" variant="primary" size="lg" className="wizard-enter" loading={completing} onClick={() => void complete()}>

@@ -146,8 +146,11 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const languages = model.model?.languages ?? [];
   const meta = [optionNote ? noteText(t, optionNote) : "", languages.length ? languages.slice(0, 4).map(languageName).join(", ") + (languages.length > 4 ? " " + t("voice.languages.more", { n: languages.length - 4 }) : "") : ""].filter(Boolean).join(" · ");
   const tryLanguage = draft.stt.language || speechLanguage;
-  // Settings' try says the sample sentence; the first-run setup's is the setup's, started from its footer too.
-  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: t("wizard.sampleText"), language: tryLanguage }) });
+  // Settings' try says its sentence (the sample, editable once it is shown); the first-run setup's is the setup's,
+  // started from its footer too.
+  const [sentence, setSentence] = useState(() => t("wizard.sampleText"));
+  const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: tryLanguage }),
+    ...(task === "tts" ? { sentence, setSentence } : {}) });
   const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried || !!setupTry.inBody} again={setupTry?.tried} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
@@ -169,9 +172,8 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
       <Row label={t("voice.model")} block>
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
-          readyAction={tryButton || undefined} readyPanel={tryPanel || undefined} onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)}
-          />
-        <ModelRuntime task={task} state={model} locked={model.installing} />
+          runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
+          onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />
       </Row>
       {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
         <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
@@ -188,6 +190,13 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
           <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
           <output id="tts-speed-value" htmlFor="tts-speed">{draft.tts.speed.toFixed(2)}×</output>
         </span>
+      </Row>}
+      {/* The try, last, after all of the slot's settings: the same place and the same block as End of turn's. */}
+      {model.ready && handle && <Row label={t(task === "stt" ? "try.title.stt" : "try.title.tts")} block>
+        <div className="turn-try turn-try-card" id={task + "-try-block"}>
+          {tryButton && <div className="turn-try-main"><span />{tryButton}</div>}
+          {tryPanel}
+        </div>
       </Row>}
       <p ref={announce} className="sr-only" role="status">{keyNote}</p>
     </Group>

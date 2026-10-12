@@ -63,11 +63,15 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   const auto = builds.find((build) => build.id === recommended);
   return (
     <div className="model-runtime">
-      <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
-        <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
+      <div className="model-runtime-head">
+        <button type="button" className="model-runtime-toggle" aria-expanded={open} aria-controls={panel} onClick={() => setOpen(!open)}>
+          <ChevronIcon size={16} className={open ? "model-runtime-chevron-open" : undefined} />{t("runtime.advanced")}
+        </button>
         <span className="model-runtime-summary">{state.build ? describe(state.build) : ""}</span>
-      </button>
+      </div>
       {open && <div className="model-runtime-panel" id={panel}>
+        {/* What this is, and that most people can leave it. */}
+        <p className="model-runtime-info">{t("runtime.info")}</p>
         <DeviceLine t={t} />
         <fieldset className="model-runtime-options">
           <legend className="sr-only">{t("runtime.title")}</legend>

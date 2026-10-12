@@ -162,76 +162,217 @@ function overflowing() {
   return () => { delete (HTMLElement.prototype as { scrollHeight?: number }).scrollHeight; };
 }
 
-test("a try is all in the model's block — getting ready, listening with the level, what was heard quoted with See all, how quick, again", async () => {
+test("a try is all in its block — getting ready, listening with the level, what was heard quoted with See all, how quick, again", async () => {
   const { actions } = renderPane();
-  const card = document.getElementById("stt-model-card")!;
+  const block = document.getElementById("stt-try-block")!;
   const running = pendingTry(actions);
   await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: false }));
-  expect(card).toHaveTextContent("Getting ready…");
+  expect(block).toHaveTextContent("Getting ready…");
   expect(document.getElementById("stt-try")).toHaveTextContent("Stop");
   act(() => running.told.onListening!());
-  expect(card).toHaveTextContent("Listening… say a short sentence");
-  expect(card.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  expect(block).toHaveTextContent("Listening… say a short sentence");
+  expect(block.querySelector(".voice-wave canvas")).toBeInTheDocument();
+  // The take's bar fills to its longest (10 s) while it listens.
+  expect(block.querySelector(".model-try-take")).toHaveStyle({ animationDuration: "10000ms" });
+  expect(block.querySelector(".model-try-take")).toHaveAccessibleName("Records up to 10 s");
   // Longer than its two lines where it is drawn: the rest a See all away.
   const long = "una frase bastante larga para la prueba ".repeat(6).trim();
   const restore = overflowing();
-  await act(async () => { running.finish({ text: long, timings: { ready_ms: 900, audio_ms: 1800, endpoint_silence_ms: 600, recognition_ms: 420 } }); });
+  await act(async () => { running.finish({ text: long, timings: { ready_ms: 900, recognition_ms: 420 } }); });
   restore();
-  expect(card.querySelector("blockquote#stt-heard")).toHaveTextContent(long);
-  expect(card.querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
+  expect(block.querySelector(".model-try-take")).toBeNull();
+  expect(block.querySelector("blockquote#stt-heard")).toHaveTextContent(long);
+  // One line, its own time only: a model already there (under 1 s to be ready) is not said.
+  expect(block.querySelector("#stt-timing")).toHaveTextContent(/^Transcribed in 0\.4 s$/);
   expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
   // See all opens the Popover with the whole of it (opened here, a Radix popover stalls jsdom for the tests after it).
   expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-haspopup", "dialog");
   expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-expanded", "false");
 });
 
-test("a try that failed says why in the model's block, and offers it again", async () => {
+test("the model's load is said after the try's time only when it had to load (from 1 s), on its line", async () => {
+  const { actions } = renderPane();
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 1000, recognition_ms: 420 } }); });
+  expect(document.querySelector("#stt-timing")).toHaveTextContent(/^Transcribed in 0\.4 s \(model loaded in 1\.0 s\)$/);
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  await act(async () => { again.finish({ text: "hola", timings: { ready_ms: 999, recognition_ms: 420 } }); });
+  expect(document.querySelector("#stt-timing")).toHaveTextContent(/^Transcribed in 0\.4 s$/);
+  expect(document.querySelector("#stt-timing .ui-infotip")).toBeNull();
+});
+
+test("the voice's try shows its sentence and Play only once started; edited there, Play says it; Stop stops it", async () => {
+  const { actions } = renderPane();
+  const block = document.getElementById("tts-try-block")!;
+  expect(block.querySelector("#tts-sentence")).toBeNull();
+  expect(block.querySelector("#tts-play")).toBeNull();
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledWith("tts", expect.objectContaining({ text: "Hi! This is how Sidevoice will read your agent's replies." }));
+  // Started: the block's own Play (Stop while it plays) beside the sentence, in one row; the slot's Try is gone.
+  expect(document.getElementById("tts-try")).toBeNull();
+  expect(block.querySelector(".voice-try")).toHaveAttribute("data-look", "row");
+  expect(block.querySelector("#tts-sentence")).toHaveValue("Hi! This is how Sidevoice will read your agent's replies.");
+  expect(block.querySelector("#tts-play")).toHaveTextContent("Stop");
+  fireEvent.click(block.querySelector("#tts-play")!);
+  expect(actions.cancelVoiceTry).toHaveBeenCalled();
+  await act(async () => { running.finish({ timings: { ready_ms: 300, first_sound_ms: 250 } }); });
+  expect(block.querySelector("#tts-play")).toHaveTextContent("Play");
+  fireEvent.change(block.querySelector("#tts-sentence")!, { target: { value: "Otra frase." } });
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(block.querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
+  await act(async () => { again.finish({}); });
+  // Nothing to say, nothing to play.
+  fireEvent.change(block.querySelector("#tts-sentence")!, { target: { value: "  " } });
+  expect(block.querySelector("#tts-play")).toBeDisabled();
+});
+
+test("the voice's try as a player: the sentence quoted with Edit, a big Play under it, the sentence lit as it plays", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "voice-try": "player" }));
+  const { actions } = renderPane();
+  const block = document.getElementById("tts-try-block")!;
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  expect(block.querySelector(".voice-try")).toHaveAttribute("data-look", "player");
+  expect(block.querySelector("#tts-play")).toHaveClass("voice-try-play-big");
+  expect(block.querySelector("#tts-play")).toHaveAccessibleName("Stop");
+  act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
+  expect(block.querySelector(".model-try-said")).toHaveTextContent(/^Hi!$/);
+  expect(block.querySelector("#tts-sentence")).toBeNull();
+  await act(async () => { running.finish({ timings: { ready_ms: 300, first_sound_ms: 250 } }); });
+  expect(block.querySelector("#tts-play")).toHaveAccessibleName("Play");
+  fireEvent.click(within(block).getByRole("button", { name: "Edit the sentence" }));
+  fireEvent.change(block.querySelector("#tts-sentence")!, { target: { value: "Otra frase." } });
+  fireEvent.click(within(block).getByRole("button", { name: "Done editing" }));
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(block.querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
+  await act(async () => { again.finish({}); });
+});
+
+test("the voice's try as a player: once edited, the quote shows the sentence as edited, and Play says it", async () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "voice-try": "player" }));
+  const { actions } = renderPane();
+  const block = document.getElementById("tts-try-block")!;
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("tts-try")!); });
+  await act(async () => { running.finish({}); });
+  expect(block.querySelector(".voice-try-quote")).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
+  // Trailing spaces: still the sentence played (it was said trimmed), so still the lit one.
+  fireEvent.click(within(block).getByRole("button", { name: "Edit the sentence" }));
+  fireEvent.change(block.querySelector("#tts-sentence")!, { target: { value: "Hi! This is how Sidevoice will read your agent's replies.  " } });
+  fireEvent.click(within(block).getByRole("button", { name: "Done editing" }));
+  expect(block.querySelector(".voice-try-quote .model-try-said")).not.toBeNull();
+  fireEvent.click(within(block).getByRole("button", { name: "Edit the sentence" }));
+  fireEvent.change(block.querySelector("#tts-sentence")!, { target: { value: "Otra frase." } });
+  fireEvent.click(within(block).getByRole("button", { name: "Done editing" }));
+  expect(block.querySelector("#tts-sentence")).toBeNull();
+  expect(block.querySelector(".voice-try-quote")).toHaveTextContent(/^Otra frase\.$/);
+  const again = pendingTry(actions);
+  await act(async () => { fireEvent.click(block.querySelector("#tts-play")!); });
+  expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Otra frase." }));
+  await act(async () => { again.finish({}); });
+  expect(block.querySelector(".voice-try-quote")).toHaveTextContent(/^Otra frase\.$/);
+});
+
+test("a try that failed says why in its block, and offers it again", async () => {
   const { actions } = renderPane();
   actions.tryVoiceSettings.mockRejectedValueOnce(Object.assign(new Error("Nothing was heard in time."), { code: "trial-silence" }));
   await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
-  expect(within(document.getElementById("stt-model-card")!).getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
+  expect(within(document.getElementById("stt-try-block")!).getByRole("alert")).toHaveTextContent("Nothing was heard in time.");
   expect(document.getElementById("stt-try")).toHaveTextContent("Speak again");
 });
 
 
-test("a transcription try that stopped shows its take in the model's block, outside what is read out as it comes; stopped by the person, it goes", async () => {
+test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes; stopped by the person, it goes", async () => {
   const { actions } = renderPane();
-  const card = document.getElementById("stt-model-card")!;
+  const block = document.getElementById("stt-try-block")!;
   const take = { sampleRate: 16000, samples: new Float32Array(32000), started_at: 0, ended_at: 2000, turns: [{ turn_id: "t1", speech_ms: 300, pauses: [], end_ms: 1700 }] };
   let running = pendingTry(actions);
   await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
   act(() => running.told.onListening!());
   act(() => running.told.onTake!(take));
-  expect(card.querySelector("#stt-take")).toBeNull();
+  expect(block.querySelector("#stt-take")).toBeNull();
   await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 900, audio_ms: 1200, endpoint_silence_ms: 500, recognition_ms: 300 } }); });
-  const shown = card.querySelector("#stt-take")!;
+  const shown = block.querySelector("#stt-take")!;
   expect(shown).toHaveTextContent("2.0 s recorded");
   expect(shown).toHaveTextContent("speech starts at 0.3 s");
   expect(shown).toHaveTextContent("turn ends at 1.7 s");
   expect(shown.closest("[aria-live]")).toBeNull();
+  // After what was heard, and not in the model's card (the try moved out of it, into the try block).
+  expect(block.querySelector("#stt-heard")!.compareDocumentPosition(shown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.getElementById("stt-model-card")!.querySelector("#stt-take")).toBeNull();
   // The voice's own try records no one: no take.
   expect(document.getElementById("tts-take")).toBeNull();
   // Again, and stopped: the try is put away with its take.
   running = pendingTry(actions);
   await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
-  expect(card.querySelector("#stt-take")).toBeNull();
+  expect(block.querySelector("#stt-take")).toBeNull();
   act(() => running.told.onTake!(take));
   await act(async () => { running.finish(Promise.reject(Object.assign(new Error("The try was stopped."), { code: "trial-cancelled" }))); });
-  expect(card.querySelector("#stt-take")).toBeNull();
+  expect(block.querySelector("#stt-take")).toBeNull();
 });
 
 test("how a model runs folds under it: each build with what it runs on and its sizes, Automatic the engine's own", () => {
   const { actions } = renderPane();
-  const toggle = document.querySelector("#stt-model-card ~ .model-runtime .model-runtime-toggle") as HTMLButtonElement;
+  const toggle = document.querySelector("#stt-model-card .model-runtime .model-runtime-toggle") as HTMLButtonElement;
   expect(toggle).toHaveAttribute("aria-expanded", "false");
+  // No (i) there: what this is is said inside, once open.
+  expect(toggle.closest(".model-runtime")!.querySelector(".ui-infotip")).toBeNull();
+  expect(document.querySelector(".model-runtime-info")).toBeNull();
   fireEvent.click(toggle);
+  // Its first line, muted: what this is, and that most people can leave it.
+  const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+  expect(panel.firstElementChild).toHaveClass("model-runtime-info");
+  expect(panel.firstElementChild).toHaveTextContent(/^Which engine and format run this model on your device/);
   const options = [...document.querySelectorAll(".model-runtime-option")].slice(0, 2);
   expect(options[0]).toHaveTextContent("Automatic (recommended)");
   expect(options[0].querySelector("input")).toBeChecked();
   expect(options[1]).toHaveTextContent("Sherpa-ONNX · int8 · processor");
   fireEvent.click(options[1].querySelector("input")!);
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { build: "whisper-base/int8" } });
+});
+
+test("in the model's card, how it runs comes after the model is chosen and before its download", () => {
+  renderPane({ voiceSettings: withVoiceModel("piper-es") });
+  for (const task of ["stt", "tts"]) {
+    const card = document.getElementById(task + "-model-card")!;
+    const parts = [...card.children].map((child) => child.className);
+    const pickers = parts.indexOf("model-prepare-pickers"), runtime = parts.indexOf("model-runtime"), status = parts.indexOf("model-prepare-status");
+    expect(pickers).toBeGreaterThanOrEqual(0);
+    expect(runtime).toBeGreaterThan(pickers);
+    expect(status).toBeGreaterThan(runtime);
+  }
+});
+
+const follows = (later: Element, earlier: Element) => Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+test("every try is last, in its own block after the slot's settings, outside the model's card", () => {
+  renderPane();
+  const stt = document.getElementById("stt-try-block")!;
+  expect(stt).toHaveClass("turn-try", "turn-try-card");
+  expect(stt.closest(".ui-row")).toHaveTextContent(/^Try transcription/);
+  expect(document.getElementById("stt-model-card")).not.toContainElement(stt);
+  expect(stt).toContainElement(document.getElementById("stt-try"));
+  expect(follows(stt, document.getElementById("stt-language")!.closest(".ui-row")!)).toBe(true);
+  const tts = document.getElementById("tts-try-block")!;
+  expect(tts).toHaveClass("turn-try", "turn-try-card");
+  expect(tts.closest(".ui-row")).toHaveTextContent(/^Try the voice/);
+  expect(document.getElementById("tts-model-card")).not.toContainElement(tts);
+  expect(tts).toContainElement(document.getElementById("tts-try"));
+  expect(follows(tts, document.getElementById("tts-voice")!.closest(".ui-row")!)).toBe(true);
+  expect(follows(tts, document.getElementById("tts-speed")!.closest(".ui-row")!)).toBe(true);
+});
+
+test("a model not ready yet has no try", () => {
+  renderPane({ voiceSettings: withVoiceModel("piper-es") });
+  expect(document.getElementById("tts-try-block")).toBeNull();
+  expect(document.getElementById("tts-try")).toBeNull();
+  expect(document.getElementById("stt-try-block")).toBeInTheDocument();
 });
 
 test("catalogues read again after a download keep the pane as it is: nothing empties and redraws under the person", () => {

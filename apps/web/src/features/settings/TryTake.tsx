@@ -7,7 +7,7 @@ import { seconds } from "./try-time";
 import type { HostTranslate } from "./host-i18n";
 import "./try-take.css";
 
-/* A try's take, once the try is over (transcription's in the model's card, the end of turn's in its own card): the whole
+/* A try's take, once the try is over (transcription's in its try block, the end of turn's in its own card): the whole
  * of it as a waveform, from the moment the voice listened to the moment it stopped, with where speech started, the
  * pauses within a turn and where the voice ended it; Play, and a click, a drag or the arrow keys to move in it. It plays
  * from memory and goes with the try (TryState.take, TurnTrial.take): nothing of it is sent or kept.

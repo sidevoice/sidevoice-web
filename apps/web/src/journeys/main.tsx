@@ -67,7 +67,7 @@ function renderShot(shot: Shot) {
       // says one; then Connect.
       const field = document.getElementById("device-pairing-code") as HTMLTextAreaElement | null;
       if (!field) return;
-      type(field, sampleCode(shot.pairUrls ?? ["https://nuc.example:8765"]));
+      type(field, sampleCode(shot.pairUrls ?? ["https://nuc.example:8768"]));
       await drawn();
       if (shot.pairAddress) {
         document.querySelector<HTMLButtonElement>("#device-pairing .pairing-other-address")?.click();
