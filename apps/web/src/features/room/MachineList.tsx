@@ -88,7 +88,7 @@ export function MachineNav({ current }: { current: boolean }) {
                 on it; the name cut short when long (whole in the title); a warning sign when it is reached without
                 encryption; the state's dot last. An entry never grows past the column. */}
             <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
-              <NewOnIcon icon={machine.local ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} isNew={notice(machine)} />
+              <NewOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} isNew={notice(machine)} />
               {machine.local && <span className="sr-only">{t("hosts.thisComputer")}</span>}
             </span>
             <span className="machine-nav-name">{copy.name}</span>

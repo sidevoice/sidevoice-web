@@ -36,8 +36,12 @@ export const ConversationsIcon = mark(MessagesSquare, 16);
 export const MachinesIcon = mark(Monitor, 16);
 /** This computer, wherever a machine is shown (the setup's choice, Settings › Machines, the recap): a laptop. */
 export const ThisComputerIcon = mark(Laptop, 18);
-/** Another machine (one paired with this device): a server — never the same glyph as this computer's. */
-export const OtherMachineIcon = mark(Server, 18);
+/** Another machine (one paired with this device): a server — never the same glyph as this computer's. Its square fills
+ *  the whole grid where the laptop is wide and short, so it is drawn at 0.86 of its box (the laptop's area), its
+ *  stroke thickened to match: the same footprint, the same weight on screen. */
+export function OtherMachineIcon({ className, size = 18 }: IconProps) {
+  return <Server className={className} size={size} viewBox="-1.95 -1.95 27.9 27.9" strokeWidth={2.09} aria-hidden />;
+}
 /** Renames what it sits beside. */
 export const EditIcon = mark(Pencil, 14);
 export const ConnectorIcon = mark(Plug, 12);
