@@ -16,7 +16,9 @@ import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./Vo
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DeviceNameField } from "./DeviceNameField";
-import { NewOnIcon, useHighlights } from "../highlights/highlights";
+import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
+import { machineStatus } from "./machine-status";
+import { MachineEntryCopy, machineEntryName } from "./MachineState";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
@@ -157,6 +159,10 @@ export function SettingsDialog() {
   useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [current, machine]);
   const waits = useVoiceReadiness();
   const news = useHighlights();
+  // This device's state, as its section's entry says it (only shown where the app reads its service).
+  const localMachine = useRoomStore((state) => state.machines.find((item) => item.local) ?? null);
+  const localStatus = useRoomStore((state) => state.facts.localHostStatus);
+  const thisDevice = machineStatus(localMachine, localStatus, true, t);
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
   // A control asked for (what's new's Set up): in view, focused, and lit for a moment, once its section is drawn.
@@ -188,15 +194,23 @@ export function SettingsDialog() {
           {/* No Save: every setting applies as it changes; what fails says so here. */}
           <form id="language-form" className="settings-layout">
             <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
-              {SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer).map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
-                aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
-                onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
-                <NewOnIcon icon={ownComputer && section.id === "machines" ? <OtherMachineIcon size={18} /> : section.icon} isNew={news.some((item) => item.section === section.id)} label={t("highlights.navNew")} /><span>{t(ownComputer && section.id === "machines" ? "settings.section.remoteMachines" : section.label)}</span>
-                {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
-              </button>
-              {/* Each machine under Machines, and Add a machine after them. */}
-              {section.id === "machines" && <MachineNav current={current === "machines"} />}
-              </Fragment>)}
+              {SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer).map((section) => {
+                const isNew = news.some((item) => item.section === section.id);
+                const label = t(ownComputer && section.id === "machines" ? "settings.section.remoteMachines" : section.label);
+                // This device is a machine's entry too: its name, and its service's state under it, said in its name.
+                const device = section.id === "this-computer";
+                return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : "ui-nav-item"} aria-controls={"pane-" + section.id}
+                  aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label, thisDevice, isNew, t) : undefined}
+                  onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
+                  <NewOnIcon icon={ownComputer && section.id === "machines" ? <OtherMachineIcon size={18} /> : section.icon} isNew={isNew} />
+                  {device ? <MachineEntryCopy name={label} status={thisDevice} isNew={isNew} /> : <span>{label}</span>}
+                  {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
+                  {!device && <NewAtEnd isNew={isNew} spoken={t("highlights.navNew")} />}
+                </button>
+                {/* Each machine under Machines, and Add a machine after them. */}
+                {section.id === "machines" && <MachineNav current={current === "machines"} />}
+                </Fragment>;
+              })}
             </nav>
             <div className="settings-content" ref={content}>
               <p id="settings-error" className="settings-error" role="alert" />

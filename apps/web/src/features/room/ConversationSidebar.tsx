@@ -6,7 +6,7 @@ import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, Sideb
 import { useSurface } from "../../lib/use-surface";
 import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
-import { useHighlights } from "../highlights/highlights";
+import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
@@ -158,7 +158,7 @@ export function ConversationSidebar() {
   );
 }
 
-/** Settings at the conversations' foot: named beside the list, a gear in the rail; its dot when something is new. */
+/** Settings at the conversations' foot: named beside the list, a gear in the rail; its mark when something is new. */
 function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
   const t = callTranslator();
   const hosts = hostTranslator();
@@ -166,7 +166,7 @@ function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }
   const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
     <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); }}>
-      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}{news.length > 0 && <span className="settings-notice-dot" aria-hidden="true" />}
+      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />
     </Button>
   );
 }

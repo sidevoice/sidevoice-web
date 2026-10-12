@@ -1,11 +1,38 @@
-/* The "new" highlights (highlights.tsx): an accent dot on what leads to it, "New" on the thing itself. Information,
-   never a warning — amber is for what needs an action. No motion. */
+/* The "new" highlights (highlights.tsx): a mark on what leads to it, "New" on the thing itself — VARIANTS `new-mark`:
+   a sparkle (A), a "New" pill (B), a dot in Settings' nav (C). Information, never a warning — amber is for what needs
+   an action. No motion. */
 .new-mark { display: inline-flex; align-items: center; gap: 2px; margin-inline-start: var(--sv-space-2); vertical-align: middle; }
 .new-mark-dismiss { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--sv-radius-sm); background: none; color: var(--sv-text-muted); cursor: pointer; }
 .new-mark-dismiss:hover { color: var(--sv-text); background: var(--sv-bg-sunken); }
 .new-mark-dismiss:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 1px; }
 @media (pointer: coarse) { .new-mark-dismiss { width: 32px; height: 32px; } }
-/* On an item's icon (NewOnIcon): the dot at its top-left corner, ringed in the ground behind it, as on the Settings gear. */
-.new-on-icon { position: relative; display: inline-grid; place-items: center; flex: none; }
-.new-on-icon-dot { position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; box-sizing: content-box; border: 2px solid var(--sv-bg-subtle); border-radius: 50%; background: var(--sv-accent); }
-.ui-nav-item[aria-current] .new-on-icon-dot { border-color: var(--sv-accent-soft); }
+/* "✦ New" (A) teaches what the sparkle means: the sparkle in the pill's own colour, no outline, 4px before the word. */
+.new-badge { gap: 4px; }
+.new-badge svg { flex: none; width: 12px; height: 12px; }
+
+/* On an item's icon (NewOnIcon): the mark at its top-left corner, outlined in the ground behind it (--new-ground), as on
+   the Settings gear: Settings' nav, the current entry's tint, a phone's list on the page. */
+.new-on-icon { --new-ground: var(--sv-bg-subtle); position: relative; display: inline-grid; place-items: center; flex: none; }
+.ui-nav-item[aria-current] .new-on-icon { --new-ground: var(--sv-accent-soft); }
+.new-on-icon-dot { position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; box-sizing: content-box; border: 2px solid var(--new-ground); border-radius: 50%; background: var(--sv-accent); }
+.new-on-icon-sparkle { position: absolute; top: -4px; left: -4px; display: block; width: 12px; height: 12px; color: var(--sv-accent); pointer-events: none; }
+/* The sparkle's outline: a 2px stroke in the ground, painted under its fill, whatever size it is drawn at. */
+.new-on-icon .new-on-icon-sparkle svg, .settings-notice[data-mark="sparkle"] svg {
+  display: block; width: 12px; height: 12px; overflow: visible; stroke: var(--new-ground); stroke-width: 4px; paint-order: stroke fill;
+}
+.new-on-icon .new-on-icon-sparkle svg > *, .settings-notice[data-mark="sparkle"] svg > * { vector-effect: non-scaling-stroke; }
+
+/* "New" at an entry's end (B, NewAtEnd): the nav's small pill, after "Not ready" when there is one. */
+.ui-nav-item > .new-nav-pill { margin-inline-start: auto; }
+.ui-nav-item > .ui-nav-badge + .new-nav-pill { margin-inline-start: 0; }
+.ui-badge.new-nav-pill { flex: none; height: 20px; padding: 0 6px; }
+
+/* On the Settings gear (GearNewMark): the sparkle (A) or how many (B, C) on its top-right corner, ringed in the ground
+   behind the gear (--dot-ring, as the conversations' dots are). The sidebar's gear places it from its left (room.css). */
+.settings-notice { --new-ground: var(--dot-ring, var(--sv-bg)); position: absolute; display: grid; place-items: center; pointer-events: none; }
+.settings-notice[data-mark="sparkle"] { top: 6px; right: 6px; width: 12px; height: 12px; color: var(--sv-accent); }
+.settings-notice[data-mark="count"] {
+  top: 3px; right: 3px; box-sizing: border-box; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
+  background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--new-ground);
+  font: var(--sv-weight-semibold) var(--sv-font-xs) / 16px var(--sv-font-sans); font-variant-numeric: tabular-nums;
+}

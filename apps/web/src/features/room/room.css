@@ -19,11 +19,8 @@
 .room-header .brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
 .room-header .brand svg { flex: none; color: var(--sv-accent-text); }
 .header-settings { flex: none; margin-inline-start: auto; }
-/* Agents waiting to be connected: a dot on the gear, as a notice and never the only word (the label says it too). */
-/* Something new under Settings: an accent dot, as every "new" is (information, not a warning; amber is for what needs
-   attention, mustard for the voice). */
-.settings-notice-dot { display: block; width: 8px; height: 8px; margin: 0; box-sizing: content-box; border: 2px solid var(--sv-bg); border-radius: 50%; background: var(--sv-accent); }
-.header-settings #settings-open .settings-notice-dot { position: absolute; top: 8px; right: 8px; }
+/* Something new under Settings: its mark on the gear's top-right corner (highlights.tsx GearNewMark, highlights.css),
+   never the only word (the label says it too) and never a dot beside the conversations' state dots. */
 .header-conversations, .conversations-scrim { display: none; }
 
 /* ----- the conversations: a column on a desktop */
@@ -131,7 +128,8 @@
 .sidebar-new { display: flex; justify-content: center; }
 .sidebar-settings { position: relative; justify-content: flex-start; }
 .conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
-.sidebar-settings .settings-notice-dot { position: absolute; top: 8px; left: 26px; }
+.sidebar-settings .settings-notice[data-mark="sparkle"] { right: auto; left: 24px; }
+.sidebar-settings .settings-notice[data-mark="count"] { right: auto; left: 22px; }
 
 /* A desktop's room has no header, as a video call app's: the conversations' column from the top, the brand at its head
  * (the mark alone in the rail); the stage's conversation named above its tile, not on it. A phone keeps its header. */

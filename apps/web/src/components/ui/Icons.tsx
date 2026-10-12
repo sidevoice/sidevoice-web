@@ -10,7 +10,7 @@ import {
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
-  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, Eye, EyeOff, Square, Hand, VolumeX, Power,
+  Timer, ScrollText, Link, Unlink, Search, ChevronLeft, Eye, EyeOff, Square, Hand, VolumeX, Power, LockOpen, Sparkle,
 } from "lucide-react";
 import type { ComponentType } from "react";
 // Other products' own marks, from their brand kits (assets/logos/README.md: where each comes from and its rules).
@@ -135,6 +135,13 @@ export const CheckIcon = mark(Check, 18);
 export const WarningIcon = mark(CircleAlert, 18);
 export const AddIcon = mark(Plus, 18);
 export const InfoIcon = mark(Info, 18);
+/** A machine reached without encryption: an open lock says what is wrong, where a generic alert would not. */
+export const NotEncryptedIcon = mark(LockOpen, 14);
+/** Something new under it (VARIANTS `new-mark` A): a filled sparkle, as a star is never a state anywhere in the room.
+ *  The outline in the ground behind it is the stylesheet's. */
+export function NewSparkleIcon({ className, size = 12 }: IconProps) {
+  return <Sparkle className={className} size={size} strokeWidth={1.8} fill="currentColor" aria-hidden />;
+}
 
 /* Drawn here, because they are somebody's mark and not a generic icon. */
 export function AppleIcon({ className, size = 12 }: IconProps) {

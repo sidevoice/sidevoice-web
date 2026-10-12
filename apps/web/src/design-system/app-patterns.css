@@ -224,6 +224,10 @@
 .pt-machine-row .ui-row-text { display: grid; }
 .pt-machine-row:hover { background: var(--sv-hover); }
 .pt-machine-row .ui-row-control { gap: var(--sv-space-3); }
+/* Its state under its name, in words or a pill (VARIANTS `machine-state`), then what else the row says; not encrypted,
+   an open lock after the name. */
+.pt-machine-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); }
+.pt-insecure { display: inline-grid; place-items: center; color: var(--sv-warning); }
 .pt-chevron-right { transform: rotate(-90deg); color: var(--sv-text-subtle); }
 .pt-confirm { display: inline-flex; flex-wrap: wrap; gap: var(--sv-space-2); justify-content: flex-end; }
 .pt-row-note { padding: 0 var(--sv-space-5) var(--sv-space-4); }

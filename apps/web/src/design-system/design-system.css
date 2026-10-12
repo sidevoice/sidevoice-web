@@ -16,6 +16,8 @@ html, body { margin: 0; min-height: 100%; background: var(--sv-bg-subtle); }
 .ds-specimen-note { margin: var(--sv-space-1) 0 0; color: var(--sv-text-muted); font-size: var(--sv-font-sm); line-height: 1.25rem; }
 .ds-specimen-body { display: grid; gap: var(--sv-space-4); margin-top: var(--sv-space-5); }
 .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); }
+/* The Settings gear as the room shows it, its "new" mark on its corner. */
+.ds-gear { position: relative; display: inline-grid; place-items: center; width: var(--sv-control-md); height: var(--sv-control-md); color: var(--sv-text-muted); }
 .ds-stack { display: grid; gap: var(--sv-space-5); min-width: 0; }
 .ds-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sv-space-3); }
 .ds-grid-2 p { margin: var(--sv-space-1) 0 0; }

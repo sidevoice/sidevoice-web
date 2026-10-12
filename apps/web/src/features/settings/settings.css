@@ -55,6 +55,15 @@
 }
 /* A section whose chosen model is not ready says so in the nav, in words. */
 .ui-nav-badge { margin-inline-start: auto; }
+/* This device's entry: a machine's two lines (MachineEntryCopy), "This device" in the other sections' size and its
+   service's state under it. A phone's strip keeps it one line, as every chip there: its page's header says the state. */
+.ui-nav-item.this-device-entry { height: auto; min-height: 52px; padding-block: 6px; }
+.ui-nav-item.this-device-entry:has(.machine-state-pill) { min-height: 54px; }
+.this-device-entry .machine-nav-name { font-size: var(--sv-font-md); line-height: 1.375rem; }
+@media (max-width: 767px) {
+  .settings-nav .ui-nav-item.this-device-entry { height: 40px; min-height: 0; padding-block: 0; }
+  .settings-nav .this-device-entry :is(.machine-state, .machine-state-pill) { display: none; }
+}
 
 /* Advanced → Downloaded models: one line each, its size, and Delete asking in place. */
 .downloaded-models { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }

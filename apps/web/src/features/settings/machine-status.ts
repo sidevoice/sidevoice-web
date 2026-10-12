@@ -1,0 +1,72 @@
+import type { LocalHostStatus } from "../../services/desktop-host";
+import type { MachineView } from "../../state/room-types";
+import type { HostTranslate } from "./host-i18n";
+
+/* A machine's state, in one set of words wherever it shows: its entry in Settings' nav, a phone's machine list, its
+ * page's header, this computer's service card, the design system. Nothing else words a machine's state.
+ *
+ * A remote machine says how this device reaches it: connected (directly, or through the room), still being checked,
+ * not connected, or no longer paired. Not connected is grey, not red: a laptop asleep is not something to fix, and the
+ * conversations say the same fact in grey; red is for what is (This device not working), amber for what needs the
+ * person (pairing it again). This device, where the app reads its service (its own section), says where the service
+ * stands instead — not prepared, starting, not working, not running, running — and, running, how it answers as any
+ * machine would. Not encrypted is said on top of any of them. */
+
+export type MachineTone = "positive" | "neutral" | "warning" | "danger";
+
+export type MachineStateKey = "unpaired" | "checking" | "room" | "direct" | "unreachable"
+  | "unprepared" | "starting" | "failed" | "stopped" | "running";
+
+export interface MachineStatus {
+  key: MachineStateKey;
+  tone: MachineTone;
+  /** In lists and names (an entry, its accessible name): 17 characters at most, never cut short. */
+  short: string;
+  /** On the machine's page, where it has the room: the same, or with how it is reached. */
+  long: string;
+  /** What to do about it, under the page's header, where there is something to say. */
+  hint?: string;
+  /** Reached without encryption, as the person agreed when pairing: said on top of the state. */
+  insecure: boolean;
+}
+
+/** Not connected's tone: grey, pending the operator's word (spec §1); it was red ("danger") before. */
+const UNREACHABLE_TONE: MachineTone = "neutral";
+
+const STARTING = new Set(["installing", "starting", "backoff"]);
+const FAILED = new Set(["failed", "service-failed", "refused", "incompatible"]);
+const STOPPED = new Set(["not-installed", "stopped-by-person"]);
+
+/** How this device reaches `machine`: the first that holds of not paired, checking, through the room, connected, not
+ *  connected. With no machine (this computer's, not projected yet), it is being checked. */
+function reachStatus(machine: MachineView | null, t: HostTranslate): Omit<MachineStatus, "insecure"> {
+  if (machine?.revoked || machine?.state === "revoked") return { key: "unpaired", tone: "warning", short: t("hosts.machineState.unpaired"),
+    long: t("hosts.machineState.unpaired.long"), hint: t("hosts.machineState.unpaired.hint") };
+  if (!machine || machine.state === "checking") return { key: "checking", tone: "neutral", short: t("hosts.machineState.checking"), long: t("hosts.machineState.checking") };
+  if (machine.state === "connected" && machine.reach === "room") return { key: "room", tone: "positive", short: t("hosts.machineState.room"), long: t("hosts.machineState.room.long") };
+  if (machine.state === "connected") return { key: "direct", tone: "positive", short: t("hosts.machineState.direct"),
+    long: t(machine.reach === "direct" ? "hosts.machineState.direct.long" : "hosts.machineState.direct") };
+  return { key: "unreachable", tone: UNREACHABLE_TONE, short: t("hosts.machineState.unreachable"), long: t("hosts.machineState.unreachable"), hint: t("hosts.reach.none") };
+}
+
+/** Where this computer's service stands, the first that holds; running, it answers as any machine would. Short and long
+ *  are the same. */
+function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: HostTranslate): Omit<MachineStatus, "insecure"> {
+  const said = (key: MachineStateKey & ("unprepared" | "starting" | "failed" | "stopped" | "running"), tone: MachineTone) =>
+    ({ key, tone, short: t(`hosts.machineState.${key}`), long: t(`hosts.machineState.${key}`) });
+  if (!machine && status.state === "absent") return said("unprepared", "neutral");
+  if (STARTING.has(status.state)) return said("starting", "neutral");
+  if (FAILED.has(status.state)) return said("failed", "danger");
+  if (STOPPED.has(status.state)) return said("stopped", "neutral");
+  if (status.state === "running" && machine?.state === "connected") return said("running", "positive");
+  // Running and not answering yet (or a pairing left without its service): as any machine, checking or not connected.
+  return reachStatus(machine, t);
+}
+
+/** `machine`'s state in words and tone. `readsService`: where the app reads this computer's service (its own section,
+ *  useThisComputerSection), this computer says where its service stands; anywhere else it reads as any machine. */
+export function machineStatus(machine: MachineView | null, localStatus: LocalHostStatus, readsService: boolean, t: HostTranslate): MachineStatus {
+  const local = !machine || !!machine.local;
+  const status = local && readsService ? serviceStatus(machine, localStatus, t) : reachStatus(machine, t);
+  return { ...status, insecure: machine?.insecure === true };
+}

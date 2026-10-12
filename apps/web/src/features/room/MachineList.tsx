@@ -1,14 +1,13 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, EditIcon, OtherMachineIcon, ThisComputerIcon, WarningIcon } from "../../components/ui/Icons";
+import { AddIcon, EditIcon, NotEncryptedIcon, OtherMachineIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
-import type { HostMessageKey } from "../settings/messages/en";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
@@ -20,6 +19,8 @@ import { useThisComputerSection } from "../../state/this-computer";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewOnIcon, useHighlights } from "../highlights/highlights";
+import { machineStatus } from "../settings/machine-status";
+import { MachineEntryCopy, MachineState, machineEntryName, machineEntryTitle, useMachineStateStyle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -28,34 +29,20 @@ function dateText(value: string | number | null | undefined) {
   return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(navigator.language, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-/** A machine's name, and what its row says about it: this computer, connected, not checked, no response. */
-function machineCopy(machine: MachineView, status: LocalHostStatus, t: HostTranslate) {
-  const name = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
-  const subtitle = machine.local
-    ? machine.state === "connected" ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
-    : machine.state === "checking" ? t("hosts.checking")
-      : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
-      ? t("hosts.remoteNoResponse") : t("hosts.connected");
-  const reachable = machine.state === "connected";
-  // Paired without encryption, it is said with its name wherever the name alone would not show it.
-  const spoken = machine.insecure ? t("hosts.notEncryptedNamed", { host: name }) : name;
-  return { name, spoken, subtitle, reachable };
+/** A machine's name: the one it has here, else this computer's or an unnamed machine's. */
+function machineName(machine: MachineView, t: HostTranslate) {
+  return machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
 }
 
 /* The paired machines, as Settings' own navigation lists them (MachineNav): under Machines a sub-entry per machine —
- * its name and a dot for its state, said in words to a screen reader and in its tooltip — and Add a machine last. The
- * machine chosen has its page in the pane (MachineList): its state, this computer's service (the local one), its
- * agents, the devices paired with it (pairing goes from a device to the machine: Add a machine, and pair-device on
- * the machine), and forgetting it. Machines itself is the first machine, or, with
- * none, a word and Add. On a phone, whose sections are a strip, the machines come at the pane's head instead. */
+ * its name on one line and its state in words on the next (machineStatus words it, here as everywhere), the whole of
+ * it in its tooltip and in its name to a screen reader — and Add a machine last. The machine chosen has its page in the
+ * pane (MachineList): its state, this computer's service (the local one), its agents, the devices paired with it
+ * (pairing goes from a device to the machine: Add a machine, and pair-device on the machine), and forgetting it.
+ * Machines itself is the first machine, or, with none, a word and Add. On a phone, whose sections are a strip, the
+ * machines come at the pane's head instead, a row each. */
 
-/** A machine's state for its dot and its words. */
-function machineState(machine: MachineView, copy: ReturnType<typeof machineCopy>, t: HostTranslate) {
-  return copy.reachable ? { tone: "positive", label: t("hosts.online") }
-    : machine.state === "checking" ? { tone: "neutral", label: t("hosts.checking") } : { tone: "danger", label: t("hosts.unavailable") };
-}
-
-/** Whether something new (an agent it found) is under a machine: its entry's dot. */
+/** Whether something new (an agent it found) is under a machine: its entry's mark. */
 function useNotice() {
   const news = useHighlights();
   return (machine: MachineView) => !!machine.pairingId && news.some((item) => item.machine === machine.pairingId);
@@ -87,23 +74,22 @@ export function MachineNav({ current }: { current: boolean }) {
   return (
     <div className="machine-nav">
       {machines.map((machine) => {
-        const copy = machineCopy(machine, status, t);
-        const state = machineState(machine, copy, t);
+        const name = machineName(machine, t);
+        // This computer, listed here only where it has no section of its own, reads as any machine.
+        const state = machineStatus(machine, status, own, t);
+        const isNew = notice(machine);
         return (
-          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.spoken + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.spoken}, ${state.label} · ${copy.subtitle}${notice(machine) ? t("highlights.navNew") : ""}`}
-            data-name={copy.name} data-state={machine.state} data-local={machine.local || undefined}
+          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state, t)}
+            aria-label={machineEntryName(name, state, isNew, t)}
+            data-name={name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
-            {/* Its icon — this computer's, or another machine's, as the setup's two choices show them — with the "new" dot
-                on it; the name cut short when long (whole in the title); a warning sign when it is reached without
-                encryption; the state's dot last. An entry never grows past the column. */}
+            {/* Its icon — this computer's, or another machine's, as the setup's two choices show them — with the "new"
+                mark on it; then its name and its state. An entry never grows past the column. */}
             <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
-              <NewOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} isNew={notice(machine)} />
-              {machine.local && <span className="sr-only">{t("hosts.thisComputer")}</span>}
+              <NewOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} isNew={isNew} />
             </span>
-            <span className="machine-nav-name">{copy.name}</span>
-            {machine.insecure && <span className="machine-nav-insecure" aria-hidden="true"><WarningIcon size={14} /></span>}
-            <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
+            <MachineEntryCopy name={name} status={state} isNew={isNew} />
           </button>
         );
       })}
@@ -120,7 +106,6 @@ export function MachineList() {
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
   const store = useContext(RoomStoreContext);
-  const notice = useNotice();
   const localMachine = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
 
@@ -137,14 +122,13 @@ export function MachineList() {
   }, [agentRequest, machines, picked]);
 
   const shown = shownMachine(machines, picked);
-  const copy = shown ? machineCopy(shown, status, t) : null;
   return (
     <Section id="machines" title={t(own ? "hosts.titleRemote" : "hosts.title")} description={t("hosts.description")}>
       {/* A phone's sections are a strip across the top, with no room for the machines: they come with the pane. */}
       <div className="machines-inline"><MachineNav current /></div>
       {machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
         <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</Button></div>}
-      {shown && copy && <HostDetail machine={shown} copy={copy} notice={notice(shown)} />}
+      {shown && <HostDetail machine={shown} name={machineName(shown, t)} />}
       {/* Preparing this computer is its own section's, when it has one. */}
       {!own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />}
     </Section>
@@ -156,10 +140,7 @@ export function MachineList() {
  *  paired with it. */
 export function ThisComputerSettings() {
   const t = hostTranslator();
-  const status = useRoomStore((state) => state.facts.localHostStatus);
   const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
-  const notice = useNotice();
-  const copy = local ? machineCopy(local, status, t) : null;
   const store = useContext(RoomStoreContext);
   // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
   const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
@@ -168,7 +149,7 @@ export function ThisComputerSettings() {
     <Section id="this-computer" title={<span className="this-device-title">{name}
       <Button variant="ghost" tone="neutral" size="icon-sm" className="this-device-rename" aria-label={t("hosts.renameDevice")} title={t("hosts.renameDevice")} onClick={rename}><EditIcon size={14} /></Button>
     </span>}>
-      {local && copy ? <HostDetail machine={local} copy={copy} notice={notice(local)} untitled />
+      {local ? <HostDetail machine={local} name={machineName(local, t)} untitled />
         : <div className="this-computer-prepare">
             <p>{t("localInstall.description")}</p>
             <LocalHostInstallEntry showCta source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
@@ -177,19 +158,22 @@ export function ThisComputerSettings() {
   );
 }
 
-/** Where this device reaches a machine, as its page says it. */
-function reachText(machine: MachineView, t: HostTranslate) {
-  if (machine.local) return "";
-  if (machine.reach === "direct") return t("hosts.reach.direct");
-  if (machine.reach === "room") return t("hosts.reach.room");
-  if (machine.reach === "away" || machine.reach === "offline" || machine.reach === "revoked") return t("hosts.reach.none");
-  return "";
+/** Reached without encryption, as the person agreed when pairing, and why it matters: said on the machine's page for
+ *  as long as it is so, after its state — in words (VARIANTS `machine-state` A) or as a pill beside the state's (B). */
+function NotEncrypted() {
+  const t = hostTranslator();
+  const style = useMachineStateStyle();
+  const about = <InfoTip label={t("hosts.notEncryptedAbout")}>{t("hosts.notEncryptedInfo")}</InfoTip>;
+  return style === "pill"
+    ? <><Badge tone="warning" className="machine-state-pill host-insecure"><NotEncryptedIcon size={12} />{t("hosts.notEncrypted")}</Badge>{about}</>
+    : <><span className="host-detail-sep" aria-hidden="true">·</span><span className="host-insecure"><NotEncryptedIcon size={14} />{t("hosts.notEncrypted")}</span>{about}</>;
 }
 
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
  *  paired with it, and forgetting it. */
-function HostDetail({ machine, copy, notice, untitled = false }: { machine: MachineView; copy: ReturnType<typeof machineCopy>; notice: boolean; untitled?: boolean }) {
+function HostDetail({ machine, name, untitled = false }: { machine: MachineView; name: string; untitled?: boolean }) {
   const t = hostTranslator();
+  const own = useThisComputerSection();
   // Renaming the machine on this device: the name being typed, or null.
   const [naming, setNaming] = useState<string | null>(null);
   // Not a form: Settings is one, and a form inside it would submit the page.
@@ -199,9 +183,10 @@ function HostDetail({ machine, copy, notice, untitled = false }: { machine: Mach
   const agents = useRef<HTMLElement>(null);
   // Asked for its agents (a new agent waiting): its agents in view.
   useEffect(() => { if (agentRequest?.fp && agentRequest.fp === machine.pairingId) agents.current?.scrollIntoView?.({ block: "start" }); }, [agentRequest, machine.pairingId]);
-  const reach = reachText(machine, t);
+  // Its state, as This device's section says it where this is that section's page; the hint of what to do, if any.
+  const state = machineStatus(machine, status, own, t);
   return (
-    <section className="host-detail" aria-label={copy.name}>
+    <section className="host-detail" aria-label={name}>
       <header className="host-detail-header">
         <span className="machine-icon" aria-hidden="true">{machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />}</span>
         <div className="host-detail-copy">
@@ -211,34 +196,31 @@ function HostDetail({ machine, copy, notice, untitled = false }: { machine: Mach
               <Button size="sm" variant="primary" onClick={saveAlias}>{t("hosts.devices.renameSave")}</Button>
               <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
             </div>
-            : <h3 className="host-name">{copy.name}
-              {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: copy.name })} title={t("hosts.rename", { machine: copy.name })}
-                onClick={() => setNaming(copy.name)}><EditIcon size={14} /></Button>}
+            : <h3 className="host-name">{name}
+              {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: name })} title={t("hosts.rename", { machine: name })}
+                onClick={() => setNaming(name)}><EditIcon size={14} /></Button>}
             </h3>}
           {/* Renamed here: whose name it really is, and the way back to it. */}
           {!untitled && machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
             <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
-          <p className="muted">{[copy.subtitle, reach].filter(Boolean).join(" · ")}</p>
+          {/* Its state at length, under its name, and not encrypted after it. A remote machine's is said as it changes;
+              this computer's service card says its own, so the page has one live state. */}
+          <p className="host-detail-state"><MachineState status={state} form="long" live={!machine.local} />{state.insecure && <NotEncrypted />}</p>
+          {state.hint && <p className="host-detail-hint muted">{state.hint}</p>}
         </div>
-        <Badge tone={copy.reachable ? "positive" : machine.state === "checking" ? "neutral" : "danger"} dot>{copy.reachable ? t("hosts.online") : machine.state === "checking" ? t("hosts.checking") : t("hosts.unavailable")}</Badge>
-        {/* Reached without encryption, as the person agreed when pairing: said for as long as it is so. */}
-        {machine.insecure && <span className="host-insecure">
-          <Badge tone="warning"><WarningIcon size={12} />{t("hosts.notEncrypted")}</Badge>
-          <InfoTip label={t("hosts.notEncryptedAbout")}>{t("hosts.notEncryptedInfo")}</InfoTip>
-        </span>}
       </header>
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
-        {machine.local ? <LocalHostStatusPanel status={status} titleId={"host-status-" + machine.id} name={machine.host || null} />
-          : <RemoteHostCard machine={machine} name={copy.name} titleId={"host-status-" + machine.id} />}
+        {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} name={machine.host || null} />
+          : <RemoteHostCard machine={machine} name={name} titleId={"host-status-" + machine.id} />}
       </section>
       <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
       </section>
       <section className="host-section">
-        <MachineDevicesPanel machine={machine} name={copy.name} />
+        <MachineDevicesPanel machine={machine} name={name} />
       </section>
-      {!machine.local && machine.pairingId && <ForgetMachine machine={machine} name={copy.name} />}
+      {!machine.local && machine.pairingId && <ForgetMachine machine={machine} name={name} />}
     </section>
   );
 }
@@ -264,20 +246,16 @@ function ForgetMachine({ machine, name }: { machine: MachineView; name: string }
   );
 }
 
-/** Another machine's Sidevoice, to read: how this device reaches it (directly, through the room, not at all), whether
- *  without encryption, and — where the machine says — its Sidevoice version. No controls: it is run there. */
+/** Another machine's Sidevoice, to read: where the machine says, its Sidevoice version. How this device reaches it is
+ *  its page's header's, two blocks up; no controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
   const t = hostTranslator();
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
-  const state: { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } = machine.revoked ? { tone: "danger", label: "hosts.state.revoked" }
-    : machine.state === "connected" ? { tone: "positive", label: machine.reach === "room" ? "hosts.state.throughRoom" : "hosts.state.connected" }
-    : machine.state === "checking" ? { tone: "neutral", label: "hosts.state.checking" } : { tone: "danger", label: "hosts.state.offline" };
   return (
-    <div className="host-status-card" data-tone={state.tone} data-remote>
+    <div className="host-status-card" data-remote>
       <div className="host-status-head">
         <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
-        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
       </div>
       {info?.version && <dl className="host-status-facts">
         {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
@@ -286,20 +264,11 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
   );
 }
 
-/** Where this computer's service stands, as one word and its dot. */
-function serviceState(status: LocalHostStatus): { tone: "positive" | "neutral" | "warning" | "danger"; label: HostMessageKey } {
-  switch (status.state) {
-    case "running": return { tone: "positive", label: "hosts.state.running" };
-    case "starting": case "installing": case "backoff": return { tone: "warning", label: "hosts.state.starting" };
-    case "failed": case "service-failed": case "refused": case "incompatible": return { tone: "danger", label: "hosts.state.failed" };
-    default: return { tone: "neutral", label: "hosts.state.stopped" };
-  }
-}
-
-/* This computer's service as a status card: its state with its dot, first; its version ("Sidevoice 0.8.1");
+/* This computer's service as a status card: its state with its dot, first, in This device's words (machineStatus, as
+ * the app reads the service here), said as it changes; its version ("Sidevoice 0.8.1");
  * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
  * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
-function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStatus; titleId: string; name: string | null }) {
+function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: MachineView; status: LocalHostStatus; titleId: string; name: string | null }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -308,7 +277,7 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
   const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
-  const state = serviceState(status);
+  const state = machineStatus(machine, status, true, t);
   // Unknown is not none: Stop asks unless the service says no call is on.
   const calls = details.calls;
   const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
@@ -362,7 +331,7 @@ function LocalHostStatusPanel({ status, titleId, name }: { status: LocalHostStat
       <div className="host-status-head">
         {/* "Sidevoice on MacBook"; with no name to say yet (its pairing lost), "Sidevoice on this computer". */}
         <h4 id={titleId} tabIndex={-1}>{name ? t("hosts.serviceOn", { machine: name }) : t("hosts.section.service")}</h4>
-        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{t(state.label)}</span>
+        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
       <dl className="host-status-facts">

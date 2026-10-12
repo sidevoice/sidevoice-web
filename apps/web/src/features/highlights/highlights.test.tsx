@@ -49,8 +49,8 @@ function room(fp: string, ids: string[]) {
 test("during the setup an agent a paired machine can connect is not new anywhere, and is recorded as seen", () => {
   room("fp-setup", ["codex"]);
   expect(document.querySelector(".new-mark")).toBeNull();
-  expect(document.querySelector(".new-on-icon-dot")).toBeNull();
-  expect(gear().querySelector(".settings-notice-dot")).toBeNull();
+  expect(document.querySelector(".new-on-icon-sparkle")).toBeNull();
+  expect(gear().querySelector(".settings-notice")).toBeNull();
   expect(gear()).not.toHaveAttribute("aria-label", expect.stringContaining("new"));
   expect(seen()["agent:fp-setup:codex"]?.seenAt).toEqual(expect.any(Number));
 });
@@ -61,10 +61,10 @@ test("after the setup what was there during it stays not new; an agent that appe
   setup.completed_at = 1;
   rerender();
   expect(document.querySelector(".new-mark")).toBeNull();
-  expect(gear().querySelector(".settings-notice-dot")).toBeNull();
+  expect(gear().querySelector(".settings-notice")).toBeNull();
   act(() => store.patch({ hostAgents: { "fp-after": listing(["codex", "cursor"]) } } as never));
   expect(gear()).toHaveAttribute("aria-label", "Settings, 1 new");
-  expect(gear().querySelector(".settings-notice-dot")).not.toBeNull();
+  expect(gear().querySelector(".settings-notice")).not.toBeNull();
   expect(seen()["agent:fp-after:cursor"]).toEqual({ shownAt: expect.any(Number) });
   expect(seen()["agent:fp-after:codex"]?.seenAt).toEqual(expect.any(Number));
 });
@@ -73,7 +73,7 @@ test("while the setup's record is not read yet nothing shows and nothing is reco
   setup.ready = false;
   room("fp-unknown", ["codex"]);
   expect(document.querySelector(".new-mark")).toBeNull();
-  expect(document.querySelector(".new-on-icon-dot")).toBeNull();
-  expect(gear().querySelector(".settings-notice-dot")).toBeNull();
+  expect(document.querySelector(".new-on-icon-sparkle")).toBeNull();
+  expect(gear().querySelector(".settings-notice")).toBeNull();
   expect(seen()["agent:fp-unknown:codex"]).toBeUndefined();
 });

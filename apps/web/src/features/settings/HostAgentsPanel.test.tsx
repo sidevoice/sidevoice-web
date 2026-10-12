@@ -107,14 +107,14 @@ test("P11 an agent new on a machine marks the gear, opens Settings at that machi
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   const gear = settingsEntry();
   expect(gear).toHaveAttribute("aria-label", "Settings, 1 new");
-  expect(gear.querySelector(".settings-notice-dot")).toBeInTheDocument();
+  expect(gear.querySelector(".settings-notice")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
-  // Opening Settings never jumps to what is new: the dots on the icons lead there.
+  // Opening Settings never jumps to what is new: the marks on the icons lead there.
   expect(openAgentSettings).not.toHaveBeenCalled();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
-  expect(entry("NUC")!.querySelector(".new-on-icon-dot")).not.toBeNull();
+  expect(entry("NUC")!.querySelector(".new-on-icon-sparkle")).not.toBeNull();
   expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
-  expect(screen.getAllByText("Not checked yet").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Checking…").length).toBeGreaterThan(0);
   expect(document.getElementById("host-agents-title")).toHaveTextContent("Agents");
   // Cursor is connected by the connector itself (it edits Cursor's file): Connect, and "New" on the row.
   const row = screen.getByText("Cursor").closest("li") as HTMLElement;
@@ -143,7 +143,7 @@ test("the runtime's Settings handler on the menu entry survives the header's ren
   expect(openAgentSettings).not.toHaveBeenCalled();
 });
 
-test("agents new on two machines: the gear counts them, Settings opens at the first, and each machine's entry has the dot", async () => {
+test("agents new on two machines: the gear counts them, Settings opens at the first, and each machine's entry has the mark", async () => {
   const store = createRoomStore();
   const hosts = [pairing("fp-nuc", "NUC"), pairing("fp-laptop", "Laptop")];
   const openAgentSettings = vi.fn((fp: string | null) => store.patch({ settingsAgentRequest: { fp, id: 2 } }));
@@ -156,10 +156,10 @@ test("agents new on two machines: the gear counts them, Settings opens at the fi
   await act(async () => { fireEvent.click(settingsEntry()); });
   // Opening Settings never jumps to what is new: the dots on the icons lead there.
   expect(openAgentSettings).not.toHaveBeenCalled();
-  // Each machine under Machines carries the dot, said in words to a screen reader.
-  expect(entry("NUC")!.querySelector(".new-on-icon-dot")).not.toBeNull();
+  // Each machine under Machines carries the mark, said in words to a screen reader.
+  expect(entry("NUC")!.querySelector(".new-on-icon-sparkle")).not.toBeNull();
   expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
-  expect(entry("Laptop")!.querySelector(".new-on-icon-dot")).not.toBeNull();
+  expect(entry("Laptop")!.querySelector(".new-on-icon-sparkle")).not.toBeNull();
   expect(entry("Laptop")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
 });
 
@@ -169,9 +169,9 @@ test("forgotten or revoked hosts cannot leave an orphaned notice on the gear", (
     const host = pairing("fp-nuc", "NUC");
     act(() => store.patch({ pairings: [host], hostAgents: { [host.fp]: ready([known("cursor", { actionable: true })]) } }));
     const view = render(<RoomProvider store={store}><RoomHeader /></RoomProvider>);
-    expect(settingsEntry().querySelector(".settings-notice-dot")).toBeInTheDocument();
+    expect(settingsEntry().querySelector(".settings-notice")).toBeInTheDocument();
     act(() => store.patch({ pairings }));
-    expect(settingsEntry().querySelector(".settings-notice-dot")).not.toBeInTheDocument();
+    expect(settingsEntry().querySelector(".settings-notice")).not.toBeInTheDocument();
     view.unmount();
   }
 });

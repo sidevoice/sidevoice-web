@@ -34,7 +34,8 @@ function open(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   return store;
 }
 
-const sections = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
+/** The sections' names as their entries show them: This device's first line, its state under it. */
+const sections = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.querySelector(".machine-nav-name")?.textContent ?? button.textContent);
 const machinesNav = () => [...document.querySelectorAll(".settings-nav .machine-nav button")].map((button) => button.textContent);
 const machinesPane = () => document.getElementById("pane-machines")!;
 
@@ -149,9 +150,9 @@ const agents = (ids: string[]) => ({ status: "ready", error: null, busy: {}, act
   id, label: id, present: true, version: "1.0.0", registration: "not-connected", connect: "auto", actionable: true,
   can: { connect: true, update: true, disconnect: true }, manual: { connect: [], disconnect: [], replace: [] },
 })), scanned_at: "2026-10-02T10:00:00Z", custom: { command: "c", snippet: "{}", version: "1" } } });
-const dotOn = (id: string) => !!document.getElementById("settings-" + id)?.querySelector(".new-on-icon-dot");
+const dotOn = (id: string) => !!document.getElementById("settings-" + id)?.querySelector(".new-on-icon-sparkle");
 
-test("a new agent on this computer puts its dot on This device; another machine's on Remote machines", () => {
+test("a new agent on this computer puts its mark on This device; another machine's on Remote machines", () => {
   localStorage.removeItem("sidevoice.highlights");
   const store = open([local, paired()]);
   act(() => store.patch({ hostAgents: { "fp-local": agents(["codex"]) } } as never));

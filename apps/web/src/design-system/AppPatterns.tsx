@@ -11,7 +11,7 @@ import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
   AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, HangupIcon, HarnessIcon, ProviderLogo,
-  ListenAgainIcon, MachinesIcon, OtherMachineIcon, ThisComputerIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
+  ListenAgainIcon, MachinesIcon, NotEncryptedIcon, OtherMachineIcon, ThisComputerIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
   SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
@@ -22,6 +22,10 @@ import { callTranslator } from "../features/call/call-i18n";
 import { conversationTranslator } from "../features/conversation/conversation-i18n";
 import { hostTranslator } from "../features/settings/host-i18n";
 import { ModelPrepare } from "../features/settings/ModelPrepare";
+import { machineStatus } from "../features/settings/machine-status";
+import { MachineState, machineEntryName } from "../features/settings/MachineState";
+import type { MachineView } from "../state/room-types";
+import type { LocalHostStatus } from "../services/desktop-host";
 import { NewConversation } from "../features/room/NewConversation";
 import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "../features/pairing/connector-commands";
 
@@ -369,6 +373,18 @@ function PairAnotherDevice() {
   );
 }
 
+/** Machines as the room's store has them (MachineView): this computer, one connected, one asleep, one reached without
+ *  encryption. Their state is worded as everywhere (machineStatus) and shown as VARIANTS `machine-state` picks. */
+const RUNNING: LocalHostStatus = { state: "running", reachable: true };
+const machine = (id: string, host: string, changes: Partial<MachineView> = {}): MachineView =>
+  ({ id, host, revoked: false, reach: "direct", state: "connected", pairedLabel: "", ...changes });
+const PATTERN_MACHINES: { view: MachineView; platform: string; note: string }[] = [
+  { view: machine("mbp", "MacBook Pro", { local: true }), platform: "macos", note: "2 agents" },
+  { view: machine("nuc", "NUC del salón"), platform: "linux", note: "192.168.1.20 · 1 agent" },
+  { view: machine("imac", "Office iMac", { reach: "offline", state: "offline" }), platform: "macos", note: "Last seen yesterday" },
+  { view: machine("lab", "Lab box", { insecure: true }), platform: "linux", note: "1 agent" },
+];
+
 function MachineDetail() {
   const t = hostTranslator();
   const [confirm, setConfirm] = useState(false);
@@ -377,7 +393,7 @@ function MachineDetail() {
       <div className="pt-machine-head">
         <span className="pt-machine-icon"><PlatformIcon platform="macos" size={20} /></span>
         <div><strong>MacBook Pro</strong><span>This computer · {t("hosts.version", { version: "0.5.0" })}</span></div>
-        <Badge tone="positive" dot>{t("hosts.status.running")}</Badge>
+        <MachineState status={machineStatus(PATTERN_MACHINES[0].view, RUNNING, true, t)} form="long" />
       </div>
       <Group title="Sidevoice on this computer">
         <Row label={t("hosts.status.running")} description="Started 2 hours ago · 3 calls">
@@ -398,20 +414,21 @@ function MachineDetail() {
 }
 
 function MachinesList() {
-  const machines = [
-    { name: "MacBook Pro", platform: "macos", status: <Badge tone="positive" dot>Online</Badge>, note: "This computer · 2 agents", here: true },
-    { name: "NUC del salón", platform: "linux", status: <Badge tone="positive" dot>Online</Badge>, note: "192.168.1.20 · 1 agent" },
-    { name: "Office iMac", platform: "macos", status: <Badge tone="danger" dot>Unreachable</Badge>, note: "Last seen yesterday" },
-  ];
+  const t = hostTranslator();
   return (
     <Section title="Machines" description="The computers where your agents run. Sidevoice talks to them; each can be opened to see its agents and devices."
       actions={<Button variant="primary"><AddIcon />Add a machine</Button>}>
       <Group>
-        {machines.map((machine) => <button type="button" className="ui-row pt-machine-row" key={machine.name}>
-          <span className="pt-machine-line"><span className="pt-machine-icon"><PlatformIcon platform={machine.platform} size={18} /></span>
-            <span className="ui-row-text"><span className="ui-row-label">{machine.name}{machine.here && <Badge>This computer</Badge>}</span><span className="ui-row-description">{machine.note}</span></span></span>
-          <span className="ui-row-control">{machine.status}<ChevronIcon size={16} className="pt-chevron-right" /></span>
-        </button>)}
+        {PATTERN_MACHINES.map(({ view, platform, note }) => {
+          // Its state in words under its name, never a dot; not encrypted, an open lock after the name.
+          const state = machineStatus(view, RUNNING, false, t);
+          return <button type="button" className="ui-row pt-machine-row" key={view.id} aria-label={machineEntryName(view.host, state, false, t)}>
+            <span className="pt-machine-line"><span className="pt-machine-icon"><PlatformIcon platform={platform} size={18} /></span>
+              <span className="ui-row-text"><span className="ui-row-label">{view.host}{view.local && <Badge>This computer</Badge>}{state.insecure && <span className="pt-insecure"><NotEncryptedIcon size={14} /></span>}</span>
+                <span className="ui-row-description pt-machine-state"><MachineState status={state} /><span>{note}</span></span></span></span>
+            <span className="ui-row-control"><ChevronIcon size={16} className="pt-chevron-right" /></span>
+          </button>;
+        })}
       </Group>
     </Section>
   );
