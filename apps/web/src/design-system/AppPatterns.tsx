@@ -11,7 +11,7 @@ import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
   AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, HangupIcon, HarnessIcon, ProviderLogo,
-  ListenAgainIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
+  ListenAgainIcon, MachinesIcon, OtherMachineIcon, ThisComputerIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
   SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
@@ -302,8 +302,8 @@ function WizardWhere() {
     <WizardFrame step={0} title={t("wizard.title.where")} footer={<Button variant="primary">{t("wizard.continue")}</Button>}>
       <p>{t("wizard.where.body")}</p>
       <div className="pt-choices" role="radiogroup" aria-label={t("wizard.title.where")}>
-        <ChoiceCard selected={choice === "local"} onSelect={() => setChoice("local")}><MachinesIcon size={20} /><strong>{t("wizard.choice.local")}</strong><span className="pt-choice-note">{t("wizard.choice.localNote")}</span></ChoiceCard>
-        <ChoiceCard selected={choice === "remote"} onSelect={() => setChoice("remote")}><ConnectorIcon size={20} /><strong>{t("wizard.choice.remote")}</strong><span className="pt-choice-note">{t("wizard.choice.remoteNote")}</span></ChoiceCard>
+        <ChoiceCard selected={choice === "local"} onSelect={() => setChoice("local")}><ThisComputerIcon size={20} /><strong>{t("wizard.choice.local")}</strong><span className="pt-choice-note">{t("wizard.choice.localNote")}</span></ChoiceCard>
+        <ChoiceCard selected={choice === "remote"} onSelect={() => setChoice("remote")}><OtherMachineIcon size={20} /><strong>{t("wizard.choice.remote")}</strong><span className="pt-choice-note">{t("wizard.choice.remoteNote")}</span></ChoiceCard>
       </div>
     </WizardFrame>
   );

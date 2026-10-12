@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from "react";
-import { CheckIcon, ConnectorIcon, EndOfTurnIcon, MachinesIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { CheckIcon, EndOfTurnIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 import { ConnectYourAgent } from "../room/ConnectYourAgent";
 import { useModelState } from "../settings/ModelSetup";
@@ -40,7 +40,7 @@ export function ReadyStep({ path, machineName, title, t }: {
     <div className="wizard-recap">
       <h3 className="sr-only">{t("wizard.recap.title")}</h3>
       <dl className="wizard-recap-list">
-        <RecapRow icon={here ? <MachinesIcon size={16} /> : <ConnectorIcon size={16} />} label={t("wizard.group.where")}
+        <RecapRow icon={here ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} label={t("wizard.group.where")}
           value={here ? t("wizard.recap.here") : machineName || t("wizard.choice.remote")} />
         <RecapRow icon={<TranscriptionIcon size={16} />} label={t("wizard.group.transcription")} value={draft?.stt.model ?? ""} detail={stt.local ? undefined : catalogName("stt")} />
         <RecapRow icon={<VoicesIcon size={16} />} label={t("wizard.group.voice")} value={draft?.tts.model ?? ""} detail={tts.local ? undefined : catalogName("tts")} />

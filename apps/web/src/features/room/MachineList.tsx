@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, ConnectorIcon, EditIcon, MachinesIcon, WarningIcon } from "../../components/ui/Icons";
+import { AddIcon, EditIcon, OtherMachineIcon, ThisComputerIcon, WarningIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
 import { InfoTip } from "../../components/ui/InfoTip";
@@ -88,7 +88,7 @@ export function MachineNav({ current }: { current: boolean }) {
                 on it; the name cut short when long (whole in the title); a warning sign when it is reached without
                 encryption; the state's dot last. An entry never grows past the column. */}
             <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
-              <NewOnIcon icon={machine.local ? <MachinesIcon size={16} /> : <ConnectorIcon size={16} />} isNew={notice(machine)} />
+              <NewOnIcon icon={machine.local ? <ThisComputerIcon size={16} /> : <OtherMachineIcon size={16} />} isNew={notice(machine)} />
               {machine.local && <span className="sr-only">{t("hosts.thisComputer")}</span>}
             </span>
             <span className="machine-nav-name">{copy.name}</span>
@@ -165,7 +165,7 @@ function HostDetail({ machine, copy, notice }: { machine: MachineView; copy: Ret
   return (
     <section className="host-detail" aria-label={copy.name}>
       <header className="host-detail-header">
-        <span className="machine-icon" aria-hidden="true"><MachinesIcon size={20} /></span>
+        <span className="machine-icon" aria-hidden="true">{machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />}</span>
         <div className="host-detail-copy">
           {naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
               <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}

@@ -3,7 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
-import { ArrowRightIcon, ConnectorIcon, MachinesIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon } from "../../components/ui/Icons";
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
@@ -312,10 +312,10 @@ export function Wizard() {
         <p>{t("wizard.where.body")}</p>
         <div className="wizard-choices" role="radiogroup" aria-label={t("wizard.title.where")}>
           {onboarding.canHostAgents && <ChoiceCard selected={choice === "agents"} onSelect={() => choose("agents")}>
-            <MachinesIcon size={20} /><strong>{t("wizard.choice.local")}</strong><span className="wizard-choice-note">{t("wizard.choice.localNote")}</span>
+            <ThisComputerIcon size={20} /><strong>{t("wizard.choice.local")}</strong><span className="wizard-choice-note">{t("wizard.choice.localNote")}</span>
           </ChoiceCard>}
           <ChoiceCard selected={choice === "remote"} onSelect={() => choose("remote")}>
-            <ConnectorIcon size={20} /><strong>{t("wizard.choice.remote")}</strong><span className="wizard-choice-note">{t("wizard.choice.remoteNote")}</span>
+            <OtherMachineIcon size={20} /><strong>{t("wizard.choice.remote")}</strong><span className="wizard-choice-note">{t("wizard.choice.remoteNote")}</span>
           </ChoiceCard>
         </div>
       </section>}
