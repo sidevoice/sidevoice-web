@@ -6,7 +6,6 @@ import { Field } from "../../components/ui/Field";
 import { CheckIcon, ChevronIcon } from "../../components/ui/Icons";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Input, Textarea } from "../../components/ui/Input";
-import { useVariant } from "../../lib/variants";
 import { currentDeviceName } from "../../state/device-name";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
@@ -20,12 +19,8 @@ import "./pairing.css";
 
 /* "Connect to your machine": the one-time code from the machine where the agents run (`sidevoice pair-device`, or the
  * agent), pasted on this device — in the first-run setup (W2r) and in the pairing dialog (Settings › Machines › Add a
- * machine). The form is the same everywhere; around it, three layouts the operator compares (VARIANTS `pair-machine`):
- * `code`, one card, the code first and how to get one behind a disclosure; `steps`, what to run on the machine and this
- * form as two numbered steps; `split`, the two side by side from 720px, stacked below. This computer's own machine
- * pairs by itself and never comes here. */
-export const PAIR_MACHINE_LAYOUTS = ["code", "steps", "split"] as const;
-export function usePairMachineLayout() { return useVariant("pair-machine", PAIR_MACHINE_LAYOUTS); }
+ * machine), the same everywhere: one card, the code first, and how to get one behind a disclosure for when it is needed.
+ * This computer's own machine pairs by itself and never comes here. */
 
 type AlertKind = "expired" | "unreachable" | "httpPrivate" | "httpOnly" | "httpBlocked" | "said";
 /** Why a code was not redeemed, and where that is said: under the field it is about, or in the form's alert. The
@@ -71,15 +66,14 @@ function CopyCommand() {
   return <Button variant="secondary" size="sm" onClick={() => void copy()}>{t(copied ? "noMachine.commandCopied" : "pairing.copyCommand")}</Button>;
 }
 
-/** The pairing screen's content: the code, the machine's address when it is needed, and what came of connecting, in the
- *  layout the variant says. Its Connect sits at the end of the form, or, given `submitIn`, in the footer of whatever
+/** The pairing screen's content: the code, the machine's address when it is needed, and what came of connecting, and how
+ *  to get one. Its Connect sits at the end of the form, or, given `submitIn`, in the footer of whatever
  *  holds it (the dialog's, the setup's), still submitting it through its `form` attribute; `null` while that footer is
- *  not there. `howOpen`: how to get a code starts unfolded (the `code` layout's disclosure). */
+ *  not there. `howOpen`: how to get a code starts unfolded. */
 export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, howOpen = false, rows = 3, submitIn }: {
   idPrefix?: string; autoFocus?: boolean; howOpen?: boolean; rows?: number; submitIn?: HTMLElement | null;
 }) {
   const t = hostTranslator();
-  const layout = usePairMachineLayout();
   const [code, setCode] = useState("");
   const [address, setAddress] = useState("");
   // The address field, once asked for: "Use a different address", or a machine the code's own addresses did not reach.
@@ -249,12 +243,12 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
           onChange={(event) => changeCode(event.currentTarget.value)} onKeyDown={enterSubmits} />
       </Field>
       <p className="sr-only" role="status">{heard}</p>
-      {layout === "code" && <div className="pairing-how">
+      <div className="pairing-how">
         <Button variant="ghost" size="sm" className="pairing-how-toggle" aria-expanded={how} aria-controls={howId} onClick={() => setHow(!how)}>
           <ChevronIcon size={16} />{t("pairing.howToggle")}
         </Button>
         <div id={howId} className="pairing-how-body" hidden={!how}><ConnectorSteps /></div>
-      </div>}
+      </div>
       {addressShown
         ? <Field className="pairing-address" label={needsAddress ? t("pairing.address") : t("pairing.addressOptional")}
             aside={<InfoTip label={t("pairing.addressAbout")}>{t("pairing.addressHint")}</InfoTip>}
@@ -273,32 +267,5 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ho
     </form>
   );
 
-  if (layout === "steps") return (
-    <div className="pair-machine" data-layout="steps">
-      <ol className="pair-steps">
-        <li className="pair-step" data-done={recognised || undefined}>
-          {/* A code recognised is the machine's step done: its number becomes a check, and is said so. */}
-          <span className="pair-step-mark" aria-hidden="true">{recognised ? <CheckIcon size={14} /> : 1}</span>
-          <h3 className="pair-step-title" aria-label={recognised ? t("pairing.stepDone", { step: t("pairing.onMachine") }) : undefined}>{t("pairing.onMachine")}</h3>
-          <ConnectorSteps numbered={false} />
-        </li>
-        <li className="pair-step">
-          <span className="pair-step-mark" aria-hidden="true">2</span>
-          <h3 className="pair-step-title">{t("pairing.onDevice")}</h3>
-          {form}
-        </li>
-      </ol>
-    </div>
-  );
-  if (layout === "split") return (
-    <div className="pair-machine" data-layout="split">
-      <section className="pair-machine-side" aria-labelledby={`${idPrefix}-machine`}>
-        <h3 id={`${idPrefix}-machine`}>{t("pairing.onMachine")}</h3>
-        {/* Its heading frames them, and a narrow column keeps its width for the commands: no numbers of their own. */}
-        <ConnectorSteps numbered={false} />
-      </section>
-      {form}
-    </div>
-  );
-  return <div className="pair-machine" data-layout="code">{form}</div>;
+  return <div className="pair-machine">{form}</div>;
 }

@@ -4,18 +4,15 @@ import { act } from "react";
 import { PairingDialog } from "./PairingDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import { VARIANTS_KEY } from "../../lib/variants";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
 /* "Connect to your machine" in the pairing dialog (Settings › Machines › Add a machine): the code first, the machine's
- * address only when it is needed, what came of connecting where it can be acted on — in each of the operator's layouts
- * (VARIANTS `pair-machine`). */
+ * address only when it is needed, what came of connecting where it can be acted on. */
 
-afterEach(() => { localStorage.removeItem(VARIANTS_KEY); localStorage.removeItem("sidevoice.deviceName"); });
+afterEach(() => { localStorage.removeItem("sidevoice.deviceName"); });
 
-function dialog(pairDevice: (...args: unknown[]) => Promise<unknown> = vi.fn(), layout?: string) {
-  if (layout) localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "pair-machine": layout }));
+function dialog(pairDevice: (...args: unknown[]) => Promise<unknown> = vi.fn()) {
   const store = createRoomStore();
   const closePairing = vi.fn(() => store.patch({ pairingOpen: false, pairingNote: "" }));
   window.sidevoiceActions = { pairDevice, closePairing } as unknown as typeof window.sidevoiceActions;
@@ -209,33 +206,6 @@ test("a machine that answers only without encryption: refused at a public addres
   expect(screen.getByRole("alert")).toHaveTextContent("This machine only answers without encryption, which a secure page can't reach. Pair from the Sidevoice desktop app, or turn on HTTPS in Sidevoice on that machine.");
   expect(screen.getByRole("alert")).toHaveAttribute("data-tone", "warning");
   expect(screen.getAllByRole("alert")).toHaveLength(1);
-});
-
-test("steps: what to run on the machine and this device's form are two numbered steps, and a recognised code checks off the first", () => {
-  dialog(vi.fn(), "steps");
-  const steps = document.querySelectorAll<HTMLElement>(".pair-step");
-  expect(steps).toHaveLength(2);
-  expect(within(steps[0]).getByRole("heading", { level: 3 })).toHaveAccessibleName("On your machine");
-  expect(within(steps[0]).getByText("npx sidevoice@latest install")).toBeVisible();
-  expect(within(steps[1]).getByRole("heading", { level: 3 })).toHaveAccessibleName("On this device");
-  expect(within(steps[1]).getByRole("textbox", { name: "Pairing code" })).toBeInTheDocument();
-  // Everything is in sight: nothing to unfold, and no Back or Next of its own.
-  expect(screen.queryByRole("button", { name: "How do I get a code?" })).toBeNull();
-  expect(screen.queryByRole("button", { name: /back|next/i })).toBeNull();
-  expect(steps[0].querySelector(".pair-step-mark")).toHaveTextContent("1");
-  paste(pairingCode());
-  expect(within(steps[0]).getByRole("heading", { level: 3 })).toHaveAccessibleName("On your machine, done");
-  expect(steps[0].querySelector(".pair-step-mark svg")).not.toBeNull();
-});
-
-test("split: the machine's column comes first, beside the form on a wide screen, and the dialog widens", () => {
-  const { element } = dialog(vi.fn(), "split");
-  expect(element()).toHaveAttribute("data-pair-layout", "split");
-  const side = screen.getByRole("region", { name: "On your machine" });
-  expect([...side.querySelectorAll(".ui-snippet code")].map((command) => command.textContent)).toEqual(["npx sidevoice@latest install", "npx sidevoice@latest pair-device"]);
-  expect(screen.queryByRole("button", { name: "How do I get a code?" })).toBeNull();
-  // In DOM order, the machine's column and then the form: stacked so on a narrow screen.
-  expect(side.compareDocumentPosition(code()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 test("a machine on a private network that answers only without encryption is reached so once the person agrees", async () => {

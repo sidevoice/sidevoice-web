@@ -113,15 +113,12 @@ export const JOURNEYS: Journey[] = [
     { id: "w5", caption: "When your turn ends: Smart (recommended) or Silence, patience with its timings.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } } },
     { id: "w6", caption: "Ready: into the room.", setup: { step: "W6", record: { basics_done: true, choice: "remote", turn_done: true } } },
   ] },
-  { id: "pairing", title: "Pairing a machine", note: "The code pasted in this device; what it says when the code cannot be used. The layout is the pair-machine variant.", shots: [
-    { id: "pair-open", caption: "Pairing: paste the code the machine gave (code, the default).", facts: PAIRING },
-    { id: "pair-open-steps", caption: "Variant steps: what to run on the machine, then this device, as two numbered steps.", facts: PAIRING, variants: { "pair-machine": "steps" } },
-    { id: "pair-open-split", caption: "Variant split: the machine's column beside the form from 720px.", facts: PAIRING, variants: { "pair-machine": "split" } },
+  { id: "pairing", title: "Pairing a machine", note: "The code pasted in this device; what it says when the code cannot be used.", shots: [
+    { id: "pair-open", caption: "Pairing: paste the code the machine gave.", facts: PAIRING },
     { id: "pair-expired", caption: "The code expired or was used: run pair-device again.", facts: PAIRING, pairRefusal: "The code expired" },
     { id: "pair-unreachable", caption: "The code's addresses did not answer: its address is asked for.", facts: PAIRING, pairRefusal: "unreachable" },
     { id: "pair-insecure", caption: "Plain http written to another machine: said under the address, nothing sent.", facts: PAIRING, pairRefusal: "address-insecure", pairAddress: "http://192.168.1.20:8765" },
     { id: "pair-http-private", caption: "Only plain http answers on a private network: what that exposes, and Connect without encryption.", facts: PAIRING, pairRefusal: "pairing-http-private", pairUrls: ["http://192.168.1.20:8765"] },
-    { id: "pair-http-private-split", caption: "The same in split: the button the form column's width.", facts: PAIRING, pairRefusal: "pairing-http-private", pairUrls: ["http://192.168.1.20:8765"], variants: { "pair-machine": "split" } },
     { id: "pair-http-only", caption: "Only plain http answers at a public address: refused.", facts: PAIRING, pairRefusal: "pairing-http-only", pairAddress: "203.0.113.5:8765" },
     { id: "pair-http-blocked", caption: "Only plain http answers, and this page is https: pair from the desktop app.", facts: PAIRING, pairRefusal: "pairing-http-blocked", pairUrls: ["http://192.168.1.20:8765"] },
   ] },

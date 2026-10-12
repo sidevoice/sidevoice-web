@@ -7,7 +7,7 @@ import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon } fro
 import { Textarea } from "../../components/ui/Input";
 import { localHostInstallController } from "../../services/local-host-install";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
-import { PairMachine, usePairMachineLayout } from "../pairing/PairMachine";
+import { PairMachine } from "../pairing/PairMachine";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { SpeechChoices, TranscriptionChoices, TurnChoices } from "../settings/VoiceSettings";
 import { Appearance } from "../settings/SettingsDialog";
@@ -291,9 +291,7 @@ export function Wizard() {
   </>;
 
   const ready = step === "W6";
-  // Connecting to another machine side by side (`split`) takes a wider setup on that step.
-  const pairLayout = usePairMachineLayout();
-  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined} data-pair-layout={pairLayout}
+  return <dialog ref={dialog} id="wizard" className="wizard-dialog" aria-labelledby="wizard-title" data-step={step} data-ready={ready || undefined}
     // Escape puts the setup off, except once it is done: Ready only goes on.
     onCancel={(event) => { event.preventDefault(); if (!ready) void onboarding.defer(); }}
     // On Ready, Escape is stopped at the key: a browser closes a modal anyway after a few cancelled Escapes. Closed

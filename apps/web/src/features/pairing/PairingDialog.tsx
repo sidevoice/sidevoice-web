@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { useRoomStore } from "../../state/room-store";
 import { hostTranslator } from "../settings/host-i18n";
-import { PairMachine, usePairMachineLayout } from "./PairMachine";
+import { PairMachine } from "./PairMachine";
 import "./pairing.css";
 
 /** Pairing this device with a machine (the node side: sidevoice-core `server/devices.py`): the machine issues a one-time code — shown by
@@ -15,7 +15,6 @@ import "./pairing.css";
 export function PairingDialog() {
   const t = hostTranslator();
   const prompt = useRoomStore((state) => state.pairing);
-  const layout = usePairMachineLayout();
   const [opened, setOpened] = useState(0);
   // Where the form's Connect goes: the dialog's footer, beside Cancel.
   const [actions, setActions] = useState<HTMLElement | null>(null);
@@ -41,7 +40,7 @@ export function PairingDialog() {
   const close = () => window.sidevoiceActions?.closePairing();
 
   return (
-    <dialog id="device-pairing" className="ui-dialog pair-dialog" data-layout="dialog" data-pair-layout={layout} aria-labelledby="device-pairing-title">
+    <dialog id="device-pairing" className="ui-dialog pair-dialog" data-layout="dialog" aria-labelledby="device-pairing-title">
       <DialogSurface titleId="device-pairing-title" title={t("noMachine.connect")} closeId="device-pairing-close" closeLabel={t("noMachine.closePairing")} onClose={close}
         footer={<><Button variant="ghost" tone="neutral" onClick={close}>{t("hosts.cancel")}</Button><span ref={setActions} className="pairing-submit" /></>}>
         {prompt.note && <div className="pairing-note" role="status"><Alert tone="warning" title={prompt.note} /></div>}

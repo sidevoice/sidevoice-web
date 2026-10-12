@@ -11,8 +11,6 @@
 .wizard-dialog[open] { display: flex; flex-direction: column; }
 /* Nothing of the room is behind it yet: the page's quiet ground, not a scrim over an empty room. */
 .wizard-dialog::backdrop { background: var(--sv-bg-subtle); }
-/* Another machine side by side (pair-machine `split`) takes a wider setup on its step, from 720px (pairing.css). */
-@media (min-width: 720px) { .wizard-dialog[data-step="W2r"][data-pair-layout="split"] { width: min(760px, calc(100vw - 32px)); } }
 
 .wizard-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); flex: none; min-height: 32px; padding: var(--sv-space-5) var(--sv-space-6) 0; }
 .wizard-brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
