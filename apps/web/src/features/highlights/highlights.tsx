@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { CloseIcon } from "../../components/ui/Icons";
 import { useVariant } from "../../lib/variants";
@@ -82,9 +82,11 @@ export function markSeen(id: string) {
   write({ ...current, [id]: { shownAt: current[id]?.shownAt ?? Date.now(), seenAt: Date.now() } });
 }
 
-/** The dot on a container (the gear, a section, a machine): shown while anything new is under it, said in words too. */
-export function NewDot({ label }: { label?: string }) {
-  return <span className="new-dot" aria-hidden={label ? undefined : true}>{label && <span className="sr-only">{label}</span>}</span>;
+
+/** An item's icon with, when something new is under it, the dot on the icon's corner (as on the Settings gear) — never
+ *  a dot of its own beside the item's state dot. Said in words to screen readers. */
+export function NewOnIcon({ icon, isNew, label }: { icon: ReactNode; isNew: boolean; label?: string }) {
+  return <span className="new-on-icon">{icon}{isNew && <span className="new-on-icon-dot" aria-hidden={label ? undefined : true}>{label && <span className="sr-only">{label}</span>}</span>}</span>;
 }
 
 /** "New" on the thing itself. Seen (half of it in view for a second) it is cleared, but stays on screen until this view

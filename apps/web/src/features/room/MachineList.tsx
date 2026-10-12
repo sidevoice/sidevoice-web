@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, EditIcon, MachinesIcon, ThisComputerIcon, WarningIcon } from "../../components/ui/Icons";
+import { AddIcon, ConnectorIcon, EditIcon, MachinesIcon, WarningIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
 import { InfoTip } from "../../components/ui/InfoTip";
@@ -18,7 +18,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
-import { NewDot, useHighlights } from "../highlights/highlights";
+import { NewOnIcon, useHighlights } from "../highlights/highlights";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -84,12 +84,15 @@ export function MachineNav({ current }: { current: boolean }) {
             data-name={copy.name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
-            {/* This computer, an icon before its name; the name cut short when long (whole in the title); a warning sign
-                after it when it is reached without encryption; the state's dot last. An entry never grows past the column. */}
-            {machine.local && <span className="machine-nav-here" title={t("hosts.thisComputer")}><ThisComputerIcon /><span className="sr-only">{t("hosts.thisComputer")}</span></span>}
+            {/* Its icon — this computer's, or another machine's, as the setup's two choices show them — with the "new" dot
+                on it; the name cut short when long (whole in the title); a warning sign when it is reached without
+                encryption; the state's dot last. An entry never grows past the column. */}
+            <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
+              <NewOnIcon icon={machine.local ? <MachinesIcon size={16} /> : <ConnectorIcon size={16} />} isNew={notice(machine)} />
+              {machine.local && <span className="sr-only">{t("hosts.thisComputer")}</span>}
+            </span>
             <span className="machine-nav-name">{copy.name}</span>
             {machine.insecure && <span className="machine-nav-insecure" aria-hidden="true"><WarningIcon size={14} /></span>}
-            {notice(machine) && <NewDot label={t("highlights.navNew")} />}
             <span className="machine-nav-dot" data-tone={state.tone} aria-hidden="true" />
           </button>
         );

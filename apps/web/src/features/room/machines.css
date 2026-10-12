@@ -83,8 +83,7 @@
 .ui-nav-item--sub { min-height: 34px; font-size: var(--sv-font-sm); }
 .machine-entry { min-width: 0; max-width: 100%; overflow: hidden; }
 .machine-nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
-.machine-nav-here { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
-.machine-entry .new-dot { margin-inline-start: 0; }
+.machine-nav-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
 /* Reached without encryption: its sign after the name, never pushed out by it. */
 .machine-nav-insecure { display: inline-grid; place-items: center; flex: none; color: var(--sv-warning); }
 .machine-nav-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-text-subtle); }

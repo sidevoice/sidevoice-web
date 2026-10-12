@@ -15,7 +15,7 @@ import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./Vo
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DeviceNameField } from "./DeviceNameField";
-import { NewDot, useHighlights } from "../highlights/highlights";
+import { NewOnIcon, useHighlights } from "../highlights/highlights";
 import { Alert } from "../../components/ui/Alert";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
@@ -182,8 +182,7 @@ export function SettingsDialog() {
               {SECTIONS.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
                 aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
                 onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
-                {section.icon}<span>{t(section.label)}</span>
-                {news.some((item) => item.section === section.id) && <NewDot label={t("highlights.navNew")} />}
+                <NewOnIcon icon={section.icon} isNew={news.some((item) => item.section === section.id)} label={t("highlights.navNew")} /><span>{t(section.label)}</span>
                 {((section.id === "transcription" && waits.stt) || (section.id === "voice" && waits.tts) || (section.id === "call" && waits.turn)) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>}
               </button>
               {/* Each machine under Machines, and Add a machine after them. */}
