@@ -1,3 +1,4 @@
+import { clampDeviceName } from "../services/device-name-rules.js";
 import { desktopComputerName } from "../services/desktop-host";
 
 const DEVICE_NAME_KEY = "sidevoice.deviceName";
@@ -20,11 +21,11 @@ export function deviceKind(nav: { userAgent?: string; platform?: string; userAge
 export function currentDeviceName(say: (kind: "browser", params: { browser: string; os: string }) => string) {
   try {
     const saved = globalThis.localStorage?.getItem(DEVICE_NAME_KEY)?.trim();
-    if (saved) return saved.slice(0, 60);
+    if (saved) return clampDeviceName(saved);
   } catch { /* Name it by what it is. */ }
   const computer = desktopComputerName();
-  if (computer) return computer.slice(0, 60);
+  if (computer) return clampDeviceName(computer);
   const { app, os } = deviceKind();
   if (!app && !os) return "Sidevoice";
-  return say("browser", { browser: app || "Browser", os: os || "?" }).slice(0, 60);
+  return clampDeviceName(say("browser", { browser: app || "Browser", os: os || "?" }));
 }

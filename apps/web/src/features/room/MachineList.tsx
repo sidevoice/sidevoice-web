@@ -80,7 +80,7 @@ export function MachineNav({ current }: { current: boolean }) {
         const copy = machineCopy(machine, status, t);
         const state = machineState(machine, copy, t);
         return (
-          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.spoken + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.spoken}, ${state.label} · ${copy.subtitle}`}
+          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={copy.spoken + " · " + state.label + " · " + copy.subtitle} aria-label={`${copy.spoken}, ${state.label} · ${copy.subtitle}${notice(machine) ? t("highlights.navNew") : ""}`}
             data-name={copy.name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
@@ -500,7 +500,7 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
           <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
         </span>
         : <div className="host-forget-row"><Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId("forget")}>{t("hosts.forget", { machine: name })}</Button></div>)}
-      {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.unavailable")}
+      {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.loadFailed")}
         action={<Button size="sm" onClick={() => void refresh()}>{t("hosts.retry")}</Button>} />}
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
       {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t(local ? "hosts.devices.emptyOthers" : "hosts.devices.empty")}</p>}

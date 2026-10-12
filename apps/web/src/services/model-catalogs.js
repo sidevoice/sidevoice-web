@@ -4,7 +4,7 @@
  * calls, `ModelCatalogs`, and the settings pane asks nothing else. */
 
 /**
- * @typedef {{reason?: {code: string, params?: Record<string, number>}, stale: boolean, detail?: string}} CatalogStatus
+ * @typedef {{reason?: {code: string, params?: Record<string, number>, detail?: string}, stale: boolean, detail?: string}} CatalogStatus
  *   How a catalogue stands, as the engine says: why it is not current (absent when it is), whether its models are the
  *   last kept, and what a provider said when it last refused.
  * @typedef {import('@sidevoice/engine').ModelInfo & Partial<import('@sidevoice/engine').LocalModelInfo> & {lastUsedAt?: number | null}} CatalogModel
@@ -26,6 +26,7 @@
  *   testCredential?(provider: string, key: string): Promise<CatalogStatus['reason'] | null>,
  * }} ModelCatalogs
  *   `testCredential`, where the host can, asks the provider with a key without keeping it: what it said against it
+ *   (its code, and the provider's own words as `detail` where the host passes them on)
  *   (its catalogue's reason), or null when it took it.
  *   `uninstall`, where the engine has it, takes a model off this device: every build of it.
  */
@@ -64,22 +65,6 @@ export function webInstallProgress(progress) {
   if (!files) return { fraction: null, done: null, total: null };
   const current = progress.size ? Math.min(1, (progress.received || 0) / progress.size) : 0;
   return { fraction: Math.min(1, ((progress.done || 0) + current) / files), done: null, total: null };
-}
-
-/** The desktop app's native engine install (`host.nativeEngine`, sidevoice-desktop's BRIDGE.md) as `install`: its
- *  bytes as the share done, and the signal as its `cancel(job)`.
- * @param {{install(model: string, engine: string | null, onProgress: (report: {done: number, total: number}) => void): Promise<void> & {job: string}, cancel(job: string): unknown}} nativeEngine
- * @returns {ModelCatalogs['install']}
- */
-export function nativeInstall(nativeEngine) {
-  return (model, { engine = null, onProgress, signal } = {}) => {
-    if (signal?.aborted) return Promise.reject(cancelled());
-    const running = nativeEngine.install(model, engine, (report) => onProgress?.({
-      fraction: report?.total ? Math.min(1, report.done / report.total) : null, done: report?.done ?? null, total: report?.total ?? null,
-    }));
-    signal?.addEventListener('abort', () => { void nativeEngine.cancel(running.job); }, { once: true });
-    return running.then(() => undefined, (error) => { throw error?.key === 'install_cancelled' ? cancelled() : error; });
-  };
 }
 
 /** What a catalogue that failed to answer stands as: its error as the reason it is not current. */

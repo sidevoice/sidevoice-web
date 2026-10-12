@@ -173,6 +173,10 @@
   font: var(--sv-weight-medium) var(--sv-font-md) / 1 var(--sv-font-sans); text-align: start; white-space: nowrap; cursor: pointer;
 }
 .ui-nav-item svg { flex: none; width: 18px; height: 18px; }
+/* An entry never overflows: its label gives way (an ellipsis), its marks (a dot, a badge) never. */
+.ui-nav-item { min-width: 0; overflow: hidden; }
+.ui-nav-item > span:not([class]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ui-nav-item > .ui-badge, .ui-nav-item > .new-dot { flex: none; }
 .ui-nav-item:hover { background: var(--sv-hover); color: var(--sv-text); }
 .ui-nav-item[aria-current="page"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); font-weight: var(--sv-weight-semibold); }
 .ui-nav-item:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
