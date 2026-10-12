@@ -116,11 +116,9 @@ function AvailableCard({ provider, name, catalog, onConnected }: ProviderProps &
     <div className="provider-card" role="group" aria-label={name} data-provider={provider}>
       <div className="provider-card-head">
         <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
-        <div className="provider-card-copy">
-          <strong>{name}</strong>
-          <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>
-        </div>
+        <strong>{name}</strong>
       </div>
+      <span className="provider-card-purpose">{usedFor(provider, catalog, t)}</span>
       <Button ref={connect} id={`provider-connect-${provider}`} className="provider-card-action" variant="secondary" size="sm"
         aria-label={t("keys.connectNamed", { provider: name })} aria-haspopup="dialog" onClick={() => setOpen(true)}><LinkIcon />{t("keys.connect")}</Button>
       {open && <KeyDialog provider={provider} name={name} replacing={null} onDone={() => { setOpen(false); onConnected(); }} onCancel={() => { setOpen(false); focusBack(); }} />}
@@ -168,7 +166,10 @@ export function ProviderKeys() {
   const yours = providers.filter((provider) => keys[provider.id] === true);
   const rest = providers.filter((provider) => keys[provider.id] !== true);
   const wanted = folded(query);
-  const shown = wanted ? rest.filter((provider) => folded(`${provider.name} ${usedFor(provider.id, provider.catalog, t)}`).includes(wanted)) : rest;
+  const matches = (provider: Provider) => folded(`${provider.name} ${usedFor(provider.id, provider.catalog, t)}`).includes(wanted);
+  const shown = wanted ? rest.filter(matches) : rest;
+  // Nothing to add matches, but one already connected does: said, rather than "no match" under its row.
+  const connectedMatch = wanted && !shown.length ? yours.find(matches) : undefined;
   // Moved between the lists: once drawn where it now is, its row (connected) or its Connect (disconnected) takes the focus.
   useEffect(() => {
     if (!moved) return;
@@ -178,7 +179,7 @@ export function ProviderKeys() {
   }, [moved]);
   const disconnected = (provider: Provider) => {
     // Its card must be there to take the focus: a search that would hide it is cleared.
-    if (wanted && !folded(`${provider.name} ${usedFor(provider.id, provider.catalog, t)}`).includes(wanted)) setQuery("");
+    if (wanted && !matches(provider)) setQuery("");
     setMoved({ provider: provider.id, to: "connect", said: t("keys.disconnected", { provider: provider.name }) });
   };
   return (
@@ -210,7 +211,7 @@ export function ProviderKeys() {
             {rest.length > 0 && <ProviderSearch query={query} onQuery={setQuery} matches={shown.length} t={t} />}
           </header>
           {!rest.length ? <p className="muted">{t("keys.section.allConnected")}</p>
-            : !shown.length ? <p className="muted">{t("keys.search.none", { query: query.trim() })}</p>
+            : !shown.length ? <p className="muted">{connectedMatch ? t("keys.search.connected", { provider: connectedMatch.name }) : t("keys.search.none", { query: query.trim() })}</p>
             : <div className="provider-grid">
                 {shown.map((provider) => <AvailableCard key={provider.id} provider={provider.id} name={provider.name} catalog={provider.catalog}
                   onConnected={() => setMoved({ provider: provider.id, to: "row", said: t("keys.connected", { provider: provider.name }) })} />)}

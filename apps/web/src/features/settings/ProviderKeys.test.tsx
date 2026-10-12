@@ -171,6 +171,10 @@ test("search filters Add a provider by name or use, any case or accent; none say
   expect(fireEvent.keyDown(search, { key: "Escape" })).toBe(false);
   expect(search).toHaveValue("");
   expect(card("elevenlabs")).toBeInTheDocument();
+  cleanup();
+  renderKeys();
+  fireEvent.change(screen.getByRole("searchbox", { name: "Search providers" }), { target: { value: "eleven" } });
+  expect(add()).toHaveTextContent("ElevenLabs is already connected, under Your providers.");
 });
 
 test("a kept key with a problem says it in words, its state in place of Connected, with the one thing to do: refused, Replace key; unreachable, Test again", async () => {

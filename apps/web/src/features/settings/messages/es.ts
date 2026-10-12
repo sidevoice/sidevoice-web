@@ -603,6 +603,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "keys.search.label": "Buscar proveedores",
   "keys.search.clear": "Borrar la búsqueda",
   "keys.search.none": "Ningún proveedor coincide con «{query}».",
+  "keys.search.connected": "{provider} ya está conectado, en Tus proveedores.",
   "keys.search.one": "1 proveedor",
   "keys.search.many": "{count} proveedores",
   "keys.inUseFor": "En uso: {uses}",

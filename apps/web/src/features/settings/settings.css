@@ -91,10 +91,10 @@
 .provider-row[data-state="rejected"] .provider-row-problem > svg, .provider-row[data-state="unreadable"] .provider-row-problem > svg { color: var(--sv-danger); }
 .provider-key-detail { color: var(--sv-text-muted); }
 .provider-row-action { flex: none; margin-top: 4px; }
-.provider-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: var(--sv-space-3); }
+/* As many across as fit at 11rem each (three in Settings' column), so a narrow window takes two rather than squeezing. */
+.provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); align-items: start; gap: var(--sv-space-3); }
 .provider-card { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
-.provider-card-head { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; }
-.provider-card-copy { display: grid; gap: 2px; min-width: 0; }
+.provider-card-head { display: flex; align-items: center; gap: var(--sv-space-3); min-width: 0; overflow-wrap: anywhere; }
 .provider-search { position: relative; display: flex; align-items: center; flex: none; width: 14rem; }
 .provider-search .ui-input { width: 100%; padding-inline: 32px; }
 .provider-search .ui-input::-webkit-search-cancel-button { appearance: none; }
@@ -110,15 +110,14 @@
 .provider-disconnect-dialog p { margin: 0 0 var(--sv-space-3); }
 .provider-disconnect-in-use { display: flex; align-items: flex-start; gap: var(--sv-space-1-5); }
 .provider-disconnect-in-use svg { flex: none; margin-top: 3px; color: var(--sv-warning); }
-@media (max-width: 760px) { .provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 599px) {
   .providers-card { padding: var(--sv-space-4); }
   .providers-card-head { flex-direction: column; align-items: stretch; }
   .provider-search { width: 100%; }
+  /* The row's text takes the width beside the mark; Disconnect goes under it, aligned with it. */
   .provider-row { flex-wrap: wrap; }
+  .provider-row-copy { flex-basis: calc(100% - 52px); }
   .provider-row-action { margin: 0 0 0 52px; }
-  .provider-grid { grid-template-columns: minmax(0, 1fr); }
-  .provider-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: stretch; }
 }
 
 /* "Saved", beside the title for a moment; the error line at the content's head. */

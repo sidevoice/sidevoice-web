@@ -601,6 +601,7 @@ export const en = {
   "keys.search.label": "Search providers",
   "keys.search.clear": "Clear search",
   "keys.search.none": "No providers match “{query}”.",
+  "keys.search.connected": "{provider} is already connected, under Your providers.",
   "keys.search.one": "1 provider",
   "keys.search.many": "{count} providers",
   "keys.inUseFor": "In use: {uses}",
