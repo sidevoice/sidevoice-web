@@ -238,6 +238,28 @@ function HostDetail({ machine, copy, notice, untitled = false }: { machine: Mach
       <section className="host-section">
         <MachineDevicesPanel machine={machine} name={copy.name} />
       </section>
+      {!machine.local && machine.pairingId && <ForgetMachine machine={machine} name={copy.name} />}
+    </section>
+  );
+}
+
+/** Forgetting a remote machine, at its page's foot: asked first — it unpairs this device from it — and, the machine
+ *  not answering, done here and told to it when it is back (the controller keeps what it needs to). */
+function ForgetMachine({ machine, name }: { machine: MachineView; name: string }) {
+  const t = hostTranslator();
+  const [asking, setAsking] = useState(false);
+  const open = useRef<HTMLButtonElement>(null);
+  return (
+    <section className="host-section host-forget" aria-label={t("hosts.forget", { machine: name })}>
+      {asking ? <div className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
+          <p>{t("hosts.forgetHint", { machine: name })}</p>
+          <p className="muted">{machine.state === "connected" ? t("hosts.confirmForget") : t("hosts.confirmForgetOffline", { machine: name })}</p>
+          <div className="host-forget-actions">
+            <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => { setAsking(false); requestAnimationFrame(() => open.current?.focus()); }}>{t("hosts.cancel")}</Button>
+            <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
+          </div>
+        </div>
+        : <Button ref={open} variant="danger" size="sm" onClick={() => setAsking(true)}>{t("hosts.forget", { machine: name })}</Button>}
     </section>
   );
 }
@@ -533,14 +555,6 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
       {usable && loading && <p className="muted" role="status">{t("hosts.working")}</p>}
       {/* The list is read once as the page opens; reading it again is offered only when that failed. */}
       {!usable && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
-      {/* Not answering, its list cannot show this device's row: forgetting it is offered here, the machine told when it is
-          back (the controller keeps what it needs to). */}
-      {!usable && !local && machine.pairingId && (confirmId === "forget" ? <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
-          <span className="muted">{t("hosts.confirmForgetOffline", { machine: name })}</span>
-          <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
-          <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
-        </span>
-        : <div className="host-forget-row"><Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId("forget")}>{t("hosts.forget", { machine: name })}</Button></div>)}
       {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.loadFailed")}
         action={<Button size="sm" onClick={() => void refresh()}>{t("hosts.retry")}</Button>} />}
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
@@ -558,15 +572,6 @@ function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: st
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
-            {device.current && !local && machine.pairingId && (confirmId === device.device_id ? (
-              <span className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
-                <span className="muted">{machine.state === "connected" ? t("hosts.confirmForget") : t("hosts.confirmForgetOffline", { machine: name })}</span>
-                <Button variant="danger" size="sm" onClick={() => void window.sidevoiceActions?.forgetMachine(machine.pairingId!)}>{t("hosts.forgetConfirm")}</Button>
-                <Button variant="ghost" size="sm" autoFocus onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
-              </span>
-            ) : <Tooltip content={t("hosts.forgetHint", { machine: name })}>
-              <Button variant="ghost" tone="danger" size="sm" onClick={() => setConfirmId(device.device_id)}>{t("hosts.forget", { machine: name })}</Button>
-            </Tooltip>)}
             {usable && device.kind !== "local" && !device.current && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>

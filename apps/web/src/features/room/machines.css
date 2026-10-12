@@ -146,3 +146,8 @@
 
 /* This device's page: its name as the title, a pencil after it that takes you to where it is renamed (General). */
 .this-device-title { display: inline-flex; align-items: center; gap: var(--sv-space-1); }
+
+/* Forgetting a remote machine: its own action at the page's foot, asked first. */
+.host-forget { display: grid; justify-items: start; gap: var(--sv-space-2); }
+.host-forget p { margin: 0; }
+.host-forget-actions { display: flex; gap: var(--sv-space-2); }

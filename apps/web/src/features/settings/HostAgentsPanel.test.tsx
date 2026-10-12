@@ -402,3 +402,35 @@ test("a row's status is one of three — Connected, Not connected, Needs attenti
   act(() => store.patch({ hostAgents: { fp: ready([known("codex", { registration: "foreign", actionable: false })]) } }));
   expect(within(row()).getByRole("button", { name: "Replace manually" })).toBeInTheDocument();
 });
+
+test("by hand, a remote machine's steps say where to run them; this device's don't", () => {
+  const remote = pairing("fp-nuc", "NUC");
+  const here: PairingSummary = { ...pairing("fp-local", "MacBook"), local: true };
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  for (const [fp, where] of [["fp-nuc", "Run these on NUC:"], ["fp-local", null]] as const) {
+    const store = createRoomStore();
+    act(() => store.patch({ pairings: [here, remote], machinesReady: true, hostAgents: { [fp]: ready() } }));
+    const view = render(<RoomProvider store={store}><HostAgentsPanel fp={fp} /></RoomProvider>);
+    const row = document.querySelector(".host-agent-row") as HTMLElement;
+    fireEvent.click(within(row).getByText("I’ll do it myself"));
+    const line = row.querySelector(".host-agent-where");
+    expect(line?.textContent ?? null).toBe(where);
+    // Above the steps.
+    if (line) expect(line.nextElementSibling).toHaveClass("host-agent-steps");
+    expect(steps(row).length).toBeGreaterThan(0);
+    view.unmount();
+  }
+});
+
+test("in Spanish, a remote machine's steps say Ejecuta esto en …", () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  try {
+    const store = createRoomStore();
+    setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+    act(() => store.patch({ pairings: [pairing("fp-nuc", "NUC")], machinesReady: true, hostAgents: { "fp-nuc": ready() } }));
+    render(<RoomProvider store={store}><HostAgentsPanel fp="fp-nuc" /></RoomProvider>);
+    const row = document.querySelector(".host-agent-row") as HTMLElement;
+    fireEvent.click(within(row).getByText("Lo hago yo"));
+    expect(row.querySelector(".host-agent-where")).toHaveTextContent("Ejecuta esto en NUC:");
+  } finally { localStorage.removeItem("sidevoice.settings"); }
+});

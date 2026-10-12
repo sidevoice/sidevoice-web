@@ -268,6 +268,7 @@ export const en = {
   "agents.notNow": "Not now",
   "agents.manual.toggle": "I’ll do it myself",
   "agents.manual.command": "Command",
+  "agents.manual.runOn": "Run these on {machine}:",
   "agents.manual.commands": "Commands",
   "agents.manual.file": "File: {file}",
   "agents.manual.snippet": "Configuration",
