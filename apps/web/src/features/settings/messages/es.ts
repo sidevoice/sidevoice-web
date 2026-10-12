@@ -3,6 +3,7 @@ import type { HostMessageKey } from "./en";
 export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.title": "Máquinas",
   "hosts.none": "Este dispositivo aún no está emparejado con ninguna máquina.",
+  "hosts.noneOther": "Aún no hay otras máquinas.",
   "hosts.unnamed": "Máquina sin nombre",
   "hosts.add": "Añadir una máquina",
   "hosts.use": "Usar {machine}",

@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -9,7 +9,8 @@ import { Group, Row, Section } from "../../components/ui/Card";
 import { Segmented } from "../../components/ui/Tabs";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { readThemePreference, setThemePreference, type ThemePreference } from "../../lib/theme";
-import { MachineList, MachineNav } from "../room/MachineList";
+import { MachineList, MachineNav, ThisComputerSettings } from "../room/MachineList";
+import { useThisComputerSection } from "../../state/this-computer";
 import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
@@ -36,6 +37,7 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: ReactNode }[] = [
   { id: "voice", label: "settings.section.voice", icon: <VoicesIcon /> },
   { id: "call", label: "settings.section.call", icon: <CallSettingsIcon /> },
   { id: "providers", label: "settings.section.providers", icon: <IntegrationsIcon /> },
+  { id: "this-computer", label: "hosts.thisComputer", icon: <ThisComputerIcon size={18} /> },
   { id: "machines", label: "settings.section.machines", icon: <MachinesIcon /> },
   { id: "advanced", label: "settings.section.advanced", icon: <AdvancedIcon /> },
 ];
@@ -147,6 +149,8 @@ export function SettingsDialog() {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
+  // This computer as a section of its own (`this-computer` own-section), where this device can host.
+  const ownComputer = useThisComputerSection();
   // A section changed (or a machine within Machines) starts at its top, not where the last one was scrolled to.
   const content = useRef<HTMLDivElement>(null);
   const machine = useRoomStore((state) => state.facts.machinesView?.machine ?? null);
@@ -184,7 +188,7 @@ export function SettingsDialog() {
           {/* No Save: every setting applies as it changes; what fails says so here. */}
           <form id="language-form" className="settings-layout">
             <nav className="ui-nav settings-nav" aria-label={t("settings.sections")}>
-              {SECTIONS.map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
+              {SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer).map((section) => <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className="ui-nav-item" aria-controls={"pane-" + section.id}
                 aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined}
                 onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                 <NewOnIcon icon={section.icon} isNew={news.some((item) => item.section === section.id)} label={t("highlights.navNew")} /><span>{t(section.label)}</span>
@@ -202,6 +206,7 @@ export function SettingsDialog() {
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
                 <Pane id="call" current={current}><CallSettings t={t} /></Pane>
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
+                {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
                 <Pane id="machines" current={current}><MachineList /></Pane>
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
               </div>

@@ -1,6 +1,7 @@
 export const en = {
   "hosts.title": "Machines",
   "hosts.none": "This device is not paired with a machine yet.",
+  "hosts.noneOther": "No other machines yet.",
   "hosts.unnamed": "Unnamed machine",
   "hosts.add": "Add a machine",
   "hosts.use": "Use {machine}",

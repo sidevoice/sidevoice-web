@@ -799,8 +799,11 @@ function discardChangedHostAgents(previous,next){
 function scanPairedAgents(rescan=false){
  for(const pairing of pairings.list)if(!pairing.revoked)void hostAgentsController.load(pairing.fp,{rescan});
 }
+// This computer in a section of its own (VARIANTS this-computer own-section, where this device can host): its agents and
+// its preparing are asked for there, not under Machines.
+function ownComputerSection(){try{return JSON.parse(localStorage.getItem('sidevoice.variants')||'{}')?.['this-computer']==='own-section'&&state.localHostAvailable}catch{return false}}
 function openAgentSettings(fp){
- settingsSection('machines');
+ settingsSection(ownComputerSection()&&localPairing?.fp===fp?'this-computer':'machines');
  roomStore.patch({settingsAgentRequest:{fp,id:++settingsAgentRequestId}});
 }
 function deviceRows(data){
@@ -2000,7 +2003,7 @@ roomStore.patch({voiceSettings:readVoiceSettings(pageStorage()),deleteUnusedDays
 $('settings-open').onclick=()=>{try{
  // Every opening reads each paired machine's agents again.
  scanPairedAgents(true);
- if(![...links.values()].some(link=>link.base!=null))settingsSection('machines');
+ if(![...links.values()].some(link=>link.base!=null))settingsSection(ownComputerSection()&&!localPairing?'this-computer':'machines');
  // What was chosen and is still on its way stays chosen across openings.
  roomStore.patch({voiceDraft:state.voiceDraft||state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);

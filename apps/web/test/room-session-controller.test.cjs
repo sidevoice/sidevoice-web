@@ -696,6 +696,23 @@ test('A local row survives reload with no native pairing',async()=>{
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
 });
 
+test('With this computer in its own section, its agents are asked for there and another machine\'s under Machines',async()=>{
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(s.run('roomStore.getState()').facts.localHostAvailable,true);
+ // The harness mirrors each fact as a global, `settingsSection` among them: the controller's own helper is put back.
+ Object.defineProperty(s.context,'settingsSection',{value:name=>s.run('roomStore').patch({settingsSection:name}),writable:true,configurable:true});
+ const section=fp=>{s.run(`openAgentSettings(${JSON.stringify(fp)})`);return s.run('roomStore.getState()').facts.settingsSection};
+ // A (the default): every machine's agents are under Machines.
+ assert.equal(section('fp-local'),'machines');
+ s.saved['sidevoice.variants']=JSON.stringify({'this-computer':'own-section'});
+ assert.equal(section('fp-local'),'this-computer');
+ assert.equal(section(PAIRED.fp),'machines');
+});
+
 test('A native status event that wins the initial state read still completes machine readiness',async()=>{
  let resolveInitialState,onStatus;
  const bridge={state:()=>new Promise(resolve=>{resolveInitialState=resolve}),subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>null};

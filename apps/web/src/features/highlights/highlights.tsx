@@ -6,6 +6,7 @@ import { useRoomStore } from "../../state/room-store";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
 import { hostTranslator } from "../settings/host-i18n";
 import { useWhatsNew, useWhatsNewPlace } from "../whats-new/WhatsNew";
+import { useThisComputerSection } from "../../state/this-computer";
 import "./highlights.css";
 
 /* What is new to this person, marked where it is, one way across the app: a dot on the Settings gear, a dot on the
@@ -74,8 +75,11 @@ function useCandidates(): Highlight[] {
   const features = useWhatsNew().items;
   useSyncExternalStore(subscribePresent, presentNow, presentNow);
   const active = new Set(pairings.filter((pairing) => !pairing.revoked).map((pairing) => pairing.fp));
+  // This computer's agents are its own section's when it has one (`this-computer` own-section).
+  const ownComputer = useThisComputerSection();
+  const localFp = useRoomStore((state) => state.machines.find((machine) => machine.local)?.pairingId ?? null);
   const agents = Object.entries(hostAgents).filter(([fp, listing]) => active.has(fp) && !!listing.value)
-    .flatMap(([fp, listing]) => (listing.value?.agents ?? []).filter(actionableAgent).map((agent) => ({ id: `agent:${fp}:${agent.id}`, section: "machines", machine: fp })));
+    .flatMap(([fp, listing]) => (listing.value?.agents ?? []).filter(actionableAgent).map((agent) => ({ id: `agent:${fp}:${agent.id}`, section: ownComputer && localFp === fp ? "this-computer" : "machines", machine: fp })));
   return [...agents, ...(dots ? features.filter((feature) => present.has(`feature:${feature.id}`)).map((feature) => ({ id: `feature:${feature.id}`, section: feature.section })) : [])];
 }
 

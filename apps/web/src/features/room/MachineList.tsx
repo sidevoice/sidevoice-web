@@ -16,6 +16,7 @@ import { normalizeLocalHostBridgeError } from "../../services/local-host-install
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
+import { useThisComputerSection } from "../../state/this-computer";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewOnIcon, useHighlights } from "../highlights/highlights";
@@ -60,6 +61,13 @@ function useNotice() {
   return (machine: MachineView) => !!machine.pairingId && news.some((item) => item.machine === machine.pairingId);
 }
 
+/** The machines Machines lists: every one, or, with this computer in its own section, the other machines. */
+function useListedMachines() {
+  const own = useThisComputerSection();
+  const machines = useRoomStore((state) => state.machines);
+  return own ? machines.filter((machine) => !machine.local) : machines;
+}
+
 /** The machine shown: the one chosen, else the first. */
 function shownMachine(machines: MachineView[], picked: string | null) {
   return (picked ? machines.find((machine) => machine.id === picked) : null) ?? machines[0] ?? null;
@@ -68,7 +76,7 @@ function shownMachine(machines: MachineView[], picked: string | null) {
 /** The machines under Machines in Settings' navigation, and Add a machine after them. */
 export function MachineNav({ current }: { current: boolean }) {
   const t = hostTranslator();
-  const machines = useRoomStore((state) => state.machines);
+  const machines = useListedMachines();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
   const store = useContext(RoomStoreContext);
@@ -104,13 +112,14 @@ export function MachineNav({ current }: { current: boolean }) {
 
 export function MachineList() {
   const t = hostTranslator();
-  const machines = useRoomStore((state) => state.machines);
+  const machines = useListedMachines();
+  const own = useThisComputerSection();
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
   const store = useContext(RoomStoreContext);
   const notice = useNotice();
-  const localMachine = machines.find((machine) => machine.local) ?? null;
+  const localMachine = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
   const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
 
   // Asked for a machine's agents (an agent waiting): that machine's page, once per request. `machines` is a new list
@@ -131,10 +140,31 @@ export function MachineList() {
     <Section id="machines" title={t("hosts.title")} description={t("hosts.description")}>
       {/* A phone's sections are a strip across the top, with no room for the machines: they come with the pane. */}
       <div className="machines-inline"><MachineNav current /></div>
-      {machines.length === 0 && <div className="machines-empty"><p className="muted">{t("hosts.none")}</p>
+      {machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
         <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.add")}</Button></div>}
       {shown && copy && <HostDetail machine={shown} copy={copy} notice={notice(shown)} />}
-      <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />
+      {/* Preparing this computer is its own section's, when it has one. */}
+      {!own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />}
+    </Section>
+  );
+}
+
+/** This computer as a section of its own (`this-computer` own-section): not prepared, preparing it — the setup's
+ *  block; prepared, its page as Machines shows it — whether it answers, its Sidevoice service, its agents, the devices
+ *  paired with it. */
+export function ThisComputerSettings() {
+  const t = hostTranslator();
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
+  const notice = useNotice();
+  const copy = local ? machineCopy(local, status, t) : null;
+  return (
+    <Section id="this-computer" title={t("hosts.thisComputer")}>
+      {local && copy ? <HostDetail machine={local} copy={copy} notice={notice(local)} />
+        : <div className="this-computer-prepare">
+            <p>{t("localInstall.description")}</p>
+            <LocalHostInstallEntry showCta source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
+          </div>}
     </Section>
   );
 }
