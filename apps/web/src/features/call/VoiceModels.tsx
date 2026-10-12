@@ -1,12 +1,13 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Popover } from "../../components/ui/Popover";
 import { Button } from "../../components/ui/Button";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
 import { useModelState } from "../settings/ModelSetup";
+import { openSettings } from "../settings/open-settings";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import type { CallMessageKey } from "./messages/en";
 
@@ -75,7 +76,8 @@ function Chip({ slot, label, icon, details }: { slot: Slot; label: string; icon:
  *  key, or its settings. None while it downloads. */
 function SlotAction({ slot, t }: { slot: Slot; t: CallTranslate }) {
   const section = slot.task === "stt" ? "transcription" : slot.task === "tts" ? "voice" : "call";
-  const settings = (where: string) => { window.sidevoiceActions?.showSettingsSection?.(where); document.getElementById("settings-open")?.click(); window.sidevoiceUI?.store?.patch({ settingsSection: where }); };
+  const store = useContext(RoomStoreContext);
+  const settings = (where: string) => openSettings({ section: where }, store);
   if (slot.status === "downloading" || slot.status === "verifying" || slot.status === "loading") return null;
   if (slot.status === "needsKey") return <Button size="sm" onClick={() => settings("providers")}>{t("voiceModels.addKey")}</Button>;
   if (slot.status === "absent" || slot.status === "failed") return <Button size="sm" onClick={() => void window.sidevoiceActions?.installVoiceModel?.(slot.task as never)}>

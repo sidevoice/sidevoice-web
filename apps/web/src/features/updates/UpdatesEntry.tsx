@@ -7,6 +7,7 @@ import { useVariant } from "../../lib/variants";
 import { useVoiceSwitch } from "../../state/call-model";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { openSettings } from "../settings/open-settings";
 import { appUpdater, updateLater, useUpdates, type UpdateItem } from "./useUpdates";
 import "./updates.css";
 
@@ -32,9 +33,7 @@ function UpdateRow({ item, inCall, t }: { item: UpdateItem; inCall: boolean; t: 
     else {
       // This computer's machine page, at its update.
       const local = machines.find((machine) => machine.local);
-      window.sidevoiceActions?.showSettingsSection?.("machines");
-      if (local) store?.patch({ machinesView: { machine: local.id } });
-      document.getElementById("settings-open")?.click();
+      openSettings({ section: "machines", machine: local?.id ?? null }, store);
     }
   };
   return (

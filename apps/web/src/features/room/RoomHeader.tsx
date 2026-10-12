@@ -110,12 +110,6 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
 
 
 
-/** Settings from the conversations' foot, where it sits on a desktop: the header's own button, which the runtime opens
- *  Settings from, pressed — kept in the header (shown only on a phone, which has no column), so it is the only one. */
-export function openSettings() {
-  document.getElementById("settings-open")?.click();
-}
-
 /* A phone's gear, at the header's right; on a desktop Settings sits at the conversations' foot, which presses this
  * button. The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
  * onClick it resets the element's handler on every render), so its wrapper hears it. With agents waiting, Settings

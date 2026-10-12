@@ -32,6 +32,10 @@ export interface SessionFacts {
  hostAgents: Record<string, HostAgentsState>; settingsAgentRequest: SettingsAgentRequest | null;
   /** The section Settings shows. */
   settingsSection: string;
+  /** On a phone, whether Settings shows the list of its sections or a section's page (`settingsSection`, and within
+   *  Machines the machine `machinesView` names): the list at each opening, unless what opens it asks for a page. A
+   *  desktop shows its sections beside the page and reads `settingsSection` alone. */
+  settingsLevel: 'list' | 'page';
   /** When a setting was last kept (there is no Save: each applies as it changes), for a moment's "Saved". */
   settingsSavedAt: number;
   /** The interface language this device keeps; '' is Automatic (the system's, followed as it is). */
@@ -44,7 +48,8 @@ export interface SessionFacts {
   audioLost: { input?: string; output?: string } | null;
   /** A newer build of this page the room serves, held while a call is on (the updates' list says so). */
   webUpdate: string | null;
-  /** The machine whose page Settings → Machines shows (MachineNav); null is the first. */
+  /** The machine whose page Settings → Machines shows (MachineNav); null is the first on a desktop, and the list of them
+   *  on a phone. */
   machinesView: { machine: string | null };
  localHostAvailable: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its

@@ -88,8 +88,8 @@ export const BASE_FACTS: Record<string, unknown> = {
 
 const DONE: Partial<OnboardingRecord> = { basics_done: true, choice: "remote", agents_done: true, turn_done: true, completed_at: 1 };
 const openSettings = (section: string) => (doc: Document) => {
-  (doc.defaultView as unknown as { __journeyStore: { patch(facts: unknown): void } }).__journeyStore.patch({ settingsSection: section });
-  // Modal, as the runtime opens it: above the room's header.
+  (doc.defaultView as unknown as { __journeyStore: { patch(facts: unknown): void } }).__journeyStore.patch({ settingsSection: section, settingsLevel: "page" });
+  // Modal, as the runtime opens it: above the room's header; on a phone at the section's page, as an opening asked for.
   const dialog = doc.getElementById("language-settings") as HTMLDialogElement | null;
   if (dialog && !dialog.open) dialog.showModal();
 };

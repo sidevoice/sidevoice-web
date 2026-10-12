@@ -2003,7 +2003,9 @@ roomStore.patch({voiceSettings:readVoiceSettings(pageStorage()),deleteUnusedDays
 $('settings-open').onclick=()=>{try{
  // Every opening reads each paired machine's agents again.
  scanPairedAgents(true);
- if(![...links.values()].some(link=>link.base!=null))settingsSection(ownComputerSection()&&!localPairing?'this-computer':'machines');
+ // Opened with no machine reachable, it shows where to get one; pressed again while open (Advanced › Reset), it stays
+ // where it is.
+ if(!$('language-settings').open&&![...links.values()].some(link=>link.base!=null))settingsSection(ownComputerSection()&&!localPairing?'this-computer':'machines');
  // What was chosen and is still on its way stays chosen across openings.
  roomStore.patch({voiceDraft:state.voiceDraft||state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
@@ -2013,8 +2015,8 @@ $('settings-open').onclick=()=>{try{
  if(!$('language-settings').open)$('language-settings').showModal();
 }catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
 // Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
-// (no machine yet) or on an agent waiting to be connected.
-function settingsSection(name){roomStore.patch({settingsSection:name})}
+// (no machine yet) or on an agent waiting to be connected — that section's own page on a phone, not the list of them.
+function settingsSection(name){roomStore.patch({settingsSection:name,settingsLevel:'page'})}
 $('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();saveLanguage('');
  roomStore.patch({voiceDraft:defaultVoiceSettings()});void applyVoiceSettings();$('reset-settings-note').textContent='Restablecido a los valores por defecto.'};
 $('settings-close').onclick=()=>$('language-settings').close();

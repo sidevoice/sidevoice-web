@@ -25,8 +25,8 @@ export function initialSessionFacts() {
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
         // Host-owned agent state is keyed by fingerprint.
         hostAgents: {}, settingsAgentRequest: null,
-        // The section Settings shows (SettingsDialog).
-        settingsSection: 'general', machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
+        // The section Settings shows (SettingsDialog), and whether a phone shows that section's page or the list of them.
+        settingsSection: 'general', settingsLevel: 'list', machinesView: { machine: null }, settingsSavedAt: 0, uiLanguage: '', webUpdate: null, settingsFocus: null, audioDevices: null, audioLost: null,
         localHostAvailable: false, localHostStatus: { state: 'absent' },
         // How each paired machine is reached, by fingerprint: `{reach, via}` — reach 'ok', 'checking', 'away', 'offline'
         // or 'revoked'; via 'room' (through a relay) or 'node' (directly). And the machine the call is with, if any.

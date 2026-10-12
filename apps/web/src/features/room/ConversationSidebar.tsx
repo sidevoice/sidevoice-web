@@ -16,8 +16,8 @@ import { RowHearIt } from "../call/HearIt";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
-import { openSettings } from "./RoomHeader";
 import { hostTranslator } from "../settings/host-i18n";
+import { openSettings } from "../settings/open-settings";
 import { UpdatesEntry, useUpdatesEntry } from "../updates/UpdatesEntry";
 import "./room.css";
 
