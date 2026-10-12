@@ -119,7 +119,11 @@
 /* The list scrolls above its foot. */
 .conversation-sidebar { overflow: hidden; }
 .conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
-.sidebar-foot { flex: none; display: flex; justify-content: center; padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+/* The sidebar's foot: its entries stacked, each the full width (Updates over Settings), never squeezed on one line;
+   collapsed to the rail, their icons one over the other in the middle. */
+.sidebar-foot { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: var(--sv-space-1); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.conversation-sidebar:not([data-collapsed]) .sidebar-foot > * { width: 100%; min-width: 0; }
+.conversation-sidebar[data-collapsed] .sidebar-foot { align-items: center; }
 
 /* Settings at a desktop's conversations' foot, the header's gear pressed from there; a phone keeps the gear at its
  * header's right. The list ends with New conversation. */

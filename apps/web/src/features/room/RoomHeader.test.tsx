@@ -65,6 +65,16 @@ test("Settings sits at the conversations' foot: it opens Settings through the he
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
 
+test("an update waiting puts its entry in the sidebar's foot, above Settings, each its own child", () => {
+  const store = room();
+  act(() => store.patch({ webUpdate: "b2" } as never));
+  const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
+  const children = [...foot.children];
+  expect(children).toHaveLength(2);
+  expect(children[0]).toContainElement(foot.querySelector(".updates-entry") as HTMLElement);
+  expect(children[1]).toContainElement(foot.querySelector(".sidebar-settings") as HTMLElement);
+});
+
 test("the chevron after the header's avatars drops the conversations and puts them away again, turning with them", () => {
   room();
   const chevron = document.querySelector<HTMLButtonElement>(".header-conversations .conversations-toggle")!;
