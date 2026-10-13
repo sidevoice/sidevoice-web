@@ -446,3 +446,24 @@ test("in Spanish, a remote machine's steps say Ejecuta esto en …", () => {
     expect(row.querySelector(".host-agent-where")).toHaveTextContent("Ejecuta esto en NUC:");
   } finally { localStorage.removeItem("sidevoice.settings"); }
 });
+
+test("a registration this app does not know reads as unknown, with nothing to do unless the connector says it can connect (core#112)", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const row = () => document.querySelector(".host-agent-row") as HTMLElement;
+  const status = () => row().querySelector(".host-agent-status") as HTMLElement;
+  const actions = () => [...row().querySelectorAll(".host-agent-actions button")].map((button) => button.textContent);
+  // A newer connector's value, extra fields and all: not "Not connected", no Connect, no steps by hand.
+  const newer = { registration: "pending-approval", approval: { by: "admin" } } as unknown as Partial<DetectedAgent>;
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { ...newer, can: undefined, connect: "auto" })]) } }));
+  expect(status().firstChild?.textContent).toBe("Connection status is unknown");
+  expect(status()).toHaveClass("muted");
+  expect(actions()).toEqual([]);
+  // Where the connector itself says it can connect, Connect is there; still nothing by hand, and nothing marked new.
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", newer)]) } }));
+  expect(status().firstChild?.textContent).toBe("Connection status is unknown");
+  expect(actions()).toEqual(["Connect"]);
+  act(() => store.patch({ hostAgents: { fp: ready([known("codex", { ...newer, can: { connect: false, update: false, disconnect: false } })]) } }));
+  expect(actions()).toEqual([]);
+});

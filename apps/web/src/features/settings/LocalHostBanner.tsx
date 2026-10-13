@@ -3,7 +3,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { RefreshIcon } from "../../components/ui/Icons";
 import type { LocalHostAction } from "./local-host-status";
-import { canRunLocalHostAction, hostStatusText, runLocalHostAction } from "./local-host-status";
+import { canRunLocalHostAction, hostStatusText, knownLocalHostState, runLocalHostAction } from "./local-host-status";
 import { hostTranslator } from "./host-i18n";
 import { useRoomStore } from "../../state/room-store";
 import "./banners.css";
@@ -19,9 +19,11 @@ export function LocalHostBanner() {
   const onlyLocalMachine = !!local && machines.every((machine) => machine.local);
   const otherAnswering = machines.some((machine) => !machine.local && machine.state === "connected");
   if (!local || status.reachable === true || (!onlyLocalMachine && otherAnswering)) return null;
-  const action: LocalHostAction | null = status.state === "incompatible" ? null : status.state === "stopped-by-person" ? "start"
-    : status.state === "not-installed" ? "serviceInstall"
-      : status.state === "refused" ? "reconnect" : "restart";
+  // A state this app does not know (sidevoice-core#112) is offered nothing: restarting is not known to be what it needs.
+  const action: LocalHostAction | null = !knownLocalHostState(status.state) || status.state === "incompatible" ? null
+    : status.state === "stopped-by-person" ? "start"
+      : status.state === "not-installed" ? "serviceInstall"
+        : status.state === "refused" ? "reconnect" : "restart";
   const available = action ? canRunLocalHostAction(action) : false;
   const cause = hostStatusText(status, t);
   async function retry() {

@@ -45,6 +45,7 @@ function useRelativeTime(value: string | number | null | undefined): string {
 /** What doing it by hand means for an agent as it stands: connecting it, taking Sidevoice out, or replacing another
  *  "sidevoice" entry — the connector's steps for its harness. */
 type ManualKind = "connect" | "update" | "disconnect" | "replace";
+const REGISTRATIONS = new Set<string>(["connected", "not-connected", "foreign", "outdated", "invalid", "unknown"]);
 function manualKind(agent: DetectedAgent): ManualKind {
   return agent.registration === "connected" ? "disconnect" : agent.registration === "foreign" ? "replace"
     : agent.registration === "outdated" ? "update" : "connect";
@@ -113,10 +114,14 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   // What the connector can do itself; an older one says only connect "auto" | "manual".
   const can = agent.can ?? { connect: agent.connect === "auto", update: agent.connect === "auto", disconnect: true };
   const manualOnly = !can.connect;
-  const readOnly = agent.registration === "foreign" || agent.registration === "invalid" || agent.registration === "unknown";
+  // A registration this app does not know (sidevoice-core#112) reads as unknown, never as Not connected: nothing to do
+  // by hand, and Connect only where the connector itself says it can.
+  const recognized = REGISTRATIONS.has(agent.registration);
+  const readOnly = agent.registration === "foreign" || agent.registration === "invalid" || agent.registration === "unknown"
+    || (!recognized && agent.can?.connect !== true);
   const isNew = !readOnly && actionableAgent(agent);
   const kind = manualKind(agent);
-  const hasManualInstructions = manualSteps(agent, kind).length > 0;
+  const hasManualInstructions = recognized && manualSteps(agent, kind).length > 0;
   const panelId = `host-agent-howto-${fp.slice(0, 7)}-${agent.id}`;
 
   useEffect(() => { if (error) setOpen(true); }, [error]);
@@ -147,7 +152,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
     : agent.registration === "foreign" ? { text: t("agents.state.attention"), reason: t("agents.foreign"), tone: "attention", info: t("agents.foreign.info", { agent: agent.label }) }
     : agent.registration === "outdated" ? { text: t("agents.state.attention"), reason: t("agents.outdated"), tone: "attention", info: t("agents.outdated.info", { agent: agent.label }) }
     : agent.registration === "invalid" ? { text: t("agents.state.attention"), reason: t("agents.invalid"), tone: "attention", info: t("agents.invalid.info", { agent: agent.label, file: agent.instructions?.file ?? "" }) }
-    : agent.registration === "unknown" ? { text: t("agents.unknown"), tone: "muted" }
+    : agent.registration === "unknown" || !recognized ? { text: t("agents.unknown"), tone: "muted" }
     : { text: t("agents.state.notConnected"), tone: "muted", ...(manualOnly ? { reason: t("agents.manualOnly") } : {}) };
   const connected = agent.registration === "connected";
   const outdated = agent.registration === "outdated";
@@ -200,7 +205,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
           <Button variant="danger" size="sm" onClick={() => { cancelConfirm(); run("disconnect"); }}>{t("agents.disconnectYes", { agent: agent.label })}</Button>
         </span>
       </div>}
-      {open && agent.registration !== "unknown" &&
+      {open && recognized && agent.registration !== "unknown" &&
         <Instructions agent={agent} fp={fp} id={panelId} kind={kind} onClose={() => setOpen(false)} />}
     </li>
   );

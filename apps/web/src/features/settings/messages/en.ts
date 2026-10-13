@@ -31,6 +31,7 @@ export const en = {
   "hosts.status.refused": "This computer no longer recognizes this app.",
   "hosts.status.incompatible": "This Sidevoice version cannot connect to this machine.",
   "hosts.status.absent": "This computer is not set up as a machine.",
+  "hosts.status.unknown": "Sidevoice on this computer reports a state this app does not recognize.",
   "hosts.cause.import.missing-module": "a required module is missing",
   "hosts.cause.bind.port-in-use": "the required port is already in use",
   "hosts.cause.identity.unreadable": "the machine identity could not be read",

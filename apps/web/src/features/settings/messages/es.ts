@@ -33,6 +33,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.status.refused": "Este ordenador ya no reconoce esta aplicación.",
   "hosts.status.incompatible": "Esta versión de Sidevoice no puede conectarse a esta máquina.",
   "hosts.status.absent": "Este ordenador no está configurado como máquina.",
+  "hosts.status.unknown": "Sidevoice en este ordenador indica un estado que esta aplicación no reconoce.",
   "hosts.cause.import.missing-module": "falta un módulo necesario",
   "hosts.cause.bind.port-in-use": "el puerto necesario ya está en uso",
   "hosts.cause.identity.unreadable": "no se pudo leer la identidad de la máquina",

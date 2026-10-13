@@ -13,6 +13,11 @@ const HOST_STATES = new Set<LocalHostStatusName>([
   "absent", "installing", "not-installed", "stopped-by-person", "starting", "backoff", "running", "failed",
   "service-failed", "refused", "incompatible",
 ]);
+/** Whether this app knows `state`: a newer desktop app may report one it does not (sidevoice-core#112), which is said as
+ *  unknown and offered no action, never read as one it knows. */
+export function knownLocalHostState(state: unknown): state is LocalHostStatusName {
+  return HOST_STATES.has(state as LocalHostStatusName);
+}
 const SERVICES = new Set(["launchd", "systemd", "none"]);
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const MAX_STATUS_COUNT = 1_000_000_000;
@@ -50,7 +55,7 @@ function safeTimestamp(value: unknown) {
 export function safeLocalHostStatusDetails(status: LocalHostStatus): SafeLocalHostStatusDetails {
   const source = status as unknown as Record<string, unknown>;
   const details: SafeLocalHostStatusDetails = {
-    state: HOST_STATES.has(source.state as LocalHostStatusName) ? source.state as LocalHostStatusName : "unknown",
+    state: knownLocalHostState(source.state) ? source.state : "unknown",
   };
   if (SERVICES.has(source.service as string)) details.service = source.service as SafeLocalHostStatusDetails["service"];
   if (typeof source.installed === "boolean") details.installed = source.installed;
@@ -156,7 +161,9 @@ export function hostStatusText(status: LocalHostStatus, t: HostTranslate) {
     case "refused": return t("hosts.status.refused");
     case "incompatible": return t("hosts.status.incompatible");
     case "installing": return t("hosts.status.starting");
-    default: return t("hosts.status.absent");
+    case "absent": return t("hosts.status.absent");
+    // A state this app does not know is said as such, not as one it knows (sidevoice-core#112).
+    default: return t("hosts.status.unknown");
   }
 }
 
