@@ -233,13 +233,27 @@ test("redeeming: the secret goes only where the code's node proved itself, and t
     rv: { url: "https://room.example", node: "c-1" }, device_id: "dev-1", token: "tok-1", paired_at: NOW / 1000 });
 });
 
-test("a typed address is https unless it says otherwise, and plain http only for this computer", () => {
-  const why = (text: string) => { try { return machineAddress(text); } catch (error) { return (error as Error).message; } };
+test("a typed address is https unless it says otherwise; plain http as is to this computer, to a private network only by consent", () => {
+  const why = (text: string, options: { insecure?: boolean; origin?: string } = {}) => {
+    try { return machineAddress(text, { origin: "http://localhost:5173", ...options }); } catch (error) { return (error as Error).message; }
+  };
   expect(why("")).toBeNull();
   expect(why(" 192.168.1.20:8768 ")).toBe("https://192.168.1.20:8768");
   expect(why("https://mac.example/")).toBe("https://mac.example");
   expect(why("http://127.0.0.1:8768")).toBe("http://127.0.0.1:8768");
-  expect(why("http://192.168.1.20:8768")).toBe("address-insecure");
+  // http:// to a private-network address: asked about, with no https attempt; agreed to, it is that address.
+  for (const text of ["http://192.168.1.20:8768", "http://10.0.0.5:8768", "http://nuc.local:8768"]) {
+    expect(why(text), text).toBe(PAIRING_HTTP_PRIVATE);
+    expect(why(text, { insecure: true }), text).toBe(text);
+  }
+  // A page served over https cannot ask over plain http at all, consent or not.
+  expect(why("http://192.168.1.20:8768", { origin: "https://room.example" })).toBe(PAIRING_HTTP_BLOCKED);
+  expect(why("http://192.168.1.20:8768", { origin: "https://room.example", insecure: true })).toBe(PAIRING_HTTP_BLOCKED);
+  // http:// to a public address or a name: refused, consent or not.
+  for (const text of ["http://203.0.113.5:8768", "http://mac.example", "http://nuc:8768"]) {
+    expect(why(text), text).toBe("address-insecure");
+    expect(why(text, { insecure: true }), text).toBe("address-insecure");
+  }
   expect(why("not an address at all")).toBe("address-invalid");
 });
 
@@ -394,4 +408,21 @@ test("a public machine answering only over http is refused, consent or not; an h
   const local = await fakeNode("nuc");
   await expect(redeemPairingCode(codeFor(payload(local, { urls: [], rv: null })), { address: "192.168.1.20:8768", get: network({}), subtle, now: NOW, origin: "https://room.example" }))
     .rejects.toThrow(PAIRING_HTTP_BLOCKED);
+});
+
+test("an http:// address on a private network is never tried over https: asked about with nothing sent, then paired unencrypted", async () => {
+  const node = await fakeNode("nuc"), asked: string[] = [];
+  const code = codeFor(payload(node, { urls: [], rv: null }));
+  const get = network({ "http://192.168.1.20:8768": node, "https://192.168.1.20:8768": node }, asked);
+  await expect(redeemPairingCode(code, { address: "http://192.168.1.20:8768", get, subtle, now: NOW, origin: "http://localhost:5173" }))
+    .rejects.toThrow(PAIRING_HTTP_PRIVATE);
+  expect(asked).toEqual([]);
+  const { pairing, base } = await redeemPairingCode(code, { address: "http://192.168.1.20:8768", get, subtle, now: NOW, origin: "http://localhost:5173", insecure: true });
+  expect(base.base).toBe("http://192.168.1.20:8768");
+  expect(asked.every((request) => request.includes(" http://192.168.1.20:8768/"))).toBe(true);
+  expect(pairing).toMatchObject({ urls: ["http://192.168.1.20:8768"], insecure: true });
+  expect(node.secrets).toHaveLength(1);
+  // Written to a public address, nothing is asked anywhere.
+  await expect(redeemPairingCode(code, { address: "http://203.0.113.5:8768", get, subtle, now: NOW, origin: "http://localhost:5173", insecure: true }))
+    .rejects.toThrow("address-insecure");
 });

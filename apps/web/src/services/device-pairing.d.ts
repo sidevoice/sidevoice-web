@@ -74,7 +74,9 @@ export const ADDRESS_INSECURE: "address-insecure";
 export const PAIRING_HTTP_ONLY: "pairing-http-only";
 export const PAIRING_HTTP_PRIVATE: "pairing-http-private";
 export const PAIRING_HTTP_BLOCKED: "pairing-http-blocked";
-export function machineAddress(text: string): string | null;
+/** A typed address as a base (device-pairing.js): https unless it says otherwise; http:// to a private-network address
+ *  only once agreed to (`insecure`), and never from a page served over https (`origin`, the page's by default). */
+export function machineAddress(text: string, options?: { insecure?: boolean; origin?: string }): string | null;
 export function decodePairingCode(code: string, now?: number, options?: { address?: string | null }): PairingCodePayload;
 /** What a code says as it is pasted (device-pairing.js): whose, until when, whether another device can tell where its
  *  machine is, and its private-network addresses over plain http as host:port. */

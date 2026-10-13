@@ -27,7 +27,15 @@
 /* The address's (i) right by its label, not at the far end of the row. */
 .pairing-address .ui-field-head { justify-content: flex-start; align-items: center; gap: var(--sv-space-1); }
 .pairing-address .ui-infotip { margin-block: -4px; }
-.pairing-other-address { justify-self: start; margin-top: calc(-1 * var(--sv-space-2)); margin-inline-start: calc(-1 * var(--sv-space-3)); }
+/* Where the address goes (VARIANTS `pair-address`): A, a disclosure like How's (its toggle is How's; its body, the field
+ * alone, no box); B, a quiet link under the code that brings the field in, in its place. */
+.pairing-address-body { justify-self: stretch; min-width: 0; }
+.pairing-address-link {
+  justify-self: start; margin-top: calc(-1 * var(--sv-space-2)); padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted);
+  font: inherit; font-size: var(--sv-font-sm); text-align: start; text-decoration: underline; text-decoration-color: var(--sv-border-strong); text-underline-offset: 3px; cursor: pointer;
+}
+.pairing-address-link:hover { color: var(--sv-text); }
+.pairing-address-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
 .pairing-status { display: flex; align-items: center; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .pairing-status[data-connected] { color: var(--sv-positive); }
 /* Saying nothing, it takes no room, and is still there to say what comes. */
@@ -49,6 +57,7 @@
  * than they show. */
 @media (pointer: coarse) {
   .pair-machine .ui-button--sm:not(.ui-button--icon) { height: 44px; }
+  .pairing-address-link { min-height: 44px; }
   .pair-machine .ui-infotip::after { content: ""; position: absolute; inset: -10px; }
 }
 

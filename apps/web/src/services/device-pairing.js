@@ -106,13 +106,24 @@ export const PAIRING_HTTP_PRIVATE = 'pairing-http-private';
 /** HTTPS did not answer at a private address, and this page (served over https) may not ask over plain http at all: only
  *  the desktop app or a page served over http could pair with a machine that answers only without encryption. */
 export const PAIRING_HTTP_BLOCKED = 'pairing-http-blocked';
-export function machineAddress(text) {
+/** Plain http:// written to a private-network address is that address without encryption, asked for on purpose: no
+ *  https attempt first, and reached only once the person agrees (`insecure`; until then PAIRING_HTTP_PRIVATE), never
+ *  from a page served over https (PAIRING_HTTP_BLOCKED). Written to any other address, it is refused (ADDRESS_INSECURE). */
+export function machineAddress(text, { insecure = false, origin = '' } = {}) {
     const raw = String(text ?? '').trim();
     if (!raw) return null;
     const base = httpUrl(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw);
     if (!base) throw pairingError(ADDRESS_INVALID);
-    if (!secureBase(base)) throw pairingError(ADDRESS_INSECURE);
+    if (secureBase(base)) return base;
+    if (!secureBase(base, '', { insecure: true })) throw pairingError(ADDRESS_INSECURE);
+    if (plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
+    if (!insecure) throw pairingError(PAIRING_HTTP_PRIVATE);
     return base;
+}
+/** Whether this page may not ask another machine anything over plain http: served over https, it may not (mixed
+ *  content). `origin` is the page's; the one it runs on when not given. */
+function plainHttpBlocked(origin) {
+    return /^https:/.test(origin || globalThis.location?.origin || '');
 }
 const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.';
 
@@ -257,19 +268,20 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
     // The address the person typed comes first, and is kept with the pairing: it is where they know the machine is.
     // It is trusted no more than the code's own: the machine there proves it is the code's before the secret goes.
     // Agreed to (`insecure`), a private address is reached over plain http instead, and the pairing says so for good.
-    const secureTyped = machineAddress(address);
-    const plain = insecure && secureTyped && privateHost(new URL(secureTyped).hostname) ? secureTyped.replace(/^https:/, 'http:') : null;
-    const typed = plain ?? secureTyped;
+    // Written with http:// to a private address, it is that already (machineAddress).
+    const written = machineAddress(address, { insecure, origin });
+    const plain = insecure && written && privateHost(new URL(written).hostname) ? written.replace(/^https:/, 'http:') : null;
+    const typed = plain ?? written;
     const decoded = decodePairingCode(code, now, { address: typed });
     const payload = { ...(typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded), ...(plain ? { insecure: true } : {}) };
     const crypto = webCrypto(subtle);
     const place = await firstProven(candidateBases(payload, { target, about, origin }), { fp: payload.fp }, { get, subtle: crypto });
     const called = payload.host ? '«' + payload.host + '»' : 'la máquina';
-    if (!place && secureTyped && !plain) {
-        const privateAddress = privateHost(new URL(secureTyped).hostname);
+    if (!place && written && !plain) {
+        const privateAddress = privateHost(new URL(written).hostname);
         // Over https, this page may not ask over plain http at all (mixed content): say what would work.
-        if (privateAddress && /^https:/.test(origin || globalThis.location?.origin || '')) throw pairingError(PAIRING_HTTP_BLOCKED);
-        if (await answersPlainHttp(secureTyped, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
+        if (privateAddress && plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
+        if (await answersPlainHttp(written, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
     }
     if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');
     let response, answer = null;

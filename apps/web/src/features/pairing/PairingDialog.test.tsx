@@ -1,17 +1,21 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { act } from "react";
 import { PairingDialog } from "./PairingDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { PAIRING_HTTP_BLOCKED, PAIRING_HTTP_ONLY, PAIRING_HTTP_PRIVATE, pairingError } from "../../services/device-pairing.js";
+import { VARIANTS_KEY } from "../../lib/variants";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
 /* "Connect to your machine" in the pairing dialog (Settings › Machines › Add a machine): the code first, the machine's
  * address only when it is needed, what came of connecting where it can be acted on. */
 
-afterEach(() => { localStorage.removeItem("sidevoice.deviceName"); });
+afterEach(() => { localStorage.removeItem("sidevoice.deviceName"); localStorage.removeItem(VARIANTS_KEY); });
+
+/** Where the address is asked for (VARIANTS `pair-address`): A's disclosure by default, B's link, C's field always there. */
+const pairAddress = (place: "disclosure" | "link" | "always") => localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "pair-address": place }));
 
 function dialog(pairDevice: (...args: unknown[]) => Promise<unknown> = vi.fn()) {
   const store = createRoomStore();
@@ -34,6 +38,8 @@ const submit = () => document.querySelector("#device-pairing button[type=submit]
 const connect = () => act(async () => { fireEvent.submit(submit().form!); });
 const address = () => screen.getByRole("textbox", { name: /^Machine address/ }) as HTMLInputElement;
 const noAddress = () => expect(screen.queryByRole("textbox", { name: /^Machine address/ })).toBeNull();
+const disclosure = () => screen.getByRole("button", { name: "Specify the machine's address" });
+const optional = "Machine address (optional)", needed = "Machine address";
 
 test("it opens on the code, how to get one folded away, with no device name field and Connect ready", () => {
   const { element } = dialog(vi.fn());
@@ -70,7 +76,7 @@ test("a code is recognised as it is pasted, and redeemed under this device's nam
   expect(code()).toHaveAccessibleDescription("Code for “nuc” · expires in 10 min");
   // The code says where the machine is: no address to give, unless the person wants another.
   noAddress();
-  expect(screen.getByRole("button", { name: "Use a different address" })).toBeInTheDocument();
+  expect(disclosure()).toHaveAttribute("aria-expanded", "false");
   submit().focus();
   await connect();
   expect(pairDevice).toHaveBeenCalledWith(pasted, "Kitchen iPad", "");
@@ -166,7 +172,7 @@ test("a machine that refuses the pairing says so in words, its own sentence only
   expect(screen.getByRole("alert").querySelector("details > pre")).toHaveTextContent("TypeError format model is not a function");
 });
 
-test("a machine its code's addresses don't reach is asked for by its address, the focus staying on Connect", async () => {
+test("a machine its code's addresses don't reach is asked for by its address, which opens, takes the focus and is needed for that code", async () => {
   const pairDevice = vi.fn().mockRejectedValue(pairingError("No se pudo llegar a «nuc»: ni directamente ni a través de la sala.", "unreachable"));
   dialog(pairDevice);
   const pasted = pairingCode();
@@ -174,15 +180,25 @@ test("a machine its code's addresses don't reach is asked for by its address, th
   submit().focus();
   await connect();
   expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach “nuc”. Check it's running and on your network, or enter its address.");
-  expect(document.activeElement).toBe(submit());
-  expect(address()).toHaveAccessibleName("Machine address (optional)");
+  expect(disclosure()).toHaveAttribute("aria-expanded", "true");
+  expect(document.activeElement).toBe(address());
+  expect(address()).toHaveAccessibleName(needed);
+  expect(address()).toBeRequired();
   expect(screen.getByRole("button", { name: "About the address" })).toBeInTheDocument();
+  // Needed: Connect without one says so under it, and asks nothing.
+  await connect();
+  expect(pairDevice).toHaveBeenCalledTimes(1);
+  expect(address()).toHaveAccessibleDescription("The code's addresses didn't reach the machine. Enter its address.");
   // Typed as host:port; an https:// pasted with it goes.
   fireEvent.change(address(), { target: { value: "https://192.168.1.20:8768" } });
   expect(address().value).toBe("192.168.1.20:8768");
   await connect();
   expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
   expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach 192.168.1.20:8768 over https. Check the address and port.");
+  // Another code: its own addresses are tried again, the address optional (and still there).
+  paste(pairingCode({ host: "other" }));
+  expect(address()).toHaveAccessibleName(optional);
+  expect(address()).not.toBeRequired();
 });
 
 test("a code that doesn't say where its machine is needs its address; one it lists over plain http on a private network is filled in", async () => {
@@ -200,20 +216,54 @@ test("a code that doesn't say where its machine is needs its address; one it lis
   paste(pairingCode({ urls: ["http://127.0.0.1:8768", "http://192.168.1.20:8768"] }));
   expect(address().value).toBe("192.168.1.20:8768");
   expect(address()).not.toHaveAccessibleDescription(/doesn't say/);
-  // Plain http written to another machine is said under the address, and nothing is sent.
-  fireEvent.change(address(), { target: { value: "http://10.0.0.5:8768" } });
+  // Folded away, it is still needed: Connect opens it again, saying so.
+  fireEvent.click(disclosure());
+  noAddress();
+  fireEvent.change(document.getElementById("device-pairing-address")!, { target: { value: "" } });
   await connect();
-  expect(address()).toHaveAccessibleDescription("Pairing goes over HTTPS. Write the address without http://.");
+  expect(disclosure()).toHaveAttribute("aria-expanded", "true");
+  expect(address()).toHaveAccessibleDescription("This code doesn't say where the machine is. Enter its address.");
   expect(document.activeElement).toBe(address());
   expect(pairDevice).not.toHaveBeenCalled();
+});
+
+test("an http:// address on a private network goes straight to agreeing to no encryption; at a public address or a name, it is refused under the field", async () => {
+  const pairDevice = vi.fn().mockResolvedValue({ host: "nuc" });
+  dialog(pairDevice);
+  const pasted = pairingCode();
+  paste(pasted);
+  fireEvent.click(disclosure());
+  // https://, or no scheme, is https as always: the https:// goes.
+  fireEvent.change(address(), { target: { value: "https://192.168.1.20:8768" } });
+  expect(address().value).toBe("192.168.1.20:8768");
+  // http:// to a public address or a name: said under the address, and nothing is sent.
+  for (const typed of ["http://203.0.113.5:8768", "http://mac.example:8768"]) {
+    fireEvent.change(address(), { target: { value: typed } });
+    expect(address().value).toBe(typed);
+    await connect();
+    expect(address()).toHaveAccessibleDescription("Unencrypted http:// is only for addresses on a private network. Write this one without http:// to pair over HTTPS.");
+    expect(document.activeElement).toBe(address());
+  }
+  expect(pairDevice).not.toHaveBeenCalled();
+  // http:// to a private-network address: no https attempt, what that exposes and its own button at once.
+  fireEvent.change(address(), { target: { value: "http://192.168.1.20:8768" } });
+  await connect();
+  expect(pairDevice).not.toHaveBeenCalled();
+  expect(address()).not.toHaveAttribute("aria-invalid");
+  const warning = document.querySelector<HTMLElement>(".pairing-consent")!;
+  expect(warning).toHaveTextContent("This machine only answers without encryption. Anyone on this network could read the pairing code and this device's access token.");
+  expect(document.activeElement).toBe(within(warning).getByText(/^This machine only answers without encryption/));
+  await act(async () => { within(warning).getByRole("button", { name: "Connect without encryption" }).click(); });
+  expect(pairDevice).toHaveBeenCalledTimes(1);
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "http://192.168.1.20:8768", { insecure: true });
+  expect(screen.getByText("Connected to “nuc” without encryption.")).toHaveAttribute("role", "status");
 });
 
 test("a machine that answers only without encryption: refused at a public address, out of a secure page's reach", async () => {
   const pairDevice = vi.fn().mockRejectedValue(pairingError(PAIRING_HTTP_ONLY));
   dialog(pairDevice);
   paste(pairingCode());
-  fireEvent.click(screen.getByRole("button", { name: "Use a different address" }));
-  expect(document.activeElement).toBe(address());
+  fireEvent.click(disclosure());
   fireEvent.change(address(), { target: { value: "203.0.113.5:8768" } });
   await connect();
   expect(screen.getByRole("alert")).toHaveTextContent("“nuc” only answers without encryption, at a public address. Put an HTTPS proxy or tunnel in front of that machine, then get a new code.");
@@ -282,4 +332,118 @@ test("agreeing holds for that code and address only, Connect and Enter never go 
   expect(document.querySelector(".pairing-consent")).toBeNull();
   expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach “other”. Check it's running and on your network, or enter its address.");
   expect(document.activeElement).toBe(submit());
+});
+
+// ----- where the address is asked for (VARIANTS `pair-address`) -----
+test("pair-address A, the default: a disclosure like How's, folded; open, its field is optional, and folded again it is not used", async () => {
+  const pairDevice = vi.fn().mockResolvedValue({ host: "nuc" });
+  dialog(pairDevice);
+  const toggle = disclosure();
+  // How's toggle, chevron and all, after How.
+  expect(toggle).toHaveClass("pairing-how-toggle");
+  expect(toggle.parentElement).toHaveClass("pairing-how");
+  expect(toggle.querySelector("svg")).not.toBeNull();
+  expect(screen.getByRole("button", { name: "How do I get a code?" }).compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(document.getElementById(toggle.getAttribute("aria-controls")!)).not.toBeVisible();
+  expect(screen.queryByRole("button", { name: "Enter the machine's address" })).toBeNull();
+  noAddress();
+  const pasted = pairingCode();
+  paste(pasted);
+  noAddress();
+  // Opened by the person: the focus stays on the toggle, as How's does.
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(document.activeElement).not.toBe(address());
+  expect(address()).toHaveAccessibleName(optional);
+  expect(address()).not.toBeRequired();
+  fireEvent.change(address(), { target: { value: "192.168.1.20:8768" } });
+  fireEvent.click(toggle);
+  noAddress();
+  await connect();
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "");
+  paste(pasted);
+  fireEvent.click(toggle);
+  await connect();
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
+});
+
+test("pair-address B: a quiet link under the code brings the field in, in its place, with the focus", async () => {
+  pairAddress("link");
+  const pairDevice = vi.fn().mockResolvedValue({ host: "nuc" });
+  dialog(pairDevice);
+  expect(screen.queryByRole("button", { name: "Specify the machine's address" })).toBeNull();
+  const link = screen.getByRole("button", { name: "Enter the machine's address" });
+  expect(link).toHaveClass("pairing-address-link");
+  expect(link).not.toHaveAttribute("aria-expanded");
+  // Under the code, before how to get one.
+  expect(code().compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(link.compareDocumentPosition(screen.getByRole("button", { name: "How do I get a code?" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  noAddress();
+  const pasted = pairingCode();
+  paste(pasted);
+  noAddress();
+  fireEvent.click(link);
+  expect(link).not.toBeInTheDocument();
+  expect(document.activeElement).toBe(address());
+  expect(address()).toHaveAccessibleName(optional);
+  expect(address()).not.toBeRequired();
+  fireEvent.change(address(), { target: { value: "192.168.1.20:8768" } });
+  await connect();
+  expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "192.168.1.20:8768");
+});
+
+test("pair-address B brings the field in by itself, needed, where A opens: a code that says nowhere, one whose addresses did not reach the machine, and what is said about the address", async () => {
+  pairAddress("link");
+  const pairDevice = vi.fn().mockRejectedValue(pairingError("No se pudo llegar a «nuc».", "unreachable"));
+  dialog(pairDevice);
+  paste(pairingCode({ urls: ["http://127.0.0.1:8768"] }));
+  expect(screen.queryByRole("button", { name: "Enter the machine's address" })).toBeNull();
+  expect(address()).toHaveAccessibleName(needed);
+  expect(address()).toBeRequired();
+  cleanup();
+  dialog(pairDevice);
+  paste(pairingCode());
+  noAddress();
+  await connect();
+  expect(address()).toHaveAccessibleName(needed);
+  expect(address()).toBeRequired();
+  expect(document.activeElement).toBe(address());
+  cleanup();
+  // A machine that says the code does not say where it is: said under the address, brought in to say it.
+  dialog(vi.fn().mockRejectedValue(pairingError("El código no dice dónde encontrar la máquina.", "code-no-address")));
+  paste(pairingCode());
+  noAddress();
+  await connect();
+  expect(address()).toHaveAccessibleDescription("This code doesn't say where the machine is. Enter its address.");
+  expect(document.activeElement).toBe(address());
+});
+
+test("pair-address C: the field always there, optional unless the code says nowhere — also once its addresses did not reach the machine", async () => {
+  pairAddress("always");
+  const pairDevice = vi.fn().mockRejectedValue(pairingError("No se pudo llegar a «nuc».", "unreachable"));
+  dialog(pairDevice);
+  expect(address()).toHaveAccessibleName(optional);
+  expect(screen.queryByRole("button", { name: "Specify the machine's address" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Enter the machine's address" })).toBeNull();
+  paste(pairingCode());
+  await connect();
+  expect(document.activeElement).toBe(address());
+  expect(address()).toHaveAccessibleName(optional);
+  expect(address()).not.toBeRequired();
+  // Connect again tries the code's own addresses.
+  await connect();
+  expect(pairDevice).toHaveBeenCalledTimes(2);
+  expect(pairDevice).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), "");
+  paste(pairingCode({ urls: ["http://127.0.0.1:8768"] }));
+  expect(address()).toHaveAccessibleName(needed);
+  expect(address()).toBeRequired();
+});
+
+test("the variant follows the preview's panel live", () => {
+  dialog(vi.fn());
+  expect(disclosure()).toBeInTheDocument();
+  act(() => { pairAddress("always"); window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })); });
+  expect(address()).toHaveAccessibleName(optional);
+  expect(screen.queryByRole("button", { name: "Specify the machine's address" })).toBeNull();
 });
