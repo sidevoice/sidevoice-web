@@ -818,6 +818,8 @@ export const en = {
   "voice.failure.unknown-voice": "That voice is not available for this model. Choose another.",
   "voice.failure.build-not-found": "That way of running the model is not available. Choose another in How it runs.",
   "voice.failure.model-in-use": "That model is in use right now. Try again after the call.",
+  "voice.failure.model-installing": "This model is still downloading. Try again when it finishes.",
+  "voice.failure.uninstall-failed": "Couldn't delete this model.",
   "voice.failure.model-load-failed": "The model could not be loaded. Try again, or choose a smaller one.",
   "voice.failure.not-installed": "The model is not fully on this device. Download it again.",
   "voice.failure.download-failed": "The model could not be downloaded. Check the connection and try again.",

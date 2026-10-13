@@ -106,6 +106,32 @@ test("Advanced lists the models in one list, those in use first, by what they ar
   expect(uninstall).toHaveBeenCalledWith("whisper-base");
 });
 
+test("a delete that fails says why in words: a model still downloading, or one that couldn't be deleted, its detail behind Details", async () => {
+  const store = open("whisper-base");
+  act(() => store.patch({ modelsRemovable: true, voiceCatalogue: { state: "ready", catalogs: withUnused, error: "" } }));
+  const detail = "EBUSY: resource busy or locked, unlink '/models/whisper-tiny.bin'";
+  const uninstall = vi.fn(async (id: string) => {
+    throw id === "whisper-small" ? Object.assign(new Error("model-installing"), { code: "model-installing" })
+      : Object.assign(new Error("uninstall-failed"), { code: "uninstall-failed", detail });
+  });
+  window.sidevoiceActions = { ...window.sidevoiceActions, uninstallVoiceModel: uninstall } as unknown as SidevoiceActions;
+  fireEvent.click(document.getElementById("settings-advanced")!);
+  const errorOf = (id: string) => document.querySelector(`[data-model="${id}"] .downloaded-model-error`);
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete whisper-small from this device" }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
+  expect(uninstall).toHaveBeenCalledWith("whisper-small");
+  expect(errorOf("whisper-small")).toHaveTextContent(/^This model is still downloading\. Try again when it finishes\.$/);
+  expect(errorOf("whisper-small")!.querySelector("details")).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete whisper-tiny from this device" }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
+  const error = errorOf("whisper-tiny")!;
+  expect(error.textContent!.startsWith("Couldn't delete this model.")).toBe(true);
+  expect(error.querySelector("details:not([open]) > pre")!.textContent).toBe(detail);
+  expect(error.textContent!.replace(error.querySelector("details")!.textContent!, "")).not.toContain("EBUSY");
+});
+
 test("the voice detector comes first, is never deletable, and says why after its tags; a row's tags are its purpose then In use", () => {
   const vad = { ...model("silero-vad", "silero-vad", "vad") };
   const withVad = [{ ...withUnused[0], models: [...(withUnused[0] as { models: unknown[] }).models, vad] }] as unknown as CatalogView[];

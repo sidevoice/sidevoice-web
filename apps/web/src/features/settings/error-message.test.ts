@@ -74,3 +74,16 @@ test("nothing to go on is the generic line alone", () => {
   expect(voiceFailure(undefined, { what: "models", t: en })).toEqual({ text: "Something went wrong with the list of models." });
   expect(roomFailure(new Error(""), { t: es })).toEqual({ text: "Algo falló con la sala." });
 });
+
+test("deleting a model: one still downloading, and one that could not be deleted, its detail only behind Details", () => {
+  expect(voiceFailure(engine("model-installing"), { t: en }))
+    .toEqual({ text: "This model is still downloading. Try again when it finishes." });
+  expect(voiceFailure(engine("model-installing"), { t: es }))
+    .toEqual({ text: "Este modelo aún se está descargando. Vuelve a intentarlo cuando termine." });
+  const detail = "EBUSY: resource busy or locked, unlink '/models/whisper-small.bin'";
+  expect(voiceFailure(engine("uninstall-failed", detail), { t: en })).toEqual({ text: "Couldn't delete this model.", details: detail });
+  const said = voiceFailure(engine("uninstall-failed", detail), { t: es });
+  expect(said).toEqual({ text: "No se pudo borrar este modelo.", details: detail });
+  expect(said.text).not.toContain("EBUSY");
+  expect(said.said).toBeUndefined();
+});

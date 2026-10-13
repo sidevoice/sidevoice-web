@@ -815,6 +815,8 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "voice.failure.unknown-voice": "Esa voz no está disponible para este modelo. Elige otra.",
   "voice.failure.build-not-found": "Esa forma de ejecutar el modelo no está disponible. Elige otra en Cómo se ejecuta.",
   "voice.failure.model-in-use": "Ese modelo se está usando ahora mismo. Vuelve a intentarlo tras la llamada.",
+  "voice.failure.model-installing": "Este modelo aún se está descargando. Vuelve a intentarlo cuando termine.",
+  "voice.failure.uninstall-failed": "No se pudo borrar este modelo.",
   "voice.failure.model-load-failed": "No se pudo cargar el modelo. Vuelve a intentarlo o elige uno más pequeño.",
   "voice.failure.not-installed": "El modelo no está entero en este dispositivo. Vuelve a descargarlo.",
   "voice.failure.download-failed": "No se pudo descargar el modelo. Comprueba la conexión y vuelve a intentarlo.",
