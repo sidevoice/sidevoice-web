@@ -801,3 +801,86 @@ test("in Spanish, a nightly app se actualiza a mano and a development one is a V
   room([local], { localHostStatus: running });
   expect(buildLine()).toHaveTextContent(/^Versión de desarrollo$/);
 });
+
+/** This device's app, with an updater (sidevoice-desktop #56) that may offer downloading updates by itself. */
+function updaterBridge(updater: Record<string, unknown> | undefined) {
+  setBridge({});
+  const desktop = (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop;
+  if (updater) desktop.host.updater = { status: vi.fn(async () => ({ available: false })), restart: vi.fn(async () => {}), ...updater };
+  actions();
+}
+const autoDownload = (name = "Download updates automatically") => screen.findByRole("switch", { name });
+
+test("an app that does not offer the choice shows no Download updates automatically", async () => {
+  updaterBridge(undefined);
+  room([local]);
+  await act(async () => {});
+  expect(screen.queryByRole("switch", { name: "Download updates automatically" })).toBeNull();
+  cleanup();
+  // An updater with only one of the two methods does not offer it either.
+  const settings = vi.fn(async () => ({ autoDownload: true }));
+  updaterBridge({ settings });
+  room([local]);
+  await act(async () => {});
+  expect(screen.queryByRole("switch", { name: "Download updates automatically" })).toBeNull();
+  expect(settings).not.toHaveBeenCalled();
+});
+
+test("where the app offers it, Download updates automatically says what the app has, with its hint", async () => {
+  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: false })), setAutoDownload: vi.fn() });
+  room([local]);
+  const toggle = await autoDownload();
+  expect(toggle).not.toBeChecked();
+  expect(thisDevice()).toHaveTextContent("Off: you're told an update exists and it downloads when you restart into it.");
+  cleanup();
+  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload: vi.fn() });
+  room([local]);
+  expect(await autoDownload()).toBeChecked();
+  cleanup();
+  // An app that can't say: on, its default.
+  updaterBridge({ settings: vi.fn(async () => { throw new Error("nope"); }), setAutoDownload: vi.fn() });
+  room([local]);
+  expect(await autoDownload()).toBeChecked();
+});
+
+test("turning it off asks the app, and shows what the app answers", async () => {
+  const setAutoDownload = vi.fn(async (_enabled: boolean) => ({ autoDownload: true }));
+  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload });
+  room([local]);
+  const toggle = await autoDownload();
+  await act(async () => { fireEvent.click(toggle); });
+  expect(setAutoDownload).toHaveBeenCalledWith(false);
+  // The app kept it on: on is what shows.
+  expect(toggle).toBeChecked();
+  setAutoDownload.mockResolvedValueOnce({ autoDownload: false });
+  await act(async () => { fireEvent.click(toggle); });
+  expect(toggle).not.toBeChecked();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("a change the app couldn't make goes back and says so", async () => {
+  const setAutoDownload = vi.fn(async (_enabled: boolean): Promise<{ autoDownload: boolean }> => { throw new Error("disk"); });
+  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload });
+  room([local]);
+  const toggle = await autoDownload();
+  await act(async () => { fireEvent.click(toggle); });
+  expect(setAutoDownload).toHaveBeenCalledWith(false);
+  expect(toggle).toBeChecked();
+  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't change it. Try again.");
+  // Trying again clears it.
+  setAutoDownload.mockResolvedValueOnce({ autoDownload: false });
+  await act(async () => { fireEvent.click(toggle); });
+  expect(toggle).not.toBeChecked();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("in Spanish, Descargar las actualizaciones automáticamente, and its failure", async () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
+  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload: vi.fn(async () => { throw new Error("x"); }) });
+  room([local]);
+  const toggle = await autoDownload("Descargar las actualizaciones automáticamente");
+  expect(thisDevice()).toHaveTextContent("Desactivado: te avisa de que hay una actualización y se descarga al reiniciar para instalarla.");
+  await act(async () => { fireEvent.click(toggle); });
+  expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cambiar. Vuelve a intentarlo.");
+});

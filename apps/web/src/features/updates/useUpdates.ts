@@ -12,11 +12,15 @@ import { useVoiceLive } from "../call/stage-view";
 export type UpdateKind = "web" | "app" | "machine";
 export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean; machine?: string }
 
-/** The desktop app's updater as the host would give it (sidevoice-desktop BRIDGE.md, to be added). */
+/** The desktop app's updater (sidevoice-desktop #56; a release's only). Downloading an update by itself is on unless the
+ *  person turns it off (`settings`, `setAutoDownload`); off, an update is said to exist as soon as it is found, and
+ *  `restart` downloads it first. An app without those two does not offer the choice. */
 export interface AppUpdater {
   status(): Promise<{ available: boolean; version?: string; required?: boolean }>;
   subscribe?(listener: () => void): () => void;
   restart(): Promise<void>;
+  settings?(): Promise<{ autoDownload: boolean }>;
+  setAutoDownload?(enabled: boolean): Promise<{ autoDownload: boolean }>;
 }
 export function appUpdater(): AppUpdater | null {
   const host = (globalThis.window as unknown as { __sidevoiceDesktop?: { host?: { updater?: AppUpdater } } } | undefined)?.__sidevoiceDesktop?.host;

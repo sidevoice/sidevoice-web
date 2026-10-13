@@ -155,3 +155,6 @@ span.host-insecure { color: var(--sv-warning); font-weight: var(--sv-weight-semi
 
 /* A nightly or development app, under its version: what it is, and how it updates. */
 .host-status-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+
+/* A change the app could not make (download updates automatically): said under its row. */
+.host-status-error { display: block; font-size: var(--sv-font-sm); color: var(--sv-danger); }

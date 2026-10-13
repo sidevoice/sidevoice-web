@@ -11,6 +11,7 @@ import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
+import { appUpdater } from "../updates/useUpdates";
 import { DESKTOP_NIGHTLY_URL, desktopBuild, localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
@@ -318,6 +319,34 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
   );
 }
 
+/** The desktop app downloading its updates by itself, on by default: where the app offers the choice (its updater's
+ *  `settings` and `setAutoDownload`, a release's), next to the version. What the app answers is what shows; a failed
+ *  change goes back and says so. */
+function AutoDownloadUpdates() {
+  const t = hostTranslator();
+  const updater = appUpdater();
+  const offered = !!updater?.settings && !!updater.setAutoDownload;
+  const [on, setOn] = useState<boolean | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!offered) return;
+    let gone = false;
+    void updater!.settings!().then((value) => { if (!gone) setOn(value.autoDownload); }).catch(() => { if (!gone) setOn(true); });
+    return () => { gone = true; };
+  }, [offered]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!offered || on === null) return null;
+  const change = (next: boolean) => {
+    setOn(next); setFailed(false);
+    void updater!.setAutoDownload!(next).then((value) => setOn(value.autoDownload)).catch(() => { setOn(!next); setFailed(true); });
+  };
+  return <label className="host-status-login">
+    <span><span className="host-status-login-label">{t("updates.autoDownload")}</span>
+      <span className="muted">{t("updates.autoDownloadHint")}</span>
+      {failed && <span className="host-status-error" role="alert">{t("updates.autoDownloadFailed")}</span>}</span>
+    <Switch checked={on} aria-label={t("updates.autoDownload")} onChange={change} />
+  </label>;
+}
+
 /** Another machine's Sidevoice, to read: where the machine says, its Sidevoice version. How this device reaches it is
  *  its page's header's, two blocks up; no controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
@@ -436,6 +465,7 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
           <span className="muted">{t(canSetLogin ? "hosts.startAtSignInHint" : "hosts.startAtSignInUnavailable")}</span></span>
         <Switch checked={installed} disabled={!!busy || !canSetLogin} aria-label={t("hosts.startAtSignIn")} onChange={(next) => void setLogin(next)} />
       </label>}
+      <AutoDownloadUpdates />
       {confirmStop ? <div className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
           <p>{t("hosts.stopConfirm")}</p>
           <span className="host-action-list">
