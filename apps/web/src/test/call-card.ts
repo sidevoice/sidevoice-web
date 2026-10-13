@@ -1,10 +1,8 @@
-import { act } from "@testing-library/react";
-import { vi } from "vitest";
-import type { CallControlsHost, CallControlsState, CallSnapshot } from "../call-controls/host";
+import type { CallSnapshot } from "../call-controls/host";
 import type { ParticipantView } from "../state/room-types";
 
-/* The desktop card's tests: a conversation row, a snapshot as the room projects it (callCardView) with the host's
- * stamps, and a host that records what the card asks of it. */
+/* The desktop card's tests: a conversation row, and a snapshot as the room projects it (callCardView) with the host's
+ * stamps. */
 
 export function row(threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView {
   return {
@@ -26,24 +24,4 @@ export function cardSnapshot(overrides: Partial<CallSnapshot> = {}): CallSnapsho
     busyReason: null, switchingTo: null, theme: "dark", language: "en", micSilent: false,
     ...overrides,
   };
-}
-
-export type FakeHost = CallControlsHost & {
-  run: ReturnType<typeof vi.fn>; layout: ReturnType<typeof vi.fn>; drag: ReturnType<typeof vi.fn>;
-  /** The app sends a new state: the fields given, over the last one. */
-  push(next: Partial<CallControlsState>): void;
-  /** The app sends a new snapshot: the call's fields given, over the last one. */
-  call(next: Partial<CallSnapshot>): void;
-};
-
-export function fakeHost(initial: Partial<CallControlsState> = {}): FakeHost {
-  let listener: ((state: CallControlsState) => void) | null = null;
-  let state: CallControlsState = { call: cardSnapshot(), level: 0, pointerInside: null, alwaysExpanded: false, muteShortcut: "⌃⌥M", ...initial };
-  const host: FakeHost = {
-    subscribe(fn) { listener = fn; fn(state); return () => { listener = null; }; },
-    run: vi.fn(), layout: vi.fn(), drag: vi.fn(),
-    push(next) { state = { ...state, ...next }; act(() => listener?.(state)); },
-    call(next) { state = { ...state, call: { ...state.call, ...next } }; act(() => listener?.(state)); },
-  };
-  return host;
 }

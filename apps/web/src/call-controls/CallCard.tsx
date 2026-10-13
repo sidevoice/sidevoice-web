@@ -1,24 +1,18 @@
 /* The desktop app's call controls card (sidevoice/sidevoice-desktop#4): a compact call surface that floats over the
  * person's other apps while the room's window is not in front.
  *
- * Which card it is, is a design variant (VARIANTS `floating-card`, briefs/FLOATING-CARD-SPEC.md): today's card, the
- * default until the operator chooses — the desktop app has no panel, so it ships it —, or one of the spec's options 1–4
- * (FloatingCard.tsx). This file keeps what they share: the gate, the host's state and the plumbing (card-shell.tsx).
+ * The host's state and the plumbing are card-shell.tsx.
  *
  * Today's card, at rest, is one row: the agent (the avatar, which shows only what the agent is doing), the conversation
  * the call is on and who is on it, and your microphone (the wave, which shows only you). Near the pointer, without
  * growing wider and without moving anything, it offers the rest: the title becomes the conversation picker, "open
  * Sidevoice" appears in the slot kept for it beside your wave, and the room's call controls appear below. Panels open
  * below the controls and close by themselves. */
-import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, PowerIcon, SkipIcon, SpeakerIcon, SpeakerOffIcon } from "../components/ui/Icons";
-import { useVariant } from "../lib/variants";
-import { resolveTheme } from "../lib/theme";
 import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
-import { exitText, FLOATING_CARD, gateOpen, isVoiceSwitch } from "./card-view";
-import { FloatingCardBody } from "./FloatingCard";
+import { isVoiceSwitch } from "./card-view";
 import type { CallControlsHost, CallControlsState } from "./host";
-import { cardLanguage, translator, type Translate } from "./i18n";
+import type { Translate } from "./i18n";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 
@@ -46,45 +40,13 @@ function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolea
   );
 }
 
-/** The call's exit notice (§2.1, O6): once the gate this card saw open closes by itself, why, until the person closes
- *  it or a new call or voice session opens the gate again. How long the card stays is its host's (the desktop's
- *  `wanted()`, FC7). */
-function useExit(state: CallControlsState | null, open: boolean, t: Translate) {
-  const seen = useRef<{ since: number | null } | null>(null);
-  const [dismissed, setDismissed] = useState<{ since: number | null } | null>(null);
-  if (state && open) seen.current = { since: state.call.since };
-  const session = seen.current;
-  const text = state && !open && session && dismissed !== session ? exitText(state.call, t) : null;
-  return { text, since: session?.since ?? null, dismiss: () => setDismissed(session) };
-}
-
 export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
   const state = useHostState(host);
-  const variant = useVariant("floating-card", FLOATING_CARD);
-  const options = variant !== "today";
-  // The options wear the room's theme and language (FC12): the system's where the host does not say them.
-  const language = state?.call.language;
-  const tc = useMemo(() => (options && language ? translator(cardLanguage([language])) : t), [options, language, t]);
-  const theme = options ? state?.call.theme ?? resolveTheme("system") : null;
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme) root.dataset.theme = theme; else delete root.dataset.theme;
-    if (options && language) root.lang = cardLanguage([language]);
-  }, [theme, options, language]);
-  const open = !!state && (options ? gateOpen(state.call) : isVoiceSwitch(state.call) ? !!state.call.voiceOn : state.call.joined);
-  const exit = useExit(state, open, tc);
   if (!state) return null;
-  if (!options) {
-    // With the voice switch (call model B) the card is there while the voice is on; the room's window says why it went off.
-    if (!open) return null;
-    // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
-    return <TodayCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
-  }
-  if (!open && !exit.text) return null;
-  return (
-    <FloatingCardBody key={(open ? state.call.since : exit.since) ?? "call"} host={host} state={state} variant={variant} t={tc}
-      exit={open ? null : exit.text} onDismiss={exit.dismiss} />
-  );
+  // With the voice switch (call model B) the card is there while the voice is on; the room's window says why it went off.
+  if (!(isVoiceSwitch(state.call) ? state.call.voiceOn : state.call.joined)) return null;
+  // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
+  return <TodayCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
 }
 
 function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallControlsState; t: Translate }) {

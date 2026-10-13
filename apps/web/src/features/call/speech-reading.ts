@@ -2,9 +2,8 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 
-/* Where the voice is in a reply, and what the person's spoken turn sent, on the clocks the stage reads them by: the
- * stage's bubbles (CallStage) and the desktop card's caption (CardCaptionFeed) both follow them from here, so the two
- * never read a reply, or a turn, differently. */
+/* Where the voice is in a reply, and what the person's spoken turn sent, on the clocks the stage's bubbles (CallStage)
+ * read them by. */
 
 /** The reply sounding now. Until its row says so the voice may already be playing it: then it is the oldest one
  *  waiting, since replies are said in order. */
@@ -41,7 +40,7 @@ export function latestWords(text: string) {
   return "…" + cut.slice(cut.indexOf(" ") + 1);
 }
 
-/** How long what was sent stays before it leaves, and how long leaving takes (call-view.css, the card's caption). */
+/** How long what was sent stays before it leaves, and how long leaving takes (call-view.css). */
 export const SENT_SHOWN_MS = 1600;
 export const SENT_LEAVING_MS = 500;
 

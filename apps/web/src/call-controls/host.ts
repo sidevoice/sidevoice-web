@@ -4,9 +4,8 @@
  * buttons back. Outside the app the seam is absent and the page shows nothing. The playground's preview gives the card
  * page the same seam, fed from the room frame beside it (preview/mock/card-host.mjs). */
 import type { AgentState, AudioDeviceOption, AudioDevices, CallCardView, CallEnded, CallModel, MicCode } from "../state/room-session-state.js";
-import type { CardCaption } from "../state/card-caption";
 
-export type { AgentState, AudioDeviceOption, AudioDevices, CallEnded, CallModel, CardCaption, MicCode };
+export type { AgentState, AudioDeviceOption, AudioDevices, CallEnded, CallModel, MicCode };
 
 /** The call as the card shows it (snapshot version 2 of the desktop bridge): the room's own projection of it, the
  *  store's `callCard` (state/room-session-state.js `callCardView`), passed through, with what is the host's own on top
@@ -32,9 +31,6 @@ export interface CallControlsState {
   /** Counts clicks the person made outside the card (the app sees them; a window never focused does not): any change
    *  closes an open panel. Absent where the app cannot tell. */
   outsideClicks?: number;
-  /** The words being said, from the room's caption channel (state/card-caption.ts; FC8): page → app `bridge_caption`,
-   *  app → card. Absent where the host carries none: the card then says the state instead. */
-  caption?: CardCaption | null;
 }
 
 export type CallCommand =

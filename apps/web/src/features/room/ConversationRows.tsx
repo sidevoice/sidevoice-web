@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { ParticipantView } from "../../state/room-types";
 
 /** The shortest thing that still tells two conversations apart, for the narrow rail a phone gets. */
@@ -9,8 +9,7 @@ function initials(title: string) {
 
 export interface ConversationRowsProps {
   rows: ParticipantView[];
-  /** A row chosen; the click with it (the desktop card tells a pointer's from a key's by it). */
-  onSelect(threadId: string, event: MouseEvent): void;
+  onSelect(threadId: string): void;
   /** The line under each title. */
   sub(row: ParticipantView): ReactNode;
   /** Rows that cannot be chosen here; by default while the call is switching. */
@@ -42,7 +41,7 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
             aria-pressed={row.selected}
             disabled={disabled(row)}
             title={tooltip(row)}
-            onClick={(event) => onSelect(row.threadId, event)}
+            onClick={() => onSelect(row.threadId)}
           >
             {lead ? lead(row) : <><span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined} title={row.stateLabel}><span className="dot" /></span></>}
             <span className="participant-copy"><span className="person-name" title={row.title} translate="no">{row.title}</span><span className="person-sub muted">{sub(row)}</span></span>

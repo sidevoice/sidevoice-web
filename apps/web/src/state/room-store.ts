@@ -2,7 +2,6 @@ import { createContext, useContext } from "react";
 import { createRoomSessionStore } from "./room-session-state.js";
 import { useStore } from "zustand";
 import { createMicLevelChannel } from "./mic-level";
-import { createCaptionChannel } from "./card-caption";
 
 export type RoomViewState = import('./room-session-state.js').SessionSnapshot;
 export type RoomStore = import('./room-session-state.js').SessionStore;
@@ -25,6 +24,5 @@ export function installRoomBridge(store: RoomStore) {
     // A sentence already worded for people, or a failure as error-message.ts words it.
     setBootError: (value) => store.patch({ bootError: !value ? null : typeof value === "string" ? { text: value } : value }),
     micLevel: createMicLevelChannel(),
-    caption: createCaptionChannel(),
   };
 }

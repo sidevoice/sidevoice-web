@@ -7,7 +7,6 @@ import { RoomHeader } from "../features/room/RoomHeader";
 import { ConversationSidebar } from "../features/room/ConversationSidebar";
 import { TranscriptPanel } from "../features/conversation/TranscriptPanel";
 import { CallStage } from "../features/call/CallStage";
-import { CardCaptionFeed } from "../features/call/CardCaptionFeed";
 import { CallToolbar } from "../features/call/CallToolbar";
 import { PresenceSound } from "../features/call/PresenceSound";
 import { RoomAnnouncer } from "../features/call/RoomAnnouncer";
@@ -76,8 +75,6 @@ function RoomContent() {
           </>}
         </main>
         {!noMachine && <PresenceSound />}
-        {/* The words being said, for the desktop app's floating card (its caption). */}
-        {!noMachine && <CardCaptionFeed />}
         {/* Call model B's announcements (VARIANTS `call-model`). */}
         {!noMachine && voiceSwitch && <RoomAnnouncer />}
         <ConnectionStatsDialog />

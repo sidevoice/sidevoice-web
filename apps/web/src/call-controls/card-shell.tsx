@@ -1,7 +1,7 @@
-/* What every value of the desktop card shares (VARIANTS `floating-card`): the host's state, the pointer's nearness, the
- * click guard, the drag, the window's size, and the two panels — the conversation picker and the devices. Today's card
- * (CallCard.tsx) and the spec's options (FloatingCard.tsx) differ only in what they lay out around them. */
-import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+/* The desktop card's plumbing with its host (CallCard.tsx lays the card out around it): the host's state, the pointer's
+ * nearness, the click guard, the drag, the window's size, and the two panels — the conversation picker and the
+ * devices. */
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon } from "../components/ui/Icons";
 import { ConversationRows } from "../features/room/ConversationRows";
 import type { ParticipantView } from "../state/room-types";
@@ -81,40 +81,30 @@ export interface CardShell {
   card: RefObject<HTMLDivElement | null>;
   panel: Panel;
   setPanel(panel: Panel): void;
-  /** Toggles a panel, remembering the control that opened it (Escape gives focus back to it). */
-  openPanel(panel: Exclude<Panel, null>, opener: HTMLElement): void;
-  /** The pointer is over the card, as the app says or, where it cannot, as the card's own events do. */
-  inside: boolean;
   /** The controls that wait for the pointer are shown. */
   expanded: boolean;
   /** Runs a command unless the click guard holds it. */
-  run(command: CallCommand, event?: ReactMouseEvent): void;
+  run(command: CallCommand): void;
   handlers: {
     onPointerEnter(): void; onPointerLeave(): void;
     onPointerDown(event: ReactPointerEvent<HTMLDivElement>): void; onPointerMove(event: ReactPointerEvent<HTMLDivElement>): void;
     onPointerUp(event: ReactPointerEvent<HTMLDivElement>): void; onPointerCancel(event: ReactPointerEvent<HTMLDivElement>): void;
     onClickCapture(event: ReactMouseEvent): void;
-    onFocus?(event: FocusEvent): void; onBlur?(event: FocusEvent): void; onKeyDown?(event: KeyboardEvent): void;
   };
 }
 
-/** The card's plumbing with its host. `keyboard`: the spec's options (§2.4–2.5) — focus within the card shows the
- *  controls, Escape closes a panel and gives focus back to what opened it, and the click guard holds only a pointer's
- *  clicks, never a key's or assistive technology's (their click carries no pointer: `detail` 0). Today's card keeps
- *  today's guard, which holds every command. */
-export function useCardShell(host: CallControlsHost, state: CallControlsState, { keyboard = false }: { keyboard?: boolean } = {}): CardShell {
+/** The card's plumbing with its host. The click guard holds every command. */
+export function useCardShell(host: CallControlsHost, state: CallControlsState): CardShell {
   const card = useRef<HTMLDivElement>(null);
   const [domInside, setDomInside] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
-  const opener = useRef<HTMLElement | null>(null);
   const guardUntil = useRef(0);
   const drag = useRef<{ x: number; y: number; moving: boolean; id: number } | null>(null);
   const dragged = useRef(false);
 
   const inside = state.pointerInside ?? domInside;
   const hovered = useDelayed(inside, SHOW_DELAY_MS, HIDE_DELAY_MS);
-  const expanded = state.alwaysExpanded || hovered || panel !== null || (keyboard && focused);
+  const expanded = state.alwaysExpanded || hovered || panel !== null;
 
   // A panel left open closes once the pointer has been away a while; a click outside the card closes it at once (the
   // app tells the card about clicks elsewhere, which a window that is never focused does not see itself).
@@ -153,10 +143,7 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, {
   // Appearing is a change too (the pointer may have just come onto the card).
   useEffect(() => { if (expanded) guardUntil.current = Math.max(guardUntil.current, Date.now() + CLICK_GUARD_MS); }, [expanded]);
 
-  const run = (command: CallCommand, event?: ReactMouseEvent) => {
-    const byPointer = !keyboard || !event || event.detail > 0;
-    if (!byPointer || Date.now() >= guardUntil.current) host.run(command);
-  };
+  const run = (command: CallCommand) => { if (Date.now() >= guardUntil.current) host.run(command); };
 
   const handlers: CardShell["handlers"] = {
     onPointerEnter: () => setDomInside(true),
@@ -165,7 +152,7 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, {
       dragged.current = false;
       const target = event.target as Element;
       // A press anywhere in the card but in an open panel or on what opens it closes the panel.
-      if (panel && !target.closest(".card-panel, .card-title, .card-devices, .fc-strip-more")) setPanel(null);
+      if (panel && !target.closest(".card-panel, .card-title, .card-devices")) setPanel(null);
       // Dragging from anywhere but a button (the title counts as card): past the threshold it moves the window.
       if (event.button > 0 || target.closest("button:not(.card-title)")) return;
       drag.current = { x: event.screenX, y: event.screenY, moving: false, id: event.pointerId };
@@ -197,21 +184,7 @@ export function useCardShell(host: CallControlsHost, state: CallControlsState, {
       if (dragged.current) { event.stopPropagation(); event.preventDefault(); dragged.current = false; }
     },
   };
-  if (keyboard) {
-    handlers.onFocus = () => setFocused(true);
-    handlers.onBlur = (event) => { if (!card.current?.contains(event.relatedTarget as Node | null)) setFocused(false); };
-    handlers.onKeyDown = (event) => {
-      if (event.key !== "Escape" || !panel) return;
-      event.preventDefault();
-      setPanel(null);
-      opener.current?.focus();
-    };
-  }
-  const openPanel = (next: Exclude<Panel, null>, from: HTMLElement) => {
-    opener.current = from;
-    setPanel(panel === next ? null : next);
-  };
-  return { card, panel, setPanel, openPanel, inside, expanded, run, handlers };
+  return { card, panel, setPanel, expanded, run, handlers };
 }
 
 /** A device as the card words it: a real device keeps its own name; the system's choice, an unnamed device and a
@@ -223,7 +196,7 @@ function deviceName(option: AudioDeviceOption, kind: "input" | "output", t: Tran
   return option.label;
 }
 
-export function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (command: CallCommand, event?: ReactMouseEvent) => void; t: Translate }) {
+export function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (command: CallCommand) => void; t: Translate }) {
   const [open, setOpen] = useState<"input" | "output" | null>(null);
   const [asked, setAsked] = useState<{ kind: "input" | "output"; id: string } | null>(null);
   const devices = call.devices;
@@ -250,10 +223,10 @@ export function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (comma
               <div className="device-options" role="listbox" aria-label={row.label}>
                 {row.options.map((option) => (
                   <button type="button" role="option" key={option.id} aria-selected={option.id === row.current}
-                    className="device-option" onClick={(event) => {
+                    className="device-option" onClick={() => {
                       setOpen(null);
                       setAsked({ kind: row.kind, id: option.id });
-                      run({ command: "select-audio-device", kind: row.kind, id: option.id }, event);
+                      run({ command: "select-audio-device", kind: row.kind, id: option.id });
                     }}>
                     <span className="check" aria-hidden="true">{option.id === row.current ? "✓" : ""}</span>{deviceName(option, row.kind, t)}
                   </button>
@@ -284,9 +257,8 @@ function conversationSub(row: ParticipantView, t: Translate) {
   );
 }
 
-/** The conversation picker: today's rows. Which can be chosen is the caller's (A: one that is there; B: every one but
- *  while switching, D5). */
-export function ConversationPicker({ call, disabled, onSelect, t }: { call: CallSnapshot; disabled(row: ParticipantView): boolean; onSelect(threadId: string, event: ReactMouseEvent): void; t: Translate }) {
+/** The conversation picker: the room's rows. Which can be chosen is the caller's. */
+export function ConversationPicker({ call, disabled, onSelect, t }: { call: CallSnapshot; disabled(row: ParticipantView): boolean; onSelect(threadId: string): void; t: Translate }) {
   return (
     <div className="card-panel conversations" aria-label={t("card.conversations")}>
       <ConversationRows
