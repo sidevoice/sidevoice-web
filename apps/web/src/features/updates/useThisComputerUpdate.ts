@@ -24,7 +24,8 @@ export function useThisComputerUpdate() {
   const serviceUpdate = useLocalHostUpdate(updatable);
   const serviceVersion = service ? safeLocalHostStatusDetails(service).product_version : null;
 
-  const appState: PartState = !app.updater ? "none" : !app.status ? "unknown" : app.status.state !== "idle" ? "pending" : app.status.error ? "unknown" : "current";
+  // Current only once a check has been seen to find nothing: never "Up to date" before any check.
+  const appState: PartState = !app.updater ? "none" : !app.status ? "unknown" : app.status.state !== "idle" ? "pending" : app.status.error || !app.checkedAt ? "unknown" : "current";
   const serviceState: PartState = !updatable ? "none" : !serviceUpdate.report ? "unknown"
     : serviceUpdate.report.update === "available" ? "pending" : serviceUpdate.report.update === "current" ? "current" : "unknown";
   const parts = [appState, serviceState];

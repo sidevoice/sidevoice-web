@@ -200,7 +200,13 @@ test("This device says its version and Update available, a link to the row's but
   await landsOn(() => document.getElementById("updates-this-computer"));
 });
 
-test("This device: Up to date where the app and its service both say so, with no link; nothing said where neither can", async () => {
+test("This device: Up to date where the app (after a check) and its service both say so, with no link; nothing said where neither can", async () => {
+  // Before any check, the app cannot say it is current: the line says the version alone.
+  open({ service: { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" } });
+  await settle();
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  cleanup();
+  localStorage.setItem("sidevoice.updates-checked-at", String(Date.now()));
   open({ service: { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" } });
   await waitFor(() => expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
   expect(within(pane("this-computer")).queryByRole("button", { name: /Update available/ })).toBeNull();
