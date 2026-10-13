@@ -192,16 +192,17 @@ test("a dot is only ever green and only means connected; one live state per page
   expect(states(own)).toEqual([own.querySelector(".host-status-card .host-status-state")]);
 });
 
-test("\"New\" is never on the state's line, and is in the entry's name", () => {
-  for (const marks of ["pill", "count", "dot"]) {
-    localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "section-new": marks }));
+test("\"New\" is off for this release: an agent new on a machine marks neither its entry nor its name, whatever the panel stored", () => {
+  for (const stored of [null, { "section-new": "pill" }, { "section-new": "count" }, { "section-new": "dot" }, { "section-new-dot": "end" }]) {
+    if (stored) localStorage.setItem(VARIANTS_KEY, JSON.stringify(stored));
     open({ hostAgents: { "fp-old": newAgent() } });
     const entry = navEntry("Old laptop");
     expect(entry.querySelector(".machine-state")).toBeNull();
     expect(dot(entry)).toBeNull();
-    expect(entry.querySelector(".machine-nav-icon .new-on-icon-dot, .machine-entry-line .new-nav-pill, .machine-entry-line .new-nav-count")).not.toBeNull();
-    expect(entry).toHaveAccessibleName("Old laptop, Not connected, new");
+    expect(entry.querySelector(".new-on-icon-dot, .new-end-dot, .new-nav-pill, .new-nav-count, .sr-only")).toBeNull();
+    expect(entry).toHaveAccessibleName("Old laptop, Not connected");
     cleanup();
+    localStorage.removeItem(VARIANTS_KEY);
     localStorage.removeItem("sidevoice.highlights");
   }
 });

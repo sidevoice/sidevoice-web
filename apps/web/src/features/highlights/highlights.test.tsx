@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, render } from "@testing-library/react";
-import { NewMark } from "./highlights";
+import { HIGHLIGHTS_ON, NewMark } from "./highlights";
 import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -22,7 +22,8 @@ vi.mock("../onboarding/onboarding-context", async (importOriginal) => ({
 
 afterEach(() => { setup.ready = true; setup.completed_at = null; });
 
-/* Nothing is new during the first-run setup, and what was there then never becomes new after it. */
+/* Nothing is new during the first-run setup, and what was there then never becomes new after it. Off for this release
+ * (HIGHLIGHTS_ON): nothing is new after it either, though what the setup saw is still taken as seen. */
 
 const agent = (id: string): DetectedAgent => ({
   id, label: id, present: true, version: "1.0.0", registration: "not-connected", connect: "auto", actionable: true,
@@ -55,7 +56,8 @@ test("during the setup an agent a paired machine can connect is not new anywhere
   expect(seen()["agent:fp-setup:codex"]?.seenAt).toEqual(expect.any(Number));
 });
 
-test("after the setup what was there during it stays not new; an agent that appears after it is new", () => {
+test("after the setup what was there during it stays not new; off for this release, an agent that appears after it is not new either", () => {
+  expect(HIGHLIGHTS_ON).toBe(false);
   const { store, rerender } = room("fp-after", ["codex"]);
   expect(seen()["agent:fp-after:codex"]?.seenAt).toEqual(expect.any(Number));
   setup.completed_at = 1;
@@ -63,9 +65,11 @@ test("after the setup what was there during it stays not new; an agent that appe
   expect(document.querySelector(".new-mark")).toBeNull();
   expect(gear().querySelector(".settings-notice")).toBeNull();
   act(() => store.patch({ hostAgents: { "fp-after": listing(["codex", "cursor"]) } } as never));
-  expect(gear()).toHaveAttribute("aria-label", "Settings, 1 new");
-  expect(gear().querySelector(".settings-notice")).not.toBeNull();
-  expect(seen()["agent:fp-after:cursor"]).toEqual({ shownAt: expect.any(Number) });
+  expect(gear()).toHaveAttribute("aria-label", "Settings");
+  expect(gear().querySelector(".settings-notice")).toBeNull();
+  expect(document.querySelector(".new-mark, .new-on-icon-dot, .new-end-dot")).toBeNull();
+  // Never shown, so not recorded as shown: it is new when the marks come back.
+  expect(seen()["agent:fp-after:cursor"]).toBeUndefined();
   expect(seen()["agent:fp-after:codex"]?.seenAt).toEqual(expect.any(Number));
 });
 
