@@ -1784,8 +1784,14 @@ test('A paired machine that says it is behind says how to update it there; anyth
  await s.run("loadMachineInfo('fp-mac')");
  assert.deepEqual(asked,[['https://mac.example/api/host/status','Bearer tok-1']],'asked of the machine itself, with this device\'s token');
  assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}});
- // What is not a latest version and a command to run is not an update: no command, a blank one, a number, a word.
- for(const update of [{latest:'0.5.0'},{latest:'0.5.0',command:'  '},{latest:5,command:'x'},{command:'x'},'yes',null]){
+ // A latest version with no command, or a blank one, is behind all the same, its command unknown (Updates says the
+ // documented one); what is not a latest version is not an update: a number, none, a word.
+ for(const update of [{latest:'0.5.0'},{latest:'0.5.0',command:'  '},{latest:'0.5.0',command:7}]){
+  says={version:'0.4.0',update};
+  await s.run("loadMachineInfo('fp-mac')");
+  assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:null}},JSON.stringify(update));
+ }
+ for(const update of [{latest:5,command:'x'},{latest:' ',command:'x'},{command:'x'},'yes',null]){
   says={version:'0.4.0',update};
   await s.run("loadMachineInfo('fp-mac')");
   assert.deepEqual(status(),{version:'0.4.0',update:null},JSON.stringify(update));

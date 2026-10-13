@@ -159,9 +159,10 @@ async function readMachineInfo(fp){
   const answer=await hostApi(fp,'/api/host/status',{headers:{accept:'application/json'},cache:'no-store'});
   const info=answer&&typeof answer==='object'?answer:{};
   const version=typeof info.version==='string'&&/^\d+\.\d+\.\d+/.test(info.version)?info.version:null;
-  // Behind the latest, and the command that updates it there (contract gap #57: no core says it yet).
+  // Behind the latest, and the command that updates it there where it names one (contract gap #57: no core says it
+  // yet; with none, Updates says the documented one).
   const u=info.update&&typeof info.update==='object'?info.update:null;
-  const update=u&&typeof u.latest==='string'&&typeof u.command==='string'&&u.command.trim()?{latest:u.latest,command:u.command}:null;
+  const update=u&&typeof u.latest==='string'&&u.latest.trim()?{latest:u.latest,command:typeof u.command==='string'&&u.command.trim()?u.command:null}:null;
   roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],version,update}}});
  }catch{}
 }

@@ -197,14 +197,21 @@ export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | 
   return status.state === "available" || status.state === "downloading" ? status : null;
 }
 
+/** What updates Sidevoice on a machine, as the connector's README documents it (sidevoice/sidevoice-connector,
+ *  "Commands"): `install` "installs this package's connector and the core it carries (or updates to them)"; `@latest`
+ *  has npx fetch the newest package rather than run one it cached. Said for a machine behind whose status names no
+ *  command of its own (contract gap #57: no machine names one yet). */
+export const SIDEVOICE_UPDATE_COMMAND = "npx sidevoice@latest install";
+
 /** The paired machines whose Sidevoice is behind, as they said (remoteHostStatus `update`, contract gap #57): only those
- *  still paired here, so a machine forgotten while it was behind is not listed. */
+ *  still paired here, so a machine forgotten while it was behind is not listed. Its command is the machine's own, else
+ *  SIDEVOICE_UPDATE_COMMAND. */
 export function useOutdatedMachines(): { machine: MachineView; version: string | null; latest: string; command: string }[] {
   const machines = useRoomStore((state) => state.machines);
   const status = useRoomStore((state) => state.facts.remoteHostStatus);
   return machines.flatMap((machine) => {
     const info = !machine.local && machine.pairingId ? status?.[machine.pairingId] : undefined;
-    return info?.update ? [{ machine, version: info.version ?? null, latest: info.update.latest, command: info.update.command }] : [];
+    return info?.update ? [{ machine, version: info.version ?? null, latest: info.update.latest, command: info.update.command?.trim() || SIDEVOICE_UPDATE_COMMAND }] : [];
   });
 }
 

@@ -59,8 +59,9 @@ export interface SessionFacts {
  localHostAvailable: boolean; localHostStatus: import('../services/desktop-host').LocalHostStatus;
  /** Each paired machine's reach, and — where the machine says (core GET /api/host/status: a contract gap) — its
   *  Sidevoice version. */
- /** `update`: the machine's Sidevoice is older than the latest, and the command that updates it there (contract gap #57). */
- remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null; update?: {latest: string; command: string} | null}>;
+ /** `update`: the machine's Sidevoice is older than the latest, and the command that updates it there where it names one
+  *  (contract gap #57). */
+ remoteHostStatus: Record<string, {state: 'checking' | 'connected' | 'offline'; checkedAt: number; version?: string | null; update?: {latest: string; command: string | null} | null}>;
  /** How each paired machine is reached, by fingerprint (every one of them is live), and the machine the call is with. */
  machineLinks: Record<string, MachineLink>; callNode: string | null;
  /** The pairing dialog, and the sentence it opens with when the page opened it. */

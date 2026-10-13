@@ -5,7 +5,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { fakeUpdater } from "../../test/updater";
 import { UpdatesEntry } from "../updates/UpdatesEntry";
-import type { UpdaterStatus } from "../updates/useUpdates";
+import { SIDEVOICE_UPDATE_COMMAND, type UpdaterStatus } from "../updates/useUpdates";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-host";
 
@@ -479,6 +479,14 @@ test("in the desktop app, a remote machine behind: the app, this computer, then 
   expect(updates().getByText("Sidevoice on this computer, and the machines whose Sidevoice is behind: their versions, and how they update.")).toBeInTheDocument();
   // Only the one behind; the one up to date is not listed.
   expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND]]);
+  expect(updates().getByRole("button", { name: "Copy the command for Lab box" })).toBeInTheDocument();
+});
+
+test("a machine behind that names no command of its own: the documented one, npx sidevoice@latest install — never a placeholder", async () => {
+  open({ section: "updates", machines: [lab], remote: { "fp-lab": { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: null } } } });
+  await settle();
+  expect(SIDEVOICE_UPDATE_COMMAND).toBe("npx sidevoice@latest install");
+  expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", "npx sidevoice@latest install"]]);
   expect(updates().getByRole("button", { name: "Copy the command for Lab box" })).toBeInTheDocument();
 });
 
