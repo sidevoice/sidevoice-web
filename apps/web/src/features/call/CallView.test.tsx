@@ -8,7 +8,8 @@ import type { SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
 import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
-import { SENT_LEAVING_MS, sentShownMs } from "./speech-reading";
+import { AGENT_LINGER_MS, SENT_LEAVING_MS } from "./speech-reading";
+import { PAGE_MS } from "./PagedText";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -66,23 +67,28 @@ function viewport({ narrow = false, crowded = false }) {
 }
 const escape = () => act(() => { fireEvent.keyDown(document, { key: "Escape" }); });
 
-test("the stage plays what the agent says as a karaoke bubble, the chunk before dim above it", () => {
+test("the stage plays what the agent says as a karaoke bubble, the whole reply in pages that follow the voice", () => {
   const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
   const bubble = document.querySelector(".stage-bubble")!;
   expect(bubble).toHaveAttribute("data-visible");
-  expect(bubble.querySelector(".stage-bubble-previous")?.textContent).toBe("…I'll start with the login and");
-  expect(bubble.querySelector(".karaoke-played")?.textContent).toBe("then look at the cart");
-  expect(bubble.querySelector(".karaoke-upcoming")?.textContent).toBe(" tests.");
+  expect(bubble).not.toHaveAttribute("data-leaving");
+  // The whole reply, lit as far as it was heard, in a window of three lines (PagedText): no chunk, nothing dim above.
+  expect(bubble.querySelector(".paged-text > .paged-text-run > .karaoke-text")).not.toBeNull();
+  expect(bubble.querySelector(".karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look at the cart");
+  expect(bubble.querySelector(".karaoke-upcoming")?.textContent).toBe(" tests. I'll tell you as soon as I have something.");
+  expect(document.querySelectorAll(".stage-bubble")).toHaveLength(1);
   // Each spoken word is a beat of the mouth, "a" and "b" in turn.
   expect(stageAgent().getAttribute("data-beat")).toMatch(/^[ab]$/);
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
-  // Between turns the bubble goes, and what the agent is doing stands in its place.
-  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true } });
-  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-visible");
+  // Its last words said, it stays a moment, whole; what the agent is doing stands under it.
+  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true },
+    history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
+  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
+  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
   // Said to assistive tech only: no badge over the agent (the sidebar shows it).
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
@@ -155,7 +161,7 @@ test("what a spoken turn sent stays a moment, then leaves, then is gone", () => 
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
   expect(personBubble()!.querySelector(".voice-wave")).toBeNull();
   expect(personBubble()).not.toHaveAttribute("data-leaving");
-  tick(sentShownMs("Split it into two commits.") - 1);
+  tick(PAGE_MS - 1);
   expect(personBubble()).not.toHaveAttribute("data-leaving");
   tick(1);
   expect(personBubble()).toHaveAttribute("data-leaving");
@@ -183,12 +189,17 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
     patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said(segment, text, time)] } as Partial<SessionFacts>);
   };
   speak("u-1", "First thing.", 2);
-  tick(sentShownMs("First thing.") + 200);
+  tick(PAGE_MS + 200);
   expect(personBubble()).toHaveAttribute("data-leaving");
-  // The next turn: the bars while spoken, then what it sent, from the start of its moment.
+  // The next turn: the bars while spoken, below the first as it goes on leaving; then what it sent, from the start of
+  // its moment.
   patch(store, { userLive: true, userTurn: { id: "u-2", segment: "turn:u-2", thread: "fp-1|t-login" }, pendingPhase: "listening" });
-  expect(personBubble()!.querySelector(".voice-wave")).not.toBeNull();
-  expect(personBubble()).not.toHaveAttribute("data-leaving");
+  const live = () => document.querySelector<HTMLElement>(".person-bubble:not([data-sent])");
+  expect(live()!.querySelector(".voice-wave")).not.toBeNull();
+  expect(live()).not.toHaveAttribute("data-leaving");
+  expect(document.querySelector(".person-bubble[data-sent]")).toHaveAttribute("data-leaving");
+  tick(SENT_LEAVING_MS);
+  expect(document.querySelector(".person-bubble[data-sent]")).toBeNull();
   patch(store, { userLive: false, pendingPhase: "" , userTurn: null, history: [...store.getState().facts.history, said("u-2", "Second thing.", 3)] } as Partial<SessionFacts>);
   expect(personBubble()).toHaveTextContent("Second thing.");
   expect(personBubble()).not.toHaveAttribute("data-leaving");
@@ -196,9 +207,9 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
   // A message typed meanwhile neither shows nor holds it on the stage.
   patch(store, { history: [...store.getState().facts.history, said("u-3", "Typed meanwhile.", 4)] });
   expect(personBubble()).toHaveTextContent("Second thing.");
-  tick(sentShownMs("Second thing.") - 1000);
+  tick(PAGE_MS - 1000);
   expect(personBubble()).toHaveAttribute("data-leaving");
-  tick(500);
+  tick(SENT_LEAVING_MS);
   expect(personBubble()).toBeNull();
 }, WHOLE_APP_MS);
 
@@ -398,23 +409,23 @@ test("two machines with the same name, or none, are two groups, each with its ow
 test("the bubble lights whole words, and its tooltip speaks the interface's language", () => {
   room({ botLive: true, karaokeState: { segment: "h-2", from: 42, to: 42 } });
   // What was heard ends inside "look": the word lights whole.
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("then look");
+  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look");
   expect(document.querySelector(".stage-bubble .karaoke-text")).toHaveAttribute("title", "Playing this reply");
 });
 
-test("a whole sentence sounding is read clause by clause at a speaking pace, never past its end", () => {
+test("a whole sentence sounding is read at a speaking pace, never past its end", () => {
   vi.useFakeTimers();
   // The voice's chunk is the reply's first sentence and a half: "Okay. I'll start with the login".
   room({ botLive: true, karaokeState: { segment: "h-2", from: 0, to: 31 } });
-  // The sentence has just started: its first clause is up, nothing lit yet.
-  expect(document.querySelector(".stage-bubble .stage-bubble-previous")).toBeNull();
+  // The sentence has just started: the whole reply is up, nothing lit yet.
+  expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(REPLY);
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("");
   act(() => { vi.advanceTimersByTime(1000); });
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent?.length).toBeGreaterThan(0);
   // Long after the voice would have got there, the bubble waits at the end of the part sounding.
   act(() => { vi.advanceTimersByTime(20000); });
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login");
-  expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(" and");
+  expect(document.querySelector(".stage-bubble .karaoke-upcoming")?.textContent).toBe(REPLY.slice("Okay. I'll start with the login".length));
 });
 
 test("without a cue from the voice, the bubble reads on at a speaking pace instead of staying dim", () => {
@@ -422,9 +433,41 @@ test("without a cue from the voice, the bubble reads on at a speaking pace inste
   room({ botLive: true, karaokeState: null });
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("");
   act(() => { vi.advanceTimersByTime(3000); });
-  expect(document.querySelector(".stage-bubble .stage-bubble-previous")).toHaveTextContent("…I'll start with the login and");
-  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("then look");
+  // Three seconds at a speaking pace: to "then look", from the reply's start.
+  expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look");
 });
+
+const stageBubbles = () => [...document.querySelectorAll<HTMLElement>(".stage-bubble")];
+/** The reply `segment` as the room has it, its voice `audio` ("playing", or "played" once said). */
+const reply = (segment: string, text: string, audio: string, time: number) =>
+  ({ segment, thread: "fp-1|t-login", role: "assistant" as const, text, name: "Fix the slow login", time, session: "s1", audio });
+const NEXT = "Done: the login is fast again.";
+
+test("its last words said, a reply stays whole AGENT_LINGER_MS, then lifts away; the next one sends it away at once", () => {
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 } });
+  vi.useFakeTimers();
+  patch(store, { botLive: false, karaokeState: null, history: [reply("h-2", REPLY, "played", 1)] } as Partial<SessionFacts>);
+  expect(stageBubbles()).toHaveLength(1);
+  expect(stageBubbles()[0].querySelector(".karaoke-played")?.textContent).toBe(REPLY);
+  tick(AGENT_LINGER_MS - 1);
+  expect(stageBubbles()[0]).not.toHaveAttribute("data-leaving");
+  tick(1);
+  expect(stageBubbles()[0]).toHaveAttribute("data-leaving");
+  tick(SENT_LEAVING_MS);
+  expect(stageBubbles()).toHaveLength(0);
+  // Two replies, one after the other: the first lifts away the moment the next sounds, the next from its start.
+  patch(store, { botLive: true, karaokeState: { segment: "h-3", from: 0, to: 0 }, history: [reply("h-2", REPLY, "played", 1), reply("h-3", "Okay.", "playing", 2)] } as Partial<SessionFacts>);
+  expect(stageBubbles()).toHaveLength(1);
+  patch(store, { karaokeState: { segment: "h-4", from: 0, to: 0 },
+    history: [reply("h-2", REPLY, "played", 1), reply("h-3", "Okay.", "played", 2), reply("h-4", NEXT, "playing", 3)] } as Partial<SessionFacts>);
+  const [before, now] = stageBubbles();
+  expect(before).toHaveAttribute("data-leaving");
+  expect(before).toHaveTextContent(/^Okay\.$/);
+  expect(now).not.toHaveAttribute("data-leaving");
+  expect(now.querySelector(".karaoke-upcoming")?.textContent).toBe(NEXT);
+  tick(SENT_LEAVING_MS);
+  expect(stageBubbles()).toEqual([now]);
+}, WHOLE_APP_MS);
 
 test("Escape closes only the topmost: a dialog, a menu or a handler above the transcript answers it first", async () => {
   room();
