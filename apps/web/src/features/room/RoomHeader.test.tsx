@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -81,7 +81,24 @@ test("Settings sits at the conversations' foot: it opens Settings through the he
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
 
-test("an update waiting puts its row in the sidebar's foot, above Settings, each its own child", () => {
+/** VARIANTS `update-notice` as the preview's panel picks it. */
+function noticeVariant(value: string) {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": value }));
+  onTestFinished(() => localStorage.removeItem("sidevoice.variants"));
+}
+
+test("an update waiting (C, the default): an update icon by the brand, its count in its name; the foot keeps Settings alone", () => {
+  const store = room();
+  expect(document.querySelector(".sidebar-brand .update-brand")).toBeNull();
+  act(() => store.patch({ webUpdate: "b2" } as never));
+  expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).getByRole("button", { name: "Updates, 1 waiting" })).toHaveAttribute("aria-haspopup", "dialog");
+  const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
+  expect([...foot.children]).toHaveLength(1);
+  expect(foot.querySelector(".update-line, .updates-entry")).toBeNull();
+});
+
+test("an update waiting (D, today's): its row in the sidebar's foot, above Settings, each its own child", () => {
+  noticeVariant("foot");
   const store = room();
   act(() => store.patch({ webUpdate: "b2" } as never));
   const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
@@ -90,6 +107,7 @@ test("an update waiting puts its row in the sidebar's foot, above Settings, each
   expect(children[0]).toContainElement(foot.querySelector(".update-line") as HTMLElement);
   expect(children[0]).toHaveTextContent("Reload to update");
   expect(children[1]).toContainElement(foot.querySelector(".sidebar-settings") as HTMLElement);
+  expect(document.querySelector(".update-brand")).toBeNull();
 });
 
 test("a phone has no updates entry: none in the header, none in the dropped list, no dot on the chevron", async () => {
@@ -99,7 +117,7 @@ test("a phone has no updates entry: none in the header, none in the dropped list
   expect(header().querySelector(".updates-entry")).toBeNull();
   await act(async () => { fireEvent.click(chevron()!); });
   expect(document.getElementById("conversations")).toHaveAttribute("data-open");
-  expect(document.querySelector(".update-line, .updates-entry")).toBeNull();
+  expect(document.querySelector(".update-line, .updates-entry, .update-brand, .update-banner")).toBeNull();
   expect(screen.queryByRole("button", { name: /Reload to update|^Updates, / })).toBeNull();
   expect(chevron()).not.toHaveAttribute("data-updates");
 });

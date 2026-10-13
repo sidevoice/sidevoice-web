@@ -18,9 +18,11 @@ const STATES = [
 ];
 const label = (status) => `${status.state}${status.error ? " " + status.error.code : ""}`;
 
-async function withUpdater(page, language, first = STATES[0]) {
-  await page.addInitScript(({ language, first }) => {
+async function withUpdater(page, language, first = STATES[0], notice = "foot") {
+  await page.addInitScript(({ language, first, notice }) => {
     localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: language }));
+    // Where the room says it (VARIANTS `update-notice`): the foot's row (D) unless a test asks for another.
+    if (!localStorage.getItem("sidevoice.variants")) localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": notice }));
     let now = first;
     const listeners = new Set();
     window.__pushUpdate = (next) => { now = next; for (const listener of listeners) listener(next); };
@@ -32,7 +34,7 @@ async function withUpdater(page, language, first = STATES[0]) {
         check: async () => now, download: async () => now, restart: async () => undefined,
       },
     } };
-  }, { language, first });
+  }, { language, first, notice });
 }
 
 /** Where the row and what it holds sit against the sidebar's foot, in CSS pixels. */
@@ -107,7 +109,7 @@ for (const language of ["en", "es"]) {
   });
 }
 
-test("the sidebar's row lands on Updates, the app's Download in view and focused", async ({ page }) => {
+test("the sidebar's row (D) lands on Updates, the app's Update the app in view and focused", async ({ page }) => {
   await installHarness(page);
   await withUpdater(page, "en", STATES[1]);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -115,7 +117,45 @@ test("the sidebar's row lands on Updates, the app's Download in view and focused
   await page.locator(".sidebar-foot .update-line").click();
   await expect(page.locator("#language-settings")).toBeVisible();
   await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
-  const download = page.locator("#updates-app").getByRole("button", { name: `Download Sidevoice ${VERSION}` });
+  const download = page.locator("#updates-app").getByRole("button", { name: "Update the app" });
   await expect(download).toBeFocused();
   await expect(download).toBeInViewport();
 });
+
+/** Whether `element` sits inside the page's width and nothing in it scrolls sideways. */
+const inPage = (element) => {
+  const width = document.documentElement.clientWidth;
+  const box = element.getBoundingClientRect();
+  const out = [...element.querySelectorAll("*")].filter((child) => { const inner = child.getBoundingClientRect(); return inner.width > 0 && (inner.left < -0.5 || inner.right > width + 0.5 || inner.right > box.right + 0.5); })
+    .map((child) => child.className || child.tagName);
+  return { out, inside: box.left >= -0.5 && box.right <= width + 0.5, noSpill: element.scrollWidth <= element.clientWidth + 1, pageFits: document.documentElement.scrollWidth <= width + 1 };
+};
+
+for (const language of ["en", "es"]) {
+  for (const width of [1024, 1280]) {
+    test(`the brand's update popover (C) and the banner (B) fit at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
+      await installHarness(page);
+      await withUpdater(page, language, STATES[0], "brand");
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/voice/");
+      const icon = page.locator(".sidebar-brand .update-brand");
+      await expect(icon).toBeVisible();
+      await icon.click();
+      const panel = page.locator(".ui-popover:has(.updates-panel)");
+      for (const status of STATES) {
+        await page.evaluate((next) => window.__pushUpdate(next), status);
+        await expect(panel.locator(".update-notice-text")).toBeVisible();
+        expect(await panel.evaluate(inPage), label(status)).toEqual({ out: [], inside: true, noSpill: true, pageFits: true });
+      }
+      await page.keyboard.press("Escape");
+      await page.evaluate(() => localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": "banner" })));
+      await page.reload();
+      const banner = page.locator(".update-banner");
+      for (const status of STATES) {
+        await page.evaluate((next) => window.__pushUpdate(next), status);
+        await expect(banner.locator(".update-notice-text")).toBeVisible();
+        expect(await banner.evaluate(inPage), label(status)).toEqual({ out: [], inside: true, noSpill: true, pageFits: true });
+      }
+    });
+  }
+}

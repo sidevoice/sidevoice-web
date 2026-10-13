@@ -656,27 +656,30 @@ function buildBridge(build: Record<string, unknown> | undefined, withUpdater = f
 }
 const versionLine = () => document.querySelector(".host-status-product");
 
-/* Everything that updates is in Settings › Updates (UpdatesSettings.test.tsx): This device's card keeps its version and
- * See updates, whatever the build, with or without an updater or an update waiting. */
-test("This device's card: its version and See updates; no Update, no Automatic/Manual, no Check, no build note", async () => {
-  for (const [build, withUpdater] of [
-    [{ channel: "release", version: "0.4.0" }, true], [{ channel: "nightly", version: "0.5.0-nightly", commit: "abcdef0123456789" }, true],
-    [{ channel: "nightly", version: "0.5.0-nightly" }, false], [{ channel: "dev", version: "0.5.0-dev" }, false],
-  ] as [Record<string, unknown>, boolean][]) {
+/* Everything that updates is in Settings › Updates (UpdatesSettings.test.tsx): This device's card says its version — the
+ * app's, the Sidevoice the person installed — and, where the app updates something here, Update available, a link to
+ * its row in Updates; never a vague "See updates", never an action of its own. */
+test("This device's card: the app's version and Update available, a link to Updates, where the app updates something; no Update, no Automatic/Manual, no Check, no build note", async () => {
+  for (const [build, withUpdater, line] of [
+    [{ channel: "release", version: "0.4.0" }, true, "Sidevoice 0.4.0 · Update available"],
+    [{ channel: "nightly", version: "0.5.0-nightly", commit: "abcdef0123456789" }, true, "Sidevoice 0.5.0-nightly · Update available"],
+    // Updated by hand, or a development build: nothing here updates it, so nothing is said of updates.
+    [{ channel: "nightly", version: "0.5.0-nightly" }, false, "Sidevoice 0.5.0-nightly"], [{ channel: "dev", version: "0.5.0-dev" }, false, "Sidevoice 0.5.0-dev"],
+  ] as [Record<string, unknown>, boolean, string][]) {
     buildBridge(build, withUpdater);
-    room([local], { localHostStatus: { ...running, product_version: "0.4.0" } });
+    room([local], { localHostStatus: { ...running, product_version: "0.8.1" } });
     await act(async () => {});
     const card = thisDevice();
-    expect(versionLine()).toHaveTextContent("Sidevoice 0.4.0");
-    expect(within(card).getByRole("button", { name: "See updates" })).toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: /Update this machine|Check for updates|Download/ })).toBeNull();
+    await waitFor(() => expect(versionLine()).toHaveTextContent(new RegExp("^" + line.replaceAll(".", "\\.") + "$")));
+    expect(within(card).queryAllByRole("button", { name: "Update available, see it in Updates" })).toHaveLength(withUpdater ? 1 : 0);
+    expect(within(card).queryByRole("button", { name: /See updates|Update the service|Update the app|Check for updates/ })).toBeNull();
     expect(within(card).queryByRole("radiogroup", { name: "Updates" })).toBeNull();
     expect(card.querySelector(".host-status-build, .host-update-control, .app-update-settings")).toBeNull();
     cleanup();
   }
 });
 
-test("where the product does not say its version, the card shows the app's own", () => {
+test("where the product does not say its version, the card shows the app's, as it does when it does", () => {
   buildBridge({ channel: "nightly", version: "0.5.0-nightly" });
   room([local], { localHostStatus: running });
   expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0-nightly");
