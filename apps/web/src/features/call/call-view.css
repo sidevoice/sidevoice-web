@@ -52,13 +52,37 @@
 .stage-tile:has(.person-bubble) .stage-tags { display: none; }
 
 /* What the person is saying, at the tile's foot on their side while they say it, with a way to take it back; its fill
- * and text are the person's in the transcript (transcript.css: one rule for both). */
-.person-bubble { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1) var(--sv-space-2);
-  width: max-content; max-width: min(75%, 28rem); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4);
+ * and text are the person's in the transcript (transcript.css: one rule for both). Speaking again during what was just
+ * sent's moment, the two stand in one column (PersonTurn, VARIANTS `sent-repeat`). */
+.person-turns { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-direction: column; align-items: flex-end; gap: var(--sv-space-2); }
+.person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1) var(--sv-space-2);
+  width: max-content; max-width: min(75cqi, 28rem); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4);
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); border-bottom-right-radius: var(--sv-radius-xs);
   box-shadow: var(--sv-shadow-sm); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
-.person-bubble > span { flex: 1 1 8rem; min-width: 0; padding-block: var(--sv-space-1); }
 .person-bubble .cancel-input { flex: none; }
+/* "leave": the sent one lifts away from the very place the bars come in, under them. */
+.person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }
+/* "stack": the bars open beneath the sent one, which rises as they do (no motion where less is asked for). */
+.person-turns[data-repeat="stack"] > .person-bubble[data-sent] + .person-bubble { animation: person-bars-open var(--sv-dur-slow) var(--sv-ease); overflow: hidden; }
+@keyframes person-bars-open { from { max-height: 0; padding-block: 0; border-width: 0; opacity: 0; } to { max-height: 6rem; } }
+
+/* What was sent (VARIANTS `sent-text`): its latest words (today); its first three lines, the last fading from the text's
+ * ink into the quieter one (both 4.5:1 on the fill) before its "…"; a long one smaller, in four lines; one line. */
+/* Its space above and below is margin, so a clamped one is cut at its last line and not a sliver below it. */
+.person-said { flex: 1 1 8rem; min-width: 0; margin-block: var(--sv-space-1); }
+.person-said[data-lines] { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.person-said[data-lines="1"] { -webkit-line-clamp: 1; line-clamp: 1; }
+.person-said[data-lines="3"] { -webkit-line-clamp: 3; line-clamp: 3; }
+.person-said[data-lines="4"] { -webkit-line-clamp: 4; line-clamp: 4; }
+.person-said[data-small] { font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.person-said[data-faded] {
+  background-image: linear-gradient(to right, var(--sv-text) 30%, var(--sv-text-subtle) 85%), linear-gradient(var(--sv-text), var(--sv-text));
+  background-size: 100% 1.5rem, 100% calc(100% - 1.5rem); background-position: bottom, top; background-repeat: no-repeat;
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+}
+@media (forced-colors: active) { .person-said[data-faded] { background: none; color: CanvasText; -webkit-text-fill-color: CanvasText; } }
+/* The transcript's own delivered mark, at the end, in the bubble's quieter ink. */
+.person-sent-check { display: inline-flex; flex: none; align-self: center; color: var(--sv-text-subtle); }
 /* What was sent: a moment on the stage, then it lifts toward the agent, shrinks and fades (a plain fade, reduced). */
 .person-bubble[data-leaving] { animation: person-sent-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
 @keyframes person-sent-out { to { opacity: 0; transform: translateY(-48px) scale(.72); } }
@@ -209,7 +233,7 @@
 .transcript-entry { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); width: 44px; height: 44px; padding: 0; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
 .transcript-entry[aria-expanded="true"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 .transcript-entry-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
-.stage-tile:has(.transcript-entry) .person-bubble { right: calc(var(--stage-inset) + 44px + var(--sv-space-2)); }
+.stage-tile:has(.transcript-entry) .person-turns { right: calc(var(--stage-inset) + 44px + var(--sv-space-2)); }
 .stage-tile:has(.transcript-entry) .stage-tags { max-width: calc(100% - 2 * (var(--stage-inset) + 44px + var(--sv-space-2))); }
 
 .stage-badge:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }

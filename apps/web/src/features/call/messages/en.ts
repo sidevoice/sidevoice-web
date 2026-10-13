@@ -45,6 +45,8 @@ export const en = {
   "stage.empty": "Choose a conversation to talk to.",
   "stage.chooseConversation": "Choose a conversation",
   "stage.cancelTurn": "Cancel sending",
+  /* Beside what a spoken turn sent, on the stage, for assistive tech: the check says it to the eye. */
+  "stage.sent": "Sent",
   /* The wanted poster an offline conversation's bicho is shown on (each fine-print key is one line of it). */
   "stage.poster.title": "WANTED",
   "stage.poster.status": "ONLINE OR PAUSED",

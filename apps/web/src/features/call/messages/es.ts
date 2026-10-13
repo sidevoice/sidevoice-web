@@ -46,6 +46,7 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "stage.empty": "Elige una conversación para hablar.",
   "stage.chooseConversation": "Elegir una conversación",
   "stage.cancelTurn": "Cancelar envío",
+  "stage.sent": "Enviado",
   "stage.poster.title": "WANTED",
   "stage.poster.status": "VIVO O EN PAUSA",
   "stage.poster.fine1": "ESTE BICHO ES FICCIÓN. CUALQUIER PARECIDO CON UN AGENTE",

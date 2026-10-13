@@ -4,20 +4,20 @@ import { Button } from "../../components/ui/Button";
 import { HandIcon, HarnessIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
-import type { ChatMessage, ConversationView } from "../../state/room-types";
+import type { ChatMessage } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
-import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
 import { moodText } from "./conversation-state";
 import { bubbleAt } from "./speech-chunks";
-import { latestWords, sounding, useSentTurn, useSpokenTo } from "./speech-reading";
+import { sounding, useSpokenTo } from "./speech-reading";
 import { useStageConversation } from "./stage-view";
 import { useVoiceSwitch } from "../../state/call-model";
 import { StageHearIt } from "./HearIt";
+import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -48,27 +48,6 @@ function AgentBubble({ reply, spokenTo, visible }: { reply: ChatMessage | null; 
     <div className="speech-bubble stage-bubble" data-visible={(visible && !!view) || undefined} aria-hidden={!visible || !view} translate="no">
       {view?.previous && <span className="stage-bubble-previous">{view.previous}</span>}
       {view && <KaraokeText text={view.current.text} playback="playing" range={view.spoken > 0 ? { from: 0, to: view.spoken } : null} />}
-    </div>
-  );
-}
-
-/** The person's turn at the tile's foot: while they speak and while it is transcribed, the voice's bars;
- *  once transcribed, what is sent, for a moment, then it lifts away toward the agent and fades (a plain fade under
- *  reduced motion). Only a turn spoken here is shown as sent, never a message typed. */
-function PersonTurn({ conversation, t }: { conversation: ConversationView; t: CallTranslate }) {
-  const pending = !!conversation.pendingText || !!conversation.pendingPhase;
-  const sent = useSentTurn(conversation);
-  if (pending) return (
-    <div className="speech-bubble person-bubble" translate="no">
-      <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />
-      {conversation.pendingCancellable && <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
-        onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>}
-    </div>
-  );
-  if (!sent) return null;
-  return (
-    <div className="speech-bubble person-bubble" data-sent="" data-leaving={sent.leaving || undefined} translate="no">
-      <span>{latestWords(sent.text)}</span>
     </div>
   );
 }

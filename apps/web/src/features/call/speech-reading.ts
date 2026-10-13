@@ -33,7 +33,7 @@ export function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messag
 }
 
 /** How much of what the person is saying their bubble holds: the latest words, a few lines; the transcript has all. */
-const LIVE_TAIL = 90;
+export const LIVE_TAIL = 90;
 export function latestWords(text: string) {
   if (text.length <= LIVE_TAIL) return text;
   const cut = text.slice(-LIVE_TAIL);
@@ -46,9 +46,13 @@ export const SENT_LEAVING_MS = 500;
 
 export interface SentTurn { text: string; key: string; leaving: boolean }
 
+/** What a turn just sent does when the person speaks again during its moment: stays its time ("keep"), leaves at once
+ *  ("leave"), or is gone at once ("drop"). */
+export type SentOnSpeech = "keep" | "leave" | "drop";
+
 /** What the person's spoken turn sent, for its moment: from the moment the transcript has it, shown SENT_SHOWN_MS,
  *  then leaving for SENT_LEAVING_MS, then gone. Only a turn spoken here is shown as sent, never a message typed. */
-export function useSentTurn(conversation: ConversationView): SentTurn | null {
+export function useSentTurn(conversation: ConversationView, onSpeech: SentOnSpeech = "keep"): SentTurn | null {
   const pending = !!conversation.pendingText || !!conversation.pendingPhase;
   const lastUser = [...conversation.messages].reverse().find((message) => message.role === "user") ?? null;
   const lastKey = lastUser ? lastUser.segment ?? String(lastUser.time) : null;
@@ -63,13 +67,22 @@ export function useSentTurn(conversation: ConversationView): SentTurn | null {
     spoke.current = false;
     setSent({ text: lastUser.text, key: lastKey!, leaving: false });
   }, [lastKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Its own clock, so a message typed meanwhile cannot stop it leaving.
+  // Speaking again during its moment: it leaves, or goes, at once, unless it keeps its time.
+  const cut = pending && !!sent && onSpeech !== "keep";
+  useEffect(() => {
+    if (!cut) return;
+    setSent((now) => !now || onSpeech === "drop" ? null : now.leaving ? now : { ...now, leaving: true });
+  }, [cut]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Its own clock, so a message typed meanwhile cannot stop it leaving; once leaving, gone SENT_LEAVING_MS later.
   const sentKey = sent?.key;
+  const sentLeaving = !!sent?.leaving;
   useEffect(() => {
     if (!sentKey) return;
-    const leave = window.setTimeout(() => setSent((now) => now?.key === sentKey ? { ...now, leaving: true } : now), SENT_SHOWN_MS);
-    const gone = window.setTimeout(() => setSent((now) => now?.key === sentKey ? null : now), SENT_SHOWN_MS + SENT_LEAVING_MS);
-    return () => { window.clearTimeout(leave); window.clearTimeout(gone); };
-  }, [sentKey]);
+    const next = sentLeaving
+      ? window.setTimeout(() => setSent((now) => now?.key === sentKey ? null : now), SENT_LEAVING_MS)
+      : window.setTimeout(() => setSent((now) => now?.key === sentKey ? { ...now, leaving: true } : now), SENT_SHOWN_MS);
+    return () => window.clearTimeout(next);
+  }, [sentKey, sentLeaving]);
+  if (cut && sent) return onSpeech === "drop" ? null : { ...sent, leaving: true };
   return sent;
 }
