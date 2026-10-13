@@ -52,6 +52,46 @@ test("General: appearance, this device's name, then the interface's language", (
     .toEqual(["Appearance", "This device’s name", "Language"]);
 });
 
+/** Leaving Settings: the back arrow before the title, the button whose click the runtime binds to close it. */
+const leave = () => document.getElementById("settings-close") as HTMLButtonElement;
+const head = () => document.querySelector<HTMLElement>("#language-settings .ui-dialog-head")!;
+
+test("Settings is left by a back arrow before its title, named Back; there is no × any more", () => {
+  open("whisper-base");
+  expect(head().firstElementChild).toBe(leave());
+  expect(leave().nextElementSibling).toContainElement(document.getElementById("settings-title"));
+  expect(leave()).toHaveAttribute("type", "button");
+  expect(leave()).not.toHaveAttribute("hidden");
+  expect(leave()).toHaveAccessibleName("Back");
+  expect(leave()).toHaveAttribute("title", "Close Settings and return to the room");
+  expect(leave().querySelector("svg")).toHaveClass("lucide-arrow-left");
+  // The arrow is the header's only button: no close × at its end.
+  expect(head().querySelectorAll("button")).toHaveLength(1);
+  expect(head().querySelector(".ui-dialog-close, .lucide-x")).toBeNull();
+});
+
+test("in Spanish the arrow that leaves Settings is Volver", () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  try {
+    open("whisper-base");
+    expect(leave()).toHaveAccessibleName("Volver");
+    expect(leave()).toHaveAttribute("title", "Cerrar la configuración y volver a la sala");
+  } finally {
+    localStorage.removeItem("sidevoice.settings");
+  }
+});
+
+test("Escape still closes Settings: its cancel is left to the dialog, whichever section shows", () => {
+  open("whisper-base");
+  const dialog = document.getElementById("language-settings")!;
+  for (const section of ["general", "advanced"]) {
+    fireEvent.click(document.getElementById("settings-" + section)!);
+    const escape = new Event("cancel", { cancelable: true });
+    dialog.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(false);
+  }
+});
+
 test("no Save: a model chosen that is not here says the one in use stays until it is ready", () => {
   open("whisper-small");
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();

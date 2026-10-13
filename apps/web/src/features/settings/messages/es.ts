@@ -509,6 +509,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "hosts.addRemote": "Añadir una máquina remota",
   "settings.section.advanced": "Avanzado",
   "settings.back": "Atrás",
+  "settings.leave": "Volver",
   "settings.backTo": "Volver a {page}",
   "settings.summary.noModel": "Ningún modelo elegido",
   "settings.summary.providersNone": "Ninguno conectado",

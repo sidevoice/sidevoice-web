@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -249,9 +249,15 @@ export function SettingsDialog() {
       aria-labelledby={phone ? undefined : "settings-title"} aria-label={phone ? t("settings.title") : undefined}>
       <OverlayPortalProvider container={dialog}>
         <SettingsLevelsProvider value={levels}>
-        <DialogSurface titleId="settings-title" closeId="settings-close" closeable flush closeLabel={t("settings.close")} title={title} titleFocusable={phone}
-          leading={phone && level > 1 ? <Button variant="ghost" tone="neutral" size="icon" className="settings-back" aria-label={t("settings.backTo", { page: parent })} title={t("settings.back")}
-            onClick={() => levels.back()}><BackIcon size={20} /></Button> : undefined}>
+        <DialogSurface titleId="settings-title" flush title={title} titleFocusable={phone}
+          // Leaving Settings is a back arrow before the title (the runtime binds #settings-close; Esc closes too). A
+          // phone's page goes back to its list there instead: the arrow that leaves stays in the page, hidden.
+          leading={<>
+            {phone && level > 1 && <Button variant="ghost" tone="neutral" size="icon" className="settings-back" aria-label={t("settings.backTo", { page: parent })} title={t("settings.back")}
+              onClick={() => levels.back()}><BackIcon size={20} /></Button>}
+            <Button id="settings-close" variant="ghost" tone="neutral" size="icon" className="settings-back" hidden={phone && level > 1}
+              aria-label={t("settings.leave")} title={t("settings.close")}><ArrowLeftIcon /></Button>
+          </>}>
           {/* No Save: every setting applies as it changes. */}
           <form id="language-form" className="settings-layout">
             {/* What fails says so here, under the header, whichever level shows. */}

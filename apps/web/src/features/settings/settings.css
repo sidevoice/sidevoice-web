@@ -228,3 +228,7 @@
 .desktop-shortcut-alternatives { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); }
 .desktop-shortcut-note { color: var(--sv-text-muted); }
 .desktop-shortcut-error { color: var(--sv-danger); font-size: var(--sv-font-sm); }
+/* Leaving Settings: the back arrow before the title, at every width (a phone's sizes it above). */
+.settings-page .ui-dialog-head > .settings-back { flex: none; margin-inline-start: calc(-1 * var(--sv-space-2)); }
+.settings-page .settings-back[hidden] { display: none; }
+.settings-back svg:dir(rtl) { transform: scaleX(-1); }

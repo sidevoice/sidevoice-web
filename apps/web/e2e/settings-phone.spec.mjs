@@ -3,7 +3,8 @@ import { installHarness } from "./harness.mjs";
 
 /* Settings on a phone, in real browsers (PHONE-SETTINGS-SPEC part 1): the list of sections, a section's page under it, a
  * machine's page under Machines — one history entry each, so the system's back goes up a level and, from the list,
- * closes Settings without leaving the room; Escape does the same; Close takes every entry back off. */
+ * closes Settings without leaving the room; Escape does the same; the back arrow before the title leaves Settings from
+ * the list, and every close takes every entry back off. */
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -44,17 +45,29 @@ test("a phone's Settings: the system's back and Escape go up a level, and from t
   expect(page.url()).toBe(room);
   await expect(page.locator("h1.brand")).toBeAttached();
 
-  // Opened again it is at the list; Escape from a page goes up, and Close from a page takes its entries off.
+  // Opened again it is at the list, left by the back arrow before the title; on a page only the page's Back shows, and
+  // Escape there goes up.
+  const leave = page.locator("#settings-close");
   await page.locator("#settings-open").click();
   await expect(title).toHaveText("Settings");
+  await expect(leave).toBeVisible();
   await page.locator("#settings-advanced").click();
   await expect(title).toHaveText("Advanced");
+  await expect(page.getByRole("button", { name: "Back to Settings" })).toBeVisible();
+  await expect(leave).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(title).toHaveText("Settings");
   await expect(dialog).toBeVisible();
+  await leave.click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => levels(page)).toBeNull();
+  expect(page.url()).toBe(room);
+
+  // Closed from a page, as the runtime may close it, its entries come back off.
+  await page.locator("#settings-open").click();
   await page.locator("#settings-call").click();
   await expect(title).toHaveText("Call");
-  await page.locator("#settings-close").click();
+  await page.evaluate(() => document.getElementById("language-settings").close());
   await expect(dialog).toBeHidden();
   await expect.poll(() => levels(page)).toBeNull();
   expect(page.url()).toBe(room);

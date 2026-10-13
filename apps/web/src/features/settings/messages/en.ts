@@ -511,6 +511,7 @@ export const en = {
   "settings.section.advanced": "Advanced",
   // A phone's Settings as a menu (settings-levels.tsx): Back to the level above, and what each row says under its name.
   "settings.back": "Back",
+  "settings.leave": "Back",
   "settings.backTo": "Back to {page}",
   "settings.summary.noModel": "No model chosen",
   "settings.summary.providersNone": "None connected",

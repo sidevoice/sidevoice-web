@@ -84,7 +84,11 @@ const close = async () => { await act(async () => { dialog().removeAttribute("op
 /** Closed with levels in the history: they are taken back off. */
 const closeOff = () => traverse(() => dialog().removeAttribute("open"));
 const title = () => document.getElementById("settings-title")!;
-const back = () => document.querySelector<HTMLButtonElement>(".settings-back");
+/** A page's Back, up a level; and the back arrow that leaves Settings (the runtime binds #settings-close). */
+const back = () => document.querySelector<HTMLButtonElement>(".settings-back:not(#settings-close)");
+const leave = () => document.getElementById("settings-close") as HTMLButtonElement;
+/** The back arrows a person sees in the header: one at a time. */
+const shownBacks = () => [...document.querySelectorAll<HTMLButtonElement>(".ui-dialog-head > button")].filter((button) => !button.hidden);
 const nav = () => document.querySelector<HTMLElement>(".settings-nav")!;
 const content = () => document.querySelector<HTMLElement>(".settings-content")!;
 const tap = async (element: Element) => { await act(async () => { fireEvent.click(element); await settle(); }); };
@@ -100,6 +104,9 @@ test("opened from the gear it is the list of sections, under Settings: each a ro
   expect(title()).toHaveTextContent(/^Settings$/);
   expect(document.activeElement).toBe(title());
   expect(back()).toBeNull();
+  // At the list the header's arrow leaves Settings.
+  expect(shownBacks()).toEqual([leave()]);
+  expect(leave()).toHaveAccessibleName("Back");
   // Named Settings whatever level shows.
   expect(dialog()).toHaveAttribute("aria-label", "Settings");
   expect(dialog()).not.toHaveAttribute("aria-labelledby");
@@ -140,6 +147,10 @@ test("a row opens its section's page under the list; Back, Escape and the system
   expect(document.activeElement).toBe(title());
   expect(back()).toHaveAccessibleName("Back to Settings");
   expect(back()).toHaveAttribute("title", "Back");
+  // Only the page's Back shows: the arrow that leaves Settings is still there, hidden.
+  expect(shownBacks()).toEqual([back()]);
+  expect(leave()).toBeInTheDocument();
+  expect(leave()).toHaveAttribute("hidden");
   expect(nav()).toHaveAttribute("hidden");
   expect(content()).not.toHaveAttribute("hidden");
   expect(document.getElementById("pane-transcription")).not.toHaveAttribute("hidden");
@@ -150,6 +161,7 @@ test("a row opens its section's page under the list; Back, Escape and the system
   await tapBack();
   expect(title()).toHaveTextContent(/^Settings$/);
   expect(document.activeElement).toBe(row("transcription"));
+  expect(shownBacks()).toEqual([leave()]);
   expect(content()).toHaveAttribute("hidden");
   expect(stack()).toEqual(["list"]);
 
@@ -225,6 +237,8 @@ test("Machines is a list, each machine's state in words; a machine is a page of 
   await tap(list.querySelector('[data-machine="fp-lab"]')!);
   expect(title()).toHaveTextContent(/^Lab box$/);
   expect(back()).toHaveAccessibleName("Back to Machines");
+  expect(shownBacks()).toEqual([back()]);
+  expect(leave()).toHaveAttribute("hidden");
   expect(stack()).toEqual(["list", "machines", "fp-lab"]);
   await tapBack();
   expect(title()).toHaveTextContent(/^Machines$/);
@@ -322,6 +336,8 @@ test("a desktop is as it was: its sections beside the page, named by its title, 
   await tap(row("advanced"));
   expect(title()).toHaveTextContent(/^Settings$/);
   expect(back()).toBeNull();
+  // Whatever section shows, the header's one arrow leaves Settings.
+  expect(shownBacks()).toEqual([leave()]);
   expect(pushed()).toBe(0);
   await close();
   expect(pushed()).toBe(0);
