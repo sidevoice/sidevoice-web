@@ -273,11 +273,19 @@ test("nothing outside a call", () => {
   expect(container).toBeEmptyDOMElement();
 });
 
-test("Spanish when the system speaks it; English for any other language", () => {
+test("the card speaks the language this device's settings chose, else the system's; English for any other", () => {
   expect(cardLanguage(["es-ES"])).toBe("es");
-  expect(cardLanguage(["de-DE"])).toBe("en");
+  expect(cardLanguage(["de-DE"])).toBe("de");
+  expect(cardLanguage(["zh-CN"])).toBe("zh-Hans");
+  expect(cardLanguage(["ko-KR"])).toBe("en");
   expect(translator("es")("card.hangUp")).toBe("Colgar");
-  expect(translator("de")("card.hangUp")).toBe("Hang up");
+  expect(translator("ko")("card.hangUp")).toBe("Hang up");
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "pl" }));
+  try {
+    expect(cardLanguage()).toBe("pl");
+  } finally {
+    localStorage.removeItem("sidevoice.settings");
+  }
 });
 
 test("the call's duration reads like a clock", () => {

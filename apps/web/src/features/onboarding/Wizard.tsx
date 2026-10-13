@@ -23,6 +23,7 @@ import { ReadyStep } from "./ReadyStep";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
 import type { OnboardingStep } from "../../services/onboarding-state";
+import { UI_LANGUAGE_NAMES, UI_LANGUAGES } from "../../services/system-language.js";
 
 /* The first-run setup, one dialog over the room: of a fixed height, so nothing jumps between steps, and the whole
  * screen on a phone. Its order is the operator's: the basics (appearance, the interface's and the person's
@@ -65,8 +66,10 @@ function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHos
 function BasicsStep({ t }: { t: HostTranslate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [language, setLanguage] = useState(() => window.sidevoiceActions?.interfaceLanguage?.() ?? "");
-  // Each language in its own name, as language pickers have them.
-  const languages = [{ value: "", label: t("wizard.languageAuto") }, { value: "es", label: "Español" }, { value: "en", label: "English" }];
+  // Each language in its own name, as language pickers have them. The speech language is chosen among Spanish and
+  // English only here: the other interface languages are not voice languages (yet).
+  const languages = [{ value: "", label: t("wizard.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: UI_LANGUAGE_NAMES[value] }))];
+  const speechLanguages = languages.filter(({ value }) => ["", "es", "en"].includes(value));
   return <section className="wizard-basics">
     <p>{t("wizard.basics.body")}</p>
     <Group>
@@ -76,7 +79,7 @@ function BasicsStep({ t }: { t: HostTranslate }) {
         <Select id="wizard-ui-language" value={language} onValueChange={(next) => { setLanguage(next); window.sidevoiceActions?.setInterfaceLanguage?.(next); }} options={languages} />
       </Row>
       <Row label={t("wizard.basics.speech")} description={t("wizard.basics.speechHint")} htmlFor="wizard-speech-language">
-        <Select id="wizard-speech-language" value={draft?.stt.language ?? ""} onValueChange={(next) => window.sidevoiceActions?.editVoice({ stt: { language: next || null } })} options={languages} />
+        <Select id="wizard-speech-language" value={draft?.stt.language ?? ""} onValueChange={(next) => window.sidevoiceActions?.editVoice({ stt: { language: next || null } })} options={speechLanguages} />
       </Row>
     </Group>
   </section>;

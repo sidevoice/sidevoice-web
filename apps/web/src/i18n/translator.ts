@@ -5,10 +5,13 @@ import { systemLanguage } from "../services/system-language.js";
 
 export type Translate<Key extends string> = (key: Key, params?: Record<string, string | number>) => string;
 
+/** Where the room keeps this device's settings (room-session-controller.js `SETTINGS_KEY`). */
+export const SETTINGS_STORAGE_KEY = "sidevoice.settings";
+
 /** The interface's language on this device, among `supported`: the one saved in its settings, else the system's. */
 export function preferredLanguage(supported: string[]) {
   try {
-    const saved = JSON.parse(globalThis.localStorage?.getItem("sidevoice.settings") || "null")?.ui_language;
+    const saved = JSON.parse(globalThis.localStorage?.getItem(SETTINGS_STORAGE_KEY) || "null")?.ui_language;
     if (typeof saved === "string") return systemLanguage(supported, [saved]);
   } catch { /* The device's language is the fallback when its preference cannot be read. */ }
   return systemLanguage(supported);

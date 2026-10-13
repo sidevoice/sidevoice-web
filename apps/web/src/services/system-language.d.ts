@@ -1,4 +1,5 @@
 export const UI_LANGUAGES: string[];
+export const UI_LANGUAGE_NAMES: Record<string, string>;
 export const SPEECH_LANGUAGES: string[];
 
 export function systemLanguage(supported: string[], preferred?: readonly (string | undefined)[] | null): string;

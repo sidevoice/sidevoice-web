@@ -6,9 +6,18 @@ import "../styles/tokens.css";
 import "./call-card.css";
 import { CallCard } from "./CallCard";
 import { callControlsHost } from "./host";
+import { SETTINGS_STORAGE_KEY } from "../i18n/translator";
 import { cardLanguage, translator } from "./i18n";
 
 const host = callControlsHost();
-const language = cardLanguage();
-document.documentElement.lang = language;
-if (host) createRoot(document.getElementById("root")!).render(<CallCard host={host} t={translator(language)} />);
+if (host) {
+  const root = createRoot(document.getElementById("root")!);
+  // In the language this device's Settings chose (the room saves it in this origin's storage), again when it changes.
+  const render = () => {
+    const language = cardLanguage();
+    document.documentElement.lang = language;
+    root.render(<CallCard host={host} t={translator(language)} />);
+  };
+  render();
+  window.addEventListener("storage", (event) => { if (event.key === null || event.key === SETTINGS_STORAGE_KEY) render(); });
+}

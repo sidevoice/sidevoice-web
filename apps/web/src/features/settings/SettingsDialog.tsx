@@ -28,6 +28,7 @@ import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { remoteProviders } from "../../services/voice-settings.js";
+import { UI_LANGUAGE_NAMES, UI_LANGUAGES } from "../../services/system-language.js";
 import { useDialogFocusReturn } from "../../lib/focus-return";
 import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
 import { MenuRow } from "./SettingsMenu";
@@ -74,7 +75,7 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
         <Select id="ui-language" value={language} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
-          options={[{ value: "", label: t("settings.general.languageAuto") }, { value: "es", label: "Español" }, { value: "en", label: "English" }]} />
+          options={[{ value: "", label: t("settings.general.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: UI_LANGUAGE_NAMES[value] }))]} />
       </Row>
     </Group>
   </Section>;
