@@ -6,10 +6,11 @@ import { UPDATE_PLACE, useAppUpdate } from "./useUpdates";
 
 type PartState = "pending" | "current" | "unknown" | "none";
 
-/** This computer's Sidevoice as This device and the one row (VARIANTS `updates-rows` A) say it: one version — the
+/** This computer's Sidevoice as This device and its row in Updates say it: one version — the
  *  app's, the Sidevoice the person installed, else its service's — and whether anything of it has an update (`state`):
- *  "pending" when the app has found one (in either mode) or the service is behind the one the app bundles (where the
- *  app updates it); "current" when each part that can say says it is current (the app's updater idle, its last check
+ *  "pending" when the app's update shows in Updates (`inView`: what the person's check found; else manual's as soon as
+ *  found, automatic's once ready — a download the app runs by itself is neither pending nor current) or the service is
+ *  behind the one the app bundles (where the app updates it); "current" when each part that can say says it is current (the app's updater idle, its last check
  *  not failed; the service as the app bundles it); null where that is not known. `place`: where its update is acted on
  *  in Settings › Updates. The service's own number and update are its row's to say (`service`). */
 export function useThisComputerUpdate() {
@@ -25,7 +26,8 @@ export function useThisComputerUpdate() {
   const serviceVersion = service ? safeLocalHostStatusDetails(service).product_version : null;
 
   // Current only once a check has been seen to find nothing: never "Up to date" before any check.
-  const appState: PartState = !app.updater ? "none" : !app.status ? "unknown" : app.status.state !== "idle" ? "pending" : app.status.error || !app.checkedAt ? "unknown" : "current";
+  const appState: PartState = !app.updater ? "none" : !app.status ? "unknown" : app.status.state !== "idle" ? app.inView ? "pending" : "unknown"
+    : app.status.error || !app.checkedAt ? "unknown" : "current";
   const serviceState: PartState = !updatable ? "none" : !serviceUpdate.report ? "unknown"
     : serviceUpdate.report.update === "available" ? "pending" : serviceUpdate.report.update === "current" ? "current" : "unknown";
   const parts = [appState, serviceState];

@@ -68,6 +68,9 @@ export const en = {
   "updates.lastChecked": "Last checked: {when}",
   "updates.neverChecked": "Not checked yet",
   "updates.checkedUpToDate": "{checked} · Up to date",
+  // While the person's own check runs, on its line; a check under a minute old was just now.
+  "updates.checking": "Checking…",
+  "updates.justNow": "just now",
   "updates.upToDate": "Sidevoice is up to date.",
   "updates.retry": "Retry",
   "updates.failure.update-check-failed": "Couldn't check for updates.",
@@ -756,10 +759,6 @@ export const en = {
   "hosts.stoppedNoLoginNote": "Sidevoice is stopped on this computer and does not start when you sign in. Start it here when you need it.",
   // What wants updating (UpdateNotice).
   "updates.title": "Updates",
-  "updates.downloadingPercent": "Downloading… {percent}",
-  "updates.reloadToUpdate": "Reload to update",
-  "updates.availableAny": "Updates available",
-  "updates.entry": "Updates, {n} waiting",
   "updates.web": "A new version of Sidevoice is ready",
   "updates.machine": "{machine} needs an update",
   "updates.reload": "Reload",
@@ -767,37 +766,32 @@ export const en = {
   // The desktop app's own: at the sidebar's foot, and its row in Updates.
   "updates.available": "Version {version} available",
   "updates.availableOne": "An update is available",
-  "updates.ready": "Version {version} ready to install",
-  "updates.readyOne": "An update is ready to install",
-  "updates.downloadingOne": "Downloading the update…",
-  "updates.downloading": "Downloading {version}…",
-  // Every update button says what it does: the app's update downloaded (manual), then restarted into; the app or the
-  // service (two rows), or Sidevoice as one (one row), updated.
+  // The app's row in Updates: Sidevoice and the version it runs · where the new one stands, its number where the app
+  // says it.
+  "updates.row.current": "Sidevoice {version}",
+  "updates.row.app": "Sidevoice",
+  "updates.row.available": "{version} available",
+  "updates.row.availableOne": "Update available",
+  "updates.row.found": "{version} found · Downloading…",
+  "updates.row.foundOne": "Update found · Downloading…",
+  "updates.row.downloading": "Downloading {version}…",
+  "updates.row.downloadingOne": "Downloading the update…",
+  "updates.row.ready": "{version} ready",
+  "updates.row.readyOne": "Update ready",
+  // Every update button says what it does: the app's update downloaded (manual), then restarted into; Sidevoice (the
+  // app and its service, as one) updated.
   "updates.action.download": "Download",
   "updates.action.retryDownload": "Retry download",
-  "updates.action.restart": "Restart",
-  "updates.action.restartApp": "Restart to update the app",
-  "updates.action.updateService": "Update the service",
-  "updates.action.updatingService": "Updating the service…",
-  "updates.action.retryService": "Retry updating the service",
   "updates.action.updateAll": "Update Sidevoice",
   "updates.action.updatingAll": "Updating Sidevoice…",
   "updates.action.retryAll": "Retry updating Sidevoice",
   "updates.action.restartAll": "Restart to update Sidevoice",
-  // Where the room says an update waits (UpdateNotice): its words, each state's.
-  "updates.notice.available": "Sidevoice {version} is available",
-  "updates.notice.availableOne": "A Sidevoice update is available",
-  "updates.notice.downloading": "Downloading Sidevoice {version}… {percent}",
-  "updates.notice.downloadingOne": "Downloading the Sidevoice update… {percent}",
+  // Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`): its words, its Restart, its ×.
   "updates.notice.ready": "Sidevoice {version} is ready",
   "updates.notice.readyOne": "A Sidevoice update is ready",
-  "updates.notice.service": "Sidevoice service {version} is available",
-  "updates.notice.serviceOne": "A Sidevoice service update is available",
   "updates.notice.machines": "{n} machines need an update",
-  // The chip beside Settings (VARIANTS `update-notice` B2): the app's update in a few words, its action after them.
-  "updates.chip.app": "Sidevoice {version}",
-  "updates.chip.hide": "Hide until a newer version",
-  "updates.chip.appOne": "Sidevoice update",
+  "updates.notice.restart": "Restart to update",
+  "updates.notice.hide": "Hide until a newer version",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "A smart end of turn",
   "whatsNew.endOfTurn.line": "A small model hears when you have finished, so a pause to think does not cut you off.",

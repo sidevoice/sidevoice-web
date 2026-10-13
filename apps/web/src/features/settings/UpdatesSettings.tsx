@@ -11,12 +11,11 @@ import { hostTranslator, type HostTranslate } from "./host-i18n";
 import "./updates-settings.css";
 
 /* Updates, a Settings section of their own (decided 2026-10-13), holding everything that updates, each in its row with
- * its action right there once an update is found. This computer (VARIANTS `updates-rows`): two rows (B), each saying
- * what it is — the Sidevoice app, this window (its version, a nightly's or development app's note, Automatic or Manual,
- * Check for updates; Download, its progress, Restart to update the app: AppUpdateSettings), and the Sidevoice
- * service, which runs on this computer (its version, Update the service when the app bundles a newer one:
- * LocalHostUpdateControl); or one row (A), Sidevoice, with one version (the app's) and one button, Update Sidevoice,
- * that updates the app and then the service. Then each remote machine that is behind (its versions, and the command to
+ * its action right there once an update is found. This computer as one row, Sidevoice (decided): one version, the
+ * app's (a nightly's or development app's note under it), Automatic or Manual, Check for updates, and where its update
+ * stands with its action — Sidevoice 0.3.0 · 0.4.0 available · Download, its progress, Restart to update Sidevoice
+ * (AppUpdateSettings) — the app updated, then its service (LocalHostUpdateControl: Update Sidevoice where only the
+ * service is behind the one the app bundles). Then each remote machine that is behind (its versions, and the command to
  * run there: the room cannot update it yet). In the desktop app always; in a browser or on a phone only while a machine
  * is behind, with only those machines. This device says its version and whether it is up to date, the update a link to
  * its row (ThisDeviceVersion); the room's notice and a check that finds one land here on the row's action
@@ -80,8 +79,8 @@ export function UpdatesSettings() {
   const description = !app ? "settings.updates.descriptionMachines" : outdated.length ? "settings.updates.descriptionAll" : "settings.updates.description";
   const note = <DesktopBuildNote build={build} updater={updater} t={t} />;
   // Update Sidevoice, the row's second step: this computer's service, where the app's update did not bring it along.
-  const serviceControl = (words: "service" | "all") => updatable && <LocalHostUpdateControl status={updatable} update={serviceUpdate} words={words}
-    continuing={words === "all" && chain} onContinued={() => { continued(); setChain(false); }} />;
+  const serviceControl = updatable && <LocalHostUpdateControl status={updatable} update={serviceUpdate}
+    continuing={chain} onContinued={() => { continued(); setChain(false); }} />;
   return <Section id="updates" title={t("settings.section.updates")} description={t(description)}>
     {(app || (service && (serviceVersion || serviceUpdate.shown))) && <Group title={t("settings.updates.one")}>
       {/* A landing lights the update's own line (its row with its button), never the whole card. */}
@@ -89,7 +88,7 @@ export function UpdatesSettings() {
         <PartVersion hint={app ? undefined : t("settings.updates.serviceHint")}
           version={here.version} upToDate={here.state === "current" && !here.app.can.check} note={note} t={t} />
         {/* Up to date, for the app and its service together, on the check's line where there is one. */}
-        {app ? <AppUpdateSettings words="all" onRestart={continueAfterRestart} idle={serviceControl("all")} current={here.state === "current"} /> : serviceControl("all")}
+        {app ? <AppUpdateSettings onRestart={continueAfterRestart} idle={serviceControl} current={here.state === "current"} /> : serviceControl}
       </div>
     </Group>}
     {outdated.length > 0 && <Group title={t("settings.updates.machines")}>

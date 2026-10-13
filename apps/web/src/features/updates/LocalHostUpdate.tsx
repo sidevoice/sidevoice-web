@@ -1,15 +1,15 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
+import { desktopBuild, localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import { hostTranslator } from "../settings/host-i18n";
 import { localHostBridgeError, safeLocalHostCount } from "../settings/local-host-status";
 import { UPDATE_PLACE } from "./useUpdates";
 
-/* This computer's service, updated from the app (Settings › Updates: its row, "Sidevoice service", or the one row's
- * second step): its Update where the app says a newer one is bundled; what stands in the way otherwise (calls on, a
- * newer core, an incompatible one). */
+/* This computer's service, updated from the app (Settings › Updates: Sidevoice's row, the step after the app's): its
+ * Update where the app says a newer one is bundled; what stands in the way otherwise (calls on, a newer core, an
+ * incompatible one). */
 
 /* One report for every place that says it (Updates' row, This device's line), so they never disagree: asked of this
  * bridge once per state of its service (its state, its core's version and API), and set again by an Update. */
@@ -44,13 +44,13 @@ export function useLocalHostUpdate(status: LocalHostStatus | null) {
   return { report, setReport, shown };
 }
 
-/** This computer's update, as `useLocalHostUpdate` found it: "Version X available" and its button (UPDATE_PLACE
- *  `thisComputer`, where a landing focuses), disabled while calls are on; a failure with its details to copy; or why
- *  there is none. Its button says what it updates (`words`): the service (two rows), or Sidevoice (one row, where the
- *  service's own number is not said: the row's is the app's). `continuing` (one row, after the app restarted into its
- *  update): it runs by itself once nothing stands in the way, and `onContinued` says it is done or not needed. */
-export function LocalHostUpdateControl({ status, update, words = "service", continuing = false, onContinued }: { status: LocalHostStatus; update: ReturnType<typeof useLocalHostUpdate>;
-  words?: "service" | "all"; continuing?: boolean; onContinued?: () => void }) {
+/** This computer's service behind the one the app bundles, as `useLocalHostUpdate` found it, in Sidevoice's row: the
+ *  Sidevoice this computer runs (the app's number: the service's own is not said) · Update available, and Update
+ *  Sidevoice (UPDATE_PLACE `thisComputer`, where a landing focuses), disabled while calls are on; a failure with its
+ *  details to copy; or why there is none. `continuing` (after the app restarted into its update): it runs by itself
+ *  once nothing stands in the way, and `onContinued` says it is done or not needed. */
+export function LocalHostUpdateControl({ status, update, continuing = false, onContinued }: { status: LocalHostStatus; update: ReturnType<typeof useLocalHostUpdate>;
+  continuing?: boolean; onContinued?: () => void }) {
   const t = hostTranslator();
   const { report, setReport } = update;
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export function LocalHostUpdateControl({ status, update, words = "service", cont
   const [note, setNote] = useState("");
   const calls = safeLocalHostCount(status.calls);
   const waitingForCalls = calls !== undefined && calls > 0;
-  // One row's second step: once the service says whether it is behind, it is updated by itself (no call on), or there
+  // Sidevoice's second step, after the app's: once the service says whether it is behind, it is updated by itself (no call on), or there
   // is nothing to continue.
   useEffect(() => {
     if (!continuing || !report || busy) return;
@@ -104,14 +104,14 @@ export function LocalHostUpdateControl({ status, update, words = "service", cont
     ? t("hosts.update.incompatibleUnknown") : t("hosts.update.incompatible", { api: report.core_api })}</p>;
   if (report.update !== "available") return null;
 
-  const bundled = words === "service" && typeof report.bundled?.version === "string" ? report.bundled.version : "";
-  const all = words === "all";
-  const label = busy ? t(continuing || all ? "updates.action.updatingAll" : "updates.action.updatingService")
-    : error ? t(all ? "updates.action.retryAll" : "updates.action.retryService") : t(all ? "updates.action.updateAll" : "updates.action.updateService");
+  const label = t(busy ? "updates.action.updatingAll" : error ? "updates.action.retryAll" : "updates.action.updateAll");
+  // Sidevoice as it runs here, the app's number; the service's new one is not the app's, so it is not said.
+  const installed = desktopBuild()?.version || null;
+  const copy = `${installed ? t("updates.row.current", { version: installed }) : t("updates.row.app")} · ${t("updates.row.availableOne")}`;
   return (
     <div className="host-update-control update-action-row" data-settings-row="" aria-live="polite">
       <div className="update-action">
-        <span className="update-action-copy">{bundled ? t("updates.available", { version: bundled }) : t("updates.availableOne")}</span>
+        <span className="update-action-copy">{copy}</span>
         <Button id={UPDATE_PLACE.thisComputer} size="sm" variant="primary" disabled={busy || waitingForCalls} onClick={() => void run()}>{label}</Button>
       </div>
       {waitingForCalls && <p className="muted">{t("hosts.update.waitCalls", { calls })}</p>}

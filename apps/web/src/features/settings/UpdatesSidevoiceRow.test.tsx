@@ -63,7 +63,7 @@ test("one row, Sidevoice: the app's version with no hint, Up to date on the chec
 test("the app's update first, in the row's one button: Download downloads, Restart to update Sidevoice restarts and asks the service to follow", async () => {
   const { fake, update } = open({ updater: { mode: "manual", status: { state: "available", version: "0.4.0" } }, service: BEHIND });
   await settle();
-  expect(document.getElementById("updates-app")).toHaveTextContent("Version 0.4.0 available");
+  expect(document.getElementById("updates-app")).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 availableDownload$/);
   // One button: the service's waits behind the app's.
   expect(row().getAllByRole("button", { name: /^(Download|Update|Restart|Retry)/ }).map((button) => button.textContent)).toEqual(["Download"]);
   // Only up to date while nothing waits: the service behind, the line doesn't say it.
@@ -77,11 +77,11 @@ test("the app's update first, in the row's one button: Download downloads, Resta
   expect(update).not.toHaveBeenCalled();
 });
 
-test("only the service behind: An update is available, no number of its own, and Update Sidevoice updates it; a failure, Retry updating Sidevoice", async () => {
+test("only the service behind: Sidevoice 0.3.0 · Update available, the service's own number not said, and Update Sidevoice updates it; a failure, Retry updating Sidevoice", async () => {
   const update = vi.fn().mockRejectedValueOnce(Object.assign(new Error("boom"), { code: "update-failed" })).mockResolvedValue(running);
   open({ service: BEHIND, update });
   const button = await row().findByRole("button", { name: "Update Sidevoice" });
-  expect(button.closest(".update-action")).toHaveTextContent(/^An update is available/);
+  expect(button.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.3\.0 · Update available/);
   expect(pane()).not.toHaveTextContent("0.9.0");
   expect(button).toHaveAttribute("id", "updates-this-computer");
   await act(async () => { fireEvent.click(button); });
@@ -122,7 +122,8 @@ test("in Spanish: Sidevoice, Versión 0.3.0, Descargar and Reiniciar para actual
   expect(groups()).toEqual(["Sidevoice"]);
   expect(pane().querySelector(".updates-part-hint")).toBeNull();
   expect(pane().querySelector(".host-status-product")).toHaveTextContent(/^Versión 0\.3\.0$/);
-  expect(row().getByRole("button", { name: "Descargar" })).toBeInTheDocument();
+  expect(row().getByRole("button", { name: "Descargar", description: "Sidevoice 0.3.0 · 0.4.0 disponible" })).toBeInTheDocument();
   await act(async () => { fake.push({ state: "ready", version: "0.4.0" }); });
   expect(row().getByRole("button", { name: "Reiniciar para actualizar Sidevoice" })).toBeInTheDocument();
+  expect(document.getElementById("updates-app")).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 listaReiniciar para actualizar Sidevoice$/);
 });

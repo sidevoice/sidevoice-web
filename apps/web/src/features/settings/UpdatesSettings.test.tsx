@@ -4,7 +4,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { fakeUpdater } from "../../test/updater";
-import { UpdateChipLine } from "../updates/UpdateNotice";
+import { UpdateNotice } from "../updates/UpdateNotice";
 import { SIDEVOICE_UPDATE_COMMAND, type UpdaterStatus } from "../updates/useUpdates";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-host";
@@ -23,8 +23,8 @@ afterEach(() => {
  * Manual, Check for updates; Download in manual, its progress, Restart to update Sidevoice in either mode; Update
  * Sidevoice where only this computer's service is behind the one the app bundles — then each remote machine that is
  * behind, with the command to run there. The one row's own steps (the service following the app's restart) are
- * UpdatesRowsOne.test.tsx. In the desktop app always; in a browser only while a machine is behind, with only those
- * machines. The chip above Settings, the rail's popover and a check that finds one land on the row's action, in view and
+ * UpdatesSidevoiceRow.test.tsx. In the desktop app always; in a browser only while a machine is behind, with only those
+ * machines. The room's notice and a check that finds one land on the row's action, in view and
  * focused. This device's card says its version and whether it is up to date, Update available a link to the row's
  * button. */
 
@@ -56,14 +56,14 @@ interface Open {
   /** The bridge's `update()`. */
   update?: ReturnType<typeof vi.fn>;
   status?: LocalHostStatus;
-  /** The chip above Settings ("foot"), or its icon in the rail ("rail"). */
-  chip?: "foot" | "rail";
+  /** The room's notice (UpdateNotice), beside Settings. */
+  notice?: boolean;
   /** Readies the fake updater before the page first asks it. */
   prepare?: (fake: ReturnType<typeof fakeUpdater>) => void;
 }
 
 /** The desktop app (its build, its updater on a release), or a browser (`build` null), with Settings at `section`. */
-function open({ build = RELEASE, updater, section = "this-computer", machines = [], remote = {}, service = null, update = vi.fn(async () => running), status = running, chip, prepare }: Open = {}) {
+function open({ build = RELEASE, updater, section = "this-computer", machines = [], remote = {}, service = null, update = vi.fn(async () => running), status = running, notice, prepare }: Open = {}) {
   const withUpdater = updater === undefined ? build?.channel === "release" : updater !== false;
   const fake = fakeUpdater(updater || undefined);
   prepare?.(fake);
@@ -78,7 +78,7 @@ function open({ build = RELEASE, updater, section = "this-computer", machines = 
   act(() => { store.patch({ pairings: [...(build ? [local] : []), ...machines], machinesReady: true, inApp: !!build, localHostAvailable: !!build,
     localHostStatus: status, remoteHostStatus: remote as never, settingsSection: section,
     machineLinks: Object.fromEntries([...(build ? [local] : []), ...machines].map((pairing) => [pairing.fp, { reach: "ok", via: "node" }])) }); });
-  render(<RoomProvider store={store}><SettingsDialog />{chip && <UpdateChipLine rail={chip === "rail"} />}</RoomProvider>);
+  render(<RoomProvider store={store}><SettingsDialog />{notice && <UpdateNotice at="room" />}</RoomProvider>);
   document.getElementById("language-settings")!.setAttribute("open", "");
   return { store, fake, update, version };
 }
@@ -245,8 +245,9 @@ test("This device: Up to date where the app (after a check) and its service both
 test("manual: an update found shows its row with Download right there; its progress in the row; then Restart to update", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   await settle();
-  const download = within(appRow()!).getByRole("button", { name: "Download" });
-  expect(appRow()).toHaveTextContent("Version 0.10.0 available");
+  const download = within(appRow()!).getByRole("button", { name: "Download", description: "Sidevoice 0.9.0 · 0.10.0 available" });
+  // Both versions said: the one it runs, the new one.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 availableDownload$/);
   // The row comes after Automatic/Manual and Check, last.
   expect(appRow()!.compareDocumentPosition(updates().getByRole("radiogroup", { name: "Updates" })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   expect(appRow()!.compareDocumentPosition(updates().getByRole("button", { name: "Check for updates" })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
@@ -254,28 +255,30 @@ test("manual: an update found shows its row with Download right there; its progr
   await act(async () => { fireEvent.click(download); });
   expect(fake.updater.download).toHaveBeenCalledTimes(1);
   act(() => fake.push({ state: "downloading", version: "0.10.0", progress: 0.4 }));
-  expect(appRow()).toHaveTextContent(/Downloading 0\.10\.0… ?40\s?%/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Downloading 0\.10\.0…\s?40\s?%$/);
   expect(within(appRow()!).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "40");
   expect(within(appRow()!).queryByRole("button")).toBeNull();
   act(() => fake.push({ state: "ready", version: "0.10.0" }));
-  expect(appRow()).toHaveTextContent("Version 0.10.0 ready to install");
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 readyRestart to update Sidevoice$/);
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update Sidevoice" })); });
   expect(fake.updater.restart).toHaveBeenCalledTimes(1);
 });
 
-test("automatic: found, it downloads by itself — no Download, its progress in the row — and ready, Restart to update there too", async () => {
+test("automatic, what the app found by itself: nothing while it downloads — no row, no progress, no Download — then Sidevoice 0.9.0 · 0.10.0 ready · Restart to update Sidevoice", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "automatic", status: { state: "available", version: "0.10.0" } } });
   await settle();
-  expect(appRow()).toHaveTextContent("Version 0.10.0 available");
-  expect(within(appRow()!).queryByRole("button")).toBeNull();
+  expect(appRow()).toBeNull();
   act(() => fake.push({ state: "downloading", version: "0.10.0", progress: 0.7 }));
-  expect(within(appRow()!).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "70");
+  expect(appRow()).toBeNull();
+  expect(pane("updates").querySelector("[role=progressbar]")).toBeNull();
+  expect(pane("updates")).not.toHaveTextContent(/0\.10\.0|Downloading/);
   act(() => fake.push({ state: "ready", version: "0.10.0" }));
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 readyRestart to update Sidevoice$/);
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update Sidevoice" })); });
   expect(fake.updater.restart).toHaveBeenCalledTimes(1);
-  // An update with no version said: said all the same.
+  // An update whose version the app does not say (a gap of the seam): what is known, the version it runs.
   act(() => fake.push({ state: "ready" }));
-  expect(appRow()).toHaveTextContent("An update is ready to install");
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update ready/);
 });
 
 const FAILURES = [
@@ -359,7 +362,9 @@ test("Check for updates in automatic mode that finds one: its row, and focus sta
   check.focus();
   await act(async () => { fireEvent.click(check); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)); });
-  expect(appRow()).toHaveTextContent("Version 0.10.0 available");
+  // The person's check found it: its download starts by itself, said as it goes.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 found · Downloading…$/);
+  expect(within(appRow()!).getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
   expect(document.activeElement).toBe(check);
 });
 
@@ -428,7 +433,8 @@ test("this computer's service behind what the app bundles: An update is availabl
   const row = group("Sidevoice");
   expect(row.querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.9\.0$/);
   const button = await within(row).findByRole("button", { name: "Update Sidevoice" });
-  expect(button.closest(".update-action")).toHaveTextContent(/^An update is available/);
+  // The Sidevoice it runs, the app's number; the service's new one is not the app's, so it is not said.
+  expect(button.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available/);
   expect(pane("updates")).not.toHaveTextContent("0.9.1");
   expect(screen.getAllByRole("button", { name: "Update Sidevoice" })).toHaveLength(1);
   await act(async () => { fireEvent.click(button); });
@@ -588,36 +594,33 @@ test("a machine forgotten while it was behind: no longer listed, and in a browse
   expect(entry()).toBeNull();
 });
 
-/* Landing: what the chip above Settings and the rail's popover can't do in place opens Updates on the row's action, in
- * view and focused, the row lit; the app's Download and Restart are done in place (UpdateNotice.test.tsx). */
+/* Landing: what the room's notice can't do in place, and This device's Update available, open Updates on the row's
+ * action, in view and focused, the row lit; the app's Download and Restart are done in place (UpdateNotice.test.tsx). */
 
-test("the chip, this computer's service behind: Updates, its Update Sidevoice focused, its line lit — not the version, not the card", async () => {
-  const { store } = open({ section: "general", service: BUNDLED, chip: "foot" });
-  const chip = await screen.findByRole("button", { name: "Update available · See updates" });
-  await act(async () => { fireEvent.click(chip); });
+test("This device's Update available, this computer's service behind: Updates, its Update Sidevoice focused, its line lit — not the version, not the card", async () => {
+  const { store } = open({ service: BUNDLED, notice: true });
+  // The room says nothing of it: the service is Sidevoice's, said here.
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+  const link = await within(pane("this-computer")).findByRole("button", { name: "Update available, see it in Updates" });
+  await act(async () => { fireEvent.click(link); });
   expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["updates", "page"]);
   await landsOn(() => document.getElementById("updates-this-computer"), lineOf(() => document.getElementById("updates-this-computer")));
   expect(document.activeElement).toHaveAccessibleName("Update Sidevoice");
   expect(store.getState().facts.settingsFocus).toBeNull();
 });
 
-test("the chip, a remote machine behind: Updates, its command's Copy focused, its row lit", async () => {
-  open({ section: "general", machines: [lab], remote: { "fp-lab": behind() }, chip: "foot" });
-  const chip = await screen.findByRole("button", { name: "Update available · See updates" });
-  await act(async () => { fireEvent.click(chip); });
+test("the room's notice, a remote machine behind: Updates, its command's Copy focused, its row lit", async () => {
+  open({ section: "general", machines: [lab], remote: { "fp-lab": behind() }, notice: true });
+  const see = await screen.findByRole("button", { name: "See updates", description: "Lab box needs an update" });
+  await act(async () => { fireEvent.click(see); });
   await landsOn(() => updates().getByRole("button", { name: "Copy the command for Lab box" }), () => document.getElementById("updates-machine-fp-lab"));
 });
 
-test("the rail: every update counted, the remote machine's too; the machine's opens Updates on its Copy, the app's Download downloads in place", async () => {
-  const { fake, store } = open({ section: "general", machines: [lab], remote: { "fp-lab": behind() }, updater: { mode: "manual", status: { state: "available", version: "0.10.0" } }, chip: "rail" });
-  await settle();
-  const icon = () => screen.getByRole("button", { name: "Updates, 2 waiting" });
-  await act(async () => { fireEvent.click(icon()); });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "See updates", description: "Lab box needs an update" })); });
-  await landsOn(() => updates().getByRole("button", { name: "Copy the command for Lab box" }));
-  act(() => { store.patch({ settingsSection: "general" } as never); });
-  await act(async () => { fireEvent.click(icon()); });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Download", description: "Sidevoice 0.10.0 is available" })); });
+test("the room's notice: the app's Download downloads in place, Settings left where it was", async () => {
+  const { fake, store } = open({ section: "general", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } }, notice: true });
+  const download = await screen.findByRole("button", { name: "Download", description: "Version 0.10.0 available" });
+  await act(async () => { fireEvent.click(download); });
   expect(fake.updater.download).toHaveBeenCalledOnce();
   expect(store.getState().facts.settingsSection).toBe("general");
 });
@@ -630,7 +633,7 @@ test("in Spanish: Actualizaciones, its one row, Sidevoice — the app's update, 
   expect(groups()).toEqual(["Sidevoice", "Máquinas remotas"]);
   expect(updates().getByText("Sidevoice en este ordenador y las máquinas con un Sidevoice anterior: sus versiones y cómo se actualizan.")).toBeInTheDocument();
   expect(group("Sidevoice").querySelector(".updates-part-hint")).toBeNull();
-  expect(appRow()).toHaveTextContent("Versión 0.10.0 disponible");
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 disponibleDescargar$/);
   expect(within(appRow()!).getByRole("button", { name: "Descargar" })).toBeInTheDocument();
   expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 disponible", "Ejecuta esto en Lab box:", COMMAND]]);
   expect(updates().getByRole("button", { name: "Copiar el comando para Lab box" })).toBeInTheDocument();
@@ -639,7 +642,7 @@ test("in Spanish: Actualizaciones, its one row, Sidevoice — the app's update, 
   // Only the service behind: the row's one button, Actualizar Sidevoice, with no number of its own.
   open({ section: "updates", service: BUNDLED });
   const button = await updates().findByRole("button", { name: "Actualizar Sidevoice" });
-  expect(button.closest(".update-action")).toHaveTextContent(/^Hay una actualización disponible/);
+  expect(button.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.9\.0 · Actualización disponible/);
 });
 
 test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones, Última comprobación, each failure, and a nightly que se actualiza a mano", async () => {

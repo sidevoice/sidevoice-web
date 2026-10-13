@@ -16,6 +16,7 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
+import { UpdateNotice } from "../features/updates/UpdateNotice";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
@@ -56,7 +57,6 @@ function RoomContent() {
       <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
         <RoomHeader />
         <LocalHostBanner />
-        {/* An update waiting, as a banner over the room (VARIANTS `update-notice` B; a desktop's only). */}
         {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
           <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
@@ -66,7 +66,9 @@ function RoomContent() {
             {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
                 the transcript run the screen's whole height beside them. */}
             <div className="call-column">
-              <ErrorBoundary area="stage"><CallStage /></ErrorBoundary>
+              {/* An update waiting, said over the stage (VARIANTS `update-notice`: a pill at its top, or at its title row's
+                  end; a desktop's only), never moving it. */}
+              <ErrorBoundary area="stage"><CallStage notice={{ room: <UpdateNotice at="room" />, title: <UpdateNotice at="title" /> }} /></ErrorBoundary>
               <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
             </div>
             <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>

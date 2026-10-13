@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The desktop app's update. Where the room says it (decided): a chip on its own line above Settings at the sidebar's
- * foot — the rail: an icon above the gear, its popover acting in place or landing on Updates. Whatever it says — ready,
- * available, downloading, a download or an install that failed — in English or Spanish, with a long version, it stays
- * inside the sidebar at a laptop's widths, its words cut short, never its action. In Updates, the app's row and its
+/* The desktop app's update. Where the room says it is VARIANTS `update-notice`: A, the default, a pill floating over
+ * the stage's tile at its top; B, at the end of the conversation's title row. Whatever it says — ready, available, a
+ * download or an install that failed — in English or Spanish, with a long version, it stays in its place at a laptop's
+ * widths, its words cut short, never its action, and the room never moves for it. In Updates, the app's row and its
  * action fit a 320px screen in either language, whatever its state. The updater is the desktop app's
  * (sidevoice-desktop #56), faked in the page with its status pushed as the app would, in manual mode: one found shows
  * at once. */
@@ -19,9 +19,13 @@ const STATES = [
 ];
 const label = (status) => `${status.state}${status.error ? " " + status.error.code : ""}`;
 
-async function withUpdater(page, language, first = STATES[0]) {
-  await page.addInitScript(({ language, first }) => {
+async function withUpdater(page, language, first = STATES[0], notice = "pill") {
+  await page.addInitScript(({ language, first, notice }) => {
     localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: language }));
+    // Where the room says it (VARIANTS `update-notice`), beside the harness's own picks.
+    let picked = {};
+    try { picked = JSON.parse(localStorage.getItem("sidevoice.variants") || "{}") ?? {}; } catch { /* None picked. */ }
+    localStorage.setItem("sidevoice.variants", JSON.stringify({ ...picked, "update-notice": notice }));
     let now = first;
     const listeners = new Set();
     window.__pushUpdate = (next) => { now = next; for (const listener of listeners) listener(next); };
@@ -33,7 +37,7 @@ async function withUpdater(page, language, first = STATES[0]) {
         check: async () => now, download: async () => now, restart: async () => undefined,
       },
     } };
-  }, { language, first });
+  }, { language, first, notice });
 }
 
 /** Whether Updates fits its screen: nothing in it past the viewport's edges or its card's padding, nothing scrolling
@@ -87,79 +91,64 @@ const inPage = (element) => {
 };
 
 
-/** Where the chip's line sits against the sidebar's foot: the chip — one pill, its words and action then its × at its
- *  end, sharing its ground and its height — inside the foot and above Settings, the row and the sidebar not scrolling
- *  sideways, its action never cut short (its words may be), what failed under it inside the foot too. */
-const chipFits = (row) => {
-  const foot = row.closest(".sidebar-foot");
-  const sidebar = row.closest(".conversation-sidebar");
-  const edge = foot.getBoundingClientRect();
-  const pill = row.getBoundingClientRect();
-  const chip = row.querySelector(".update-chip").getBoundingClientRect();
-  const hide = row.querySelector(".update-chip-hide").getBoundingClientRect();
-  const settings = foot.querySelector(":scope > .sidebar-settings").getBoundingClientRect();
-  const action = row.querySelector(".update-chip-action");
-  const error = foot.querySelector(".update-line-error")?.getBoundingClientRect() ?? null;
+/** Where the room's notice sits (VARIANTS `update-notice`): A, over the stage's tile at its top; B, at the end of the
+ *  title row, after the conversation's name and its machine (with no conversation on the stage, as A). Either inside
+ *  the page, its × at its end and inside it, its action whole and its words cut short before it, clear of the
+ *  conversation's name. */
+const noticeFits = (notice) => {
+  const width = document.documentElement.clientWidth;
+  const box = notice.getBoundingClientRect();
+  const hide = notice.querySelector(".update-notice-hide");
+  const action = notice.querySelector(".update-notice-line > .ui-button");
+  const text = notice.querySelector(".update-notice-text").getBoundingClientRect();
+  const tile = document.querySelector(".stage-tile").getBoundingClientRect();
+  const row = notice.closest(".stage-title");
+  const before = row ? [...row.children].filter((child) => !child.contains(notice)).map((child) => child.getBoundingClientRect()) : [];
   return {
-    inside: pill.left >= edge.left - 0.5 && pill.right <= edge.right + 0.5,
-    hideInChip: hide.left >= chip.right - 0.5 && hide.right <= pill.right + 0.5 && hide.top >= pill.top - 0.5 && hide.bottom <= pill.bottom + 0.5,
-    hideAtEnd: Math.abs(hide.right - pill.right) <= 1,
-    hideChipHigh: Math.abs(hide.height - chip.height) <= 1 && Math.abs(hide.top - chip.top) <= 1,
-    above: chip.bottom <= settings.top + 0.5 && (!error || error.bottom <= settings.top + 0.5),
-    rowFits: row.scrollWidth <= row.clientWidth + 1,
-    actionWhole: !action || action.scrollWidth <= action.clientWidth + 1,
-    errorInside: !error || (error.left >= edge.left - 0.5 && error.right <= edge.right + 0.5),
-    sidebarFits: sidebar.scrollWidth <= sidebar.clientWidth + 1,
+    inside: box.left >= -0.5 && box.right <= width + 0.5,
+    hideLast: notice.lastElementChild === hide,
+    hideInside: hide.getBoundingClientRect().left >= box.left - 0.5 && hide.getBoundingClientRect().right <= box.right + 0.5,
+    actionWhole: action.scrollWidth <= action.clientWidth + 1,
+    wordsBeforeAction: text.right <= action.getBoundingClientRect().left + 0.5,
+    clear: row ? before.every((other) => other.width === 0 || box.left >= other.right - 0.5)
+      : box.left >= tile.left - 0.5 && box.right <= tile.right + 0.5 && box.top >= tile.top - 0.5,
+    pageFits: document.documentElement.scrollWidth <= width + 1,
   };
+};
+/** Where the room stands — its stage's tile, its title row — which the notice never moves. */
+const roomBox = () => {
+  const tile = document.querySelector(".stage-tile").getBoundingClientRect();
+  const title = document.querySelector(".stage-title")?.getBoundingClientRect();
+  return { tileTop: tile.top, tileHeight: tile.height, titleHeight: title?.height ?? 0 };
 };
 
 for (const language of ["en", "es"]) {
   for (const width of [1024, 1280]) {
-    test(`the chip stays on its line above Settings inside the sidebar at ${width}px in ${language}, its action whole and its × within it, whatever it says`, async ({ page }) => {
-      await installHarness(page);
-      await withUpdater(page, language);
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto("/voice/");
-      const row = page.locator(".sidebar-foot .update-beside-row");
-      for (const status of STATES) {
-        await page.evaluate((next) => window.__pushUpdate(next), status);
-        await expect(row.locator(".update-chip")).toBeVisible();
-        if (status.state !== "downloading") await expect(row.locator(".update-chip")).toHaveAttribute("title", new RegExp(VERSION.replace(/[.+]/g, "\\$&")));
-        await expect(page.locator(".sidebar-foot > .sidebar-settings")).toBeVisible();
-        await expect(row.locator(".update-chip-hide")).toBeVisible();
-        expect(await row.evaluate(chipFits), label(status)).toEqual({ inside: true, hideInChip: true, hideAtEnd: true, hideChipHigh: true, above: true, rowFits: true,
-          actionWhole: true, errorInside: true, sidebarFits: true });
-      }
-    });
-
-    test(`in the rail at ${width}px in ${language}: the chip's icon above the gear, inside the rail; its popover fits`, async ({ page }) => {
-      await installHarness(page);
-      await withUpdater(page, language);
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto("/voice/");
-      await page.locator(".sidebar-collapse").click();
-      const icon = page.locator(".sidebar-foot .update-chip--icon");
-      await expect(icon).toBeVisible();
-      const rail = await icon.evaluate((chip) => {
-        const foot = chip.closest(".sidebar-foot");
-        const box = chip.getBoundingClientRect();
-        const edge = foot.getBoundingClientRect();
-        const gear = foot.querySelector(":scope > .sidebar-settings").getBoundingClientRect();
-        return { inside: box.left >= edge.left - 0.5 && box.right <= edge.right + 0.5, above: box.bottom <= gear.top + 0.5 };
+    for (const notice of ["pill", "title"]) {
+      test(`${notice === "pill" ? "A, the pill" : "B, the title row"} at ${width}px in ${language}: in its place, its × at its end, its action whole, the room unmoved, whatever it says`, async ({ page }) => {
+        await installHarness(page);
+        await withUpdater(page, language, { state: "idle" }, notice);
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto("/voice/");
+        await expect(page.locator(".stage-tile")).toBeVisible();
+        const before = await page.evaluate(roomBox);
+        const shown = page.locator(".update-notice:not([data-leaving])");
+        for (const status of STATES) {
+          await page.evaluate((next) => window.__pushUpdate(next), status);
+          // Manual, as this app is: a download's progress is Updates' to show, never the room's.
+          if (status.state === "downloading") { await expect(page.locator(".update-notice")).toHaveCount(0); continue; }
+          await expect(shown).toBeVisible();
+          await expect(shown.locator(".update-notice-text")).toHaveAttribute("title", new RegExp(VERSION.replace(/[.+]/g, "\\$&")));
+          expect(await shown.evaluate(noticeFits), label(status)).toEqual({ inside: true, hideLast: true, hideInside: true, actionWhole: true, wordsBeforeAction: true,
+            clear: true, pageFits: true });
+          expect(await page.evaluate(roomBox), label(status)).toEqual(before);
+        }
       });
-      expect(rail).toEqual({ inside: true, above: true });
-      await icon.click();
-      const panel = page.locator(".ui-popover:has(.updates-panel)");
-      for (const status of STATES) {
-        await page.evaluate((next) => window.__pushUpdate(next), status);
-        await expect(panel.locator(".update-notice-text")).toBeVisible();
-        expect(await panel.evaluate(inPage), label(status)).toEqual({ out: [], inside: true, noSpill: true, pageFits: true });
-      }
-    });
+    }
   }
 }
 
-test("the chip's Download acts in place; in the rail, a machine behind lands on its Copy in Updates", async ({ page }) => {
+test("the notice's Download acts in place, its download said in Updates only; the next one waiting shows meanwhile, a machine behind, which lands on its Copy in Updates", async ({ page }) => {
   await installHarness(page);
   // The paired machine says its Sidevoice is behind (contract gap #57).
   await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json",
@@ -167,18 +156,13 @@ test("the chip's Download acts in place; in the rail, a machine behind lands on 
   await withUpdater(page, "en", STATES[1]);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/voice/");
-  const chip = page.locator(".sidebar-foot .update-chip");
-  await expect(chip).toHaveAccessibleName(`Version ${VERSION} available · Download`);
-  await chip.click();
+  const shown = page.locator(".update-notice:not([data-leaving])");
+  await expect(shown.locator(".update-notice-text")).toHaveText(`Version ${VERSION} available`);
+  await shown.getByRole("button", { name: "Download" }).click();
   await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
-  await expect(chip).toHaveText(/^Downloading… 30\s?%$/);
-  // The rail: every update behind the icon; not in place, Settings › Updates, the machine's row, its button focused.
-  await page.locator(".sidebar-collapse").click();
-  const icon = page.locator(".sidebar-foot .update-chip--icon");
-  await expect(icon).toHaveAccessibleName("Updates, 2 waiting");
-  await icon.click();
-  const panel = page.locator(".ui-popover:has(.updates-panel)");
-  await panel.getByRole("button", { name: "See updates" }).click();
+  // Downloading: the room says nothing of the app's; the next one waiting shows, the machine's.
+  await expect(shown.locator(".update-notice-text")).toHaveText(/needs an update$/);
+  await shown.getByRole("button", { name: "See updates" }).click();
   await expect(page.locator("#language-settings")).toBeVisible();
   await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
   const copy = page.locator("[id^='updates-machine-'] button").first();

@@ -151,11 +151,11 @@ export const JOURNEYS: Journey[] = [
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], callNode: null, machineLinks: { [NUC.fp]: { reach: "revoked", via: "" } } }, after: openSettings("machines") },
     { id: "s-advanced", caption: "Advanced: memory when idle, the downloaded models, reset, the build.", facts: { modelsRemovable: true }, after: openSettings("advanced") },
   ] },
-  { id: "updates", title: "Updates and what's new", note: "What wants updating, behind one quiet entry; what a release added, shown once, never the setup again.", shots: [
+  { id: "updates", title: "Updates and what's new", note: "What wants updating, said over the room without moving it; what a release added, shown once, never the setup again.", shots: [
     { id: "u-web", caption: "A new version of the page while in a call: Reload loads it at once, in the call or not.", facts: { webUpdate: "b2" } },
-    { id: "u-several", caption: "Several at once: one row, the most pressing first: the desktop app's Restart to update, before the page's Reload and this computer's machine.", facts: { webUpdate: "b2", pairings: [THIS, NUC], localHostStatus: running, localHostAvailable: true },
+    { id: "u-several", caption: "Several at once: the notice says the most pressing, the desktop app's Restart to update; its × shows the next, the page's Reload. This computer's service is Settings › Updates' to say.", facts: { webUpdate: "b2", pairings: [THIS, NUC], localHostStatus: running, localHostAvailable: true },
       updater: { status: { state: "ready", version: "0.5.0" } }, desktop: { ...localBridge(running), version: { bridge: 1, bundled: { version: "0.5.0" }, installed: { version: "0.4.0" }, core_api: 1, update: "available" } } },
-    { id: "u-app-manual", caption: "The desktop app's update in manual mode, downloading where its Download was: the progress in place, then Restart to update.",
+    { id: "u-app-manual", caption: "The desktop app's update in manual mode, downloading: the room says nothing until it is ready (its progress is in Settings › Updates), then Restart to update.",
       updater: { status: { state: "downloading", version: "0.5.0", progress: 0.4 }, mode: "manual" } },
     { id: "whats-new", caption: "What's new for someone set up on an earlier release: only what needs them, marked new where it is set up.", record: { baseline_release: 0 },
       facts: { ws: null, voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } } },

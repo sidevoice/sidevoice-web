@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
-import { desktopBuild, localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
+import { useVariant } from "../../lib/variants";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
-import { safeLocalHostStatusDetails } from "../settings/local-host-status";
 
-/** This computer in Settings › Updates: one row, Sidevoice, the app's version and one button; behind it, this
- *  computer's service is updated with it, within what the two are compatible with — never a row or a word of its own. */
-export type UpdatesRows = "one";
-export const useUpdatesRows = (): UpdatesRows => "one";
-/** What a button names: the app, the service (two rows), or Sidevoice as one (one row). */
-export type UpdateWords = "app" | "service" | "all";
+/** Where the room says an update waits (VARIANTS `update-notice`, a desktop's only): a pill floating at the top centre
+ *  of the stage (A, the default), or at the end of the conversation's title row (B). Neither takes room of its own;
+ *  both say the same, act the same, and hide by their × until a newer version or the app restarts. */
+export const UPDATE_NOTICE = ["pill", "title"] as const;
+export const useUpdateNotice = () => useVariant("update-notice", UPDATE_NOTICE);
 
-/* One row (A) updates the app, then this computer's service: restarting into the app's update is the app's last step,
+/* Sidevoice updates the app, then this computer's service: restarting into the app's update is the app's last step,
  * so the service is updated by the page the new app opens — asked for here before the restart, done once the service
  * says it is behind and no call is on, and forgotten after half an hour (a restart that never happened). */
 const CONTINUE_KEY = "sidevoice.update-continue";
@@ -41,11 +39,6 @@ export const UPDATE_PLACE = {
   thisComputer: "updates-this-computer",
   machine: (pairingId: string) => "updates-machine-" + pairingId,
 };
-/** A machine's update's place: a remote one's row, else this computer's Update. */
-export const machineUpdatePlace = (item: UpdateItem) => item.machine ? UPDATE_PLACE.machine(item.machine) : UPDATE_PLACE.thisComputer;
-/** This computer's update's place: the app's row while the app has one (one row shows the app's first), else the
- *  service's Update. */
-export const thisComputerPlace = (appFound: boolean, rows: UpdatesRows) => appFound && rows === "one" ? UPDATE_PLACE.app : UPDATE_PLACE.thisComputer;
 
 export type UpdateMode = "automatic" | "manual";
 export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed";
@@ -85,6 +78,18 @@ function checkedNow() {
   try { localStorage.setItem(CHECKED_KEY, String(Date.now())); } catch { /* For this visit only. */ }
   window.dispatchEvent(new Event(CHANGED));
 }
+/* Whether the person's own check is under way, and whether what the app's updater has now is what that check found:
+ * the seam says neither (sidevoice-desktop #56 pushes the status alone, whoever checked), so this page keeps both
+ * while it is open, set by its own `check()` (Check for updates). While the person's check runs, neither the room's
+ * notice nor Updates' row says a found update (Updates says Checking…); what it found shows each of its steps in
+ * Updates — automatic's download too — while one the app found by itself (at launch, every 6 h) shows only as
+ * appUpdateInView says. A check that found nothing forgets it; one that failed leaves it as it was. */
+const checking = new WeakSet<AppUpdater>();
+const asked = new WeakSet<AppUpdater>();
+function flag(set: WeakSet<AppUpdater>, updater: AppUpdater, on: boolean) {
+  if (on) set.add(updater); else set.delete(updater);
+  window.dispatchEvent(new Event(CHANGED));
+}
 /** The mode as each app's updater last answered it, for every place that shows its update. */
 const knownModes = new WeakMap<AppUpdater, UpdateMode>();
 function modeKnown(updater: AppUpdater, mode: UpdateMode) {
@@ -100,9 +105,15 @@ export function useAppUpdate() {
   const [status, setStatus] = useState<UpdaterStatus | null>(null);
   const [mode, setModeShown] = useState<UpdateMode | null>(() => updater ? knownModes.get(updater) ?? null : null);
   const [checkedAt, setCheckedAt] = useState(readCheckedAt);
+  const [person, setPerson] = useState(() => ({ checking: !!updater && checking.has(updater), asked: !!updater && asked.has(updater) }));
 
   useEffect(() => {
-    const changed = () => { setCheckedAt(readCheckedAt()); if (updater && knownModes.has(updater)) setModeShown(knownModes.get(updater)!); };
+    const changed = () => {
+      setCheckedAt(readCheckedAt());
+      if (updater && knownModes.has(updater)) setModeShown(knownModes.get(updater)!);
+      if (updater) setPerson((was) => was.checking === checking.has(updater) && was.asked === asked.has(updater) ? was
+        : { checking: checking.has(updater), asked: asked.has(updater) });
+    };
     window.addEventListener(CHANGED, changed);
     return () => window.removeEventListener(CHANGED, changed);
   }, [updater]);
@@ -125,16 +136,25 @@ export function useAppUpdate() {
     return () => { current = false; stop?.(); };
   }, [updater]);
 
-  /** Asks the app to check; its answer is the status. A check that did not fail is when it last checked. */
+  /** Asks the app to check, as the person asked; its answer is the status. A check that did not fail is when it last
+   *  checked. What the app says while it checks is this check's finding. */
   async function check() {
     if (typeof updater?.check !== "function") return null;
+    const before = asked.has(updater);
+    flag(asked, updater, true);
+    flag(checking, updater, true);
     try {
       const next = await updater.check();
-      if (next?.error?.code !== "update-check-failed") checkedNow();
+      const failed = next?.error?.code === "update-check-failed";
+      if (!failed) checkedNow();
+      flag(asked, updater, failed || !next ? before : next.state !== "idle");
       if (next && typeof next.state === "string") setStatus(next);
       return next;
     } catch (error) {
+      flag(asked, updater, before);
       throw failedAs("update-check-failed", error);
+    } finally {
+      flag(checking, updater, false);
     }
   }
   async function download() {
@@ -159,8 +179,16 @@ export function useAppUpdate() {
     modeKnown(updater, next);
     try { modeKnown(updater, (await updater.setMode(next)).mode === "manual" ? "manual" : "automatic"); } catch (error) { modeKnown(updater, before); throw error; }
   }
+  const shownMode = updater ? mode : null;
   return {
-    updater, status, mode: updater ? mode : null, checkedAt, check, download, restart, setMode,
+    updater, status, mode: shownMode, checkedAt, check, download, restart, setMode,
+    /** Whether the person's own check is under way; whether it found what the app has now. */
+    checking: !!updater && person.checking,
+    asked: !!updater && person.asked,
+    /** The app's update as Settings › Updates shows it (appUpdateInView), and as the room's notice says it
+     *  (appUpdateShown). */
+    inView: appUpdateInView(status, shownMode, !!updater && person.asked, !!updater && person.checking),
+    noticed: appUpdateShown(status, shownMode, !!updater && person.checking),
     can: {
       mode: typeof updater?.settings === "function" && typeof updater.setMode === "function",
       check: typeof updater?.check === "function",
@@ -177,14 +205,24 @@ function failedAs(code: UpdaterFailure, error: unknown) {
   return Object.assign(new Error(error instanceof Error ? error.message : String(error ?? "")), { code });
 }
 
-/** What the sidebar's foot says of the app's update. Automatic: nothing until it is ready to restart into. Manual: that
- *  one is available, then its download, then ready. A download or install that failed is said there too; a failed
- *  check is Updates' to say. */
-export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null): UpdaterStatus | null {
-  if (!status) return null;
+/** What the room's notice says of the app's update: manual, that one is available (with Download) once a check found
+ *  one; in either mode, once downloaded, that it is ready to restart into — never a download, whose progress is
+ *  Updates' to show, and nothing while the person's own check runs. Automatic says nothing until then: it downloads by
+ *  itself. A download that failed is said with its Retry (manual), an install that failed with ready; a failed check is
+ *  Updates' to say. */
+export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null, checking = false): UpdaterStatus | null {
+  if (!status || checking) return null;
   if (status.state === "ready") return status;
-  if (mode !== "manual") return null;
-  return status.state === "available" || status.state === "downloading" ? status : null;
+  return mode === "manual" && status.state === "available" ? status : null;
+}
+
+/** What Settings › Updates shows of the app's update: every step of what the person's own check found (`asked`),
+ *  automatic's download too; else what the app found by itself as its mode has it — manual, at once and its download
+ *  after Download; automatic, once ready (never a download it runs by itself) — and nothing while the person's check
+ *  runs (Updates says Checking…). */
+export function appUpdateInView(status: UpdaterStatus | null, mode: UpdateMode | null, asked: boolean, checking = false): UpdaterStatus | null {
+  if (!status || status.state === "idle" || checking) return null;
+  return asked || status.state === "ready" || mode === "manual" ? status : null;
 }
 
 /** What updates Sidevoice on a machine, as the connector's README documents it (sidevoice/sidevoice-connector,
@@ -205,30 +243,20 @@ export function useOutdatedMachines(): { machine: MachineView; version: string |
   });
 }
 
-/** The page's, this computer's machine's and the paired machines' updates waiting (`items`), and the desktop app's as
- *  the sidebar shows it (`app`, with its actions in `appUpdate`). */
+/** The page's and the paired machines' updates waiting (`items`), and the desktop app's as the room's notice says it
+ *  (`app`, with its actions in `appUpdate`). This computer's service is Sidevoice's, updated with the app: its update
+ *  is Settings › Updates' to say (useThisComputerUpdate), never the room's on its own. */
 export function useUpdates() {
   const web = useRoomStore((state) => state.facts.webUpdate);
-  const status = useRoomStore((state) => state.facts.localHostStatus);
   const outdated = useOutdatedMachines();
   const appUpdate = useAppUpdate();
-  const [machine, setMachine] = useState<LocalHostVersion | null>(null);
   // Each paired machine, once connected, is asked whether its Sidevoice is behind (loadMachineInfo, contract gap #57).
   const connected = useRoomStore((state) => state.machines.filter((item) => !item.local && item.pairingId && item.state === "connected").map((item) => item.pairingId).join(" "));
   useEffect(() => { for (const fp of connected.split(" ").filter(Boolean)) void window.sidevoiceActions?.loadMachineInfo?.(fp); }, [connected]);
 
-  useEffect(() => {
-    const bridge = localHostBridge();
-    if (typeof bridge?.version !== "function") return;
-    let current = true;
-    void bridge.version().then((answer) => { if (current) setMachine(answer); }).catch(() => undefined);
-    return () => { current = false; };
-  }, [status.state, status.core?.version]);
-
   const items: UpdateItem[] = [];
   if (web) items.push({ id: "web", kind: "web", version: web, required: false });
-  if (machine?.update === "available") items.push({ id: "machine:local", kind: "machine", version: typeof machine.bundled?.version === "string" ? machine.bundled.version : "", required: false });
   // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section.
   for (const { machine: remote, latest } of outdated) items.push({ id: "machine:" + remote.pairingId, kind: "machine", version: latest, required: false, machine: remote.pairingId });
-  return { items, app: appUpdateShown(appUpdate.status, appUpdate.mode), appUpdate };
+  return { items, app: appUpdate.noticed, appUpdate };
 }
