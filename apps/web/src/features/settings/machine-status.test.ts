@@ -21,7 +21,7 @@ const said = (value: ReturnType<typeof machineStatus>) => [value.key, value.tone
 
 test("a remote machine: the first that holds of not paired, checking, connected, not connected", () => {
   expect(said(machineStatus(machine({ revoked: true, state: "connected" }), running, false, en)))
-    .toEqual(["unpaired", "warning", "Not paired", "No longer paired", "Pair it again, or forget it below."]);
+    .toEqual(["unpaired", "warning", "Not paired", "No longer paired", "This machine removed this device. To use it here again, pair it with a new code from it, or forget it below."]);
   expect(said(machineStatus(machine({ state: "revoked", reach: "revoked" }), running, false, en))[0]).toBe("unpaired");
   expect(said(machineStatus(machine({ state: "checking", reach: "checking" }), running, false, en)))
     .toEqual(["checking", "neutral", "Checking…", "Checking…", undefined]);
@@ -105,7 +105,7 @@ test("in Spanish, the words the spec gives", () => {
   }
   expect(said(machineStatus(machine({ state: "offline" }), running, false, es)).slice(2, 5)).toEqual(["No conectada", "No conectada", "Ahora no se llega desde aquí"]);
   expect(said(machineStatus(machine({ revoked: true }), running, false, es)).slice(2, 5))
-    .toEqual(["Sin emparejar", "Ya no está emparejada", "Vuelve a emparejarla u olvídala abajo."]);
+    .toEqual(["Sin emparejar", "Ya no está emparejada", "Esta máquina quitó este dispositivo. Para volver a usarla aquí, emparéjala con un código nuevo de ella, u olvídala abajo."]);
   expect(machineStatus(local(), status("stopped-by-person"), true, es).short).toBe("No está en marcha");
   expect(machineStatus(null, status("absent"), true, es).short).toBe("Sin preparar");
 });

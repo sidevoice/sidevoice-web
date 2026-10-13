@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { NotEncryptedIcon } from "../../components/ui/Icons";
+import { useVariant } from "../../lib/variants";
 import { NewAtEnd } from "../highlights/highlights";
 import type { HostTranslate } from "./host-i18n";
 import type { MachineStatus } from "./machine-status";
@@ -12,6 +13,15 @@ import "./machine-state.css";
  * entry's name (machineEntryName), its native tooltip, and on the machine's page, in words (MachineState). This
  * device's routine is never worded in the nav: its dot means connected, as any machine's. A dot is only ever green and
  * only ever means connected: never the accent (new, selected). */
+
+/** Where Not encrypted is said (VARIANTS `machine-unencrypted`): on the machine's entry wherever it is listed — the open
+ *  lock after its name, and in its name for a screen reader and its tooltip — as well as on its page (A, "list", the
+ *  default); or on its page only (B, "page"), where it is said in words with why it matters. */
+export const MACHINE_UNENCRYPTED = ["list", "page"] as const;
+export const useMachineUnencrypted = () => useVariant("machine-unencrypted", MACHINE_UNENCRYPTED);
+/** `status` as a list's entry says it: not encrypted only where the list says it (`where`). */
+export const listedStatus = (status: MachineStatus, where: (typeof MACHINE_UNENCRYPTED)[number]): MachineStatus =>
+  where === "list" || !status.insecure ? status : { ...status, insecure: false };
 
 /** A state the person has something to do about: said in words wherever the machine is listed. */
 const needsYou = (status: MachineStatus) => status.tone === "warning" || status.tone === "danger";

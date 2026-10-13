@@ -154,7 +154,34 @@ test("a page's header: the long state, Not encrypted in words after it, and what
   expect(navEntry("NUC")).toHaveAccessibleName("NUC, Not paired");
   expect(navEntry("NUC").querySelector(".machine-state")).toHaveAttribute("data-tone", "warning");
   expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^No longer paired$/);
-  expect(header("machines").querySelector(".host-detail-hint")).toHaveTextContent(/^Pair it again, or forget it below\.$/);
+  expect(header("machines").querySelector(".host-detail-hint")).toHaveTextContent(
+    /^This machine removed this device\. To use it here again, pair it with a new code from it, or forget it below\.$/);
+});
+
+test("no longer paired: its page says why and what to do — Pair again opens Add a machine, Forget is at its foot; a paired one has neither", () => {
+  open({}, [local, paired({ revoked: true })]);
+  const pair = within(header("machines")).getByRole("button", { name: "Pair again" });
+  act(() => { pair.click(); });
+  expect(window.sidevoiceActions!.openPairing).toHaveBeenCalledOnce();
+  expect(within(document.getElementById("pane-machines")!).getByRole("button", { name: "Forget NUC" })).toBeInTheDocument();
+  cleanup();
+  open({ machinesView: { machine: "fp-nuc" } });
+  expect(within(header("machines")).queryByRole("button", { name: "Pair again" })).toBeNull();
+});
+
+test("machine-unencrypted A (the default): Not encrypted in the list too; B: only on the machine's page, in words with why", () => {
+  open({ machinesView: { machine: "fp-lab" } });
+  expect(navEntry("Lab box").querySelector(".machine-nav-insecure")).not.toBeNull();
+  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected, not encrypted");
+  cleanup();
+  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "machine-unencrypted": "page" }));
+  open({ machinesView: { machine: "fp-lab" } });
+  for (const entry of [navEntry, row]) expect(entry("Lab box").querySelector(".machine-nav-insecure")).toBeNull();
+  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
+  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected");
+  // Its page says it all the same, with what it means.
+  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected·Not encrypted$/);
+  expect(within(header("machines")).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
 });
 
 test("Connected on a page wears the models' Ready badge, green with its dot; not connected stays muted words", () => {

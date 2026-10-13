@@ -22,7 +22,7 @@ import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
 import { ThisDeviceVersion } from "../settings/UpdatesSettings";
-import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
+import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, listedStatus, machineEntryName, machineEntryTitle, useMachineUnencrypted } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -85,13 +85,15 @@ export function MachineNav({ current }: { current: boolean }) {
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
   const store = useContext(RoomStoreContext);
   const notice = useNotice();
+  const unencrypted = useMachineUnencrypted();
   const shown = shownMachine(machines, picked);
   return (
     <div className="machine-nav">
       {machines.map((machine) => {
         const name = machineName(machine, t);
-        // This computer, listed here only where it has no section of its own, reads as any machine.
-        const state = machineStatus(machine, status, own, t);
+        // This computer, listed here only where it has no section of its own, reads as any machine; not encrypted, as
+        // VARIANTS `machine-unencrypted` has the list say it.
+        const state = listedStatus(machineStatus(machine, status, own, t), unencrypted);
         const isNew = notice(machine);
         return (
           <button type="button" key={machine.id} className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state, t)}
@@ -140,6 +142,7 @@ export function MachineList() {
 
   const levels = useSettingsLevels();
   const notice = useNotice();
+  const unencrypted = useMachineUnencrypted();
   // The machine whose page a phone shows went (forgotten here, or revoked elsewhere): back to the list, without a slide —
   // what it showed is gone — and, forgotten here, said so: its page and its control went with it.
   const forgetting = useRef<{ id: string; name: string } | null>(null);
@@ -170,8 +173,9 @@ export function MachineList() {
             {machines.length > 0 && <ul className="settings-menu machines-menu">
               {machines.map((machine) => {
                 const name = machineName(machine, t);
-                // This computer, listed here only where it has no section of its own, reads as any machine.
-                const state = machineStatus(machine, status, own, t);
+                // This computer, listed here only where it has no section of its own, reads as any machine; not
+                // encrypted, as VARIANTS `machine-unencrypted` has the list say it.
+                const state = listedStatus(machineStatus(machine, status, own, t), unencrypted);
                 const isNew = notice(machine);
                 return <li key={machine.id}>
                   <MenuRow className="machine-entry" data-machine={machine.id} data-name={name} data-state={machine.state} data-local={machine.local || undefined}
@@ -277,6 +281,10 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
               this computer's service card says its own, so the page has one live state. */}
           <p className="host-detail-state"><MachineState status={state} form="long" live={!machine.local} />{state.insecure && <NotEncrypted />}</p>
           {state.hint && <p className="host-detail-hint muted">{state.hint}</p>}
+          {/* No longer paired (the machine removed this device): pairing it again is a new code from it, in Add a
+              machine; forgetting it is at the page's foot. */}
+          {state.key === "unpaired" && !machine.local && <Button size="sm" variant="secondary" className="host-pair-again"
+            onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.machineState.unpaired.pair")}</Button>}
         </div>
       </header>
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}

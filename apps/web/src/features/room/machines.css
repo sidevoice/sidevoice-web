@@ -41,6 +41,8 @@ span.host-insecure { color: var(--sv-warning); font-weight: var(--sv-weight-semi
 .ui-badge.host-insecure svg { width: 12px; height: 12px; }
 .host-detail-state .ui-infotip { margin-inline-start: calc(-1 * var(--sv-space-1)); }
 .host-detail-hint { color: var(--sv-text-muted); line-height: 1.25rem; }
+/* No longer paired: Pair again under what to do about it, its own width. */
+.host-pair-again { justify-self: start; margin-top: var(--sv-space-2); }
 /* Its sections one under another, each headed, a rule between them: everything a machine has, none behind a tab. */
 .host-section { display: grid; gap: var(--sv-space-3); min-width: 0; padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); scroll-margin-top: var(--sv-space-4); }
 .host-section > h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); }
