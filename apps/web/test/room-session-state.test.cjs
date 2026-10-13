@@ -1,19 +1,20 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const moduleReady=import('../src/state/room-session-state.js');
-function facts(api,patch={}){return {...api.initialSessionFacts(),ws:{},sessionId:'s',roomBinding:{thread_id:'a'},...patch}}
-function turn(patch={}){return {session:'s',thread:'a',status:'read',...patch}}
+// A call on machine m, bound to its thread a: the conversation is m|a, the machine's thread b another one.
+function facts(api,patch={}){return {...api.initialSessionFacts(),ws:{},sessionId:'s',callNode:'m',roomBinding:{thread_id:'a'},...patch}}
+function turn(patch={}){return {session:'s',thread:'m|a',status:'read',...patch}}
 
 test('A harness report, including idle, overrides every receipt, settled turn and microphone state',async()=>{
  const api=await moduleReady;
  for(const busy of [false,true])for(const userLive of [false,true])for(const botLive of [false,true])for(const settled of [false,true]){
-  const s=facts(api,{harness:{a:busy},userLive,botLive,turns:{one:turn({settled})}});
+  const s=facts(api,{harness:{'m|a':busy},userLive,botLive,turns:{one:turn({settled})}});
   assert.equal(api.working(s),busy);
  }
 });
 test('Harness activity belongs to its conversation; another conversation cannot light these dots',async()=>{
  const api=await moduleReady;
- assert.equal(api.working(facts(api,{harness:{b:true}})),false);
- assert.equal(api.working(facts(api,{harness:{a:true,b:false}})),true);
+ assert.equal(api.working(facts(api,{harness:{'m|b':true}})),false);
+ assert.equal(api.working(facts(api,{harness:{'m|a':true,'m|b':false}})),true);
 });
 test('A reply settles only its own turn, and late receipts cannot reopen it',async()=>{
  const api=await moduleReady;let s=facts(api,{turns:{'s:user-turn:1':turn(),'s:user-turn:2':turn()}});
@@ -42,21 +43,21 @@ test('Read means working immediately; delivery means working after the fallback 
 });
 test('Failed delivery and another browser never count as this conversation working',async()=>{
  const api=await moduleReady;
- for(const patch of [{status:'pending'},{status:'not_sent'},{status:'channel_closed'},{session:'other'},{thread:'b'}])
+ for(const patch of [{status:'pending'},{status:'not_sent'},{status:'channel_closed'},{session:'other'},{thread:'m|b'}])
   assert.equal(api.working(facts(api,{turns:{one:turn(patch)}})),false);
 });
 test('The person and room speaking are independent of harness work and tab transcription',async()=>{
  const api=await moduleReady;
- const v=api.sessionStatus(facts(api,{harness:{a:true},userLive:true,botLive:true,pendingPhase:'transcribing'}));
+ const v=api.sessionStatus(facts(api,{harness:{'m|a':true},userLive:true,botLive:true,pendingPhase:'transcribing'}));
  assert.equal(v.speaker,'user');assert.equal(v.conversation,'working');assert.equal(v.tab,'transcribing');
  assert.equal(api.sessionStatus(facts(api,{botLive:true})).conversation,'speaking');
  assert.equal(api.sessionStatus(facts(api)).conversation,'idle');
 });
 test('A waveform belongs only to the viewed active input, and cancelled input cannot be cancelled again',async()=>{
- const api=await moduleReady;const s=facts(api,{userTurn:{id:'t1',segment:'turn:t1',thread:'a'},pendingPhase:'listening'});
+ const api=await moduleReady;const s=facts(api,{userTurn:{id:'t1',segment:'turn:t1',thread:'m|a'},pendingPhase:'listening'});
  assert.equal(api.conversationView(s).pendingPhase,'listening');
  s.pendingPhase='transcribing';assert.equal(api.conversationView(s).pendingPhase,'transcribing');
- s.viewedThread='b';assert.equal(api.conversationView(s).pendingPhase,'');assert.equal(api.conversationView(s).pendingCancellable,false);
+ s.viewedThread='m|b';assert.equal(api.conversationView(s).pendingPhase,'');assert.equal(api.conversationView(s).pendingCancellable,false);
  s.viewedThread=null;s.cancelledInput=true;assert.equal(api.conversationView(s).pendingPhase,'');assert.equal(api.conversationView(s).pendingCancellable,false);
 });
 test('Join progress, returning subject and failure text are derived from the same join facts',async()=>{
@@ -64,6 +65,9 @@ test('Join progress, returning subject and failure text are derived from the sam
  for(const [step,text] of Object.entries(api.JOIN_STEPS))assert.equal(api.joinView({...s,joinStep:step,joinSubject:'A'}).text,text+(step==='conversation'?'A':''));
  assert.equal(api.joinView({...s,joinStep:'voice',joinProgress:16.7}).text,'Preparando la voz (17 %)');
  assert.deepEqual(api.joinView({...s,joinStep:'room',joinFailure:'No permission'}),{step:'failed',text:'No permission',progress:null,failed:true});
+ // What was raw about a failure comes with it, for its Details; never in its text.
+ assert.deepEqual(api.joinView({...s,joinFailure:'Something went wrong with the room.',joinFailureDetails:'TypeError\nFailed to fetch'}),
+  {step:'failed',text:'Something went wrong with the room.',progress:null,failed:true,details:'TypeError\nFailed to fetch'});
  assert.equal(api.joinView(s),null);
 });
 test('Two ticks require read; transport delivery and unconfirmed delivery each have one',async()=>{
@@ -74,7 +78,7 @@ test('Two ticks require read; transport delivery and unconfirmed delivery each h
  for(const status of ['uncertain','not_sent'])assert.equal(receiptView(status).symbol,'!');
 });
 test('Playback labels are projections of the reply facts, preserving its full text',async()=>{
- const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'queued'};
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'m|a',text:'All the text',time:1,audio:'queued'};
  const s=facts(api,{history:[row]});
  assert.equal(api.conversationView(s).messages[0].playback,'pending');
  s.karaokeState={segment:'h',from:0,to:3};assert.equal(api.conversationView(s).messages[0].playback,'playing');
@@ -83,8 +87,8 @@ test('Playback labels are projections of the reply facts, preserving its full te
 });
 test('The reply being said carries the part sounding to its bubble, and only that reply plays',async()=>{
  // The runtime keeps where the voice is as the range a bubble reads: one shape from the voice's handle to the view.
- const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'a',text:'All the text',time:1,audio:'heard'};
- const s=facts(api,{history:[row,{role:'assistant',thread:'a',text:'No id yet',time:2}],karaokeState:{segment:'h',from:4,to:7}});
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'m|a',text:'All the text',time:1,audio:'heard'};
+ const s=facts(api,{history:[row,{role:'assistant',thread:'m|a',text:'No id yet',time:2}],karaokeState:{segment:'h',from:4,to:7}});
  assert.deepEqual(api.conversationView(s).messages[0].karaoke,{from:4,to:7});
  assert.equal(api.conversationView(s).messages[0].playback,'playing');
  assert.equal(api.conversationView(s).messages[1].karaoke,null,'a row without an id is never the one being said');
@@ -96,8 +100,49 @@ test('The reply being said carries the part sounding to its bubble, and only tha
 });
 test('One store transition publishes one coherent projection, without calls from a handler to render or sound',async()=>{
  const api=await moduleReady;const store=api.createRoomSessionStore(facts(api));const seen=[];store.subscribe(s=>seen.push(s));
- store.batch(()=>{store.facts.harness={a:true};store.facts.userLive=true});
+ store.batch(()=>{store.facts.harness={'m|a':true};store.facts.userLive=true});
  assert.equal(seen.length,1);assert.equal(seen[0].session.working,true);assert.equal(seen[0].session.speaker,'user');
  store.facts.userLive=false;assert.equal(seen[1].session.speaker,'nobody');
  assert.equal(seen[0].facts.userLive,true,'prior snapshots do not change');
+});
+
+// ----- what a newer room or machine sends (sidevoice-core#112): extra fields, values not known yet, fields left out -----
+test('A participant from a newer machine is listed: extra fields ignored, an unknown reach read by availability, capabilities of any shape',async()=>{
+ const api=await moduleReady;
+ const person=(patch)=>({node:'m',thread_id:'a',title:'A',available:true,future:{x:1},...patch});
+ const view=(people)=>api.participantsView(facts(api,{people}));
+ // An unknown reach is not "offline": it reads as one the room left unsaid, by whether the conversation is available.
+ const [up,down]=view([person({reach:{state:'warming_up',detail:'Loading',eta:3}}),person({thread_id:'b',available:false,reach:{state:'warming_up'}})]);
+ assert.equal(up.reach,'listening');assert.equal(up.stateLabel,'Escuchando');assert.equal(up.detail,'Loading');
+ assert.equal(down.reach,'offline');
+ for(const state of ['listening','holding','offline'])assert.equal(view([person({reach:{state}})])[0].reach,state);
+ // A reach without a state, and no reach at all.
+ assert.equal(view([person({reach:{detail:'x'}})])[0].reach,'listening');
+ assert.equal(view([person({reach:undefined})])[0].reach,'listening');
+ // `experimental` of a shape this version does not know marks nothing, and never stops the list.
+ for(const experimental of [{deliver:true},'deliver',3,null,undefined]){
+  const [row]=view([person({capabilities:{working:'supported',experimental}})]);
+  assert.equal(row.activityNote,null,JSON.stringify(experimental));
+ }
+ assert.match(view([person({capabilities:{working:'supported',experimental:['deliver','teleport']}})])[0].activityNote,/Entrega experimental/);
+ // No capabilities at all: what is not known is said as not known.
+ assert.match(view([person({capabilities:undefined})])[0].activityNote,/No sabemos/);
+});
+test('A reply audio status not known yet is left unsaid, never taken for finished; no status is a written reply',async()=>{
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'m|a',text:'Texto',time:1};
+ const playback=(patch)=>api.playbackState({...row,...patch},facts(api));
+ assert.equal(playback({audio:'resampling'}),undefined);
+ assert.equal(playback({audio:42}),undefined);
+ assert.equal(playback({}),'complete');assert.equal(playback({audio:null}),'complete');
+ for(const audio of ['playback_finished','heard','unplayed','interrupted','disconnected','failed','text_only'])assert.equal(playback({audio}),'complete',audio);
+ for(const audio of ['queued','synthesizing','waiting_for_turn','waiting_for_pause'])assert.equal(playback({audio}),'pending',audio);
+ assert.equal(playback({audio:'playing'}),'playing');
+ // Nor counted as sounding ahead of another reply, and nothing said under it.
+ const s=facts(api,{history:[{...row,audio:'resampling',audio_reason:'gpu_busy'}]});
+ const [message]=api.conversationView(s).messages;
+ assert.equal(message.playback,undefined);assert.equal(message.audioNote,'');
+});
+test('A delivery status not known yet has no mark and no words, never the warning of one that failed',async()=>{
+ const {receiptView}=await moduleReady;
+ for(const status of ['queued_offline','',undefined])assert.deepEqual(receiptView(status),{symbol:'',label:''},String(status));
 });

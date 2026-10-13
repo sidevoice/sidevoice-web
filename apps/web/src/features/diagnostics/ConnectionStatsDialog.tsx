@@ -1,23 +1,65 @@
-import { DialogFrame } from "../../components/ui/DialogFrame";
+import { useRef } from "react";
 import { Button } from "../../components/ui/Button";
+import { DialogSurface } from "../../components/ui/Dialog";
+import { CopyIcon, RefreshIcon } from "../../components/ui/Icons";
+import { useDialogFocusReturn } from "../../lib/focus-return";
+import { diagnosticsTranslator } from "./diagnostics-i18n";
+import "./diagnostics.css";
 
-const cards = [
-  ["Turno cerrado → texto", "stats-recognition", "Mediana · reconocimiento en este dispositivo"],
-  ["Texto enviado → respuesta", "stats-response", "Mediana · primera respuesta por turno"]
-];
-
+/* The call's diagnostics. The runtime (room-session-controller.js) opens it with showModal on #connection-stats, owns
+ * the clicks of its close, refresh and copy buttons, and writes every figure, fact, stage, row and status line into the
+ * elements below by id; this draws the frame and names each part. So none of those buttons takes a React click. */
 export function ConnectionStatsDialog() {
+  const t = diagnosticsTranslator();
+  // Opened from ⋮'s menu, which shuts as it opens: closed, focus goes back to ⋮ (focus-return.ts).
+  const dialog = useRef<HTMLDialogElement>(null);
+  useDialogFocusReturn(dialog);
   return (
-    <DialogFrame id="connection-stats" labelledBy="stats-title" eyebrow="Diagnóstico de la llamada" title="Conexión y latencia" closeId="stats-close" footer={<div className="stats-footer"><span id="stats-updated" className="muted" /><Button id="stats-refresh">Actualizar</Button></div>}>
-      <div className="stats-body">
-        <p id="stats-status" role="status">Recogiendo mediciones…</p>
-        <div className="stats-cards">{cards.map(([label, id, note]) => <div key={id}><span>{label}</span><strong id={id}>—</strong><small>{note}</small></div>)}</div>
-        <section aria-labelledby="stats-connection-title"><h3 id="stats-connection-title">Estado de la conexión</h3><dl className="connection-facts" id="stats-connection" /></section>
-        <section aria-labelledby="stats-stages-title"><h3 id="stats-stages-title">Tramos del último turno</h3><p className="muted" id="stats-stages-note">De tu última voz a la respuesta enviada a este dispositivo, en el orden en que ocurren; cada tramo se mide en su propio reloj.</p><ol id="stats-stages" className="stats-stages" aria-label="Tramos del último turno" /></section>
-        <section aria-labelledby="stats-aggregates-title"><h3 id="stats-aggregates-title">Agregados de la sesión</h3><p className="muted" id="stats-aggregates-note">Recuento, media, p50, p90 y máximo por tramo. Los tramos se solapan: no se deben sumar.</p><div id="stats-aggregates" className="stats-aggregates" /><div className="stats-aggregates-actions"><Button id="stats-aggregates-copy">Copiar como texto</Button><span id="stats-aggregates-copied" className="muted" role="status" /></div></section>
-        <section aria-labelledby="stats-turns-title"><h3 id="stats-turns-title">Últimas respuestas</h3><p className="muted">Los tramos se solapan: no se deben sumar. «Agente» incluye entrega, colas y generación, no solo el modelo.</p><div className="stats-table-wrap" tabIndex={0} aria-label="Mediciones por respuesta"><table className="stats-table"><thead><tr><th>Turno</th><th>Silencio</th><th>Reconocimiento</th><th>Agente</th><th>Respuesta → dispositivo</th><th>Estado</th></tr></thead><tbody id="stats-rows" /></table></div><p id="stats-empty" className="muted" /></section>
-        <p className="stats-limitations">Son mediciones de la aplicación, no del sonido que sale del altavoz. Los datos faltantes aparecen como «—», nunca como cero.</p>
-      </div>
-    </DialogFrame>
+    <dialog ref={dialog} id="connection-stats" className="ui-dialog stats-dialog" data-layout="dialog" aria-labelledby="stats-title">
+      <DialogSurface titleId="stats-title" eyebrow={t("stats.eyebrow")} title={t("stats.title")} closeId="stats-close" closeable closeLabel={t("stats.close")}
+        footer={<>
+          <p className="ui-dialog-reason stats-updated"><span>{t("stats.updated")}</span> <span id="stats-updated" /></p>
+          <Button id="stats-refresh"><RefreshIcon />{t("stats.refresh")}</Button>
+        </>}>
+        <p id="stats-status" className="stats-status" role="status">{t("stats.collecting")}</p>
+        <div className="stats-metrics">
+          <div className="stats-metric"><span>{t("stats.recognition")}</span><strong id="stats-recognition">—</strong><small>{t("stats.recognitionNote")}</small></div>
+          <div className="stats-metric"><span>{t("stats.response")}</span><strong id="stats-response">—</strong><small>{t("stats.responseNote")}</small></div>
+        </div>
+        <section className="stats-section" aria-labelledby="stats-connection-title">
+          <h3 id="stats-connection-title">{t("stats.connection")}</h3>
+          <dl className="stats-facts" id="stats-connection" />
+        </section>
+        <section className="stats-section" aria-labelledby="stats-stages-title">
+          <h3 id="stats-stages-title">{t("stats.stages")}</h3>
+          <p className="stats-note" id="stats-stages-note">{t("stats.stagesNote")}</p>
+          <ol id="stats-stages" className="stats-stages" aria-label={t("stats.stages")} />
+        </section>
+        <section className="stats-section" aria-labelledby="stats-aggregates-title">
+          <h3 id="stats-aggregates-title">{t("stats.aggregates")}</h3>
+          <p className="stats-note" id="stats-aggregates-note">{t("stats.aggregatesNote")}</p>
+          <div id="stats-aggregates" className="stats-aggregates" />
+          <div className="stats-aggregates-actions">
+            <Button id="stats-aggregates-copy" size="sm"><CopyIcon />{t("stats.copyAggregates")}</Button>
+            <span id="stats-aggregates-copied" className="stats-note" role="status" />
+          </div>
+        </section>
+        <section className="stats-section" aria-labelledby="stats-turns-title">
+          <h3 id="stats-turns-title">{t("stats.turns")}</h3>
+          <p className="stats-note">{t("stats.turnsNote")}</p>
+          <div className="stats-table-wrap" role="region" tabIndex={0} aria-label={t("stats.turnsTable")}>
+            <table className="stats-table">
+              <thead><tr>
+                <th scope="col">{t("stats.column.turn")}</th><th scope="col">{t("stats.column.silence")}</th><th scope="col">{t("stats.column.recognition")}</th>
+                <th scope="col">{t("stats.column.agent")}</th><th scope="col">{t("stats.column.dispatch")}</th><th scope="col">{t("stats.column.state")}</th>
+              </tr></thead>
+              <tbody id="stats-rows" />
+            </table>
+          </div>
+          <p id="stats-empty" className="stats-note" />
+        </section>
+        <p className="stats-limitations">{t("stats.limitations")}</p>
+      </DialogSurface>
+    </dialog>
   );
 }

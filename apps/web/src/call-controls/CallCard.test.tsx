@@ -3,11 +3,12 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS, duration, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS } from "./CallCard";
 import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
 import { cardLanguage, translator } from "./i18n";
+import { cardSnapshot } from "../test/call-card";
 
 const t = translator("en");
 
 function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
-  return {
+  return cardSnapshot({
     version: 2, ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, title: "Sidevoice: mini call",
     agent: "idle", youTalking: false, canSkip: false, since: SINCE,
     participants: [
@@ -22,8 +23,9 @@ function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
       { id: "x", label: "Micrófono 2", number: 2 }, { id: "gone", label: "Dispositivo seleccionado · desconectado", missing: true }],
       outputs: [{ id: "default", label: "Predeterminado del sistema", system: true }], inputId: "default", outputId: "default",
       available: true, outputAvailable: true, busy: false },
+    conversation: "a",
     ...overrides,
-  };
+  });
 }
 
 function fakeHost(initial: Partial<CallControlsState> = {}) {
@@ -56,7 +58,9 @@ test("at rest: the agent, the conversation, who is on it and for how long, and y
   render(<CallCard host={fakeHost()} t={t} />);
   expect(screen.getByRole("button", { name: /Sidevoice: mini call/ })).toBeInTheDocument();
   expect(screen.getByText("daimon")).toBeInTheDocument();
-  expect(screen.getByText("Claude Code")).toBeInTheDocument();
+  // The harness is its mark, never its name in words.
+  expect(screen.queryByText("Claude Code")).toBeNull();
+  expect(document.querySelector(".card-harness .ui-logo")).toBeInTheDocument();
   expect(screen.getByText("12:34")).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "The agent is idle" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Your microphone" })).toBeInTheDocument();
@@ -73,6 +77,14 @@ test("the avatar shows only the agent, the wave only you: muted crosses the wave
   expect(screen.getByRole("img", { name: "The agent is speaking" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "You are muted" })).toHaveAttribute("data-muted", "true");
   expect(document.querySelector(".agent-mark")).toHaveAttribute("data-state", "speaking");
+});
+
+test("an agent state this version does not know names the agent, never a raw key (core#112)", () => {
+  const host = fakeHost();
+  render(<CallCard host={host} t={t} />);
+  host.push({ call: snapshot({ agent: "dreaming" as unknown as CallSnapshot["agent"] }) });
+  expect(screen.getByRole("img", { name: "The agent" })).toBeInTheDocument();
+  expect(document.body.innerHTML).not.toContain("card.agent.");
 });
 
 test("reconnecting overrides both and is written", () => {

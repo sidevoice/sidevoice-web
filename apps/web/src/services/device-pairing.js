@@ -13,6 +13,7 @@
  * No DOM and no clock of its own: storage, fetch, WebCrypto and the time are handed in, so each step can be
  * tested alone. Only `export function|async function|const`: the controller's node tests inline this file. */
 import { patiently } from './rendezvous.js';
+import { clampDeviceName } from './device-name-rules.js';
 export const PAIRING_CODE_PREFIX = 'SV1.';
 export const PAIRINGS_KEY = 'sidevoice.pairings';
 export const IDENTITY_PREFIX = 'sidevoice-node-identity:';
@@ -22,7 +23,7 @@ export const VERIFIED_FOR_MS = 5 * 60 * 1000;
 export const IDENTITY_TIMEOUT_MS = 4000;
 export const NO_WEBCRYPTO = 'Este navegador no puede comprobar la identidad de la máquina: abre la página por https (o en este mismo equipo).';
 const DAMAGED = 'El código está incompleto o dañado. Cópialo entero otra vez.';
-/** A node lists its own address and a few public ones; every address in a code gets probed. */
+/** A node lists its own address and a few public ones; every address in a code gets probed, up to this many. */
 const MAX_CODE_URLS = 8;
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -56,10 +57,11 @@ export function base64ToBytes(text) {
 export function utf8(text) { return new TextEncoder().encode(text); }
 function webCrypto(subtle) {
     const found = subtle ?? globalThis.crypto?.subtle;
-    if (!found) throw Error(NO_WEBCRYPTO);
+    if (!found) throw Object.assign(Error(NO_WEBCRYPTO), { code: 'no-webcrypto' });
     return found;
 }
-export function pairingError(message) { const error = Error(message); error.pairing = true; return error; }
+/** Why a code was not redeemed: its stable `code` (what the pairing screen says it by) and a sentence for the log. */
+export function pairingError(message, code = message) { const error = Error(message); error.pairing = true; error.code = code; return error; }
 function httpUrl(value) {
     if (typeof value !== 'string') return null;
     try {
@@ -68,46 +70,120 @@ function httpUrl(value) {
     } catch { return null; }
 }
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
-/** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback.
- *  A relative base is on `origin`, the page's own, and is judged by it. */
-export function secureBase(base, origin = '') {
+/** Whether a pairing secret or a device token may be sent to `base`: https anywhere, plain http only to loopback —
+ *  or, for a pairing the person agreed to keep unencrypted (`insecure`), to a private-network address. A relative base
+ *  is on `origin`, the page's own, and is judged by it. */
+export function secureBase(base, origin = '', { insecure = false } = {}) {
     try {
         const url = new URL(base, origin || undefined);
-        return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
+        return url.protocol === 'https:' || (url.protocol === 'http:' && (LOOPBACK.has(url.hostname) || (insecure && privateHost(url.hostname))));
     } catch { return false; }
+}
+/** A host only a private network reaches: 10/8, 172.16/12, 192.168/16, 100.64/10 (carrier-grade NAT, Tailscale),
+ *  loopback, IPv6 unique-local (fc00::/7) and loopback, and *.local names. Anything else is public. */
+export function privateHost(hostname) {
+    const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+    if (LOOPBACK.has(host) || LOOPBACK.has('[' + host + ']') || host === '::1') return true;
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.local\.?$/.test(host)) return true;
+    const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (v4) {
+        const [a, b] = [Number(v4[1]), Number(v4[2])];
+        if (v4.slice(1).some(part => Number(part) > 255)) return false;
+        return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    }
+    return host.includes(':') && /^f[cd][0-9a-f]{0,2}:/.test(host);
+}
+/** The address a person typed for a machine (`192.168.1.20:8768`, `https://mac.example`), as a base: https unless
+ *  it says otherwise, and only one a pairing secret may travel to (`secureBase`). Empty is null: the code's own
+ *  addresses are used. */
+export const ADDRESS_INVALID = 'address-invalid';
+export const ADDRESS_INSECURE = 'address-insecure';
+/** The machine at the address typed answers, but only over plain http: pairing never goes there (its secret would
+ *  travel unencrypted), and the person is told so rather than that it is unreachable. */
+export const PAIRING_HTTP_ONLY = 'pairing-http-only';
+/** The same, at a private-network address: pairing may go there unencrypted, once the person agrees (`insecure`). */
+export const PAIRING_HTTP_PRIVATE = 'pairing-http-private';
+/** HTTPS did not answer at a private address, and this page (served over https) may not ask over plain http at all: only
+ *  the desktop app or a page served over http could pair with a machine that answers only without encryption. */
+export const PAIRING_HTTP_BLOCKED = 'pairing-http-blocked';
+/** Plain http:// written to a private-network address is that address without encryption, asked for on purpose: no
+ *  https attempt first, and reached only once the person agrees (`insecure`; until then PAIRING_HTTP_PRIVATE), never
+ *  from a page served over https (PAIRING_HTTP_BLOCKED). Written to any other address, it is refused (ADDRESS_INSECURE). */
+export function machineAddress(text, { insecure = false, origin = '' } = {}) {
+    const raw = String(text ?? '').trim();
+    if (!raw) return null;
+    const base = httpUrl(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : 'https://' + raw);
+    if (!base) throw pairingError(ADDRESS_INVALID);
+    if (secureBase(base)) return base;
+    if (!secureBase(base, '', { insecure: true })) throw pairingError(ADDRESS_INSECURE);
+    if (plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
+    if (!insecure) throw pairingError(PAIRING_HTTP_PRIVATE);
+    return base;
+}
+/** Whether this page may not ask another machine anything over plain http: served over https, it may not (mixed
+ *  content). `origin` is the page's; the one it runs on when not given. */
+function plainHttpBlocked(origin) {
+    return /^https:/.test(origin || globalThis.location?.origin || '');
 }
 const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y el emparejamiento solo viaja por https (o dentro de este mismo equipo). Configura la máquina con una dirección https y pide un código nuevo.';
 
 // ----- the code -----
-/** What a pasted code says, or why it cannot be used, in one sentence the person can act on. The code may
- *  arrive wrapped over lines or inside the sentence it was sent in: the `SV1.` token is found either way. */
-export function decodePairingCode(code, now = Date.now()) {
+/** A pasted code's payload, checked for its shape only: whether the addresses it names can be used from here, and
+ *  whether it is still valid, are for its readers to judge. The code may arrive wrapped over lines or inside the
+ *  sentence it was sent in: the `SV1.` token is found either way.
+ *
+ *  Read as every reader of the protocol is (sidevoice-core#112): a field this version does not know is ignored, and
+ *  an address it cannot use — one that is not http(s), a room without the node's id, a room or an entry of a shape it
+ *  does not know — is left out rather than making the whole code unusable; what is left is for `decodePairingCode` to
+ *  judge, through its own "no address" sentence when nothing is. `v` stays the one deliberate gate: a code of another
+ *  version is a breaking change, said as such. What the code cannot be redeemed without (`fp`, `secret`, `exp`) still
+ *  has to be there, in its shape: the fingerprint is what the machine is checked against. */
+function readPairingCode(code) {
     const raw = String(code ?? ''), compact = raw.replace(/\s+/g, '');
-    if (!compact) throw pairingError('Pega el código que te dio la máquina.');
+    if (!compact) throw pairingError('Pega el código que te dio la máquina.', 'code-empty');
     const text = /^SV1\.[A-Za-z0-9_-]+$/.test(compact) ? compact : raw.match(/SV1\.[A-Za-z0-9_-]+/)?.[0];
-    if (!text) throw pairingError('Eso no es un código de emparejamiento de Sidevoice: empieza por «SV1.».');
+    if (!text) throw pairingError('Eso no es un código de emparejamiento de Sidevoice: empieza por «SV1.».', 'code-invalid');
     let payload;
     try { payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(base64ToBytes(text.slice(PAIRING_CODE_PREFIX.length)))); }
-    catch { throw pairingError(DAMAGED); }
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw pairingError(DAMAGED);
-    if (payload.v !== 1) throw pairingError('Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.');
+    catch { throw pairingError(DAMAGED, 'code-damaged'); }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw pairingError(DAMAGED, 'code-damaged');
+    if (payload.v !== 1) throw pairingError('Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.', 'code-version');
     const { fp, host, urls, rv, secret, exp } = payload;
-    const urlList = Array.isArray(urls) ? urls.map(httpUrl) : null;
-    const room = rv === null ? null : rv && typeof rv === 'object' && typeof rv.node === 'string' && rv.node ? { url: httpUrl(rv.url), node: rv.node } : undefined;
-    if (typeof fp !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(fp) || !(host === null || typeof host === 'string') ||
-        !urlList || urlList.includes(null) || room === undefined || (room && !room.url) ||
+    if (typeof fp !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(fp) ||
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
-        throw pairingError(DAMAGED);
-    if (!urlList.length && !room) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.');
+        throw pairingError(DAMAGED, 'code-damaged');
+    const urlList = (Array.isArray(urls) ? urls : []).map(httpUrl).filter(url => url !== null);
+    const roomUrl = rv && typeof rv === 'object' && typeof rv.node === 'string' && rv.node ? httpUrl(rv.url) : null;
+    const room = roomUrl ? { url: roomUrl, node: rv.node } : null;
+    return { fp, host: typeof host === 'string' ? host : null, urls: urlList, room, secret, exp };
+}
+const EXPIRED = 'Este código ya caducó: duran 10 minutos. Pide uno nuevo.';
+/** What a pasted code says, or why it cannot be used, in one sentence the person can act on. */
+export function decodePairingCode(code, now = Date.now(), { address = null } = {}) {
+    const { fp, host, urls: urlList, room, secret, exp } = readPairingCode(code);
+    if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.', 'code-no-address');
     // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
     // left with none cannot be used from here.
-    const secureUrls = urlList.filter(url => secureBase(url)), secureRoom = room && secureBase(room.url) ? room : null;
-    if (!secureUrls.length && !secureRoom) throw pairingError(PLAINTEXT);
-    // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
-    // address is probed.
-    if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED);
-    if (exp * 1000 <= now) throw pairingError('Este código ya caducó: duran 10 minutos. Pide uno nuevo.');
+    // A node lists its own address and a few public ones, and each one is probed: past MAX_CODE_URLS the rest are not.
+    const secureUrls = urlList.filter(url => secureBase(url)).slice(0, MAX_CODE_URLS), secureRoom = room && secureBase(room.url) ? room : null;
+    if (!secureUrls.length && !secureRoom && !address) throw pairingError(PLAINTEXT, 'code-plaintext');
+    if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
     return { v: 1, fp, host: host || null, urls: secureUrls, rv: secureRoom, secret, exp };
+}
+/** What a code says as it is pasted, before anything is sent anywhere: whose it is (`host`), until when (`exp`, in
+ *  seconds), whether it tells another device where its machine is (`reachable`: an https address other than loopback,
+ *  or a room), and the private-network addresses it lists over plain http, as host:port (`plain`) — which pairing
+ *  reaches only typed, and only once the person agrees (`insecure`). Throws as `decodePairingCode` does for a code that
+ *  cannot be used wherever its machine is. */
+export function previewPairingCode(code, now = Date.now()) {
+    const { host, urls, room, exp } = readPairingCode(code);
+    if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
+    const away = urls.map(url => new URL(url)).filter(url => !LOOPBACK.has(url.hostname));
+    return {
+        host: host || null, exp,
+        reachable: away.some(url => url.protocol === 'https:') || !!(room && secureBase(room.url)),
+        plain: away.filter(url => url.protocol === 'http:' && privateHost(url.hostname)).map(url => url.host),
+    };
 }
 
 // ----- the node's identity -----
@@ -155,13 +231,16 @@ export async function proveIdentity(base, expected, { get = globalThis.fetch, su
  *  An address a secret or a token may not go to (`secureBase`) is no candidate, wherever it came from. */
 export function candidateBases(pairing, { target = '', about = null, origin = '' } = {}) {
     const list = [], seen = new Set();
+    // A pairing kept unencrypted by the person's choice reaches its own private addresses over plain http; no other does.
+    const insecure = pairing.insecure === true;
     const add = (base, via) => {
         const key = /^https?:\/\//.test(base) ? base : origin + base;
-        if (seen.has(key) || !secureBase(base, origin)) return;
+        if (seen.has(key) || !secureBase(base, origin, { insecure })) return;
         seen.add(key); list.push({ base, via });
     };
     const relay = room => room + '/nodes/' + encodeURIComponent(pairing.rv.node);
-    if (about?.kind === 'node' && about.fingerprint === pairing.fp) add(target, 'direct');
+    // A server of a kind this version does not know is that node when it says its fingerprint: it proves it all the same.
+    if ((about?.kind === 'node' || about?.kind === 'unknown') && about.fingerprint && about.fingerprint === pairing.fp) add(target, 'direct');
     if (about?.kind === 'room' && pairing.rv) add(relay(target), 'room');
     for (const url of pairing.urls || []) add(url, 'direct');
     if (pairing.rv) add(relay(pairing.rv.url), 'room');
@@ -188,40 +267,67 @@ export async function firstProven(candidates, expected, deps = {}, started = new
 }
 
 // ----- redeeming a code -----
-/** Pair this device with the node a code names: find an address that proves it is that node, hand it the
+/** Pair this device with the node a code names, at the address the person typed if any: find an address that proves it is that node, hand it the
  *  one-time secret there and nowhere else, and keep the token only if the key it returns is the code's. */
-export async function redeemPairingCode(code, { name = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now() } = {}) {
-    const payload = decodePairingCode(code, now);
+export async function redeemPairingCode(code, { name = '', address = '', target = '', about = null, origin = '', get = globalThis.fetch, subtle, now = Date.now(), insecure = false } = {}) {
+    // The address the person typed comes first, and is kept with the pairing: it is where they know the machine is.
+    // It is trusted no more than the code's own: the machine there proves it is the code's before the secret goes.
+    // Agreed to (`insecure`), a private address is reached over plain http instead, and the pairing says so for good.
+    // Written with http:// to a private address, it is that already (machineAddress).
+    const written = machineAddress(address, { insecure, origin });
+    const plain = insecure && written && privateHost(new URL(written).hostname) ? written.replace(/^https:/, 'http:') : null;
+    const typed = plain ?? written;
+    const decoded = decodePairingCode(code, now, { address: typed });
+    const payload = { ...(typed ? { ...decoded, urls: [typed, ...decoded.urls.filter(url => url !== typed)] } : decoded), ...(plain ? { insecure: true } : {}) };
     const crypto = webCrypto(subtle);
     const place = await firstProven(candidateBases(payload, { target, about, origin }), { fp: payload.fp }, { get, subtle: crypto });
     const called = payload.host ? '«' + payload.host + '»' : 'la máquina';
-    if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.');
+    if (!place && written && !plain) {
+        const privateAddress = privateHost(new URL(written).hostname);
+        // Over https, this page may not ask over plain http at all (mixed content): say what would work.
+        if (privateAddress && plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
+        if (await answersPlainHttp(written, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
+    }
+    if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');
     let response, answer = null;
     try {
         // Never redirected: a 307 would hand the secret, in the body, to wherever it pointed.
         response = await get(place.base + '/api/device/pair', { method: 'POST', headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-            body: JSON.stringify({ secret: payload.secret, name: String(name || '').trim().slice(0, 60) || deviceName() }), cache: 'no-store', redirect: 'error' });
-    } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.'); }
+            body: JSON.stringify({ secret: payload.secret, name: clampDeviceName(name || '') || deviceName() }), cache: 'no-store', redirect: 'error' });
+    } catch { throw pairingError('No se pudo llegar a ' + called + ' para emparejar. Vuelve a intentarlo.', 'unreachable'); }
     try { answer = await response.json(); } catch { /* no body */ }
-    if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.');
+    if (response.status === 403) throw pairingError(answer?.detail || 'Ese código ya no vale: se usó o caducó. Pide uno nuevo.', 'code-spent');
     const node = answer?.node;
     if (!response.ok || typeof answer?.token !== 'string' || typeof answer?.device_id !== 'string' || typeof node?.public_key !== 'string')
-        throw pairingError(answer?.detail || 'La máquina no aceptó el emparejamiento. Vuelve a intentarlo.');
+        throw pairingError(answer?.detail || 'La máquina no aceptó el emparejamiento. Vuelve a intentarlo.', 'pair-refused');
     let fp = null;
     try { fp = await fingerprintOf(base64ToBytes(node.public_key), crypto); } catch { /* not a key */ }
-    if (fp !== payload.fp) throw pairingError('La máquina que respondió no es la del código. No se ha guardado nada.');
+    if (fp !== payload.fp) throw pairingError('La máquina que respondió no es la del código. No se ha guardado nada.', 'identity-mismatch');
     return {
         pairing: { fp, public_key: node.public_key, host: node.host || payload.host, urls: payload.urls, rv: payload.rv,
-            device_id: answer.device_id, token: answer.token, paired_at: Math.floor(now / 1000) },
+            device_id: answer.device_id, token: answer.token, paired_at: Math.floor(now / 1000), ...(payload.insecure ? { insecure: true } : {}) },
         base: place,
     };
 }
+/** Whether the machine at `base` (https, as typed) answers at the same place over plain http — asked only to say why
+ *  it could not be reached; nothing is sent there. A page on https may not ask (mixed content): then it is not known. */
+async function answersPlainHttp(base, get) {
+    try {
+        const url = new URL(base);
+        if (url.protocol !== 'https:') return false;
+        url.protocol = 'http:';
+        const response = await patiently(get(url.origin + '/api/device/identity?nonce=probe', { headers: { accept: 'application/json' }, cache: 'no-store', redirect: 'error' }), 4000);
+        return !!response;
+    } catch { return false; }
+}
+
 /** What this device calls itself when it pairs, unless the person says otherwise. */
 export function deviceName(nav = globalThis.navigator) {
     const text = String(nav?.userAgent || '') + ' ' + String(nav?.userAgentData?.platform || nav?.platform || '');
     const where = /iPhone/.test(text) ? 'iPhone' : /iPad/.test(text) ? 'iPad' : /Android/.test(text) ? 'Android'
         : /Mac/.test(text) ? 'Mac' : /Win/.test(text) ? 'Windows' : /CrOS/.test(text) ? 'ChromeOS' : /Linux/.test(text) ? 'Linux' : '';
-    return where ? 'Sidevoice en ' + where : 'Sidevoice';
+    const browser = /Edg\//.test(text) ? 'Edge' : /Firefox\/|FxiOS/.test(text) ? 'Firefox' : /CriOS|Chrome\//.test(text) ? 'Chrome' : /Safari\//.test(text) ? 'Safari' : 'Browser';
+    return where ? browser + ' on ' + where : 'Sidevoice';
 }
 
 // ----- the pairings this device keeps -----
@@ -229,53 +335,40 @@ function validPairing(p) {
     return !!p && typeof p === 'object' && typeof p.fp === 'string' && typeof p.token === 'string' && typeof p.public_key === 'string' &&
         typeof p.device_id === 'string' && Array.isArray(p.urls) && (p.rv === null || (p.rv && typeof p.rv.url === 'string' && typeof p.rv.node === 'string'));
 }
-/** Several pairings, one in use: `{inUse, list}`, newest first. What storage cannot give back is no pairing. */
+/** Several pairings, every one of them live: `{list}`, newest first. What storage cannot give back is no pairing. */
 export function readPairings(storage) {
     return projectPairings(readPairingState(storage), null);
 }
-/** Stored pairings never contain the desktop-owned local host. Keep its selected fingerprint long enough to
- *  project that host before validating `in_use` (the pointer may name it). */
+/** Stored pairings never contain the desktop-owned local host: the bridge projects it (`projectPairings`). */
 export function readPairingState(storage) {
     try {
         const stored = JSON.parse(storage?.getItem(PAIRINGS_KEY) || 'null');
-        const list = Array.isArray(stored?.pairings) ? stored.pairings.filter(validPairing) : [];
-        return { inUse: typeof stored?.in_use === 'string' ? stored.in_use : null, list };
-    } catch { return { inUse: null, list: [] }; }
+        return { list: Array.isArray(stored?.pairings) ? stored.pairings.filter(validPairing) : [] };
+    } catch { return { list: [] }; }
 }
-/** The desktop's verified local pairing wins over a stale code pairing with the same fingerprint. */
+/** The desktop's verified local pairing wins over a stale code pairing with the same fingerprint, and comes first. */
 export function projectPairings(stored, localPairing) {
     const fp = localPairing?.local ? localPairing.fp : null;
     const remote = (stored?.list || []).filter(p => !p.local && p.fp !== fp);
-    const list = localPairing?.local ? [localPairing, ...remote] : remote;
-    const inUse = list.some(p => p.fp === stored?.inUse) ? stored.inUse : list[0]?.fp ?? null;
-    return { inUse, list };
+    return { list: localPairing?.local ? [localPairing, ...remote] : remote };
 }
 export function writePairings(storage, pairings) {
-    try { storage.setItem(PAIRINGS_KEY, JSON.stringify({ in_use: pairings.inUse, pairings: pairings.list.filter(p => !p.local) })); return true; }
+    try { storage.setItem(PAIRINGS_KEY, JSON.stringify({ pairings: pairings.list.filter(p => !p.local) })); return true; }
     catch { return false; }
 }
-/** A new pairing replaces any older one with the same node, and becomes the one in use unless told not to. */
-export function withPairing(pairings, pairing, { use = true } = {}) {
-    const list = [pairing, ...pairings.list.filter(p => p.fp !== pairing.fp)];
-    return { inUse: use || !pairings.inUse ? pairing.fp : pairings.inUse, list };
+/** A new pairing replaces any older one with the same node. */
+export function withPairing(pairings, pairing) {
+    return { list: [pairing, ...pairings.list.filter(p => p.fp !== pairing.fp)] };
 }
-/** Forgetting the one in use hands the use to the newest one left, if any. */
 export function withoutPairing(pairings, fp) {
-    const list = pairings.list.filter(p => p.fp !== fp);
-    return { inUse: pairings.inUse === fp || !list.some(p => p.fp === pairings.inUse) ? list[0]?.fp ?? null : pairings.inUse, list };
-}
-export function usingPairing(pairings, fp) {
-    return pairings.list.some(p => p.fp === fp) ? { ...pairings, inUse: fp } : pairings;
+    return { list: pairings.list.filter(p => p.fp !== fp) };
 }
 /** The node said this token is no longer one of its devices: kept, saying so, until the person pairs again or forgets it. */
 export function revokedPairing(pairings, fp) {
     return { ...pairings, list: pairings.list.map(p => p.fp === fp ? { ...p, revoked: true } : p) };
 }
-export function pairingInUse(pairings) {
-    return pairings.list.find(p => p.fp === pairings.inUse) || null;
-}
 /** A pairing as the interface may see it: everything but the token. */
 export function pairingSummary(p) {
     return { fp: p.fp, host: p.host || null, urls: [...(p.urls || [])], rv: p.rv ? { ...p.rv } : null, device_id: p.device_id,
-        paired_at: typeof p.paired_at === 'number' ? p.paired_at : null, revoked: !!p.revoked, local: !!p.local };
+        paired_at: typeof p.paired_at === 'number' ? p.paired_at : null, revoked: !!p.revoked, local: !!p.local, insecure: p.insecure === true };
 }

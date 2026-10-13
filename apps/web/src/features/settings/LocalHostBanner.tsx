@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { RefreshIcon } from "../../components/ui/Icons";
 import type { LocalHostAction } from "./local-host-status";
-import { canRunLocalHostAction, hostStatusText, runLocalHostAction } from "./local-host-status";
+import { canRunLocalHostAction, hostStatusText, knownLocalHostState, runLocalHostAction } from "./local-host-status";
 import { hostTranslator } from "./host-i18n";
 import { useRoomStore } from "../../state/room-store";
+import "./banners.css";
 
 export function LocalHostBanner() {
   const t = hostTranslator();
@@ -12,12 +15,15 @@ export function LocalHostBanner() {
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const selected = machines.find((machine) => machine.inUse) ?? null;
+  // Every machine is live at once: this computer not answering is worth a banner when nothing else answers either.
   const onlyLocalMachine = !!local && machines.every((machine) => machine.local);
-  if (!local || status.reachable === true || (!local.inUse && !onlyLocalMachine && selected)) return null;
-  const action: LocalHostAction | null = status.state === "incompatible" ? null : status.state === "stopped-by-person" ? "start"
-    : status.state === "not-installed" ? "serviceInstall"
-      : status.state === "refused" ? "reconnect" : "restart";
+  const otherAnswering = machines.some((machine) => !machine.local && machine.state === "connected");
+  if (!local || status.reachable === true || (!onlyLocalMachine && otherAnswering)) return null;
+  // A state this app does not know (sidevoice-core#112) is offered nothing: restarting is not known to be what it needs.
+  const action: LocalHostAction | null = !knownLocalHostState(status.state) || status.state === "incompatible" ? null
+    : status.state === "stopped-by-person" ? "start"
+      : status.state === "not-installed" ? "serviceInstall"
+        : status.state === "refused" ? "reconnect" : "restart";
   const available = action ? canRunLocalHostAction(action) : false;
   const cause = hostStatusText(status, t);
   async function retry() {
@@ -27,9 +33,11 @@ export function LocalHostBanner() {
     finally { setBusy(false); }
   }
   return (
-    <aside className="local-host-banner" role="status">
-      <span>{t("noMachine.retryBanner", { cause })}{error ? ` ${t("hosts.actionFailed")}` : ""}</span>
-      {available && <Button variant="ghost" size="compact" disabled={busy} onClick={() => void retry()}>{t("hosts.retry")}</Button>}
+    <aside className="room-banner local-host-banner" role="status">
+      <Alert tone="danger" title={t("noMachine.retryBanner", { cause })}
+        action={available ? <Button size="sm" loading={busy} onClick={() => void retry()}><RefreshIcon />{t("hosts.retry")}</Button> : undefined}>
+        {error ? t("hosts.actionFailed") : undefined}
+      </Alert>
     </aside>
   );
 }

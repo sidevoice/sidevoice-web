@@ -1,0 +1,28 @@
+/* Trying the end of turn (TurnTry.tsx): where it stands in words, a small waveform beside them while the voice listens,
+   Try and Stop as one button; then the latest turn's words and what to change. A block of its own after the choices,
+   framed as a model's block is, its try under a line as a model's try is (model-prepare.css). */
+.turn-try { display: grid; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.turn-try-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-width: 0; min-height: 36px; }
+.turn-try-lead { flex: 1; min-width: 0; }
+.turn-try-hint { display: grid; gap: 2px; }
+.turn-try-state { margin: 0; color: var(--sv-text); }
+.turn-try-lead .model-try-listening { gap: var(--sv-space-2); }
+.turn-try .voice-wave { width: min(6rem, 24vw); height: 20px; }
+.turn-try-reason, .turn-try-adjust { margin: 0; color: var(--sv-text-muted); }
+.turn-try-result { display: grid; gap: var(--sv-space-2); min-width: 0; }
+
+
+.turn-try-card { gap: var(--sv-space-3); margin-top: var(--sv-space-3); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.turn-try-card > .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.turn-try-card .voice-wave { width: min(9rem, 36vw); height: 28px; }
+
+/* Starting again with a new setting is quick once its models are loaded: "Getting ready…" shows only if it takes a
+   moment, rather than flashing at each change. */
+.turn-try[data-phase="restarting"] .turn-try-busy { animation: turn-try-late 0s 300ms both; }
+@keyframes turn-try-late { from { visibility: hidden; } to { visibility: visible; } }
+
+/* A phone (a narrow group): the button full width, under where the try stands. */
+@container (max-width: 560px) {
+  .turn-try-main { flex-direction: column; align-items: stretch; }
+  .turn-try-main > .turn-try-button { width: 100%; }
+}

@@ -1,6 +1,7 @@
 import type { LocalHostBridge, LocalHostBridgeError, LocalHostStatus, LocalHostStatusName } from "../../services/desktop-host";
 import { localHostBridge } from "../../services/desktop-host";
 import type { HostMessageKey } from "./messages/en";
+import { errorMessage, type ErrorMessage } from "./error-message";
 
 export type HostTranslate = (key: HostMessageKey, params?: Record<string, string | number>) => string;
 
@@ -12,6 +13,11 @@ const HOST_STATES = new Set<LocalHostStatusName>([
   "absent", "installing", "not-installed", "stopped-by-person", "starting", "backoff", "running", "failed",
   "service-failed", "refused", "incompatible",
 ]);
+/** Whether this app knows `state`: a newer desktop app may report one it does not (sidevoice-core#112), which is said as
+ *  unknown and offered no action, never read as one it knows. */
+export function knownLocalHostState(state: unknown): state is LocalHostStatusName {
+  return HOST_STATES.has(state as LocalHostStatusName);
+}
 const SERVICES = new Set(["launchd", "systemd", "none"]);
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const MAX_STATUS_COUNT = 1_000_000_000;
@@ -29,6 +35,7 @@ export interface SafeLocalHostStatusDetails {
   window_started?: string;
   next_retry_at?: string;
   failure?: { key?: string; at?: string };
+  product_version?: string;
 }
 
 export function safeLocalHostCount(value: unknown) {
@@ -48,7 +55,7 @@ function safeTimestamp(value: unknown) {
 export function safeLocalHostStatusDetails(status: LocalHostStatus): SafeLocalHostStatusDetails {
   const source = status as unknown as Record<string, unknown>;
   const details: SafeLocalHostStatusDetails = {
-    state: HOST_STATES.has(source.state as LocalHostStatusName) ? source.state as LocalHostStatusName : "unknown",
+    state: knownLocalHostState(source.state) ? source.state : "unknown",
   };
   if (SERVICES.has(source.service as string)) details.service = source.service as SafeLocalHostStatusDetails["service"];
   if (typeof source.installed === "boolean") details.installed = source.installed;
@@ -71,6 +78,7 @@ export function safeLocalHostStatusDetails(status: LocalHostStatus): SafeLocalHo
     if (typeof core.version === "string" && VERSION.test(core.version)) safeCore.version = core.version;
     if (Object.keys(safeCore).length) details.core = safeCore;
   }
+  if (typeof source.product_version === "string" && VERSION.test(source.product_version)) details.product_version = source.product_version;
   if (source.failure && typeof source.failure === "object" && !Array.isArray(source.failure)) {
     const failure = source.failure as Record<string, unknown>;
     const safeFailure: NonNullable<SafeLocalHostStatusDetails["failure"]> = {};
@@ -122,11 +130,13 @@ const INSTALL_CHECKS: Record<string, HostMessageKey> = {
   "archive-type": "localInstall.check.archiveType",
 };
 
-export function localHostBridgeErrorText(error: LocalHostBridgeError, t: HostTranslate) {
-  const key = INSTALL_CAUSES[error.key] ?? "localInstall.error.unknown";
+/** A failure of this computer's setup or update, in words (error-message.ts): its cause's sentence, else the setup's own
+ *  generic line, the key behind Details. */
+export function localHostBridgeError(error: LocalHostBridgeError, t: HostTranslate): ErrorMessage {
   const checkKey = typeof error.params?.check === "string" ? INSTALL_CHECKS[error.params.check] : undefined;
   const check = checkKey ? t(checkKey) : t("localInstall.error.verificationCheck");
-  return t(key, { check });
+  return errorMessage({ key: error.key }, { t, generic: t("localInstall.error.unknown"),
+    known: (code) => INSTALL_CAUSES[code] ? t(INSTALL_CAUSES[code], { check }) : null });
 }
 
 export function hostCause(status: LocalHostStatus, t: HostTranslate) {
@@ -151,7 +161,9 @@ export function hostStatusText(status: LocalHostStatus, t: HostTranslate) {
     case "refused": return t("hosts.status.refused");
     case "incompatible": return t("hosts.status.incompatible");
     case "installing": return t("hosts.status.starting");
-    default: return t("hosts.status.absent");
+    case "absent": return t("hosts.status.absent");
+    // A state this app does not know is said as such, not as one it knows (sidevoice-core#112).
+    default: return t("hosts.status.unknown");
   }
 }
 

@@ -1,0 +1,39 @@
+/* An update found, in its row in Settings › Updates (the app's, this computer's): what it is, its action right there,
+ * wrapping under it where the row is narrow; a download's progress and what failed under them. */
+.update-action-row { display: grid; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); }
+.update-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); min-width: 0; }
+.update-action-copy { display: flex; flex: 1 1 10rem; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-medium); overflow-wrap: anywhere; }
+.app-update-percent { font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; }
+.app-update-error { font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
+/* Sidevoice in Updates (AppUpdateSettings): Automatic or Manual first, as Start at sign-in's rows; under it, the version
+ * installed with Check for updates, then the newer one's line (.update-action-row) while one waits. */
+.app-update-settings { display: grid; gap: var(--sv-space-3); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.app-update-settings:first-child { padding-top: 0; border-top: 0; }
+.app-update-installed[data-settings-row] { margin-inline: calc(-1 * var(--sv-space-2)); padding: var(--sv-space-1) var(--sv-space-2); border-radius: var(--sv-radius-md); }
+.app-update-installed.settings-highlight { background: var(--sv-accent-soft); }
+.app-update-progress { flex: 1 1 5rem; min-width: 4rem; }
+.app-update-setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); }
+.app-update-setting-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.app-update-setting-copy.muted, .app-update-setting-copy .muted { font-size: var(--sv-font-xs); }
+.app-update-failure { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
+/* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
+.app-update-setting .ui-segment { padding-inline: 10px; }
+/* Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`): one line — the update's icon, its words
+ * cut short before anything else is, its action, then × — wherever the room puts it (the stage's top, the title row's
+ * end), taking no room of its own. What failed hangs under it, over the room too. It comes in and goes softly; under
+ * reduced motion, at once. Never the voice's colour. */
+.update-notice { position: relative; display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; max-width: 100%; color: var(--sv-text);
+  font-size: var(--sv-font-sm); animation: update-notice-in var(--sv-dur-base, 180ms) ease-out both; }
+.update-notice[data-leaving] { animation: update-notice-out 200ms ease-in both; }
+.update-notice-icon { flex: none; color: var(--sv-accent-text); }
+.update-notice-line { display: flex; flex: 1 1 auto; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.update-notice-text { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: var(--sv-weight-medium);
+  font-variant-numeric: tabular-nums; }
+.update-notice-line > .ui-button, .update-notice-hide { flex: none; }
+.update-notice-hide.ui-button { color: var(--sv-text-muted); }
+.update-notice-error { position: absolute; z-index: 1; top: calc(100% + var(--sv-space-1)); inset-inline-end: 0; width: max-content; max-width: min(24rem, 100%);
+  padding: var(--sv-space-2) var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-surface);
+  box-shadow: var(--sv-shadow-sm); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
+@keyframes update-notice-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes update-notice-out { to { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .update-notice, .update-notice[data-leaving] { animation: none; } }

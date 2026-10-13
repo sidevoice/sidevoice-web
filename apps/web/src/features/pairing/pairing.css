@@ -1,0 +1,105 @@
+/* Pairing a machine and preparing this one: the two numbered commands with their copy buttons, the pairing form and
+ * its dialog, this computer's preparation (its offer and its progress), and the screen with no machine yet. Shared
+ * by the first-run setup, the room and Settings → Machines, wherever these components are used. */
+
+/* ----- the commands to run on the other machine, as numbered steps */
+.connector-steps { display: grid; gap: var(--sv-space-4); margin: 0; padding: 0; list-style: none; counter-reset: connector-step; }
+.connector-steps > li { position: relative; display: grid; gap: var(--sv-space-2); min-width: 0; padding-inline-start: 36px; counter-increment: connector-step; }
+.connector-steps > li::before {
+  content: counter(connector-step); position: absolute; inset-inline-start: 0; top: 0; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-bold);
+}
+.connector-steps > li > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
+
+/* ----- "Connect to your machine" (PairMachine): the form */
+.pair-machine { display: grid; gap: var(--sv-space-5); min-width: 0; }
+.pairing-form { position: relative; display: grid; gap: var(--sv-space-4); min-width: 0; }
+.pairing-intro { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
+.ui-textarea.pairing-code { font-family: var(--sv-font-mono); font-size: var(--sv-font-sm); line-height: 1.25rem; word-break: break-all; }
+.pairing-recognised { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); color: var(--sv-positive); font-variant-numeric: tabular-nums; }
+.pairing-recognised svg { flex: none; }
+/* How to get a code: a quiet toggle, its chevron pointing where the commands are. */
+.pairing-how { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; margin-top: calc(-1 * var(--sv-space-2)); }
+.pairing-how-toggle { margin-inline-start: calc(-1 * var(--sv-space-3)); }
+.pairing-how-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-base) var(--sv-ease); }
+.pairing-how-toggle[aria-expanded="true"] svg { transform: none; }
+.pairing-how-body { justify-self: stretch; min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+/* The address's (i) right by its label, not at the far end of the row. */
+.pairing-address .ui-field-head { justify-content: flex-start; align-items: center; gap: var(--sv-space-1); }
+.pairing-address .ui-infotip { margin-block: -4px; }
+/* Where the address goes (VARIANTS `pair-address`): A, a disclosure like How's (its toggle is How's; its body, the field
+ * alone, no box); B, a quiet link under the code that brings the field in, in its place. */
+.pairing-address-body { justify-self: stretch; min-width: 0; }
+.pairing-address-link {
+  padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted);
+  font: inherit; font-size: var(--sv-font-sm); text-align: start; text-decoration: underline; text-decoration-color: var(--sv-border-strong); text-underline-offset: 3px; cursor: pointer;
+}
+.pairing-address-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); }
+/* Its chevron says it opens, and turns as it does: pressed again, it closes. */
+.pairing-address-link svg { flex: none; transform: rotate(-90deg); transition: transform var(--sv-dur-base) var(--sv-ease); }
+.pairing-address-link[aria-expanded="true"] svg { transform: none; }
+.pairing-address-link svg:dir(rtl) { transform: rotate(90deg); }
+.pairing-address-link[aria-expanded="true"] svg:dir(rtl) { transform: none; }
+/* Open, the field has no visible label: the toggle above says what it is, the placeholder how it looks. */
+.pairing-address .ui-field-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pairing-address-link:hover { color: var(--sv-text); }
+.pairing-address-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
+.pairing-status { display: flex; align-items: center; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.pairing-status[data-connected] { color: var(--sv-positive); }
+/* Saying nothing, it takes no room, and is still there to say what comes. */
+.pairing-status:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.pairing-alert:empty { display: none; }
+/* Agreeing to no encryption: the button under the warning's words, the whole width on a phone; busy, its words stay in sight beside the spinner. */
+.pairing-consent .ui-alert-body { margin-top: var(--sv-space-3); }
+/* Its words take the focus (not the button): ringed as one block, not line by line. */
+.pairing-consent .ui-alert-title > [tabindex="-1"] { display: block; border-radius: var(--sv-radius-sm); outline-offset: 2px; }
+.pairing-insecure[data-loading] .ui-button-content { visibility: visible; }
+.pairing-insecure[data-loading] .ui-spinner { position: static; flex: none; margin: 0; }
+@media (max-width: 599px) { .pairing-insecure { width: 100%; min-height: 44px; } }
+.pairing-form-actions { display: flex; justify-content: flex-end; }
+/* The form's Connect, sent to a footer from the form: laid out there as if it were the footer's own. */
+.pairing-submit { display: contents; }
+@media (max-width: 599px) { .ui-dialog-foot > .pairing-submit > .ui-button { flex: 1 1 0; } }
+
+/* On touch, every target here is at least 44px: the small buttons grow, the (i) and the copy buttons reach further
+ * than they show. */
+@media (pointer: coarse) {
+  .pair-machine .ui-button--sm:not(.ui-button--icon) { height: 44px; }
+  .pair-machine .ui-infotip::after { content: ""; position: absolute; inset: -10px; }
+  .pairing-address-link { min-height: 44px; }
+}
+
+/* ----- this computer's preparation: the offer, then its progress */
+.local-install-entry { min-width: 0; }
+.local-install-cta { display: grid; justify-items: start; gap: var(--sv-space-1-5); }
+.local-install-cta p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.local-install-panel { display: grid; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); text-align: start; }
+.local-install-head { display: flex; align-items: center; gap: var(--sv-space-2); }
+.local-install-head .ui-spinner { color: var(--sv-accent-text); }
+.local-install-panel h4 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.local-install-panel p { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.local-install-panel .local-install-status { color: var(--sv-text); }
+.local-install-progress { display: grid; gap: var(--sv-space-1-5); margin-top: var(--sv-space-1); }
+.local-install-progress p { font-variant-numeric: tabular-nums; }
+.local-install-panel .local-install-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
+/* In the room, under the header, while a preparation started from the no-machine screen goes on. */
+.local-install-entry--room { flex: none; padding: var(--sv-space-2) var(--sv-space-4); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
+.local-install-entry--room .local-install-panel { max-width: 42rem; margin: 0 auto; padding: var(--sv-space-3) var(--sv-space-4); }
+
+/* ----- the screen with no machine yet: an empty state on the stage's ground */
+.no-machine-screen {
+  display: grid; justify-items: center; align-content: start; gap: var(--sv-space-2); width: min(40rem, calc(100% - 2 * var(--sv-space-4))); max-height: calc(100% - 2 * var(--sv-space-4));
+  margin: auto; padding: var(--sv-space-10) var(--sv-space-6); overflow: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
+}
+.no-machine-icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--sv-radius-xl); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.no-machine-screen h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
+.no-machine-screen > p { max-width: 42ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.no-machine-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sv-space-2); margin-top: var(--sv-space-3); }
+.no-machine-screen > .no-machine-hint { max-width: 46ch; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.no-machine-screen > .local-install-entry { justify-self: stretch; margin-top: var(--sv-space-4); }
+@media (max-width: 599px) {
+  .no-machine-screen { padding: var(--sv-space-8) var(--sv-space-4); }
+  .no-machine-actions { display: grid; justify-self: stretch; justify-content: stretch; }
+}
+/* The address's disclosure and, beside it, when it is worth using. */
+.pairing-address-head { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; max-width: 100%; margin-top: calc(-1 * var(--sv-space-2)); }

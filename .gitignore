@@ -5,7 +5,8 @@
 .voice-poc/
 .codex/
 .claude/
-node_modules/
+# node_modules as a folder, and as a link to one (a worktree sharing another's): both stay out.
+node_modules
 dist/
 __pycache__/
 *.py[cod]

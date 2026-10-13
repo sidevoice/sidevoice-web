@@ -1,15 +1,28 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { MachinesIcon } from "../../components/ui/Icons";
-import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion, type LocalPairingCode } from "../../services/desktop-host";
-import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
+import { AddIcon, EditIcon, OtherMachineIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { Input } from "../../components/ui/Input";
+import { currentDeviceName } from "../../state/device-name";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { Switch } from "../../components/ui/Switch";
+import { Badge } from "../../components/ui/Badge";
+import { Section } from "../../components/ui/Card";
+import "./machines.css";
+import { desktopBuild, localHostBridge, type LocalHostStatus } from "../../services/desktop-host";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
-import { hostTranslator } from "../settings/host-i18n";
+import { useThisComputerSection } from "../../state/this-computer";
+import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
-import { actionableAgent } from "../../services/host-agents";
-import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeErrorText, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
+import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
+import { motionOf, useSettingsLevels } from "../settings/settings-levels";
+import { MenuRow } from "../settings/SettingsMenu";
+import { machineStatus } from "../settings/machine-status";
+import { ThisDeviceVersion } from "../settings/UpdatesSettings";
+import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
+import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
@@ -17,98 +30,311 @@ function dateText(value: string | number | null | undefined) {
   return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(navigator.language, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export function MachineList() {
-  const t = hostTranslator();
+/** A machine's name: the one it has here, else this computer's or an unnamed machine's. */
+export function machineName(machine: MachineView, t: HostTranslate) {
+  return machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
+}
+
+/* The paired machines, as Settings' own navigation lists them (MachineNav): under Machines a sub-entry per machine —
+ * its name on one line and its state in words on the next (machineStatus words it, here as everywhere), the whole of
+ * it in its tooltip and in its name to a screen reader — and Add a machine last. The machine chosen has its page in the
+ * pane (MachineList): its state, this computer's service (the local one), its agents, the devices paired with it
+ * (pairing goes from a device to the machine: Add a machine, and pair-device on the machine), and forgetting it.
+ * Machines itself is the first machine, or, with none, a word and Add. On a phone, whose Settings is a menu of levels
+ * (settings-levels.tsx), Machines is always a list — a row each, its state in words under its name, Add a machine last
+ * — and a machine is a page of its own under it. */
+
+/** How many new things (agents it found) are under a machine: its entry's mark. */
+function useNotice() {
+  const news = useHighlights();
+  return (machine: MachineView) => machine.pairingId ? news.filter((item) => item.machine === machine.pairingId).length : 0;
+}
+
+/** The machines Machines lists: every one, or, with this computer in its own section, the other machines. */
+function useListedMachines() {
+  const own = useThisComputerSection();
   const machines = useRoomStore((state) => state.machines);
-  const hostAgents = useRoomStore((state) => state.facts.hostAgents);
-  const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
+  return own ? machines.filter((machine) => !machine.local) : machines;
+}
+
+/** What Machines' row says under its name in a phone's Settings: none yet; the one machine and its state; how many, and
+ *  how many of them connected. */
+export function useMachinesSummary() {
+  const t = hostTranslator();
+  const own = useThisComputerSection();
+  const machines = useListedMachines();
   const status = useRoomStore((state) => state.facts.localHostStatus);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<"status" | "devices" | "agents">("status");
-  const localMachine = machines.find((machine) => machine.local) ?? null;
-  const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
-  const selectedMachine = selected ? machines.find((machine) => machine.id === selected) ?? null : null;
+  if (!machines.length) return t("settings.summary.machinesNone");
+  if (machines.length > 1) return t("settings.summary.machines", { n: machines.length, online: machines.filter((machine) => machine.state === "connected").length });
+  return t("settings.summary.machine", { machine: machineName(machines[0], t), state: machineStatus(machines[0], status, own, t).short });
+}
 
-  useEffect(() => {
-    if (!agentRequest) return;
-    if (!agentRequest.fp) { setSelected(null);return; }
-    const machine = machines.find((entry) => entry.pairingId === agentRequest.fp);
-    if (machine) { setSelected(machine.id);setSelectedTab("agents"); }
-  }, [agentRequest, machines]);
+/** The machine shown: the one chosen, else the first. */
+function shownMachine(machines: MachineView[], picked: string | null) {
+  return (picked ? machines.find((machine) => machine.id === picked) : null) ?? machines[0] ?? null;
+}
 
-  if (selectedMachine) return <HostDetail machine={selectedMachine} initialTab={selectedTab} onBack={() => setSelected(null)} />;
-
+/** The machines under Machines in Settings' navigation, and Add a machine after them. */
+export function MachineNav({ current }: { current: boolean }) {
+  const t = hostTranslator();
+  // With this device in a section of its own, these are the remote machines, and said so.
+  const own = useThisComputerSection();
+  const machines = useListedMachines();
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const picked = useRoomStore((state) => state.facts.machinesView.machine);
+  const store = useContext(RoomStoreContext);
+  const notice = useNotice();
+  const shown = shownMachine(machines, picked);
   return (
-    <div className="machines" id="machines">
-      <h3><MachinesIcon /> {t("hosts.title")}</h3>
-      {machines.length === 0 && <p className="muted">{t("hosts.none")}</p>}
-      <div className="machine-list">
-        {machines.map((machine) => {
-          const machineName = machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
-          const notice = !!machine.pairingId && hostAgents[machine.pairingId]?.status === "ready" &&
-            hostAgents[machine.pairingId]?.value?.agents.some(actionableAgent) === true;
-          const subtitle = machine.local
-            ? machine.selectable && status.reachable === true ? status.state === "running" ? t("hosts.thisComputer") : t("hosts.connected") : hostStatusText(status, t)
-            : machine.state === "checking" ? t("hosts.checking")
-              : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed"
-              ? t("hosts.remoteNoResponse") : t("hosts.connected");
-          return (
-            <div className="machine-row" key={machine.id} data-state={machine.state} data-in-use={machine.inUse || undefined} data-local={machine.local || undefined} data-agent-notice={notice || undefined}>
-              <div className="machine-summary">
-                <span className="machine-state" data-state={machine.state} aria-hidden="true"><span className="dot" /></span>
-                <span className="machine-copy">
-                  <span className="machine-name">{machineName}{notice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</span>
-                  <span className="machine-brief muted">{[machine.inUse ? t("hosts.inUse") : "", subtitle].filter(Boolean).join(" · ")}</span>
-                </span>
-                <span className="machine-actions">
-                  {!machine.inUse && machine.selectable !== false && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.use", { machine: machineName })}
-                    onClick={() => window.sidevoiceActions?.chooseMachine(machine.pairingId || machine.id)}>{t("hosts.use", { machine: machineName })}</Button>}
-                  {machine.local && <Button variant="ghost" size="compact" className="machine-action" aria-label={t("hosts.open", { machine: machineName })}
-                    onClick={() => {setSelectedTab("status");setSelected(machine.id)}}>{t("hosts.open", { machine: machineName })}</Button>}
-                  {!!machine.pairingId && <Button variant="ghost" size="compact" className="machine-action host-agent-tab-label" aria-label={t("agents.review", { machine: machineName })}
-                    onClick={() => {setSelectedTab("agents");setSelected(machine.id)}}>{t("agents.tab")}{notice && <span className="host-agent-dot" aria-label={t("agents.notice")} />}</Button>}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="pairing">
-        <Button id="pair-device-open" variant="ghost" size="compact" onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.add")}</Button>
-        <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />
-      </div>
+    <div className="machine-nav">
+      {machines.map((machine) => {
+        const name = machineName(machine, t);
+        // This computer, listed here only where it has no section of its own, reads as any machine.
+        const state = machineStatus(machine, status, own, t);
+        const isNew = notice(machine);
+        return (
+          <button type="button" key={machine.id} className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state)}
+            aria-label={machineEntryName(name, state, isNew, t)}
+            data-name={name} data-state={machine.state} data-local={machine.local || undefined}
+            aria-current={current && shown?.id === machine.id ? "page" : undefined}
+            onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
+            {/* Its icon — this computer's, or another machine's, as the setup's two choices show them — with the connected
+                dot and the "new" mark on it; then its name and, where it is said, its state. An entry never grows past
+                the column. */}
+            <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
+              <NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} status={state} />} isNew={isNew} />
+            </span>
+            <MachineEntryCopy name={name} status={state} isNew={isNew} />
+          </button>
+        );
+      })}
+      <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" title={t(own ? "hosts.addRemote" : "hosts.add")}
+        aria-label={t(own ? "hosts.addRemote" : "hosts.add")} onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.addShort")}</button>
     </div>
   );
 }
 
-function HostDetail({ machine, initialTab, onBack }: { machine: MachineView; initialTab: "status" | "devices" | "agents"; onBack: () => void }) {
+export function MachineList() {
   const t = hostTranslator();
+  const machines = useListedMachines();
+  const own = useThisComputerSection();
+  const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
   const status = useRoomStore((state) => state.facts.localHostStatus);
-  const hostAgents = useRoomStore((state) => machine.pairingId ? state.facts.hostAgents[machine.pairingId] : undefined);
-  const notice = hostAgents?.status === "ready" && hostAgents.value?.agents.some(actionableAgent) === true;
-  const [tab, setTab] = useState<"status" | "devices" | "agents">(initialTab);
-  useEffect(() => { setTab(initialTab); }, [initialTab, machine.id]);
-  const tabs = machine.local ? ["status", "devices", "agents"] as const : ["agents"] as const;
+  const picked = useRoomStore((state) => state.facts.machinesView.machine);
+  const store = useContext(RoomStoreContext);
+  const localMachine = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
+  const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
+
+  // Asked for a machine's agents (an agent waiting): that machine's page, once per request. `machines` is a new list
+  // after every change to the store, this patch included: the request is answered once, and only with a change, or
+  // the two would feed each other without end.
+  const answered = useRef<number | null>(null);
+  useEffect(() => {
+    if (!agentRequest?.fp || answered.current === agentRequest.id) return;
+    const machine = machines.find((entry) => entry.pairingId === agentRequest.fp);
+    if (!machine) return;
+    answered.current = agentRequest.id;
+    if (picked !== machine.id) store?.patch({ machinesView: { machine: machine.id } });
+  }, [agentRequest, machines, picked]);
+
+  const levels = useSettingsLevels();
+  const notice = useNotice();
+  // The machine whose page a phone shows went (forgotten here, or revoked elsewhere): back to the list, without a slide —
+  // what it showed is gone — and, forgotten here, said so: its page and its control went with it.
+  const forgetting = useRef<{ id: string; name: string } | null>(null);
+  const gone = levels.phone && levels.level === 3 && !!picked && !machines.some((machine) => machine.id === picked);
+  useEffect(() => {
+    if (!gone) return;
+    if (forgetting.current?.id === picked) levels.say(t("settings.machineForgotten", { machine: forgetting.current.name }));
+    forgetting.current = null;
+    levels.back({ instantly: true });
+  }, [gone]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const empty = machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
+    <Button id="pair-device-open" variant="primary" title={t(own ? "hosts.addRemote" : "hosts.add")} aria-label={t(own ? "hosts.addRemote" : "hosts.add")}
+      onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.addShort")}</Button></div>;
+  // Preparing this computer is its own section's, when it has one.
+  const install = !own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />;
+  if (levels.phone) {
+    const page = picked ? machines.find((machine) => machine.id === picked) ?? null : null;
+    // The list and a machine's page share the pane's scroll: during a slide both are drawn, the one left held where it
+    // was scrolled (`shift`).
+    const sub = levels.motion && levels.motion.from > 1 && levels.motion.to > 1 ? levels.motion : null;
+    const held = (level: 2 | 3) => (motionOf(sub, level)?.startsWith("out") ? { "--level-shift": `${sub!.shift}px` } as CSSProperties : undefined);
+    return (
+      <Section id="machines" title={t(own ? "hosts.titleRemote" : "hosts.title")}>
+        <div className="settings-sublevels">
+          <div className="settings-sublevel" hidden={levels.level !== 2 && !sub} inert={motionOf(sub, 2)?.startsWith("out") || undefined} data-motion={motionOf(sub, 2)} style={held(2)}>
+            <p className="ui-section-description">{t("hosts.description")}</p>
+            {machines.length > 0 && <ul className="settings-menu machines-menu">
+              {machines.map((machine) => {
+                const name = machineName(machine, t);
+                // This computer, listed here only where it has no section of its own, reads as any machine.
+                const state = machineStatus(machine, status, own, t);
+                const isNew = notice(machine);
+                return <li key={machine.id}>
+                  <MenuRow className="machine-entry" data-machine={machine.id} data-name={name} data-state={machine.state} data-local={machine.local || undefined}
+                    aria-label={machineEntryName(name, state, isNew, t)}
+                    icon={<NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />} status={state} />} isNew={isNew} />}
+                    label={<span className="machine-nav-name">{name}</span>}
+                    summary={<MachineEntryState status={state} />} end={<NewAtEnd isNew={isNew} />}
+                    onClick={() => levels.open("machines", machine.id)} />
+                </li>;
+              })}
+              {/* A dialog, not a page: no chevron. A machine paired there joins the list above it. */}
+              <li><MenuRow className="settings-menu-row--add" icon={<AddIcon size={20} />} label={t(own ? "hosts.addRemote" : "hosts.add")} chevron={false}
+                onClick={() => window.sidevoiceActions?.openPairing()} /></li>
+            </ul>}
+            {empty}
+            {install}
+          </div>
+          <div className="settings-sublevel" hidden={levels.level !== 3 && !sub} inert={motionOf(sub, 3)?.startsWith("out") || undefined} data-motion={motionOf(sub, 3)} style={held(3)}>
+            {page && <HostDetail machine={page} name={machineName(page, t)} onForget={() => { forgetting.current = { id: page.id, name: machineName(page, t) }; }} />}
+          </div>
+        </div>
+      </Section>
+    );
+  }
+  const shown = shownMachine(machines, picked);
   return (
-    <section className="host-detail" aria-labelledby="host-detail-title">
-      <Button variant="ghost" size="compact" onClick={onBack}>{t("hosts.pageBack")}</Button>
+    <Section id="machines" title={t(own ? "hosts.titleRemote" : "hosts.title")} description={t("hosts.description")}>
+      {/* Hidden on a desktop, where the machines are under Machines in Settings' own navigation. */}
+      <div className="machines-inline"><MachineNav current /></div>
+      {empty}
+      {shown && <HostDetail machine={shown} name={machineName(shown, t)} />}
+      {install}
+    </Section>
+  );
+}
+
+/** This computer as a section of its own: not prepared, preparing it — the setup's
+ *  block; prepared, its page as Machines shows it — whether it answers, its Sidevoice service, its agents, the devices
+ *  paired with it. */
+export function ThisComputerSettings() {
+  const t = hostTranslator();
+  const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
+  const store = useContext(RoomStoreContext);
+  // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
+  const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const rename = () => store?.patch({ settingsSection: "general", settingsFocus: "device-name" });
+  return (
+    <Section id="this-computer" title={<span className="this-device-title">{name}
+      <Button variant="ghost" tone="neutral" size="icon-sm" className="this-device-rename" aria-label={t("hosts.renameDevice")} title={t("hosts.renameDevice")} onClick={rename}><EditIcon size={14} /></Button>
+    </span>}>
+      {local ? <HostDetail machine={local} name={machineName(local, t)} untitled />
+        : <div className="this-computer-prepare">
+            <p>{t("localInstall.description")}</p>
+            <LocalHostInstallEntry showCta source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
+          </div>}
+    </Section>
+  );
+}
+
+/** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
+ *  paired with it, and forgetting it. */
+function HostDetail({ machine, name, untitled = false, onForget }: { machine: MachineView; name: string; untitled?: boolean; onForget?: () => void }) {
+  const t = hostTranslator();
+  const own = useThisComputerSection();
+  // Renaming the machine on this device: the name being typed, or null.
+  const [naming, setNaming] = useState<string | null>(null);
+  // Not a form: Settings is one, and a form inside it would submit the page.
+  const saveAlias = () => { window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, naming?.trim() || null); setNaming(null); };
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
+  const agents = useRef<HTMLElement>(null);
+  // Asked for its agents (a new agent waiting): its agents in view.
+  useEffect(() => { if (agentRequest?.fp && agentRequest.fp === machine.pairingId) agents.current?.scrollIntoView?.({ block: "start" }); }, [agentRequest, machine.pairingId]);
+  // Its state, as This device's section says it where this is that section's page; the hint of what to do, if any.
+  const state = machineStatus(machine, status, own, t);
+  return (
+    <section className="host-detail" aria-label={name}>
       <header className="host-detail-header">
-        <div><h3 id="host-detail-title">{machine.host || t("hosts.unnamed")}{notice && <span className="host-agent-dot" role="img" aria-label={t("agents.notice")} />}</h3><p className="muted">{machine.local ? t("hosts.thisComputer") : machine.state === "checking" ? t("hosts.checking")
-          : machine.state === "offline" || machine.state === "revoked" || machine.state === "failed" ? t("hosts.remoteNoResponse") : t("hosts.connected")}</p></div>
+        <span className="machine-icon" aria-hidden="true">{machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />}</span>
+        <div className="host-detail-copy">
+          {untitled ? null : naming !== null ? <div className="host-rename" role="group" aria-label={t("hosts.renameLabel")}>
+              <Input aria-label={t("hosts.renameLabel")} value={naming} maxLength={60} autoFocus onChange={(event) => setNaming(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setNaming(null); } if (event.key === "Enter") { event.preventDefault(); saveAlias(); } }} />
+              <Button size="sm" variant="primary" onClick={saveAlias}>{t("hosts.devices.renameSave")}</Button>
+              <Button size="sm" variant="ghost" tone="neutral" onClick={() => setNaming(null)}>{t("hosts.cancel")}</Button>
+            </div>
+            : <h3 className="host-name">{name}
+              {machine.pairingId && <Button variant="ghost" tone="neutral" size="icon-sm" className="host-rename-open" aria-label={t("hosts.rename", { machine: name })} title={t("hosts.rename", { machine: name })}
+                onClick={() => setNaming(name)}><EditIcon size={14} /></Button>}
+            </h3>}
+          {/* Renamed here: whose name it really is, and the way back to it. */}
+          {!untitled && machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
+            <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
+          {/* Its state at length, under its name. A remote machine's is said as it changes; this computer's service card
+              says its own, so the page has one live state. */}
+          <p className="host-detail-state"><MachineState status={state} form="long" live={!machine.local} /></p>
+          {state.hint && <p className="host-detail-hint muted">{state.hint}</p>}
+          {/* No longer paired (the machine removed this device): pairing it again is a new code from it, in Add a
+              machine; forgetting it is at the page's foot. */}
+          {state.key === "unpaired" && !machine.local && <Button size="sm" variant="secondary" className="host-pair-again"
+            onClick={() => window.sidevoiceActions?.openPairing()}>{t("hosts.machineState.unpaired.pair")}</Button>}
+        </div>
       </header>
-      <div className="host-tabs" role="tablist" aria-label={t("hosts.title")}>
-        {tabs.map((name) => <Button key={name} variant="ghost" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>
-          <span className="host-agent-tab-label">{t(name === "agents" ? "agents.tab" : `hosts.tab.${name}` as "hosts.tab.status" | "hosts.tab.devices")}{name === "agents" && notice && <span className="host-agent-dot" aria-label={t("agents.notice")} />}</span>
-        </Button>)}
-      </div>
-      {tab === "agents" ? <HostAgentsPanel fp={machine.pairingId ?? null} />
-        : tab === "status" && machine.local ? <LocalHostStatusPanel status={status} />
-          : machine.local ? <LocalHostDevicesPanel machine={machine} /> : null}
+      {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
+      <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
+        {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} name={machine.host || null} />
+          : <RemoteHostCard machine={machine} name={name} titleId={"host-status-" + machine.id} />}
+      </section>
+      <section className="host-section" ref={agents}>
+        <HostAgentsPanel fp={machine.pairingId ?? null} />
+      </section>
+      <section className="host-section">
+        <MachineDevicesPanel machine={machine} name={name} />
+      </section>
+      {!machine.local && machine.pairingId && <ForgetMachine machine={machine} name={name} onForget={onForget} />}
     </section>
   );
 }
 
-function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
+/** Forgetting a remote machine, at its page's foot: asked first — it unpairs this device from it — and, the machine
+ *  not answering, done here and told to it when it is back (the controller keeps what it needs to). `onForget`: told as
+ *  it is forgotten (a phone's Settings says so once it is gone). */
+function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name: string; onForget?: () => void }) {
+  const t = hostTranslator();
+  const [asking, setAsking] = useState(false);
+  const open = useRef<HTMLButtonElement>(null);
+  return (
+    <section className="host-section host-forget" aria-label={t("hosts.forget", { machine: name })}>
+      {asking ? <div className="device-revoke-confirm" role="group" aria-label={t("hosts.forget", { machine: name })}>
+          <p>{t("hosts.forgetHint", { machine: name })}</p>
+          <p className="muted">{machine.state === "connected" ? t("hosts.confirmForget") : t("hosts.confirmForgetOffline", { machine: name })}</p>
+          <div className="host-forget-actions">
+            <Button variant="ghost" tone="neutral" size="sm" autoFocus onClick={() => { setAsking(false); requestAnimationFrame(() => open.current?.focus()); }}>{t("hosts.cancel")}</Button>
+            <Button variant="danger" size="sm" onClick={() => { onForget?.(); void window.sidevoiceActions?.forgetMachine(machine.pairingId!); }}>{t("hosts.forgetConfirm")}</Button>
+          </div>
+        </div>
+        : <Button ref={open} variant="danger" size="sm" onClick={() => setAsking(true)}>{t("hosts.forget", { machine: name })}</Button>}
+    </section>
+  );
+}
+
+/** Another machine's Sidevoice, to read: where the machine says, its Sidevoice version. How this device reaches it is
+ *  its page's header's, two blocks up; no controls: it is run there. */
+function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
+  const t = hostTranslator();
+  const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
+  useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
+  return (
+    <div className="host-status-card" data-remote>
+      <div className="host-status-head">
+        <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
+      </div>
+      {info?.version && <dl className="host-status-facts">
+        {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
+      </dl>}
+    </div>
+  );
+}
+
+/* This computer's service as a status card: its state with its dot, first, in This device's words (machineStatus, as
+ * the app reads the service here), said as it changes; its version ("Sidevoice 0.8.1");
+ * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
+ * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
+function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: MachineView; status: LocalHostStatus; titleId: string; name: string | null }) {
   const t = hostTranslator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -117,22 +343,27 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   const details = safeLocalHostStatusDetails(status);
   const statusMessage = hostStatusText(status, t);
   const hasMethod = (action: LocalHostAction) => canRunLocalHostAction(action);
-  const buttons: { action: LocalHostAction; label: string }[] = [];
+  const state = machineStatus(machine, status, true, t);
+  // Unknown is not none: Stop asks unless the service says no call is on.
+  const calls = details.calls;
+  const buttons: { action: LocalHostAction; label: string; variant: "primary" | "secondary" | "ghost" }[] = [];
   if (status.state === "running") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart") });
-    if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop") });
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart"), variant: "secondary" });
+    if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop"), variant: "ghost" });
   } else if (status.state === "not-installed") {
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.startAtLogin") });
+    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.start"), variant: "primary" });
   } else if (status.state === "stopped-by-person") {
-    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start") });
-  } else if (status.state === "backoff" || status.state === "failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry") });
-  } else if (status.state === "service-failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry") });
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.reinstall") });
+    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start"), variant: "primary" });
+  } else if (status.state === "backoff") {
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
+  } else if (status.state === "failed" || status.state === "service-failed") {
+    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
   } else if (status.state === "refused") {
-    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect") });
+    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect"), variant: "primary" });
   }
+  // Any failure has the repair path too, whatever the system's service says of itself: reinstalling.
+  if (["failed", "service-failed", "refused", "incompatible"].includes(status.state) && hasMethod("serviceInstall"))
+    buttons.push({ action: "serviceInstall", label: t("hosts.reinstall"), variant: "secondary" });
   const installed = status.installed ?? (status.service !== "none" && status.service !== undefined);
   const loginAction: LocalHostAction | null = status.state === "absent" || (!installed && status.state === "not-installed") ? null
     : installed ? hasMethod("serviceUninstall") ? "serviceUninstall" : null
@@ -142,6 +373,16 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
     setBusy(action);setNote("");
     try { await runLocalHostAction(action);if (action === "stop") setConfirmStop(false); }
     catch { setNote(t("hosts.actionFailed")); }
+    // Its buttons change with the state: the focus goes back to the card's title rather than to the page.
+    finally { setBusy(null); requestAnimationFrame(() => document.getElementById(titleId)?.focus()); }
+  }
+  const bridge = localHostBridge();
+  const canSetLogin = typeof bridge?.setStartAtLogin === "function";
+  async function setLogin(enabled: boolean) {
+    if (busy || !bridge?.setStartAtLogin) return;
+    setBusy(loginAction);setNote("");
+    try { await bridge.setStartAtLogin(enabled); }
+    catch { setNote(t("hosts.actionFailed")); }
     finally { setBusy(null); }
   }
   async function copyDetails() {
@@ -150,118 +391,59 @@ function LocalHostStatusPanel({ status }: { status: LocalHostStatus }) {
   }
   const cause = status.failure ? hostCause(status, t) : "";
   const failureAt = dateText(details.failure?.at);
+  const failed = status.state === "failed" || status.state === "service-failed";
   return (
-    <div className="host-status-panel" data-state={status.state}>
-      <p className="host-status-summary" role="status">{statusMessage}</p>
-      {details.core?.version && <p className="muted">{t("hosts.version", { version: details.core.version })}</p>}
-      {details.calls !== undefined && <p className="muted">{t("hosts.calls", { calls: details.calls })}</p>}
+    <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
+      <div className="host-status-head">
+        {/* "Sidevoice on MacBook"; with no name to say yet (its pairing lost), "Sidevoice on this computer". */}
+        <h4 id={titleId} tabIndex={-1}>{name ? t("hosts.serviceOn", { machine: name }) : t("hosts.section.service")}</h4>
+        <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>
+      </div>
+      {/* The facts, compact; then what the state means where it says more than its word. */}
+      <dl className="host-status-facts">
+        {/* One version — the app's, the Sidevoice the person installed, else its service's (never the core's or the
+            connector's) — and whether it is up to date: Update available is a link to its row in Updates, where
+            everything that updates is. */}
+        <ThisDeviceVersion t={t} />
+      </dl>
+      {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
+      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
+          come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
+      {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
-      {status.failure && (status.state === "failed" || status.state === "service-failed") && (
+      {status.failure && failed && (details.attempts !== undefined || !!failureAt) && (
         <div className="host-failure-details">
           {details.attempts !== undefined && <p>{t("hosts.failureAttempts", { attempts: details.attempts, limit: details.limit ? ` of ${details.limit}` : "" })}</p>}
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
         </div>
       )}
-      <div className="host-action-list">
-        {buttons.map(({ action, label }) => action !== "stop" || !confirmStop ? <Button key={action} variant={action === "stop" ? "ghost" : "primary"} disabled={!!busy}
-          onClick={() => action === "stop" ? setConfirmStop(true) : void run(action)}>{busy === action ? t("hosts.working") : label}</Button> : null)}
-        {confirmStop && <span className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
-          <span>{t("hosts.stopConfirm")}</span>
-          <Button variant="danger" disabled={!!busy} onClick={() => void run("stop")}>{busy === "stop" ? t("hosts.working") : t("hosts.stop")}</Button>
-          <Button variant="ghost" disabled={!!busy} onClick={() => setConfirmStop(false)}>{t("hosts.cancel")}</Button>
-        </span>}
-        {loginAction && <Button variant="ghost" disabled={!!busy} onClick={() => void run(loginAction)}>{installed ? t("hosts.stopAtLogin") : t("hosts.startAtLogin")}</Button>}
-        {(status.state === "failed" || status.state === "service-failed") && hasMethod("revealLog") && <Button variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
-        {(status.state === "failed" || status.state === "service-failed") && typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
-      </div>
-      {note && <p className="muted" role="status">{note}</p>}
-      <LocalHostUpdateControl status={status} />
-    </div>
-  );
-}
-
-function LocalHostUpdateControl({ status }: { status: LocalHostStatus }) {
-  const t = hostTranslator();
-  const [report, setReport] = useState<LocalHostVersion | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<LocalHostBridgeError | null>(null);
-  const [note, setNote] = useState("");
-
-  useEffect(() => {
-    let current = true;
-    const bridge = localHostBridge();
-    if (typeof bridge?.version !== "function" || typeof bridge.update !== "function") {
-      setReport(null);
-      setChecking(false);
-      return () => { current = false; };
-    }
-    setChecking(true);
-    void bridge.version().then((next) => { if (current) setReport(next); })
-      .catch(() => { if (current) setReport(null); })
-      .finally(() => { if (current) setChecking(false); });
-    return () => { current = false; };
-  }, [status.state, status.core?.version, status.core?.api]);
-
-  const bridge = localHostBridge();
-  if (checking || typeof bridge?.version !== "function" || typeof bridge.update !== "function") return null;
-
-  async function refreshVersion() {
-    const nextBridge = localHostBridge();
-    if (typeof nextBridge?.version !== "function") return;
-    try { setReport(await nextBridge.version()); } catch { setReport(null); }
-  }
-
-  async function update() {
-    const nextBridge = localHostBridge();
-    if (report?.update !== "available" || typeof nextBridge?.version !== "function" || typeof nextBridge.update !== "function" || busy) return;
-    setBusy(true);setError(null);setNote("");
-    try {
-      const current = await nextBridge.version();
-      setReport(current);
-      if (current.update !== "available") return;
-      await nextBridge.update();
-      await refreshVersion();
-    }
-    catch (reason) { setError(normalizeLocalHostBridgeError(reason)); }
-    finally { setBusy(false); }
-  }
-
-  async function copyErrorDetails() {
-    if (!error) return;
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(JSON.stringify(error, null, 2));
-      setNote(t("localInstall.detailsCopied"));
-    } catch { setNote(t("localInstall.detailsCopyFailed")); }
-  }
-
-  if (!report) return null;
-  if (report.update === "newer-installed") return <p className="host-update-guidance" role="status">{t("hosts.update.newerInstalled")}</p>;
-  if (report.update === "incompatible") return <p className="host-update-guidance" role="status">{report.core_api == null
-    ? t("hosts.update.incompatibleUnknown") : t("hosts.update.incompatible", { api: report.core_api })}</p>;
-  if (report.update !== "available") return null;
-
-  const calls = safeLocalHostCount(status.calls);
-  const waitingForCalls = calls !== undefined && calls > 0;
-  return (
-    <div className="host-update-control" aria-live="polite">
-      {waitingForCalls && <p className="muted">{t("hosts.update.waitCalls", { calls })}</p>}
-      {error && <div className="local-install-error" role="alert">
-        <p>{localHostBridgeErrorText(error, t)}</p>
-        <div className="local-install-actions">
-          <Button variant="ghost" onClick={() => void copyErrorDetails()}>{t("localInstall.copyDetails")}</Button>
-          {note && <span className="muted" role="status">{note}</span>}
+      {/* Start at sign-in is its own: it changes only whether the service starts at the next sign-in, never whether it
+          runs now. Where the app can only set it by installing or removing the service (which starts or stops it too),
+          it is shown, and says why it cannot change here. */}
+      {loginAction && <label className="host-status-login">
+        <span><span className="host-status-login-label">{t("hosts.startAtSignIn")}</span>
+          <span className="muted">{t(canSetLogin ? "hosts.startAtSignInHint" : "hosts.startAtSignInUnavailable")}</span></span>
+        <Switch checked={installed} disabled={!!busy || !canSetLogin} aria-label={t("hosts.startAtSignIn")} onChange={(next) => void setLogin(next)} />
+      </label>}
+      {confirmStop ? <div className="host-stop-confirm" role="group" aria-label={t("hosts.stop")}>
+          <p>{t("hosts.stopConfirm")}</p>
+          <span className="host-action-list">
+            <Button variant="ghost" tone="neutral" size="sm" autoFocus disabled={!!busy} onClick={() => { setConfirmStop(false); requestAnimationFrame(() => document.getElementById(titleId)?.focus()); }}>{t("hosts.cancel")}</Button>
+            <Button variant="danger" size="sm" loading={busy === "stop"} onClick={() => void run("stop")}>{t("hosts.stop")}</Button>
+          </span>
         </div>
-      </div>}
-      <Button variant="primary" disabled={busy || waitingForCalls} onClick={() => void update()}>
-        {busy ? t("hosts.update.working") : error ? t("hosts.update.retry") : t("hosts.update.button")}
-      </Button>
+        : (buttons.length > 0 || failed) && <div className="host-action-list host-status-actions">
+          {buttons.map(({ action, label, variant }) => <Button key={action} size="sm" variant={variant} tone={action === "stop" ? "danger" : undefined} loading={busy === action} disabled={!!busy && busy !== action}
+            onClick={() => action === "stop" && calls !== 0 ? setConfirmStop(true) : void run(action)}>{label}</Button>)}
+          {failed && hasMethod("revealLog") && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void run("revealLog")}>{t("hosts.viewLog")}</Button>}
+          {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
+        </div>}
+      {note && <p className="muted" role="status">{note}</p>}
     </div>
   );
 }
 
-function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
+function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: string }) {
   const t = hostTranslator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [devices, setDevices] = useState<HostDeviceView[]>([]);
@@ -269,45 +451,36 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [pairing, setPairing] = useState<LocalPairingCode | null>(null);
-  const [pairingFor, setPairingFor] = useState<string | null>(null);
-  const [pairingError, setPairingError] = useState(false);
-  const [pairingCopied, setPairingCopied] = useState(false);
   const [deviceNote, setDeviceNote] = useState("");
-  const [roomUrl, setRoomUrl] = useState("");
-  const [roomCode, setRoomCode] = useState("");
-  const [roomBusy, setRoomBusy] = useState(false);
-  const [roomPaired, setRoomPaired] = useState(false);
-  const [roomError, setRoomError] = useState(false);
   const deviceEpoch = useRef(0);
-  const pairingEpoch = useRef(0);
-  const roomEpoch = useRef(0);
   const bridge = localHostBridge();
-  const canPairDevices = typeof bridge?.pairingCode === "function";
-  const canPairRoom = typeof bridge?.pairRoom === "function";
-  const usable = status.reachable === true && machine.selectable === true;
+  const local = !!machine.local;
+  const usable = machine.state === "connected" && !!machine.pairingId;
+  const list = () => local ? window.sidevoiceActions?.localHostDevices?.() : window.sidevoiceActions?.machineDevices?.(machine.pairingId!);
+  // This device by the name it has here (its setting, else its default), however the machine last heard it.
+  useRoomStore((state) => state.facts.deviceName);
+  const ownName = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
+  const shownName = (device: HostDeviceView) => (device.current && ownName) || device.name || t("hosts.devices.thisDevice");
+  const drop = (id: string) => local ? window.sidevoiceActions?.revokeLocalHostDevice?.(id) : window.sidevoiceActions?.revokeMachineDevice?.(machine.pairingId!, id);
   const pairingKey = machine.pairingId || "";
-  const visibleDevices = usable && devicesFor === pairingKey ? devices : [];
-  const visiblePairing = usable && pairingFor === pairingKey ? pairing : null;
+  // A machine's own Sidevoice (paired with itself) is never listed: on this computer's page that is this device itself.
+  const visibleDevices = usable && devicesFor === pairingKey ? devices.filter((device) => device.kind !== "local") : [];
 
   async function refresh() {
     const epoch = ++deviceEpoch.current;
     if (!usable) { setError(true);setDevices([]);return; }
-    const action = window.sidevoiceActions?.localHostDevices;
-    if (!action) { setError(true);return; }
+    if (!(local ? window.sidevoiceActions?.localHostDevices : window.sidevoiceActions?.machineDevices)) { setError(true);return; }
     setLoading(true);setError(false);
-    try { const next = await action();if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)} }
+    try { const next = await list() ?? [];if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)} }
     catch { if (deviceEpoch.current === epoch && usable) setError(true); }
     finally { if (deviceEpoch.current === epoch) setLoading(false); }
   }
   useEffect(() => {
     deviceEpoch.current++;
-    pairingEpoch.current++;
-    roomEpoch.current++;
     setLoading(false);
     setConfirmId(null);
-    setDevices([]);setDevicesFor(null);setPairing(null);setPairingFor(null);setPairingError(false);setPairingCopied(false);
-    setDeviceNote("");setRoomUrl("");setRoomCode("");setRoomBusy(false);setRoomPaired(false);setRoomError(false);
+    setDevices([]);setDevicesFor(null);
+    setDeviceNote("");
     if (!usable) {
       setError(true);
       return;
@@ -316,92 +489,54 @@ function LocalHostDevicesPanel({ machine }: { machine: MachineView }) {
     void refresh();
   }, [usable, machine.pairingId]);
   async function revoke(id: string) {
-    const action = window.sidevoiceActions?.revokeLocalHostDevice;
-    if (!usable || !action) return;
+    if (!usable || !(local ? window.sidevoiceActions?.revokeLocalHostDevice : window.sidevoiceActions?.revokeMachineDevice)) return;
     const epoch = ++deviceEpoch.current;
     setLoading(true);setError(false);
     try {
-      await action(id);
+      await drop(id);
       if (deviceEpoch.current !== epoch || !usable) return;
       setConfirmId(null);setDeviceNote(t("hosts.devices.revoked"));
-      const next = await window.sidevoiceActions?.localHostDevices?.() ?? [];
+      const next = await list() ?? [];
       if (deviceEpoch.current === epoch && usable) {setDevices(next);setDevicesFor(pairingKey)}
     }
     catch { if (deviceEpoch.current === epoch && usable) setError(true); }
     finally { if (deviceEpoch.current === epoch) setLoading(false); }
   }
-  async function createCode() {
-    if (!usable || !bridge?.pairingCode) return;
-    const epoch = ++pairingEpoch.current;
-    setPairingError(false);setPairingCopied(false);setPairing(null);setPairingFor(null);
-    try { const next = await bridge.pairingCode();if (pairingEpoch.current === epoch && usable) {setPairing(next);setPairingFor(pairingKey)} }
-    catch { if (pairingEpoch.current === epoch && usable) setPairingError(true); }
-  }
-  async function copyPairingCode() {
-    if (!usable || !visiblePairing) return;
-    try { await navigator.clipboard.writeText(visiblePairing.code);setPairingCopied(true);setDeviceNote(t("hosts.devices.codeCopied")); }
-    catch { setPairingCopied(false);setError(true); }
-  }
-  async function connectRoom(event: FormEvent) {
-    event.preventDefault();
-    if (!usable || !bridge?.pairRoom || !roomUrl.trim() || !roomCode.trim()) return;
-    const epoch = ++roomEpoch.current;
-    setRoomBusy(true);setRoomError(false);setRoomPaired(false);
-    try { await bridge.pairRoom(roomUrl.trim(), roomCode.trim());if (roomEpoch.current === epoch && usable){setRoomPaired(true);setRoomCode("");setPairing(null)} }
-    catch { if (roomEpoch.current === epoch && usable) setRoomError(true); }
-    finally { if (roomEpoch.current === epoch) setRoomBusy(false); }
-  }
   return (
     <div className="host-devices-panel">
       <div className="host-devices-head">
         <h4>{t("hosts.tab.devices")}</h4>
-        {usable && <Button variant="ghost" size="compact" disabled={loading} onClick={() => void refresh()}>{t("hosts.retry")}</Button>}
       </div>
       {usable && loading && <p className="muted" role="status">{t("hosts.working")}</p>}
-      {(!usable || error) && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
+      {/* The list is read once as the page opens; reading it again is offered only when that failed. */}
+      {!usable && <p className="muted" role="alert">{t("hosts.devices.unavailable")}</p>}
+      {usable && error && !loading && <Alert tone="danger" live title={t("hosts.devices.loadFailed")}
+        action={<Button size="sm" onClick={() => void refresh()}>{t("hosts.retry")}</Button>} />}
       {usable && deviceNote && <p className="muted" role="status">{deviceNote}</p>}
-      {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t("hosts.devices.empty")}</p>}
+      {usable && !loading && !error && visibleDevices.length === 0 && <p className="muted">{t(local ? "hosts.devices.emptyOthers" : "hosts.devices.empty")}</p>}
       <ul className="host-device-list">
         {visibleDevices.map((device) => (
           <li className="host-device-row" key={device.device_id}>
             <div className="host-device-copy">
-              <strong>{device.name || t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</strong>
-              {(device.kind === "local" || device.current) && <span className="muted">{t(device.kind === "local" ? "hosts.devices.thisApp" : "hosts.devices.thisDevice")}</span>}
+              {/* The name and, on the same line, whether it is this device: the name gives way (an ellipsis), the tag never. */}
+              <span className="host-device-title">
+                {/* This device by the name it has now (General's), however the machine last heard it. */}
+                <strong title={shownName(device)}>{shownName(device)}</strong>
+                {device.current && <Badge tone="accent">{t("hosts.devices.thisDevice")}</Badge>}
+              </span>
               {dateText(device.created_at) && <span className="muted">{t("hosts.devices.created", { date: dateText(device.created_at) })}</span>}
               {dateText(device.last_seen_at) && <span className="muted">{t("hosts.devices.lastSeen", { date: dateText(device.last_seen_at) })}</span>}
             </div>
-            {usable && device.kind !== "local" && (confirmId === device.device_id ? (
+            {usable && device.kind !== "local" && !device.current && (confirmId === device.device_id ? (
               <span className="device-revoke-confirm" role="group" aria-label={t("hosts.devices.revoke", { device: device.name || device.device_id })}>
                 <span className="muted">{t("hosts.devices.revokeConfirm")}</span>
-                <Button variant="danger" size="compact" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke")}</Button>
-                <Button variant="ghost" size="compact" disabled={loading} onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
+                <Button variant="danger" size="sm" disabled={loading} onClick={() => void revoke(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>
+                <Button variant="ghost" size="sm" disabled={loading} onClick={() => setConfirmId(null)}>{t("hosts.cancel")}</Button>
               </span>
-            ) : <Button variant="ghost" size="compact" disabled={loading} onClick={() => setConfirmId(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>)}
+            ) : <Button variant="ghost" size="sm" disabled={loading} onClick={() => setConfirmId(device.device_id)}>{t("hosts.devices.revoke", { device: device.name || device.device_id })}</Button>)}
           </li>
         ))}
       </ul>
-      {canPairDevices && <section className="pair-another-device">
-        <h4>{t("hosts.devices.pairAnother")}</h4>
-        <Button variant="primary" disabled={!usable} onClick={() => void createCode()}>{t("hosts.devices.generateCode")}</Button>
-        {usable && pairingError && <p role="alert">{t("hosts.devices.codeFailed")}</p>}
-        {visiblePairing && <div className="local-pairing-code" role="status">
-          <p>{t(`hosts.devices.reach.${visiblePairing.reach}` as never)}</p>
-          <output>{visiblePairing.code}</output>
-          {typeof navigator.clipboard?.writeText === "function" && <Button variant="ghost" size="compact" disabled={!usable} onClick={() => void copyPairingCode()}>{pairingCopied ? t("hosts.devices.codeCopied") : t("hosts.devices.copyCode")}</Button>}
-          <p className="muted">{t("hosts.devices.codeExpires", { minutes: Math.ceil(visiblePairing.expires_in / 60) })}</p>
-        </div>}
-        {visiblePairing?.reach === "local-only" && <>
-          {canPairRoom && <form className="room-pair-form" onSubmit={connectRoom}>
-            <h5>{t("hosts.devices.roomTitle")}</h5>
-            <p>{t("hosts.devices.roomInstructions")}</p>
-            <label>{t("hosts.devices.roomUrl")}<input value={roomUrl} autoComplete="url" onChange={(event) => setRoomUrl(event.currentTarget.value)} /></label>
-            <label>{t("hosts.devices.roomCode")}<input value={roomCode} autoComplete="off" onChange={(event) => setRoomCode(event.currentTarget.value)} /></label>
-            <Button type="submit" variant="primary" disabled={!usable || roomBusy || !roomUrl.trim() || !roomCode.trim()}>{t("hosts.devices.pairRoom")}</Button>
-            {roomPaired && <p role="status">{t("hosts.devices.roomPaired")}</p>}
-            {roomError && <p role="alert">{t("hosts.devices.roomFailed")}</p>}
-          </form>}
-        </>}
-      </section>}
     </div>
   );
 }

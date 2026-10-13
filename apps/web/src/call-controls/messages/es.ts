@@ -5,6 +5,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "card.agent.idle": "El agente está parado",
   "card.agent.working": "El agente está trabajando",
   "card.agent.speaking": "El agente está hablando",
+  "card.agent.unknown": "El agente",
   "card.reconnecting": "Reconectando…",
   "card.switchConversation": "Cambiar de conversación",
   "card.conversations": "Conversaciones",

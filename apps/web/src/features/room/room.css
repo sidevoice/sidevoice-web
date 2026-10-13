@@ -1,0 +1,166 @@
+/* The room's header and its conversations (RoomHeader, ConversationSidebar, ConversationRows, ConversationAvatar), as
+ * the app patterns "Room · header" and "Room · conversations" draw them (design-system/app-patterns.css), on the tokens
+ * alone. Below 900px (state/call-layout.ts NARROW_QUERY) the conversations have no column: a few sit in the header and
+ * the whole list drops from it as a panel over the dimmed call. This file loads before the shared components' CSS, so
+ * what it changes on a Button is said under a parent of its own. */
+
+/* ----- a conversation's agent, small, and the dot of its state. The dot is ringed in what is behind it (--dot-ring),
+ * so it reads as cut out of the avatar on a row, a selected row, the header or the panel alike. */
+.conversation-avatar { position: relative; display: block; flex: none; width: 40px; height: 40px; }
+.conversation-avatar .sv-avatar { width: 100%; height: 100%; border-radius: 50%; background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
+[data-theme="dark"] .conversation-avatar .sv-avatar { background: var(--av-bg); }
+.state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-text-subtle); }
+.state-dot[data-state="in-call"] { background: var(--sv-positive); }
+.state-dot[data-state="working"] { background: var(--sv-voice); }
+.state-dot[data-state="waiting"] { background: var(--sv-accent); }
+/* On the sidebar's cards the plain dot says one thing only: connected (green). Any other state has no dot there (its
+   words are on the card). */
+.sidebar-rows .state-dot:not([data-state="in-call"]):empty { display: none; }
+
+/* ----- the header: the mark, and Settings at its end */
+.room-header { --dot-ring: var(--sv-bg); display: flex; align-items: center; gap: var(--sv-space-3); height: var(--sv-header-height); padding: 0 var(--sv-space-4) 0 var(--sv-space-5); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
+.room-header .brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); flex: none; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
+.room-header .brand svg { flex: none; color: var(--sv-accent-text); }
+.header-settings { flex: none; margin-inline-start: auto; }
+/* Something new under Settings: its mark on the gear's top-right corner (highlights.tsx GearNewMark, highlights.css),
+   never the only word (the label says it too) and never a dot beside the conversations' state dots. */
+.header-conversations, .conversations-scrim { display: none; }
+
+/* ----- the conversations: a column on a desktop */
+.conversation-sidebar { --dot-ring: var(--sv-bg-subtle); display: flex; flex-direction: column; gap: var(--sv-space-4); flex: none; width: 288px; min-height: 0; padding: var(--sv-space-3); overflow: hidden auto; border-right: 1px solid var(--sv-border); background: var(--sv-bg-subtle); transition: width var(--sv-dur-slow) var(--sv-ease); }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); flex: none; min-height: 32px; padding-inline-start: var(--sv-space-2); }
+.sidebar-head h2 { display: flex; align-items: center; gap: var(--sv-space-2); flex: 1; min-width: 0; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-head h2 svg { flex: none; width: 16px; height: 16px; }
+.conversation-sidebar .sidebar-close { display: none; }
+.sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
+.sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
+.sidebar-group-label { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-1); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
+.sidebar-group-label span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-rows { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
+.sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; text-align: center; color: var(--sv-text-muted); }
+
+/* A conversation is a card, as the avatar lab draws them: its bicho on its own tint with its dot, the title, the harness
+ * and the state in words, what is unread, and its options; the one on the stage edged in the accent. */
+.sidebar-rows .participant-row { --dot-ring: var(--sv-surface); position: relative; display: flex; align-items: center; min-width: 0;
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); box-shadow: var(--sv-shadow-xs);
+  transition: border-color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease); }
+.sidebar-rows .participant-row[data-selected] { --dot-ring: var(--sv-accent-soft); border-color: color-mix(in srgb, var(--sv-accent) 55%, var(--sv-border)); background: var(--sv-accent-soft); }
+.sidebar-rows .person { display: flex; align-items: center; gap: var(--sv-space-3); flex: 1; min-width: 0; margin: 0; padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-2) var(--sv-space-2); border: 0; border-radius: inherit; background: none; color: var(--sv-text); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sidebar-rows .person:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: -2px; }
+.sidebar-rows .person:disabled { cursor: default; opacity: .6; }
+.sidebar-rows .participant-copy { display: grid; flex: 1; min-width: 0; }
+.sidebar-rows .person-name { overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.sidebar-rows .person-sub { min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.sidebar-state { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; }
+.sidebar-state svg { flex: none; }
+.sidebar-state-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* What cannot hear you steps back: its words in the subtle grey, beside its dimmed avatar. */
+.sidebar-rows .participant-row:has(.state-dot[data-state="idle"]) :is(.person-name, .person-sub) { color: var(--sv-text-subtle); }
+/* The options wait, invisible but in place and focusable, until the row is pointed at, focused or chosen; nothing
+ * hovers on a touch screen, so there they are always shown. */
+.sidebar-rows .participant-more { flex: none; margin-inline-end: var(--sv-space-1); opacity: 0;
+  transition: opacity var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
+.sidebar-rows .participant-row:is(:hover, :focus-within, [data-selected]) .participant-more, .sidebar-rows .participant-more[data-state="open"] { opacity: 1; }
+@media (hover: hover) { .sidebar-rows .participant-row:not([data-selected]):hover { border-color: var(--sv-border-strong); } }
+@media (hover: none), (pointer: coarse) { .sidebar-rows .participant-more { opacity: 1; } }
+
+/* The rail: the same avatars in a narrow column, the machines told apart by a line. */
+@media (min-width: 900px) {
+  .conversation-sidebar[data-collapsed] { width: 68px; padding-inline: 10px; }
+  .conversation-sidebar[data-collapsed] .sidebar-head { justify-content: center; padding: 0; }
+  .conversation-sidebar[data-collapsed] :is(.sidebar-head h2, .sidebar-group-label, .participant-copy, .sidebar-unread, .participant-more, .sidebar-empty) { display: none; }
+  .conversation-sidebar[data-collapsed] .sidebar-group + .sidebar-group { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+  .conversation-sidebar[data-collapsed] .person { flex: none; padding: var(--sv-space-1); }
+}
+
+/* ----- a row's options menu (components/ui/DropdownMenu.tsx: only these rows use it) */
+.ui-dropdown { z-index: 100; display: grid; min-width: 13rem; padding: var(--sv-space-1-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface-raised); box-shadow: var(--sv-shadow-md); animation: room-menu-in var(--sv-dur-fast) var(--sv-ease); }
+.ui-dropdown-item { display: flex; align-items: center; gap: var(--sv-space-2); height: 36px; padding: 0 var(--sv-space-3); border-radius: var(--sv-radius-sm); color: var(--sv-text); font-size: var(--sv-font-md); white-space: nowrap; outline: none; cursor: pointer; user-select: none; }
+.ui-dropdown-item svg { flex: none; width: 16px; height: 16px; color: var(--sv-text-muted); }
+.ui-dropdown-item[data-highlighted] { background: var(--sv-accent-soft); }
+.ui-dropdown-item[data-danger], .ui-dropdown-item[data-danger] svg { color: var(--sv-danger); }
+.ui-dropdown-item[data-danger][data-highlighted] { background: var(--sv-danger-soft); }
+.ui-dropdown-item[data-disabled] { color: var(--sv-disabled-text); cursor: default; }
+@keyframes room-menu-in { from { opacity: 0; transform: translateY(-4px); } }
+
+/* ----- a phone */
+@media (max-width: 899px) {
+  /* The header keeps its place above the scrim while the list is down, and until the scrim has faded after. */
+  .room-header { position: relative; z-index: 1; gap: var(--sv-space-2); padding: 0 var(--sv-space-2) 0 var(--sv-space-4); transition: z-index 0s linear var(--sv-dur-base); }
+  .room-header[data-list-down] { z-index: 32; transition: none; }
+  /* No brand on a phone: the heading stays, for a screen reader only. */
+  .room-header .brand { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* The conversations from the left, as many as fit (header-row.ts measures the row), then "+", then the chevron with
+     the count of the rest. */
+  .header-conversations { display: flex; align-items: center; gap: var(--sv-space-1); flex: 1; min-width: 0; }
+  .conversations-toggle { gap: 2px; padding-inline: var(--sv-space-2); }
+  .conversations-rest { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+  .header-avatar { position: relative; display: grid; place-items: center; flex: none; margin: 0; padding: 2px; border: 0; border-radius: 50%; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .header-avatar .conversation-avatar { width: 34px; height: 34px; }
+  .header-avatar:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 0; }
+  .header-avatar[aria-disabled="true"] { cursor: default; opacity: .6; }
+  @media (hover: hover) { .header-avatar:not([aria-disabled="true"], [aria-pressed="true"]):hover { background: var(--sv-hover); } }
+  /* The one on the stage, marked where it is: the accent's soft circle behind it, as the column's chosen row, and a short
+     bar under it — a shape, not a colour alone. Neither is the focus ring, nor touches the state's dot. */
+  .header-avatar[aria-pressed="true"] { --dot-ring: var(--sv-accent-soft); background: var(--sv-accent-soft); }
+  .header-avatar[aria-pressed="true"]::after { content: ""; position: absolute; top: calc(100% + 3px); left: 50%; width: 16px; height: 3px; margin-left: -8px; border-radius: var(--sv-radius-pill); background: var(--sv-accent); }
+  /* A new conversation: a slot of its own, an empty avatar's dashed circle — never read as the chevron's "+3". Solid in
+     the accent while its panel is open. */
+  .header-new { display: grid; place-items: center; flex: none; width: 38px; height: 38px; margin: 0; padding: 0; border: 1.5px dashed var(--sv-border-strong); border-radius: 50%;
+    background: none; color: var(--sv-text-muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .header-new[aria-expanded="true"] { border-style: solid; border-color: var(--sv-accent); color: var(--sv-accent-text); }
+  .header-new:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+  @media (hover: hover) { .header-new:hover { background: var(--sv-hover); color: var(--sv-text); } }
+  /* Something unread in a conversation behind the chevron: the accent's dot on its corner. */
+  .conversations-cue { position: absolute; top: 6px; right: 6px; box-sizing: content-box; border: 2px solid var(--sv-bg); border-radius: 50%; pointer-events: none; }
+  .conversations-cue[data-cue="unread"] { width: 8px; height: 8px; background: var(--sv-accent); }
+
+  /* The chevron after the avatars, wherever the variant puts them: it drops the list, and turns up while it is down. */
+  .conversations-toggle svg { transition: transform var(--sv-dur-base) var(--sv-ease); }
+  .conversations-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+  /* The list drops from under the header as a panel over the dimmed call. */
+  .conversation-sidebar { --dot-ring: var(--sv-surface); position: fixed; z-index: 31; top: var(--conversations-top, var(--sv-header-height)); left: 0; right: 0; width: auto; max-height: min(72dvh, 36rem); gap: var(--sv-space-2);
+    padding: var(--sv-space-2) var(--sv-space-3) var(--sv-space-4); border: 0; border-radius: 0 0 var(--sv-radius-2xl) var(--sv-radius-2xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-md);
+    transform: translateY(-100%); visibility: hidden; transition: transform var(--sv-dur-base) var(--sv-ease), visibility 0s linear var(--sv-dur-base); }
+  .conversation-sidebar[data-open] { transform: none; visibility: visible; transition: transform var(--sv-dur-slow) var(--sv-ease); }
+  .conversation-sidebar .sidebar-collapse { display: none; }
+  .conversation-sidebar .sidebar-close { display: inline-flex; }
+  .conversations-scrim { position: fixed; inset: 0; z-index: 30; display: block; background: var(--sv-scrim); opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease); }
+  .conversations-scrim[data-open] { opacity: 1; pointer-events: auto; }
+}
+
+/* The list scrolls above its foot. */
+.conversation-sidebar { overflow: hidden; }
+.conversation-sidebar > .sidebar-body { flex: 1 1 auto; min-height: 0; overflow: hidden auto; }
+/* The sidebar's foot: its entries stacked, each the full width (Updates over Settings), never squeezed on one line;
+   collapsed to the rail, their icons one over the other in the middle. */
+.sidebar-foot { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: var(--sv-space-1); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.conversation-sidebar:not([data-collapsed]) .sidebar-foot > * { width: 100%; min-width: 0; }
+.conversation-sidebar[data-collapsed] .sidebar-foot { align-items: center; }
+
+/* Settings at a desktop's conversations' foot, the header's gear pressed from there; a phone keeps the gear at its
+ * header's right. The list ends with New conversation. */
+@media (min-width: 900px) { .room-header .header-settings { display: none; } }
+.sidebar-new { display: flex; justify-content: center; }
+.sidebar-settings { position: relative; justify-content: flex-start; }
+.conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
+.sidebar-settings .settings-notice[data-mark="count"] { right: auto; left: 22px; }
+
+/* A desktop's room has no header, as a video call app's: the conversations' column from the top, the brand at its head
+ * (the mark alone in the rail); the stage's conversation named above its tile, not on it. A phone keeps its header. */
+.sidebar-brand { display: none; }
+@media (min-width: 900px) {
+  .room-shell > .room-header { display: none; }
+  .room-shell .sidebar-brand { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; min-height: 40px; padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
+  .room-shell .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
+  .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }
+  .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand span { display: none; }
+}
+
+/* The rail keeps the cards' bichos, without their frames. */
+@media (min-width: 900px) {
+  .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row { border-color: transparent; background: none; box-shadow: none; }
+  .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row[data-selected] { background: var(--sv-accent-soft); }
+}

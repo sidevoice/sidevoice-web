@@ -1,41 +1,20 @@
 /* The desktop app's call controls card talks to the app through one seam, `window.__sidevoiceDesktop.host.callControls`,
  * which the app injects into the card's window (sidevoice-desktop bridge/call-controls-bridge.js, docs/BRIDGE.md →
  * "The call controls card"). The card never sees the room page: the app relays the call to it and carries its
- * buttons back. Outside the app the seam is absent and the page shows nothing. */
-import type { ParticipantView } from "../state/room-types";
+ * buttons back. Outside the app the seam is absent and the page shows nothing. The playground's preview gives the card
+ * page the same seam, fed from the room frame beside it (preview/mock/card-host.mjs). */
+import type { AgentState, AudioDeviceOption, AudioDevices, CallCardView, CallEnded } from "../state/room-session-state.js";
 
-/** One device to choose, as the app lists it. `system` is the system's own choice, `number` a device the system lists
- *  without a name (its place, from 1), `missing` the chosen one, no longer connected: the card words those itself. */
-export interface AudioDeviceOption { id: string; label: string; system?: boolean; number?: number; missing?: boolean }
-/** The app's microphones and speakers, the chosen ones, and whether each can be chosen now. */
-export interface AudioDevices {
-  inputs: AudioDeviceOption[]; outputs: AudioDeviceOption[];
-  inputId: string; outputId: string; available: boolean; outputAvailable: boolean; busy: boolean;
-}
+export type { AgentState, AudioDeviceOption, AudioDevices, CallEnded };
 
-/** What the agent is doing: the avatar shows it, and only it. */
-export type AgentState = "idle" | "working" | "speaking";
-
-/** The call as the room window reports it to the app (snapshot version 2 of the desktop bridge). */
-export interface CallSnapshot {
+/** The call as the card shows it (snapshot version 2 of the desktop bridge): the room's own projection of it, the
+ *  store's `callCard` (state/room-session-state.js `callCardView`), passed through, with what is the host's own on top
+ *  — the bridge's version and when the call went on. One projection, never mapped again by the host
+ *  (briefs/FLOATING-CARD-SPEC.md FC0). The host may mark `devices.busy` while a choice it carries is on its way. */
+export interface CallSnapshot extends CallCardView {
   version: number;
-  ready: boolean;
-  joined: boolean;
-  /** Reconnecting or switching conversation. */
-  busy: boolean;
-  micEnabled: boolean;
-  micDisabled: boolean;
-  /** The conversation the call is on. */
-  title: string;
-  agent: AgentState;
-  /** You are speaking (the room hears a turn open). */
-  youTalking: boolean;
-  /** Something is playing that "skip" would stop. */
-  canSkip: boolean;
-  /** When the call was joined (ms since the epoch); null when not in one. */
+  /** When the call was joined (ms since the epoch); null out of a call. */
   since: number | null;
-  participants: ParticipantView[];
-  devices: AudioDevices | null;
 }
 
 export interface CallControlsState {
@@ -60,7 +39,11 @@ export type CallCommand =
   | { command: "skip-reply" }
   | { command: "open-app" }
   | { command: "select-participant"; threadId: string }
-  | { command: "select-audio-device"; kind: "input" | "output"; id: string };
+  | { command: "select-audio-device"; kind: "input" | "output"; id: string }
+  /** The idle warning's Keep: a sign of the person, so the call stays on (FC6). */
+  | { command: "keep-alive" }
+  /** The exit notice's Close: the card goes at once instead of when its time is up (FC7; card-local, the host's). */
+  | { command: "dismiss" };
 
 export interface CallControlsHost {
   /** Called with the whole state at once, and again on every change. Returns the function that stops it. */

@@ -1,0 +1,4 @@
+/* What to tell an agent so it joins (ConnectYourAgent): its title, a line, and the phrase quoted, to copy. */
+.connect-agent { display: grid; gap: var(--sv-space-3); min-width: 0; }
+.connect-agent-title { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.connect-agent-body { margin: 0; color: var(--sv-text-muted); }

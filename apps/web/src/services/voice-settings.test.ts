@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, remoteProviders, voiceChoices, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
@@ -26,26 +26,26 @@ function memory(entries: Record<string, string> = {}) {
   return { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => void stored.set(key, value), removeItem: (key: string) => void stored.delete(key) } as unknown as Storage;
 }
 
-test("with nothing kept, the defaults on this device's catalogue; what is kept is read back field by field", () => {
-  expect(readVoiceSettings(memory(), "es")).toEqual(defaultVoiceSettings("es"));
-  expect(defaultVoiceSettings("es").stt).toEqual({ catalog: "local", model: "whisper-base", language: "es" });
+test("with nothing kept, the defaults on this device's catalogue, the language heard detected; what is kept is read back field by field", () => {
+  expect(readVoiceSettings(memory())).toEqual(defaultVoiceSettings());
+  expect(defaultVoiceSettings().stt).toEqual({ catalog: "local", model: "whisper-base", language: null });
   const storage = memory({ [VOICE_SETTINGS_KEY]: JSON.stringify({
     stt: { catalog: "elevenlabs", model: "scribe_v2", language: null }, tts: { model: "eleven_flash_v2_5", voice: "v1", speed: 1.1 },
     patience: "eager", end_of_turn: "smart-turn",
   }) });
   // A slot that does not name its catalogue is the default slot whole: a model is never looked for in another catalogue.
-  expect(readVoiceSettings(storage, "es")).toEqual({
+  expect(readVoiceSettings(storage)).toEqual({
     stt: { catalog: "elevenlabs", model: "scribe_v2", language: null },
     tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: null, speed: 1.1 },
-    patience: "normal", end_of_turn: "smart-turn",
+    patience: "normal", end_of_turn: "smart-turn", idle_unload_minutes: 10,
   });
-  expect(readVoiceSettings(memory({ [VOICE_SETTINGS_KEY]: "{broken" }), "en")).toEqual(defaultVoiceSettings("en"));
-  writeVoiceSettings(storage, defaultVoiceSettings("en"));
-  expect(readVoiceSettings(storage, "es")).toEqual(defaultVoiceSettings("en"));
+  expect(readVoiceSettings(memory({ [VOICE_SETTINGS_KEY]: "{broken" }))).toEqual(defaultVoiceSettings());
+  writeVoiceSettings(storage, defaultVoiceSettings());
+  expect(readVoiceSettings(storage)).toEqual(defaultVoiceSettings());
 });
 
 test("another source takes its first model that runs; another model drops a language and a voice it lacks, and keeps the speed in its range", () => {
-  const settings = { ...defaultVoiceSettings("es"), tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: "ef_dora", speed: 1.8 } };
+  const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: "es" }, tts: { catalog: "local", model: "kokoro-82m-v1.0", voice: "ef_dora", speed: 1.8 } };
   const remote = editVoiceSettings(settings, { stt: { catalog: "elevenlabs" }, tts: { catalog: "elevenlabs" } }, CATALOGS);
   expect(remote.stt).toEqual({ catalog: "elevenlabs", model: "scribe_v2", language: "es" });
   expect(remote.tts).toEqual({ catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1.2 });
@@ -57,7 +57,7 @@ test("another source takes its first model that runs; another model drops a lang
 });
 
 test("each slot offers this device first, then each provider, one with no models disabled with why; local models by family", () => {
-  const choices = voiceChoices(CATALOGS, defaultVoiceSettings("es"), ["es", "en", "fr"]);
+  const choices = voiceChoices(CATALOGS, defaultVoiceSettings(), ["es", "en", "fr"]);
   expect(choices.stt.sources).toEqual([
     { id: "local", local: true, name: null, disabled: false, note: null },
     { id: "elevenlabs", local: false, name: "ElevenLabs", disabled: false, note: null },
@@ -75,7 +75,7 @@ test("each slot offers this device first, then each provider, one with no models
 });
 
 test("a remote slot: the provider's models, its voices by name, languages for the person to pick, and its words when it refuses", () => {
-  const settings = { ...defaultVoiceSettings("es"), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null }, tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } };
+  const settings = { ...defaultVoiceSettings(), stt: { catalog: "elevenlabs", model: "scribe_v2", language: null }, tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } };
   const choices = voiceChoices(CATALOGS, settings, ["es", "en", "fr"]);
   expect(choices.stt.options).toEqual([{ id: "scribe_v2", group: null, disabled: false, note: null }]);
   expect(choices.stt.languages).toEqual(["es", "en", "fr"]);
@@ -86,7 +86,7 @@ test("a remote slot: the provider's models, its voices by name, languages for th
 });
 
 test("a kept model its catalogue no longer lists stays chosen and says so; smart-turn once this device has a model that ends turns", () => {
-  const settings = { ...defaultVoiceSettings("es"), stt: { catalog: "local", model: "parakeet", language: null } };
+  const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "parakeet", language: null } };
   const withTurns = CATALOGS.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, local("smart-turn-v3", "smart-turn", ["end-of-turn"])] } : catalog) as CatalogView[];
   const choices = voiceChoices(withTurns, settings);
   expect(choices.stt.options[0]).toEqual({ id: "parakeet", group: null, disabled: false, note: { key: "voice.model.missing" } });
@@ -97,4 +97,39 @@ test("a kept model its catalogue no longer lists stays chosen and says so; smart
 
 test("the remote providers are the remote catalogues", () => {
   expect(remoteProviders(CATALOGS)).toEqual([{ id: "elevenlabs", name: "ElevenLabs" }, { id: "openai", name: "OpenAI" }]);
+});
+
+test("a build chosen is the model's: another model, or Automatic, drops it", () => {
+  const settings = { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-base", language: null, build: "whisper-base/q8" } };
+  expect(editVoiceSettings(settings, { stt: { language: "es" } }, CATALOGS).stt.build).toBe("whisper-base/q8");
+  expect(editVoiceSettings(settings, { stt: { model: "moonshine-tiny" } }, CATALOGS).stt).not.toHaveProperty("build");
+  expect(editVoiceSettings(settings, { stt: { build: null } } as never, CATALOGS).stt).not.toHaveProperty("build");
+});
+
+test("a model chosen before it is here waits: the one in use stays, the rest of the change applies, and it switches once ready", () => {
+  const saved = defaultVoiceSettings();
+  const draft = { ...saved, stt: { catalog: "local", model: "moonshine-tiny", language: "en" }, patience: "calm" as const };
+  const notHere = CATALOGS.map((catalog) => catalog.id === "local" ? { ...catalog, models: catalog.models.map((model) => model.id === "moonshine-tiny" ? { ...model, installed: false, builds: [build("moonshine-tiny/int8")] } : model) } : catalog) as CatalogView[];
+  expect(readyVoiceSettings(draft, saved, notHere)).toEqual({ ...saved, patience: "calm" });
+  expect(readyVoiceSettings(draft, saved, CATALOGS).stt).toEqual(draft.stt);
+  // The same model takes its other changes at once.
+  expect(readyVoiceSettings({ ...saved, stt: { ...saved.stt, language: "es" } }, saved, []).stt.language).toBe("es");
+});
+
+test("the voice detector every call uses is the local Silero VAD where it runs, else another VAD that does", async () => {
+  const { vadModel } = await import("./voice-settings.js");
+  const vad = (id: string, family: string, runs = true) => ({ id, family, capabilities: ["vad"], builds: [{ id: id + "-b", available: runs, installed: true }] });
+  const catalogs = (models: unknown[]) => [{ id: "local", name: null, status: { stale: false }, models }] as never;
+  expect(vadModel(catalogs([vad("other-vad", "other"), vad("silero-vad", "silero-vad")]))?.id).toBe("silero-vad");
+  expect(vadModel(catalogs([vad("other-vad", "other"), vad("silero-vad", "silero-vad", false)]))?.id).toBe("other-vad");
+});
+
+test("a catalogue from a newer engine is read: a model without capabilities, or with them in a shape not known, offers none (core#112)", () => {
+  const newer = [{ ...CATALOGS[0], models: [...(CATALOGS[0] as unknown as { models: unknown[] }).models,
+    { id: "future-model", family: "future", languages: ["en"], voices: [], builds: [build("future-model/int8")], tier: "pro" },
+    { id: "odd-model", family: "odd", capabilities: { stt: true }, languages: ["en"], voices: [], builds: [build("odd-model/int8")] }] },
+    ...CATALOGS.slice(1)] as unknown as CatalogView[];
+  const choices = voiceChoices(newer, defaultVoiceSettings(), ["es", "en"]);
+  expect(choices.stt.options.map((option: { id: string }) => option.id)).toEqual(["whisper-base", "whisper-large", "moonshine-tiny"]);
+  expect(choices.tts.options.map((option: { id: string }) => option.id)).toEqual(["kokoro-82m-v1.0"]);
 });

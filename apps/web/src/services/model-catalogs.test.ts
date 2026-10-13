@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { WebEngine } from "@sidevoice/engine";
-import { engineCatalogs, localStorageCredentials } from "./model-catalogs.js";
+import { engineCatalogs, localStorageCredentials, webInstallProgress } from "./model-catalogs.js";
 
 /* The engine's catalogues and the providers' keys, as the settings pane reads them on the web. */
 
@@ -48,4 +48,54 @@ test("a catalogue whose listing fails with no reason of its own is not an empty 
   expect(await engineCatalogs(engine, localStorageCredentials(storage)).catalogs()).toEqual([
     { id: "local", name: null, status: { stale: false, reason: { code: "storage-blocked", params: {} } }, models: [] },
   ]);
+});
+
+test("on the web a model installs through the engine, its progress a share of its files, and a cancel is install-cancelled", async () => {
+  const seen: unknown[] = [];
+  let signalled: AbortSignal | undefined;
+  const engine = {
+    catalogs: () => [],
+    install: async (model: string, build: string | undefined, onProgress: (p: object) => void, signal?: AbortSignal) => {
+      seen.push(["install", model, build]);
+      onProgress({ files: 4, done: 1, received: 50, size: 100 });
+      signalled = signal;
+      if (signal?.aborted) throw Object.assign(new Error("cancelled"), { code: "cancelled" });
+    },
+  } as unknown as WebEngine;
+  const catalogs = engineCatalogs(engine, localStorageCredentials(memory().storage));
+  const progress: unknown[] = [];
+  await catalogs.install("kokoro-82m-v1.0", { build: "kokoro/q8", onProgress: (p) => progress.push(p) });
+  expect(seen).toEqual([["install", "kokoro-82m-v1.0", "kokoro/q8"]]);
+  expect(progress).toEqual([{ fraction: 0.375, done: null, total: null }]);
+  expect(webInstallProgress({ files: 0 })).toEqual({ fraction: null, done: null, total: null });
+  const abort = new AbortController();
+  abort.abort();
+  await expect(catalogs.install("kokoro-82m-v1.0", { signal: abort.signal })).rejects.toMatchObject({ code: "install-cancelled" });
+  expect(signalled?.aborted).toBe(true);
+});
+
+test("on the web a model is taken off this device through the engine, every build of it", async () => {
+  const seen: unknown[] = [];
+  const engine = { catalogs: () => [], uninstall: async (...args: unknown[]) => void seen.push(args) } as unknown as WebEngine;
+  await engineCatalogs(engine, localStorageCredentials(memory().storage)).uninstall!("whisper-base");
+  expect(seen).toEqual([["whisper-base"]]);
+});
+
+test("a key is tried with the provider without being kept: the engine reads it during the try, then the kept one again", async () => {
+  const { stored, storage } = memory();
+  stored.set("sidevoice.provider-key.openai", "sk-old");
+  const credentials = localStorageCredentials(storage);
+  const seen: (string | null)[] = [];
+  const catalog = {
+    id: "openai",
+    refresh: async () => void seen.push(credentials.get("openai")),
+    status: async () => (credentials.get("openai") === "sk-bad" ? { stale: false, reason: { code: "credential-rejected" } } : { stale: false }),
+    models: async () => [],
+  };
+  const catalogs = engineCatalogs({ catalogs: () => [catalog] } as unknown as WebEngine, credentials);
+  expect(await catalogs.testCredential!("openai", " sk-bad ")).toEqual({ code: "credential-rejected" });
+  expect(seen).toEqual(["sk-bad", "sk-old"]);
+  expect(stored.get("sidevoice.provider-key.openai")).toBe("sk-old");
+  expect(await catalogs.testCredential!("openai", "sk-good")).toBeNull();
+  expect(stored.get("sidevoice.provider-key.openai")).toBe("sk-old");
 });

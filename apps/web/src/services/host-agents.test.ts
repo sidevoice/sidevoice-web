@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { actionableAgent, actionableHostFingerprints, createHostAgentsController } from "./host-agents";
+import { actionableAgent, createHostAgentsController } from "./host-agents";
 import type { HostAgentsListing, HostAgentsState } from "../state/room-types";
 
 const agent = (id: string, changes: Partial<HostAgentsListing["agents"][number]> = {}) => ({
@@ -82,7 +82,6 @@ test("Not now clears an actionable notice even if the host response is stale", a
 
   const state = states.get("host-a");
   expect(state?.value?.agents[0]).toMatchObject({ dismissed: true, actionable: false });
-  expect(actionableHostFingerprints({ "host-a": state! })).toEqual([]);
   expect(api).toHaveBeenCalledWith("host-a", "/api/host/agents/cursor/dismiss", expect.objectContaining({ method: "POST" }));
 });
 
@@ -96,5 +95,4 @@ test("the connector actionable flag drives notices, with a conservative legacy f
   expect(actionableAgent(agent("codex", { actionable: undefined, connect: "manual" }))).toBe(true);
   expect(actionableAgent(agent("codex", { actionable: undefined, registration: "foreign" }))).toBe(false);
   expect(actionableAgent(agent("codex", { actionable: undefined, present: false }))).toBe(false);
-  expect(actionableHostFingerprints({ "host-a": { status: "ready", value: { agents: [agent("codex", { actionable: true })], scanned_at: 1 }, error: null, busy: {}, actionErrors: {} } }, new Set())).toEqual([]);
 });

@@ -1,13 +1,21 @@
+// The avatars' palette (styles/tokens.css) and drawing (styles/call.css), then the design tokens, which win, the shared
+// components and the page — before anything that imports a feature, so each feature's own CSS comes after them and
+// wins a tie against a shared component's.
+import "./styles/tokens.css";
+import "./styles/call.css";
+// The bichos (the conversations' agents) and their stage: before the design tokens, which win a tie.
+import "./styles/bichos.css";
+import "./styles/theme.css";
+import "./components/ui/ui.css";
+import "./styles/app.css";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
 import { Button } from "./components/ui/Button";
+import { ErrorDetails } from "./components/ui/ErrorText";
+import { hostTranslator } from "./features/settings/host-i18n";
 
 import "./i18n/room-i18n.js";
-import "./styles/tokens.css";
-import "./styles/room.css";
-import "./styles/react.css";
-import "./styles/call.css";
-import "./styles/bichos.css";
+import { startPageTheme } from "./lib/theme";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the
 // socket, so until it exists the reports wait here.
@@ -23,6 +31,9 @@ window.addEventListener("unhandledrejection", (event) => {
   report("unhandled-rejection", String(reason?.message ?? event.reason), reason?.stack);
 });
 
+// The theme this device chose in Settings, else the system's (lib/theme.ts).
+startPageTheme();
+
 const root = createRoot(document.getElementById("root")!);
 
 declare const __BUILD_ID__: string;
@@ -32,12 +43,14 @@ const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 try {
   root.render(<App />);
 } catch (error) {
+  // What it threw is no sentence for people: behind Details.
   const message = error instanceof Error ? error.message : String(error);
+  const t = hostTranslator();
   root.render(
     <main className="startup-error" role="alert">
-      <h1>No se pudo iniciar Sidevoice</h1>
-      <p>{message}</p>
-      <Button variant="primary" onClick={() => location.reload()}>Reintentar</Button>
+      <h1>{t("app.startFailed")}</h1>
+      <ErrorDetails details={message} />
+      <Button variant="primary" onClick={() => location.reload()}>{t("app.retry")}</Button>
     </main>,
   );
 }
