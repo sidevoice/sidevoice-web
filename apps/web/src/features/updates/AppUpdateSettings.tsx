@@ -70,8 +70,12 @@ export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: 
   const retry = code === "update-check-failed" && can.check ? "check" : code === "update-download-failed" && can.download ? "download" : null;
   const settings = (can.mode && mode) || can.check || !!checkError;
   if (!found && !settings) return <>{idle}</>;
+  // In order: Automatic or Manual; when it last checked, and Check for updates; then where the update stands, with its
+  // action right there (Up to date, Version X available · Update, its progress, Restart to update).
+  const standing = found ? <AppUpdateRow status={found} mode={mode} can={can} busy={busy} error={rowError} act={(action) => void act(action)} words={words} t={t} />
+    : idle ?? <div id={UPDATE_PLACE.app} className="update-action-row" data-state="idle"><div className="update-action">
+        <span className="update-action-copy">{t("settings.updates.upToDate")}</span></div></div>;
   return <>
-    {found ? <AppUpdateRow status={found} mode={mode} can={can} busy={busy} error={rowError} act={(action) => void act(action)} words={words} t={t} /> : idle}
     {settings && <div className="app-update-settings">
       {can.mode && mode && <div className="app-update-setting">
         <span className="app-update-setting-copy"><span className="host-status-login-label">{t("updates.mode")}</span>
@@ -81,7 +85,7 @@ export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: 
           items={[{ value: "automatic", label: t("updates.mode.automatic") }, { value: "manual", label: t("updates.mode.manual") }]} />
       </div>}
       {can.check && <div className="app-update-setting">
-        <span className="app-update-setting-copy muted">{checkedAt && t("updates.lastChecked", { when: when(checkedAt) })}
+        <span className="app-update-setting-copy muted">{checkedAt ? t("updates.lastChecked", { when: when(checkedAt) }) : t("updates.neverChecked")}
           {/* The card's version line says Up to date already: the check's finding is for a screen reader. */}
           {upToDate && !found && <span role="status" className="sr-only">{t("updates.upToDate")}</span>}</span>
         <Button size="sm" variant="secondary" loading={busy === "check"} onClick={() => void act("check")}>{t("updates.check")}</Button>
@@ -91,6 +95,7 @@ export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: 
         {retry && <Button size="sm" variant="ghost" loading={busy === retry} onClick={() => void act(retry)}>{t("updates.retry")}</Button>}
       </div>}
     </div>}
+    {standing}
   </>;
 }
 

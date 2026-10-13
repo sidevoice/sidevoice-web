@@ -94,7 +94,7 @@ export function UpdatesSettings() {
       : <>
         {app && <Group title={t("settings.updates.app")}>
           <div className="updates-settings">
-            <PartVersion hint={t("settings.updates.appHint")} version={build?.version} upToDate={here.app.state === "current"} note={note} t={t} />
+            <PartVersion hint={t("settings.updates.appHint")} version={build?.version} upToDate={false} note={note} t={t} />
             <AppUpdateSettings />
           </div>
         </Group>}

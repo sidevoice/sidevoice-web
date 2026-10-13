@@ -109,7 +109,8 @@ export function MachineNav({ current }: { current: boolean }) {
           </button>
         );
       })}
-      <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</button>
+      <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" title={t(own ? "hosts.addRemote" : "hosts.add")}
+        aria-label={t(own ? "hosts.addRemote" : "hosts.add")} onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.addShort")}</button>
     </div>
   );
 }
@@ -151,7 +152,8 @@ export function MachineList() {
   }, [gone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const empty = machines.length === 0 && <div className="machines-empty"><p className="muted">{t(own ? "hosts.noneOther" : "hosts.none")}</p>
-    <Button id="pair-device-open" variant="primary" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</Button></div>;
+    <Button id="pair-device-open" variant="primary" title={t(own ? "hosts.addRemote" : "hosts.add")} aria-label={t(own ? "hosts.addRemote" : "hosts.add")}
+      onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("hosts.addShort")}</Button></div>;
   // Preparing this computer is its own section's, when it has one.
   const install = !own && <LocalHostInstallEntry showCta={!hasLocalHost} className="local-install-entry--machines" holdSuccess />;
   if (levels.phone) {

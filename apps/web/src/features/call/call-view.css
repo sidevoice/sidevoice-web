@@ -32,10 +32,14 @@
 /* One width whatever the chunk, so the bubble does not jump as the voice moves from one chunk to the next. The words
  * said are the text's colour; the rest, and the chunk before, the subtle one (5:1 and more on the bubble). */
 .stage-bubble { display: grid; gap: var(--sv-space-1); width: 100%; max-width: 34rem; min-width: 0; padding: var(--sv-space-3) var(--sv-space-4);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); border-bottom-left-radius: var(--sv-radius-xs);
-  background: var(--sv-surface); box-shadow: var(--sv-shadow-sm); color: var(--sv-text-subtle); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere;
+  border: 1px solid var(--sv-stage-bubble-edge); border-radius: var(--sv-radius-xl); border-bottom-left-radius: var(--sv-radius-xs);
+  background: var(--sv-surface); box-shadow: var(--sv-stage-bubble-shadow); color: var(--sv-text-subtle); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere;
   opacity: 0; transform: translateY(-6px) scale(.98); transition: opacity var(--sv-dur-base) var(--sv-ease), transform var(--sv-dur-base) var(--sv-ease); }
 .stage-bubble[data-visible] { opacity: 1; transform: none; }
+/* A reply leaving (its time over, or a new one over it): it lifts away and fades where the next comes in. */
+.stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
+@keyframes stage-bubble-out { to { opacity: 0; transform: translateY(-28px) scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .stage-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; } }
 .stage-bubble-previous { display: block; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text-subtle); }
 .stage-bubble .karaoke-text { white-space: pre-wrap; }
 .stage-bubble .karaoke-text .karaoke-played { color: var(--sv-text); opacity: 1; }
@@ -53,36 +57,18 @@
 
 /* What the person is saying, at the tile's foot on their side while they say it, with a way to take it back; its fill
  * and text are the person's in the transcript (transcript.css: one rule for both). Speaking again during what was just
- * sent's moment, the two stand in one column (PersonTurn, VARIANTS `sent-repeat`). */
+ * sent's moment, the sent one lifts away under the new bars (PersonTurn). */
 .person-turns { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-direction: column; align-items: flex-end; gap: var(--sv-space-2); }
 .person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1) var(--sv-space-2);
   width: max-content; max-width: min(75cqi, 28rem); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); border-bottom-right-radius: var(--sv-radius-xs);
-  box-shadow: var(--sv-shadow-sm); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
+  border: 1px solid var(--sv-stage-bubble-edge); border-radius: var(--sv-radius-xl); border-bottom-right-radius: var(--sv-radius-xs);
+  box-shadow: var(--sv-stage-bubble-shadow); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
 .person-bubble .cancel-input { flex: none; }
-/* "leave": the sent one lifts away from the very place the bars come in, under them. */
+/* Speaking again: the sent one lifts away from the very place the bars come in, under them. */
 .person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }
-/* "stack": the bars open beneath the sent one, which rises as they do (no motion where less is asked for). */
-.person-turns[data-repeat="stack"] > .person-bubble[data-sent] + .person-bubble:not([data-sent]) { animation: person-bars-open var(--sv-dur-slow) var(--sv-ease); overflow: hidden; }
-@keyframes person-bars-open { from { max-height: 0; padding-block: 0; border-width: 0; opacity: 0; } to { max-height: 6rem; } }
 
-/* What was sent (VARIANTS `sent-text`): its latest words (today); its first three lines, the last fading from the text's
- * ink into the quieter one (both 4.5:1 on the fill) before its "…"; a long one smaller, in four lines; one line. */
-/* Its space above and below is margin, so a clamped one is cut at its last line and not a sliver below it. */
+/* What was sent: its space above and below is margin, so a page is cut at its last line and not a sliver below it. */
 .person-said { flex: 1 1 8rem; min-width: 0; margin-block: var(--sv-space-1); }
-.person-said[data-lines] { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
-.person-said[data-lines="1"] { -webkit-line-clamp: 1; line-clamp: 1; }
-.person-said[data-lines="3"] { -webkit-line-clamp: 3; line-clamp: 3; }
-.person-said[data-lines="4"] { -webkit-line-clamp: 4; line-clamp: 4; }
-.person-said[data-small] { font-size: var(--sv-font-sm); line-height: 1.25rem; }
-.person-said[data-faded] {
-  background-image: linear-gradient(to right, var(--sv-text) 30%, var(--sv-text-subtle) 85%), linear-gradient(var(--sv-text), var(--sv-text));
-  background-size: 100% 1.5rem, 100% calc(100% - 1.5rem); background-position: bottom, top; background-repeat: no-repeat;
-  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
-}
-@media (forced-colors: active) { .person-said[data-faded] { background: none; color: CanvasText; -webkit-text-fill-color: CanvasText; } }
-/* The transcript's own delivered mark, at the end, in the bubble's quieter ink. */
-.person-sent-check { display: inline-flex; flex: none; align-self: center; color: var(--sv-text-subtle); }
 /* What was sent: a moment on the stage, then it lifts toward the agent, shrinks and fades (a plain fade, reduced). */
 .person-bubble[data-leaving] { animation: person-sent-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
 @keyframes person-sent-out { to { opacity: 0; transform: translateY(-48px) scale(.72); } }
@@ -286,7 +272,7 @@
 .mic-silent-note svg { flex: none; color: var(--sv-warning); }
 #mic-control[data-silent] #mute { box-shadow: 0 0 0 2px var(--sv-warning); }
 
-/* "pages" (VARIANTS `sent-text`): a window three lines tall; the run inside scrolls up three lines at a time. */
-.person-pages { display: block; max-height: calc(3 * 1.5rem); line-height: 1.5rem; overflow: hidden; }
-.person-pages-run { display: block; transition: transform 600ms var(--sv-ease); }
-@media (prefers-reduced-motion: reduce) { .person-pages-run { transition: none; } }
+/* What is said on the stage, in pages (PagedText): a window three lines tall; the run inside scrolls up a page at a time. */
+.paged-text { display: block; max-height: 3lh; overflow: hidden; }
+.paged-text-run { display: block; transition: transform 600ms var(--sv-ease); }
+@media (prefers-reduced-motion: reduce) { .paged-text-run { transition: none; } }

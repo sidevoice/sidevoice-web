@@ -3,7 +3,8 @@ import { act, render } from "@testing-library/react";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { VARIANTS_KEY } from "../../lib/variants";
 import { callTranslator } from "./call-i18n";
-import { PersonTurn, SENT_PAGE_MS } from "./PersonTurn";
+import { PersonTurn } from "./PersonTurn";
+import { PAGE_MS as SENT_PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS, SENT_SHOWN_MAX_MS, SENT_SHOWN_MS, sentShownMs } from "./speech-reading";
 
 const LONG = "Okay, so here's what I'd like you to do next. First, go through the settings pane and check that every toggle "

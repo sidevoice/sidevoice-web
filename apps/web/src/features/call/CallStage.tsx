@@ -12,8 +12,8 @@ import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
 import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
 import { moodText } from "./conversation-state";
-import { bubbleAt } from "./speech-chunks";
-import { sounding, useSpokenTo } from "./speech-reading";
+import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
+import { PagedText } from "./PagedText";
 import { useStageConversation } from "./stage-view";
 import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
@@ -40,14 +40,23 @@ import "./call-view.css";
  * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
  * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
 
-function AgentBubble({ reply, spokenTo, visible }: { reply: ChatMessage | null; spokenTo: number | null; visible: boolean }) {
-  const view = reply && spokenTo !== null ? bubbleAt(reply.text, spokenTo) : null;
+/** One reply on the stage, as the person's sent turn shows (PagedText): three lines at a time, lit as the voice says
+ *  them, its pages turning with the words heard. */
+function AgentBubble({ turn }: { turn: AgentTurn }) {
   return (
-    <div className="speech-bubble stage-bubble" data-visible={(visible && !!view) || undefined} aria-hidden={!visible || !view} translate="no">
-      {view?.previous && <span className="stage-bubble-previous">{view.previous}</span>}
-      {view && <KaraokeText text={view.current.text} playback="playing" range={view.spoken > 0 ? { from: 0, to: view.spoken } : null} />}
+    <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
+      <PagedText measure={turn.text} follow=".karaoke-played">
+        <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
+      </PagedText>
     </div>
   );
+}
+
+/** The agent's replies on the stage: the one sounding, followed as it is heard; once its last words are said it stays
+ *  PAGE_MS, then leaves. A new reply over it: the one before lifts away at once (as the person's sent turn does). */
+function AgentBubbles({ reply, spokenTo }: { reply: ChatMessage | null; spokenTo: number | null }) {
+  const turns = useAgentTurns(reply, spokenTo);
+  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
 }
 
 /** The room's errors, above the stage (#error is the runtime's id), as people read them: what was raw about one is
@@ -108,7 +117,7 @@ export function CallStage() {
         </div>
         <VoiceModels />
         <div className="stage-top">
-          <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
+          <AgentBubbles reply={reply} spokenTo={spokenTo} />
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>

@@ -88,8 +88,6 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const t = hostTranslator();
   const [code, setCode] = useState("");
   const [address, setAddress] = useState("");
-  // The address field, once asked for: "Use a different address", or a machine the code's own addresses did not reach.
-  const [addressAsked, setAddressAsked] = useState(false);
   // Connecting: over https (Connect), or without encryption once the person agreed (its own button).
   const [busy, setBusy] = useState<"https" | "insecure" | null>(null);
   const [fieldError, setFieldError] = useState<{ field: "code" | "address"; key: HostMessageKey } | null>(null);
@@ -101,7 +99,6 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const [how, setHow] = useState(false);
   // The address the code itself filled in, replaced when the code changes unless the person wrote their own.
   const prefilled = useRef("");
-  const focusAddress = useRef(false);
   const codeField = useRef<HTMLTextAreaElement>(null);
   const addressField = useRef<HTMLInputElement>(null);
   const alertBox = useRef<HTMLDivElement>(null);
@@ -128,8 +125,6 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
 
   // The address is asked for only when the code does not say where another device finds the machine: then it is needed.
   const needsAddress = !!preview && !preview.reachable;
-  const addressShown = addressAsked || needsAddress || fieldError?.field === "address";
-  useEffect(() => { if (addressShown && focusAddress.current) { focusAddress.current = false; addressField.current?.focus(); } }, [addressShown]);
 
   function changeCode(next: string) {
     const at = Date.now(), seen = readCode(next, at);
@@ -163,8 +158,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
       return;
     }
     setFieldError(null);
-    // The code's own addresses did not answer: where else it might be is asked for.
-    if (why.alert === "unreachable") setAddressAsked(true);
+    // The code's own addresses did not answer: where else it might be goes in the address field.
+    if (why.alert === "unreachable") addressField.current?.focus();
     setAlert({ kind: why.alert, key: why.key, why: why.why, host, address: typed });
   }
 
@@ -175,7 +170,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
     let seen: PairingCodePreview;
     try { seen = previewPairingCode(code); } catch (reason) { refuse(failure(reason, t), "", ""); return; }
     const host = named(seen.host, t);
-    const typed = addressShown || !seen.reachable ? address.trim() : "";
+    const typed = address.trim();
     if (!seen.reachable && !typed) { refuse({ field: "address", key: "pairing.addressNeeded" }, host, ""); return; }
     if (typed) {
       try { machineAddress(typed); } catch (reason) { refuse(failure(reason, t), host, typed); return; }
@@ -262,18 +257,16 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
         </Button>
         <div id={howId} className="pairing-how-body" hidden={!how}><ConnectorSteps /></div>
       </div>
-      {addressShown
-        ? <Field className="pairing-address" label={needsAddress ? t("pairing.address") : t("pairing.addressOptional")}
-            aside={<InfoTip label={t("pairing.addressAbout")}>{t("pairing.addressHint")}</InfoTip>}
-            error={fieldError?.field === "address" ? t(fieldError.key) : undefined}
-            hint={needsAddress && !preview?.plain.length && fieldError?.field !== "address" ? t("pairing.addressNeeded") : undefined}>
-            <Input ref={addressField} id={`${idPrefix}-address`} type="text" inputMode="url" value={address} placeholder={t("pairing.addressPlaceholder")}
-              required={needsAddress} readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
-              onChange={(event) => changeAddress(event.currentTarget.value)} />
-          </Field>
-        : recognised && <Button variant="ghost" size="sm" className="pairing-other-address" onClick={() => { focusAddress.current = true; setAddressAsked(true); }}>
-            {t("pairing.otherAddress")}
-          </Button>}
+      {/* The machine's address (an IP or a domain), always there: optional while the code carries addresses that
+          reach it, needed when it does not. */}
+      <Field className="pairing-address" label={needsAddress ? t("pairing.address") : t("pairing.addressOptional")}
+        aside={<InfoTip label={t("pairing.addressAbout")}>{t("pairing.addressHint")}</InfoTip>}
+        error={fieldError?.field === "address" ? t(fieldError.key) : undefined}
+        hint={needsAddress && !preview?.plain.length && fieldError?.field !== "address" ? t("pairing.addressNeeded") : undefined}>
+        <Input ref={addressField} id={`${idPrefix}-address`} type="text" inputMode="url" value={address} placeholder={t("pairing.addressPlaceholder")}
+          required={needsAddress} readOnly={!!busy} spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off"
+          onChange={(event) => changeAddress(event.currentTarget.value)} />
+      </Field>
       <p className="pairing-status" role="status" data-connected={(!busy && !!connected) || undefined}>{!busy && connected && <CheckIcon size={16} />}{status}</p>
       <div ref={alertBox} className="pairing-alert">{alertView()}</div>
       {submitIn === undefined ? <div className="pairing-form-actions">{connect}</div> : submitIn && createPortal(connect, submitIn)}

@@ -5,7 +5,8 @@ import type { HostTranslate } from "./host-i18n";
 /* A machine's state, in one set of words wherever it shows: its entry in Settings' nav, a phone's machine list, its
  * page's header, this computer's service card, the design system. Nothing else words a machine's state.
  *
- * A remote machine says how this device reaches it: connected (directly, or through the room), still being checked,
+ * A remote machine says whether this device reaches it: connected (how — directly or through the room — is not said
+ * while the relay is not shipping), still being checked,
  * not connected, or no longer paired. Not connected is grey, not red: a laptop asleep is not something to fix, and the
  * conversations say the same fact in grey; red is for what is (This device not working), amber for what needs the
  * person (pairing it again). This device, where the app reads its service (its own section), says where the service
@@ -14,7 +15,7 @@ import type { HostTranslate } from "./host-i18n";
 
 export type MachineTone = "positive" | "neutral" | "warning" | "danger";
 
-export type MachineStateKey = "unpaired" | "checking" | "room" | "direct" | "unreachable"
+export type MachineStateKey = "unpaired" | "checking" | "direct" | "unreachable"
   | "unprepared" | "starting" | "failed" | "stopped" | "running";
 
 export interface MachineStatus {
@@ -37,15 +38,13 @@ const STARTING = new Set(["installing", "starting", "backoff"]);
 const FAILED = new Set(["failed", "service-failed", "refused", "incompatible"]);
 const STOPPED = new Set(["not-installed", "stopped-by-person"]);
 
-/** How this device reaches `machine`: the first that holds of not paired, checking, through the room, connected, not
- *  connected. With no machine (this computer's, not projected yet), it is being checked. */
+/** How this device reaches `machine`: the first that holds of not paired, checking, connected, not connected. With no machine (this computer's, not projected yet), it is being checked. */
 function reachStatus(machine: MachineView | null, t: HostTranslate): Omit<MachineStatus, "insecure"> {
   if (machine?.revoked || machine?.state === "revoked") return { key: "unpaired", tone: "warning", short: t("hosts.machineState.unpaired"),
     long: t("hosts.machineState.unpaired.long"), hint: t("hosts.machineState.unpaired.hint") };
   if (!machine || machine.state === "checking") return { key: "checking", tone: "neutral", short: t("hosts.machineState.checking"), long: t("hosts.machineState.checking") };
-  if (machine.state === "connected" && machine.reach === "room") return { key: "room", tone: "positive", short: t("hosts.machineState.room"), long: t("hosts.machineState.room.long") };
-  if (machine.state === "connected") return { key: "direct", tone: "positive", short: t("hosts.machineState.direct"),
-    long: t(machine.reach === "direct" ? "hosts.machineState.direct.long" : "hosts.machineState.direct") };
+  // Connected, however it is reached: directly or through the room is not said while the relay is not shipping.
+  if (machine.state === "connected") return { key: "direct", tone: "positive", short: t("hosts.machineState.direct"), long: t("hosts.machineState.direct") };
   return { key: "unreachable", tone: UNREACHABLE_TONE, short: t("hosts.machineState.unreachable"), long: t("hosts.machineState.unreachable"), hint: t("hosts.reach.none") };
 }
 

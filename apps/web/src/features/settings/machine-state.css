@@ -2,7 +2,8 @@
  * and an entry's second line when it needs the person. Never the
  * accent: that means new (and selected), so the current entry's own colour never reaches it. */
 .machine-state { font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-medium); white-space: nowrap; color: var(--sv-text-muted); }
-.machine-state[data-tone="positive"] { color: var(--sv-positive); }
+/* Connected: the models' "Ready" badge itself (Badge tone positive, its dot); only its size is the line's. */
+.machine-state.machine-state-badge { font-size: inherit; line-height: inherit; }
 .machine-state[data-tone="warning"] { color: var(--sv-warning); }
 .machine-state[data-tone="danger"] { color: var(--sv-danger); }
 
@@ -19,4 +20,4 @@
 .machine-entry-line .machine-nav-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .machine-nav-insecure { display: inline-grid; place-items: center; flex: none; color: var(--sv-warning); }
 .ui-nav-item .machine-nav-insecure svg { width: 14px; height: 14px; }
-.machine-entry-line .new-nav-pill, .machine-entry-line .new-nav-count { margin-inline-start: auto; }
+.machine-entry-line .new-end-dot { margin-inline-start: auto; }
