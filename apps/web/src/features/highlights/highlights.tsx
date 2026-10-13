@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { CloseIcon } from "../../components/ui/Icons";
-import { useVariant } from "../../lib/variants";
 import { actionableAgent } from "../../services/host-agents";
 import { useRoomStore } from "../../state/room-store";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
@@ -85,6 +84,10 @@ function useCandidates(): Highlight[] {
   return [...agents, ...features.filter((feature) => present.has(`feature:${feature.id}`)).map((feature) => ({ id: `feature:${feature.id}`, section: feature.section }))];
 }
 
+/** Whether "new" shows at all: off for this release (no marks on the gear, sections or items, no What's new); the
+ *  catalogue and the marks stay, dormant, to come back. */
+export const HIGHLIGHTS_ON = false;
+
 /** What shows as new now: not seen, not past its two weeks, at most three. Each is recorded as shown the first time. */
 export function useHighlights() {
   const seen = useSyncExternalStore(subscribe, read, read);
@@ -103,7 +106,7 @@ export function useHighlights() {
     write(next);
   }, [unseen]);
   const now = Date.now();
-  const items = settingUp || unknown ? [] : candidates.filter((item) => !seen[item.id]?.seenAt && !(seen[item.id] && now - seen[item.id].shownAt > EXPIRES_MS)).slice(0, AT_ONCE);
+  const items = !HIGHLIGHTS_ON || settingUp || unknown ? [] : candidates.filter((item) => !seen[item.id]?.seenAt && !(seen[item.id] && now - seen[item.id].shownAt > EXPIRES_MS)).slice(0, AT_ONCE);
   const fresh = items.filter((item) => !seen[item.id]).map((item) => item.id).join(" ");
   useEffect(() => {
     if (!fresh) return;
@@ -121,35 +124,29 @@ export function markSeen(id: string) {
 }
 
 
-export type SectionNewStyle = "pill" | "count" | "dot";
-
-/** How a section and a machine show something new under them (VARIANTS `section-new`): A "New" at the entry's end, B how
- *  many at its end, C a dot on its icon. */
-export function useSectionNewStyle(): SectionNewStyle {
-  return useVariant("section-new", ["pill", "count", "dot"] as const);
+/** Where a section's or a machine's "new" dot sits: on the icon's top corner (dormant while HIGHLIGHTS_ON is off; the
+ *  other places tried were its side, before the label and the entry's end). */
+export type SectionNewDot = "corner" | "side" | "label" | "end";
+export function useSectionNewDot(): SectionNewDot {
+  return "corner";
 }
 
-/** An item's icon with, when something new is under it (`isNew`: how many, or whether), a dot on its top corner (C);
- *  nothing in A and B, whose mark is at the entry's end (NewAtEnd). The mark is never the only cue: the entry says it in
- *  words. */
+/** An item's icon with, when something new is under it (`isNew`), its dot by the icon (corner, side, label); at the
+ *  end, NewAtEnd draws it. The mark is never the only cue: the entry says it in words. */
 export function NewOnIcon({ icon, isNew }: { icon: ReactNode; isNew: boolean | number }) {
-  const style = useSectionNewStyle();
-  return <span className="new-on-icon">{icon}
-    {!!isNew && style === "dot" && <span className="new-on-icon-dot" aria-hidden="true" />}
+  const place = useSectionNewDot();
+  const here = !!isNew && place !== "end";
+  return <span className="new-on-icon" data-dot={here ? place : undefined}>{icon}
+    {here && <span className="new-on-icon-dot" aria-hidden="true" />}
   </span>;
 }
 
-/** An entry's end, when something new is under it (`isNew`: how many, or whether): "New", the thing's own pill (A),
- *  which its name then says; how many, as the gear says it (B); nothing to see in C, whose mark is on the icon. Where
- *  the mark is not words (B, C), `spoken` (", new") says it to a screen reader — none where the entry's own name says
- *  it already. */
+/** An entry's end, when something new is under it: the dot where it sits at the end, and `spoken` (", new") for a
+ *  screen reader — none where the entry's own name says it already. */
 export function NewAtEnd({ isNew, spoken }: { isNew: boolean | number; spoken?: string }) {
-  const t = hostTranslator();
-  const style = useSectionNewStyle();
+  const place = useSectionNewDot();
   if (!isNew) return null;
-  if (style === "pill") return <Badge tone="accent" className="new-nav-pill">{t("highlights.new")}</Badge>;
-  const said = spoken ? <span className="sr-only">{spoken}</span> : null;
-  return style === "count" ? <><span className="new-nav-count" aria-hidden="true">{Number(isNew)}</span>{said}</> : said;
+  return <>{place === "end" && <span className="new-end-dot" aria-hidden="true" />}{spoken && <span className="sr-only">{spoken}</span>}</>;
 }
 
 /** The Settings gear's mark, with `count` things new under it: how many, on its corner — never a dot, which beside the
