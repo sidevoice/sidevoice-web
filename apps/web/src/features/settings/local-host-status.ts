@@ -154,7 +154,7 @@ export function hostStatusText(status: LocalHostStatus, t: HostTranslate) {
     case "backoff": {
       const attempts = safeLocalHostCount(status.attempts) ?? "?";
       const limit = safeLocalHostCount(status.limit);
-      return t("hosts.status.backoff", { attempts, limit: limit ? ` of ${limit}` : "" });
+      return limit ? t("hosts.status.backoffLimit", { attempts, limit }) : t("hosts.status.backoff", { attempts });
     }
     case "failed": return t("hosts.status.failed", { cause: hostCause(status, t) });
     case "service-failed": return t("hosts.status.service-failed", { cause: hostCause(status, t) });

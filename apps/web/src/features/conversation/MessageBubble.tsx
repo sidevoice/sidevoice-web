@@ -4,6 +4,7 @@ import type { ChatMessage } from "../../state/room-types";
 import { receiptView } from "../../state/room-session-state.js";
 import { conversationTranslator } from "./conversation-i18n";
 import { KaraokeText } from "./KaraokeText";
+import { uiLocale } from "../../i18n/locale";
 
 /** The delivery mark as a drawing, not a glyph: a text check sat below the time's line and at its own size. The
  *  warning only for a message that failed or is in doubt: a status this version does not know has no mark at all. */
@@ -29,7 +30,7 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
       <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />
       {message.cancellable && <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">
-        {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString()}>{new Date(message.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>}
+        {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}
         {replay && <Button variant="ghost" tone="neutral" size="icon-sm" className="listen-again" aria-label={t("messages.listenAgain")} title={t("messages.listenAgain")}
           onClick={() => void window.sidevoiceActions?.replayReply(message.segment)}><ListenAgainIcon size={12} /></Button>}
         {delivery && <span className="receipt delivery" data-state={delivery} title={receiptView(delivery).label} aria-label={receiptView(delivery).label}><DeliveryMark state={delivery} /></span>}

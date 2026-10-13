@@ -6,6 +6,7 @@ import { conversationTranslator, type ConversationTranslate } from "./conversati
 import { groupMessages } from "./group-messages";
 import { MessageGroup, Speaker } from "./MessageGroup";
 import { VoiceWaveform } from "./VoiceWaveform";
+import { uiLocale } from "../../i18n/locale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -15,7 +16,7 @@ export function dayLabel(time: number, t: ConversationTranslate, now = Date.now(
   if (day === new Date(now).toDateString()) return t("messages.today");
   if (day === new Date(now - DAY_MS).toDateString()) return t("messages.yesterday");
   const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear();
-  return new Date(time).toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: sameYear ? undefined : "numeric" });
+  return new Date(time).toLocaleDateString(uiLocale(), { weekday: "long", day: "numeric", month: "long", year: sameYear ? undefined : "numeric" });
 }
 
 /** `visible`: the list is on screen. Hidden, it cannot scroll, so it lands on the latest message when it shows. */

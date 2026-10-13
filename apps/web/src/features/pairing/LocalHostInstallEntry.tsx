@@ -13,6 +13,7 @@ import { hostTranslator } from "../settings/host-i18n";
 import type { HostMessageKey } from "../settings/messages/en";
 import { localHostBridgeError } from "../settings/local-host-status";
 import "./pairing.css";
+import { uiLocale } from "../../i18n/locale";
 
 const stepKeys: Record<string, HostMessageKey> = {
   download: "localInstall.step.download",
@@ -26,7 +27,7 @@ const stepKeys: Record<string, HostMessageKey> = {
 };
 
 function formatMegabytes(bytes: number) {
-  return new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
+  return new Intl.NumberFormat(uiLocale(), { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
 }
 
 /** Whether a screen may offer to prepare this computer: `supported` when this app can (the desktop app's install),

@@ -11,6 +11,7 @@ import { ErrorDetails } from "../../components/ui/ErrorText";
 import { errorMessage, type ErrorMessage } from "./error-message";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
+import { uiLocale } from "../../i18n/locale";
 
 /* How a provider's key is given, and taken back: one small dialog everywhere (Settings › Providers, and a voice slot
  * whose provider has no key yet, in Settings and the first-run setup). Paste the key, Connect: the provider is asked
@@ -200,8 +201,7 @@ export function DisconnectDialog({ provider, name, last4, inUse, onDone, onCance
 
 /** Section names as one phrase ("Transcription and Voice"), in the page's language. */
 export function listed(names: string[]) {
-  const locale = document.documentElement.lang || undefined;
-  try { return new Intl.ListFormat(locale, { type: "conjunction" }).format(names); } catch { return names.join(", "); }
+  try { return new Intl.ListFormat(uiLocale(), { type: "conjunction" }).format(names); } catch { return names.join(", "); }
 }
 
 /** A voice slot's provider while it has no key (`needed`): "OpenAI needs a key" and Connect, which opens the key's

@@ -9,8 +9,9 @@ import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { UPDATE_PLACE, useAppUpdate, type UpdateMode, type UpdaterStatus } from "./useUpdates";
 import "./updates.css";
+import { uiLocale } from "../../i18n/locale";
 
-const percent = (progress: number) => new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(progress);
+const percent = (progress: number) => new Intl.NumberFormat(uiLocale(), { style: "percent" }).format(progress);
 
 /** Whether the app's update, as `status` says it, has a button in its row: Download (manual, or a download that
  *  failed, as Retry) or Restart to update (ready, either mode). */

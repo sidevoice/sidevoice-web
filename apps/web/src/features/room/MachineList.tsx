@@ -23,11 +23,12 @@ import { machineStatus } from "../settings/machine-status";
 import { ThisDeviceVersion } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
+import { uiLocale } from "../../i18n/locale";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
   const date = typeof value === "number" ? new Date(value < 1e12 ? value * 1000 : value) : new Date(value);
-  return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(navigator.language, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(uiLocale(), { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 /** A machine's name: the one it has here, else this computer's or an unnamed machine's. */
@@ -413,7 +414,9 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
       {status.failure && failed && (details.attempts !== undefined || !!failureAt) && (
         <div className="host-failure-details">
-          {details.attempts !== undefined && <p>{t("hosts.failureAttempts", { attempts: details.attempts, limit: details.limit ? ` of ${details.limit}` : "" })}</p>}
+          {details.attempts !== undefined && <p>{details.limit
+            ? t("hosts.failureAttemptsLimit", { attempts: details.attempts, limit: details.limit })
+            : t("hosts.failureAttempts", { attempts: details.attempts })}</p>}
           {failureAt && <p>{t("hosts.failureAt", { time: failureAt })}</p>}
         </div>
       )}

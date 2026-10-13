@@ -14,6 +14,7 @@ import { errorMessage, keyFor, type ErrorMessage } from "./error-message";
 import { NewMark } from "../highlights/highlights";
 import { InfoTip } from "../../components/ui/InfoTip";
 import "./host-agents.css";
+import { uiLocale } from "../../i18n/locale";
 
 /** A machine's failure with its agents, in words (error-message.ts): its key's sentence, else this panel's own generic
  *  line, the key behind Details. */
@@ -35,7 +36,7 @@ function useRelativeTime(value: string | number | null | undefined): string {
   const at = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value).valueOf();
   if (Number.isNaN(at)) return "";
   const seconds = Math.round((at - Math.max(now, at)) / 1000);
-  const words = new Intl.RelativeTimeFormat(document.documentElement.lang || navigator.language, { numeric: "auto" });
+  const words = new Intl.RelativeTimeFormat(uiLocale(), { numeric: "auto" });
   const minutes = Math.round(seconds / 60), hours = Math.round(seconds / 3600), days = Math.round(seconds / 86400);
   return seconds > -45 ? words.format(0, "second") : minutes > -45 ? words.format(minutes, "minute") : hours > -22 ? words.format(hours, "hour") : words.format(days, "day");
 }
