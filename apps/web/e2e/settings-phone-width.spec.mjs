@@ -50,7 +50,7 @@ const overflow = (page) => page.evaluate(() => {
     if (style.textOverflow === "ellipsis" || (box && getComputedStyle(box).textOverflow === "ellipsis")) continue;
     const edges = box ? box.getBoundingClientRect() : { left: 0, right: width };
     if (rect.right > Math.min(width, edges.right) + 1 || rect.left < Math.max(0, edges.left) - 1)
-      found.push(`${element.tagName.toLowerCase()}.${element.className} "${element.textContent.trim().slice(0, 30)}"`);
+      found.push(`${element.tagName.toLowerCase()}.${element.className} "${element.textContent.trim().slice(0, 30)}" ${Math.round(rect.left)}–${Math.round(rect.right)}px in ${box ? box.className : "the screen"} ${Math.round(edges.left)}–${Math.round(edges.right)}px`);
   }
   return found;
 });
