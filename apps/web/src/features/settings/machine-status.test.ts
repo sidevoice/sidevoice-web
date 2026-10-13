@@ -36,15 +36,6 @@ test("a remote machine: the first that holds of not paired, checking, connected,
   }
 });
 
-test("not encrypted is said on top of any state, never instead of it", () => {
-  for (const changes of [{}, { state: "checking" as const }, { state: "offline" as const }, { revoked: true }]) {
-    const plain = machineStatus(machine(changes), running, false, en);
-    const insecure = machineStatus(machine({ ...changes, insecure: true }), running, false, en);
-    expect(insecure).toEqual({ ...plain, insecure: true });
-    expect(plain.insecure).toBe(false);
-  }
-});
-
 test("This device, where the app reads its service: not prepared, starting, not working, not running, running", () => {
   const device = (state: LocalHostStatusName, row: MachineView | null = local()) => said(machineStatus(row, status(state), true, en));
   expect(device("absent", null)).toEqual(["unprepared", "neutral", "Not prepared", "Not prepared", undefined]);

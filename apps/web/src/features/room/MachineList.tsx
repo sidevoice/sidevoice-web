@@ -1,10 +1,9 @@
 import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { AddIcon, EditIcon, NotEncryptedIcon, OtherMachineIcon, ThisComputerIcon } from "../../components/ui/Icons";
+import { AddIcon, EditIcon, OtherMachineIcon, ThisComputerIcon } from "../../components/ui/Icons";
 import { Input } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
-import { InfoTip } from "../../components/ui/InfoTip";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
@@ -22,7 +21,7 @@ import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
 import { ThisDeviceVersion } from "../settings/UpdatesSettings";
-import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, listedStatus, machineEntryName, machineEntryTitle, useMachineUnencrypted } from "../settings/MachineState";
+import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -85,18 +84,16 @@ export function MachineNav({ current }: { current: boolean }) {
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
   const store = useContext(RoomStoreContext);
   const notice = useNotice();
-  const unencrypted = useMachineUnencrypted();
   const shown = shownMachine(machines, picked);
   return (
     <div className="machine-nav">
       {machines.map((machine) => {
         const name = machineName(machine, t);
-        // This computer, listed here only where it has no section of its own, reads as any machine; not encrypted, as
-        // VARIANTS `machine-unencrypted` has the list say it.
-        const state = listedStatus(machineStatus(machine, status, own, t), unencrypted);
+        // This computer, listed here only where it has no section of its own, reads as any machine.
+        const state = machineStatus(machine, status, own, t);
         const isNew = notice(machine);
         return (
-          <button type="button" key={machine.id} className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state, t)}
+          <button type="button" key={machine.id} className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state)}
             aria-label={machineEntryName(name, state, isNew, t)}
             data-name={name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
@@ -142,7 +139,6 @@ export function MachineList() {
 
   const levels = useSettingsLevels();
   const notice = useNotice();
-  const unencrypted = useMachineUnencrypted();
   // The machine whose page a phone shows went (forgotten here, or revoked elsewhere): back to the list, without a slide —
   // what it showed is gone — and, forgotten here, said so: its page and its control went with it.
   const forgetting = useRef<{ id: string; name: string } | null>(null);
@@ -173,15 +169,14 @@ export function MachineList() {
             {machines.length > 0 && <ul className="settings-menu machines-menu">
               {machines.map((machine) => {
                 const name = machineName(machine, t);
-                // This computer, listed here only where it has no section of its own, reads as any machine; not
-                // encrypted, as VARIANTS `machine-unencrypted` has the list say it.
-                const state = listedStatus(machineStatus(machine, status, own, t), unencrypted);
+                // This computer, listed here only where it has no section of its own, reads as any machine.
+                const state = machineStatus(machine, status, own, t);
                 const isNew = notice(machine);
                 return <li key={machine.id}>
                   <MenuRow className="machine-entry" data-machine={machine.id} data-name={name} data-state={machine.state} data-local={machine.local || undefined}
                     aria-label={machineEntryName(name, state, isNew, t)}
                     icon={<NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />} status={state} />} isNew={isNew} />}
-                    label={<><span className="machine-nav-name">{name}</span>{state.insecure && <span className="machine-nav-insecure" aria-hidden="true"><NotEncryptedIcon size={14} /></span>}</>}
+                    label={<span className="machine-nav-name">{name}</span>}
                     summary={<MachineEntryState status={state} />} end={<NewAtEnd isNew={isNew} />}
                     onClick={() => levels.open("machines", machine.id)} />
                 </li>;
@@ -235,14 +230,6 @@ export function ThisComputerSettings() {
   );
 }
 
-/** Reached without encryption, as the person agreed when pairing, and why it matters: said in words on the machine's
- *  page for as long as it is so, after its state. */
-function NotEncrypted() {
-  const t = hostTranslator();
-  return <><span className="host-detail-sep" aria-hidden="true">·</span><span className="host-insecure"><NotEncryptedIcon size={14} />{t("hosts.notEncrypted")}</span>
-    <InfoTip label={t("hosts.notEncryptedAbout")}>{t("hosts.notEncryptedInfo")}</InfoTip></>;
-}
-
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
  *  paired with it, and forgetting it. */
 function HostDetail({ machine, name, untitled = false, onForget }: { machine: MachineView; name: string; untitled?: boolean; onForget?: () => void }) {
@@ -277,9 +264,9 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
           {/* Renamed here: whose name it really is, and the way back to it. */}
           {!untitled && machine.alias && naming === null && <p className="host-alias muted">{t("hosts.aliasOf", { name: machine.machineHost ?? "" })}
             <Button variant="ghost" size="sm" onClick={() => window.sidevoiceActions?.renameMachine?.(machine.pairingId || machine.id, null)}>{t("hosts.aliasReset")}</Button></p>}
-          {/* Its state at length, under its name, and not encrypted after it. A remote machine's is said as it changes;
-              this computer's service card says its own, so the page has one live state. */}
-          <p className="host-detail-state"><MachineState status={state} form="long" live={!machine.local} />{state.insecure && <NotEncrypted />}</p>
+          {/* Its state at length, under its name. A remote machine's is said as it changes; this computer's service card
+              says its own, so the page has one live state. */}
+          <p className="host-detail-state"><MachineState status={state} form="long" live={!machine.local} /></p>
           {state.hint && <p className="host-detail-hint muted">{state.hint}</p>}
           {/* No longer paired (the machine removed this device): pairing it again is a new code from it, in Add a
               machine; forgetting it is at the page's foot. */}

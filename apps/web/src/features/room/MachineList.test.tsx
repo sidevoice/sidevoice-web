@@ -581,27 +581,27 @@ test("this computer is not among the remote machines; stopped, its page says Sta
 });
 
 
-test("a machine paired without encryption says so on its page, with why, and its entry carries a sign heard with its name", async () => {
-  actions();
-  const remote = { "fp-nuc": { state: "connected", checkedAt: 1_700_000_000_000 }, "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } };
-  room([paired({ fp: "fp-lab", host: "Lab box", insecure: true, urls: ["http://192.168.1.20:8768"], rv: null }), paired()], { remoteHostStatus: remote,
-    machineLinks: { "fp-lab": { reach: "ok", via: "node" }, "fp-nuc": { reach: "ok", via: "node" } } });
-  await act(async () => { entry("Lab box").click(); });
-  const page = screen.getByRole("region", { name: "Lab box" });
-  // On its page, after its state, in words with an open lock, and why in its (i).
-  const words = within(page.querySelector("header")!).getByText("Not encrypted");
-  expect(words.closest(".host-detail-state")).toHaveTextContent(/^Connected·Not encrypted/);
-  expect(words.querySelector("svg")).toHaveClass("lucide-lock-open");
-  expect(within(page).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
-  // In the list, an open lock after the name (which gives way, the lock never), and in words to a screen reader.
-  expect(entry("Lab box").querySelector(".machine-nav-name + .machine-nav-insecure svg")).toHaveClass("lucide-lock-open");
-  expect(entry("Lab box").getAttribute("aria-label")).toBe("Lab box, Connected, not encrypted");
-  expect(entry("Lab box")).toHaveAttribute("title", "Lab box · Connected · Not encrypted");
-  // One paired over https says nothing of the kind.
-  expect(entry("NUC").querySelector(".machine-nav-insecure")).toBeNull();
-  expect(entry("NUC").getAttribute("aria-label")).not.toMatch(/not encrypted/);
-  await act(async () => { entry("NUC").click(); });
-  expect(screen.queryByText("Not encrypted")).toBeNull();
+test("a machine paired without encryption shows exactly what the same machine paired with it shows: its entry, its page", async () => {
+  // The same machine, paired over https or — as the person agreed when pairing — over plain http on a private network.
+  const lab = { fp: "fp-lab", host: "Lab box", rv: null };
+  const encrypted = paired({ ...lab, urls: ["https://lab.example"] });
+  const unencrypted = paired({ ...lab, insecure: true, urls: ["http://192.168.1.20:8768"] });
+  // What the person meets under Machines, with Lab box's page open; React's own ids are counted afresh each render.
+  const shown = async (pairing: PairingSummary) => {
+    actions();
+    room([pairing, paired()], { remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 1_700_000_000_000 } },
+      machineLinks: { "fp-lab": { reach: "ok", via: "node" }, "fp-nuc": { reach: "ok", via: "node" } } });
+    await act(async () => { entry("Lab box").click(); });
+    expect(screen.getByRole("region", { name: "Lab box" })).toBeInTheDocument();
+    const html = document.getElementById("machines")!.outerHTML.replace(/«r[0-9a-z]+»|:r[0-9a-z]+:|_r_[0-9a-z]+_/g, "«id»");
+    cleanup();
+    return html;
+  };
+  const plain = await shown(unencrypted);
+  expect(plain).toBe(await shown(encrypted));
+  // And nothing in it speaks of encryption: no words, no open lock, no (i) about the connection.
+  expect(plain).not.toMatch(/encrypt|lucide-lock|insecure|About this connection/i);
+  expect(plain).toContain("Lab box, Connected");
 });
 
 /** The devices list on a remote machine's page, and the action at that page's foot. */

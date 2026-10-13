@@ -11,7 +11,7 @@ import { Input, Textarea } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import {
   AddIcon, CallIcon, CheckIcon, ChevronIcon, CloseIcon, CloseUpIcon, ConnectorIcon, HangupIcon, HarnessIcon, ProviderLogo,
-  ListenAgainIcon, MachinesIcon, NotEncryptedIcon, OtherMachineIcon, ThisComputerIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
+  ListenAgainIcon, MachinesIcon, OtherMachineIcon, ThisComputerIcon, MicrophoneIcon, MicrophoneOffIcon, MoreIcon, MoreVerticalIcon, PlatformIcon, ReadIcon, RefreshIcon, SentIcon,
   SettingsIcon, SendIcon, SidebarCollapseIcon, SidebarExpandIcon, SidevoiceMark, SkipIcon, TranscriptIcon,
 } from "../components/ui/Icons";
 import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/avatar-spec";
@@ -373,8 +373,8 @@ function PairAnotherDevice() {
   );
 }
 
-/** Machines as the room's store has them (MachineView): this computer, one connected, one asleep, one reached without
- *  encryption. Their state is worded as everywhere (machineStatus), in words as a machine's page says it. */
+/** Machines as the room's store has them (MachineView): this computer, one connected, one asleep. Their state is worded
+ *  as everywhere (machineStatus), in words as a machine's page says it. */
 const RUNNING: LocalHostStatus = { state: "running", reachable: true };
 const machine = (id: string, host: string, changes: Partial<MachineView> = {}): MachineView =>
   ({ id, host, revoked: false, reach: "direct", state: "connected", pairedLabel: "", ...changes });
@@ -382,7 +382,6 @@ const PATTERN_MACHINES: { view: MachineView; platform: string; note: string }[] 
   { view: machine("mbp", "MacBook Pro", { local: true }), platform: "macos", note: "2 agents" },
   { view: machine("nuc", "NUC del salón"), platform: "linux", note: "192.168.1.20 · 1 agent" },
   { view: machine("imac", "Office iMac", { reach: "offline", state: "offline" }), platform: "macos", note: "Last seen yesterday" },
-  { view: machine("lab", "Lab box", { insecure: true }), platform: "linux", note: "1 agent" },
 ];
 
 function MachineDetail() {
@@ -420,11 +419,11 @@ function MachinesList() {
       actions={<Button variant="primary"><AddIcon />Add a machine</Button>}>
       <Group>
         {PATTERN_MACHINES.map(({ view, platform, note }) => {
-          // Its state in words under its name, never a dot; not encrypted, an open lock after the name.
+          // Its state in words under its name, never a dot.
           const state = machineStatus(view, RUNNING, false, t);
           return <button type="button" className="ui-row pt-machine-row" key={view.id} aria-label={machineEntryName(view.host, state, false, t)}>
             <span className="pt-machine-line"><span className="pt-machine-icon"><PlatformIcon platform={platform} size={18} /></span>
-              <span className="ui-row-text"><span className="ui-row-label">{view.host}{view.local && <Badge>This computer</Badge>}{state.insecure && <span className="pt-insecure"><NotEncryptedIcon size={14} /></span>}</span>
+              <span className="ui-row-text"><span className="ui-row-label">{view.host}{view.local && <Badge>This computer</Badge>}</span>
                 <span className="ui-row-description pt-machine-state"><MachineState status={state} /><span>{note}</span></span></span></span>
             <span className="ui-row-control"><ChevronIcon size={16} className="pt-chevron-right" /></span>
           </button>;

@@ -65,7 +65,10 @@ test("a green dot on a connected machine's icon and nothing else; not connected,
     expect(dot(entry("Old laptop"))).toBeNull();
     expect(word(entry("Old laptop"))).toBeNull();
     expect(lines(entry("Old laptop"))).toBe(1);
-    expect(entry("Lab box").querySelector(".machine-entry-line .machine-nav-insecure svg")).toHaveClass("lucide-lock-open");
+    // Paired without encryption, it reads as NUC: its dot, no word, one line, nothing after its name.
+    expect(dot(entry("Lab box"))).toHaveAttribute("data-state", "direct");
+    expect(entry("Lab box").querySelector(".machine-entry-line")!.children.length).toBe(entry("NUC").querySelector(".machine-entry-line")!.children.length);
+    expect(entry("Lab box").querySelector("svg.lucide-lock-open")).toBeNull();
   }
   // The dot sits on the icon, beside the "new" mark's place, never on the name's or a state's line.
   expect(navEntry("NUC").querySelector(".machine-nav-icon .state-on-icon .state-on-icon-dot")).toHaveAttribute("aria-hidden", "true");
@@ -73,10 +76,10 @@ test("a green dot on a connected machine's icon and nothing else; not connected,
   // Its whole state is in its name and in its native tooltip.
   expect(navEntry("NUC")).toHaveAccessibleName("NUC, Connected");
   expect(navEntry("Old laptop")).toHaveAccessibleName("Old laptop, Not connected");
-  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected, not encrypted");
+  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
   expect(navEntry("NUC")).toHaveAttribute("title", "NUC · Connected");
   expect(navEntry("Old laptop")).toHaveAttribute("title", "Old laptop · Not connected");
-  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected · Not encrypted");
+  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected");
   // One line where nothing is said.
   expect(lines(navEntry("NUC"))).toBe(1);
   // This device: the dot while its service runs and answers, no word, and connected in its name.
@@ -89,7 +92,7 @@ test("a remote entry's tooltip is the native one: no app tooltip on keyboard foc
   open();
   act(() => { navEntry("Lab box").focus(); });
   expect(screen.queryByRole("tooltip")).toBeNull();
-  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected, not encrypted");
+  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
   act(() => { navEntry("Lab box").click(); });
   expect(header("machines")).toHaveTextContent("Lab box");
 });
@@ -101,7 +104,7 @@ test("a state still being found shows nothing: no dot, no word, one line", () =>
     expect(word(entry("Lab box"))).toBeNull();
     expect(lines(entry("Lab box"))).toBe(1);
   }
-  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Checking… · Not encrypted");
+  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Checking…");
   expect(dot(thisDevice())).toBeNull();
   expect(thisDevice().textContent).toBe("This device");
 });
@@ -142,10 +145,12 @@ test("This device is never \"Running\", \"Starting…\" or \"Not running\" in th
   }
 });
 
-test("a page's header: the long state, Not encrypted in words after it, and what to do under it", () => {
+test("a page's header: the long state, nothing after it, and what to do under it", () => {
   open({ machinesView: { machine: "fp-lab" } });
-  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected·Not encrypted$/);
-  expect(within(header("machines")).getByText("Not encrypted").querySelector("svg")).toHaveClass("lucide-lock-open");
+  // Paired without encryption: its state alone, as any machine's.
+  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected$/);
+  expect(header("machines").querySelector(".host-detail-state")!.children.length).toBe(1);
+  expect(header("machines").querySelector("svg.lucide-lock-open, .ui-infotip")).toBeNull();
   act(() => { navEntry("Old laptop").click(); });
   expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Not connected$/);
   expect(header("machines").querySelector(".host-detail-hint")).toHaveTextContent(/^Not reachable from here now$/);
@@ -169,19 +174,19 @@ test("no longer paired: its page says why and what to do — Pair again opens Ad
   expect(within(header("machines")).queryByRole("button", { name: "Pair again" })).toBeNull();
 });
 
-test("machine-unencrypted A (the default): Not encrypted in the list too; B: only on the machine's page, in words with why", () => {
-  open({ machinesView: { machine: "fp-lab" } });
-  expect(navEntry("Lab box").querySelector(".machine-nav-insecure")).not.toBeNull();
-  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected, not encrypted");
-  cleanup();
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "machine-unencrypted": "page" }));
-  open({ machinesView: { machine: "fp-lab" } });
-  for (const entry of [navEntry, row]) expect(entry("Lab box").querySelector(".machine-nav-insecure")).toBeNull();
-  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
-  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected");
-  // Its page says it all the same, with what it means.
-  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected·Not encrypted$/);
-  expect(within(header("machines")).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
+test("machine-unencrypted is decided (none): whatever the preview's panel stored for it, nothing says not encrypted", () => {
+  for (const stored of [null, "list", "page"]) {
+    if (stored) localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "machine-unencrypted": stored }));
+    open({ machinesView: { machine: "fp-lab" } });
+    for (const entry of [navEntry, row]) expect(entry("Lab box").querySelector("svg.lucide-lock-open")).toBeNull();
+    expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
+    expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected");
+    expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected$/);
+    expect(screen.queryByRole("button", { name: "About this connection" })).toBeNull();
+    expect(document.getElementById("pane-machines")).not.toHaveTextContent(/encrypt/i);
+    cleanup();
+    localStorage.removeItem(VARIANTS_KEY);
+  }
 });
 
 test("Connected on a page wears the models' Ready badge, green with its dot; not connected stays muted words", () => {

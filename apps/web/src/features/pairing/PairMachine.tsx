@@ -219,7 +219,7 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
       setHeard("");
       setAlert(null);
       setUnreached(false);
-      setConnected(t(insecure ? "pairing.connectedInsecure" : "pairing.connected", { host: named(result?.host ?? seen.host, t) }));
+      setConnected(t("pairing.connected", { host: named(result?.host ?? seen.host, t) }));
     } catch (reason) {
       const why = failure(reason, t);
       if (insecure && !("field" in why)) refocusConnect.current = true;

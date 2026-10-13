@@ -228,9 +228,10 @@ test("Machines is a list, each machine's state on its row; a machine is a page o
   // Connected: the green dot on its icon; not connected, nothing — both said in its name.
   expect(list.querySelector('[data-machine="fp-nuc"] .state-on-icon-dot')).not.toBeNull();
   expect(list.querySelector('[data-machine="fp-lab"] .state-on-icon-dot')).toBeNull();
-  // Not encrypted: its open lock after the name, and said in its name.
-  expect(list.querySelector('[data-machine="fp-lab"] .machine-nav-insecure')).not.toBeNull();
-  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Not connected, not encrypted");
+  // Paired without encryption: nothing after its name, and its name as any machine's.
+  expect(list.querySelector('[data-machine="fp-lab"] .settings-menu-label')!.children.length).toBe(1);
+  expect(list.querySelector('[data-machine="fp-lab"] svg.lucide-lock-open')).toBeNull();
+  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Not connected");
   // Add a machine opens a dialog, not a page: no chevron; and no chips at the page's head.
   expect(list.querySelector(".settings-menu-row--add .settings-menu-chevron")).toBeNull();
   expect(document.querySelector(".machines-inline")).toBeNull();
@@ -251,8 +252,10 @@ test("Machines is a list, each machine's state on its row; a machine is a page o
   await tap(screen.getByRole("button", { name: "Forget Lab box" }));
   await tap(screen.getByRole("button", { name: "Yes, forget" }));
   expect(forgetMachine).toHaveBeenCalledWith("fp-lab");
-  await waitFor(() => expect(title()).toHaveTextContent(/^Machines$/));
-  expect(stack()).toEqual(["list", "machines"]);
+  // Back a level once history's back lands (its popstate comes later than the page going, which already titles it
+  // Machines).
+  await waitFor(() => expect(stack()).toEqual(["list", "machines"]));
+  expect(title()).toHaveTextContent(/^Machines$/);
   expect(document.activeElement).toBe(list.querySelector('[data-machine="fp-nuc"]'));
   await waitFor(() => expect(dialog().querySelector('form > [role="status"]')).toHaveTextContent("Lab box forgotten"));
 });

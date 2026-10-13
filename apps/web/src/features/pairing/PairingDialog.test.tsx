@@ -260,7 +260,7 @@ test("an http:// address on a private network goes straight to agreeing to no en
   await act(async () => { within(warning).getByRole("button", { name: "Connect without encryption" }).click(); });
   expect(pairDevice).toHaveBeenCalledTimes(1);
   expect(pairDevice).toHaveBeenLastCalledWith(pasted, expect.any(String), "http://192.168.1.20:8768", { insecure: true });
-  expect(screen.getByText("Connected to “nuc” without encryption.")).toHaveAttribute("role", "status");
+  expect(screen.getByText("Connected to “nuc”.")).toHaveAttribute("role", "status");
 });
 
 test("a machine that answers only without encryption: refused at a public address, out of a secure page's reach", async () => {
@@ -307,7 +307,7 @@ test("a machine on a private network that answers only without encryption is rea
   expect(address().readOnly).toBe(true);
   expect(warning).toBeInTheDocument();
   await act(async () => { finish({ host: "nuc" }); });
-  expect(screen.getByText("Connected to “nuc” without encryption.")).toHaveAttribute("role", "status");
+  expect(screen.getByText("Connected to “nuc”.")).toHaveAttribute("role", "status");
   expect(document.querySelector(".pairing-consent")).toBeNull();
 });
 

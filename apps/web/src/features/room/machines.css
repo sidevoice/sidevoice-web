@@ -29,17 +29,11 @@
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
 .host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
-/* Its state at length under its name, a word in its tone, semibold, and
-   Not encrypted after it, with its (i); what to do about it, when there is something, on the line under. */
+/* Its state at length under its name, a word in its tone, semibold; what to do about it, when there is something, on
+   the line under. */
 .host-detail-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); min-height: 1.25rem; }
 .host-detail-state .machine-state { font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); }
 .host-detail-state .ui-badge.machine-state-pill { height: 22px; padding: 0 var(--sv-space-2); }
-.host-detail-sep { color: var(--sv-text-muted); }
-.host-insecure { display: inline-flex; align-items: center; gap: var(--sv-space-1); flex: none; }
-span.host-insecure { color: var(--sv-warning); font-weight: var(--sv-weight-semibold); line-height: 1.25rem; }
-.host-insecure svg { flex: none; width: 14px; height: 14px; }
-.ui-badge.host-insecure svg { width: 12px; height: 12px; }
-.host-detail-state .ui-infotip { margin-inline-start: calc(-1 * var(--sv-space-1)); }
 .host-detail-hint { color: var(--sv-text-muted); line-height: 1.25rem; }
 /* No longer paired: Pair again under what to do about it, its own width. */
 .host-pair-again { justify-self: start; margin-top: var(--sv-space-2); }

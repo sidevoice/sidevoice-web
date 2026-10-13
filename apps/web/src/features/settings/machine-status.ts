@@ -11,7 +11,7 @@ import type { HostTranslate } from "./host-i18n";
  * conversations say the same fact in grey; red is for what is (This device not working), amber for what needs the
  * person (pairing it again). This device, where the app reads its service (its own section), says where the service
  * stands instead — not prepared, starting, not working, not running, running — and, running, how it answers as any
- * machine would. Not encrypted is said on top of any of them. */
+ * machine would. Whether it was paired with encryption is never said: a machine is connected or not. */
 
 export type MachineTone = "positive" | "neutral" | "warning" | "danger";
 
@@ -27,8 +27,6 @@ export interface MachineStatus {
   long: string;
   /** What to do about it, under the page's header, where there is something to say. */
   hint?: string;
-  /** Reached without encryption, as the person agreed when pairing: said on top of the state. */
-  insecure: boolean;
 }
 
 /** Not connected's tone: grey, pending the operator's word (spec §1); it was red ("danger") before. */
@@ -39,7 +37,7 @@ const FAILED = new Set(["failed", "service-failed", "refused", "incompatible"]);
 const STOPPED = new Set(["not-installed", "stopped-by-person"]);
 
 /** How this device reaches `machine`: the first that holds of not paired, checking, connected, not connected. With no machine (this computer's, not projected yet), it is being checked. */
-function reachStatus(machine: MachineView | null, t: HostTranslate): Omit<MachineStatus, "insecure"> {
+function reachStatus(machine: MachineView | null, t: HostTranslate): MachineStatus {
   if (machine?.revoked || machine?.state === "revoked") return { key: "unpaired", tone: "warning", short: t("hosts.machineState.unpaired"),
     long: t("hosts.machineState.unpaired.long"), hint: t("hosts.machineState.unpaired.hint") };
   if (!machine || machine.state === "checking") return { key: "checking", tone: "neutral", short: t("hosts.machineState.checking"), long: t("hosts.machineState.checking") };
@@ -50,7 +48,7 @@ function reachStatus(machine: MachineView | null, t: HostTranslate): Omit<Machin
 
 /** Where this computer's service stands, the first that holds; running, it answers as any machine would. Short and long
  *  are the same. */
-function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: HostTranslate): Omit<MachineStatus, "insecure"> {
+function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: HostTranslate): MachineStatus {
   const said = (key: MachineStateKey & ("unprepared" | "starting" | "failed" | "stopped" | "running"), tone: MachineTone) =>
     ({ key, tone, short: t(`hosts.machineState.${key}`), long: t(`hosts.machineState.${key}`) });
   if (!machine && status.state === "absent") return said("unprepared", "neutral");
@@ -66,6 +64,5 @@ function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: 
  *  useThisComputerSection), this computer says where its service stands; anywhere else it reads as any machine. */
 export function machineStatus(machine: MachineView | null, localStatus: LocalHostStatus, readsService: boolean, t: HostTranslate): MachineStatus {
   const local = !machine || !!machine.local;
-  const status = local && readsService ? serviceStatus(machine, localStatus, t) : reachStatus(machine, t);
-  return { ...status, insecure: machine?.insecure === true };
+  return local && readsService ? serviceStatus(machine, localStatus, t) : reachStatus(machine, t);
 }

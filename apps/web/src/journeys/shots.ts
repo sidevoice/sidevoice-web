@@ -147,7 +147,6 @@ export const JOURNEYS: Journey[] = [
       facts: { pairings: [THIS, NUC], localHostStatus: { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" }, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-remote", caption: "Machines: a remote machine, connected.", facts: { pairings: [NUC, WORKSTATION, LAPTOP], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], callNode: null, machineLinks: { [LAPTOP.fp]: { reach: "away", via: "" }, [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
-    { id: "s-machine-insecure", caption: "Machines: a machine reached without encryption, as agreed when pairing.", facts: { pairings: [{ ...NUC, insecure: true, urls: ["http://192.168.1.20:8768"] }, LAPTOP], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], callNode: null, machineLinks: { [NUC.fp]: { reach: "revoked", via: "" } } }, after: openSettings("machines") },
     { id: "s-advanced", caption: "Advanced: memory when idle, the downloaded models, reset, the build.", facts: { modelsRemovable: true }, after: openSettings("advanced") },
   ] },

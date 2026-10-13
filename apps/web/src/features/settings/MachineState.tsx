@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
-import { NotEncryptedIcon } from "../../components/ui/Icons";
-import { useVariant } from "../../lib/variants";
 import { NewAtEnd } from "../highlights/highlights";
 import type { HostTranslate } from "./host-i18n";
 import type { MachineStatus } from "./machine-status";
@@ -12,16 +10,8 @@ import "./machine-state.css";
  * device Not working) is always said in words, in its tone: it is an action, not a status. The whole state is in each
  * entry's name (machineEntryName), its native tooltip, and on the machine's page, in words (MachineState). This
  * device's routine is never worded in the nav: its dot means connected, as any machine's. A dot is only ever green and
- * only ever means connected: never the accent (new, selected). */
-
-/** Where Not encrypted is said (VARIANTS `machine-unencrypted`): on the machine's entry wherever it is listed — the open
- *  lock after its name, and in its name for a screen reader and its tooltip — as well as on its page (A, "list", the
- *  default); or on its page only (B, "page"), where it is said in words with why it matters. */
-export const MACHINE_UNENCRYPTED = ["list", "page"] as const;
-export const useMachineUnencrypted = () => useVariant("machine-unencrypted", MACHINE_UNENCRYPTED);
-/** `status` as a list's entry says it: not encrypted only where the list says it (`where`). */
-export const listedStatus = (status: MachineStatus, where: (typeof MACHINE_UNENCRYPTED)[number]): MachineStatus =>
-  where === "list" || !status.insecure ? status : { ...status, insecure: false };
+ * only ever means connected: never the accent (new, selected). A machine paired without encryption reads as any other:
+ * nothing on a machine says how it was paired (the plain-http consent is asked once, when pairing). */
 
 /** A state the person has something to do about: said in words wherever the machine is listed. */
 const needsYou = (status: MachineStatus) => status.tone === "warning" || status.tone === "danger";
@@ -58,27 +48,24 @@ function spokenState(status: MachineStatus | null, t: HostTranslate) {
   return SERVICE.has(status.key) && !needsYou(status) ? null : status.short;
 }
 
-/** An entry's name for a screen reader: its name, its state in words, then not encrypted and new when they hold. */
+/** An entry's name for a screen reader: its name, its state in words, then new when it holds. */
 export function machineEntryName(name: string, status: MachineStatus | null, isNew: boolean | number, t: HostTranslate) {
   const state = spokenState(status, t);
-  return (state ? t("hosts.machineEntry", { name, state }) : name) + (status?.insecure ? t("hosts.machineEntry.insecure") : "")
-    + (isNew ? t("highlights.navNew") : "");
+  return (state ? t("hosts.machineEntry", { name, state }) : name) + (isNew ? t("highlights.navNew") : "");
 }
 
-/** An entry's tooltip: its whole name, its state at length, not encrypted. */
-export function machineEntryTitle(name: string, status: MachineStatus, t: HostTranslate) {
-  return [name, status.long, status.insecure ? t("hosts.notEncrypted") : ""].filter(Boolean).join(" · ");
+/** An entry's tooltip: its whole name and its state at length. */
+export function machineEntryTitle(name: string, status: MachineStatus) {
+  return [name, status.long].filter(Boolean).join(" · ");
 }
 
-/** An entry's words (a machine under Remote machines, This device): its name, cut short when long, the open lock after
- *  it when reached without encryption and "New" at its end (VARIANTS `section-new` A, B); its state on a line of its own
- *  when it needs the person, never cut short. */
+/** An entry's words (a machine under Remote machines, This device): its name, cut short when long, and "New" at its end
+ *  (VARIANTS `section-new` A, B); its state on a line of its own when it needs the person, never cut short. */
 export function MachineEntryCopy({ name, status, isNew }: { name: string; status: MachineStatus | null; isNew: boolean | number }) {
   return (
     <span className="machine-entry-copy">
       <span className="machine-entry-line">
         <span className="machine-nav-name">{name}</span>
-        {status?.insecure && <span className="machine-nav-insecure" aria-hidden="true"><NotEncryptedIcon size={14} /></span>}
         <NewAtEnd isNew={isNew} />
       </span>
       <MachineEntryState status={status} />

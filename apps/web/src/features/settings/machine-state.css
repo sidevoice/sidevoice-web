@@ -13,11 +13,9 @@
 .state-on-icon-dot { position: absolute; bottom: -2px; inset-inline-end: -3px; width: 7px; height: 7px; box-sizing: content-box;
   border: 2px solid var(--new-ground, var(--sv-bg-subtle)); border-radius: 50%; background: var(--sv-positive); }
 
-/* An entry's words (MachineEntryCopy): the name on its line — it gives way (an ellipsis), the lock and "New" after it
- * never — and, where it is said, the state on the next, whole. */
+/* An entry's words (MachineEntryCopy): the name on its line — it gives way (an ellipsis), "New" after it never — and,
+ * where it is said, the state on the next, whole. */
 .machine-entry-copy { display: grid; flex: 1 1 auto; justify-items: start; gap: 2px; min-width: 0; text-align: start; }
 .machine-entry-line { display: flex; align-items: center; gap: var(--sv-space-1); width: 100%; min-width: 0; }
 .machine-entry-line .machine-nav-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.machine-nav-insecure { display: inline-grid; place-items: center; flex: none; color: var(--sv-warning); }
-.ui-nav-item .machine-nav-insecure svg { width: 14px; height: 14px; }
 .machine-entry-line .new-end-dot { margin-inline-start: auto; }

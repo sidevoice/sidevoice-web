@@ -80,8 +80,6 @@ export interface MachineView {
   /** Renamed on this device (an alias): `host` is that name, `machineHost` the machine's own. */
   alias?: boolean;
   machineHost?: string | null;
-  /** Paired without encryption by the person's choice (plain http on a private network). */
-  insecure?: boolean;
   /** Stable UI row identity. The local row remains stable while its native pairing is unavailable. */
   id: string;
   /** The pairing fingerprint, when this row currently has a usable pairing. */

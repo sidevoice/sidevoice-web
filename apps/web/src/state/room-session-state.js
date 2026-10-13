@@ -353,7 +353,7 @@ export function machinesView(s) {
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
         return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null, insecure: p.insecure === true,
+            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null,
             pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
     });
 }
