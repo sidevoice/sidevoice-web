@@ -39,3 +39,5 @@ div.update-line { min-height: var(--sv-control-md, 40px); padding-inline: var(--
 .update-line--progress { flex-wrap: wrap; row-gap: 4px; padding-block: var(--sv-space-1); }
 .update-line-bar { flex: 1 0 100%; }
 .update-line-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
+/* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
+.app-update-setting .ui-segment { padding-inline: 10px; }

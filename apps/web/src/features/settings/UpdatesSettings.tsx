@@ -72,7 +72,7 @@ export function UpdatesSettings() {
       {outdated.map(({ machine, version, latest, command }) => <div key={machine.id} className="updates-settings updates-machine">
         <div className="updates-settings-version">
           <span className="host-status-product">{machine.host || t("hosts.unnamed")}</span>
-          <span className="host-status-build">{t("settings.updates.machineBehind", { version: version ?? "?", latest })}</span>
+          <span className="host-status-build">{version ? t("settings.updates.machineBehind", { version, latest }) : t("updates.available", { version: latest })}</span>
         </div>
         <p className="host-agent-where">{t("settings.updates.runOn", { machine: machine.host || t("hosts.unnamed") })}</p>
         <Snippet text={command} />
