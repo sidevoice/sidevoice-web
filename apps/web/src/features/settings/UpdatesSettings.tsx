@@ -13,7 +13,7 @@ import "./updates-settings.css";
 /* Updates, a Settings section of their own (decided 2026-10-13), holding everything that updates, each in its row with
  * its action right there once an update is found. This computer (VARIANTS `updates-rows`): two rows (B), each saying
  * what it is — the Sidevoice app, this window (its version, a nightly's or development app's note, Automatic or Manual,
- * Check for updates; Update the app, its progress, Restart to update the app: AppUpdateSettings), and the Sidevoice
+ * Check for updates; Download, its progress, Restart to update the app: AppUpdateSettings), and the Sidevoice
  * service, which runs on this computer (its version, Update the service when the app bundles a newer one:
  * LocalHostUpdateControl); or one row (A), Sidevoice, with one version (the app's) and one button, Update Sidevoice,
  * that updates the app and then the service. Then each remote machine that is behind (its versions, and the command to
@@ -87,8 +87,9 @@ export function UpdatesSettings() {
     {rows === "one" ? (app || (service && (serviceVersion || serviceUpdate.shown))) && <Group title={t("settings.updates.one")}>
         <div className="updates-settings" data-settings-row="">
           <PartVersion hint={t(!app ? "settings.updates.serviceHint" : service ? "settings.updates.oneHint" : "settings.updates.appHint")}
-            version={here.version} upToDate={here.state === "current"} note={note} t={t} />
-          {app ? <AppUpdateSettings words="all" onRestart={continueAfterRestart} idle={serviceControl("all")} /> : serviceControl("all")}
+            version={here.version} upToDate={here.state === "current" && !here.app.can.check} note={note} t={t} />
+          {/* Up to date, for the app and its service together, on the check's line where there is one. */}
+          {app ? <AppUpdateSettings words="all" onRestart={continueAfterRestart} idle={serviceControl("all")} current={here.state === "current"} /> : serviceControl("all")}
         </div>
       </Group>
       : <>

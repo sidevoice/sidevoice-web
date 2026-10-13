@@ -66,6 +66,7 @@ export const en = {
   "updates.check": "Check for updates",
   "updates.lastChecked": "Last checked: {when}",
   "updates.neverChecked": "Not checked yet",
+  "updates.checkedUpToDate": "{checked} · Up to date",
   "updates.upToDate": "Sidevoice is up to date.",
   "updates.retry": "Retry",
   "updates.failure.update-check-failed": "Couldn't check for updates.",
@@ -778,6 +779,8 @@ export const en = {
   "updates.open": "Open",
   "updates.none": "Everything is up to date.",
   // Every update button says what it updates: the app or the service (two rows), or Sidevoice as one (one row).
+  "updates.action.download": "Download",
+  "updates.action.retryDownload": "Retry download",
   "updates.action.updateApp": "Update the app",
   "updates.action.retryApp": "Retry updating the app",
   "updates.action.restartApp": "Restart to update the app",

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, type ReactNode } from "react";
+import { useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { ProgressBar } from "../../components/ui/ProgressBar";
@@ -20,16 +20,19 @@ function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: R
 }
 
 /** The desktop app's updates, in Settings › Updates under its version (a release's updater only; none, nothing
- *  shows). First, once one is found, its row with its action right there (UPDATE_PLACE `app`, where a landing
- *  focuses): available, Download in manual mode (automatic fetches it by itself); downloading, its progress, in either
- *  mode; ready, Restart to update, in either mode; a download or an install that failed, said there, with Retry for a
- *  download. Then Updates, automatic or manual, as the app keeps it; Check for updates, busy while it checks, and when
- *  it last checked — a check that finds one with a button lands on it; and a check that failed, with Retry. Each part
- *  shows where the app has the method for it. Its buttons say what they update (`words`): the app (two rows), or
- *  Sidevoice (one row, which restarts with `onRestart` first, and shows `idle` in the update's place while the app has
- *  none: its service's). Where its card already says it is up to date, a check that finds none says so to a screen
- *  reader only. */
-export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: "app" | "all"; idle?: ReactNode; onRestart?: () => void } = {}) {
+ *  shows): Updates, automatic or manual, as the app keeps it; Check for updates, busy while it checks, beside one muted
+ *  line — when it last checked and, a check gone through with nothing waiting, Up to date (never beside Not checked yet
+ *  or a failure) — a check that finds one with a button landing on it;
+ *  a check that failed, with Retry. Then, once one is found, its row with its action right there (UPDATE_PLACE `app`,
+ *  where a landing focuses): available, Download in manual mode (automatic fetches it by itself: a check never
+ *  downloads in manual); downloading, its progress, in either mode; ready, Restart to update, in either mode, only ever
+ *  pressed by the person; a download or an install that failed, said there, with Retry download. Each part shows where
+ *  the app has the method for it. Restart says what it updates (`words`): the app (two rows), or Sidevoice (one row,
+ *  which restarts with `onRestart` first, and shows `idle` in the update's place while the app has none: its
+ *  service's). `current`: whether the line says Up to date — by default, the app's updater idle and its last check
+ *  not failed; one row says it for the app and its service together. A check that finds none says so to a screen
+ *  reader too. Up to date is never a colour: those are for what waits. */
+export function AppUpdateSettings({ words = "app", idle, onRestart, current }: { words?: "app" | "all"; idle?: ReactNode; onRestart?: () => void; current?: boolean } = {}) {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
   const update = useAppUpdate();
@@ -70,11 +73,14 @@ export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: 
   const retry = code === "update-check-failed" && can.check ? "check" : code === "update-download-failed" && can.download ? "download" : null;
   const settings = (can.mode && mode) || can.check || !!checkError;
   if (!found && !settings) return <>{idle}</>;
-  // In order: Automatic or Manual; when it last checked, and Check for updates; then where the update stands, with its
-  // action right there (Up to date, Version X available · Update, its progress, Restart to update).
+  // In order: Automatic or Manual; when it last checked (Up to date, nothing waiting), and Check for updates; then where
+  // the update stands, with its action right there (Version X available · Download, its progress, Restart to update).
   const standing = found ? <AppUpdateRow status={found} mode={mode} can={can} busy={busy} error={rowError} act={(action) => void act(action)} words={words} t={t} />
-    : idle ?? <div id={UPDATE_PLACE.app} className="update-action-row" data-state="idle"><div className="update-action">
-        <span className="update-action-copy">{t("settings.updates.upToDate")}</span></div></div>;
+    : idle;
+  // Up to date only once a check went through and nothing waits: never beside Not checked yet, never after a failure.
+  const upToDateNow = current ?? (status?.state === "idle" && !status.error);
+  const checked = checkedAt ? t("updates.lastChecked", { when: when(checkedAt) }) : null;
+  const checkLine = !checked ? t("updates.neverChecked") : upToDateNow && !checkError ? t("updates.checkedUpToDate", { checked }) : checked;
   return <>
     {settings && <div className="app-update-settings">
       {can.mode && mode && <div className="app-update-setting">
@@ -85,8 +91,8 @@ export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: 
           items={[{ value: "automatic", label: t("updates.mode.automatic") }, { value: "manual", label: t("updates.mode.manual") }]} />
       </div>}
       {can.check && <div className="app-update-setting">
-        <span className="app-update-setting-copy muted">{checkedAt ? t("updates.lastChecked", { when: when(checkedAt) }) : t("updates.neverChecked")}
-          {/* The card's version line says Up to date already: the check's finding is for a screen reader. */}
+        <span className="app-update-setting-copy muted">{checkLine}
+          {/* The line says it as it changes; a screen reader is told the check's finding. */}
           {upToDate && !found && <span role="status" className="sr-only">{t("updates.upToDate")}</span>}</span>
         <Button size="sm" variant="secondary" loading={busy === "check"} onClick={() => void act("check")}>{t("updates.check")}</Button>
       </div>}
@@ -99,19 +105,20 @@ export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: 
   </>;
 }
 
-/** The app's update once found, its action right there: Version X available · Update the app (or Retry), Downloading…
- *  with its progress, Version X ready · Restart to update the app (one row: Update Sidevoice, Restart to update
- *  Sidevoice); what failed under it. The row is where a landing goes. */
+/** The app's update once found, its action right there: Version X available · Download (or Retry download), its words
+ *  its description; Downloading… with its progress; Version X ready · Restart to update the app (one row: Restart to
+ *  update Sidevoice); what failed under it. The row is where a landing goes. */
 function AppUpdateRow({ status, mode, can, busy, error, act, words, t }: { status: UpdaterStatus; mode: UpdateMode | null; can: ReturnType<typeof useAppUpdate>["can"];
   busy: "check" | "download" | "restart" | null; error: unknown; act: (action: "download" | "restart") => void; words: "app" | "all"; t: HostTranslate }) {
   const version = status.version ?? "";
   const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed";
   const progress = status.progress == null ? null : Math.max(0, Math.min(1, status.progress));
   const all = words === "all";
+  const copyId = useId();
   const button = status.state === "ready" ? can.restart && <Button size="sm" variant="primary" loading={busy === "restart"} onClick={() => act("restart")}>
       {t(all ? "updates.action.restartAll" : "updates.action.restartApp")}</Button>
-    : status.state === "available" && hasAction(status, mode, can) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"} onClick={() => act("download")}>
-        {t(downloadFailed ? all ? "updates.action.retryAll" : "updates.action.retryApp" : all ? "updates.action.updateAll" : "updates.action.updateApp")}</Button>
+    : status.state === "available" && hasAction(status, mode, can) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"}
+        aria-describedby={copyId} onClick={() => act("download")}>{t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download")}</Button>
       : null;
   const copy = status.state === "ready" ? version ? t("updates.ready", { version }) : t("updates.readyOne")
     : status.state === "downloading" ? version ? t("updates.downloading", { version }) : t("updates.downloadingOne")
@@ -119,7 +126,7 @@ function AppUpdateRow({ status, mode, can, busy, error, act, words, t }: { statu
   return (
     <div id={UPDATE_PLACE.app} className="update-action-row" data-settings-row="" data-state={status.state}>
       <div className="update-action">
-        <span className="update-action-copy">{copy}
+        <span id={copyId} className="update-action-copy">{copy}
           {status.state === "downloading" && progress != null && <span className="app-update-percent">{percent(progress)}</span>}</span>
         {button}
       </div>

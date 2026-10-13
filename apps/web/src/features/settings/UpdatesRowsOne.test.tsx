@@ -15,8 +15,8 @@ afterEach(() => {
 });
 
 /* Updates' rows, VARIANTS `updates-rows` A: this computer as ONE row, Sidevoice — one version (the app's, the Sidevoice
- * the person installed) and one button, Update Sidevoice, that updates the app and then this computer's service, in
- * order. Restarting into the app's update is the app's last step, so the service follows by itself in the page the new
+ * the person installed) and one button that updates the app (Download in manual, then Restart to update Sidevoice) and
+ * then this computer's service (Update Sidevoice, where only it is behind), in order. Restarting into the app's update is the app's last step, so the service follows by itself in the page the new
  * app opens, once nothing stands in the way. The service's own number is not said: the row's is the app's. B, two
  * rows, is UpdatesSettings.test.tsx. */
 
@@ -46,9 +46,13 @@ const groups = () => [...pane().querySelectorAll(".ui-group-title")].map((title)
 const row = () => within(pane().querySelector<HTMLElement>(".ui-group")!);
 const settle = () => act(async () => {});
 
-test("one row, Sidevoice: what it is, the app's version, Up to date once the app and its service both say so", async () => {
+test("one row, Sidevoice: what it is, the app's version, Up to date on the check's muted line once checked and the app and its service both say so", async () => {
+  localStorage.setItem("sidevoice.updates-checked-at", String(Date.parse("2026-10-12T09:30:00Z")));
   open();
-  await waitFor(() => expect(pane().querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.3\.0 · Up to date$/));
+  const line = () => row().getByRole("button", { name: "Check for updates" }).closest(".app-update-setting")!.querySelector(".app-update-setting-copy");
+  await waitFor(() => expect(line()?.textContent).toMatch(/^Last checked: .* · Up to date$/));
+  expect(pane().querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.3\.0$/);
+  expect(pane().querySelector(".update-action-row")).toBeNull();
   expect(groups()).toEqual(["Sidevoice"]);
   expect(row().getByText("The app, and the service that connects your agents")).toBeInTheDocument();
   // The app's settings stay under it; no second row, no service number.
@@ -57,13 +61,15 @@ test("one row, Sidevoice: what it is, the app's version, Up to date once the app
   expect(pane()).not.toHaveTextContent("0.8.1");
 });
 
-test("the app's update first, in the row's one button: Update Sidevoice downloads, Restart to update Sidevoice restarts and asks the service to follow", async () => {
+test("the app's update first, in the row's one button: Download downloads, Restart to update Sidevoice restarts and asks the service to follow", async () => {
   const { fake, update } = open({ updater: { mode: "manual", status: { state: "available", version: "0.4.0" } }, service: BEHIND });
   await settle();
   expect(document.getElementById("updates-app")).toHaveTextContent("Version 0.4.0 available");
   // One button: the service's waits behind the app's.
-  expect(row().getAllByRole("button", { name: /Sidevoice|the app|the service/ }).map((button) => button.textContent)).toEqual(["Update Sidevoice"]);
-  await act(async () => { fireEvent.click(row().getByRole("button", { name: "Update Sidevoice" })); });
+  expect(row().getAllByRole("button", { name: /^(Download|Update|Restart|Retry)/ }).map((button) => button.textContent)).toEqual(["Download"]);
+  // Only up to date while nothing waits: the service behind, the line doesn't say it.
+  expect(pane()).not.toHaveTextContent("Up to date");
+  await act(async () => { fireEvent.click(row().getByRole("button", { name: "Download" })); });
   expect(fake.updater.download).toHaveBeenCalledOnce();
   await act(async () => { fake.push({ state: "ready", version: "0.4.0" }); });
   await act(async () => { fireEvent.click(row().getByRole("button", { name: "Restart to update Sidevoice" })); });
@@ -109,7 +115,7 @@ test("a request to follow with nothing to follow (the service current) is forgot
   expect(old.update).not.toHaveBeenCalled();
 });
 
-test("in Spanish: Sidevoice, Versión 0.3.0, Actualizar Sidevoice and Reiniciar para actualizar Sidevoice", async () => {
+test("in Spanish: Sidevoice, Versión 0.3.0, Descargar and Reiniciar para actualizar Sidevoice", async () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
   const { fake } = open({ updater: { mode: "manual", status: { state: "available", version: "0.4.0" } } });
@@ -117,7 +123,7 @@ test("in Spanish: Sidevoice, Versión 0.3.0, Actualizar Sidevoice and Reiniciar 
   expect(groups()).toEqual(["Sidevoice"]);
   expect(row().getByText("La app, y el servicio que conecta tus agentes")).toBeInTheDocument();
   expect(pane().querySelector(".host-status-product")).toHaveTextContent(/^Versión 0\.3\.0$/);
-  expect(row().getByRole("button", { name: "Actualizar Sidevoice" })).toBeInTheDocument();
+  expect(row().getByRole("button", { name: "Descargar" })).toBeInTheDocument();
   await act(async () => { fake.push({ state: "ready", version: "0.4.0" }); });
   expect(row().getByRole("button", { name: "Reiniciar para actualizar Sidevoice" })).toBeInTheDocument();
 });

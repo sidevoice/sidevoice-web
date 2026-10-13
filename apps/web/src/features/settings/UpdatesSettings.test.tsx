@@ -19,7 +19,7 @@ afterEach(() => {
 
 /* Updates (decided): a Settings section of their own, holding everything that updates, each row with its action right
  * there once an update is found — the Sidevoice app (what it is, its version, Automatic or Manual, Check for updates;
- * Update the app in manual, its progress, Restart to update the app in either mode), the Sidevoice service (what it is,
+ * Download in manual, its progress, Restart to update the app in either mode), the Sidevoice service (what it is,
  * Update the service when the app bundles a newer one), and each remote machine that is behind, with the command to run
  * there. These are VARIANTS `updates-rows` B, the default; A, one row, is in UpdatesRowsOne.test.tsx. In the desktop app
  * always; in a browser only while a machine is behind, with only those machines. The sidebar's entry, the rail's rows
@@ -87,6 +87,8 @@ const group = (name: string) => [...pane("updates").querySelectorAll<HTMLElement
 const navOrder = () => [...document.querySelectorAll(".settings-nav > button.ui-nav-item")].map((item) => item.id.replace("settings-", ""));
 /** The app's update row, once one is found. */
 const appRow = () => document.getElementById("updates-app");
+/** The muted line beside Check for updates: when it last checked, and Up to date when nothing waits. */
+const checkLine = (check: HTMLElement) => check.closest(".app-update-setting")!.querySelector<HTMLElement>(".app-update-setting-copy")!;
 /** Each machine behind as Updates says it: its name, its versions, where to run the command, the command. */
 const machineRows = () => [...pane("updates").querySelectorAll(".updates-machine")].map((row) => [
   row.querySelector(".host-status-product")?.textContent, row.querySelector(".host-status-build")?.textContent,
@@ -117,31 +119,63 @@ test("Updates is a section of its own, before Advanced: the app's version, Autom
   expect(group("Sidevoice app").querySelector(".updates-up-to-date")).toBeNull();
   const modes = await updates().findByRole("radiogroup", { name: "Updates" });
   const check = updates().getByRole("button", { name: "Check for updates" });
-  // Never checked here: said beside Check for updates.
-  expect(check.closest(".app-update-setting")).toHaveTextContent(/^Not checked yet/);
-  // Nothing found: the status row says Up to date, with no action.
-  expect(appRow()).toHaveAttribute("data-state", "idle");
-  expect(appRow()).toHaveTextContent(/^Up to date$/);
-  expect(within(appRow()!).queryByRole("button")).toBeNull();
-  // In order: Automatic or Manual, then Check for updates, then the status row.
+  // Never checked here: said on the muted line beside Check for updates, and nothing claims Up to date yet; no row of
+  // its own, no colour, no badge.
+  expect(checkLine(check)).toHaveTextContent(/^Not checked yet$/);
+  expect(checkLine(check)).toHaveClass("muted");
+  expect(appRow()).toBeNull();
+  expect(group("Sidevoice app").querySelector(".update-action-row, .ui-badge")).toBeNull();
+  // In order: Automatic or Manual, then Check for updates.
   expect(modes.compareDocumentPosition(check) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(check.compareDocumentPosition(appRow()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test("the app's version never says Up to date, even where its updater says it is current; its status row says it", async () => {
+test("the app's version never says Up to date, even where its updater says it is current; the check's muted line says it, once checked", async () => {
+  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
   open({ section: "updates", service: { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" } });
   await settle();
-  // This device says it, both parts current: the app's own line in Updates doesn't, the service's does.
+  // This device says it, both parts current: the app's own version in Updates doesn't, the service's does.
   await waitFor(() => expect(group("Sidevoice service").querySelector(".host-status-product")).toHaveTextContent(/· Up to date$/));
   expect(group("Sidevoice app").querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.9\.0$/);
-  expect(within(group("Sidevoice app")).getByText("Up to date")).toBe(appRow()!.querySelector(".update-action-copy"));
+  expect(checkLine(updates().getByRole("button", { name: "Check for updates" })).textContent).toMatch(/^Last checked: .*2026.* · Up to date$/);
+  expect(group("Sidevoice app").querySelector(".update-action-row, .ui-badge")).toBeNull();
 });
 
-test("in Spanish: Aún sin comprobar beside Check for updates, then the status row", async () => {
-  inSpanish();
+test("Up to date only after a check that went through and found nothing: never beside Not checked yet, never after a failure", async () => {
+  const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
+  const check = await updates().findByRole("button", { name: "Check for updates" });
+  expect(checkLine(check)).toHaveTextContent(/^Not checked yet$/);
+  expect(checkLine(check)).not.toHaveTextContent("Up to date");
+  // Installed elsewhere and checked again: nothing waits.
+  fake.updater.check.mockResolvedValueOnce({ state: "idle" });
+  await act(async () => { fake.push({ state: "idle" }); });
+  await act(async () => { fireEvent.click(check); });
+  // The line, then what a screen reader is told of the check.
+  expect(checkLine(check).textContent).toMatch(/^Last checked: .+ · Up to date(Sidevoice is up to date\.)?$/);
+  expect(appRow()).toBeNull();
+  // The next check fails: when it last checked, and what failed — not Up to date.
+  fake.updater.check.mockResolvedValueOnce({ state: "idle", error: { code: "update-check-failed" } });
+  await act(async () => { fireEvent.click(check); });
+  expect(checkLine(check).textContent).toMatch(/^Last checked: /);
+  expect(checkLine(check)).not.toHaveTextContent("Up to date");
+  expect(updates().getByRole("alert")).toHaveTextContent("Couldn't check for updates.");
+  cleanup();
+  // Idle and never checked: not Up to date either.
+  localStorage.removeItem(CHECKED);
   open({ section: "updates" });
-  const check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
-  expect(check.closest(".app-update-setting")).toHaveTextContent(/^Aún sin comprobar/);
+  expect(checkLine(await updates().findByRole("button", { name: "Check for updates" }))).toHaveTextContent(/^Not checked yet$/);
+});
+
+test("in Spanish: Última comprobación … · Al día on the muted line beside Buscar actualizaciones; Aún sin comprobar never checked", async () => {
+  inSpanish();
+  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
+  open({ section: "updates" });
+  let check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
+  expect(checkLine(check).textContent).toMatch(/^Última comprobación: .* · Al día$/);
+  cleanup();
+  localStorage.removeItem(CHECKED);
+  open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
+  check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
+  expect(checkLine(check)).toHaveTextContent(/^Aún sin comprobar$/);
   expect(check.compareDocumentPosition(appRow()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
@@ -188,7 +222,7 @@ test("This device: Up to date where the app and its service both say so, with no
 test("manual: an update found shows its row with Download right there; its progress in the row; then Restart to update", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   await settle();
-  const download = within(appRow()!).getByRole("button", { name: "Update the app" });
+  const download = within(appRow()!).getByRole("button", { name: "Download" });
   expect(appRow()).toHaveTextContent("Version 0.10.0 available");
   // The row comes after Automatic/Manual and Check, last.
   expect(appRow()!.compareDocumentPosition(updates().getByRole("radiogroup", { name: "Updates" })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
@@ -223,19 +257,21 @@ test("automatic: found, it downloads by itself — no Download, its progress in 
 
 const FAILURES = [
   { code: "update-check-failed", state: "idle", en: "Couldn't check for updates.", es: "No se pudo comprobar si hay actualizaciones.", retry: "check", button: "Retry", boton: "Reintentar" },
-  { code: "update-download-failed", state: "available", en: "The update couldn't be downloaded.", es: "No se pudo descargar la actualización.", retry: "download", button: "Retry updating the app", boton: "Reintentar actualizar la app" },
+  { code: "update-download-failed", state: "available", en: "The update couldn't be downloaded.", es: "No se pudo descargar la actualización.", retry: "download", button: "Retry download", boton: "Reintentar la descarga" },
   { code: "update-install-failed", state: "ready", en: "The update couldn't be installed.", es: "No se pudo instalar la actualización.", retry: null, button: null, boton: null },
 ] as const;
 
-test("each failure is said where it happened, with Retry for a check and Retry updating the app for a download; an install is tried again by Restart to update the app", async () => {
+test("each failure is said where it happened, with Retry for a check and Retry download for a download; an install is tried again by Restart to update the app", async () => {
   for (const { code, state, en, retry, button } of FAILURES) {
     const { fake } = open({ section: "updates", updater: { status: { state, version: "0.10.0", error: { code } }, mode: "manual" } });
     const alert = await updates().findByRole("alert");
     expect(alert, code).toHaveTextContent(en);
     // A check's is under Check for updates; a download's or an install's in the update's row.
     if (code === "update-check-failed") {
-      expect(appRow()).not.toContainElement(alert);
+      // Nothing found to have a row; never Up to date beside a failure.
+      expect(appRow()).toBeNull();
       expect(alert.closest(".app-update-settings")).not.toBeNull();
+      expect(pane("updates")).not.toHaveTextContent("Up to date");
     } else expect(appRow()).toContainElement(alert);
     if (retry) {
       await act(async () => { fireEvent.click(updates().getByRole("button", { name: button! })); });
@@ -260,7 +296,7 @@ test("a check or a download the app rejected is said as that failure, its own wo
   await act(async () => { fireEvent.click(within(alert).getByRole("button", { name: "Retry" })); });
   expect(fake.updater.check).toHaveBeenCalledTimes(2);
   // The app's status says the download failed: the row's Retry downloads, and a rejected download says so there.
-  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Retry updating the app" })); });
+  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Retry download" })); });
   expect(fake.updater.download).toHaveBeenCalledTimes(1);
   expect(within(appRow()!).getByRole("alert")).toHaveTextContent("The update couldn't be downloaded.");
   expect(within(appRow()!).getByRole("alert").querySelector("details")).toHaveTextContent("disk full");
@@ -288,7 +324,7 @@ test("Check for updates in manual mode that finds one: its row's Download in vie
   await settle();
   fake.updater.check.mockResolvedValueOnce({ state: "available", version: "0.10.0" });
   await act(async () => { fireEvent.click(updates().getByRole("button", { name: "Check for updates" })); });
-  await landsOn(() => within(appRow()!).getByRole("button", { name: "Update the app" }), appRow);
+  await landsOn(() => within(appRow()!).getByRole("button", { name: "Download" }), appRow);
   expect(pane("updates")).not.toHaveTextContent("Sidevoice is up to date.");
 });
 
@@ -459,7 +495,7 @@ test("a nightly with an updater (desktop #56, for now) updates as a release: no 
   expect(within(note as HTMLElement).queryByRole("link")).toBeNull();
   expect(await updates().findByRole("radiogroup", { name: "Updates" })).toBeInTheDocument();
   expect(updates().getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
-  expect(within(appRow()!).getByRole("button", { name: "Update the app" })).toBeInTheDocument();
+  expect(within(appRow()!).getByRole("button", { name: "Download" })).toBeInTheDocument();
   expect(await updates().findByRole("button", { name: "Update the service" })).toBeInTheDocument();
 });
 
@@ -528,7 +564,7 @@ test("the sidebar's row, an app update found in manual mode: Updates, its Downlo
   await settle();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Version 0.10.0 available" })); });
   expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["updates", "page"]);
-  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Update the app" }), appRow);
+  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Download" }), appRow);
   expect(store.getState().facts.settingsFocus).toBeNull();
 });
 
@@ -563,7 +599,7 @@ test("the rail: every update counted, the remote machine's too; each row opens U
   await landsOn(() => updates().getByRole("button", { name: "Copy the command for Lab box" }));
   await act(async () => { fireEvent.click(icon()); });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "See updates", description: "Version 0.10.0 available" })); });
-  await landsOn(() => within(appRow()!).getByRole("button", { name: "Update the app" }));
+  await landsOn(() => within(appRow()!).getByRole("button", { name: "Download" }));
 });
 
 test("in Spanish: Actualizaciones, its rows with what each is, the app's row, the service's, a machine behind and This device's Actualización disponible", async () => {
@@ -574,7 +610,7 @@ test("in Spanish: Actualizaciones, its rows with what each is, the app's row, th
   expect(groups()).toEqual(["App de Sidevoice", "Servicio Sidevoice", "Máquinas remotas"]);
   expect(updates().getByText("Sidevoice en este ordenador y las máquinas con un Sidevoice anterior: sus versiones y cómo se actualizan.")).toBeInTheDocument();
   expect(appRow()).toHaveTextContent("Versión 0.10.0 disponible");
-  expect(within(appRow()!).getByRole("button", { name: "Actualizar la app" })).toBeInTheDocument();
+  expect(within(appRow()!).getByRole("button", { name: "Descargar" })).toBeInTheDocument();
   expect(await updates().findByRole("button", { name: "Actualizar el servicio" })).toBeInTheDocument();
   expect(group("Servicio Sidevoice")).toHaveTextContent("Versión 0.9.1 disponible");
   expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 disponible", "Ejecuta esto en Lab box:", COMMAND]]);

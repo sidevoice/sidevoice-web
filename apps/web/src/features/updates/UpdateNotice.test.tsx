@@ -134,7 +134,7 @@ test("A: the gear wears the update's mark and says so; it opens Updates on the m
   expect(banner()).toBeNull();
   await act(async () => { fireEvent.click(gear()); });
   // The app's first: its row's Update the app.
-  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Update the app" }));
+  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Download" }));
 });
 
 test("A: the page's new version alone puts no mark on the gear: it loads by itself after the call", async () => {
