@@ -1,0 +1,32 @@
+import type { MessageKey } from "./en";
+
+/** The call controls card's texts in Simplified Chinese. A missing key falls back to English. */
+export const zhHans: Partial<Record<MessageKey, string>> = {
+  "card.agent.idle": "智能体空闲中",
+  "card.agent.working": "智能体正在工作",
+  "card.agent.speaking": "智能体正在说话",
+  "card.agent.unknown": "智能体",
+  "card.reconnecting": "正在重新连接…",
+  "card.switchConversation": "切换对话",
+  "card.conversations": "对话",
+  "card.openApp": "打开 Sidevoice",
+  "card.mute": "静音",
+  "card.unmute": "取消静音",
+  "card.shortcut": "{action}（{shortcut}）",
+  "card.devices": "麦克风和扬声器",
+  "card.microphone": "麦克风",
+  "card.speaker": "扬声器",
+  "card.systemDefault": "系统默认",
+  "card.skip": "跳过正在播放的内容",
+  "card.hangUp": "挂断",
+  "card.yourMicrophone": "你的麦克风",
+  "card.reach.holding": "无法接收",
+  "card.reach.offline": "离线",
+  "card.unread": "{n} 条未读",
+  "card.microphoneNumber": "麦克风 {n}",
+  "card.speakerNumber": "扬声器 {n}",
+  "card.deviceMissing": "所选设备 · 已断开",
+  "card.deviceFailed": "通话继续使用之前的设备：所选设备无法使用。",
+  "card.devicesInSystem": "请在系统设置中选择此设备。",
+  "card.youAreMuted": "你已静音",
+};
