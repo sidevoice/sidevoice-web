@@ -23,7 +23,7 @@ async function openAgents(page) {
   // A phone's Machines is a list: the machine's row opens its page, under its name.
   const open = page.locator(".machines-menu .machine-entry[data-name='E2E Host']");
   await expect(open).toBeVisible();
-  await expect(open).toHaveAccessibleName(/Connected|Through the room/);
+  await expect(open).toHaveAccessibleName(/Connected/);
   await open.click();
   await expect(page.locator("#settings-title")).toHaveText("E2E Host");
   await expect(page.getByRole("button", { name: "Back to Machines" })).toBeVisible();

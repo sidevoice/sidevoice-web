@@ -48,16 +48,19 @@ function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   return store;
 }
 
-test("the local host is This device's; every remote row says how it is reached without revealing a route, and no machine is to be chosen", async () => {
+test("the local host is This device's; every remote row says Connected however it is reached, never a route, and no machine is to be chosen", async () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "room" }, "fp-other": { reach: "ok", via: "node" } } });
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
   expect(rows).toHaveLength(2);
-  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Through the room");
-  expect(rows[0].getAttribute("aria-label")).not.toMatch(/room\.example|nuc-1|fingerprint|relay/i);
+  // Through the room or directly, the same word: how it is reached is not said while the relay is not shipping.
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Connected");
+  expect(rows[0].getAttribute("aria-label")).not.toMatch(/room|nuc-1|fingerprint|relay/i);
+  expect(rows[0]).toHaveAttribute("title", "NUC · Connected");
   expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
+  expect(rows[1]).toHaveAttribute("title", "Other PC · Connected");
   expect(rows.some((row) => row.hasAttribute("data-in-use"))).toBe(false);
   // Every machine is live at once: no page says In use or offers Use.
   for (const name of ["NUC", "Other PC"]) {
@@ -340,27 +343,59 @@ test("in a browser (this device can't host) it is plain Machines, Add a machine,
   expect(store.getState().facts.inApp).toBeFalsy();
   const machines = document.getElementById("machines")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent(/^Machines$/);
-  expect([...machines.querySelectorAll(".machine-nav button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), "Add a machine"]);
+  // Add, short, its whole words its name and its tooltip.
+  expect([...machines.querySelectorAll(".machine-nav button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), "Add"]);
+  expect(machines.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a machine");
+  expect(machines.querySelector(".machine-nav-add")).toHaveAttribute("title", "Add a machine");
   expect(screen.queryByText(/remote machine/i)).toBeNull();
+  expect(screen.queryByTitle(/remote machine/i)).toBeNull();
   cleanup();
   // Nothing paired: the empty page's own button says the same.
   room([]);
-  expect(document.getElementById("pair-device-open")).toHaveTextContent(/^Add a machine$/);
+  expect(document.getElementById("pair-device-open")).toHaveTextContent(/^Add$/);
+  expect(document.getElementById("pair-device-open")).toHaveAccessibleName("Add a machine");
+  expect(document.getElementById("pair-device-open")).toHaveAttribute("title", "Add a machine");
   cleanup();
   // Not even a browser talking to a local Sidevoice: that one is a machine among the others.
   room([local, paired()], { localHostAvailable: true, inApp: false });
   expect(within(document.getElementById("machines")!).getByRole("heading", { level: 2 })).toHaveTextContent(/^Machines$/);
-  expect([...document.querySelectorAll(".machine-nav button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
+  expect([...document.querySelectorAll(".machine-nav button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add"]);
+  expect(document.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a machine");
   expect(document.getElementById("this-computer")?.querySelector(".host-detail") ?? null).not.toBeNull();
 });
 
-test("where this device hosts, Remote machines with none says Add a remote machine", () => {
+test("where this device hosts, Remote machines with none says Add, named Add a remote machine", () => {
   actions();
   room([local]);
   const machines = document.getElementById("machines")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
-  expect(document.getElementById("pair-device-open")).toHaveTextContent(/^Add a remote machine$/);
-  expect(machines.querySelector(".machine-nav-add")).toHaveTextContent(/^Add a remote machine$/);
+  for (const add of [document.getElementById("pair-device-open"), machines.querySelector(".machine-nav-add")]) {
+    expect(add).toHaveTextContent(/^Add$/);
+    expect(add).toHaveAccessibleName("Add a remote machine");
+    expect(add).toHaveAttribute("title", "Add a remote machine");
+  }
+});
+
+test("in Spanish, Add is Añadir, named with its whole words", async () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  try {
+    actions();
+    room([local]);
+    for (const add of [document.getElementById("pair-device-open"), document.querySelector("#machines .machine-nav-add")]) {
+      expect(add).toHaveTextContent(/^Añadir$/);
+      expect(add).toHaveAccessibleName("Añadir una máquina remota");
+      expect(add).toHaveAttribute("title", "Añadir una máquina remota");
+    }
+    cleanup();
+    room([paired()], { machineLinks: { "fp-nuc": { reach: "ok", via: "node" } } });
+    expect(document.querySelector("#machines .machine-nav-add")).toHaveTextContent(/^Añadir$/);
+    expect(document.querySelector("#machines .machine-nav-add")).toHaveAccessibleName("Añadir una máquina");
+    // A click on the short Add opens the pairing all the same.
+    await act(async () => { (document.querySelector("#machines .machine-nav-add") as HTMLElement).click(); });
+    expect(window.sidevoiceActions!.openPairing).toHaveBeenCalledTimes(1);
+  } finally {
+    localStorage.removeItem("sidevoice.settings");
+  }
 });
 
 test("Add machine opens the explicit remote setup and pairing flow", async () => {
@@ -501,7 +536,8 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   const machines = document.getElementById("machines")!;
   const nav = machines.querySelector(".machines-inline .machine-nav")!;
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
-  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add a remote machine"]);
+  expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add"]);
+  expect(nav.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a remote machine");
   expect(entry("NUC")).toHaveAccessibleName("NUC, Connected");
   // Each a server, as Remote machines' own icon is: in its entry and in its page's header.
   expect(entry("NUC").querySelector("svg")).toHaveClass("lucide-server");
@@ -554,13 +590,13 @@ test("a machine paired without encryption says so on its page, with why, and its
   const page = screen.getByRole("region", { name: "Lab box" });
   // On its page, after its state, in words with an open lock, and why in its (i).
   const words = within(page.querySelector("header")!).getByText("Not encrypted");
-  expect(words.closest(".host-detail-state")).toHaveTextContent(/^Connected directly·Not encrypted/);
+  expect(words.closest(".host-detail-state")).toHaveTextContent(/^Connected·Not encrypted/);
   expect(words.querySelector("svg")).toHaveClass("lucide-lock-open");
   expect(within(page).getByRole("button", { name: "About this connection" })).toBeInTheDocument();
   // In the list, an open lock after the name (which gives way, the lock never), and in words to a screen reader.
   expect(entry("Lab box").querySelector(".machine-nav-name + .machine-nav-insecure svg")).toHaveClass("lucide-lock-open");
   expect(entry("Lab box").getAttribute("aria-label")).toBe("Lab box, Connected, not encrypted");
-  expect(entry("Lab box")).toHaveAttribute("title", "Lab box · Connected directly · Not encrypted");
+  expect(entry("Lab box")).toHaveAttribute("title", "Lab box · Connected · Not encrypted");
   // One paired over https says nothing of the kind.
   expect(entry("NUC").querySelector(".machine-nav-insecure")).toBeNull();
   expect(entry("NUC").getAttribute("aria-label")).not.toMatch(/not encrypted/);

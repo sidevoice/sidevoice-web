@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { SettingsDialog } from "./SettingsDialog";
+import { Badge } from "../../components/ui/Badge";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { VARIANTS_KEY } from "../../lib/variants";
@@ -73,9 +74,9 @@ test("a green dot on a connected machine's icon and nothing else; not connected,
   expect(navEntry("NUC")).toHaveAccessibleName("NUC, Connected");
   expect(navEntry("Old laptop")).toHaveAccessibleName("Old laptop, Not connected");
   expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected, not encrypted");
-  expect(navEntry("NUC")).toHaveAttribute("title", "NUC · Connected directly");
+  expect(navEntry("NUC")).toHaveAttribute("title", "NUC · Connected");
   expect(navEntry("Old laptop")).toHaveAttribute("title", "Old laptop · Not connected");
-  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected directly · Not encrypted");
+  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected · Not encrypted");
   // One line where nothing is said.
   expect(lines(navEntry("NUC"))).toBe(1);
   // This device: the dot while its service runs and answers, no word, and connected in its name.
@@ -143,7 +144,7 @@ test("This device is never \"Running\", \"Starting…\" or \"Not running\" in th
 
 test("a page's header: the long state, Not encrypted in words after it, and what to do under it", () => {
   open({ machinesView: { machine: "fp-lab" } });
-  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected directly·Not encrypted$/);
+  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected·Not encrypted$/);
   expect(within(header("machines")).getByText("Not encrypted").querySelector("svg")).toHaveClass("lucide-lock-open");
   act(() => { navEntry("Old laptop").click(); });
   expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Not connected$/);
@@ -156,16 +157,36 @@ test("a page's header: the long state, Not encrypted in words after it, and what
   expect(header("machines").querySelector(".host-detail-hint")).toHaveTextContent(/^Pair it again, or forget it below\.$/);
 });
 
+test("Connected on a page wears the models' Ready badge, green with its dot; not connected stays muted words", () => {
+  const ready = render(<Badge tone="positive" dot>Ready</Badge>).container.firstElementChild!;
+  open({ machinesView: { machine: "fp-nuc" } });
+  const state = header("machines").querySelector(".host-detail-state > :first-child")!;
+  expect(state).toHaveTextContent(/^Connected$/);
+  expect(state).toHaveClass("ui-badge", "machine-state");
+  expect(state).toHaveAttribute("data-tone", "positive");
+  expect(state).toHaveAttribute("role", "status");
+  // The Ready badge's own parts: its class, its tone and its dot, hidden from a screen reader.
+  expect(state.getAttribute("data-tone")).toBe(ready.getAttribute("data-tone"));
+  expect(state.firstElementChild!.className).toBe(ready.firstElementChild!.className);
+  expect(state.querySelector(".ui-badge-dot")).toHaveAttribute("aria-hidden");
+  act(() => { navEntry("Old laptop").click(); });
+  const off = header("machines").querySelector(".host-detail-state > :first-child")!;
+  expect(off).toHaveTextContent(/^Not connected$/);
+  expect(off).not.toHaveClass("ui-badge");
+  expect(off).toHaveAttribute("data-tone", "neutral");
+  expect(off.querySelector(".ui-badge-dot")).toBeNull();
+});
+
 test("a dot is only ever green and only means connected; one live state per page; the page in words", () => {
   open();
   expect(document.querySelectorAll(".state-on-icon-dot").length).toBeGreaterThan(0);
-  for (const mark of document.querySelectorAll(".state-on-icon-dot")) expect(["direct", "room", "running"]).toContain(mark.getAttribute("data-state"));
+  for (const mark of document.querySelectorAll(".state-on-icon-dot")) expect(["direct", "running"]).toContain(mark.getAttribute("data-state"));
   for (const state of document.querySelectorAll(".machine-state")) expect(state.getAttribute("data-tone")).not.toBe("accent");
   // A remote page: its header's state is the live one, in words at length; the card has none.
   const states = (page: HTMLElement) => [...page.querySelectorAll(".host-detail-header [role=status], .host-status-card [role=status]")];
   const remote = document.querySelector<HTMLElement>("#pane-machines .host-detail")!;
   expect(states(remote)).toEqual([remote.querySelector(".host-detail-state > :first-child")]);
-  expect(states(remote)[0]).toHaveTextContent(/^Connected directly$/);
+  expect(states(remote)[0]).toHaveTextContent(/^Connected$/);
   // This device: its card's state is the live one, its header's is not.
   const own = document.querySelector<HTMLElement>("#pane-this-computer .host-detail")!;
   expect(states(own)).toEqual([own.querySelector(".host-status-card .host-status-state")]);

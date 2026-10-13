@@ -38,6 +38,9 @@ function open(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
 const sections = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.querySelector(".machine-nav-name")?.textContent ?? button.textContent);
 const machinesNav = () => [...document.querySelectorAll(".settings-nav .machine-nav button")].map((button) => button.textContent);
 const machinesPane = () => document.getElementById("pane-machines")!;
+/** The nav's Add, short ("Add"), its whole words its name and its tooltip. */
+const add = () => document.querySelector<HTMLElement>(".settings-nav .machine-nav .machine-nav-add")!;
+const addSays = (whole: string) => { expect(add()).toHaveAccessibleName(whole); expect(add()).toHaveAttribute("title", whole); };
 
 const navIcon = (id: string) => document.getElementById("settings-" + id)!.querySelector("svg")!;
 
@@ -49,7 +52,8 @@ test("in the desktop app: This device right before Providers, Remote machines af
   expect(navIcon("machines")).toHaveClass("lucide-server");
   expect(navIcon("machines")).not.toHaveClass("lucide-monitor");
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Remote machines$/);
-  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add a remote machine"]);
+  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add"]);
+  addSays("Add a remote machine");
 });
 
 test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then Máquinas remotas", () => {
@@ -60,7 +64,8 @@ test("in the desktop app, in Spanish: Este dispositivo before Proveedores, then 
   expect(names.indexOf("Máquinas remotas")).toBe(names.indexOf("Proveedores") + 1);
   expect(names).not.toContain("Máquinas");
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Máquinas remotas$/);
-  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Añadir una máquina remota"]);
+  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Añadir"]);
+  addSays("Añadir una máquina remota");
 });
 
 test("in a browser: no This device, and plain Machines with its own icon, in English and in Spanish", () => {
@@ -69,13 +74,15 @@ test("in a browser: no This device, and plain Machines with its own icon, in Eng
   expect(document.getElementById("pane-this-computer")).toBeNull();
   expect(navIcon("machines")).toHaveClass("lucide-monitor");
   expect(machinesPane().querySelector(".ui-section-title")).toHaveTextContent(/^Machines$/);
-  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add a machine"]);
+  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add"]);
+  addSays("Add a machine");
   cleanup();
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   open([paired()]);
   expect(sections()).toContain("Máquinas");
   expect(sections()).not.toContain("Este dispositivo");
-  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Añadir una máquina"]);
+  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Añadir"]);
+  addSays("Añadir una máquina");
 });
 
 test("in a browser talking to a local Sidevoice (it can host, but it isn't the app): no This device; that one is a machine", () => {
@@ -84,7 +91,8 @@ test("in a browser talking to a local Sidevoice (it can host, but it isn't the a
   expect(sections()).toContain("Machines");
   expect(document.getElementById("pane-this-computer")).toBeNull();
   expect(navIcon("machines")).toHaveClass("lucide-monitor");
-  expect(machinesNav()).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add a machine"]);
+  expect(machinesNav()).toEqual([expect.stringMatching(/MacBook/), expect.stringMatching(/^NUC/), "Add"]);
+  addSays("Add a machine");
   expect(machinesPane().querySelector('.machine-entry[data-name="MacBook"]')).not.toBeNull();
 });
 
@@ -119,7 +127,8 @@ test("with this computer prepared: This device shows its page; Remote machines l
   expect(within(pane).queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
   // Remote machines: the others alone, then Add a remote machine — in the nav and in its pane.
   await act(async () => { document.getElementById("settings-machines")!.click(); });
-  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add a remote machine"]);
+  expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add"]);
+  addSays("Add a remote machine");
   expect(machinesPane().querySelector('.machine-entry[data-name="MacBook"]')).toBeNull();
   expect(machinesPane().querySelector('.machine-entry[data-name="NUC"]')).not.toBeNull();
   expect(within(machinesPane()).queryByRole("heading", { name: "Sidevoice on MacBook" })).toBeNull();

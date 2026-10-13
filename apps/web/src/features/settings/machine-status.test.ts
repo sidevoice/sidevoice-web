@@ -19,18 +19,16 @@ const running = status("running");
 /** The parts a person meets: its key, tone, short and long words, and hint. */
 const said = (value: ReturnType<typeof machineStatus>) => [value.key, value.tone, value.short, value.long, value.hint];
 
-test("a remote machine: the first that holds of not paired, checking, through the room, connected, not connected", () => {
+test("a remote machine: the first that holds of not paired, checking, connected, not connected", () => {
   expect(said(machineStatus(machine({ revoked: true, state: "connected" }), running, false, en)))
     .toEqual(["unpaired", "warning", "Not paired", "No longer paired", "Pair it again, or forget it below."]);
   expect(said(machineStatus(machine({ state: "revoked", reach: "revoked" }), running, false, en))[0]).toBe("unpaired");
   expect(said(machineStatus(machine({ state: "checking", reach: "checking" }), running, false, en)))
     .toEqual(["checking", "neutral", "Checking…", "Checking…", undefined]);
-  expect(said(machineStatus(machine({ reach: "room" }), running, false, en)))
-    .toEqual(["room", "positive", "Through the room", "Connected through the room", undefined]);
-  expect(said(machineStatus(machine(), running, false, en)))
-    .toEqual(["direct", "positive", "Connected", "Connected directly", undefined]);
-  // Connected another way than directly or through the room: no how.
-  expect(said(machineStatus(machine({ reach: "away" }), running, false, en)).slice(2, 4)).toEqual(["Connected", "Connected"]);
+  // Connected, however it is reached (directly, through the room, another way): the how is never said.
+  for (const reach of ["direct", "room", "away"] as const) {
+    expect(said(machineStatus(machine({ reach }), running, false, en)), reach).toEqual(["direct", "positive", "Connected", "Connected", undefined]);
+  }
   // Not connected is grey, not red: a machine asleep is not something to fix.
   for (const state of ["offline", "failed"] as const) {
     expect(said(machineStatus(machine({ state, reach: "offline" }), running, false, en)))
@@ -74,7 +72,7 @@ test("anywhere the app does not read the service, this computer's row reads as a
 
 test("no state is ever the accent, and every short form fits a nav entry (17 characters at most), in English and Spanish", () => {
   const rows: [MachineView | null, LocalHostStatusName, boolean][] = [
-    [machine({ revoked: true }), "running", false], [machine({ state: "checking" }), "running", false], [machine({ reach: "room" }), "running", false],
+    [machine({ revoked: true }), "running", false], [machine({ state: "checking" }), "running", false],
     [machine(), "running", false], [machine({ state: "offline" }), "running", false], [null, "absent", true], [local(), "starting", true],
     [local(), "failed", true], [local(), "stopped-by-person", true], [local(), "running", true],
   ];
@@ -90,9 +88,21 @@ test("no state is ever the accent, and every short form fits a nav entry (17 cha
   }
 });
 
+test("no state says how a machine is reached, in English or Spanish", () => {
+  for (const t of [en, es]) {
+    for (const reach of ["direct", "room", "away", "offline", "checking"] as const) {
+      for (const state of ["connected", "checking", "offline"] as const) {
+        const value = machineStatus(machine({ reach, state }), running, false, t);
+        expect([value.short, value.long].join(" "), `${reach} ${state}`).not.toMatch(/room|directly|sala|directamente/i);
+      }
+    }
+  }
+});
+
 test("in Spanish, the words the spec gives", () => {
-  expect(said(machineStatus(machine(), running, false, es)).slice(2, 4)).toEqual(["Conectada", "Conectada directamente"]);
-  expect(said(machineStatus(machine({ reach: "room" }), running, false, es)).slice(2, 4)).toEqual(["Por la sala", "Conectada a través de la sala"]);
+  for (const reach of ["direct", "room"] as const) {
+    expect(said(machineStatus(machine({ reach }), running, false, es)).slice(2, 4)).toEqual(["Conectada", "Conectada"]);
+  }
   expect(said(machineStatus(machine({ state: "offline" }), running, false, es)).slice(2, 5)).toEqual(["No conectada", "No conectada", "Ahora no se llega desde aquí"]);
   expect(said(machineStatus(machine({ revoked: true }), running, false, es)).slice(2, 5))
     .toEqual(["Sin emparejar", "Ya no está emparejada", "Vuelve a emparejarla u olvídala abajo."]);
