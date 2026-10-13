@@ -24,7 +24,8 @@
 .stage-name span { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text-muted); }
 @container stage (max-width: 480px) { .stage-name h2 { font-size: var(--sv-font-md); line-height: 1.375rem; } }
 
-/* Under the name, the agent's bubble or, between turns, its activity: one place, one at a time. */
+/* Under the name, the agent's bubble; between turns its activity is said there to assistive tech only (the sidebar
+ * shows it). */
 .stage-top { position: absolute; z-index: 2; top: calc(var(--stage-inset) + var(--sv-space-12) + var(--sv-space-3)); left: var(--stage-inset); right: var(--stage-inset);
   display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; pointer-events: none; }
 .stage-top > * { grid-area: 1 / 1; align-self: start; }
@@ -40,9 +41,6 @@
 .stage-bubble .karaoke-text .karaoke-played { color: var(--sv-text); opacity: 1; }
 .stage-bubble .karaoke-text .karaoke-upcoming { color: var(--sv-text-subtle); opacity: 1; }
 @container stage (max-width: 480px) { .stage-bubble { font-size: var(--sv-font-md); line-height: 1.375rem; } }
-.stage-activity { display: inline-flex; align-items: center; gap: var(--sv-space-2); max-width: 100%; padding: var(--sv-space-2) var(--sv-space-4); overflow: hidden;
-  border-radius: var(--sv-radius-pill); background: var(--sv-voice-soft); color: var(--sv-voice-text);
-  font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; }
 
 /* The harness and model, at the tile's foot; they step aside while the person's bubble is up. */
 .stage-tags { position: absolute; z-index: 2; left: 50%; bottom: var(--stage-inset); display: flex; justify-content: center; gap: var(--sv-space-1-5); max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); }
