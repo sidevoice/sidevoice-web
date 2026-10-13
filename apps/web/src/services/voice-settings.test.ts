@@ -130,6 +130,6 @@ test("a catalogue from a newer engine is read: a model without capabilities, or 
     { id: "odd-model", family: "odd", capabilities: { stt: true }, languages: ["en"], voices: [], builds: [build("odd-model/int8")] }] },
     ...CATALOGS.slice(1)] as unknown as CatalogView[];
   const choices = voiceChoices(newer, defaultVoiceSettings(), ["es", "en"]);
-  expect(choices.stt.options.map((option) => option.id)).toEqual(["whisper-base", "whisper-large", "moonshine-tiny"]);
-  expect(choices.tts.options.map((option) => option.id)).toEqual(["kokoro-82m-v1.0"]);
+  expect(choices.stt.options.map((option: { id: string }) => option.id)).toEqual(["whisper-base", "whisper-large", "moonshine-tiny"]);
+  expect(choices.tts.options.map((option: { id: string }) => option.id)).toEqual(["kokoro-82m-v1.0"]);
 });
