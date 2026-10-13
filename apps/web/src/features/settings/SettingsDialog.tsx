@@ -48,10 +48,13 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: (size?: number) => Re
   { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
   { id: "providers", label: "settings.section.providers", icon: (size) => <IntegrationsIcon size={size} /> },
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
-  // The desktop app's updates, where they have a section of their own (VARIANTS `updates-section` B).
+  // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
   { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
 ];
+
+/** What a place asked for (`settingsFocus`) can focus: a control that takes it now. */
+const FOCUSABLE = "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
 
 export function Appearance({ t }: { t: HostTranslate }) {
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
@@ -205,18 +208,21 @@ export function SettingsDialog() {
   const summaries = useSummaries(t, thisDevice);
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
-  // A control asked for (This device's rename): in view, focused, and lit for a moment, once its section is drawn.
+  // A place asked for, once its section is drawn (it may come later: an update found as the app answers): in view, lit
+  // for a moment, and focused — a control itself (This device's rename, an update's Download), else the first one in it
+  // (a remote machine's update row: its command's Copy). Its row is what is lit: a setting's, an update's, or itself.
   useEffect(() => {
     if (!focus) return;
     let tries = 0;
     const find = () => {
-      const control = document.getElementById(focus);
-      if (!control && ++tries < 20) { timer = window.setTimeout(find, 100); return; }
+      const place = document.getElementById(focus);
+      if (!place && ++tries < 20) { timer = window.setTimeout(find, 100); return; }
       store?.patch({ settingsFocus: null });
-      if (!control) return;
-      const row = control.closest(".ui-row") ?? control;
+      if (!place) return;
+      const control = place.matches(FOCUSABLE) ? place : place.querySelector<HTMLElement>(FOCUSABLE);
+      const row = place.closest<HTMLElement>(".ui-row, [data-settings-row]") ?? place;
       row.scrollIntoView?.({ block: "center" });
-      control.focus({ preventScroll: true });
+      control?.focus({ preventScroll: true });
       row.classList.add("settings-highlight");
       window.setTimeout(() => row.classList.remove("settings-highlight"), 2400);
     };
@@ -228,11 +234,11 @@ export function SettingsDialog() {
     if (phone && level === 2 && current === "this-computer" && !ownComputer) levels.back({ instantly: true, focus: "title" });
   }, [phone, level, current, ownComputer]); // eslint-disable-line react-hooks/exhaustive-deps
   const show = (section: string) => store?.patch({ settingsSection: section });
-  // The desktop app's updates as a section of their own, where the variant puts them there.
-  const updatesApart = useUpdatesSection();
-  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesApart));
-  // Updates shown as they stop having a section of their own: This device, where they are then.
-  useEffect(() => { if (current === "updates" && !updatesApart) show(ownComputer ? "this-computer" : "general"); }, [current, updatesApart]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Updates: in the desktop app, or wherever a machine is behind.
+  const updatesShown = useUpdatesSection();
+  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown));
+  // Updates shown as the last machine behind is updated (a browser, a phone): General.
+  useEffect(() => { if (current === "updates" && !updatesShown) show("general"); }, [current, updatesShown]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
   // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
@@ -305,7 +311,7 @@ export function SettingsDialog() {
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
                 <Pane id="machines" current={current}><MachineList /></Pane>
-                {updatesApart && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
+                {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
               </div>
             </div>

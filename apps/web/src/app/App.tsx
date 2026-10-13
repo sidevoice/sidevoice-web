@@ -17,6 +17,7 @@ import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
 import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
+import { UpdateBanner } from "../features/updates/UpdateNotice";
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
@@ -56,6 +57,8 @@ function RoomContent() {
       <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
         <RoomHeader />
         <LocalHostBanner />
+        {/* An update waiting, as a banner over the room (VARIANTS `update-notice` B; a desktop's only). */}
+        {!noMachine && <UpdateBanner />}
         {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
           <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}

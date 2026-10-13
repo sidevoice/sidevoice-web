@@ -1,171 +1,94 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useId } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { RefreshIcon, UpdateIcon } from "../../components/ui/Icons";
+import { UpdateIcon } from "../../components/ui/Icons";
 import { Popover } from "../../components/ui/Popover";
-import { ProgressBar } from "../../components/ui/ProgressBar";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
-import { useThisComputerSection } from "../../state/this-computer";
-import { useUpdatesSection } from "../settings/UpdatesSettings";
-import { useUpdates, type UpdateItem, type UpdaterStatus, type useAppUpdate } from "./useUpdates";
+import { machineUpdatePlace, UPDATE_PLACE, useUpdates, type UpdateItem, type UpdaterStatus } from "./useUpdates";
 import "./updates.css";
 
-/* The updates waiting, as one quiet row at the conversations' foot, above Settings (UpdateLine): the most pressing one,
- * acting where it is. The desktop app's first: automatic, "Restart to update" once it is ready; manual, "Version X
- * available · Download", its download's progress in the same row, then "Restart to update". Then the page's (Reload to
- * update), then this computer's machine's (Updates available, opening where it is updated). The rail keeps them all
- * behind an icon with their count. A phone has no entry (decided): its page picks up a new version the next time it
- * is opened. Nothing opens by itself, and nothing waits for a call: Reload and Restart act when pressed. Never the
+/* The updates waiting, as one quiet row at the conversations' foot, above Settings (UpdateLine): the most pressing
+ * one's words — the desktop app's first (automatic: nothing until it is ready to restart into; manual: available, its
+ * download's percentage, then ready), then the page's (Reload to update), then a machine's (Updates available). The rail
+ * keeps them all behind an icon with their count. Each opens Settings › Updates on its own row, its action (Download,
+ * Restart to update, Update, a remote machine's command) in view and focused: that is where it is done. The page's
+ * Reload is the exception, acting where it is: Updates does not list the page. A phone has no entry (decided): its page
+ * picks up a new version the next time it is opened. Nothing opens by itself, and nothing waits for a call. Never the
  * voice's colour, which is the agents' waiting. */
 
-/** Where a machine's update is acted on: This computer's page, This device or its machine's page under Machines. */
-function useOpenMachineUpdate() {
-  const machines = useRoomStore((state) => state.machines);
+/** Opens Settings › Updates on an update's place (UPDATE_PLACE): its row's action in view and focused. */
+function useLandOn() {
   const store = useContext(RoomStoreContext);
-  // This computer in a section of its own (This device): its update is there, not under Remote machines, which leave it out.
-  const ownComputer = useThisComputerSection();
-  const open = () => {
-    const local = machines.find((machine) => machine.local);
-    openSettings(ownComputer ? { section: "this-computer" } : { section: "machines", machine: local?.id ?? null }, store);
-  };
-  return { open, ownComputer };
+  return (place: string) => openSettings({ section: "updates", focus: place }, store);
 }
 
-function UpdateRow({ item, t }: { item: UpdateItem; t: HostTranslate }) {
-  const { open: openMachine, ownComputer } = useOpenMachineUpdate();
-  const store = useContext(RoomStoreContext);
-  const apart = useUpdatesSection();
-  const open = apart ? () => openSettings({ section: "updates" }, store) : openMachine;
-  const remote = useRoomStore((state) => item.machine ? state.machines.find((machine) => machine.pairingId === item.machine)?.host : null);
-  // A remote machine with no name here is an unnamed one, never This computer.
-  const title = item.kind === "web" ? t("updates.web") : t("updates.machine", { machine: item.machine ? remote || t("hosts.unnamed") : t("hosts.thisComputer") });
-  const act = () => {
-    if (item.kind === "web") window.sidevoiceActions?.reloadToUpdate?.();
-    else open();
-  };
+/** What the app's update says where it waits: ready, Restart to update; downloading, how far; available, its version. */
+function appUpdateText(app: UpdaterStatus, t: HostTranslate) {
+  const version = app.version ?? "";
+  if (app.state === "ready") return version ? t("updates.restartToUpdateVersion", { version }) : t("updates.restartToUpdate");
+  if (app.state === "downloading") return t("updates.downloadingPercent", { percent: app.progress == null ? ""
+    : new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(Math.max(0, Math.min(1, app.progress))) });
+  return version ? t("updates.available", { version }) : t("updates.availableOne");
+}
+
+/** A download or an install that failed, as the app says it; a failed check is Updates' to say. */
+const appFailure = (app: UpdaterStatus | null) => app?.error && app.error.code !== "update-check-failed" ? app.error : null;
+
+/** One update in the rail's list: what it is, and Open, which lands on it in Updates (Reload, for the page, reloads). */
+function UpdateRow({ title, required, onOpen, reload, error, t }: { title: string; required?: boolean; onOpen: () => void; reload?: boolean; error?: unknown; t: HostTranslate }) {
+  const titleId = useId();
   return (
     <li className="update-row">
       <span className="update-row-copy">
-        <strong>{title}</strong>{item.required && <Badge tone="warning">{t("updates.required")}</Badge>}
+        <strong id={titleId}>{title}</strong>{required && <Badge tone="warning">{t("updates.required")}</Badge>}
       </span>
+      {!!error && <ErrorText className="update-row-error" message={updaterFailure(error, { t })} />}
       <span className="update-row-actions">
-        <Button size="sm" variant="primary" onClick={act}
-          aria-label={item.kind === "web" ? t("updates.reloadNamed") : apart ? t("settings.updates.see") : ownComputer ? t("updates.openThisDevice") : t("updates.openNamed", { machine: t("hosts.thisComputer") })}>
-          {item.kind === "web" ? t("updates.reload") : t("updates.open")}
+        <Button size="sm" variant="primary" onClick={onOpen} aria-label={reload ? t("updates.reloadNamed") : t("settings.updates.see")} aria-describedby={reload ? undefined : titleId}>
+          {reload ? t("updates.reload") : t("updates.open")}
         </Button>
       </span>
     </li>
   );
 }
 
-/** The desktop app's update where it shows (`appUpdateShown`), acting in place: Download fetches it here and its
- *  progress shows here, then Restart to update, which restarts at once, in a call or not. A download or an install
- *  that failed is said under it, with a Retry where one makes sense (a download). */
-export function AppUpdateLine({ status, update, t }: { status: UpdaterStatus; update: ReturnType<typeof useAppUpdate>; t: HostTranslate }) {
-  const [busy, setBusy] = useState<"download" | "restart" | null>(null);
-  const [failure, setFailure] = useState<unknown>(null);
-  // What the app says next replaces what a call of this page's said.
-  useEffect(() => { setFailure(null); }, [status.state]);
-  const version = status.version ?? "";
-  const error = failure ?? (status.error && status.error.code !== "update-check-failed" ? status.error : null);
-  const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed";
-  async function run(action: "download" | "restart") {
-    if (busy) return;
-    setBusy(action); setFailure(null);
-    try { await (action === "download" ? update.download() : update.restart()); }
-    catch (reason) { setFailure(reason); }
-    finally { setBusy(null); }
-  }
-  const progress = status.progress == null ? null : Math.max(0, Math.min(1, status.progress));
-  return (
-    <div className="app-update" data-state={status.state}>
-      {status.state === "ready" ? update.can.restart && <Button variant="ghost" tone="neutral" block className="app-update-restart" loading={busy === "restart"} onClick={() => void run("restart")}>
-          <RefreshIcon size={16} /><span>{t("updates.restartToUpdate")}</span></Button>
-        : status.state === "downloading" ? <div className="app-update-progress">
-          <span className="app-update-copy">{t("updates.downloading", { version })}
-            {progress != null && <span className="app-update-percent">{new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(progress)}</span>}</span>
-          <ProgressBar value={progress} label={t("updates.downloading", { version })} />
-        </div>
-        : <div className="app-update-row">
-          <span className="app-update-copy">{t("updates.available", { version })}</span>
-          {update.can.download && <Button size="sm" variant="ghost" loading={busy === "download"} onClick={() => void run("download")}
-            aria-label={downloadFailed ? undefined : t("updates.downloadNamed", { version })}>{t(downloadFailed ? "updates.retry" : "updates.download")}</Button>}
-        </div>}
-      {!!error && <ErrorText className="app-update-error" role="alert" message={updaterFailure(error, { t })} />}
-    </div>
-  );
+function MachineRow({ item, t }: { item: UpdateItem; t: HostTranslate }) {
+  const land = useLandOn();
+  const remote = useRoomStore((state) => item.machine ? state.machines.find((machine) => machine.pairingId === item.machine)?.host : null);
+  // A remote machine with no name here is an unnamed one, never This computer.
+  const title = t("updates.machine", { machine: item.machine ? remote || t("hosts.unnamed") : t("hosts.thisComputer") });
+  return <UpdateRow title={title} required={item.required} onOpen={() => land(machineUpdatePlace(item))} t={t} />;
 }
 
-function UpdatesList({ items, app, update, t }: { items: UpdateItem[]; app: UpdaterStatus | null; update: ReturnType<typeof useAppUpdate>; t: HostTranslate }) {
+function UpdatesList({ items, app, t }: { items: UpdateItem[]; app: UpdaterStatus | null; t: HostTranslate }) {
+  const land = useLandOn();
   return items.length || app ? <ul className="updates-list">
-    {app && <li className="update-row update-row--app"><AppUpdateLine status={app} update={update} t={t} /></li>}
-    {items.map((item) => <UpdateRow key={item.id} item={item} t={t} />)}</ul>
+    {app && <UpdateRow title={appUpdateText(app, t)} error={appFailure(app)} onOpen={() => land(UPDATE_PLACE.app)} t={t} />}
+    {items.map((item) => item.kind === "web"
+      ? <UpdateRow key={item.id} title={t("updates.web")} required={item.required} reload onOpen={() => window.sidevoiceActions?.reloadToUpdate?.()} t={t} />
+      : <MachineRow key={item.id} item={item} t={t} />)}</ul>
     : <p className="updates-none">{t("updates.none")}</p>;
 }
 
-/** The sidebar's foot: one quiet row, its words the most pressing update's, acting where it is.
- *  The app's first (restart once ready; manual: download, then its progress in the row), then the page's (reload), then
- *  a machine's service ("Updates available", opening where it is updated). One line, cut short, never wider than the
- *  sidebar. */
-function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: UpdaterStatus | null; update: ReturnType<typeof useAppUpdate>; t: HostTranslate }) {
-  const [busy, setBusy] = useState<"download" | "restart" | null>(null);
-  const [failure, setFailure] = useState<unknown>(null);
-  const store = useContext(RoomStoreContext);
-  // Where updates have a section of their own (VARIANTS `updates-section` B), the entry says the same and opens it.
-  const apart = useUpdatesSection();
-  const { open: openMachine } = useOpenMachineUpdate();
-  const open = apart ? () => openSettings({ section: "updates" }, store) : openMachine;
-  useEffect(() => { setFailure(null); }, [app?.state]);
-  async function run(action: "download" | "restart") {
-    if (busy) return;
-    setBusy(action); setFailure(null);
-    try { await (action === "download" ? update.download() : update.restart()); }
-    catch (reason) { setFailure(reason); }
-    finally { setBusy(null); }
-  }
-  const error = app ? failure ?? (app.error && app.error.code !== "update-check-failed" ? app.error : null) : null;
-  const row = (text: string, act?: { label?: string; onClick: () => void; loading?: boolean }, extra?: React.ReactNode) => act
-    ? <Button variant="ghost" tone="neutral" block className="update-line" title={text} loading={act.loading} onClick={act.onClick}>
-        <UpdateIcon /><span className="update-line-text">{text}</span>{act.label && <span className="update-line-act">{act.label}</span>}</Button>
-    : <div className="update-line" role="status" title={text}><UpdateIcon /><span className="update-line-text">{text}</span>{extra}</div>;
-  let line: React.ReactNode = null;
-  if (apart && app) {
-    const version = app.version ?? "";
-    const text = app.state === "ready" ? version ? t("updates.restartToUpdateVersion", { version }) : t("updates.restartToUpdate") : app.state === "downloading"
-      ? t("updates.downloadingPercent", { percent: app.progress == null ? "" : new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(app.progress) })
-      : t("updates.available", { version });
-    line = row(text, { onClick: open });
-  } else if (app) {
-    const version = app.version ?? "";
-    if (app.state === "ready") line = update.can.restart
-      ? row(version ? t("updates.restartToUpdateVersion", { version }) : t("updates.restartToUpdate"), { onClick: () => void run("restart"), loading: busy === "restart" })
-      : null;
-    else if (app.state === "downloading") {
-      const progress = app.progress == null ? null : Math.max(0, Math.min(1, app.progress));
-      const percent = progress == null ? "" : new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(progress);
-      line = <div className="update-line update-line--progress" role="status" title={t("updates.downloadingPercent", { percent })}>
-        <UpdateIcon /><span className="update-line-text">{t("updates.downloadingPercent", { percent })}</span>
-        <ProgressBar className="update-line-bar" value={progress} label={t("updates.downloading", { version })} />
-      </div>;
-    } else {
-      const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed";
-      line = update.can.download
-        ? row(t("updates.available", { version }), { label: t(downloadFailed ? "updates.retry" : "updates.download"), onClick: () => void run("download"),
-            loading: busy === "download" })
-        : row(t("updates.available", { version }));
-    }
-  } else if (items.some((item) => item.kind === "web")) {
-    line = row(t("updates.reloadToUpdate"), { onClick: () => window.sidevoiceActions?.reloadToUpdate?.() });
-  } else if (items.length) {
-    line = row(t("updates.availableAny"), { onClick: open });
-  }
-  if (!line) return null;
+/** The sidebar's foot: one quiet row, the most pressing update's words, landing on it in Updates — the app's first,
+ *  then the page's (Reload, in place), then a machine's ("Updates available", on the first one's). One line, cut short,
+ *  never wider than the sidebar; a download or an install that failed said under it. */
+function UpdateLine({ items, app, t }: { items: UpdateItem[]; app: UpdaterStatus | null; t: HostTranslate }) {
+  const land = useLandOn();
+  const machine = items.find((item) => item.kind === "machine");
+  const shown: [string, () => void] | null = app ? [appUpdateText(app, t), () => land(UPDATE_PLACE.app)]
+    : items.some((item) => item.kind === "web") ? [t("updates.reloadToUpdate"), () => window.sidevoiceActions?.reloadToUpdate?.()]
+      : machine ? [t("updates.availableAny"), () => land(machineUpdatePlace(machine))] : null;
+  if (!shown) return null;
+  const [text, open] = shown;
+  const error = appFailure(app);
   return <div className="update-foot">
-    {line}
+    <Button variant="ghost" tone="neutral" block className="update-line" title={text} onClick={open}>
+      <UpdateIcon /><span className="update-line-text">{text}</span></Button>
     {!!error && <ErrorText className="update-line-error" role="alert" message={updaterFailure(error, { t })} />}
   </div>;
 }
@@ -174,21 +97,16 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
  *  count. Hidden while nothing waits. */
 export function UpdatesEntry({ compact = false }: { compact?: boolean }) {
   const t = hostTranslator();
-  const all = useUpdates();
-  // A remote machine behind is the Updates section's to say (VARIANTS `updates-section` B); elsewhere it has no place yet.
-  const apart = useUpdatesSection();
-  const { app, appUpdate } = all;
-  const items = apart ? all.items : all.items.filter((item) => !item.machine);
-  if (!compact) return <UpdateLine items={items} app={app} update={appUpdate} t={t} />;
-  const behind = app;
-  const count = items.length + (behind ? 1 : 0);
+  const { items, app } = useUpdates();
+  if (!compact) return <UpdateLine items={items} app={app} t={t} />;
+  const count = items.length + (app ? 1 : 0);
   const label = t("updates.entry", { n: count });
   const trigger = <Button variant="ghost" tone="neutral" size="icon" className="updates-entry updates-entry--icon" aria-label={label} title={label} aria-haspopup="dialog">
       <UpdateIcon size={20} /><span className="updates-count" aria-hidden="true">{count}</span></Button>;
   return <>
     {count > 0 && <Popover trigger={trigger} label={t("updates.title")} side="top" align="start">
       <div className="updates-panel">
-        <h3>{t("updates.title")}</h3><UpdatesList items={items} app={behind} update={appUpdate} t={t} />
+        <h3>{t("updates.title")}</h3><UpdatesList items={items} app={app} t={t} />
       </div>
     </Popover>}
   </>;

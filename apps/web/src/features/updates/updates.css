@@ -3,38 +3,61 @@
 .updates-badge { margin-inline-start: auto; }
 .updates-entry--icon .updates-count { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
   background: var(--sv-accent); color: var(--sv-on-accent); font-size: 10px; line-height: 16px; font-weight: var(--sv-weight-semibold); text-align: center; }
-.updates-panel { display: grid; gap: var(--sv-space-2); width: min(340px, calc(100vw - 32px)); }
+.updates-panel { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .updates-panel h3 { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
 .updates-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
 .update-row { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
 .update-row-copy { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); font-size: var(--sv-font-sm); }
 .update-row-note { flex-basis: 100%; color: var(--sv-text-muted); }
 .update-row-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
+.update-row-error { font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
 .updates-none { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
-/* The desktop app's update, in place at the sidebar's foot (and in the panel's list where the entry is an icon). */
-.app-update { display: grid; gap: var(--sv-space-1); min-width: 0; font-size: var(--sv-font-sm); }
-.app-update-restart { justify-content: flex-start; gap: var(--sv-space-2); }
-.app-update-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); min-height: var(--sv-control-sm); padding-inline-start: var(--sv-space-3); }
-.app-update-copy { display: flex; gap: var(--sv-space-2); min-width: 0; color: var(--sv-text-muted); }
+/* An update found, in its row in Settings › Updates (the app's, this computer's): what it is, its action right there,
+ * wrapping under it where the row is narrow; a download's progress and what failed under them. */
+.update-action-row { display: grid; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); }
+.update-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); min-width: 0; }
+.update-action-copy { display: flex; flex: 1 1 10rem; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-medium); overflow-wrap: anywhere; }
 .app-update-percent { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
-.app-update-progress { display: grid; gap: var(--sv-space-1); padding: var(--sv-space-1) var(--sv-space-3); }
-.app-update-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); }
-.update-row--app .app-update-row, .update-row--app .app-update-progress, .update-row--app .app-update-error { padding-inline: 0; }
-/* The desktop app's updates on This device's card (AppUpdateSettings), by its version: rows as Start at sign-in's. */
+.app-update-error { font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
+/* The app's updates' settings (AppUpdateSettings), under its version and its update: rows as Start at sign-in's. */
 .app-update-settings { display: grid; gap: var(--sv-space-3); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .app-update-setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); }
 .app-update-setting-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
 .app-update-setting-copy.muted, .app-update-setting-copy .muted { font-size: var(--sv-font-xs); }
 .app-update-failure { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
-/* The sidebar foot's one row (UpdateLine): the update icon, the words cut short on one line, the act at its end. */
+/* The sidebar foot's one row (UpdateLine): the update icon, the words cut short on one line, landing in Updates. */
 .update-foot { display: grid; gap: var(--sv-space-1); min-width: 0; }
 .update-line { display: flex; align-items: center; justify-content: flex-start; gap: var(--sv-space-2); min-width: 0; max-width: 100%; overflow: hidden; font-size: var(--sv-font-sm); }
-div.update-line { min-height: var(--sv-control-md, 40px); padding-inline: var(--sv-space-3); color: var(--sv-text-muted); }
 .update-line > svg { flex: none; color: var(--sv-accent); }
 .update-line-text { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; }
-.update-line-act { flex: none; color: var(--sv-accent-text, var(--sv-accent)); font-weight: var(--sv-weight-semibold); }
-.update-line--progress { flex-wrap: wrap; row-gap: 4px; padding-block: var(--sv-space-1); }
-.update-line-bar { flex: 1 0 100%; }
 .update-line-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
 /* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
 .app-update-setting .ui-segment { padding-inline: 10px; }
+/* Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`). Each update's line: its words, its
+ * action beside them (under them where it is narrow), what failed under both. */
+.update-notice-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
+.updates-panel .update-notice-list > li { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.update-notice-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2) var(--sv-space-3); min-width: 0; }
+.update-notice-line .update-notice-text { flex: 1 1 10rem; min-width: 0; margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.update-notice-text:focus:not(:focus-visible) { outline: none; }
+.update-notice-error { flex-basis: 100%; font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
+/* C: the update icon at the brand's end (under the mark in the rail), an accent dot on its corner ringed in the
+ * column's ground. */
+.sidebar-brand .update-brand { position: relative; flex: none; margin-inline-start: auto; color: var(--sv-text-muted); }
+.sidebar-brand .update-brand:hover { color: var(--sv-text); }
+.update-brand-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-accent); box-shadow: 0 0 0 2px var(--dot-ring, var(--sv-bg)); }
+@media (min-width: 900px) {
+  .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand:has(.update-brand) { flex-direction: column; gap: var(--sv-space-1); }
+  .conversation-sidebar[data-collapsed] .sidebar-brand .update-brand { margin-inline-start: 0; }
+}
+/* A: the update's icon on the gear's corner, where the "new" count would be, ringed as it is. */
+.settings-notice[data-mark="update"] { top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--new-ground); }
+.settings-notice[data-mark="update"] svg { width: 10px; height: 10px; stroke-width: 2.4; }
+.sidebar-settings .settings-notice[data-mark="update"] { right: auto; left: 22px; }
+/* B: a slim bar across the room, the accent's soft ground; its words and action, then × at its end. */
+.update-banner { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 44px; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-5);
+  border-bottom: 1px solid var(--sv-border); background: var(--sv-accent-soft); color: var(--sv-text); }
+.update-banner-icon { flex: none; color: var(--sv-accent-text); }
+.update-banner .update-notice-line { flex: 1 1 auto; }
+.update-banner .update-notice-text { flex: 0 1 auto; font-weight: var(--sv-weight-medium); }
+.update-banner-hide { flex: none; margin-inline-start: auto; }

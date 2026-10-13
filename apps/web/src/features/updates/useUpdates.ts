@@ -1,7 +1,40 @@
 import { useEffect, useState } from "react";
-import { localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
+import { desktopBuild, localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
+import { useVariant } from "../../lib/variants";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
+import { safeLocalHostStatusDetails } from "../settings/local-host-status";
+
+/** Where the room says an update waits (VARIANTS `update-notice`, desktop only: a phone has none): an update icon by
+ *  the brand, with a popover (C, the default); a mark on the Settings gear (A); a slim banner over the room (B); the
+ *  conversations' foot, today's (D). */
+export const UPDATE_NOTICE = ["brand", "gear", "banner", "foot"] as const;
+export type UpdateNotice = (typeof UPDATE_NOTICE)[number];
+export const useUpdateNotice = () => useVariant("update-notice", UPDATE_NOTICE);
+
+/** This computer in Settings › Updates (VARIANTS `updates-rows`): two rows, the app and its service, each its own
+ *  version and button (B, the default); or one, Sidevoice, one version and one button that updates the app, then the
+ *  service (A). Every button says what it updates: `words` names it. */
+export const UPDATES_ROWS = ["two", "one"] as const;
+export type UpdatesRows = (typeof UPDATES_ROWS)[number];
+export const useUpdatesRows = () => useVariant("updates-rows", UPDATES_ROWS);
+/** What a button names: the app, the service (two rows), or Sidevoice as one (one row). */
+export type UpdateWords = "app" | "service" | "all";
+
+/* One row (A) updates the app, then this computer's service: restarting into the app's update is the app's last step,
+ * so the service is updated by the page the new app opens — asked for here before the restart, done once the service
+ * says it is behind and no call is on, and forgotten after half an hour (a restart that never happened). */
+const CONTINUE_KEY = "sidevoice.update-continue";
+const CONTINUE_MS = 30 * 60 * 1000;
+export function continueAfterRestart() {
+  try { localStorage.setItem(CONTINUE_KEY, String(Date.now())); } catch { /* Then the service waits for its own press. */ }
+}
+export function continuing() {
+  try { const at = Number(localStorage.getItem(CONTINUE_KEY)); return at > 0 && Date.now() - at < CONTINUE_MS; } catch { return false; }
+}
+export function continued() {
+  try { localStorage.removeItem(CONTINUE_KEY); } catch { /* Nothing kept. */ }
+}
 
 /* What wants updating, from four places: this page (a newer build the room serves: out of a call the page reloads
  * itself, in one Reload loads it when the person says), the desktop app (its updater, behind the host's `updater`
@@ -10,6 +43,19 @@ import type { MachineView } from "../../state/room-types";
 
 export type UpdateKind = "web" | "machine";
 export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean; machine?: string }
+
+/** Where each update is acted on in Settings › Updates, by the id a landing asks for (`settingsFocus`): the app's
+ *  action row, this computer's Update, a remote machine's row (its command's Copy). */
+export const UPDATE_PLACE = {
+  app: "updates-app",
+  thisComputer: "updates-this-computer",
+  machine: (pairingId: string) => "updates-machine-" + pairingId,
+};
+/** A machine's update's place: a remote one's row, else this computer's Update. */
+export const machineUpdatePlace = (item: UpdateItem) => item.machine ? UPDATE_PLACE.machine(item.machine) : UPDATE_PLACE.thisComputer;
+/** This computer's update's place: the app's row while the app has one (one row shows the app's first), else the
+ *  service's Update. */
+export const thisComputerPlace = (appFound: boolean, rows: UpdatesRows) => appFound && rows === "one" ? UPDATE_PLACE.app : UPDATE_PLACE.thisComputer;
 
 export type UpdateMode = "automatic" | "manual";
 export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed";
@@ -20,9 +66,10 @@ export interface UpdaterStatus {
   progress?: number;
   error?: { code: UpdaterFailure };
 }
-/** The desktop app's updater (sidevoice-desktop #56; a release's only: a nightly, a development build or an older app
- *  has none, and then nothing of it shows). Each method is looked for before it is used. Automatic downloads an update
- *  by itself; manual says one exists and `download` fetches it. `restart` installs a ready one at once. */
+/** The desktop app's updater (sidevoice-desktop #56: a release's, and for now a nightly's; a development build or an
+ *  older app has none, and then nothing of it shows: whatever its channel, it is the updater that says). Each method
+ *  is looked for before it is used. Automatic downloads an update by itself; manual says one exists and `download`
+ *  fetches it. `restart` installs a ready one at once. */
 export interface AppUpdater {
   settings?(): Promise<{ mode: UpdateMode }>;
   setMode?(mode: UpdateMode): Promise<{ mode: UpdateMode }>;
@@ -55,8 +102,9 @@ function modeKnown(updater: AppUpdater, mode: UpdateMode) {
   window.dispatchEvent(new Event(CHANGED));
 }
 
-/** The desktop app's update, wherever it shows (the sidebar's foot, This device): its status as the app pushes it, its
- *  mode, when it last checked, and its actions. Without an updater, `updater` is null and nothing else is used. */
+/** The desktop app's update, wherever it shows (the sidebar's foot, the rail, Updates): its status as the app pushes
+ *  it, its mode, when it last checked, and its actions. Without an updater, `updater` is null and nothing else is
+ *  used. */
 export function useAppUpdate() {
   const [updater] = useState(appUpdater);
   const [status, setStatus] = useState<UpdaterStatus | null>(null);
@@ -141,7 +189,7 @@ function failedAs(code: UpdaterFailure, error: unknown) {
 
 /** What the sidebar's foot says of the app's update. Automatic: nothing until it is ready to restart into. Manual: that
  *  one is available, then its download, then ready. A download or install that failed is said there too; a failed
- *  check is This device's to say. */
+ *  check is Updates' to say. */
 export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null): UpdaterStatus | null {
   if (!status) return null;
   if (status.state === "ready") return status;
@@ -183,7 +231,7 @@ export function useUpdates() {
   const items: UpdateItem[] = [];
   if (web) items.push({ id: "web", kind: "web", version: web, required: false });
   if (machine?.update === "available") items.push({ id: "machine:local", kind: "machine", version: typeof machine.bundled?.version === "string" ? machine.bundled.version : "", required: false });
-  // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section (VARIANTS `updates-section` B).
+  // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section.
   for (const { machine: remote, latest } of outdated) items.push({ id: "machine:" + remote.pairingId, kind: "machine", version: latest, required: false, machine: remote.pairingId });
   return { items, app: appUpdateShown(appUpdate.status, appUpdate.mode), appUpdate };
 }

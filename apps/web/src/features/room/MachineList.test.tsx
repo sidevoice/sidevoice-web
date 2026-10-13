@@ -8,7 +8,6 @@ import { createRoomStore } from "../../state/room-store";
 import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
-import type { UpdaterStatus } from "../updates/useUpdates";
 import { fakeUpdater } from "../../test/updater";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -191,96 +190,6 @@ test("service failure display and copied diagnostics omit secret-bearing native 
     if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
     else Reflect.deleteProperty(navigator, "clipboard");
   }
-});
-
-test("Update appears only for an available version and waits for active calls", async () => {
-  const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
-  const versionCheck = vi.fn(async () => version);
-  const update = vi.fn().mockResolvedValue(running);
-  setBridge({ version: versionCheck, update });
-  actions();
-  room([local], { localHostStatus: { ...running, calls: 2 } });
-
-  expect(await screen.findByText("Wait for 2 active calls to finish before updating.")).toBeInTheDocument();
-  const updateButton = screen.getByRole("button", { name: "Update this machine" });
-  expect(updateButton).toBeDisabled();
-  expect(versionCheck).toHaveBeenCalledOnce();
-  expect(update).not.toHaveBeenCalled();
-});
-
-test("an available Update click delegates to the optional desktop transaction", async () => {
-  const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
-  const current: LocalHostVersion = { ...available, update: "current" };
-  const version = vi.fn().mockResolvedValueOnce(available).mockResolvedValueOnce(available).mockResolvedValueOnce(current);
-  const update = vi.fn().mockResolvedValue(running);
-  setBridge({ version, update });
-  actions();
-  room([local], { localHostStatus: { ...running, calls: 0 } });
-  await act(async () => {});
-
-  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
-  expect(update).toHaveBeenCalledOnce();
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull());
-  expect(version).toHaveBeenCalledTimes(3);
-});
-
-test("copied Update errors omit unrecognized bridge keys and steps while retaining safe checks", async () => {
-  const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
-  const version = vi.fn(async () => available);
-  const update = vi.fn().mockRejectedValue({ key: "SV1.private-pairing-code", step: "token-secret",
-    params: { check: "archive-link", token: "raw-token" } });
-  setBridge({ version, update });
-  actions();
-  room([local], { localHostStatus: { ...running, calls: 0 } });
-  await act(async () => {});
-
-  const writeText = vi.fn(async (_value: string) => {});
-  const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-  try {
-    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Sidevoice could not prepare this computer.");
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
-
-    const copied = writeText.mock.calls[0][0];
-    expect(JSON.parse(copied)).toEqual({ key: "install.unknown", params: { check: "archive-link" } });
-    expect(copied).not.toContain("SV1.private-pairing-code");
-    expect(copied).not.toContain("token-secret");
-    expect(copied).not.toContain("raw-token");
-  } finally {
-    if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
-    else Reflect.deleteProperty(navigator, "clipboard");
-  }
-});
-
-test("a newer installed build found at click time is never downgraded", async () => {
-  const available: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
-  const newer: LocalHostVersion = { ...available, update: "newer-installed" };
-  const version = vi.fn().mockResolvedValueOnce(available).mockResolvedValueOnce(newer);
-  const update = vi.fn().mockResolvedValue(running);
-  setBridge({ version, update });
-  actions();
-  room([local], { localHostStatus: { ...running, calls: 0 } });
-  await act(async () => {});
-
-  await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Update this machine" })); });
-  expect(await screen.findByText("A newer Sidevoice core is already installed. Update the desktop app to use it.")).toBeInTheDocument();
-  expect(update).not.toHaveBeenCalled();
-});
-
-test.each([
-  ["newer-installed", "A newer Sidevoice core is already installed. Update the desktop app to use it."],
-  ["incompatible", "This machine reports core API 9, which this app cannot use."],
-] as const)("Update is not offered when version reports %s", async (state, copy) => {
-  const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 9, update: state };
-  const update = vi.fn().mockResolvedValue(running);
-  setBridge({ version: vi.fn(async () => version), update });
-  actions();
-  room([local]);
-
-  expect(await screen.findByText(copy)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
-  expect(update).not.toHaveBeenCalled();
 });
 
 test("stopping the local host while calls are active asks first, and Cancel leaves it running", async () => {
@@ -736,246 +645,42 @@ test("Cancel closes Forget's question without forgetting, and the focus goes bac
   expect(done.forgetMachine).not.toHaveBeenCalled();
 });
 
-/** This device's app, with its build (sidevoice-desktop #56) and an update on offer where the updater would allow it. */
-function buildBridge(build: Record<string, unknown> | undefined) {
-  const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
+/** This device's app, with its build (sidevoice-desktop #56), its service behind what it bundles, and maybe its updater. */
+function buildBridge(build: Record<string, unknown> | undefined, withUpdater = false) {
+  const version: LocalHostVersion = { bridge: 3, bundled: { version: "0.9.1" }, installed: {}, core_api: 2, update: "available" };
   setBridge({ version: vi.fn(async () => version), update: vi.fn().mockResolvedValue(running) });
   const desktop = (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop;
   desktop.host.build = build;
+  if (withUpdater) desktop.host.updater = fakeUpdater({ mode: "manual", status: { state: "available", version: "0.5.0" } }).updater;
   actions();
 }
 const versionLine = () => document.querySelector(".host-status-product");
-const buildLine = () => document.querySelector(".host-status-build");
 
-test("a release app says its version alone, and keeps Update this machine", async () => {
-  buildBridge({ channel: "release", version: "0.4.0", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" });
-  room([local], { localHostStatus: { ...running, product_version: "0.4.0" } });
-  expect(versionLine()).toHaveTextContent("Sidevoice 0.4.0");
-  expect(buildLine()).toBeNull();
-  expect(await screen.findByRole("button", { name: "Update this machine" })).toBeInTheDocument();
+/* Everything that updates is in Settings › Updates (UpdatesSettings.test.tsx): This device's card says its version — the
+ * app's, the Sidevoice the person installed — and, where the app updates something here, Update available, a link to
+ * its row in Updates; never a vague "See updates", never an action of its own. */
+test("This device's card: the app's version and Update available, a link to Updates, where the app updates something; no Update, no Automatic/Manual, no Check, no build note", async () => {
+  for (const [build, withUpdater, line] of [
+    [{ channel: "release", version: "0.4.0" }, true, "Sidevoice 0.4.0 · Update available"],
+    [{ channel: "nightly", version: "0.5.0-nightly", commit: "abcdef0123456789" }, true, "Sidevoice 0.5.0-nightly · Update available"],
+    // Updated by hand, or a development build: nothing here updates it, so nothing is said of updates.
+    [{ channel: "nightly", version: "0.5.0-nightly" }, false, "Sidevoice 0.5.0-nightly"], [{ channel: "dev", version: "0.5.0-dev" }, false, "Sidevoice 0.5.0-dev"],
+  ] as [Record<string, unknown>, boolean, string][]) {
+    buildBridge(build, withUpdater);
+    room([local], { localHostStatus: { ...running, product_version: "0.8.1" } });
+    await act(async () => {});
+    const card = thisDevice();
+    await waitFor(() => expect(versionLine()).toHaveTextContent(new RegExp("^" + line.replaceAll(".", "\\.") + "$")));
+    expect(within(card).queryAllByRole("button", { name: "Update available, see it in Updates" })).toHaveLength(withUpdater ? 1 : 0);
+    expect(within(card).queryByRole("button", { name: /See updates|Update the service|Update the app|Check for updates/ })).toBeNull();
+    expect(within(card).queryByRole("radiogroup", { name: "Updates" })).toBeNull();
+    expect(card.querySelector(".host-status-build, .host-update-control, .app-update-settings")).toBeNull();
+    cleanup();
+  }
 });
 
-test("a nightly app says so under its version, with its short commit and day, and is updated by hand from the nightly release", async () => {
-  buildBridge({ channel: "nightly", version: "0.5.0-nightly", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" });
-  room([local], { localHostStatus: { ...running, product_version: "0.5.0" } });
-  expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0");
-  expect(buildLine()).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — updates by hand");
-  const link = within(buildLine() as HTMLElement).getByRole("link", { name: /updates by hand/ });
-  expect(link).toHaveAttribute("href", "https://github.com/sidevoice/sidevoice-desktop/releases/tag/nightly");
-  expect(link).toHaveAttribute("target", "_blank");
-  expect(link).toHaveTextContent("(opens in a new tab)");
-  await act(async () => {});
-  expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
-});
-
-test("a development app says Development build under its version, and offers no update", async () => {
-  buildBridge({ channel: "dev", version: "0.5.0-dev" });
-  room([local], { localHostStatus: { ...running, product_version: "0.5.0" } });
-  expect(buildLine()).toHaveTextContent(/^Development build$/);
-  expect(screen.queryByRole("link", { name: /updates by hand/ })).toBeNull();
-  await act(async () => {});
-  expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
-});
-
-test("where the product does not say its version, the card shows the app's own", () => {
+test("where the product does not say its version, the card shows the app's, as it does when it does", () => {
   buildBridge({ channel: "nightly", version: "0.5.0-nightly" });
   room([local], { localHostStatus: running });
   expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0-nightly");
-  // No commit nor date: only what the build says.
-  expect(buildLine()).toHaveTextContent(/^Nightly — updates by hand/);
-});
-
-test("an app too old to say its build shows no build line and keeps Update this machine", async () => {
-  buildBridge(undefined);
-  room([local], { localHostStatus: { ...running, product_version: "0.3.0" } });
-  expect(buildLine()).toBeNull();
-  expect(await screen.findByRole("button", { name: "Update this machine" })).toBeInTheDocument();
-});
-
-test("in Spanish, a nightly app se actualiza a mano and a development one is a Versión de desarrollo", () => {
-  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
-  onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
-  buildBridge({ channel: "nightly", version: "0.5.0", commit: "abcdef0123456789", date: "2026-10-13" });
-  room([local], { localHostStatus: running });
-  expect(buildLine()).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — se actualiza a mano (se abre en una pestaña nueva)");
-  cleanup();
-  buildBridge({ channel: "dev", version: "0.5.0" });
-  room([local], { localHostStatus: running });
-  expect(buildLine()).toHaveTextContent(/^Versión de desarrollo$/);
-});
-
-/** This device's app with an updater (sidevoice-desktop #56: a release's), as a test drives it. */
-function updaterBridge(options?: Parameters<typeof fakeUpdater>[0]) {
-  setBridge({});
-  const fake = fakeUpdater(options);
-  (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop.host.updater = fake.updater;
-  actions();
-  return fake;
-}
-const CHECKED = "sidevoice.updates-checked-at";
-const modes = (name = "Updates") => screen.findByRole("radiogroup", { name });
-const checkButton = (name = "Check for updates") => screen.findByRole("button", { name });
-const inSpanish = () => {
-  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
-  onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
-};
-afterEach(() => localStorage.removeItem(CHECKED));
-
-test("an app without an updater (a nightly, a development build, an older app) shows no Updates and no Check for updates", async () => {
-  for (const build of [{ channel: "nightly", version: "0.5.0" }, { channel: "dev", version: "0.5.0" }, { channel: "release", version: "0.4.0" }, undefined]) {
-    buildBridge(build);
-    room([local], { localHostStatus: running });
-    await act(async () => {});
-    expect(screen.queryByRole("radiogroup", { name: "Updates" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Check for updates" })).toBeNull();
-    // Update this computer stays as it was: a release's, or an app too old to say its build.
-    if (!build || build.channel === "release") expect(await screen.findByRole("button", { name: "Update this machine" })).toBeInTheDocument();
-    cleanup();
-  }
-});
-
-test("Updates says the app's mode with its hint, and a change shows what the app answers", async () => {
-  const { updater } = updaterBridge({ mode: "manual" });
-  room([local]);
-  const group = await modes();
-  const radio = (name: string) => within(group).getByRole("radio", { name });
-  expect(radio("Manual")).toHaveAttribute("aria-checked", "true");
-  expect(thisDevice()).toHaveTextContent("You're told when one is out, and download it when you choose.");
-  await act(async () => { fireEvent.click(radio("Automatic (recommended)")); });
-  expect(updater.setMode).toHaveBeenCalledWith("automatic");
-  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
-  expect(thisDevice()).toHaveTextContent("They download by themselves; you restart when it suits you.");
-  // The app kept automatic when asked for manual: automatic is what shows.
-  updater.setMode.mockResolvedValueOnce({ mode: "automatic" });
-  await act(async () => { fireEvent.click(radio("Manual")); });
-  expect(updater.setMode).toHaveBeenLastCalledWith("manual");
-  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
-  expect(screen.queryByRole("alert")).toBeNull();
-});
-
-test("an app that can't say its mode is on automatic; a change it couldn't make goes back and says so", async () => {
-  const { updater } = updaterBridge();
-  updater.settings.mockRejectedValueOnce(new Error("nope"));
-  updater.setMode.mockRejectedValueOnce(new Error("disk"));
-  room([local]);
-  const group = await modes();
-  const radio = (name: string) => within(group).getByRole("radio", { name });
-  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
-  await act(async () => { fireEvent.click(radio("Manual")); });
-  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
-  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't change it. Try again.");
-  // Trying again clears it.
-  await act(async () => { fireEvent.click(radio("Manual")); });
-  expect(radio("Manual")).toHaveAttribute("aria-checked", "true");
-  expect(screen.queryByRole("alert")).toBeNull();
-});
-
-test("each part shows where the app has its method: no settings or setMode, no Updates; no check, no Check for updates", async () => {
-  const { updater } = updaterBridge({ without: ["settings"] });
-  room([local]);
-  expect(await checkButton()).toBeInTheDocument();
-  await act(async () => {});
-  expect(screen.queryByRole("radiogroup", { name: "Updates" })).toBeNull();
-  expect(updater.status).toHaveBeenCalled();
-  cleanup();
-  updaterBridge({ without: ["check"] });
-  room([local]);
-  expect(await modes()).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Check for updates" })).toBeNull();
-});
-
-test("Check for updates is busy while the app checks, then says what it found and when it last checked", async () => {
-  const { updater } = updaterBridge();
-  let answer!: (status: UpdaterStatus) => void;
-  updater.check.mockImplementationOnce(() => new Promise<UpdaterStatus>((resolve) => { answer = resolve; }));
-  room([local]);
-  const button = await checkButton();
-  expect(thisDevice()).not.toHaveTextContent("Last checked");
-  await act(async () => { fireEvent.click(button); });
-  expect(button).toHaveAttribute("aria-busy", "true");
-  await act(async () => { answer({ state: "idle" }); });
-  expect(button).not.toHaveAttribute("aria-busy");
-  expect(thisDevice()).toHaveTextContent("Sidevoice is up to date.");
-  expect(thisDevice()).toHaveTextContent(/Last checked: \S/);
-  expect(Number(localStorage.getItem(CHECKED))).toBeGreaterThan(0);
-  updater.check.mockResolvedValueOnce({ state: "available", version: "0.5.0" });
-  await act(async () => { fireEvent.click(button); });
-  expect(thisDevice()).toHaveTextContent("Sidevoice 0.5.0 is available.");
-});
-
-test("when it last checked is kept: shown on the next visit; an update the app found by itself counts, a failed check doesn't", async () => {
-  const before = Date.parse("2026-10-12T09:30:00Z");
-  localStorage.setItem(CHECKED, String(before));
-  const fake = updaterBridge();
-  room([local]);
-  await checkButton();
-  expect(thisDevice()).toHaveTextContent(/Last checked: .*2026/);
-  await act(async () => {});
-  await act(async () => { fake.push({ state: "available", version: "0.5.0" }); });
-  const found = Number(localStorage.getItem(CHECKED));
-  expect(found).toBeGreaterThan(before);
-  localStorage.setItem(CHECKED, String(before));
-  fake.updater.check.mockResolvedValueOnce({ state: "idle", error: { code: "update-check-failed" } });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check for updates" })); });
-  expect(Number(localStorage.getItem(CHECKED))).toBe(before);
-});
-
-const FAILURES = [
-  { code: "update-check-failed", state: "idle", en: "Couldn't check for updates.", es: "No se pudo comprobar si hay actualizaciones.", retry: "check" },
-  { code: "update-download-failed", state: "available", en: "The update couldn't be downloaded.", es: "No se pudo descargar la actualización.", retry: "download" },
-  { code: "update-install-failed", state: "ready", en: "The update couldn't be installed.", es: "No se pudo instalar la actualización.", retry: null },
-] as const;
-
-test("each failure the app reports is said in words, with Retry for a check or a download", async () => {
-  for (const { code, state, en, retry } of FAILURES) {
-    const { updater } = updaterBridge({ status: { state, version: "0.5.0", error: { code } }, mode: "manual" });
-    room([local]);
-    const alert = await within(thisDevice()).findByRole("alert");
-    expect(alert).toHaveTextContent(en);
-    const again = within(alert).queryByRole("button", { name: "Retry" });
-    if (!retry) expect(again, code).toBeNull();
-    else {
-      await act(async () => { fireEvent.click(again!); });
-      expect(updater[retry], code).toHaveBeenCalledTimes(1);
-    }
-    cleanup();
-  }
-});
-
-test("a check or a download the app rejected is said as that failure, its own words behind Details", async () => {
-  const { updater } = updaterBridge({ status: { state: "available", version: "0.5.0", error: { code: "update-download-failed" } } });
-  updater.check.mockRejectedValueOnce(new Error("socket hang up"));
-  updater.download.mockRejectedValueOnce(new Error("disk full"));
-  room([local]);
-  await act(async () => { fireEvent.click(await checkButton()); });
-  const alert = within(thisDevice()).getByRole("alert");
-  expect(alert).toHaveTextContent("Couldn't check for updates.");
-  expect(alert.querySelector("details")).toHaveTextContent("socket hang up");
-  await act(async () => { fireEvent.click(within(alert).getByRole("button", { name: "Retry" })); });
-  expect(updater.check).toHaveBeenCalledTimes(2);
-  // The app's status says the download failed: its Retry downloads, and a rejected download says so.
-  updater.check.mockResolvedValueOnce({ state: "available", version: "0.5.0", error: { code: "update-download-failed" } });
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check for updates" })); });
-  await act(async () => { fireEvent.click(within(within(thisDevice()).getByRole("alert")).getByRole("button", { name: "Retry" })); });
-  expect(updater.download).toHaveBeenCalledTimes(1);
-  expect(within(thisDevice()).getByRole("alert")).toHaveTextContent("The update couldn't be downloaded.");
-  expect(within(thisDevice()).getByRole("alert").querySelector("details")).toHaveTextContent("disk full");
-});
-
-test("in Spanish: Actualizaciones, Automáticas (recomendado) | Manuales, Buscar actualizaciones, Última comprobación, and each failure", async () => {
-  inSpanish();
-  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
-  for (const { code, state, es, retry } of FAILURES) {
-    updaterBridge({ status: { state, version: "0.5.0", error: { code } }, mode: "manual" });
-    room([local]);
-    const group = await modes("Actualizaciones");
-    expect(within(group).getByRole("radio", { name: "Manuales" })).toHaveAttribute("aria-checked", "true");
-    expect(within(group).getByRole("radio", { name: "Automáticas (recomendado)" })).toBeInTheDocument();
-    expect(await checkButton("Buscar actualizaciones")).toBeInTheDocument();
-    expect(thisDevice()).toHaveTextContent("Última comprobación:");
-    const alert = within(thisDevice()).getByRole("alert");
-    expect(alert).toHaveTextContent(es);
-    if (retry) expect(within(alert).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
-    cleanup();
-  }
 });
