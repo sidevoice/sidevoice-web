@@ -37,7 +37,8 @@ async function withUpdater(page, language, first = STATES[0]) {
 }
 
 /** Whether Updates fits its screen: nothing in it past the viewport's edges or its card's padding, nothing scrolling
- *  sideways. */
+ *  sideways. A ground drawn into the padding on purpose (an update's line, lit by a landing: its negative margin) may
+ *  reach that far, never past the card. */
 const fits = (pane) => {
   const width = document.documentElement.clientWidth;
   const out = [...pane.querySelectorAll("*")].filter((element) => {
@@ -46,7 +47,8 @@ const fits = (pane) => {
     const card = element.closest(".updates-settings");
     const inner = card && card !== element ? card.getBoundingClientRect() : null;
     const pad = inner ? parseFloat(getComputedStyle(card).paddingRight) : 0;
-    return box.left < -0.5 || box.right > width + 0.5 || (inner && box.right > inner.right - pad + 0.5);
+    const bleed = Math.min(pad, Math.max(0, -parseFloat(getComputedStyle(element).marginRight) || 0));
+    return box.left < -0.5 || box.right > width + 0.5 || (inner && box.right > inner.right - pad + bleed + 0.5);
   }).map((element) => element.className || element.tagName);
   return { out, paneFits: pane.scrollWidth <= pane.clientWidth + 1, pageFits: document.documentElement.scrollWidth <= width + 1 };
 };
