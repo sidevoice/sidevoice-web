@@ -87,13 +87,13 @@ span.host-insecure { color: var(--sv-warning); font-weight: var(--sv-weight-semi
   .host-detail-header > .host-detail-copy { grid-column: 2; min-width: 0; }
 }
 
-/* The machines under Machines in Settings' navigation: each one's name, and its state in words on the line under it
- * (machine-state.css), Add a machine last. A phone lists them on Machines' own page instead, a row each (MachineList,
- * settings.css). Never a dot for a state: the colour only repeats the word. */
+/* The machines under Machines in Settings' navigation: each one's icon, with the connected dot where VARIANTS
+ * `machine-state` has one, its name, and its state in words on the line under it where it is said (machine-state.css);
+ * Add a machine last. A phone lists them on Machines' own page instead, a row each (MachineList, settings.css). */
 .machine-nav { display: grid; gap: 2px; margin: 2px 0 var(--sv-space-2) var(--sv-space-6); }
 .ui-nav-item--sub { min-height: 34px; font-size: var(--sv-font-sm); }
-.ui-nav-item.machine-entry { height: auto; min-height: 46px; padding-block: 6px; min-width: 0; max-width: 100%; overflow: hidden; }
-.ui-nav-item.machine-entry:has(.machine-state-pill) { min-height: 50px; }
+.ui-nav-item.machine-entry { height: auto; min-height: 34px; padding-block: 6px; min-width: 0; max-width: 100%; overflow: hidden; }
+.ui-nav-item.machine-entry:has(.machine-state) { min-height: 46px; }
 .machine-entry .machine-nav-name { font-size: var(--sv-font-sm); line-height: 18px; }
 .machine-nav-icon { display: inline-grid; place-items: center; flex: none; color: var(--sv-text-muted); }
 .machine-nav-add { color: var(--sv-text-muted); }

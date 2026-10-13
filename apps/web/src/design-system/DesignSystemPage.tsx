@@ -175,9 +175,9 @@ function Badges() {
 
 /* "New" (features/highlights): information, never a warning. A mark (accent) on what leads to it — the gear, the
  * Settings section, the machine — and the word "New" on the thing itself, which seeing clears (half of it in view for a
- * second); the marks above go once nothing new is under them. Which mark is VARIANTS `new-mark`: a sparkle (A), "New"
- * at an entry's end and a count on the gear (B), a dot on Settings' icons and a count on the gear (C) — never a dot
- * beside a state, never on a state's line. It goes on its own two weeks after first shown; at most three at once.
+ * second); the marks above go once nothing new is under them. The gear says how many; which mark a section and a
+ * machine wear is VARIANTS `section-new`: "New" at the entry's end (A), how many at its end (B), a dot on its icon (C)
+ * — never on a state's line. It goes on its own two weeks after first shown; at most three at once.
  * Rules: only for what is genuinely new to this person or needs nothing but a look — never marketing or tips; what
  * needs an action (a model to download, a key) uses the attention style (amber) and clears only when resolved; the
  * mark is never the only cue: entries say ", new" to screen readers (or show "New"), the gear its count. */

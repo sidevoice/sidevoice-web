@@ -119,10 +119,10 @@ test("P11 an agent new on a machine marks the gear, opens Settings at that machi
   expect(gear).toHaveAttribute("aria-label", "Settings, 1 new");
   expect(gear.querySelector(".settings-notice")).toBeInTheDocument();
   await act(async () => { fireEvent.click(gear); });
-  // Opening Settings never jumps to what is new: the marks on the icons lead there.
+  // Opening Settings never jumps to what is new: the marks on the entries lead there.
   expect(openAgentSettings).not.toHaveBeenCalled();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
-  expect(entry("NUC")!.querySelector(".new-on-icon-sparkle")).not.toBeNull();
+  expect(entry("NUC")!.querySelector(".new-nav-pill")).not.toBeNull();
   expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
   expect(screen.getAllByText("Checking…").length).toBeGreaterThan(0);
   expect(document.getElementById("host-agents-title")).toHaveTextContent("Agents");
@@ -149,7 +149,7 @@ test("the runtime's Settings handler on the menu entry survives the header's ren
   expect(settingsEntry().onclick).toBe(openSettings);
   await act(async () => { fireEvent.click(settingsEntry()); });
   expect(openSettings).toHaveBeenCalledTimes(1);
-  // Opening Settings never jumps to what is new: the dots on the icons lead there.
+  // Opening Settings never jumps to what is new: the marks on the entries lead there.
   expect(openAgentSettings).not.toHaveBeenCalled();
 });
 
@@ -164,12 +164,12 @@ test("agents new on two machines: the gear counts them, Settings opens at the fi
   render(<RoomProvider store={store}><RoomHeader /><MachineList /></RoomProvider>);
   expect(settingsEntry()).toHaveAttribute("aria-label", "Settings, 2 new");
   await act(async () => { fireEvent.click(settingsEntry()); });
-  // Opening Settings never jumps to what is new: the dots on the icons lead there.
+  // Opening Settings never jumps to what is new: the marks on the entries lead there.
   expect(openAgentSettings).not.toHaveBeenCalled();
   // Each machine under Machines carries the mark, said in words to a screen reader.
-  expect(entry("NUC")!.querySelector(".new-on-icon-sparkle")).not.toBeNull();
+  expect(entry("NUC")!.querySelector(".new-nav-pill")).not.toBeNull();
   expect(entry("NUC")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
-  expect(entry("Laptop")!.querySelector(".new-on-icon-sparkle")).not.toBeNull();
+  expect(entry("Laptop")!.querySelector(".new-nav-pill")).not.toBeNull();
   expect(entry("Laptop")).toHaveAttribute("aria-label", expect.stringContaining(", new"));
 });
 

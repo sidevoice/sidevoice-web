@@ -19,7 +19,7 @@ import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
-import { MachineEntryCopy, MachineState, machineEntryName } from "./MachineState";
+import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName, useThisDeviceEntryStatus } from "./MachineState";
 import { Alert } from "../../components/ui/Alert";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
@@ -160,7 +160,7 @@ function Pane({ id, current, children }: { id: string; current: string; children
 /** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
  *  set up and working: the model chosen, This device's service (as its entry words it), the providers connected, the
  *  machines. Blank while it is not known yet (the catalogue loading or failed); none for a section of preferences. */
-function useSummaries(t: HostTranslate, thisDevice: MachineStatus): Record<string, ReactNode> {
+function useSummaries(t: HostTranslate, thisDevice: MachineStatus | null): Record<string, ReactNode> {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   const keys = useRoomStore((state) => state.facts.providerKeys);
@@ -170,7 +170,7 @@ function useSummaries(t: HostTranslate, thisDevice: MachineStatus): Record<strin
   const model = (task: "stt" | "tts") => !known ? "" : draft?.[task].model || t("settings.summary.noModel");
   const connected = remoteProviders(catalogue.catalogs).filter((provider: { id: string }) => keys[provider.id] === true).map((provider: { name: string }) => provider.name);
   return {
-    transcription: model("stt"), voice: model("tts"), "this-computer": <MachineState status={thisDevice} />,
+    transcription: model("stt"), voice: model("tts"), "this-computer": <MachineEntryState status={thisDevice} />,
     providers: !known ? "" : connected.length ? connected.join(", ") : t("settings.summary.providersNone"),
     machines,
   };
@@ -199,10 +199,11 @@ export function SettingsDialog() {
   useEffect(() => { if (!phone) content.current?.scrollTo?.({ top: 0 }); }, [current, machine]); // eslint-disable-line react-hooks/exhaustive-deps
   const waits = useVoiceReadiness();
   const news = useHighlights();
-  // This device's state, as its section's entry says it (only shown where the app reads its service).
+  // This device's state, as its section's entry says it (only shown where the app reads its service): none where
+  // VARIANTS `machine-state-this-device` hides it, but for what needs the person.
   const localMachine = useRoomStore((state) => state.machines.find((item) => item.local) ?? null);
   const localStatus = useRoomStore((state) => state.facts.localHostStatus);
-  const thisDevice = machineStatus(localMachine, localStatus, true, t);
+  const thisDevice = useThisDeviceEntryStatus(machineStatus(localMachine, localStatus, true, t));
   const summaries = useSummaries(t, thisDevice);
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
@@ -231,8 +232,12 @@ export function SettingsDialog() {
   const show = (section: string) => store?.patch({ settingsSection: section });
   const sections = SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer);
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
-  const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} /> : SECTIONS.find((section) => section.id === id)!.icon(size);
-  const isNew = (id: string) => news.some((item) => item.section === id);
+  // This device's icon wears its connected dot, as a machine's does (VARIANTS `machine-state`).
+  const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
+    : id === "this-computer" ? <StateOnIcon icon={SECTIONS.find((section) => section.id === id)!.icon(size)} status={thisDevice} />
+      : SECTIONS.find((section) => section.id === id)!.icon(size);
+  // How many new things are under a section (its mark, VARIANTS `section-new`).
+  const isNew = (id: string) => news.filter((item) => item.section === id).length;
   const notReady = (id: string) => (id === "transcription" && waits.stt) || (id === "voice" && waits.tts) || (id === "call" && waits.turn);
   const badge = (id: string) => notReady(id) && <Badge tone="warning" className="ui-nav-badge" title={t("settings.section.waiting")}>{t("settings.section.notReady")}</Badge>;
   // A phone's header says where the person is: Settings on the list, the section on its page, the machine on its own.

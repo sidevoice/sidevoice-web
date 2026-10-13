@@ -215,7 +215,7 @@ test("asked for a page (a call's model action), it opens there, the list under i
   expect(document.activeElement).toBe(row("providers"));
 });
 
-test("Machines is a list, each machine's state in words; a machine is a page of its own, and forgotten there it is back at the list, said", async () => {
+test("Machines is a list, each machine's state on its row (VARIANTS `machine-state`); a machine is a page of its own, and forgotten there it is back at the list, said", async () => {
   const forgetMachine = vi.fn();
   const store = room({ pairings: [NUC, LAB], machineLinks: { "fp-nuc": { reach: "ok", via: "node" }, "fp-lab": { reach: "away", via: "" } } });
   window.sidevoiceActions = { ...window.sidevoiceActions, forgetMachine: forgetMachine.mockImplementation(() => act(() => store.patch({ pairings: [NUC] }))) } as unknown as typeof window.sidevoiceActions;
@@ -224,7 +224,10 @@ test("Machines is a list, each machine's state in words; a machine is a page of 
   expect(title()).toHaveTextContent(/^Machines$/);
   const list = document.querySelector<HTMLElement>(".machines-menu")!;
   expect([...list.querySelectorAll(".settings-menu-row")].map((entry) => [entry.querySelector(".settings-menu-label")?.textContent, entry.querySelector(".settings-menu-summary")?.textContent ?? null]))
-    .toEqual([["NUC", "Connected"], ["Lab box", "Not connected"], ["Add a machine", null]]);
+    .toEqual([["NUC", ""], ["Lab box", ""], ["Add a machine", null]]);
+  // Connected: the green dot on its icon (VARIANTS `machine-state` A); not connected, nothing — both said in its name.
+  expect(list.querySelector('[data-machine="fp-nuc"] .state-on-icon-dot')).not.toBeNull();
+  expect(list.querySelector('[data-machine="fp-lab"] .state-on-icon-dot')).toBeNull();
   // Not encrypted: its open lock after the name, and said in its name.
   expect(list.querySelector('[data-machine="fp-lab"] .machine-nav-insecure')).not.toBeNull();
   expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Not connected, not encrypted");
@@ -270,7 +273,9 @@ test("This device's rename goes to General in place of its page: Back still goes
   } } } });
   room({ pairings: [LOCAL, NUC], inApp: true, localHostAvailable: true, localHostStatus: running });
   await open();
-  expect(summary("this-computer")).toBe("Running");
+  // Its service running: the green dot on its icon, no words (VARIANTS `machine-state` A).
+  expect(summary("this-computer")).toBe("");
+  expect(row("this-computer").querySelector(".state-on-icon-dot")).not.toBeNull();
   await tap(row("this-computer"));
   expect(title()).toHaveTextContent(/^This device$/);
   await tap(screen.getByRole("button", { name: "Rename this device" }));

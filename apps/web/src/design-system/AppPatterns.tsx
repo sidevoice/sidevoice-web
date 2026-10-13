@@ -374,7 +374,7 @@ function PairAnotherDevice() {
 }
 
 /** Machines as the room's store has them (MachineView): this computer, one connected, one asleep, one reached without
- *  encryption. Their state is worded as everywhere (machineStatus) and shown as VARIANTS `machine-state` picks. */
+ *  encryption. Their state is worded as everywhere (machineStatus), in words as a machine's page says it. */
 const RUNNING: LocalHostStatus = { state: "running", reachable: true };
 const machine = (id: string, host: string, changes: Partial<MachineView> = {}): MachineView =>
   ({ id, host, revoked: false, reach: "direct", state: "connected", pairedLabel: "", ...changes });

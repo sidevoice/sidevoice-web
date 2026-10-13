@@ -150,16 +150,16 @@ const agents = (ids: string[]) => ({ status: "ready", error: null, busy: {}, act
   id, label: id, present: true, version: "1.0.0", registration: "not-connected", connect: "auto", actionable: true,
   can: { connect: true, update: true, disconnect: true }, manual: { connect: [], disconnect: [], replace: [] },
 })), scanned_at: "2026-10-02T10:00:00Z", custom: { command: "c", snippet: "{}", version: "1" } } });
-const dotOn = (id: string) => !!document.getElementById("settings-" + id)?.querySelector(".new-on-icon-sparkle");
+const markOn = (id: string) => !!document.getElementById("settings-" + id)?.querySelector(".new-nav-pill");
 
 test("a new agent on this computer puts its mark on This device; another machine's on Remote machines", () => {
   localStorage.removeItem("sidevoice.highlights");
   const store = open([local, paired()]);
   act(() => store.patch({ hostAgents: { "fp-local": agents(["codex"]) } } as never));
-  expect(dotOn("this-computer")).toBe(true);
-  expect(dotOn("machines")).toBe(false);
+  expect(markOn("this-computer")).toBe(true);
+  expect(markOn("machines")).toBe(false);
   act(() => store.patch({ hostAgents: { "fp-nuc": agents(["cursor"]) } } as never));
-  expect(dotOn("machines")).toBe(true);
-  expect(dotOn("this-computer")).toBe(false);
+  expect(markOn("machines")).toBe(true);
+  expect(markOn("this-computer")).toBe(false);
   localStorage.removeItem("sidevoice.highlights");
 });

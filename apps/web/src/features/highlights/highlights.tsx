@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
-import { CloseIcon, NewSparkleIcon } from "../../components/ui/Icons";
+import { CloseIcon } from "../../components/ui/Icons";
 import { useVariant } from "../../lib/variants";
 import { actionableAgent } from "../../services/host-agents";
 import { useRoomStore } from "../../state/room-store";
@@ -10,12 +10,12 @@ import { useWhatsNew } from "../whats-new/WhatsNew";
 import { useThisComputerSection } from "../../state/this-computer";
 import "./highlights.css";
 
-/* What is new to this person, marked where it is, one way across the app: a mark on the Settings gear, a mark on the
- * section (and the machine) it is under, and "New" on the thing itself. Which mark is VARIANTS `new-mark`: a sparkle on
- * each icon (A); "New" at the end of each entry, and on the gear how many (B); a dot on the icons in Settings' nav only,
- * and on the gear how many (C). None of them is ever a round dot outside Settings, where a dot on a picture's corner is
- * a conversation's state; and none is on a machine's state line. It is information, never a warning: the accent,
- * not amber — what needs an action (a model to download, a key missing) keeps its own attention style and clears only
+/* What is new to this person, marked where it is, one way across the app: how many on the Settings gear, a mark on the
+ * section (and the machine) it is under, and "New" on the thing itself. Which mark a section and a machine wear is
+ * VARIANTS `section-new`: "New" at the entry's end, the thing's own pill (A); how many at its end, the gear's own count
+ * (B); a dot on its icon, in Settings only (C). The gear is never a dot, which beside the conversations' avatars would
+ * read as a state; and no mark is on a machine's state line. It is information, never a warning: the accent, not
+ * amber — what needs an action (a model to download, a key missing) keeps its own attention style and clears only
  * when resolved. Seeing the thing clears it (half of it in view for a second), and the marks above it go once nothing
  * new is under them; it also goes on its own two weeks after it was first shown. At most three show at once, the rest
  * waiting their turn. Each "New" also has a × to clear it without looking, for as long as it shows. What was seen is
@@ -121,48 +121,48 @@ export function markSeen(id: string) {
 }
 
 
-export type NewMarkStyle = "sparkle" | "pill" | "dot";
+export type SectionNewStyle = "pill" | "count" | "dot";
 
-/** How what is new is marked (VARIANTS `new-mark`): A a sparkle, B a "New" pill, C a dot in Settings' nav only. */
-export function useNewMarkStyle(): NewMarkStyle {
-  return useVariant("new-mark", ["sparkle", "pill", "dot"] as const);
+/** How a section and a machine show something new under them (VARIANTS `section-new`): A "New" at the entry's end, B how
+ *  many at its end, C a dot on its icon. */
+export function useSectionNewStyle(): SectionNewStyle {
+  return useVariant("section-new", ["pill", "count", "dot"] as const);
 }
 
-/** An item's icon with, when something new is under it, its mark on the icon's corner: a sparkle (A) or a dot (C);
- *  never a mark of its own beside the item's state. Nothing in B, whose "New" is at the entry's end (NewAtEnd). The
- *  mark is never the only cue: the entry says it in words. */
-export function NewOnIcon({ icon, isNew }: { icon: ReactNode; isNew: boolean }) {
-  const style = useNewMarkStyle();
+/** An item's icon with, when something new is under it (`isNew`: how many, or whether), a dot on its top corner (C);
+ *  nothing in A and B, whose mark is at the entry's end (NewAtEnd). The mark is never the only cue: the entry says it in
+ *  words. */
+export function NewOnIcon({ icon, isNew }: { icon: ReactNode; isNew: boolean | number }) {
+  const style = useSectionNewStyle();
   return <span className="new-on-icon">{icon}
-    {isNew && style === "sparkle" && <span className="new-on-icon-sparkle" aria-hidden="true"><NewSparkleIcon /></span>}
-    {isNew && style === "dot" && <span className="new-on-icon-dot" aria-hidden="true" />}
+    {!!isNew && style === "dot" && <span className="new-on-icon-dot" aria-hidden="true" />}
   </span>;
 }
 
-/** An entry's end, when something new is under it: "New" as a pill (B), which its name then says; in A and C, whose mark
- *  is on the icon, `spoken` (", new") to a screen reader alone — none where the entry's own name says it already. */
-export function NewAtEnd({ isNew, spoken }: { isNew: boolean; spoken?: string }) {
+/** An entry's end, when something new is under it (`isNew`: how many, or whether): "New", the thing's own pill (A),
+ *  which its name then says; how many, as the gear says it (B); nothing to see in C, whose mark is on the icon. Where
+ *  the mark is not words (B, C), `spoken` (", new") says it to a screen reader — none where the entry's own name says
+ *  it already. */
+export function NewAtEnd({ isNew, spoken }: { isNew: boolean | number; spoken?: string }) {
   const t = hostTranslator();
-  const style = useNewMarkStyle();
+  const style = useSectionNewStyle();
   if (!isNew) return null;
-  return style === "pill" ? <Badge tone="accent" className="new-nav-pill">{t("highlights.new")}</Badge>
-    : spoken ? <span className="sr-only">{spoken}</span> : null;
+  if (style === "pill") return <Badge tone="accent" className="new-nav-pill">{t("highlights.new")}</Badge>;
+  const said = spoken ? <span className="sr-only">{spoken}</span> : null;
+  return style === "count" ? <><span className="new-nav-count" aria-hidden="true">{Number(isNew)}</span>{said}</> : said;
 }
 
-/** The Settings gear's mark, with `count` things new under it: a sparkle (A), or the count (B, C) — never a dot, which
- *  beside the conversations' avatars would read as a state. The gear's own name says it in words. */
+/** The Settings gear's mark, with `count` things new under it: how many, on its corner — never a dot, which beside the
+ *  conversations' avatars would read as a state. The gear's own name says it in words. */
 export function GearNewMark({ count }: { count: number }) {
-  const style = useNewMarkStyle();
   if (count <= 0) return null;
-  return style === "sparkle" ? <span className="settings-notice" data-mark="sparkle" aria-hidden="true"><NewSparkleIcon /></span>
-    : <span className="settings-notice" data-mark="count" aria-hidden="true">{count}</span>;
+  return <span className="settings-notice" data-mark="count" aria-hidden="true">{count}</span>;
 }
 
-/** The word "New" as the thing itself wears it: with the sparkle that teaches what the sparkle means (A), or alone. */
+/** The word "New" as the thing itself wears it. */
 export function NewBadge() {
   const t = hostTranslator();
-  const style = useNewMarkStyle();
-  return <Badge tone="accent" className="new-badge">{style === "sparkle" && <NewSparkleIcon />}{t("highlights.new")}</Badge>;
+  return <Badge tone="accent" className="new-badge">{t("highlights.new")}</Badge>;
 }
 
 /** "New" on the thing itself. Seen (half of it in view for a second) it is cleared, but stays on screen until this view

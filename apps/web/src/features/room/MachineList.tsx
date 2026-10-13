@@ -24,7 +24,7 @@ import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
-import { MachineEntryCopy, MachineState, machineEntryName, machineEntryTitle, useMachineStateStyle } from "../settings/MachineState";
+import { MachineEntryCopy, MachineEntryState, MachineEntryTip, MachineState, StateOnIcon, machineEntryName } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeError, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -47,10 +47,10 @@ export function machineName(machine: MachineView, t: HostTranslate) {
  * (settings-levels.tsx), Machines is always a list — a row each, its state in words under its name, Add a machine last
  * — and a machine is a page of its own under it. */
 
-/** Whether something new (an agent it found) is under a machine: its entry's mark. */
+/** How many new things (agents it found) are under a machine: its entry's mark. */
 function useNotice() {
   const news = useHighlights();
-  return (machine: MachineView) => !!machine.pairingId && news.some((item) => item.machine === machine.pairingId);
+  return (machine: MachineView) => machine.pairingId ? news.filter((item) => item.machine === machine.pairingId).length : 0;
 }
 
 /** The machines Machines lists: every one, or, with this computer in its own section, the other machines. */
@@ -95,20 +95,22 @@ export function MachineNav({ current }: { current: boolean }) {
         // This computer, listed here only where it has no section of its own, reads as any machine.
         const state = machineStatus(machine, status, own, t);
         const isNew = notice(machine);
-        return (
-          <button key={machine.id} type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state, t)}
+        // Its tooltip: the native one, or the app's on hover and focus (VARIANTS `machine-state` B).
+        return <MachineEntryTip key={machine.id} name={name} status={state} t={t}>{(title) => (
+          <button type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={title}
             aria-label={machineEntryName(name, state, isNew, t)}
             data-name={name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
             onClick={() => store?.patch({ settingsSection: "machines", machinesView: { machine: machine.id } })}>
-            {/* Its icon — this computer's, or another machine's, as the setup's two choices show them — with the "new"
-                mark on it; then its name and its state. An entry never grows past the column. */}
+            {/* Its icon — this computer's, or another machine's, as the setup's two choices show them — with the connected
+                dot and the "new" mark on it; then its name and, where it is said, its state. An entry never grows past
+                the column. */}
             <span className="machine-nav-icon" title={machine.local ? t("hosts.thisComputer") : undefined}>
-              <NewOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} isNew={isNew} />
+              <NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={18} /> : <OtherMachineIcon size={18} />} status={state} />} isNew={isNew} />
             </span>
             <MachineEntryCopy name={name} status={state} isNew={isNew} />
           </button>
-        );
+        )}</MachineEntryTip>;
       })}
       <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</button>
     </div>
@@ -175,9 +177,9 @@ export function MachineList() {
                 return <li key={machine.id}>
                   <MenuRow className="machine-entry" data-machine={machine.id} data-name={name} data-state={machine.state} data-local={machine.local || undefined}
                     aria-label={machineEntryName(name, state, isNew, t)}
-                    icon={<NewOnIcon icon={machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />} isNew={isNew} />}
+                    icon={<NewOnIcon icon={<StateOnIcon icon={machine.local ? <ThisComputerIcon size={20} /> : <OtherMachineIcon size={20} />} status={state} />} isNew={isNew} />}
                     label={<><span className="machine-nav-name">{name}</span>{state.insecure && <span className="machine-nav-insecure" aria-hidden="true"><NotEncryptedIcon size={14} /></span>}</>}
-                    summary={<MachineState status={state} />} end={<NewAtEnd isNew={isNew} />}
+                    summary={<MachineEntryState status={state} />} end={<NewAtEnd isNew={isNew} />}
                     onClick={() => levels.open("machines", machine.id)} />
                 </li>;
               })}
@@ -230,15 +232,12 @@ export function ThisComputerSettings() {
   );
 }
 
-/** Reached without encryption, as the person agreed when pairing, and why it matters: said on the machine's page for
- *  as long as it is so, after its state — in words (VARIANTS `machine-state` A) or as a pill beside the state's (B). */
+/** Reached without encryption, as the person agreed when pairing, and why it matters: said in words on the machine's
+ *  page for as long as it is so, after its state. */
 function NotEncrypted() {
   const t = hostTranslator();
-  const style = useMachineStateStyle();
-  const about = <InfoTip label={t("hosts.notEncryptedAbout")}>{t("hosts.notEncryptedInfo")}</InfoTip>;
-  return style === "pill"
-    ? <><Badge tone="warning" className="machine-state-pill host-insecure"><NotEncryptedIcon size={12} />{t("hosts.notEncrypted")}</Badge>{about}</>
-    : <><span className="host-detail-sep" aria-hidden="true">·</span><span className="host-insecure"><NotEncryptedIcon size={14} />{t("hosts.notEncrypted")}</span>{about}</>;
+  return <><span className="host-detail-sep" aria-hidden="true">·</span><span className="host-insecure"><NotEncryptedIcon size={14} />{t("hosts.notEncrypted")}</span>
+    <InfoTip label={t("hosts.notEncryptedAbout")}>{t("hosts.notEncryptedInfo")}</InfoTip></>;
 }
 
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices

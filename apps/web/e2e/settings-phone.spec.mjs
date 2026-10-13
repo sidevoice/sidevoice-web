@@ -27,7 +27,8 @@ test("a phone's Settings: the system's back and Escape go up a level, and from t
   await page.locator("#settings-machines").click();
   await expect(title).toHaveText("Machines");
   const machine = page.locator(".machines-menu .machine-entry[data-name='E2E Host']");
-  await expect(machine).toContainText(/Connected|Through the room/);
+  // Connected: a dot on its icon (VARIANTS `machine-state`), said in its name.
+  await expect(machine).toHaveAccessibleName(/Connected|Through the room/);
   await machine.click();
   await expect(title).toHaveText("E2E Host");
   await expect(page.getByRole("button", { name: "Back to Machines" })).toBeVisible();
