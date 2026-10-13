@@ -1,24 +1,31 @@
 import { expect, test } from "vitest";
-import { en as callEn } from "../features/call/messages/en";
-import { es as callEs } from "../features/call/messages/es";
-import { en as conversationEn } from "../features/conversation/messages/en";
-import { es as conversationEs } from "../features/conversation/messages/es";
-import { en as diagnosticsEn } from "../features/diagnostics/messages/en";
-import { es as diagnosticsEs } from "../features/diagnostics/messages/es";
-import { en as settingsEn } from "../features/settings/messages/en";
-import { es as settingsEs } from "../features/settings/messages/es";
-import { en as uiEn } from "../components/ui/messages/en";
-import { es as uiEs } from "../components/ui/messages/es";
+import { UI_LANGUAGES } from "../services/system-language.js";
 
-/* AGENTS.md: English has every key (each translator's type holds its callers to it); another language may lag, but what
- * it says must take the same placeholders. */
-test.each([["call", callEn, callEs], ["conversation", conversationEn, conversationEs], ["diagnostics", diagnosticsEn, diagnosticsEs], ["settings", settingsEn, settingsEs], ["ui", uiEn, uiEs]] as const)(
-  "the %s bundle: Spanish keeps to English keys and placeholders, and no English text is empty", (_, en, es) => {
-    const english: Record<string, string> = en;
-    const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
-    for (const [key, text] of Object.entries(es)) {
-      expect(english, key).toHaveProperty([key]);
-      expect(placeholders(text!), key).toEqual(placeholders(english[key]));
+/* AGENTS.md: English has every key (each translator's type holds its callers to it). Every language the interface is
+ * offered in says every one of them too, with the same placeholders and never an empty text: a missing key would fall
+ * back to English in the middle of another language. Found by file, so a new bundle or language cannot be skipped. */
+const files = import.meta.glob<Record<string, Record<string, string>>>(["../**/messages/*.ts", "!../**/*.test.ts"], { eager: true });
+const bundles = new Map<string, Record<string, Record<string, string>>>();
+for (const [path, module] of Object.entries(files)) {
+  const [, dir, language] = path.match(/^\.\.\/(.+)\/messages\/([\w-]+)\.ts$/)!;
+  const exported = Object.values(module).filter((value) => typeof value === "object");
+  expect(exported, path).toHaveLength(1);
+  bundles.set(dir, { ...bundles.get(dir), [language]: exported[0] });
+}
+const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
+
+test("every keyed bundle is found, in every interface language and no other", () => {
+  expect([...bundles.keys()].sort()).toEqual(["call-controls", "components/ui", "features/call", "features/conversation", "features/diagnostics", "features/settings"]);
+  for (const [dir, languages] of bundles) expect(Object.keys(languages).sort(), dir).toEqual([...UI_LANGUAGES].sort());
+});
+
+test.each([...bundles].flatMap(([dir, languages]) => UI_LANGUAGES.map((language) => [dir, language, languages] as const)))(
+  "the %s bundle in %s: exactly English's keys, the same placeholders, no empty text", (_, language, languages) => {
+    const english = languages.en;
+    const bundle = languages[language];
+    expect(Object.keys(bundle).sort()).toEqual(Object.keys(english).sort());
+    for (const [key, text] of Object.entries(bundle)) {
+      expect(text.trim(), key).not.toBe("");
+      expect(placeholders(text), key).toEqual(placeholders(english[key]));
     }
-    for (const [key, text] of Object.entries(english)) expect(text.trim(), key).not.toBe("");
   });

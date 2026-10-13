@@ -4,7 +4,8 @@ import { installHarness } from "./harness.mjs";
 /* Settings on the narrowest phone (360px): no section is wider than the screen. Nothing scrolls sideways, and nothing
  * sticks out of the card it sits in (an overflow a card does not clip still crosses its border). Seeded with what made
  * sections overflow: a model run on the graphics card (its long "how it runs" line), downloaded models not in use (their
- * size and when they were last used), a provider connected; in Spanish too, whose words are longer. */
+ * size and when they were last used), a provider connected; in Spanish, German and Polish too, whose words are longer
+ * — German on a 320px screen as well, the narrowest still sold. */
 
 test.use({ viewport: { width: 360, height: 780 }, hasTouch: true, isMobile: true });
 
@@ -54,8 +55,9 @@ const overflow = (page) => page.evaluate(() => {
   return found;
 });
 
-for (const language of ["en", "es"]) {
-  test(`every Settings section fits a 360px phone (${language})`, async ({ page }) => {
+for (const [language, width] of [["en", 360], ["es", 360], ["de", 360], ["pl", 360], ["de", 320]]) {
+  test(`every Settings section fits a ${width}px phone (${language})`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 780 });
     await page.addInitScript((ui) => localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: ui })), language);
     await installHarness(page);
     await page.goto("/voice/");
