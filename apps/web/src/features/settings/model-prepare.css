@@ -84,5 +84,9 @@
 .stt-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .stt-try-head { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 32px; }
 .stt-try-head .model-try-wave { flex: 1; min-width: 0; }
+/* The level takes the room the button leaves, up to its width elsewhere: a longer label (another language, Play again)
+   narrows it rather than pushing the try past its card. */
+.stt-try-head { min-width: 0; }
+.stt-try-head .voice-wave { width: 100%; max-width: 9rem; }
 .stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-height: 3.75rem; min-width: 0; }
 .stt-try-area .model-try-take { flex: none; width: 100%; }
