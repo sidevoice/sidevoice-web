@@ -65,7 +65,6 @@ export const en = {
   "updates.check": "Check for updates",
   "updates.lastChecked": "Last checked: {when}",
   "updates.upToDate": "Sidevoice is up to date.",
-  "updates.found": "Sidevoice {version} is available.",
   "updates.retry": "Retry",
   "updates.failure.update-check-failed": "Couldn't check for updates.",
   "updates.failure.update-download-failed": "The update couldn't be downloaded.",
@@ -509,14 +508,16 @@ export const en = {
   "hosts.titleRemote": "Remote machines",
   "hosts.addRemote": "Add a remote machine",
   "settings.section.advanced": "Advanced",
-  // The desktop app's updates as a section of their own (VARIANTS `updates-section` B).
+  // Updates, a section of their own (UpdatesSettings): the app, this computer, the machines behind.
   "settings.section.updates": "Updates",
   "settings.updates.description": "The Sidevoice app on this computer: its version, and how it updates.",
   "settings.updates.descriptionMachines": "Machines whose Sidevoice is behind, and how to update them.",
+  "settings.updates.descriptionAll": "The Sidevoice app on this computer, and the machines whose Sidevoice is behind: their versions, and how they update.",
   "settings.updates.app": "Sidevoice app",
   "settings.updates.machines": "Remote machines",
   "settings.updates.machineBehind": "{version} · {latest} available",
   "settings.updates.runOn": "Run this on {machine}:",
+  "settings.updates.copyCommand": "Copy the command for {machine}",
   "settings.updates.see": "See updates",
   // A phone's Settings as a menu (settings-levels.tsx): Back to the level above, and what each row says under its name.
   "settings.back": "Back",
@@ -764,15 +765,17 @@ export const en = {
   "updates.required": "Required",
   "updates.reload": "Reload",
   "updates.reloadNamed": "Reload Sidevoice",
-  // The desktop app's own, at the sidebar's foot.
+  // The desktop app's own: at the sidebar's foot, and its row in Updates.
   "updates.available": "Version {version} available",
+  "updates.availableOne": "An update is available",
+  "updates.ready": "Version {version} ready to install",
+  "updates.readyOne": "An update is ready to install",
+  "updates.downloadingOne": "Downloading the update…",
   "updates.download": "Download",
   "updates.downloadNamed": "Download Sidevoice {version}",
   "updates.downloading": "Downloading {version}…",
   "updates.restartToUpdate": "Restart to update",
   "updates.open": "Open",
-  "updates.openNamed": "Open {machine} in Machines",
-  "updates.openThisDevice": "Open This device",
   "updates.none": "Everything is up to date.",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "A smart end of turn",

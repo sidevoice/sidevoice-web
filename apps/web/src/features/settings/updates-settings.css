@@ -1,12 +1,21 @@
-/* Updates as a section (UpdatesSettings, VARIANTS `updates-section` B): one card — the version, its build's note under
- * it, then the app's updates (AppUpdateSettings, its rows as on This device's card, the card's padding around them). */
+/* Updates (UpdatesSettings): a card per thing that updates — its version, its build's note under it, then what updates
+ * it (AppUpdateSettings, LocalHostUpdateControl, a remote machine's command), the card's padding around them. */
 .updates-settings { display: grid; gap: var(--sv-space-3); min-width: 0; padding: 14px var(--sv-space-5); }
 .updates-settings-version { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .updates-settings-version .host-status-product { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
 .updates-settings-version .host-status-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
-/* This device's way to Updates (B): a link's look, beside its version. */
+/* This computer's update, as the app's: its row, tinted, not This device's card's rule above it. */
+.updates-settings .host-update-control { justify-items: stretch; padding: var(--sv-space-3); border-top: 0; }
+.updates-settings .host-update-control .muted { margin: 0; font-size: var(--sv-font-xs); }
+/* This device's way to Updates: a link's look, beside its version. */
 .see-updates { justify-self: start; padding: 0; border: 0; background: none; font: inherit; font-size: var(--sv-font-sm); color: var(--sv-accent-text); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .see-updates:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-xs); }
 /* A machine behind: its name and versions, then the command to run there. */
 .updates-machine + .updates-machine { border-top: 1px solid var(--sv-border); }
 .updates-machine .host-agent-where { margin: 0; font-size: var(--sv-font-sm); }
+/* The row a landing asked for (settingsFocus: the sidebar's entry, the rail, a check that found one), lit for a moment. */
+[data-settings-row].settings-highlight { box-shadow: inset 0 0 0 2px var(--sv-accent); transition: box-shadow var(--sv-dur-slow) var(--sv-ease), background-color var(--sv-dur-slow) var(--sv-ease); }
+.updates-settings[data-settings-row].settings-highlight { background: var(--sv-accent-soft); }
+@media (prefers-reduced-motion: reduce) { [data-settings-row].settings-highlight { transition: none; } }
+/* A 320px screen: the card's inner padding narrower, so Automatic (recommended) | Manual fits inside it in Spanish too. */
+@media (max-width: 360px) { .updates-settings { padding-inline: var(--sv-space-3); } }

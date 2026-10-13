@@ -10,7 +10,7 @@ export interface SettingsPlace {
   section?: string;
   /** Within Machines: the machine's page (a phone's third level); its list on a phone, the first on a desktop, if none. */
   machine?: string | null;
-  /** A control's id, in view and focused once its section is drawn. */
+  /** A control's id, or a place's holding one (an update's row), in view and focused once its section draws it. */
   focus?: string;
 }
 

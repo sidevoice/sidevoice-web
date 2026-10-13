@@ -11,6 +11,16 @@ import type { MachineView } from "../../state/room-types";
 export type UpdateKind = "web" | "machine";
 export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean; machine?: string }
 
+/** Where each update is acted on in Settings › Updates, by the id a landing asks for (`settingsFocus`): the app's
+ *  action row, this computer's Update, a remote machine's row (its command's Copy). */
+export const UPDATE_PLACE = {
+  app: "updates-app",
+  thisComputer: "updates-this-computer",
+  machine: (pairingId: string) => "updates-machine-" + pairingId,
+};
+/** A machine's update's place: a remote one's row, else this computer's Update. */
+export const machineUpdatePlace = (item: UpdateItem) => item.machine ? UPDATE_PLACE.machine(item.machine) : UPDATE_PLACE.thisComputer;
+
 export type UpdateMode = "automatic" | "manual";
 export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed";
 export interface UpdaterStatus {
@@ -20,9 +30,10 @@ export interface UpdaterStatus {
   progress?: number;
   error?: { code: UpdaterFailure };
 }
-/** The desktop app's updater (sidevoice-desktop #56; a release's only: a nightly, a development build or an older app
- *  has none, and then nothing of it shows). Each method is looked for before it is used. Automatic downloads an update
- *  by itself; manual says one exists and `download` fetches it. `restart` installs a ready one at once. */
+/** The desktop app's updater (sidevoice-desktop #56: a release's, and for now a nightly's; a development build or an
+ *  older app has none, and then nothing of it shows: whatever its channel, it is the updater that says). Each method
+ *  is looked for before it is used. Automatic downloads an update by itself; manual says one exists and `download`
+ *  fetches it. `restart` installs a ready one at once. */
 export interface AppUpdater {
   settings?(): Promise<{ mode: UpdateMode }>;
   setMode?(mode: UpdateMode): Promise<{ mode: UpdateMode }>;
@@ -55,8 +66,9 @@ function modeKnown(updater: AppUpdater, mode: UpdateMode) {
   window.dispatchEvent(new Event(CHANGED));
 }
 
-/** The desktop app's update, wherever it shows (the sidebar's foot, This device): its status as the app pushes it, its
- *  mode, when it last checked, and its actions. Without an updater, `updater` is null and nothing else is used. */
+/** The desktop app's update, wherever it shows (the sidebar's foot, the rail, Updates): its status as the app pushes
+ *  it, its mode, when it last checked, and its actions. Without an updater, `updater` is null and nothing else is
+ *  used. */
 export function useAppUpdate() {
   const [updater] = useState(appUpdater);
   const [status, setStatus] = useState<UpdaterStatus | null>(null);
@@ -141,7 +153,7 @@ function failedAs(code: UpdaterFailure, error: unknown) {
 
 /** What the sidebar's foot says of the app's update. Automatic: nothing until it is ready to restart into. Manual: that
  *  one is available, then its download, then ready. A download or install that failed is said there too; a failed
- *  check is This device's to say. */
+ *  check is Updates' to say. */
 export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null): UpdaterStatus | null {
   if (!status) return null;
   if (status.state === "ready") return status;
@@ -183,7 +195,7 @@ export function useUpdates() {
   const items: UpdateItem[] = [];
   if (web) items.push({ id: "web", kind: "web", version: web, required: false });
   if (machine?.update === "available") items.push({ id: "machine:local", kind: "machine", version: typeof machine.bundled?.version === "string" ? machine.bundled.version : "", required: false });
-  // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section (VARIANTS `updates-section` B).
+  // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section.
   for (const { machine: remote, latest } of outdated) items.push({ id: "machine:" + remote.pairingId, kind: "machine", version: latest, required: false, machine: remote.pairingId });
   return { items, app: appUpdateShown(appUpdate.status, appUpdate.mode), appUpdate };
 }
