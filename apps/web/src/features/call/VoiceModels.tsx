@@ -1,4 +1,4 @@
-import { useContext, type ReactNode } from "react";
+import { useContext, type ReactNode, useEffect } from "react";
 import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { Popover } from "../../components/ui/Popover";
@@ -24,9 +24,11 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn:
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
-  // The catalogue is read when Settings opens or a model installs: until then nothing is known of a model's state,
-  // and the badge claims nothing.
-  const known = useRoomStore((state) => state.facts.voiceCatalogue.state === "ready");
+  // The catalogue is read as the stage first shows these badges (as Settings, the setup and an install read it too):
+  // until it is, nothing is known of a model's state, and the badge claims nothing.
+  const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
+  useEffect(() => { if (catalogueState === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const known = catalogueState === "ready";
   const settings = saved ? voiceSettingsHere(saved, catalogs) : null;
   const stt = useModelState("stt", settings);
   const tts = useModelState("tts", settings);
