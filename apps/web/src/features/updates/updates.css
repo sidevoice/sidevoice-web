@@ -37,11 +37,3 @@
 @keyframes update-notice-in { from { opacity: 0; transform: translateY(-6px); } }
 @keyframes update-notice-out { to { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .update-notice, .update-notice[data-leaving] { animation: none; } }
-/* C (VARIANTS `update-notice` "two-lines"), at the conversations' foot directly above Settings: the pill's message in
- * the foot's flow — its words whole, wrapping; its action on their line while it fits, else under them; × at its end. */
-.update-notice[data-layout="two-lines"] { align-items: flex-start; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); }
-.update-notice[data-layout="two-lines"] .update-notice-icon { margin-block-start: 6px; }
-.update-notice[data-layout="two-lines"] .update-notice-line { flex-wrap: wrap; row-gap: var(--sv-space-1); padding-block: 2px; }
-.update-notice[data-layout="two-lines"] .update-notice-text { flex: 1 1 auto; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
-.update-notice[data-layout="two-lines"] .update-notice-error { position: static; flex: 1 1 100%; width: auto; max-width: none; }

@@ -66,9 +66,8 @@ function RoomContent() {
             {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and
                 the transcript run the screen's whole height beside them. */}
             <div className="call-column">
-              {/* An update waiting, said over the stage (VARIANTS `update-notice`: a pill at its top, or at its title row's
-                  end; a desktop's only), never moving it. */}
-              <ErrorBoundary area="stage"><CallStage notice={{ room: <UpdateNotice at="room" />, title: <UpdateNotice at="title" /> }} /></ErrorBoundary>
+              {/* An update waiting, said over the stage: a pill at its top, a desktop's only, never moving it. */}
+              <ErrorBoundary area="stage"><CallStage notice={<UpdateNotice />} /></ErrorBoundary>
               <ErrorBoundary area="toolbar"><CallToolbar /></ErrorBoundary>
             </div>
             <ErrorBoundary area="transcript"><TranscriptPanel /></ErrorBoundary>

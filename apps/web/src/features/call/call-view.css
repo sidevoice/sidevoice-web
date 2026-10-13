@@ -189,17 +189,9 @@
   .room-shell .stage-title h2 { min-width: 0; overflow: hidden; margin: 0; font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-semibold); letter-spacing: -.015em; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
   .room-shell .stage-title > span { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
   .room-shell .stage-name { display: none; }
-  /* The title row's end (CallStage's `notice.title`: where an update waits, VARIANTS `update-notice` B), in the room
-   * the row has there: one line while it holds something, which gives way first — its words cut short — and never
-   * makes the row taller. */
-  .room-shell .stage-title:has(> .stage-title-end > *) { flex-wrap: nowrap; }
-  .room-shell .stage-title:has(> .stage-title-end > *) > :is(h2, span) { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .stage-title-end { display: flex; flex: 0 1000 auto; align-self: center; justify-content: flex-end; min-width: min(16rem, 50%); max-width: 60%; height: 1.75rem;
-    margin-inline-start: auto; }
-  .stage-title-end:empty { display: none; }
 }
 
-/* What the room says over the stage (CallStage's `notice.room`: where an update waits, VARIANTS `update-notice` A):
+/* What the room says over the stage (CallStage's `notice`: where an update waits, the pill):
  * a pill floating at the tile's top centre, in the band kept clear above the agent's replies and clear of the voice
  * models' corner; it takes no room of its own. */
 .stage-notice { position: absolute; z-index: 4; top: var(--stage-inset); left: 50%; display: flex; justify-content: center; width: max-content;

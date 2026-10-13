@@ -80,7 +80,7 @@ function open({ build = RELEASE, updater, section = "this-computer", machines = 
   act(() => { store.patch({ pairings: [...(build ? [local] : []), ...machines], machinesReady: true, inApp: !!build, localHostAvailable: !!build,
     localHostStatus: status, remoteHostStatus: remote as never, settingsSection: section,
     machineLinks: Object.fromEntries([...(build ? [local] : []), ...machines].map((pairing) => [pairing.fp, { reach: "ok", via: "node" }])) }); });
-  render(<RoomProvider store={store}><SettingsDialog />{notice && <UpdateNotice at="room" />}</RoomProvider>);
+  render(<RoomProvider store={store}><SettingsDialog />{notice && <UpdateNotice />}</RoomProvider>);
   document.getElementById("language-settings")!.setAttribute("open", "");
   return { store, fake, update, version };
 }

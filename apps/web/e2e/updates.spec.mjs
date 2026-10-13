@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The desktop app's update. Where the room says it is VARIANTS `update-notice`: A, the default, a pill floating over
- * the stage's tile at its top; B, at the end of the conversation's title row. Whatever it says — ready, available, a
+/* The desktop app's update. The room says it in a pill floating over the stage's tile at its top (decided; a value
+ * still stored for the gone update-notice variant changes nothing). Whatever it says — ready, available, a
  * download or an install that failed — in English or Spanish, with a long version, it stays in its place at a laptop's
  * widths, its words cut short, never its action, and the room never moves for it. In Updates, the app's row and its
  * action fit a 320px screen in either language, whatever its state. The updater is the desktop app's
@@ -19,13 +19,15 @@ const STATES = [
 ];
 const label = (status) => `${status.state}${status.error ? " " + status.error.code : ""}`;
 
-async function withUpdater(page, language, first = STATES[0], notice = "pill") {
-  await page.addInitScript(({ language, first, notice }) => {
+async function withUpdater(page, language, first = STATES[0], stored = null) {
+  await page.addInitScript(({ language, first, stored }) => {
     localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: language }));
-    // Where the room says it (VARIANTS `update-notice`), beside the harness's own picks.
-    let picked = {};
-    try { picked = JSON.parse(localStorage.getItem("sidevoice.variants") || "{}") ?? {}; } catch { /* None picked. */ }
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ ...picked, "update-notice": notice }));
+    // A value still stored for the gone update-notice variant, beside the harness's own picks: it changes nothing.
+    if (stored) {
+      let picked = {};
+      try { picked = JSON.parse(localStorage.getItem("sidevoice.variants") || "{}") ?? {}; } catch { /* None picked. */ }
+      localStorage.setItem("sidevoice.variants", JSON.stringify({ ...picked, "update-notice": stored }));
+    }
     let now = first;
     const listeners = new Set();
     window.__pushUpdate = (next) => { now = next; for (const listener of listeners) listener(next); };
@@ -37,7 +39,7 @@ async function withUpdater(page, language, first = STATES[0], notice = "pill") {
         check: async () => now, download: async () => now, restart: async () => undefined,
       },
     } };
-  }, { language, first, notice });
+  }, { language, first, stored });
 }
 
 /** Whether Updates fits its screen: nothing in it past the viewport's edges or its card's padding, nothing scrolling
@@ -91,10 +93,8 @@ const inPage = (element) => {
 };
 
 
-/** Where the room's notice sits (VARIANTS `update-notice`): A, over the stage's tile at its top; B, at the end of the
- *  title row, after the conversation's name and its machine (with no conversation on the stage, as A). Either inside
- *  the page, its × at its end and inside it, its action whole and its words cut short before it, clear of the
- *  conversation's name. */
+/** Where the room's notice sits: over the stage's tile at its top, inside the page, its × at its end and inside it,
+ *  its action whole and its words cut short before it. */
 const noticeFits = (notice) => {
   const width = document.documentElement.clientWidth;
   const box = notice.getBoundingClientRect();
@@ -124,10 +124,10 @@ const roomBox = () => {
 
 for (const language of ["en", "es"]) {
   for (const width of [1024, 1280]) {
-    for (const notice of ["pill", "title"]) {
-      test(`${notice === "pill" ? "A, the pill" : "B, the title row"} at ${width}px in ${language}: in its place, its × at its end, its action whole, the room unmoved, whatever it says`, async ({ page }) => {
+    for (const stored of [null, "title", "two-lines"]) {
+      test(`the pill at ${width}px in ${language}${stored ? ` (stored update-notice "${stored}")` : ""}: over the stage, its × at its end, its action whole, the room unmoved, whatever it says`, async ({ page }) => {
         await installHarness(page);
-        await withUpdater(page, language, { state: "idle" }, notice);
+        await withUpdater(page, language, { state: "idle" }, stored);
         await page.setViewportSize({ width, height: 800 });
         await page.goto("/voice/");
         await expect(page.locator(".stage-tile")).toBeVisible();
@@ -145,48 +145,6 @@ for (const language of ["en", "es"]) {
         }
       });
     }
-  }
-}
-
-/** C ("two-lines"), at the conversations' foot directly above Settings: inside the sidebar, its × at its end and inside it,
- *  its words whole (never cut short: wrapped), its action whole — on their line, or under them where it has no room. */
-const footFits = (notice) => {
-  const box = notice.getBoundingClientRect();
-  const sidebar = notice.closest(".conversation-sidebar").getBoundingClientRect();
-  const hide = notice.querySelector(".update-notice-hide");
-  const action = notice.querySelector(".update-notice-line > .ui-button");
-  const text = notice.querySelector(".update-notice-text");
-  const settings = document.querySelector(".sidebar-settings");
-  return {
-    inSidebar: box.left >= sidebar.left - 0.5 && box.right <= sidebar.right + 0.5,
-    aboveSettings: notice.nextElementSibling === settings && box.bottom <= settings.getBoundingClientRect().top + 0.5,
-    hideLast: notice.lastElementChild === hide,
-    hideInside: hide.getBoundingClientRect().left >= box.left - 0.5 && hide.getBoundingClientRect().right <= box.right + 0.5,
-    wordsWhole: text.scrollWidth <= text.clientWidth + 1 && getComputedStyle(text).textOverflow !== "ellipsis",
-    actionWhole: action.scrollWidth <= action.clientWidth + 1 && action.getBoundingClientRect().right <= box.right + 0.5,
-    pageFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
-  };
-};
-
-for (const language of ["en", "es"]) {
-  for (const width of [1024, 1280]) {
-    test(`C, two-lines at ${width}px in ${language}: directly above Settings, its words whole, its action whole (wrapping under them), its × at its end, whatever it says`, async ({ page }) => {
-      await installHarness(page);
-      await withUpdater(page, language, { state: "idle" }, "two-lines");
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto("/voice/");
-      await expect(page.locator(".sidebar-settings")).toBeVisible();
-      const shown = page.locator(".sidebar-foot .update-notice:not([data-leaving])");
-      for (const status of STATES) {
-        await page.evaluate((next) => window.__pushUpdate(next), status);
-        if (status.state === "downloading") { await expect(page.locator(".update-notice")).toHaveCount(0); continue; }
-        await expect(shown).toBeVisible();
-        // Nowhere else: not over the stage, not in its title row.
-        await expect(page.locator(".stage-notice .update-notice, .stage-title-end .update-notice")).toHaveCount(0);
-        expect(await shown.evaluate(footFits), label(status)).toEqual({ inSidebar: true, aboveSettings: true, hideLast: true, hideInside: true, wordsWhole: true,
-          actionWhole: true, pageFits: true });
-      }
-    });
   }
 }
 

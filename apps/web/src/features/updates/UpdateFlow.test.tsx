@@ -74,7 +74,7 @@ function app(mode: UpdateMode, { finds = true }: { finds?: boolean } = {}) {
   act(() => { store.patch({ pairings: [local], machinesReady: true, inApp: true, localHostAvailable: true, localHostStatus: running, settingsSection: "updates",
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } } as never); });
   render(<RoomProvider store={store}>
-    <CallStage notice={{ room: <UpdateNotice at="room" />, title: <UpdateNotice at="title" /> }} /><SettingsDialog /></RoomProvider>);
+    <CallStage notice={<UpdateNotice />} /><SettingsDialog /></RoomProvider>);
   return { fake, appChecks: () => { void check(); }, release: () => { found = true; } };
 }
 

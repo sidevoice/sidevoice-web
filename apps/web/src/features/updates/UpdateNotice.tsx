@@ -7,16 +7,13 @@ import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
-import { continueAfterRestart, UPDATE_PLACE, useUpdates, useUpdateNotice, type UpdaterStatus } from "./useUpdates";
+import { continueAfterRestart, UPDATE_PLACE, useUpdates, type UpdaterStatus } from "./useUpdates";
 import "./updates.css";
 
 /* Where the room says an update waits, on a desktop (a phone has none: its page picks up a new version when next
- * opened), as VARIANTS `update-notice` puts it: A, a pill floating at the top centre of the stage, over it; B, at the
- * end of the conversation's title row, in the room already there, its words cut short before they reach the title;
- * C ("two-lines"), at the conversations' foot directly above Settings where the sidebar is open (its rail has no room
- * for it): the same message, its words never cut short, its action wrapping under them where the line has no room. A and
- * B take no room of their own: the room never moves for them. All say the same — this computer's most pressing update
- * and its action, then × — the desktop app's (manual: Version 0.4.0 available · Download once a check found one;
+ * opened): a pill floating at the top centre of the stage, over it (decided: the update-notice variant is gone, and a
+ * value still stored for it changes nothing). It takes no room of its own: the room never moves for it. It says this
+ * computer's most pressing update and its action, then × — the desktop app's (manual: Version 0.4.0 available · Download once a check found one;
  * automatic: nothing while it downloads by itself; either mode, once downloaded: Sidevoice 0.4.0 is ready · Restart to
  * update; nothing while the person's own check runs: appUpdateShown), the page's (Reload). Only this computer's: a
  * machine elsewhere that is behind is its row's in Settings › Updates, never the room's. This computer's service is
@@ -109,22 +106,17 @@ function NoticeLine({ notice, data }: { notice: Notice; data: Notices }) {
   </div>;
 }
 
-/** Where each VARIANTS `update-notice` value says it: A over the stage, B in its title row, C at the conversations' foot. */
-const NOTICE_AT = { pill: "room", title: "title", "two-lines": "foot" } as const;
-
-/** The notice at `at` — the stage's top ("room": A, the pill), the conversation's title row ("title": B) or the
- *  conversations' foot ("foot": C, two lines) — where VARIANTS `update-notice` puts it; a desktop's only. */
-export function UpdateNotice({ at }: { at: "room" | "title" | "foot" }) {
-  const where = useUpdateNotice();
+/** The notice, the pill over the stage's top (CallStage's `notice`); a desktop's only. */
+export function UpdateNotice() {
   const narrow = useMedia(NARROW_QUERY);
-  if (narrow || NOTICE_AT[where] !== at) return null;
-  return <NoticeShown lines={at === "foot"} />;
+  if (narrow) return null;
+  return <NoticeShown />;
 }
 
 /** The most pressing update that × did not hide (hidden, the next one waiting shows): its icon, its line, then ×. It comes and goes softly (none under reduced
  *  motion); going while focus is in it — hidden, or acted on — focus goes to what follows it. Not a live region: a
  *  standing notice. */
-function NoticeShown({ lines }: { lines: boolean }) {
+function NoticeShown() {
   const data = useNotices();
   const { t } = data;
   const [hidden, hideNotice, forget] = useHidden();
@@ -135,8 +127,7 @@ function NoticeShown({ lines }: { lines: boolean }) {
   const lead = data.notices.find((each) => !hidden.includes(hideKey(each))) ?? null;
   const { notice, leaving } = useLeaving(lead, box);
   if (!notice) return null;
-  return <aside ref={box} className="update-notice" data-kind={notice.kind} data-layout={lines ? "two-lines" : undefined} data-leaving={leaving || undefined}
-    inert={leaving} aria-label={t("updates.title")}>
+  return <aside ref={box} className="update-notice" data-kind={notice.kind} data-leaving={leaving || undefined} inert={leaving} aria-label={t("updates.title")}>
     <UpdateIcon size={16} className="update-notice-icon" />
     <NoticeLine key={notice.kind} notice={notice} data={data} />
     <Button variant="ghost" tone="neutral" size="icon-sm" className="update-notice-hide" aria-label={t("updates.notice.hide")} title={t("updates.notice.hide")}
