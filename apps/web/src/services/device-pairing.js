@@ -23,7 +23,7 @@ export const VERIFIED_FOR_MS = 5 * 60 * 1000;
 export const IDENTITY_TIMEOUT_MS = 4000;
 export const NO_WEBCRYPTO = 'Este navegador no puede comprobar la identidad de la máquina: abre la página por https (o en este mismo equipo).';
 const DAMAGED = 'El código está incompleto o dañado. Cópialo entero otra vez.';
-/** A node lists its own address and a few public ones; every address in a code gets probed. */
+/** A node lists its own address and a few public ones; every address in a code gets probed, up to this many. */
 const MAX_CODE_URLS = 8;
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -130,7 +130,14 @@ const PLAINTEXT = 'Este código solo lleva a la máquina por http sin cifrar, y 
 // ----- the code -----
 /** A pasted code's payload, checked for its shape only: whether the addresses it names can be used from here, and
  *  whether it is still valid, are for its readers to judge. The code may arrive wrapped over lines or inside the
- *  sentence it was sent in: the `SV1.` token is found either way. */
+ *  sentence it was sent in: the `SV1.` token is found either way.
+ *
+ *  Read as every reader of the protocol is (sidevoice-core#112): a field this version does not know is ignored, and
+ *  an address it cannot use — one that is not http(s), a room without the node's id, a room or an entry of a shape it
+ *  does not know — is left out rather than making the whole code unusable; what is left is for `decodePairingCode` to
+ *  judge, through its own "no address" sentence when nothing is. `v` stays the one deliberate gate: a code of another
+ *  version is a breaking change, said as such. What the code cannot be redeemed without (`fp`, `secret`, `exp`) still
+ *  has to be there, in its shape: the fingerprint is what the machine is checked against. */
 function readPairingCode(code) {
     const raw = String(code ?? ''), compact = raw.replace(/\s+/g, '');
     if (!compact) throw pairingError('Pega el código que te dio la máquina.', 'code-empty');
@@ -142,13 +149,13 @@ function readPairingCode(code) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw pairingError(DAMAGED, 'code-damaged');
     if (payload.v !== 1) throw pairingError('Este código es de otra versión de Sidevoice. Actualiza la aplicación o pide un código nuevo.', 'code-version');
     const { fp, host, urls, rv, secret, exp } = payload;
-    const urlList = Array.isArray(urls) ? urls.map(httpUrl) : null;
-    const room = rv === null ? null : rv && typeof rv === 'object' && typeof rv.node === 'string' && rv.node ? { url: httpUrl(rv.url), node: rv.node } : undefined;
-    if (typeof fp !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(fp) || !(host === null || typeof host === 'string') ||
-        !urlList || urlList.includes(null) || room === undefined || (room && !room.url) ||
+    if (typeof fp !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(fp) ||
         typeof secret !== 'string' || !/^[A-Za-z0-9_-]+$/.test(secret) || typeof exp !== 'number' || !Number.isFinite(exp))
         throw pairingError(DAMAGED, 'code-damaged');
-    return { fp, host, urls: urlList, room, secret, exp };
+    const urlList = (Array.isArray(urls) ? urls : []).map(httpUrl).filter(url => url !== null);
+    const roomUrl = rv && typeof rv === 'object' && typeof rv.node === 'string' && rv.node ? httpUrl(rv.url) : null;
+    const room = roomUrl ? { url: roomUrl, node: rv.node } : null;
+    return { fp, host: typeof host === 'string' ? host : null, urls: urlList, room, secret, exp };
 }
 const EXPIRED = 'Este código ya caducó: duran 10 minutos. Pide uno nuevo.';
 /** What a pasted code says, or why it cannot be used, in one sentence the person can act on. */
@@ -157,11 +164,9 @@ export function decodePairingCode(code, now = Date.now(), { address = null } = {
     if (!urlList.length && !room && !address) throw pairingError('El código no dice dónde encontrar la máquina. Pide uno nuevo.', 'code-no-address');
     // An address the secret may not travel to is left out (a node may list a cluster address for others); a code
     // left with none cannot be used from here.
-    const secureUrls = urlList.filter(url => secureBase(url)), secureRoom = room && secureBase(room.url) ? room : null;
+    // A node lists its own address and a few public ones, and each one is probed: past MAX_CODE_URLS the rest are not.
+    const secureUrls = urlList.filter(url => secureBase(url)).slice(0, MAX_CODE_URLS), secureRoom = room && secureBase(room.url) ? room : null;
     if (!secureUrls.length && !secureRoom && !address) throw pairingError(PLAINTEXT, 'code-plaintext');
-    // A node lists its own address and a few public ones; a code naming more is not one a node wrote, and each
-    // address is probed.
-    if (urlList.length > MAX_CODE_URLS) throw pairingError(DAMAGED, 'code-damaged');
     if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
     return { v: 1, fp, host: host || null, urls: secureUrls, rv: secureRoom, secret, exp };
 }
@@ -172,7 +177,6 @@ export function decodePairingCode(code, now = Date.now(), { address = null } = {
  *  cannot be used wherever its machine is. */
 export function previewPairingCode(code, now = Date.now()) {
     const { host, urls, room, exp } = readPairingCode(code);
-    if (urls.length > MAX_CODE_URLS) throw pairingError(DAMAGED, 'code-damaged');
     if (exp * 1000 <= now) throw pairingError(EXPIRED, 'code-expired');
     const away = urls.map(url => new URL(url)).filter(url => !LOOPBACK.has(url.hostname));
     return {

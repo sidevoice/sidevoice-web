@@ -73,11 +73,78 @@ test("a code that cannot be used says why, in one sentence the person can act on
   expect(why(codeFor(payload({ fp }, { v: 2 })))).toMatch(/otra versión/);
   expect(why(codeFor({ v: 1, fp, urls: [], rv: null, exp: NOW / 1000 + 60 }))).toMatch(/incompleto o dañado/);  // keys missing
   expect(why(codeFor(payload({ fp: "short" })))).toMatch(/incompleto o dañado/);
-  expect(why(codeFor(payload({ fp }, { urls: ["ftp://mac"] })))).toMatch(/incompleto o dañado/);
-  expect(why(codeFor(payload({ fp }, { urls: Array.from({ length: 9 }, (_, i) => `https://m${i}.example`) })))).toMatch(/incompleto o dañado/);  // more addresses than a node writes
-  expect(why(codeFor(payload({ fp }, { rv: { url: "https://room.example" } })))).toMatch(/incompleto o dañado/);
+  expect(why(codeFor(payload({ fp }, { secret: 42 })))).toMatch(/incompleto o dañado/);
+  expect(why(codeFor(payload({ fp }, { exp: "soon" })))).toMatch(/incompleto o dañado/);
   expect(why(codeFor(payload({ fp }, { urls: [], rv: null })))).toMatch(/dónde encontrar la máquina/);
   expect(why(codeFor(payload({ fp }, { exp: NOW / 1000 })))).toMatch(/caducó/);
+});
+
+// ----- a code from another version of the node (sidevoice-core#112) -----
+test("a code from a newer node is read: fields this version does not know are ignored, optional ones may be missing", () => {
+  const fp = "A".repeat(43);
+  const decode = (code: Record<string, unknown>) => decodePairingCode(codeFor(code), NOW);
+  const newer = { ...payload({ fp }), caps: ["relay-v2"], issued_by: { kind: "node", build: "9.9.9" },
+    rv: { url: "https://room.example", node: "c-1", region: "eu" } };
+  expect(decode(newer)).toEqual({ v: 1, fp, host: "macbook", urls: ["http://127.0.0.1:8768"], rv: { url: "https://room.example", node: "c-1" },
+    secret: "c2VjcmV0LXNlY3JldC0xNg", exp: NOW / 1000 + 600 });
+  // No name, no room, no list of addresses: each missing one is none, not a damaged code.
+  const { host: _host, rv: _rv, ...noNameNoRoom } = payload({ fp });
+  expect(decode(noNameNoRoom)).toMatchObject({ host: null, rv: null, urls: ["http://127.0.0.1:8768"] });
+  const { urls: _urls, ...onlyRoom } = payload({ fp });
+  expect(decode(onlyRoom)).toMatchObject({ urls: [], rv: { url: "https://room.example", node: "c-1" } });
+  // A name of a shape this version does not know is no name.
+  expect(decode(payload({ fp }, { host: { short: "mac" } })).host).toBeNull();
+});
+
+test("an address in a code that cannot be used is left out, and the code keeps the ones that can", () => {
+  const fp = "A".repeat(43);
+  const decode = (extra: Record<string, unknown>) => decodePairingCode(codeFor(payload({ fp }, extra)), NOW);
+  // Not http(s), not a URL, not a string: skipped, the usable address kept in its place in the list.
+  expect(decode({ urls: ["ftp://mac", "https://mac.example/", 42, null, { url: "https://x" }, "nonsense"], rv: null }).urls).toEqual(["https://mac.example"]);
+  // A room without the node's id, at an address that is not http(s), or of a shape this version does not know: no room.
+  for (const rv of [{ url: "https://room.example" }, { url: "ws://room.example", node: "c-1" }, { node: "c-1" }, "https://room.example", ["https://room.example"], 7])
+    expect(decode({ rv }).rv, JSON.stringify(rv)).toBeNull();
+  // More addresses than a node writes: the first ones are probed, not the code refused.
+  const many = Array.from({ length: 12 }, (_, i) => `https://m${i}.example`);
+  expect(decode({ urls: many, rv: null }).urls).toEqual(many.slice(0, 8));
+  // Counted among the usable ones: the plain-http addresses left out do not use up the list.
+  expect(decode({ urls: [...Array.from({ length: 8 }, (_, i) => `http://10.0.0.${i + 1}:8768`), "https://mac.example"], rv: null }).urls).toEqual(["https://mac.example"]);
+  // Previewed the same way.
+  expect(previewPairingCode(codeFor(payload({ fp }, { urls: ["ftp://mac", "https://mac.example"], rv: { url: "https://room.example" } })), NOW))
+    .toMatchObject({ reachable: true, plain: [] });
+  expect(previewPairingCode(codeFor(payload({ fp }, { urls: many, rv: null })), NOW)).toMatchObject({ reachable: true });
+});
+
+test("a code none of whose addresses can be used says it does not say where the machine is", () => {
+  const fp = "A".repeat(43);
+  const why = (extra: Record<string, unknown>) => { try { decodePairingCode(codeFor(payload({ fp }, extra)), NOW); return ""; } catch (error) { return (error as Error & { code: string }).code; } };
+  for (const extra of [{ urls: ["ftp://mac", "nonsense", 42], rv: null }, { urls: ["ftp://mac"], rv: { url: "https://room.example" } },
+    { urls: "https://mac.example", rv: { url: "ws://room.example", node: "c-1" } }])
+    expect(why(extra), JSON.stringify(extra)).toBe("code-no-address");
+  // As before: a typed address is where it is.
+  expect(decodePairingCode(codeFor(payload({ fp }, { urls: ["ftp://mac"], rv: null })), NOW, { address: "https://mac.example" })).toMatchObject({ urls: [] });
+});
+
+test("a code of another version is still refused: `v` is the one deliberate breaking change", () => {
+  const fp = "A".repeat(43);
+  const why = (code: Record<string, unknown>) => { try { decodePairingCode(codeFor(code), NOW); return ""; } catch (error) { return (error as Error & { code: string }).code; } };
+  for (const v of [2, 0, "1", null, 1.5]) expect(why(payload({ fp }, { v })), String(v)).toBe("code-version");
+  const { v: _v, ...unversioned } = payload({ fp });
+  expect(why(unversioned)).toBe("code-version");
+  // Whatever else it carries, a newer field included.
+  expect(why(payload({ fp }, { v: 2, caps: ["relay-v2"] }))).toBe("code-version");
+  expect(() => previewPairingCode(codeFor(payload({ fp }, { v: 2 })), NOW)).toThrow(/otra versión/);
+});
+
+test("a code with one unusable address and one usable pairs through the usable one, and nothing goes to the other", async () => {
+  const node = await fakeNode(), asked: string[] = [];
+  const get = network({ "https://mac.example": node }, asked);
+  const code = codeFor(payload(node, { urls: ["ftp://mac.example", "https://mac.example", "mailto:x@y"], rv: { url: "https://room.example" }, caps: ["relay-v2"] }));
+  const { pairing, base } = await redeemPairingCode(code, { get, subtle, now: NOW });
+  expect(base).toMatchObject({ base: "https://mac.example", via: "direct" });
+  expect(pairing).toMatchObject({ fp: node.fp, urls: ["https://mac.example"], rv: null, token: "tok-1" });
+  expect(node.secrets).toHaveLength(1);
+  expect(asked.every((url) => / https:\/\/mac\.example\/api\//.test(url))).toBe(true);
 });
 
 test("a code's plain-http addresses off this machine are left out, and a code left with none is refused", () => {
