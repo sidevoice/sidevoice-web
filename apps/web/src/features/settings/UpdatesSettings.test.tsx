@@ -177,7 +177,7 @@ test("B in a browser, a machine behind: Updates lists only the machines — no a
   expect(pane("updates")!.querySelector(".app-update-settings")).toBeNull();
   expect(machineRows()).toEqual([
     ["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND],
-    ["Unnamed machine", "? · 0.5.0 available", "Run this on Unnamed machine:", "sidevoice update"],
+    ["Unnamed machine", "Version 0.5.0 available", "Run this on Unnamed machine:", "sidevoice update"],
   ]);
   // Updated (and the other forgotten): no machine behind, no section, and Settings is back where the person can be.
   act(() => { store.patch({ pairings: [lab], remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 2, version: "0.5.0", update: null } } } as never); });
