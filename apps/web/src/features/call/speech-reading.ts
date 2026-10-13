@@ -87,9 +87,26 @@ export function useAgentTurns(reply: ChatMessage | null, spokenTo: number | null
   const last = useRef<{ key: string; text: string } | null>(null);
   const [linger, setLinger] = useState<{ key: string; text: string } | null>(null);
   const [leaving, setLeaving] = useState<{ key: string; text: string }[]>([]);
+  // Each reply leaving, by its key, until it has: its clock, stopped if it sounds again or the stage goes.
+  const clocks = useRef(new Map<string, number>());
   const away = useCallback((turn: { key: string; text: string }) => {
-    setLeaving((now) => now.some((item) => item.key === turn.key) ? now : [...now, turn]);
-    window.setTimeout(() => setLeaving((now) => now.filter((item) => item.key !== turn.key)), SENT_LEAVING_MS);
+    if (clocks.current.has(turn.key)) return;
+    setLeaving((now) => [...now.filter((item) => item.key !== turn.key), turn]);
+    clocks.current.set(turn.key, window.setTimeout(() => {
+      clocks.current.delete(turn.key);
+      setLeaving((now) => now.filter((item) => item.key !== turn.key));
+    }, SENT_LEAVING_MS));
+  }, []);
+  const back = useCallback((key: string) => {
+    const clock = clocks.current.get(key);
+    if (clock === undefined) return;
+    window.clearTimeout(clock);
+    clocks.current.delete(key);
+    setLeaving((now) => now.filter((item) => item.key !== key));
+  }, []);
+  useEffect(() => () => {
+    for (const clock of clocks.current.values()) window.clearTimeout(clock);
+    clocks.current.clear();
   }, []);
   const key = current?.key ?? null;
   useEffect(() => {
@@ -98,7 +115,12 @@ export function useAgentTurns(reply: ChatMessage | null, spokenTo: number | null
       // A new reply over it: away at once. Its end: it stays a moment, whole.
       if (key) away(before); else setLinger(before);
     }
-    if (key) setLinger((now) => { if (now && now.key !== key) away(now); return null; });
+    if (key) {
+      // Sounding (again, after a pause or heard again): the one sounding, at once; one lingering before it goes.
+      back(key);
+      if (linger && linger.key !== key) away(linger);
+      setLinger(null);
+    }
     last.current = current ? { key: current.key, text: current.text } : null;
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   // The same reply, grown: what it leaves with is all of it. A new one is the effect's to take over.
@@ -108,8 +130,9 @@ export function useAgentTurns(reply: ChatMessage | null, spokenTo: number | null
     const next = window.setTimeout(() => { away(linger); setLinger(null); }, AGENT_LINGER_MS);
     return () => window.clearTimeout(next);
   }, [linger, away]);
-  const turns: AgentTurn[] = leaving.map((turn) => ({ ...turn, spoken: turn.text.length, leaving: true }));
-  if (linger && !leaving.some((turn) => turn.key === linger.key)) turns.push({ ...linger, spoken: linger.text.length, leaving: false });
-  if (current && !turns.some((turn) => turn.key === current.key)) turns.push({ ...current, leaving: false });
+  // The one sounding is shown as it sounds, over the same reply lingering or leaving until the effect lets them go.
+  const turns: AgentTurn[] = leaving.filter((turn) => turn.key !== key).map((turn) => ({ ...turn, spoken: turn.text.length, leaving: true }));
+  if (linger && linger.key !== key && !leaving.some((turn) => turn.key === linger.key)) turns.push({ ...linger, spoken: linger.text.length, leaving: false });
+  if (current) turns.push({ ...current, leaving: false });
   return turns;
 }
