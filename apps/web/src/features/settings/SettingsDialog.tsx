@@ -16,6 +16,7 @@ import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./Vo
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DeviceNameField } from "./DeviceNameField";
+import { DesktopCallSettings } from "./DesktopCallSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
 import { MachineEntryCopy, MachineState, machineEntryName } from "./MachineState";
@@ -105,6 +106,7 @@ function CallSettings({ t }: { t: HostTranslate }) {
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
     </Group>
+    <DesktopCallSettings t={t} />
     <Group title={t("settings.call.device")}>
       <Row label={t(voiceSwitch ? "settings.call.keepAwakeVoice" : "settings.call.keepAwake")} description={wakeLock ? t(voiceSwitch ? "settings.call.keepAwakeVoiceHint" : "settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t(voiceSwitch ? "settings.call.keepAwakeVoice" : "settings.call.keepAwake")} />

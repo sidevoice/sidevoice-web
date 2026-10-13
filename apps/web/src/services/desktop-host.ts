@@ -116,6 +116,36 @@ export interface DesktopBuild {
   commit?: string | null;
   date?: string | null;
 }
+/** The desktop app's global shortcut to mute the microphone (sidevoice-desktop, after #56): the accelerator set, how it
+ *  reads, whether the system took it (`refused`: another app has it), others to pick instead, and whether it clashes
+ *  with VoiceOver. `set` rejects `{ key: "shortcut_invalid" }` for one the app cannot register. */
+export interface MuteShortcut {
+  accelerator: string | null;
+  label: string | null;
+  state: "on" | "off" | "refused";
+  alternatives: string[];
+  voiceOver: boolean;
+}
+export interface MuteShortcutBridge {
+  get(): Promise<MuteShortcut>;
+  set(accelerator: string | null): Promise<MuteShortcut>;
+  subscribe?(listener: (shortcut: MuteShortcut) => void): () => void;
+}
+/** Whether the desktop app's call controls (the floating card) show always, or only while the app is minimised. */
+export interface CallControlsBridge {
+  settings(): Promise<{ alwaysShown: boolean }>;
+  setAlwaysShown(enabled: boolean): Promise<{ alwaysShown: boolean }>;
+}
+/** The app's mute shortcut and call controls settings, where it offers them (an app before them has neither). */
+export function muteShortcutBridge(): MuteShortcutBridge | null {
+  const bridge = desktopHost()?.muteShortcut as Partial<MuteShortcutBridge> | undefined;
+  return bridge && typeof bridge.get === "function" && typeof bridge.set === "function" ? bridge as MuteShortcutBridge : null;
+}
+export function callControlsBridge(): CallControlsBridge | null {
+  const bridge = desktopHost()?.callControls as Partial<CallControlsBridge> | undefined;
+  return bridge && typeof bridge.settings === "function" && typeof bridge.setAlwaysShown === "function" ? bridge as CallControlsBridge : null;
+}
+
 /** Where nightly builds are published, to update one by hand. */
 export const DESKTOP_NIGHTLY_URL = "https://github.com/sidevoice/sidevoice-desktop/releases/tag/nightly";
 
