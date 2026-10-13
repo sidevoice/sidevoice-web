@@ -1,0 +1,31 @@
+import type { DiagnosticsMessageKey } from "./en";
+
+/** The connection statistics dialog's words in Italian. A missing key falls back to English. */
+export const it: Partial<Record<DiagnosticsMessageKey, string>> = {
+  "stats.eyebrow": "Diagnostica della chiamata",
+  "stats.title": "Connessione e latenza",
+  "stats.close": "Chiudi le statistiche di connessione",
+  "stats.collecting": "Raccolta delle misurazioni…",
+  "stats.recognition": "Turno chiuso → testo",
+  "stats.recognitionNote": "Mediana · riconoscimento su questo dispositivo",
+  "stats.response": "Testo inviato → risposta",
+  "stats.responseNote": "Mediana · prima risposta per turno",
+  "stats.connection": "Stato della connessione",
+  "stats.stages": "Fasi dell’ultimo turno",
+  "stats.stagesNote": "Dalla tua ultima voce alla risposta inviata a questo dispositivo, nell’ordine in cui avvengono; ogni fase è misurata con il proprio orologio.",
+  "stats.aggregates": "Aggregati della sessione",
+  "stats.aggregatesNote": "Conteggio, media, p50, p90 e massimo per fase. Le fasi si sovrappongono: non vanno sommate.",
+  "stats.copyAggregates": "Copia come testo",
+  "stats.turns": "Ultime risposte",
+  "stats.turnsNote": "Le fasi si sovrappongono: non vanno sommate. «Agente» include consegna, code e generazione, non solo il modello.",
+  "stats.turnsTable": "Misurazioni per risposta",
+  "stats.column.turn": "Turno",
+  "stats.column.silence": "Silenzio",
+  "stats.column.recognition": "Riconoscimento",
+  "stats.column.agent": "Agente",
+  "stats.column.dispatch": "Risposta → dispositivo",
+  "stats.column.state": "Stato",
+  "stats.limitations": "Sono misurazioni dell’applicazione, non del suono che esce dall’altoparlante. I dati mancanti appaiono come «—», mai come zero.",
+  "stats.updated": "Aggiornato",
+  "stats.refresh": "Aggiorna",
+};
