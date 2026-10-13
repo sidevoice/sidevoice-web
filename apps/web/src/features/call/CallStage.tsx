@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { HarnessIcon } from "../../components/ui/Icons";
@@ -70,7 +70,10 @@ function posterWords(t: CallTranslate): PosterWords {
   return { title: t("stage.poster.title"), status: t("stage.poster.status"), fine: [t("stage.poster.fine1"), t("stage.poster.fine2"), t("stage.poster.fine3")] };
 }
 
-export function CallStage() {
+/** The stage; `notice`, what the room says over it (App: where an update waits) — at the tile's top (`room`) or at the
+ *  title row's end (`title`), neither taking room of its own; with no conversation on the stage (no title row), both at
+ *  the tile's top. */
+export function CallStage({ notice }: { notice?: { room?: ReactNode; title?: ReactNode } } = {}) {
   const t = callTranslator();
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
@@ -86,6 +89,7 @@ export function CallStage() {
       <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
         <div className="stage-tile stage-empty">
+          <div className="stage-notice">{notice?.room}{notice?.title}</div>
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
           {narrow && <TranscriptEntry />}
@@ -102,8 +106,10 @@ export function CallStage() {
       <header className="stage-title" translate="no">
         <h2 title={stage.title}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
+        <div className="stage-title-end">{notice?.title}</div>
       </header>
       <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} style={avatarTone(tone) as CSSProperties}>
+        <div className="stage-notice">{notice?.room}</div>
         <div className="stage-scene">
           <StageBackdrop seed={stage.threadId} tone={tone} />
           {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={callLanguage()} />}

@@ -81,33 +81,30 @@ test("Settings sits at the conversations' foot: it opens Settings through the he
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
 
-test("an update waiting: nothing by the brand; its chip on its own line above Settings, Settings named as ever; nothing waiting, Settings alone", () => {
+test("an update waiting: nothing by the brand, nothing at the conversations' foot — Settings alone, named as ever (the room's notice is over the stage: UpdateNotice.test.tsx)", () => {
   const store = room();
-  expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).queryByRole("button")).toBeNull();
   const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
-  expect([...foot.children]).toHaveLength(1);
-  expect(foot.querySelector(".update-chip")).toBeNull();
-  expect(foot.querySelector(".sidebar-settings")).toHaveTextContent("Settings");
+  const alone = () => {
+    expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).queryByRole("button")).toBeNull();
+    expect([...foot.children]).toHaveLength(1);
+    expect(foot.firstElementChild).toHaveClass("sidebar-settings");
+    expect(foot.firstElementChild).toHaveAccessibleName("Settings");
+    expect(foot.firstElementChild).toHaveTextContent("Settings");
+  };
+  alone();
   act(() => store.patch({ webUpdate: "b2" } as never));
-  expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).queryByRole("button")).toBeNull();
-  const [line, settings] = [...foot.children] as HTMLElement[];
-  expect([...foot.children]).toHaveLength(2);
-  expect(line).toHaveClass("update-beside");
-  expect(line.querySelector(".update-chip")).toHaveAccessibleName("Reload to update");
-  expect(line.querySelector(".sidebar-settings")).toBeNull();
-  expect(settings).toHaveClass("sidebar-settings");
-  expect(settings).toHaveAccessibleName("Settings");
-  expect(settings).toHaveTextContent("Settings");
+  alone();
+  expect(document.querySelector(".update-notice")).toBeNull();
 });
 
 test("a phone has no updates entry: none in the header, none in the dropped list, no dot on the chevron", async () => {
   phone(190);
   const store = room();
   act(() => store.patch({ webUpdate: "b2" } as never));
-  expect(header().querySelector(".update-chip")).toBeNull();
+  expect(header().querySelector(".update-notice")).toBeNull();
   await act(async () => { fireEvent.click(chevron()!); });
   expect(document.getElementById("conversations")).toHaveAttribute("data-open");
-  expect(document.querySelector(".update-chip, .update-beside")).toBeNull();
+  expect(document.querySelector(".update-notice")).toBeNull();
   expect(screen.queryByRole("button", { name: /Reload to update|^Updates, / })).toBeNull();
   expect(chevron()).not.toHaveAttribute("data-updates");
 });
