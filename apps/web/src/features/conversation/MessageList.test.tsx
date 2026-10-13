@@ -152,3 +152,20 @@ test("at the end, the list stays there when the text box takes its height; scrol
     Object.defineProperty(globalThis, "ResizeObserver", { configurable: true, value: original });
   }
 });
+
+test("a delivery status this version does not know shows no mark, never the warning of one that failed (core#112)", () => {
+  const { container } = render(<MessageList conversation={view([
+    message({ segment: "u1", role: "user", name: "Tú", text: "Uno", delivery: "queued_offline" }),
+    message({ segment: "u2", role: "user", name: "Tú", text: "Dos", delivery: "not_sent", time: base + 1_000 }),
+    message({ segment: "u3", role: "user", name: "Tú", text: "Tres", delivery: "read", time: base + 2_000 }),
+  ])} />);
+  const marks = [...container.querySelectorAll(".receipt.delivery")].map((mark) => mark.getAttribute("data-state"));
+  expect(marks).toEqual(["not_sent", "read"]);
+  expect(screen.getByRole("article", { name: /Uno/ }).querySelector(".receipt")).toBeNull();
+});
+
+test("a reply whose audio status this version does not know is drawn as plain text, and listening again stays the room's call (core#112)", () => {
+  const { container } = render(<MessageList conversation={view([message({ segment: "a:voice:9", text: "Nueva", replayable: true, playback: undefined })])} />);
+  expect(container.querySelector(".karaoke-text")?.getAttribute("data-playback")).toBe("complete");
+  expect(screen.getByRole("button", { name: conversationTranslator()("messages.listenAgain") })).toBeInTheDocument();
+});

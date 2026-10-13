@@ -5,19 +5,22 @@ import { receiptView } from "../../state/room-session-state.js";
 import { conversationTranslator } from "./conversation-i18n";
 import { KaraokeText } from "./KaraokeText";
 
-/** The delivery mark as a drawing, not a glyph: a text check sat below the time's line and at its own size. */
+/** The delivery mark as a drawing, not a glyph: a text check sat below the time's line and at its own size. The
+ *  warning only for a message that failed or is in doubt: a status this version does not know has no mark at all. */
 function DeliveryMark({ state }: { state: string }) {
   if (state === "read") return <ReadIcon size={14} />;
   if (state === "delivered" || state === "unconfirmed") return <SentIcon size={14} />;
   if (state === "pending" || state === "sending") return <PendingIcon size={12} />;
-  return <UncertainIcon size={12} />;
+  if (state === "uncertain" || state === "not_sent") return <UncertainIcon size={12} />;
+  return null;
 }
 
 /* No sender's name on a bubble (2026-10-11): the side says who — the agent at the left, the person at the right —
  * and the agent's face sits at the foot of its run. The name stays in what a screen reader is told. */
 export function MessageBubble({ message, position }: { message: ChatMessage; position: "only" | "first" | "middle" | "last" }) {
   const t = conversationTranslator();
-  const delivery = message.role === "user" && message.delivery ? message.delivery : null;
+  // A delivery status this version does not know (sidevoice-core#112) shows no mark: it has no words to say.
+  const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
   const label = t(message.interrupted ? "messages.interrupted" : "messages.message", { name: message.name, text: message.text });
   return (

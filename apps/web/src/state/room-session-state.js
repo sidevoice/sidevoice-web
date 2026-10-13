@@ -219,6 +219,12 @@ export function capabilityPanel(s) {
 function saying(s, r) {
     return !!s.karaokeState && s.karaokeState.segment === r.segment && conversationOf(r.thread)?.node === s.callNode;
 }
+/** A reply's audio statuses that have finished, one way or another (sidevoice-core `control/room`). */
+const AUDIO_ENDED = new Set(['playback_finished', 'heard', 'unplayed', 'interrupted', 'disconnected', 'failed', 'text_only']);
+/** Where a reply's sound is: pending, playing, or complete — a reply with no status yet is written, and complete. A
+ *  status this version does not know is none of them (sidevoice-core#112): left unsaid, so the reply is drawn as
+ *  plain text, never as sounding or waiting, and not taken for finished; listening again stays the room's to offer
+ *  (`replayable`). */
 export function playbackState(r, s) {
     if (r.role !== 'assistant')
         return undefined;
@@ -226,8 +232,12 @@ export function playbackState(r, s) {
         return 'playing';
     if (['queued', 'synthesizing', 'waiting_for_turn', 'waiting_for_pause'].includes(r.audio))
         return 'pending';
-    return r.audio === 'playing' ? 'playing' : 'complete';
+    if (r.audio === 'playing')
+        return 'playing';
+    return r.audio == null || AUDIO_ENDED.has(r.audio) ? 'complete' : undefined;
 }
+/** A delivery status's mark and words; a status this version does not know has neither (sidevoice-core#112), and no
+ *  mark is drawn for it — never the warning of one that failed. */
 export function receiptView(status) {
     const symbols = { pending: '◷', sending: '◷', delivered: '✓', unconfirmed: '✓', read: '✓✓', uncertain: '!', not_sent: '!' };
     const labels = { pending: 'Enviando', sending: 'Enviando', delivered: 'Entregado a la conversación; lectura sin confirmar', unconfirmed: 'Escrito en la conversación, sin acuse', read: 'Leído por la conversación', uncertain: 'Entrega sin confirmar', not_sent: 'No enviado' };
@@ -261,13 +271,15 @@ export function routeLabel(p) {
 }
 /** A capability the harness reaches by a route it does not offer: said, because it can misbehave. */
 export function experimentalNote(p) {
-    const marked = p.capabilities?.experimental || [];
+    // A list of the capabilities marked experimental; anything else in its place marks none (sidevoice-core#112).
+    const marked = Array.isArray(p.capabilities?.experimental) ? p.capabilities.experimental : [];
     return [marked.includes('deliver') ? 'Entrega experimental: lo que dices se escribe en la conversación por un camino que su harness no ofrece; si escribes a la vez, se mezcla.' : null,
         marked.includes('sessionIdentity') ? 'Identificación experimental: la conversación es la que muestra la tarjeta de Sidevoice.' : null].filter(Boolean).join(' ') || null;
 }
 export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? 'Este harness no informa cuándo está trabajando; los puntos siguen lo que dice la conversación.' : 'No sabemos si este harness informa cuándo está trabajando.'; }
 /** Whether a machine this device is paired with cannot be reached now: its conversations cannot hear anybody. */
 function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok'; }
+const REACH_STATES = new Set(['listening', 'holding', 'offline']);
 /** What this device calls a paired machine: its alias here, else the machine's own name. */
 function machineName(s, fp) { return (s.pairings || []).find(p => p.fp === fp)?.host || null; }
 export function participantsView(s) {
@@ -278,7 +290,9 @@ export function participantsView(s) {
         // A machine that does not answer leaves its conversations listed as it last said them, none of them reachable.
         const p = machineDown(s, person.node) ? { ...person, available: false, reach: { state: 'offline' } } : person;
         const key = personKey(p), unread = unreadCount(s, key);
-        const reach = p.reach?.state || (p.available ? 'listening' : 'offline');
+        // A reach this version does not know reads as one the room did not say (sidevoice-core#112): by whether the
+        // conversation is available, which the room always says, rather than as offline.
+        const reach = REACH_STATES.has(p.reach?.state) ? p.reach.state : (p.available ? 'listening' : 'offline');
         const base = reach === 'listening' ? (unread ? unread + ' nuevas' : 'Escuchando') : reach === 'holding' ? 'No puede recibir' : p.available ? 'Sin poder recibir' : 'Desconectada';
         const busy = working(s, key);
         // The dot already says "listening"; the line under the title says only what the dot cannot: where the

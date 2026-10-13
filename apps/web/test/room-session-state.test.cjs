@@ -105,3 +105,44 @@ test('One store transition publishes one coherent projection, without calls from
  store.facts.userLive=false;assert.equal(seen[1].session.speaker,'nobody');
  assert.equal(seen[0].facts.userLive,true,'prior snapshots do not change');
 });
+
+// ----- what a newer room or machine sends (sidevoice-core#112): extra fields, values not known yet, fields left out -----
+test('A participant from a newer machine is listed: extra fields ignored, an unknown reach read by availability, capabilities of any shape',async()=>{
+ const api=await moduleReady;
+ const person=(patch)=>({node:'m',thread_id:'a',title:'A',available:true,future:{x:1},...patch});
+ const view=(people)=>api.participantsView(facts(api,{people}));
+ // An unknown reach is not "offline": it reads as one the room left unsaid, by whether the conversation is available.
+ const [up,down]=view([person({reach:{state:'warming_up',detail:'Loading',eta:3}}),person({thread_id:'b',available:false,reach:{state:'warming_up'}})]);
+ assert.equal(up.reach,'listening');assert.equal(up.stateLabel,'Escuchando');assert.equal(up.detail,'Loading');
+ assert.equal(down.reach,'offline');
+ for(const state of ['listening','holding','offline'])assert.equal(view([person({reach:{state}})])[0].reach,state);
+ // A reach without a state, and no reach at all.
+ assert.equal(view([person({reach:{detail:'x'}})])[0].reach,'listening');
+ assert.equal(view([person({reach:undefined})])[0].reach,'listening');
+ // `experimental` of a shape this version does not know marks nothing, and never stops the list.
+ for(const experimental of [{deliver:true},'deliver',3,null,undefined]){
+  const [row]=view([person({capabilities:{working:'supported',experimental}})]);
+  assert.equal(row.activityNote,null,JSON.stringify(experimental));
+ }
+ assert.match(view([person({capabilities:{working:'supported',experimental:['deliver','teleport']}})])[0].activityNote,/Entrega experimental/);
+ // No capabilities at all: what is not known is said as not known.
+ assert.match(view([person({capabilities:undefined})])[0].activityNote,/No sabemos/);
+});
+test('A reply audio status not known yet is left unsaid, never taken for finished; no status is a written reply',async()=>{
+ const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'m|a',text:'Texto',time:1};
+ const playback=(patch)=>api.playbackState({...row,...patch},facts(api));
+ assert.equal(playback({audio:'resampling'}),undefined);
+ assert.equal(playback({audio:42}),undefined);
+ assert.equal(playback({}),'complete');assert.equal(playback({audio:null}),'complete');
+ for(const audio of ['playback_finished','heard','unplayed','interrupted','disconnected','failed','text_only'])assert.equal(playback({audio}),'complete',audio);
+ for(const audio of ['queued','synthesizing','waiting_for_turn','waiting_for_pause'])assert.equal(playback({audio}),'pending',audio);
+ assert.equal(playback({audio:'playing'}),'playing');
+ // Nor counted as sounding ahead of another reply, and nothing said under it.
+ const s=facts(api,{history:[{...row,audio:'resampling',audio_reason:'gpu_busy'}]});
+ const [message]=api.conversationView(s).messages;
+ assert.equal(message.playback,undefined);assert.equal(message.audioNote,'');
+});
+test('A delivery status not known yet has no mark and no words, never the warning of one that failed',async()=>{
+ const {receiptView}=await moduleReady;
+ for(const status of ['queued_offline','',undefined])assert.deepEqual(receiptView(status),{symbol:'',label:''},String(status));
+});
