@@ -63,7 +63,7 @@ test("Settings is left by a back arrow before its title, named Back; there is no
   expect(leave()).toHaveAttribute("type", "button");
   expect(leave()).not.toHaveAttribute("hidden");
   expect(leave()).toHaveAccessibleName("Back");
-  expect(leave()).toHaveAttribute("title", "Close Settings and return to the room");
+  expect(leave()).toHaveAttribute("title", "Close Settings and return to your conversations");
   expect(leave().querySelector("svg")).toHaveClass("lucide-arrow-left");
   // The arrow is the header's only button: no close × at its end.
   expect(head().querySelectorAll("button")).toHaveLength(1);
@@ -75,7 +75,7 @@ test("in Spanish the arrow that leaves Settings is Volver", () => {
   try {
     open("whisper-base");
     expect(leave()).toHaveAccessibleName("Volver");
-    expect(leave()).toHaveAttribute("title", "Cerrar la configuración y volver a la sala");
+    expect(leave()).toHaveAttribute("title", "Cerrar la configuración y volver a tus conversaciones");
   } finally {
     localStorage.removeItem("sidevoice.settings");
   }

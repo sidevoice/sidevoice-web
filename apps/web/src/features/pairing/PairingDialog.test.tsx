@@ -176,7 +176,7 @@ test("a machine that refuses the pairing says so in words, its own sentence only
 });
 
 test("a machine its code's addresses don't reach is asked for by its address, which opens, takes the focus and is needed for that code", async () => {
-  const pairDevice = vi.fn().mockRejectedValue(pairingError("No se pudo llegar a «nuc»: ni directamente ni a través de la sala.", "unreachable"));
+  const pairDevice = vi.fn().mockRejectedValue(pairingError("No se pudo llegar a «nuc»: por ningún camino.", "unreachable"));
   dialog(pairDevice);
   const pasted = pairingCode();
   paste(pasted);

@@ -37,16 +37,16 @@ test("a step is one quiet line, and a failure takes its place as an alert", () =
 
   // What was raw about it is closed behind Details, after the line: never the line itself.
   act(() => {
-    window.sidevoiceUI?.store?.patch({joinFailure:"Something went wrong with the room.",joinFailureDetails:"TypeError\nFailed to fetch"});
+    window.sidevoiceUI?.store?.patch({joinFailure:"Something went wrong with the machine.",joinFailureDetails:"TypeError\nFailed to fetch"});
   });
   const line = screen.getByRole("alert");
-  expect(line.querySelector("span")).toHaveTextContent(/^Something went wrong with the room\.$/);
+  expect(line.querySelector("span")).toHaveTextContent(/^Something went wrong with the machine\.$/);
   expect(line.querySelector("details:not([open]) > summary")).toHaveTextContent("Details");
   expect(line.querySelector("details > pre")!.textContent).toBe("TypeError\nFailed to fetch");
 });
 
 test("the line goes away once the call is up", () => {
-  const store = renderJoin({ step: "room", text: "Entrando en la sala", progress: null, failed: false });
+  const store = renderJoin({ step: "room", text: "Entrando en la llamada", progress: null, failed: false });
   act(() => store.patch({ joinStep: null }));
   expect(document.getElementById("join-status")).not.toBeVisible();
 });
@@ -62,11 +62,11 @@ test("with no machine to talk to the line says why before any tap, as a note, an
   act(() => store.patch(link("offline")));
   const line = document.getElementById("join-status")!;
   expect(line).toBeVisible();
-  expect(screen.getByRole("status")).toHaveTextContent(/«mac» no está conectada a la sala ahora mismo\. Comprueba que está encendida\.$/);
+  expect(screen.getByRole("status")).toHaveTextContent(/«mac» no está conectada ahora mismo\. Comprueba que está encendida\.$/);
   expect(line.dataset.state).toBe("note");
   expect(line.querySelector(".join-status-dot")).toBeNull();   // a standing note, not a step in progress
   act(() => store.patch(link("away")));
-  expect(screen.getByRole("status")).toHaveTextContent(/No se llega a «mac» ni directamente ni a través de la sala/);
+  expect(screen.getByRole("status")).toHaveTextContent(/No se llega a «mac» por ningún camino/);
 
   // A join that found no machine says it as an alert; the machine answering takes both away.
   act(() => store.patch({ joinFailure: "No se llega a «mac»." }));

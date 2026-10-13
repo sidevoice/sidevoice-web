@@ -15,7 +15,7 @@ export const en = {
   "sidebar.collapse": "Collapse conversations",
   "sidebar.expand": "Expand conversations",
   "sidebar.close": "Close conversations",
-  "sidebar.empty": "No conversation is in the room yet.",
+  "sidebar.empty": "No conversations yet.",
   "sidebar.unknownMachine": "Unknown machine",
   "sidebar.options": "Options for {title}",
   "sidebar.closeConversation": "Close conversation",

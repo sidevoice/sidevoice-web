@@ -3,7 +3,7 @@ export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 // A dropped socket is the network's business for this long: the call goes on as if nothing happened (no tone, no
 // line, no control held), and only a drop that outlasts it says the call is reconnecting.
 export const RECONNECT_GRACE_MS = 30000;
-export const JOIN_STEPS = { voice: 'Preparando la voz', room: 'Entrando en la sala', conversation: 'Volviendo a ', reconnect: 'Reconectando con la sala…' };
+export const JOIN_STEPS = { voice: 'Preparando la voz', room: 'Entrando en la llamada', conversation: 'Volviendo a ', reconnect: 'Reconectando…' };
 export const NO_MACHINE = 'Ninguna máquina disponible. Enciende alguna de las tuyas, o empareja una en Configuración › Máquinas.';
 export const UNPAIRED = 'Este dispositivo no está emparejado con ninguna máquina. Emparéjalo para poder entrar.';
 export function initialSessionFacts() {
@@ -181,7 +181,7 @@ export function micView(s) {
 export function callView(s) {
     const joined = !!(inCall(s) || s.connecting);
     return { joined, busy: !!s.reconnectShown,
-        label: joined ? 'Salir de la sala' : 'Entrar en la sala' };
+        label: joined ? 'Salir de la llamada' : 'Entrar en la llamada' };
 }
 /** The name over the transcript: the conversation being looked at, whoever it is. */
 export function viewedTitle(s) {
@@ -208,7 +208,7 @@ export function capabilityPanel(s) {
     const rows = [], voice = s.voiceState;
     if (voice)
         rows.push({ id: 'voice', label: 'Voz', value: LISTENING_WORDS[voice.listening] || voice.listening,
-            state: s.reconnecting ? 'warn' : 'ok', note: s.reconnecting ? 'Sin la sala: lo que digas se envía al volver.' : '' });
+            state: s.reconnecting ? 'warn' : 'ok', note: s.reconnecting ? 'Sin conexión: lo que digas se envía al volver.' : '' });
     if (s.screenLock?.state)
         rows.push({ id: 'screen', label: 'Pantalla',
             value: s.screenLock.state === 'on' ? 'Se mantiene encendida' : 'No se pudo mantener',
@@ -374,9 +374,9 @@ export function reachNote(s) {
     if (reach === 'revoked')
         return Called + ' ya no reconoce este dispositivo: se revocó el emparejamiento. Vuelve a emparejarlo con un código nuevo.';
     if (reach === 'offline')
-        return Called + ' no está conectada a la sala ahora mismo. Comprueba que está encendida.';
+        return Called + ' no está conectada ahora mismo. Comprueba que está encendida.';
     if (reach === 'away')
-        return 'No se llega a ' + called + ' ni directamente ni a través de la sala. Comprueba que está encendida.';
+        return 'No se llega a ' + called + ' por ningún camino. Comprueba que está encendida.';
     return '';
 }
 export function liveText(s) {
@@ -387,7 +387,7 @@ export function liveText(s) {
         return s.liveNote;
     const v = sessionStatus(s);
     if (v.tab === 'reconnecting')
-        return 'Reconectando con la sala…';
+        return 'Reconectando…';
     if (v.tab === 'switching')
         return 'Cambiando de conversación…';
     if (inCall(s) && s.voiceState && s.micEnabled === false)
@@ -398,7 +398,7 @@ export function liveText(s) {
         return 'La conversación está hablando · Puedes interrumpir';
     if (v.tab === 'transcribing')
         return 'Procesando tu intervención…';
-    return inCall(s) ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la sala · Esperando a una conversación') : 'Entra en la sala para hablar.';
+    return inCall(s) ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la llamada · Esperando a una conversación') : 'Entra en la llamada para hablar.';
 }
 // A receipt/reply records evidence about its own turn, never an instruction to extinguish a light.
 export function recordReceipt(s, id, status, at) {

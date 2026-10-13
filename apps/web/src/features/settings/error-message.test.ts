@@ -35,7 +35,7 @@ test("an unknown code is the generic line about what failed; its code and its ow
   });
   expect(voiceFailure(raw, { what: "try", t: es }).text).toBe("Algo falló con la prueba.");
   expect(roomFailure(new TypeError("Failed to fetch"), { t: es }))
-    .toEqual({ text: "Algo falló con la sala.", details: "TypeError\nFailed to fetch" });
+    .toEqual({ text: "Algo falló con la máquina.", details: "TypeError\nFailed to fetch" });
   // A caller's own generic line, in place of the generic one.
   expect(errorMessage({ key: "agents.mystery" }, { t: en, generic: en("agents.error.unknown") }))
     .toEqual({ text: "This action could not be completed.", details: "agents.mystery" });
@@ -53,7 +53,7 @@ test("a raw text is never the sentence, whatever shape the failure comes in", ()
   }
   // A machine's refusal: its sentence, in whatever language it came, is only a detail.
   expect(roomFailure({ message: "The connection or conversation changed. The text was not sent." }, { t: es }))
-    .toEqual({ text: "Algo falló con la sala.", details: "The connection or conversation changed. The text was not sent." });
+    .toEqual({ text: "Algo falló con la máquina.", details: "The connection or conversation changed. The text was not sent." });
 });
 
 test("an engine failure that is not a provider's keeps its detail behind Details; a provider's refusal follows the sentence", () => {
@@ -72,7 +72,7 @@ test("a failure already worded for people is said as it is", () => {
 
 test("nothing to go on is the generic line alone", () => {
   expect(voiceFailure(undefined, { what: "models", t: en })).toEqual({ text: "Something went wrong with the list of models." });
-  expect(roomFailure(new Error(""), { t: es })).toEqual({ text: "Algo falló con la sala." });
+  expect(roomFailure(new Error(""), { t: es })).toEqual({ text: "Algo falló con la máquina." });
 });
 
 test("deleting a model: one still downloading, and one that could not be deleted, its detail only behind Details", () => {
