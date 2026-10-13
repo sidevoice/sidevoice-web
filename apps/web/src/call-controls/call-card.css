@@ -5,7 +5,11 @@
 :root { color-scheme: light dark; }
 html, body { margin: 0; background: transparent; overflow: hidden; }
 *, *::before, *::after { box-sizing: border-box; }
-body { font: 13px/1.35 "DM Sans", Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; cursor: default; }
+/* DM Sans has no Chinese or Japanese: the system's own faces (as styles/theme.css), in the card language's order. */
+:root { --card-font-cjk: "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Microsoft YaHei", "Yu Gothic", "Meiryo"; }
+:root:lang(ja) { --card-font-cjk: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Yu Gothic", "Meiryo", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei"; }
+:root:lang(zh) { --card-font-cjk: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", "Meiryo"; }
+body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-serif; -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; cursor: default; }
 #root { padding: 12px; }
 
 .call-card {
