@@ -511,12 +511,8 @@ export const en = {
   "settings.updates.description": "Sidevoice on this computer: its versions, and how it updates.",
   "settings.updates.descriptionMachines": "Machines whose Sidevoice is behind, and how to update them.",
   "settings.updates.descriptionAll": "Sidevoice on this computer, and the machines whose Sidevoice is behind: their versions, and how they update.",
-  "settings.updates.app": "Sidevoice app",
-  "settings.updates.appHint": "This window: the interface, models and voice",
-  "settings.updates.service": "Sidevoice service",
   "settings.updates.serviceHint": "Runs on this computer and connects your agents",
   "settings.updates.one": "Sidevoice",
-  "settings.updates.oneHint": "The app, and the service that connects your agents",
   "settings.updates.version": "Version {version}",
   "settings.updates.upToDate": "Up to date",
   "settings.updates.updateAvailable": "Update available",
@@ -756,16 +752,14 @@ export const en = {
   "hosts.devices.codeExpiresIn": "Expires in {time}. Share it only with the device you are pairing.",
   "hosts.stoppedNote": "Sidevoice is stopped on this computer. Start it here, or it starts again when you next sign in.",
   "hosts.stoppedNoLoginNote": "Sidevoice is stopped on this computer and does not start when you sign in. Start it here when you need it.",
-  // What wants updating (UpdatesEntry).
+  // What wants updating (UpdateNotice).
   "updates.title": "Updates",
-  "updates.restartToUpdateVersion": "Restart to update · {version}",
   "updates.downloadingPercent": "Downloading… {percent}",
   "updates.reloadToUpdate": "Reload to update",
   "updates.availableAny": "Updates available",
   "updates.entry": "Updates, {n} waiting",
   "updates.web": "A new version of Sidevoice is ready",
   "updates.machine": "{machine} needs an update",
-  "updates.required": "Required",
   "updates.reload": "Reload",
   "updates.reloadNamed": "Reload Sidevoice",
   // The desktop app's own: at the sidebar's foot, and its row in Updates.
@@ -775,9 +769,6 @@ export const en = {
   "updates.readyOne": "An update is ready to install",
   "updates.downloadingOne": "Downloading the update…",
   "updates.downloading": "Downloading {version}…",
-  "updates.restartToUpdate": "Restart to update",
-  "updates.open": "Open",
-  "updates.none": "Everything is up to date.",
   // Every update button says what it does: the app's update downloaded (manual), then restarted into; the app or the
   // service (two rows), or Sidevoice as one (one row), updated.
   "updates.action.download": "Download",
@@ -801,7 +792,6 @@ export const en = {
   "updates.notice.service": "Sidevoice service {version} is available",
   "updates.notice.serviceOne": "A Sidevoice service update is available",
   "updates.notice.machines": "{n} machines need an update",
-  "updates.notice.dismiss": "Hide this notice",
   // The chip beside Settings (VARIANTS `update-notice` B2): the app's update in a few words, its action after them.
   "updates.chip.app": "Sidevoice {version}",
   "updates.chip.hide": "Hide until a newer version",

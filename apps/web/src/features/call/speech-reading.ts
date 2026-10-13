@@ -32,26 +32,10 @@ export function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messag
   return reply && reading.current?.segment === reply.segment ? readingPosition(reading.current) : null;
 }
 
-/** How much of what the person is saying their bubble holds: the latest words, a few lines; the transcript has all. */
-export const LIVE_TAIL = 90;
-export function latestWords(text: string) {
-  if (text.length <= LIVE_TAIL) return text;
-  const cut = text.slice(-LIVE_TAIL);
-  return "…" + cut.slice(cut.indexOf(" ") + 1);
-}
-
-/** How long what was sent stays before it leaves, and how long leaving takes (call-view.css): about three seconds, a
- *  little more for a long one, never past five. */
-export const SENT_SHOWN_MS = 3000;
-export const SENT_SHOWN_MAX_MS = 5000;
-export const sentShownMs = (text: string) => Math.min(SENT_SHOWN_MAX_MS, SENT_SHOWN_MS + Math.max(0, text.length - 120) * 8);
+/** How long what was sent takes to leave (call-view.css). */
 export const SENT_LEAVING_MS = 500;
 
 export interface SentTurn { text: string; key: string }
-
-/** What a turn just sent does when the person speaks again during its moment: stays its time ("keep"), leaves at once
- *  ("leave"), or is gone at once ("drop"). */
-export type SentOnSpeech = "keep" | "leave" | "drop";
 
 /** The person's spoken turns just sent, oldest first, each until `done(key)`: what shows one owns its own clock
  *  (SentBubble), so a turn sent after it never cuts or restarts it. Only a turn spoken here is shown as sent, never a

@@ -156,19 +156,18 @@ export function ConversationSidebar() {
   );
 }
 
-/** Settings at the conversations' foot: named beside the list, a gear in the rail — and beside an update's chip
- *  (`gear`, VARIANTS `update-notice` B2), named by its label and its tooltip as there; its mark when something is new. */
-function SidebarSettings({ rail, onOpen, gear = false }: { rail: boolean; onOpen: () => void; gear?: boolean }) {
+/** Settings at the conversations' foot: named beside the list, a gear in the rail, named by its label and its tooltip
+ *  there; its mark when something is new. */
+function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
   const t = callTranslator();
   const hosts = hostTranslator();
   const store = useContext(RoomStoreContext);
   const news = useHighlights();
   const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
-  const icon = rail || gear;
   return (
-    <Button variant="ghost" tone="neutral" size={icon ? "icon" : "md"} block={!icon} className="sidebar-settings" aria-label={label} title={label}
+    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label}
       onClick={() => { onOpen(); openSettings({}, store); }}>
-      <SettingsIcon size={20} />{!icon && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />
+      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />
     </Button>
   );
 }

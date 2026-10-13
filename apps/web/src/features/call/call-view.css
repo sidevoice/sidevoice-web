@@ -40,7 +40,6 @@
 .stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
 @keyframes stage-bubble-out { to { opacity: 0; transform: translateY(-28px) scale(.94); } }
 @media (prefers-reduced-motion: reduce) { .stage-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; } }
-.stage-bubble-previous { display: block; overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text-subtle); }
 .stage-bubble .karaoke-text { white-space: pre-wrap; }
 .stage-bubble .karaoke-text .karaoke-played { color: var(--sv-text); opacity: 1; }
 .stage-bubble .karaoke-text .karaoke-upcoming { color: var(--sv-text-subtle); opacity: 1; }

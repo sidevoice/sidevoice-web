@@ -1,17 +1,6 @@
-/* The updates' entry and its panel (UpdatesEntry): quiet, an accent count, never the voice's colour. */
-.updates-entry { position: relative; justify-content: flex-start; gap: var(--sv-space-2); }
-.updates-badge { margin-inline-start: auto; }
-.updates-entry--icon .updates-count { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
-  background: var(--sv-accent); color: var(--sv-on-accent); font-size: 10px; line-height: 16px; font-weight: var(--sv-weight-semibold); text-align: center; }
+/* The updates' panel, the rail's popover (UpdateNotice): its title quiet, never the voice's colour. */
 .updates-panel { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .updates-panel h3 { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
-.updates-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
-.update-row { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
-.update-row-copy { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); font-size: var(--sv-font-sm); }
-.update-row-note { flex-basis: 100%; color: var(--sv-text-muted); }
-.update-row-actions { display: flex; justify-content: flex-end; gap: var(--sv-space-2); }
-.update-row-error { font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
-.updates-none { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 /* An update found, in its row in Settings › Updates (the app's, this computer's): what it is, its action right there,
  * wrapping under it where the row is narrow; a download's progress and what failed under them. */
 .update-action-row { display: grid; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); }
@@ -25,11 +14,7 @@
 .app-update-setting-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
 .app-update-setting-copy.muted, .app-update-setting-copy .muted { font-size: var(--sv-font-xs); }
 .app-update-failure { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
-/* The sidebar foot's one row (UpdateLine): the update icon, the words cut short on one line, landing in Updates. */
-.update-foot { display: grid; gap: var(--sv-space-1); min-width: 0; }
-.update-line { display: flex; align-items: center; justify-content: flex-start; gap: var(--sv-space-2); min-width: 0; max-width: 100%; overflow: hidden; font-size: var(--sv-font-sm); }
-.update-line > svg { flex: none; color: var(--sv-accent); }
-.update-line-text { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; }
+/* What failed, under the chip's row (UpdateNotice). */
 .update-line-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
 /* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
 .app-update-setting .ui-segment { padding-inline: 10px; }
@@ -53,7 +38,6 @@
  * icon above the gear. */
 .update-beside { display: grid; gap: var(--sv-space-1); min-width: 0; }
 .update-beside-row { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
-.update-beside-row > .sidebar-settings { flex: none; }
 .update-beside .update-chip { display: flex; flex: 1 1 auto; align-items: center; justify-content: flex-start; gap: var(--sv-space-2); min-width: 0; height: var(--sv-control-md);
   padding: 0 var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); color: var(--sv-text); font-size: var(--sv-font-sm);
   font-weight: var(--sv-weight-medium); font-variant-numeric: tabular-nums; text-align: start; }
