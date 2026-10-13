@@ -5,7 +5,7 @@ import { installHarness } from "./harness.mjs";
  * still stored for the gone update-notice variant changes nothing). Whatever it says — ready, available, a
  * download or an install that failed — in English or Spanish, with a long version, it stays in its place at a laptop's
  * widths, its words cut short, never its action, and the room never moves for it. In Updates, the app's row and its
- * action fit a 320px screen in either language, whatever its state. The updater is the desktop app's
+ * action fit a 320px screen in every interface language, whatever its state. The updater is the desktop app's
  * (sidevoice-desktop #56), faked in the page with its status pushed as the app would, in manual mode: one found shows
  * at once. */
 
@@ -59,7 +59,7 @@ const fits = (pane) => {
   return { out, paneFits: pane.scrollWidth <= pane.clientWidth + 1, pageFits: document.documentElement.scrollWidth <= width + 1 };
 };
 
-for (const language of ["en", "es"]) {
+for (const language of ["en", "es", "fr", "it", "de", "ja", "zh-Hans", "pl"]) {
   test(`Updates fits 320px in ${language}: the app's row and its action, whatever its state`, async ({ page }) => {
     await installHarness(page);
     await withUpdater(page, language, STATES[1]);

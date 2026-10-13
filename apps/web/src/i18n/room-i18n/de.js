@@ -647,5 +647,7 @@ export const de = {
     ["Mantén Espacio para hablar si está silenciado\\.", "Halte die Leertaste gedrückt, um im stummen Zustand zu sprechen."],
     ["Eco cancelado", "Echo unterdrückt"],
     ["Ruido reducido", "Rauschen reduziert"],
+    [" · hay una versión nueva, recarga$", " · Neue Version verfügbar, lade die Seite neu"],
+    [" · al día$", " · aktuell"],
   ],
 };

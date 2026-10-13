@@ -647,5 +647,7 @@ export const ja = {
     ["Mantén Espacio para hablar si está silenciado\\.", "ミュート中は Space キーを押している間だけ話せます。"],
     ["Eco cancelado", "エコー除去済み"],
     ["Ruido reducido", "ノイズ低減済み"],
+    [" · hay una versión nueva, recarga$", " · 新しいバージョンがあります。ページを再読み込みしてください"],
+    [" · al día$", " · 最新"],
   ],
 };

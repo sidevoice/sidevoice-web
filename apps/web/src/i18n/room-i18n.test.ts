@@ -65,3 +65,19 @@ test("Japanese and Chinese close what they open: a whole parenthesis in full-wid
   roomI18n().setLanguage("it");
   expect(roomI18n().translate("Automática (CPU)")).toBe("Automatica (CPU)");
 });
+
+test.each(Object.keys(tables))("in %s the served version says whether it is current, and English and Spanish say as before", (language) => {
+  const stale = "a1b2c3d · hay una versión nueva, recarga";
+  const current = "a1b2c3d · al día";
+  roomI18n().setLanguage(language);
+  for (const value of [stale, current]) {
+    const text = roomI18n().translate(value);
+    expect(text, value).toMatch(/^a1b2c3d · /);
+    expect(text, value).not.toMatch(/versión|al día/);
+  }
+  for (const unchanged of ["en", "es"]) {
+    roomI18n().setLanguage(unchanged);
+    expect(roomI18n().translate(stale)).toBe(stale);
+    expect(roomI18n().translate(current)).toBe(current);
+  }
+});

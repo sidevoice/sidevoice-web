@@ -647,5 +647,7 @@ export const fr = {
     ["Mantén Espacio para hablar si está silenciado\\.", "Maintenez Espace pour parler quand le micro est coupé."],
     ["Eco cancelado", "Écho annulé"],
     ["Ruido reducido", "Bruit réduit"],
+    [" · hay una versión nueva, recarga$", " · une nouvelle version est disponible, rechargez la page"],
+    [" · al día$", " · à jour"],
   ],
 };

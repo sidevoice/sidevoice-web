@@ -647,5 +647,7 @@ export const pl = {
     ["Mantén Espacio para hablar si está silenciado\\.", "Przytrzymaj Spację, aby mówić przy wyciszonym mikrofonie."],
     ["Eco cancelado", "Echo usunięte"],
     ["Ruido reducido", "Szum zredukowany"],
+    [" · hay una versión nueva, recarga$", " · dostępna jest nowa wersja, odśwież stronę"],
+    [" · al día$", " · aktualna"],
   ],
 };

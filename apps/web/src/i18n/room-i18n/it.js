@@ -647,5 +647,7 @@ export const it = {
     ["Mantén Espacio para hablar si está silenciado\\.", "Tieni premuto Spazio per parlare quando è silenziato."],
     ["Eco cancelado", "Eco cancellata"],
     ["Ruido reducido", "Rumore ridotto"],
+    [" · hay una versión nueva, recarga$", " · è disponibile una nuova versione, ricarica la pagina"],
+    [" · al día$", " · aggiornata"],
   ],
 };

@@ -62,7 +62,7 @@ export const fr: Partial<Record<HostMessageKey, string>> = {
   "hosts.build.byHand": "mise à jour manuelle",
   "hosts.build.dev": "Version de développement",
   "updates.mode": "Mises à jour",
-  "updates.mode.automatic": "Automatiques (recommandé)",
+  "updates.mode.automatic": "Automatiques (conseillé)",
   "updates.mode.manual": "Manuelles",
   "updates.mode.automaticHint": "Elles se téléchargent toutes seules ; vous redémarrez quand ça vous arrange.",
   "updates.mode.manualHint": "Vous êtes prévenu quand une sort, et vous la téléchargez quand vous voulez.",

@@ -647,5 +647,7 @@ export const zhHans = {
     ["Mantén Espacio para hablar si está silenciado\\.", "静音时按住空格键即可说话。"],
     ["Eco cancelado", "回声消除已开启"],
     ["Ruido reducido", "降噪已开启"],
+    [" · hay una versión nueva, recarga$", " · 有新版本，请刷新页面"],
+    [" · al día$", " · 已是最新版本"],
   ],
 };
