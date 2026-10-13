@@ -61,9 +61,9 @@
 .chat-bubble[data-role="user"], .person-bubble {
   --sv-text: var(--sv-chat-person-fg); --sv-text-subtle: var(--sv-chat-person-subtle); background: var(--sv-chat-person-bg); color: var(--sv-text);
 }
-/* A person's bubble filled in the deep colour (VARIANTS `chat-colors` "filled") is an island of light inks: the time,
- * the marks, the waveform, a draft's edge, the cancel button and its hover and focus ring all take them. */
-[data-chat-colors="filled"] :is(.chat-bubble[data-role="user"], .person-bubble) {
+/* A person's bubble, filled in the deep colour, is an island of light inks: the time, the marks, the waveform, a
+ * draft's edge, the cancel button and its hover and focus ring all take them. */
+:is(.chat-bubble[data-role="user"], .person-bubble) {
   --sv-text-muted: var(--sv-chat-person-subtle); --sv-border-strong: var(--sv-chat-person-subtle); --sv-border: var(--sv-chat-person-bg);
   --sv-accent: var(--sv-chat-person-mark); --sv-accent-text: var(--sv-chat-person-mark); --sv-focus: var(--sv-chat-person-mark);
   --sv-danger: var(--sv-chat-person-danger); --sv-disabled-text: var(--sv-chat-person-quiet);

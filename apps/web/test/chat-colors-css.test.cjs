@@ -1,6 +1,6 @@
 const fs = require("node:fs"), test = require("node:test"), assert = require("node:assert/strict");
 
-// The chat's colours (theme.css --sv-chat-*), each palette in each theme as the page resolves it, and the two bubbles
+// The chat's colours (theme.css --sv-chat-*), in each theme as the page resolves it, and the two bubbles
 // that read them: the transcript's and the stage's person bubble.
 const read = (path) => fs.readFileSync(__dirname + "/../src/" + path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
 const theme = read("styles/theme.css");
@@ -9,13 +9,11 @@ const rules = [...theme.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, bod
   tokens: Object.fromEntries([...body.matchAll(/(--sv-chat-[a-z-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()])),
 }));
 
-/** The chat's tokens in `mode` ("light" | "dark") and `palette`, applied in the order the cascade would. */
-function resolve(mode, palette) {
+/** The chat's tokens in `mode` ("light" | "dark"), applied in the order the cascade would. */
+function resolve(mode) {
   const steps = [
     (s) => s.includes(":root") && s.includes('[data-theme="light"]'),
     (s) => mode === "dark" && s === '[data-theme="dark"]',
-    (s) => s.includes(`[data-chat-colors="${palette}"]`) && !s.includes("data-theme"),
-    (s) => mode === "dark" && s.includes(`[data-chat-colors="${palette}"]`) && s.includes('[data-theme="dark"]'),
   ];
   return Object.assign({}, ...steps.flatMap((step) => rules.filter((rule) => step(rule.selector)).map((rule) => rule.tokens)));
 }
@@ -26,9 +24,9 @@ const luminance = (hex) => {
 };
 const ratio = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 
-for (const palette of ["today", "soft", "filled"]) for (const mode of ["light", "dark"]) {
-  test(`chat colours "${palette}", ${mode}: every text 4.5:1 and more on its bubble`, () => {
-    const tokens = resolve(mode, palette);
+for (const mode of ["light", "dark"]) {
+  test(`chat colours, ${mode}: every text 4.5:1 and more on its bubble`, () => {
+    const tokens = resolve(mode);
     for (const role of ["agent", "person"]) {
       const bg = tokens[`--sv-chat-${role}-bg`];
       assert.match(bg ?? "", /^#[0-9a-f]{6}$/i, `${role} fill`);
@@ -37,7 +35,6 @@ for (const palette of ["today", "soft", "filled"]) for (const mode of ["light", 
         assert.ok(ratio(value, bg) >= 4.5, `${role} ${ink} ${value} on ${bg}: ${ratio(value, bg).toFixed(2)}`);
       }
     }
-    if (palette !== "filled") return;
     // What sits on a filled bubble: a failure in words, 4.5:1; the marks, 3:1 (WCAG 1.4.11).
     const bg = tokens["--sv-chat-person-bg"];
     assert.ok(ratio(tokens["--sv-chat-person-danger"], bg) >= 4.5);
@@ -45,11 +42,12 @@ for (const palette of ["today", "soft", "filled"]) for (const mode of ["light", 
   });
 }
 
-test("today's palette is the one the page had: agent lila, person crema", () => {
-  assert.equal(resolve("light", "today")["--sv-chat-agent-bg"], "#f3eefa");
-  assert.equal(resolve("light", "today")["--sv-chat-person-bg"], "#f7f1e6");
-  assert.equal(resolve("dark", "today")["--sv-chat-agent-bg"], "#1e1b26");
-  assert.equal(resolve("dark", "today")["--sv-chat-person-bg"], "#24211b");
+test("the decided palette: the agent grey, the person the brand's lila with white text", () => {
+  assert.equal(resolve("light")["--sv-chat-agent-bg"], "#f1f1f4");
+  assert.equal(resolve("light")["--sv-chat-person-bg"], "#4a2f6b");
+  assert.equal(resolve("dark")["--sv-chat-agent-bg"], "#212125");
+  assert.equal(resolve("dark")["--sv-chat-person-bg"], "#46366a");
+  assert.equal(resolve("dark")["--sv-chat-person-fg"], "#ffffff");
 });
 
 test("the person's bubble on the stage and in the transcript are one rule, on the chat's tokens", () => {

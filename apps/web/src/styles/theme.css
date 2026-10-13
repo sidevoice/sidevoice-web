@@ -106,9 +106,12 @@
   --sv-tooltip-bg: #2a1a40;
   --sv-tooltip-text: #ffffff;
   /* The chat's bubbles, the agent's and the person's, in the transcript and on the stage: a fill, its text and its
-   * quieter text (the time, the marks, what is not said yet), 4.5:1 and more on the fill (14.8 and 4.6; 15.0 and 4.7). */
-  --sv-chat-agent-bg: #f3eefa; --sv-chat-agent-fg: #1b1d24; --sv-chat-agent-subtle: #686b7a;
-  --sv-chat-person-bg: #f7f1e6; --sv-chat-person-fg: #1b1d24; --sv-chat-person-subtle: #686b7a;
+   * quieter text (the time, the marks, what is not said yet), 4.5:1 and more on the fill (14.9 and 4.7; 11.0 and 7.4).
+   * The agent a plain grey; the person the brand's lila itself, with white text and its own inks for what sits on it
+   * (transcript.css): white marks, a failure in pink (6.5), an unconfirmed mark a quieter lila (4.3). */
+  --sv-chat-agent-bg: #f1f1f4; --sv-chat-agent-fg: #1b1d24; --sv-chat-agent-subtle: #686b7a;
+  --sv-chat-person-bg: #4a2f6b; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;
+  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #ab9bc8; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);
   --sv-stage-bg: radial-gradient(ellipse at 12% 0%, #eee4fa 0, transparent 50%), linear-gradient(145deg, #faf8fd, #f7f2e9);
   --sv-shadow-xs: 0 1px 2px rgb(42 26 64 / 8%);
   --sv-shadow-sm: 0 1px 2px rgb(42 26 64 / 5%), 0 8px 20px -14px rgb(42 26 64 / 22%);
@@ -134,9 +137,10 @@
   --sv-voice: #e0a82e; --sv-on-voice: #2a1a40; --sv-voice-soft: #2d2412; --sv-voice-text: #ecbe5c;
   --sv-disabled-bg: #26262b; --sv-disabled-text: #73737c;
   --sv-scrim: rgb(0 0 0 / 70%); --sv-tooltip-bg: #fafafa; --sv-tooltip-text: #18181b;
-  /* 16.2 and 5.6 on the agent's fill; 15.4 and 5.3 on the person's. */
-  --sv-chat-agent-bg: #1e1b26; --sv-chat-agent-fg: #fafafa; --sv-chat-agent-subtle: #93939c;
-  --sv-chat-person-bg: #24211b; --sv-chat-person-fg: #fafafa; --sv-chat-person-subtle: #93939c;
+  /* 15.4 and 5.3 on the agent's fill; 10.5 and 7.0 on the person's (a failure 6.2, an unconfirmed mark 4.6). */
+  --sv-chat-agent-bg: #212125; --sv-chat-agent-fg: #fafafa; --sv-chat-agent-subtle: #93939c;
+  --sv-chat-person-bg: #46366a; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;
+  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #b3a4ce; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);
   --sv-stage-bg: radial-gradient(ellipse at 12% 0%, rgb(201 182 236 / 14%) 0, transparent 50%), linear-gradient(145deg, #161518, #111113);
   --sv-shadow-xs: 0 1px 2px rgb(0 0 0 / 60%); --sv-shadow-sm: none; --sv-shadow-md: 0 16px 34px rgb(0 0 0 / 55%); --sv-shadow-lg: 0 30px 80px rgb(0 0 0 / 70%);
   /* Buttons: a 1px inner highlight on fills, a hairline raise, and the secondary's own fill. */
@@ -144,27 +148,6 @@
   --sv-button-raise: 0 1px 2px rgb(0 0 0 / 45%);
   --sv-button-secondary-bg: rgb(255 255 255 / 6%); --sv-button-secondary-hover: rgb(255 255 255 / 10%);
   --sv-button-secondary-active: rgb(255 255 255 / 14%); --sv-button-border: rgb(255 255 255 / 14%);
-}
-
-/* The chat's other palettes (VARIANTS `chat-colors`, on the call's <main>): the brand's lila for the person, the agent
- * in a plain grey. "soft" a tint of it with the theme's text; "filled" the colour itself with white text, and its own
- * inks for what sits on it (transcript.css). Ratios: text, then the quieter text, on each fill. */
-[data-chat-colors="soft"], [data-chat-colors="filled"] {
-  --sv-chat-agent-bg: #f1f1f4; --sv-chat-agent-fg: #1b1d24; --sv-chat-agent-subtle: #686b7a;    /* 14.9, 4.7 */
-}
-[data-theme="dark"] :is([data-chat-colors="soft"], [data-chat-colors="filled"]) {
-  --sv-chat-agent-bg: #212125; --sv-chat-agent-fg: #fafafa; --sv-chat-agent-subtle: #93939c;    /* 15.4, 5.3 */
-}
-[data-chat-colors="soft"] { --sv-chat-person-bg: #ece4f7; --sv-chat-person-fg: #1b1d24; --sv-chat-person-subtle: #5a5d6c; }    /* 13.6, 5.3 */
-[data-theme="dark"] [data-chat-colors="soft"] { --sv-chat-person-bg: #2f2741; --sv-chat-person-fg: #fafafa; --sv-chat-person-subtle: #a1a1aa; }    /* 13.5, 5.5 */
-/* Filled: the marks are white, a failure the dark theme's pink (6.5 / 6.2), an unconfirmed mark a quieter lila (4.3 / 4.6). */
-[data-chat-colors="filled"] {
-  --sv-chat-person-bg: #4a2f6b; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;    /* 11.0, 7.4 */
-  --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #ab9bc8; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);
-}
-[data-theme="dark"] [data-chat-colors="filled"] {
-  --sv-chat-person-bg: #46366a; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;    /* 10.5, 7.0 */
-  --sv-chat-person-quiet: #b3a4ce;
 }
 
 /* What every themed box inherits: the theme's text, in the brand's type. */
