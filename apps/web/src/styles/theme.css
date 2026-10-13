@@ -109,6 +109,8 @@
    * quieter text (the time, the marks, what is not said yet), 4.5:1 and more on the fill (14.9 and 4.7; 11.0 and 7.4).
    * The agent a plain grey; the person the brand's lila itself, with white text and its own inks for what sits on it
    * (transcript.css): white marks, a failure in pink (6.5), an unconfirmed mark a quieter lila (4.3). */
+  /* The stage's bubbles, opaque on any scene: an edge and a soft shadow that part them from light and dark alike. */
+  --sv-stage-bubble-edge: rgb(27 29 36 / 16%); --sv-stage-bubble-shadow: 0 1px 2px rgb(27 29 36 / 12%), 0 8px 24px -8px rgb(27 29 36 / 35%);
   --sv-chat-agent-bg: #f1f1f4; --sv-chat-agent-fg: #1b1d24; --sv-chat-agent-subtle: #686b7a;
   --sv-chat-person-bg: #4a2f6b; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;
   --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #ab9bc8; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);
@@ -138,6 +140,7 @@
   --sv-disabled-bg: #26262b; --sv-disabled-text: #73737c;
   --sv-scrim: rgb(0 0 0 / 70%); --sv-tooltip-bg: #fafafa; --sv-tooltip-text: #18181b;
   /* 15.4 and 5.3 on the agent's fill; 10.5 and 7.0 on the person's (a failure 6.2, an unconfirmed mark 4.6). */
+  --sv-stage-bubble-edge: rgb(255 255 255 / 18%); --sv-stage-bubble-shadow: 0 1px 2px rgb(0 0 0 / 50%), 0 10px 28px -8px rgb(0 0 0 / 70%);
   --sv-chat-agent-bg: #212125; --sv-chat-agent-fg: #fafafa; --sv-chat-agent-subtle: #93939c;
   --sv-chat-person-bg: #46366a; --sv-chat-person-fg: #ffffff; --sv-chat-person-subtle: #d9cfe8;
   --sv-chat-person-mark: #ffffff; --sv-chat-person-quiet: #b3a4ce; --sv-chat-person-danger: #ffb4ab; --sv-chat-person-wash: rgb(255 255 255 / 14%);

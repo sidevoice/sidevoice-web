@@ -74,3 +74,42 @@ export function useSentTurns(conversation: ConversationView): { turns: SentTurn[
   const done = useCallback((key: string) => setTurns((now) => now.filter((turn) => turn.key !== key)), []);
   return { turns, done };
 }
+
+/** A reply on the stage: its text, how far the voice is into it, and whether it is leaving. */
+export interface AgentTurn { key: string; text: string; spoken: number; leaving: boolean }
+/** How long a reply stays once its last words are said, before it leaves. */
+export const AGENT_LINGER_MS = 3000;
+
+/** The replies the stage shows: the one sounding (`reply`, `spokenTo` into it); the one just finished, whole, for
+ *  AGENT_LINGER_MS; and any leaving, for SENT_LEAVING_MS. A new reply sends the one before away at once. */
+export function useAgentTurns(reply: ChatMessage | null, spokenTo: number | null): AgentTurn[] {
+  const current = reply && spokenTo !== null ? { key: reply.segment ?? String(reply.time), text: reply.text, spoken: spokenTo } : null;
+  const last = useRef<{ key: string; text: string } | null>(null);
+  const [linger, setLinger] = useState<{ key: string; text: string } | null>(null);
+  const [leaving, setLeaving] = useState<{ key: string; text: string }[]>([]);
+  const away = useCallback((turn: { key: string; text: string }) => {
+    setLeaving((now) => now.some((item) => item.key === turn.key) ? now : [...now, turn]);
+    window.setTimeout(() => setLeaving((now) => now.filter((item) => item.key !== turn.key)), SENT_LEAVING_MS);
+  }, []);
+  const key = current?.key ?? null;
+  useEffect(() => {
+    const before = last.current;
+    if (before && before.key !== key) {
+      // A new reply over it: away at once. Its end: it stays a moment, whole.
+      if (key) away(before); else setLinger(before);
+    }
+    if (key) setLinger((now) => { if (now && now.key !== key) away(now); return null; });
+    last.current = current ? { key: current.key, text: current.text } : null;
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The same reply, grown: what it leaves with is all of it. A new one is the effect's to take over.
+  if (current && last.current?.key === current.key) last.current = { key: current.key, text: current.text };
+  useEffect(() => {
+    if (!linger) return;
+    const next = window.setTimeout(() => { away(linger); setLinger(null); }, AGENT_LINGER_MS);
+    return () => window.clearTimeout(next);
+  }, [linger, away]);
+  const turns: AgentTurn[] = leaving.map((turn) => ({ ...turn, spoken: turn.text.length, leaving: true }));
+  if (linger && !leaving.some((turn) => turn.key === linger.key)) turns.push({ ...linger, spoken: linger.text.length, leaving: false });
+  if (current && !turns.some((turn) => turn.key === current.key)) turns.push({ ...current, leaving: false });
+  return turns;
+}
