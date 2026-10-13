@@ -2,6 +2,7 @@ import { afterEach, expect, onTestFinished, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
+import { VARIANTS_KEY } from "../../lib/variants";
 import { fakeUpdater, withUpdater } from "../../test/updater";
 import { UpdatesEntry, useUpdatesWaiting } from "./UpdatesEntry";
 import { useUpdates, type UpdaterStatus } from "./useUpdates";
@@ -227,5 +228,124 @@ test("this computer's update, Updates available, opens This device where it has 
     expect([facts.settingsSection, facts.settingsLevel]).toEqual([app ? "this-computer" : "machines", "page"]);
     if (!app) expect(facts.machinesView.machine).toBe(store.getState().machines.find((machine) => machine.local)?.id);
     unmount();
+  }
+});
+
+/* VARIANTS `updates-section` B: everything that updates in a Settings section of its own (UpdatesSettings). The foot's
+ * row still says the most pressing update, the app's as its state goes, but always opens that section; a remote
+ * machine behind (remoteHostStatus `update`, contract gap #57) is the section's to list, and has no place in A. */
+const sectionB = () => {
+  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "updates-section": "section" }));
+  onTestFinished(() => localStorage.removeItem(VARIANTS_KEY));
+};
+const RELEASE = { channel: "release", version: "0.9.0", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" };
+const lab = { fp: "fp-lab", host: "Lab box", local: false, urls: ["https://lab.example"], rv: null, device_id: "d-lab", paired_at: 2, revoked: false };
+const labBehind = (host = "Lab box") => ({ pairings: [{ ...lab, host }], machinesReady: true, machineLinks: { "fp-lab": { reach: "ok", via: "node" } },
+  remoteHostStatus: { "fp-lab": { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "sidevoice update" } } } });
+const section = (store: ReturnType<typeof foot>) => [store.getState().facts.settingsSection, store.getState().facts.settingsLevel];
+
+test("A: a remote machine behind has no place at the foot or in the rail; B: Updates available, which opens Updates", async () => {
+  window.sidevoiceActions = { loadMachineInfo: vi.fn() } as unknown as typeof window.sidevoiceActions;
+  foot(undefined, labBehind());
+  await settle();
+  expect(line()).toBeNull();
+  expect(screen.getByTestId("waiting")).toHaveTextContent("false");
+  cleanup();
+  foot(undefined, labBehind(), true);
+  await settle();
+  expect(screen.queryByRole("button", { name: /^Updates, / })).toBeNull();
+  cleanup();
+  sectionB();
+  const store = foot(undefined, labBehind());
+  await settle();
+  expect(screen.getByTestId("items")).toHaveTextContent("machine:fp-lab");
+  expect(screen.getByTestId("waiting")).toHaveTextContent("true");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Updates available" })); });
+  expect(section(store)).toEqual(["updates", "page"]);
+});
+
+test("B, the rail: the remote machine by its name, an unnamed one as such; its button opens Updates", async () => {
+  sectionB();
+  for (const host of ["Lab box", ""]) {
+    const store = foot(undefined, labBehind(host), true);
+    await settle();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Updates, 1 waiting" })); });
+    expect(screen.getByText(host ? "Lab box needs an update" : "Unnamed machine needs an update")).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "See updates" })); });
+    expect(section(store)).toEqual(["updates", "page"]);
+    cleanup();
+  }
+});
+
+test("a machine forgotten while it was behind is not listed: no item, no count, no row", async () => {
+  sectionB();
+  const facts = labBehind();
+  foot(undefined, { ...facts, pairings: [] }, true);
+  await settle();
+  expect(screen.getByTestId("items")).toHaveTextContent(/^$/);
+  expect(screen.getByTestId("waiting")).toHaveTextContent("false");
+  expect(screen.queryByRole("button", { name: /^Updates, / })).toBeNull();
+});
+
+test("each paired machine elsewhere, once connected, is asked whether it is behind; this computer's and one not connected are not", async () => {
+  const loadMachineInfo = vi.fn();
+  window.sidevoiceActions = { loadMachineInfo } as unknown as typeof window.sidevoiceActions;
+  const away = { ...lab, fp: "fp-away", host: "Away", device_id: "d-away" };
+  const store = foot(undefined, { pairings: [local, lab, away], machinesReady: true, machineLinks: { "fp-local": { reach: "ok", via: "node" }, "fp-lab": { reach: "ok", via: "node" }, "fp-away": { reach: "away", via: "" } } });
+  await settle();
+  // Each place the updates show asks (the controller makes it one request per machine at a time).
+  const asked = () => new Set(loadMachineInfo.mock.calls.map(([fp]) => fp));
+  expect(asked()).toEqual(new Set(["fp-lab"]));
+  loadMachineInfo.mockClear();
+  // The other one connects: asked then.
+  act(() => store.patch({ machineLinks: { ...store.getState().facts.machineLinks, "fp-away": { reach: "ok", via: "node" } } } as never));
+  await settle();
+  expect(asked()).toContain("fp-away");
+  expect(asked()).not.toContain("fp-local");
+});
+
+test("B in the desktop app: the foot's words follow the app's update, and it opens Updates instead of acting in place", async () => {
+  sectionB();
+  for (const [status, mode, words] of [
+    [{ state: "ready", version: "0.5.0" }, "automatic", "Restart to update · 0.5.0"],
+    [{ state: "ready" }, "automatic", "Restart to update"],
+    [{ state: "available", version: "0.5.0" }, "manual", "Version 0.5.0 available"],
+    [{ state: "downloading", version: "0.5.0", progress: 0.4 }, "manual", /^Downloading… 40\s?%$/],
+  ] as [UpdaterStatus, "automatic" | "manual", string | RegExp][]) {
+    const { updater } = fakeUpdater({ status, mode });
+    withUpdater(updater, { build: RELEASE });
+    const store = createRoomStore();
+    render(<RoomProvider store={store} runtime={false}><UpdatesEntry /></RoomProvider>);
+    await settle();
+    const row = screen.getByRole("button", { name: words });
+    expect(row.querySelector(".update-line-act")).toBeNull();
+    await act(async () => { fireEvent.click(row); });
+    expect(section(store)).toEqual(["updates", "page"]);
+    expect(updater.restart).not.toHaveBeenCalled();
+    expect(updater.download).not.toHaveBeenCalled();
+    cleanup();
+  }
+});
+
+test("B in the desktop app: this computer's update opens Updates, not This device", async () => {
+  sectionB();
+  for (const compact of [false, true]) {
+    withMachineUpdate();
+    const desktop = (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop;
+    desktop.host.build = RELEASE;
+    const store = createRoomStore();
+    act(() => store.patch({ inApp: true, localHostAvailable: true, localHostStatus: { state: "running" }, pairings: [local], machinesReady: true } as never));
+    render(<RoomProvider store={store} runtime={false}><UpdatesEntry compact={compact} /></RoomProvider>);
+    if (compact) {
+      const entry = await screen.findByRole("button", { name: "Updates, 1 waiting" });
+      await act(async () => { entry.click(); });
+      expect(screen.getByText("This computer needs an update")).toBeInTheDocument();
+      await act(async () => { screen.getByRole("button", { name: "See updates" }).click(); });
+    } else {
+      const row = await screen.findByRole("button", { name: "Updates available" });
+      await act(async () => { row.click(); });
+    }
+    expect(section(store)).toEqual(["updates", "page"]);
+    cleanup();
   }
 });

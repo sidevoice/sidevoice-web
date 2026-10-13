@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
 import { useRoomStore } from "../../state/room-store";
+import type { MachineView } from "../../state/room-types";
 
-/* What wants updating, from three places: this page (a newer build the room serves: out of a call the page reloads
+/* What wants updating, from four places: this page (a newer build the room serves: out of a call the page reloads
  * itself, in one Reload loads it when the person says), the desktop app (its updater, behind the host's `updater`
- * seam: a release's only), and this computer's machine (the bridge's `version()`). A paired machine elsewhere reports
- * no version to this page today, so it cannot be listed. */
+ * seam: a release's only), this computer's machine (the bridge's `version()`), and each paired machine elsewhere that
+ * says it is behind (remoteHostStatus `update`: contract gap #57, which no core says yet). */
 
 export type UpdateKind = "web" | "machine";
 export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean; machine?: string }
@@ -148,13 +149,28 @@ export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | 
   return status.state === "available" || status.state === "downloading" ? status : null;
 }
 
-/** The page's and this computer's machine's updates waiting (`items`), and the desktop app's as the sidebar shows it
- *  (`app`, with its actions in `appUpdate`). */
+/** The paired machines whose Sidevoice is behind, as they said (remoteHostStatus `update`, contract gap #57): only those
+ *  still paired here, so a machine forgotten while it was behind is not listed. */
+export function useOutdatedMachines(): { machine: MachineView; version: string | null; latest: string; command: string }[] {
+  const machines = useRoomStore((state) => state.machines);
+  const status = useRoomStore((state) => state.facts.remoteHostStatus);
+  return machines.flatMap((machine) => {
+    const info = !machine.local && machine.pairingId ? status?.[machine.pairingId] : undefined;
+    return info?.update ? [{ machine, version: info.version ?? null, latest: info.update.latest, command: info.update.command }] : [];
+  });
+}
+
+/** The page's, this computer's machine's and the paired machines' updates waiting (`items`), and the desktop app's as
+ *  the sidebar shows it (`app`, with its actions in `appUpdate`). */
 export function useUpdates() {
   const web = useRoomStore((state) => state.facts.webUpdate);
   const status = useRoomStore((state) => state.facts.localHostStatus);
+  const outdated = useOutdatedMachines();
   const appUpdate = useAppUpdate();
   const [machine, setMachine] = useState<LocalHostVersion | null>(null);
+  // Each paired machine, once connected, is asked whether its Sidevoice is behind (loadMachineInfo, contract gap #57).
+  const connected = useRoomStore((state) => state.machines.filter((item) => !item.local && item.pairingId && item.state === "connected").map((item) => item.pairingId).join(" "));
+  useEffect(() => { for (const fp of connected.split(" ").filter(Boolean)) void window.sidevoiceActions?.loadMachineInfo?.(fp); }, [connected]);
 
   useEffect(() => {
     const bridge = localHostBridge();
@@ -167,5 +183,7 @@ export function useUpdates() {
   const items: UpdateItem[] = [];
   if (web) items.push({ id: "web", kind: "web", version: web, required: false });
   if (machine?.update === "available") items.push({ id: "machine:local", kind: "machine", version: typeof machine.bundled?.version === "string" ? machine.bundled.version : "", required: false });
+  // Remote machines behind (contract gap #57): updated by a command run there, from the Updates section (VARIANTS `updates-section` B).
+  for (const { machine: remote, latest } of outdated) items.push({ id: "machine:" + remote.pairingId, kind: "machine", version: latest, required: false, machine: remote.pairingId });
   return { items, app: appUpdateShown(appUpdate.status, appUpdate.mode), appUpdate };
 }

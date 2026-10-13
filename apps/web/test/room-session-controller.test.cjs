@@ -1774,3 +1774,41 @@ test('This device\'s microphone and speaker are given to the voice when it is ma
  assert.deepEqual(plain(s.run('audioLost')),{input:'mic-b'});
  assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{});
 });
+
+// ----- a paired machine's Sidevoice: its version, and whether it is behind (contract gap #57) -----
+test('A paired machine that says it is behind says how to update it there; anything less is no update, and one question is out at a time',async()=>{
+ const s=setup();
+ s.run("hostAgentBases.set('fp-mac','https://mac.example');verified.set('https://mac.example',Date.now())");
+ let says={version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}};const asked=[];
+ s.context.fetch=async(url,init={})=>{asked.push([String(url),init.headers?.Authorization]);return {ok:true,status:200,json:async()=>says}};
+ const status=()=>plain(s.run("roomStore.getState().facts.remoteHostStatus['fp-mac']"));
+ await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(asked,[['https://mac.example/api/host/status','Bearer tok-1']],'asked of the machine itself, with this device\'s token');
+ assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}});
+ // What is not a latest version and a command to run is not an update: no command, a blank one, a number, a word.
+ for(const update of [{latest:'0.5.0'},{latest:'0.5.0',command:'  '},{latest:5,command:'x'},{command:'x'},'yes',null]){
+  says={version:'0.4.0',update};
+  await s.run("loadMachineInfo('fp-mac')");
+  assert.deepEqual(status(),{version:'0.4.0',update:null},JSON.stringify(update));
+ }
+ // Up to date once more: no update; a version that is not one is unknown.
+ says={version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}};await s.run("loadMachineInfo('fp-mac')");
+ says={version:'v0.5'};await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(status(),{version:null,update:null});
+ // A machine that cannot be asked keeps what it last said.
+ says={version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}};await s.run("loadMachineInfo('fp-mac')");
+ s.context.fetch=async()=>{throw new TypeError('Failed to fetch')};
+ await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}});
+ // Asked from several places at once (its page's card, each place the updates show): one request, one answer for all.
+ let answer;asked.length=0;
+ s.context.fetch=async url=>{asked.push([String(url)]);return new Promise(resolve=>{answer=()=>resolve({ok:true,status:200,json:async()=>({version:'0.5.0'})})})};
+ const loads=s.run("[loadMachineInfo('fp-mac'),loadMachineInfo('fp-mac'),loadMachineInfo('fp-mac')]");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(asked.length,1);
+ answer();await Promise.all(loads);
+ assert.deepEqual(status(),{version:'0.5.0',update:null});
+ // Once answered, the next question goes out again.
+ await Promise.all([s.run("loadMachineInfo('fp-mac')"),new Promise(resolve=>setTimeout(()=>{answer();resolve()},0))]);
+ assert.equal(asked.length,2);
+});

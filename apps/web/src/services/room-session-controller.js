@@ -152,14 +152,25 @@ function setLocalHostStatus(status){
  roomStore.patch({localHostStatus:status});
 }
 let localHostEpoch=0;
-// What a paired machine says of its Sidevoice — its version — for its page's card: asked of it with this
+// What a paired machine says of its Sidevoice — its version, and whether it is behind — for its page's card: asked of it with this
 // device's pairing (core GET /api/host/status, which core does not serve yet: a contract gap). Unknown stays unknown.
-async function loadMachineInfo(fp){
+// One question per machine at a time: every place asking while it is out (its page's card, each place the updates
+// show) shares its answer.
+const machineInfoLoads=new Map();
+function loadMachineInfo(fp){
+ let load=machineInfoLoads.get(fp);
+ if(!load){load=readMachineInfo(fp).finally(()=>machineInfoLoads.delete(fp));machineInfoLoads.set(fp,load)}
+ return load;
+}
+async function readMachineInfo(fp){
  try{
   const answer=await hostApi(fp,'/api/host/status',{headers:{accept:'application/json'},cache:'no-store'});
   const info=answer&&typeof answer==='object'?answer:{};
   const version=typeof info.version==='string'&&/^\d+\.\d+\.\d+/.test(info.version)?info.version:null;
-  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],version}}});
+  // Behind the latest, and the command that updates it there (contract gap #57: no core says it yet).
+  const u=info.update&&typeof info.update==='object'?info.update:null;
+  const update=u&&typeof u.latest==='string'&&typeof u.command==='string'&&u.command.trim()?{latest:u.latest,command:u.command}:null;
+  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],version,update}}});
  }catch{}
 }
 async function refreshLocalHost(){

@@ -11,6 +11,7 @@ import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
 import { useThisComputerSection } from "../../state/this-computer";
+import { useUpdatesSection } from "../settings/UpdatesSettings";
 import { useUpdates, type UpdateItem, type UpdaterStatus, type useAppUpdate } from "./useUpdates";
 import "./updates.css";
 
@@ -39,8 +40,13 @@ function useOpenMachineUpdate() {
 }
 
 function UpdateRow({ item, t }: { item: UpdateItem; t: HostTranslate }) {
-  const { open, ownComputer } = useOpenMachineUpdate();
-  const title = item.kind === "web" ? t("updates.web") : t("updates.machine", { machine: t("hosts.thisComputer") });
+  const { open: openMachine, ownComputer } = useOpenMachineUpdate();
+  const store = useContext(RoomStoreContext);
+  const apart = useUpdatesSection();
+  const open = apart ? () => openSettings({ section: "updates" }, store) : openMachine;
+  const remote = useRoomStore((state) => item.machine ? state.machines.find((machine) => machine.pairingId === item.machine)?.host : null);
+  // A remote machine with no name here is an unnamed one, never This computer.
+  const title = item.kind === "web" ? t("updates.web") : t("updates.machine", { machine: item.machine ? remote || t("hosts.unnamed") : t("hosts.thisComputer") });
   const act = () => {
     if (item.kind === "web") window.sidevoiceActions?.reloadToUpdate?.();
     else open();
@@ -52,7 +58,7 @@ function UpdateRow({ item, t }: { item: UpdateItem; t: HostTranslate }) {
       </span>
       <span className="update-row-actions">
         <Button size="sm" variant="primary" onClick={act}
-          aria-label={item.kind === "web" ? t("updates.reloadNamed") : ownComputer ? t("updates.openThisDevice") : t("updates.openNamed", { machine: t("hosts.thisComputer") })}>
+          aria-label={item.kind === "web" ? t("updates.reloadNamed") : apart ? t("settings.updates.see") : ownComputer ? t("updates.openThisDevice") : t("updates.openNamed", { machine: t("hosts.thisComputer") })}>
           {item.kind === "web" ? t("updates.reload") : t("updates.open")}
         </Button>
       </span>
@@ -112,7 +118,11 @@ function UpdatesList({ items, app, update, t }: { items: UpdateItem[]; app: Upda
 function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: UpdaterStatus | null; update: ReturnType<typeof useAppUpdate>; t: HostTranslate }) {
   const [busy, setBusy] = useState<"download" | "restart" | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
-  const { open } = useOpenMachineUpdate();
+  const store = useContext(RoomStoreContext);
+  // Where updates have a section of their own (VARIANTS `updates-section` B), the entry says the same and opens it.
+  const apart = useUpdatesSection();
+  const { open: openMachine } = useOpenMachineUpdate();
+  const open = apart ? () => openSettings({ section: "updates" }, store) : openMachine;
   useEffect(() => { setFailure(null); }, [app?.state]);
   async function run(action: "download" | "restart") {
     if (busy) return;
@@ -127,7 +137,13 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
         <UpdateIcon /><span className="update-line-text">{text}</span>{act.label && <span className="update-line-act">{act.label}</span>}</Button>
     : <div className="update-line" role="status" title={text}><UpdateIcon /><span className="update-line-text">{text}</span>{extra}</div>;
   let line: React.ReactNode = null;
-  if (app) {
+  if (apart && app) {
+    const version = app.version ?? "";
+    const text = app.state === "ready" ? version ? t("updates.restartToUpdateVersion", { version }) : t("updates.restartToUpdate") : app.state === "downloading"
+      ? t("updates.downloadingPercent", { percent: app.progress == null ? "" : new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(app.progress) })
+      : t("updates.available", { version });
+    line = row(text, { onClick: open });
+  } else if (app) {
     const version = app.version ?? "";
     if (app.state === "ready") line = update.can.restart
       ? row(version ? t("updates.restartToUpdateVersion", { version }) : t("updates.restartToUpdate"), { onClick: () => void run("restart"), loading: busy === "restart" })
@@ -162,7 +178,11 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
  *  with all of them behind it and their count. Hidden while nothing waits. */
 export function UpdatesEntry({ compact = false, side = "top" }: { compact?: boolean; side?: "top" | "bottom" }) {
   const t = hostTranslator();
-  const { items, app, appUpdate } = useUpdates();
+  const all = useUpdates();
+  // A remote machine behind is the Updates section's to say (VARIANTS `updates-section` B); elsewhere it has no place yet.
+  const apart = useUpdatesSection();
+  const { app, appUpdate } = all;
+  const items = apart ? all.items : all.items.filter((item) => !item.machine);
   if (!compact) return <UpdateLine items={items} app={app} update={appUpdate} t={t} />;
   const behind = app;
   const count = items.length + (behind ? 1 : 0);
@@ -181,5 +201,6 @@ export function UpdatesEntry({ compact = false, side = "top" }: { compact?: bool
 /** Whether something waits: a phone's chevron wears a dot for it where the updates live in its panel. */
 export function useUpdatesWaiting() {
   const { items, app } = useUpdates();
-  return items.length > 0 || !!app;
+  const apart = useUpdatesSection();
+  return items.some((item) => apart || !item.machine) || !!app;
 }

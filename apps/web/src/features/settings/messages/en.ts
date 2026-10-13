@@ -512,7 +512,12 @@ export const en = {
   // The desktop app's updates as a section of their own (VARIANTS `updates-section` B).
   "settings.section.updates": "Updates",
   "settings.updates.description": "The Sidevoice app on this computer: its version, and how it updates.",
-  "settings.updates.version": "Version",
+  "settings.updates.descriptionMachines": "Machines whose Sidevoice is behind, and how to update them.",
+  "settings.updates.app": "Sidevoice app",
+  "settings.updates.machines": "Remote machines",
+  "settings.updates.machineBehind": "{version} · {latest} available",
+  "settings.updates.runOn": "Run this on {machine}:",
+  "settings.updates.see": "See updates",
   // A phone's Settings as a menu (settings-levels.tsx): Back to the level above, and what each row says under its name.
   "settings.back": "Back",
   "settings.leave": "Back",

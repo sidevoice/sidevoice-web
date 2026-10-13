@@ -4,3 +4,9 @@
 .updates-settings-version { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .updates-settings-version .host-status-product { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
 .updates-settings-version .host-status-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+/* This device's way to Updates (B): a link's look, beside its version. */
+.see-updates { justify-self: start; padding: 0; border: 0; background: none; font: inherit; font-size: var(--sv-font-sm); color: var(--sv-accent-text); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.see-updates:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-xs); }
+/* A machine behind: its name and versions, then the command to run there. */
+.updates-machine + .updates-machine { border-top: 1px solid var(--sv-border); }
+.updates-machine .host-agent-where { margin: 0; font-size: var(--sv-font-sm); }
