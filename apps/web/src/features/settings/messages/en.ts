@@ -778,11 +778,11 @@ export const en = {
   "updates.restartToUpdate": "Restart to update",
   "updates.open": "Open",
   "updates.none": "Everything is up to date.",
-  // Every update button says what it updates: the app or the service (two rows), or Sidevoice as one (one row).
+  // Every update button says what it does: the app's update downloaded (manual), then restarted into; the app or the
+  // service (two rows), or Sidevoice as one (one row), updated.
   "updates.action.download": "Download",
   "updates.action.retryDownload": "Retry download",
-  "updates.action.updateApp": "Update the app",
-  "updates.action.retryApp": "Retry updating the app",
+  "updates.action.restart": "Restart",
   "updates.action.restartApp": "Restart to update the app",
   "updates.action.updateService": "Update the service",
   "updates.action.updatingService": "Updating the service…",
@@ -802,7 +802,9 @@ export const en = {
   "updates.notice.serviceOne": "A Sidevoice service update is available",
   "updates.notice.machines": "{n} machines need an update",
   "updates.notice.dismiss": "Hide this notice",
-  "updates.notice.gear": "Settings, an update is waiting",
+  // The chip beside Settings (VARIANTS `update-notice` B2): the app's update in a few words, its action after them.
+  "updates.chip.app": "Sidevoice {version}",
+  "updates.chip.appOne": "Sidevoice update",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "A smart end of turn",
   "whatsNew.endOfTurn.line": "A small model hears when you have finished, so a pause to think does not cut you off.",

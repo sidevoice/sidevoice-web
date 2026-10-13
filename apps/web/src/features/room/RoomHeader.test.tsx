@@ -87,14 +87,33 @@ function noticeVariant(value: string) {
   onTestFinished(() => localStorage.removeItem("sidevoice.variants"));
 }
 
-test("an update waiting (C, the default): an update icon by the brand, its count in its name; the foot keeps Settings alone", () => {
+test("an update waiting (B1, the default: the banner over the room): nothing by the brand; the foot keeps Settings alone, named", () => {
   const store = room();
-  expect(document.querySelector(".sidebar-brand .update-brand")).toBeNull();
   act(() => store.patch({ webUpdate: "b2" } as never));
-  expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).getByRole("button", { name: "Updates, 1 waiting" })).toHaveAttribute("aria-haspopup", "dialog");
+  expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).queryByRole("button")).toBeNull();
   const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
   expect([...foot.children]).toHaveLength(1);
-  expect(foot.querySelector(".update-line, .updates-entry")).toBeNull();
+  expect(foot.querySelector(".update-line, .updates-entry, .update-chip")).toBeNull();
+  expect(foot.querySelector(".sidebar-settings")).toHaveTextContent("Settings");
+});
+
+test("an update waiting (B2): one row at the foot, Settings as its gear (named so) then the chip; nothing waiting, Settings alone", () => {
+  noticeVariant("beside-settings");
+  const store = room();
+  const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
+  expect(foot.querySelector(".update-chip")).toBeNull();
+  expect(foot.querySelector(".sidebar-settings")).toHaveTextContent("Settings");
+  act(() => store.patch({ webUpdate: "b2" } as never));
+  expect([...foot.children]).toHaveLength(1);
+  const row = foot.querySelector<HTMLElement>(".update-beside-row")!;
+  const [gear, chip] = [...row.children] as HTMLElement[];
+  expect(gear).toHaveClass("sidebar-settings");
+  expect(gear).toHaveAccessibleName("Settings");
+  expect(gear).toHaveAttribute("title", "Settings");
+  expect(gear).not.toHaveTextContent("Settings");
+  expect(chip).toHaveClass("update-chip");
+  expect(chip).toHaveAccessibleName("Reload to update");
+  expect(document.querySelector(".update-banner")).toBeNull();
 });
 
 test("an update waiting (D, today's): its row in the sidebar's foot, above Settings, each its own child", () => {
@@ -107,7 +126,7 @@ test("an update waiting (D, today's): its row in the sidebar's foot, above Setti
   expect(children[0]).toContainElement(foot.querySelector(".update-line") as HTMLElement);
   expect(children[0]).toHaveTextContent("Reload to update");
   expect(children[1]).toContainElement(foot.querySelector(".sidebar-settings") as HTMLElement);
-  expect(document.querySelector(".update-brand")).toBeNull();
+  expect(document.querySelector(".update-chip, .update-banner")).toBeNull();
 });
 
 test("a phone has no updates entry: none in the header, none in the dropped list, no dot on the chevron", async () => {
@@ -117,7 +136,7 @@ test("a phone has no updates entry: none in the header, none in the dropped list
   expect(header().querySelector(".updates-entry")).toBeNull();
   await act(async () => { fireEvent.click(chevron()!); });
   expect(document.getElementById("conversations")).toHaveAttribute("data-open");
-  expect(document.querySelector(".update-line, .updates-entry, .update-brand, .update-banner")).toBeNull();
+  expect(document.querySelector(".update-line, .updates-entry, .update-chip, .update-banner")).toBeNull();
   expect(screen.queryByRole("button", { name: /Reload to update|^Updates, / })).toBeNull();
   expect(chevron()).not.toHaveAttribute("data-updates");
 });

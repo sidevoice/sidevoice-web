@@ -5,10 +5,10 @@ import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
 import { safeLocalHostStatusDetails } from "../settings/local-host-status";
 
-/** Where the room says an update waits (VARIANTS `update-notice`, desktop only: a phone has none): an update icon by
- *  the brand, with a popover (C, the default); a mark on the Settings gear (A); a slim banner over the room (B); the
- *  conversations' foot, today's (D). */
-export const UPDATE_NOTICE = ["brand", "gear", "banner", "foot"] as const;
+/** Where the room says an update waits (VARIANTS `update-notice`, desktop only: a phone has none): a slim banner over
+ *  the room (B1, the default); the same banner's look as a chip in Settings' row, at the conversations' foot (B2); or
+ *  the foot's quiet row above Settings, today's, kept as the reference the other two are weighed against (D). */
+export const UPDATE_NOTICE = ["banner", "beside-settings", "foot"] as const;
 export type UpdateNotice = (typeof UPDATE_NOTICE)[number];
 export const useUpdateNotice = () => useVariant("update-notice", UPDATE_NOTICE);
 

@@ -33,31 +33,38 @@
 .update-line-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
 /* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
 .app-update-setting .ui-segment { padding-inline: 10px; }
-/* Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`). Each update's line: its words, its
- * action beside them (under them where it is narrow), what failed under both. */
+/* Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`). Each update's line (the banner's, the
+ * rail's popover): its words, its action beside them (under them where it is narrow), what failed under both. */
 .update-notice-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
 .updates-panel .update-notice-list > li { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
 .update-notice-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2) var(--sv-space-3); min-width: 0; }
 .update-notice-line .update-notice-text { flex: 1 1 10rem; min-width: 0; margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .update-notice-text:focus:not(:focus-visible) { outline: none; }
 .update-notice-error { flex-basis: 100%; font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
-/* C: the update icon at the brand's end (under the mark in the rail), an accent dot on its corner ringed in the
- * column's ground. */
-.sidebar-brand .update-brand { position: relative; flex: none; margin-inline-start: auto; color: var(--sv-text-muted); }
-.sidebar-brand .update-brand:hover { color: var(--sv-text); }
-.update-brand-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-accent); box-shadow: 0 0 0 2px var(--dot-ring, var(--sv-bg)); }
-@media (min-width: 900px) {
-  .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand:has(.update-brand) { flex-direction: column; gap: var(--sv-space-1); }
-  .conversation-sidebar[data-collapsed] .sidebar-brand .update-brand { margin-inline-start: 0; }
-}
-/* A: the update's icon on the gear's corner, where the "new" count would be, ringed as it is. */
-.settings-notice[data-mark="update"] { top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--new-ground); }
-.settings-notice[data-mark="update"] svg { width: 10px; height: 10px; stroke-width: 2.4; }
-.sidebar-settings .settings-notice[data-mark="update"] { right: auto; left: 22px; }
-/* B: a slim bar across the room, the accent's soft ground; its words and action, then × at its end. */
+/* B1: a slim bar across the room, the accent's soft ground; its words and action, then × at its end. */
 .update-banner { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 44px; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-5);
   border-bottom: 1px solid var(--sv-border); background: var(--sv-accent-soft); color: var(--sv-text); }
 .update-banner-icon { flex: none; color: var(--sv-accent-text); }
 .update-banner .update-notice-line { flex: 1 1 auto; }
 .update-banner .update-notice-text { flex: 0 1 auto; font-weight: var(--sv-weight-medium); }
 .update-banner-hide { flex: none; margin-inline-start: auto; }
+/* B2: Settings' row at the conversations' foot, the gear then the update as a chip in the banner's look taking the
+ * rest: its words cut short on one line, never its action; what failed under the row. In the rail, the chip is an
+ * icon above the gear. */
+.update-beside { display: grid; gap: var(--sv-space-1); min-width: 0; }
+.update-beside-row { display: flex; align-items: center; gap: var(--sv-space-1); min-width: 0; }
+.update-beside-row > .sidebar-settings { flex: none; }
+.update-beside .update-chip { display: flex; flex: 1 1 auto; align-items: center; justify-content: flex-start; gap: var(--sv-space-2); min-width: 0; height: var(--sv-control-md);
+  padding: 0 var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); color: var(--sv-text); font-size: var(--sv-font-sm);
+  font-weight: var(--sv-weight-medium); font-variant-numeric: tabular-nums; text-align: start; }
+.update-beside .update-chip.ui-button { background: var(--sv-accent-soft); color: var(--sv-text); }
+.update-beside .update-chip .ui-button-content { flex: 1 1 auto; justify-content: flex-start; gap: var(--sv-space-2); }
+.update-beside .update-chip svg { flex: none; width: 16px; height: 16px; color: var(--sv-accent-text); }
+.update-beside .update-chip.ui-button:not(:disabled, [aria-disabled="true"]):hover { background: var(--sv-accent-soft-hover); color: var(--sv-text); }
+.update-beside .update-chip.ui-button:not(:disabled, [aria-disabled="true"]):active { background: var(--sv-accent-soft-hover); }
+.update-chip-words { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.update-chip-sep { flex: none; color: var(--sv-text-muted); }
+.update-chip-action { flex: none; white-space: nowrap; font-weight: var(--sv-weight-semibold); }
+.update-beside[data-rail] { display: flex; flex-direction: column; align-items: center; gap: var(--sv-space-1); }
+.update-beside[data-rail] .update-chip--icon { flex: none; width: var(--sv-control-md); padding: 0; }
+.update-beside[data-rail] .update-chip--icon .ui-button-content { justify-content: center; }

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { CloseIcon, UpdateIcon } from "../../components/ui/Icons";
@@ -8,20 +8,19 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
-import { continueAfterRestart, thisComputerPlace, UPDATE_PLACE, useUpdateNotice, useUpdates, useUpdatesRows, type UpdaterStatus, type UpdatesRows } from "./useUpdates";
+import { continueAfterRestart, thisComputerPlace, UPDATE_PLACE, useUpdates, useUpdatesRows, useUpdateNotice, type UpdaterStatus, type UpdatesRows } from "./useUpdates";
 import "./updates.css";
 
 /* Where the room says an update waits, on a desktop (a phone has none: its page picks up a new version when next
- * opened), as VARIANTS `update-notice` has it: an update icon by the brand, its popover listing each update with its
- * action (C, the default); a mark on the Settings gear, which then opens Settings › Updates on the most pressing one's
- * button (A); a slim banner over the room with the most pressing one, dismissible until it changes (B); or the
- * conversations' foot, today's (D, UpdatesEntry). The most pressing first: the desktop app's (automatic: nothing until it
- * is ready to restart into; manual: available, its download's percentage, ready), the page's, this computer's service,
- * the machines elsewhere. What can be done where it is said is done there — the app's Update and Restart, the page's
- * Reload — and anything else lands on its row's button in Settings › Updates (See updates). Every button says what it
- * updates, in the words of Updates' rows (VARIANTS `updates-rows`). Never the voice's colour, which is the agents'
- * waiting. The mark on the gear is the update's icon, never a dot, which beside the conversations' avatars would read
- * as a state. */
+ * opened), as VARIANTS `update-notice` has it: a slim banner over the room with the most pressing one, dismissible until
+ * it changes (B1, the default); that banner's look as a chip in Settings' row at the conversations' foot, Settings
+ * then its gear — in the rail, an icon above the gear whose popover lists each one (B2); or the foot's quiet row, kept
+ * as the reference (D, UpdatesEntry). The most pressing first: the desktop app's (automatic: nothing until it is ready
+ * to restart into, as it downloads by itself; manual: available with Download, then its download's percentage, then
+ * ready), the page's, this computer's service, the machines elsewhere. Restarting is only ever the person's press. What
+ * can be done where it is said is done there — the app's Download and Restart, the page's Reload — and anything else
+ * lands on its row's button in Settings › Updates (See updates). Every button says what it does, in the words of
+ * Updates' rows (VARIANTS `updates-rows`). Never the voice's colour, which is the agents' waiting. */
 
 type Notice =
   | { key: string; kind: "app"; status: UpdaterStatus }
@@ -55,6 +54,7 @@ function useNotices() {
     : thisComputerPlace(appFound, rows);
   return { notices, appUpdate, rows, placeOf, t };
 }
+type Notices = ReturnType<typeof useNotices>;
 
 /** What a notice says: the app's state with its version, the page's new version, the service's, the machines'. */
 function noticeText(notice: Notice, rows: UpdatesRows, t: HostTranslate) {
@@ -75,90 +75,78 @@ function noticeText(notice: Notice, rows: UpdatesRows, t: HostTranslate) {
 /** A download or an install that failed, as the app says it; a failed check is Updates' to say. */
 const appFailure = (status: UpdaterStatus) => status.error && status.error.code !== "update-check-failed" ? status.error : null;
 
-type Action = { label: string; run: () => Promise<unknown> | void; land?: string; aria?: string };
+/** An update's action: its words (`label`), the chip's one word for it (`short`), what it does, and where it lands
+ *  instead when it is done in Settings › Updates (`land`). */
+type Action = { label: string; short: string; run: () => Promise<unknown> | void; land?: string; aria?: string };
 
-/** One update, said, with its action: done in place where it can be (the app's Update and Restart, the page's
- *  Reload), else See updates, landing on its row's button. A failure is said under it. Where its button goes as it acts
- *  (the app's download starts), focus stays on the update's words. */
-function NoticeLine({ notice, data }: { notice: Notice; data: ReturnType<typeof useNotices> }) {
+/** What acting on `notice` takes where it is said: the app's Restart (ready, either mode) or Download (manual, or a
+ *  download that failed, as Retry download), the page's Reload; else See updates, landing on its row's button. Null
+ *  while there is nothing to do but wait: the app's download. */
+function noticeAction(notice: Notice, data: Notices, store: Parameters<typeof openSettings>[1]): Action | null {
   const { appUpdate, rows, placeOf, t } = data;
+  if (notice.kind === "app") {
+    const { state, error } = notice.status;
+    const downloadFailed = error?.code === "update-download-failed";
+    if (state === "downloading") return null;
+    if (state === "ready" && appUpdate.can.restart) {
+      const all = rows === "one";
+      return { label: t(all ? "updates.action.restartAll" : "updates.action.restartApp"), short: t("updates.action.restart"),
+        run: async () => { if (all) continueAfterRestart(); await appUpdate.restart(); } };
+    }
+    if (state === "available" && appUpdate.can.download && (appUpdate.mode === "manual" || downloadFailed)) return {
+      label: t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download"), short: t(downloadFailed ? "updates.retry" : "updates.action.download"),
+      run: () => appUpdate.download() };
+  } else if (notice.kind === "web") return { label: t("updates.reload"), short: t("updates.reload"), aria: t("updates.reloadNamed"), run: () => window.sidevoiceActions?.reloadToUpdate?.() };
+  const place = placeOf(notice);
+  return { label: t("settings.updates.see"), short: t("settings.updates.see"), run: () => openSettings({ section: "updates", focus: place }, store), land: place };
+}
+
+/** A notice's action, run where it is said: busy while it runs, what failed (its own call's, or the app's download or
+ *  install), cleared as the app moves on. */
+function useNoticeAct(notice: Notice, data: Notices) {
   const store = useContext(RoomStoreContext);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
-  const text = useRef<HTMLParagraphElement>(null);
-  const acted = useRef(false);
-  const all = rows === "one";
-  const see: Action = { label: t("settings.updates.see"), run: () => openSettings({ section: "updates", focus: placeOf(notice) }, store), land: placeOf(notice) };
-  let action: Action | null = see;
-  if (notice.kind === "app") {
-    const { state } = notice.status;
-    const downloadFailed = notice.status.error?.code === "update-download-failed";
-    if (state === "downloading") action = null;
-    else if (state === "ready" && appUpdate.can.restart) action = { label: t(all ? "updates.action.restartAll" : "updates.action.restartApp"),
-      run: async () => { if (all) continueAfterRestart(); await appUpdate.restart(); } };
-    else if (state === "available" && appUpdate.can.download && (appUpdate.mode === "manual" || downloadFailed)) action = {
-      label: t(downloadFailed ? all ? "updates.action.retryAll" : "updates.action.retryApp" : all ? "updates.action.updateAll" : "updates.action.updateApp"),
-      run: () => appUpdate.download() };
-  } else if (notice.kind === "web") action = { label: t("updates.reload"), aria: t("updates.reloadNamed"), run: () => window.sidevoiceActions?.reloadToUpdate?.() };
+  const action = noticeAction(notice, data, store);
   // What the app says next replaces what this said of its last call.
   const state = notice.kind === "app" ? notice.status.state : null;
   useEffect(() => { setFailure(null); }, [state]);
-  useEffect(() => {
-    if (!acted.current || action) return;
-    acted.current = false;
-    if (!document.activeElement || document.activeElement === document.body) text.current?.focus();
-  }, [action?.label]); // eslint-disable-line react-hooks/exhaustive-deps
   async function act() {
     if (!action || busy) return;
-    acted.current = true;
     setFailure(null);
     if (action.land) { action.run(); return; }
     setBusy(true);
     try { await action.run(); } catch (reason) { setFailure(reason); } finally { setBusy(false); }
   }
-  const error = failure ?? (notice.kind === "app" ? appFailure(notice.status) : null);
+  return { action, busy, error: failure ?? (notice.kind === "app" ? appFailure(notice.status) : null), act };
+}
+
+/** One update, said, with its action beside it, which reads the update's words as its description. A failure is said
+ *  under both. Where its button goes as it acts (the app's download starts), focus stays on the update's words. */
+function NoticeLine({ notice, data }: { notice: Notice; data: Notices }) {
+  const { rows, t } = data;
+  const { action, busy, error, act } = useNoticeAct(notice, data);
+  const text = useRef<HTMLParagraphElement>(null);
+  const textId = useId();
+  const acted = useRef(false);
+  useEffect(() => {
+    if (!acted.current || action) return;
+    acted.current = false;
+    if (!document.activeElement || document.activeElement === document.body) text.current?.focus();
+  }, [action?.label]); // eslint-disable-line react-hooks/exhaustive-deps
   return <div className="update-notice-line" data-kind={notice.kind}>
-    <p ref={text} className="update-notice-text" tabIndex={-1}>{noticeText(notice, rows, t)}</p>
-    {action && <Button size="sm" variant={action.land ? "secondary" : "primary"} loading={busy} aria-label={action.aria} onClick={() => void act()}>{action.label}</Button>}
+    <p ref={text} id={textId} className="update-notice-text" tabIndex={-1}>{noticeText(notice, rows, t)}</p>
+    {action && <Button size="sm" variant={action.land ? "secondary" : "primary"} loading={busy} aria-label={action.aria} aria-describedby={action.aria ? undefined : textId}
+      onClick={() => { acted.current = true; void act(); }}>{action.label}</Button>}
     {!!error && <ErrorText className="update-notice-error" role="alert" message={updaterFailure(error, { t })} />}
   </div>;
 }
 
-/** C: an update icon by the brand, a dot on it while anything waits; its popover lists each one with its action. */
-export function UpdateBrandNotice() {
-  const data = useNotices();
-  const { notices, t } = data;
-  if (!notices.length) return null;
-  const label = t("updates.entry", { n: notices.length });
-  const trigger = <Button variant="ghost" tone="neutral" size="icon-sm" className="update-brand" aria-label={label} title={label} aria-haspopup="dialog">
-    <UpdateIcon size={18} /><span className="update-brand-dot" aria-hidden="true" /></Button>;
-  return <Popover trigger={trigger} label={t("updates.title")} side="bottom" align="start">
-    <div className="updates-panel">
-      <h3>{t("updates.title")}</h3>
-      {/* Keyed by what it is, not its state: a line that moves on (downloaded, ready) keeps its place and its focus. */}
-      <ul className="update-notice-list">{notices.map((notice) => <li key={notice.kind}><NoticeLine notice={notice} data={data} /></li>)}</ul>
-    </div>
-  </Popover>;
-}
-
-/** A: the gear's mark and where pressing it lands, while an update waits that Settings holds (the page's new version
- *  loads by itself after the call: Updates does not list it). Null while none does. */
-export function useGearUpdate() {
-  const { notices, placeOf, t } = useNotices();
-  const lead = notices.find((notice) => notice.kind !== "web");
-  return lead ? { place: placeOf(lead), label: t("updates.notice.gear") } : null;
-}
-
-/** The gear's mark (A): the update's icon on the gear's corner, where the "new" count would be. */
-export function GearUpdateMark() {
-  return <span className="settings-notice" data-mark="update" aria-hidden="true"><UpdateIcon size={10} /></span>;
-}
-
-/** B's notices hidden by the person, this window's: each comes back as its update moves on (downloaded, ready). */
+/** B1's notices hidden by the person, this window's: each comes back as its update moves on (downloaded, ready). */
 const HIDDEN_KEY = "sidevoice.update-notice-hidden";
 const readHidden = () => { try { return sessionStorage.getItem(HIDDEN_KEY); } catch { return null; } };
 
-/** B: a slim banner over the room with the most pressing update and its action; × hides it until that update moves
+/** B1: a slim banner over the room with the most pressing update and its action; × hides it until that update moves
  *  on, focus going to what follows it. Not a live region: it is a standing notice, and its percentage moves. */
 export function UpdateBanner() {
   const notice = useUpdateNotice();
@@ -190,8 +178,65 @@ function UpdateBannerShown() {
   </aside>;
 }
 
-/** C's place: the update icon by the brand, on a desktop's sidebar, while the variant says so. */
-export function UpdateNoticeByBrand() {
-  const notice = useUpdateNotice();
-  return notice === "brand" ? <UpdateBrandNotice /> : null;
+/** The chip's words for an update: the app's name and version (or how far its download is), the page's Reload to
+ *  update, Update available for the rest. */
+function chipWords(notice: Notice, t: HostTranslate) {
+  if (notice.kind === "app") {
+    const { state, version } = notice.status;
+    if (state === "downloading") return t("updates.downloadingPercent", { percent: percent(notice.status.progress) });
+    return version ? t("updates.chip.app", { version }) : t("updates.chip.appOne");
+  }
+  if (notice.kind === "web") return t("updates.reloadToUpdate");
+  return t(notice.kind === "machines" && notice.names.length > 1 ? "updates.availableAny" : "settings.updates.updateAvailable");
+}
+
+/** B2, beside the conversations' list: Settings and the most pressing update in one row, the update as a chip in the
+ *  banner's look — its words cut short, never its action: "Sidevoice 0.4.0 · Restart", "· Download"; "Downloading…
+ *  42 %", to read; "Reload to update"; "Update available", landing on its row in Updates — with what failed under the
+ *  row. Settings is its gear then (named so, as in the rail), the chip taking the rest of the row. In the rail, the chip
+ *  is an icon above the gear, its popover listing each update with its action. `settings(beside)`: the Settings button,
+ *  its gear only while `beside`. Nothing waiting, Settings alone, as ever. */
+export function UpdateBesideSettings({ rail, settings }: { rail: boolean; settings: (beside: boolean) => ReactNode }) {
+  const data = useNotices();
+  const lead = data.notices[0];
+  if (!lead) return <>{settings(false)}</>;
+  if (rail) return <div className="update-beside" data-rail=""><UpdateRailChip data={data} />{settings(true)}</div>;
+  return <BesideRow key={lead.kind} notice={lead} data={data} settings={settings(true)} />;
+}
+
+function BesideRow({ notice, data, settings }: { notice: Notice; data: Notices; settings: ReactNode }) {
+  const { rows, t } = data;
+  const { action, busy, error, act } = useNoticeAct(notice, data);
+  const words = chipWords(notice, t);
+  // The app's own action has its word in the chip; anything else is the chip's words alone.
+  const short = notice.kind === "app" && action ? action.short : null;
+  const title = [noticeText(notice, rows, t), action?.label].filter(Boolean).join(" · ");
+  // Its name begins with what it shows, then says the action in full ("… · Restart to update the app").
+  const name = action && notice.kind !== "web" ? `${words} · ${action.label}` : undefined;
+  return <div className="update-beside">
+    <div className="update-beside-row">
+      {settings}
+      {action ? <Button variant="ghost" tone="neutral" className="update-chip" data-kind={notice.kind} loading={busy} aria-label={name} title={title} onClick={() => void act()}>
+          <UpdateIcon size={16} /><span className="update-chip-words">{words}</span>
+          {short && <><span className="update-chip-sep" aria-hidden="true">·</span><span className="update-chip-action">{short}</span></>}</Button>
+        : <span className="update-chip" data-kind={notice.kind} title={title}><UpdateIcon size={16} /><span className="update-chip-words">{words}</span></span>}
+    </div>
+    {!!error && <ErrorText className="update-line-error" role="alert" message={updaterFailure(error, { t })} />}
+  </div>;
+}
+
+/** B2 in the rail: the update's icon on the banner's ground, above the gear; its popover lists each update with its
+ *  action, as the banner's line says it. */
+function UpdateRailChip({ data }: { data: Notices }) {
+  const { notices, t } = data;
+  const label = t("updates.entry", { n: notices.length });
+  const trigger = <Button variant="ghost" tone="neutral" size="icon" className="update-chip update-chip--icon" aria-label={label} title={label} aria-haspopup="dialog">
+    <UpdateIcon size={20} /></Button>;
+  return <Popover trigger={trigger} label={t("updates.title")} side="top" align="start">
+    <div className="updates-panel">
+      <h3>{t("updates.title")}</h3>
+      {/* Keyed by what it is, not its state: a line that moves on (downloaded, ready) keeps its place and its focus. */}
+      <ul className="update-notice-list">{notices.map((notice) => <li key={notice.kind}><NoticeLine notice={notice} data={data} /></li>)}</ul>
+    </div>
+  </Popover>;
 }

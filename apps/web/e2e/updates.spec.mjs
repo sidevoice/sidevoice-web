@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The desktop app's update. Where the room says it is VARIANTS `update-notice`: C, the default, an update icon by
- * the brand whose popover acts in place or lands on Updates; B, a banner; A, the gear's mark; D, the sidebar's foot.
- * At the sidebar's foot (D) it is one row (UpdatesEntry's UpdateLine) that lands on Settings ›
- * Updates: whatever it says — ready, available, downloading, a download that failed — in English or Spanish, with a
+/* The desktop app's update. Where the room says it is VARIANTS `update-notice`: B1, the default, a banner over the
+ * room; B2, the banner's look as a chip in Settings' row at the sidebar's foot (the rail: an icon above the gear, its
+ * popover acting in place or landing on Updates); D, the reference, the sidebar's foot row. Each fits, whatever it
+ * says, in English or Spanish, with a long version. At the sidebar's foot (D) it is one row (UpdatesEntry's UpdateLine)
+ * that lands on Settings › Updates: whatever it says — ready, available, downloading, a download that failed — in English or Spanish, with a
  * long version, it stays inside the sidebar at a laptop's widths, its words cut short. Pressed, Settings opens on
  * Updates with the row's action (Download) in view and focused. In Updates, the app's row and its action fit a 320px
  * screen in either language, whatever its state. The updater is the desktop app's (sidevoice-desktop #56), faked in
@@ -114,7 +115,7 @@ for (const language of ["en", "es"]) {
   });
 }
 
-test("the sidebar's row (D) lands on Updates, the app's Update the app in view and focused", async ({ page }) => {
+test("the sidebar's row (D) lands on Updates, the app's Download in view and focused", async ({ page }) => {
   await installHarness(page);
   await withUpdater(page, "en", STATES[1]);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -122,7 +123,7 @@ test("the sidebar's row (D) lands on Updates, the app's Update the app in view a
   await page.locator(".sidebar-foot .update-line").click();
   await expect(page.locator("#language-settings")).toBeVisible();
   await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
-  const download = page.locator("#updates-app").getByRole("button", { name: "Update the app" });
+  const download = page.locator("#updates-app").getByRole("button", { name: "Download" });
   await expect(download).toBeFocused();
   await expect(download).toBeInViewport();
 });
@@ -136,15 +137,55 @@ const inPage = (element) => {
   return { out, inside: box.left >= -0.5 && box.right <= width + 0.5, noSpill: element.scrollWidth <= element.clientWidth + 1, pageFits: document.documentElement.scrollWidth <= width + 1 };
 };
 
+/** Where B2's row sits against the sidebar's foot: the chip inside it, the row and the sidebar not scrolling sideways,
+ *  its action never cut short (its words may be), what failed under it inside the foot too. */
+const besideFits = (row) => {
+  const foot = row.closest(".sidebar-foot");
+  const sidebar = row.closest(".conversation-sidebar");
+  const edge = foot.getBoundingClientRect();
+  const chip = row.querySelector(".update-chip").getBoundingClientRect();
+  const action = row.querySelector(".update-chip-action");
+  const error = foot.querySelector(".update-line-error")?.getBoundingClientRect() ?? null;
+  return {
+    inside: chip.left >= edge.left - 0.5 && chip.right <= edge.right + 0.5,
+    rowFits: row.scrollWidth <= row.clientWidth + 1,
+    actionWhole: !action || action.scrollWidth <= action.clientWidth + 1,
+    errorInside: !error || (error.left >= edge.left - 0.5 && error.right <= edge.right + 0.5),
+    sidebarFits: sidebar.scrollWidth <= sidebar.clientWidth + 1,
+  };
+};
+
 for (const language of ["en", "es"]) {
   for (const width of [1024, 1280]) {
-    test(`the brand's update popover (C, the default) fits at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
+    test(`B2's chip stays in Settings' row inside the sidebar at ${width}px in ${language}, its action whole, whatever it says`, async ({ page }) => {
       await installHarness(page);
-      await withUpdater(page, language, STATES[0], "brand");
+      await withUpdater(page, language, STATES[0], "beside-settings");
       await page.setViewportSize({ width, height: 800 });
       await page.goto("/voice/");
-      const icon = page.locator(".sidebar-brand .update-brand");
+      const row = page.locator(".sidebar-foot .update-beside-row");
+      for (const status of STATES) {
+        await page.evaluate((next) => window.__pushUpdate(next), status);
+        await expect(row.locator(".update-chip")).toBeVisible();
+        await expect(row.locator(".sidebar-settings")).toBeVisible();
+        expect(await row.evaluate(besideFits), label(status)).toEqual({ inside: true, rowFits: true, actionWhole: true, errorInside: true, sidebarFits: true });
+      }
+    });
+
+    test(`B2 in the rail at ${width}px in ${language}: the chip's icon above the gear, inside the rail; its popover fits`, async ({ page }) => {
+      await installHarness(page);
+      await withUpdater(page, language, STATES[0], "beside-settings");
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/voice/");
+      await page.locator(".sidebar-collapse").click();
+      const icon = page.locator(".sidebar-foot .update-chip--icon");
       await expect(icon).toBeVisible();
+      const rail = await icon.evaluate((chip) => {
+        const foot = chip.closest(".sidebar-foot").getBoundingClientRect();
+        const box = chip.getBoundingClientRect();
+        const gear = chip.closest(".update-beside").querySelector(".sidebar-settings").getBoundingClientRect();
+        return { inside: box.left >= foot.left - 0.5 && box.right <= foot.right + 0.5, above: box.bottom <= gear.top + 0.5 };
+      });
+      expect(rail).toEqual({ inside: true, above: true });
       await icon.click();
       const panel = page.locator(".ui-popover:has(.updates-panel)");
       for (const status of STATES) {
@@ -154,7 +195,7 @@ for (const language of ["en", "es"]) {
       }
     });
 
-    test(`the banner (B) fits at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
+    test(`the banner (B1, the default) fits at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
       await installHarness(page);
       await withUpdater(page, language, STATES[0], "banner");
       await page.setViewportSize({ width, height: 800 });
@@ -169,39 +210,29 @@ for (const language of ["en", "es"]) {
   }
 }
 
-test("the brand's update popover (C, the default): the app's Update the app acts in place; a machine behind lands on its Copy in Updates", async ({ page }) => {
+test("B2: the chip's Download acts in place; in the rail, a machine behind lands on its Copy in Updates", async ({ page }) => {
   await installHarness(page);
   // The paired machine says its Sidevoice is behind (contract gap #57).
   await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json",
     body: JSON.stringify({ version: "0.8.1", update: { latest: "0.9.0", command: "sidevoice update" } }) }));
-  await withUpdater(page, "en", STATES[1], "brand");
+  await withUpdater(page, "en", STATES[1], "beside-settings");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/voice/");
-  const icon = page.locator(".sidebar-brand .update-brand");
+  const chip = page.locator(".sidebar-foot .update-chip");
+  await expect(chip).toHaveAccessibleName(/ · Download$/);
+  await chip.click();
+  await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
+  await expect(chip).toHaveText(/^Downloading… 30\s?%$/);
+  // The rail: every update behind the icon; not in place, Settings › Updates, the machine's row, its button focused.
+  await page.locator(".sidebar-collapse").click();
+  const icon = page.locator(".sidebar-foot .update-chip--icon");
   await expect(icon).toHaveAccessibleName("Updates, 2 waiting");
   await icon.click();
   const panel = page.locator(".ui-popover:has(.updates-panel)");
-  // In place: its download starts, the popover stays.
-  await panel.getByRole("button", { name: "Update the app" }).click();
-  await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
-  await expect(panel.getByText(/^Downloading Sidevoice /)).toBeVisible();
-  // Not in place: Settings › Updates, the machine's row, its button focused.
   await panel.getByRole("button", { name: "See updates" }).click();
   await expect(page.locator("#language-settings")).toBeVisible();
   await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
   const copy = page.locator("[id^='updates-machine-'] button").first();
   await expect(copy).toBeFocused();
   await expect(copy).toBeInViewport();
-});
-
-test("the gear's mark (A) opens Updates on the app's Update the app, focused", async ({ page }) => {
-  await installHarness(page);
-  await withUpdater(page, "en", STATES[1], "gear");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/voice/");
-  const gear = page.locator(".sidebar-foot .sidebar-settings");
-  await expect(gear).toHaveAccessibleName("Settings, an update is waiting");
-  await gear.click();
-  await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
-  await expect(page.locator("#updates-app").getByRole("button", { name: "Update the app" })).toBeFocused();
 });
