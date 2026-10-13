@@ -210,7 +210,7 @@ test("no notice on a phone, whatever the variant", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
     media, matches: media === "(max-width: 899px)", onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
   }) as unknown as MediaQueryList);
-  onTestFinished(() => vi.restoreAllMocks());
+  onTestFinished(() => { vi.restoreAllMocks(); });
   for (const notice of ["brand", "gear", "banner", "foot"]) {
     variants(notice);
     room({ updater: { status: { state: "ready", version: "0.4.0" } } as { status: UpdaterStatus } });
