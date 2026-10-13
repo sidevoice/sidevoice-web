@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "../../components/ui/Badge";
 import { NotEncryptedIcon } from "../../components/ui/Icons";
 import { NewAtEnd } from "../highlights/highlights";
 import type { HostTranslate } from "./host-i18n";
@@ -20,9 +21,11 @@ const SERVICE = new Set(["unprepared", "starting", "failed", "stopped", "running
 /** `status` in words, in its tone: its short form (an entry's second line) or its long one (the machine's page). `live`:
  *  said as it changes. */
 export function MachineState({ status, form = "short", live = false }: { status: MachineStatus; form?: "short" | "long"; live?: boolean }) {
-  return <span className="machine-state" data-tone={status.tone} data-state={status.key} role={live ? "status" : undefined}>
-    {form === "long" ? status.long : status.short}
-  </span>;
+  const words = form === "long" ? status.long : status.short;
+  // Connected wears the models' "Ready" badge (green, with its dot); the rest are words in their tone, not connected muted.
+  if (status.tone === "positive") return <Badge tone="positive" dot className="machine-state machine-state-badge" data-tone={status.tone} data-state={status.key}
+    role={live ? "status" : undefined}>{words}</Badge>;
+  return <span className="machine-state" data-tone={status.tone} data-state={status.key} role={live ? "status" : undefined}>{words}</span>;
 }
 
 /** An entry's state on the line under its name, only when it needs the person; else nothing (the line goes). */
