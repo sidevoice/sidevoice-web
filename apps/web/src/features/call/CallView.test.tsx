@@ -54,7 +54,9 @@ beforeEach(() => {
   localStorage.clear();
   markSetUp();
   selectParticipant = vi.fn();
-  window.sidevoiceActions = { selectParticipant, cancelInput: vi.fn().mockResolvedValue(undefined), closeParticipant: vi.fn() } as unknown as typeof window.sidevoiceActions;
+  // The stage's model badges read the voice catalogue as they first show.
+  window.sidevoiceActions = { selectParticipant, cancelInput: vi.fn().mockResolvedValue(undefined), closeParticipant: vi.fn(),
+    loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined) } as unknown as typeof window.sidevoiceActions;
 });
 afterEach(() => { delete window.sidevoiceActions; localStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
