@@ -31,9 +31,17 @@
  * alone, no box); B, a quiet link under the code that brings the field in, in its place. */
 .pairing-address-body { justify-self: stretch; min-width: 0; }
 .pairing-address-link {
-  justify-self: start; margin-top: calc(-1 * var(--sv-space-2)); padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted);
+  padding: var(--sv-space-1) 0; border: 0; background: none; color: var(--sv-text-muted);
   font: inherit; font-size: var(--sv-font-sm); text-align: start; text-decoration: underline; text-decoration-color: var(--sv-border-strong); text-underline-offset: 3px; cursor: pointer;
 }
+.pairing-address-link { display: inline-flex; align-items: center; gap: var(--sv-space-1); }
+/* Its chevron says it opens, and turns as it does: pressed again, it closes. */
+.pairing-address-link svg { flex: none; transform: rotate(-90deg); transition: transform var(--sv-dur-base) var(--sv-ease); }
+.pairing-address-link[aria-expanded="true"] svg { transform: none; }
+.pairing-address-link svg:dir(rtl) { transform: rotate(90deg); }
+.pairing-address-link[aria-expanded="true"] svg:dir(rtl) { transform: none; }
+/* Open, the field has no visible label: the toggle above says what it is, the placeholder how it looks. */
+.pairing-address .ui-field-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pairing-address-link:hover { color: var(--sv-text); }
 .pairing-address-link:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
 .pairing-status { display: flex; align-items: center; gap: var(--sv-space-1-5); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
@@ -57,8 +65,8 @@
  * than they show. */
 @media (pointer: coarse) {
   .pair-machine .ui-button--sm:not(.ui-button--icon) { height: 44px; }
-  .pairing-address-link { min-height: 44px; }
   .pair-machine .ui-infotip::after { content: ""; position: absolute; inset: -10px; }
+  .pairing-address-link { min-height: 44px; }
 }
 
 /* ----- this computer's preparation: the offer, then its progress */
@@ -93,3 +101,5 @@
   .no-machine-screen { padding: var(--sv-space-8) var(--sv-space-4); }
   .no-machine-actions { display: grid; justify-self: stretch; justify-content: stretch; }
 }
+/* The address's disclosure and, beside it, when it is worth using. */
+.pairing-address-head { display: inline-flex; align-items: center; gap: var(--sv-space-1); justify-self: start; max-width: 100%; margin-top: calc(-1 * var(--sv-space-2)); }

@@ -75,8 +75,8 @@ function renderShot(shot: Shot) {
       type(field, sampleCode(shot.pairUrls ?? ["https://nuc.example:8768"]));
       await drawn();
       if (shot.pairAddress) {
-        // Its field opened as the page's `pair-address` asks: A's disclosure, B's link; C's is always there.
-        document.querySelector<HTMLButtonElement>("#device-pairing :is(.pairing-address-toggle[aria-expanded=false], .pairing-address-link)")?.click();
+        // Its field opened from the link under the code, unless it is open already.
+        document.querySelector<HTMLButtonElement>("#device-pairing .pairing-address-link[aria-expanded=false]")?.click();
         await drawn();
         const address = document.getElementById("device-pairing-address") as HTMLInputElement | null;
         if (address) type(address, shot.pairAddress);
