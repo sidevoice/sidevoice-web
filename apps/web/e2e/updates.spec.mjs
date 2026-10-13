@@ -148,6 +148,48 @@ for (const language of ["en", "es"]) {
   }
 }
 
+/** C ("two-lines"), at the conversations' foot directly above Settings: inside the sidebar, its × at its end and inside it,
+ *  its words whole (never cut short: wrapped), its action whole — on their line, or under them where it has no room. */
+const footFits = (notice) => {
+  const box = notice.getBoundingClientRect();
+  const sidebar = notice.closest(".conversation-sidebar").getBoundingClientRect();
+  const hide = notice.querySelector(".update-notice-hide");
+  const action = notice.querySelector(".update-notice-line > .ui-button");
+  const text = notice.querySelector(".update-notice-text");
+  const settings = document.querySelector(".sidebar-settings");
+  return {
+    inSidebar: box.left >= sidebar.left - 0.5 && box.right <= sidebar.right + 0.5,
+    aboveSettings: notice.nextElementSibling === settings && box.bottom <= settings.getBoundingClientRect().top + 0.5,
+    hideLast: notice.lastElementChild === hide,
+    hideInside: hide.getBoundingClientRect().left >= box.left - 0.5 && hide.getBoundingClientRect().right <= box.right + 0.5,
+    wordsWhole: text.scrollWidth <= text.clientWidth + 1 && getComputedStyle(text).textOverflow !== "ellipsis",
+    actionWhole: action.scrollWidth <= action.clientWidth + 1 && action.getBoundingClientRect().right <= box.right + 0.5,
+    pageFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+  };
+};
+
+for (const language of ["en", "es"]) {
+  for (const width of [1024, 1280]) {
+    test(`C, two-lines at ${width}px in ${language}: directly above Settings, its words whole, its action whole (wrapping under them), its × at its end, whatever it says`, async ({ page }) => {
+      await installHarness(page);
+      await withUpdater(page, language, { state: "idle" }, "two-lines");
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/voice/");
+      await expect(page.locator(".sidebar-settings")).toBeVisible();
+      const shown = page.locator(".sidebar-foot .update-notice:not([data-leaving])");
+      for (const status of STATES) {
+        await page.evaluate((next) => window.__pushUpdate(next), status);
+        if (status.state === "downloading") { await expect(page.locator(".update-notice")).toHaveCount(0); continue; }
+        await expect(shown).toBeVisible();
+        // Nowhere else: not over the stage, not in its title row.
+        await expect(page.locator(".stage-notice .update-notice, .stage-title-end .update-notice")).toHaveCount(0);
+        expect(await shown.evaluate(footFits), label(status)).toEqual({ inSidebar: true, aboveSettings: true, hideLast: true, hideInside: true, wordsWhole: true,
+          actionWhole: true, pageFits: true });
+      }
+    });
+  }
+}
+
 test("the notice's Download acts in place, its download said in Updates only; a machine behind is never the room's — Updates lists it with its command", async ({ page }) => {
   await installHarness(page);
   // The paired machine says its Sidevoice is behind (contract gap #57).

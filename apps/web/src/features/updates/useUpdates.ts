@@ -4,9 +4,11 @@ import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
 
 /** Where the room says an update waits (VARIANTS `update-notice`, a desktop's only): a pill floating at the top centre
- *  of the stage (A, the default), or at the end of the conversation's title row (B). Neither takes room of its own;
- *  both say the same, act the same, and hide by their × until a newer version or the app restarts. */
-export const UPDATE_NOTICE = ["pill", "title"] as const;
+ *  of the stage (A, the default), at the end of the conversation's title row (B), or at the conversations'
+ *  foot directly above Settings (C, "two-lines": its action wrapping under its words where the line has no room). A and B
+ *  take no room of their own; all say the same, act the
+ *  same, and hide by their × until a newer version or the app restarts. */
+export const UPDATE_NOTICE = ["pill", "title", "two-lines"] as const;
 export const useUpdateNotice = () => useVariant("update-notice", UPDATE_NOTICE);
 
 /* Sidevoice updates the app, then this computer's service: restarting into the app's update is the app's last step,

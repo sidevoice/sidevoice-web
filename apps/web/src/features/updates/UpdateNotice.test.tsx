@@ -4,6 +4,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { fakeUpdater } from "../../test/updater";
 import { CallStage } from "../call/CallStage";
+import { ConversationSidebar } from "../room/ConversationSidebar";
 import { SettingsDialog } from "../settings/SettingsDialog";
 import { UpdateNotice } from "./UpdateNotice";
 import type { UpdaterStatus } from "./useUpdates";
@@ -41,8 +42,8 @@ const NOTICES = ["pill", "title"] as const;
 
 /** The desktop app (a release, its updater as fakeUpdater makes it), its service as `service` says, the stage with a
  *  conversation on it (none: `stage` false) and Settings, the room's notice where App puts it; `notice` picked. */
-function room({ updater = {}, service = CURRENT, remote = {}, facts = {}, stage = true, notice }: { updater?: Parameters<typeof fakeUpdater>[0]; service?: LocalHostVersion;
-  remote?: Record<string, unknown>; facts?: Record<string, unknown>; stage?: boolean; notice?: string } = {}) {
+function room({ updater = {}, service = CURRENT, remote = {}, facts = {}, stage = true, notice, sidebar = false }: { updater?: Parameters<typeof fakeUpdater>[0]; service?: LocalHostVersion;
+  remote?: Record<string, unknown>; facts?: Record<string, unknown>; stage?: boolean; notice?: string; sidebar?: boolean } = {}) {
   if (notice) localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": notice }));
   const fake = fakeUpdater(updater);
   const update = vi.fn(async () => running);
@@ -58,7 +59,7 @@ function room({ updater = {}, service = CURRENT, remote = {}, facts = {}, stage 
     ...(stage ? { callNode: "fp-local", roomBinding: { thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" },
       people: [{ thread_id: "t-login", title: "Fix the slow login", available: true, reach: { state: "listening" }, node: "fp-local", machine: { host: "MacBook", id: "m1" } }] } : {}),
     ...facts } as never); });
-  render(<RoomProvider store={store}>
+  render(<RoomProvider store={store}>{sidebar && <ConversationSidebar />}
     <CallStage notice={{ room: <UpdateNotice at="room" />, title: <UpdateNotice at="title" /> }} /><SettingsDialog /></RoomProvider>);
   return { store, fake, update, reloadToUpdate };
 }
@@ -261,6 +262,59 @@ test("× spent once the app says none waits (idle): the same version found again
   await waitFor(() => expect(sessionStorage.getItem("sidevoice.update-notice-hidden")).toBe("[]"));
   await act(async () => { fake.push(FOUND); });
   await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
+});
+
+test("C, two-lines: the same message at the conversations' foot directly above Settings, its words never cut short; manual's Version 0.4.0 available · Download, nothing while it downloads, then ready · Restart to update; × until a newer version; nothing over the stage", async () => {
+  const { fake } = room({ updater: { mode: "manual" }, notice: "two-lines", sidebar: true });
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+  await act(async () => { fake.push(FOUND); });
+  const shown = await waitFor(() => { const found = notice(); expect(found).not.toBeNull(); return found!; });
+  // At the foot, before Settings; never over the stage nor in its title row.
+  expect(shown.closest(".sidebar-foot")).not.toBeNull();
+  expect(shown.compareDocumentPosition(document.querySelector(".sidebar-settings")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.querySelector(".stage-notice .update-notice, .stage-title-end .update-notice")).toBeNull();
+  expect(shown).toHaveAttribute("data-layout", "two-lines");
+  expect(shown.querySelector(".update-notice-text")).toHaveTextContent(/^Version 0.4.0 available$/);
+  expect(said()).toBe("Version 0.4.0 available · Download");
+  await act(async () => { fireEvent.click(action()); });
+  expect(fake.updater.download).toHaveBeenCalledOnce();
+  // Its download is Updates' to show: nothing here meanwhile; then ready.
+  await act(async () => { fake.push({ state: "downloading", version: "0.4.0", progress: 0.4 }); });
+  await gone();
+  await act(async () => { fake.push(READY); });
+  await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
+  // × hides it until a newer version.
+  await act(async () => { fireEvent.click(hide()); });
+  await gone();
+  await act(async () => { fake.push({ state: "ready", version: "0.4.1" }); });
+  await waitFor(() => expect(said()).toBe("Sidevoice 0.4.1 is ready · Restart to update"));
+});
+
+test("C, automatic: nothing at the foot while it downloads by itself; once ready, Sidevoice 0.4.0 is ready · Restart to update; a remote machine behind, never; in the rail, none", async () => {
+  const { fake } = room({ notice: "two-lines", sidebar: true, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
+  await act(async () => { fake.push(FOUND); });
+  await act(async () => { fake.push({ state: "downloading", version: "0.4.0", progress: 0.4 }); });
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+  await act(async () => { fake.push(READY); });
+  await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
+  expect(notice()!.closest(".sidebar-foot")).not.toBeNull();
+  await act(async () => { fireEvent.click(action()); });
+  expect(fake.updater.restart).toHaveBeenCalledOnce();
+  // The sidebar folded to its rail: no room for it there, and nowhere else either.
+  cleanup();
+  localStorage.setItem("sidevoice.sidebar-collapsed", "1");
+  onTestFinished(() => localStorage.removeItem("sidevoice.sidebar-collapsed"));
+  room({ updater: { status: READY }, notice: "two-lines", sidebar: true });
+  await waitFor(() => expect(document.querySelector(".conversation-sidebar[data-collapsed]")).not.toBeNull());
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+});
+
+test("the panel's values for update-notice are exactly pill, title and two-lines", async () => {
+  const { UPDATE_NOTICE } = await import("./useUpdates");
+  expect([...UPDATE_NOTICE]).toEqual(["pill", "title", "two-lines"]);
 });
 
 test("in Spanish: Versión 0.4.0 disponible · Descargar, then Sidevoice 0.4.0 está listo · Reiniciar para actualizar; its × Ocultar hasta una versión más nueva", async () => {

@@ -16,6 +16,7 @@ import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
 import { hostTranslator } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
+import { UpdateNotice } from "../updates/UpdateNotice";
 import "./room.css";
 
 /** How a conversation's harness is reached, when that matters; the harness itself is its mark, never its name. */
@@ -145,6 +146,8 @@ export function ConversationSidebar() {
         {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
             opens upward from here. A phone has no updates entry: its page picks up a new version when next opened. */}
         {!narrow && <div className="sidebar-foot">
+          {/* An update waiting, directly above Settings (VARIANTS `update-notice` C, "two-lines"), where the sidebar is open: its rail has no room for it. */}
+          {!rail && <UpdateNotice at="foot" />}
           <SidebarSettings rail={rail} onOpen={close} />
         </div>}
       </aside>
