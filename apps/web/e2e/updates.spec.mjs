@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { installHarness } from "./harness.mjs";
 
-/* The desktop app's update. At the sidebar's foot it is one row (UpdatesEntry's UpdateLine) that lands on Settings ›
+/* The desktop app's update. Where the room says it is VARIANTS `update-notice`: C, the default, an update icon by
+ * the brand whose popover acts in place or lands on Updates; B, a banner; A, the gear's mark; D, the sidebar's foot.
+ * At the sidebar's foot (D) it is one row (UpdatesEntry's UpdateLine) that lands on Settings ›
  * Updates: whatever it says — ready, available, downloading, a download that failed — in English or Spanish, with a
  * long version, it stays inside the sidebar at a laptop's widths, its words cut short. Pressed, Settings opens on
  * Updates with the row's action (Download) in view and focused. In Updates, the app's row and its action fit a 320px
@@ -21,8 +23,11 @@ const label = (status) => `${status.state}${status.error ? " " + status.error.co
 async function withUpdater(page, language, first = STATES[0], notice = "foot") {
   await page.addInitScript(({ language, first, notice }) => {
     localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: language }));
-    // Where the room says it (VARIANTS `update-notice`): the foot's row (D) unless a test asks for another.
-    if (!localStorage.getItem("sidevoice.variants")) localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": notice }));
+    // Where the room says it (VARIANTS `update-notice`), beside the harness's own picks: the foot's row (D) unless a
+    // test asks for another.
+    let picked = {};
+    try { picked = JSON.parse(localStorage.getItem("sidevoice.variants") || "{}") ?? {}; } catch { /* None picked. */ }
+    localStorage.setItem("sidevoice.variants", JSON.stringify({ ...picked, "update-notice": notice }));
     let now = first;
     const listeners = new Set();
     window.__pushUpdate = (next) => { now = next; for (const listener of listeners) listener(next); };
@@ -133,7 +138,7 @@ const inPage = (element) => {
 
 for (const language of ["en", "es"]) {
   for (const width of [1024, 1280]) {
-    test(`the brand's update popover (C) and the banner (B) fit at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
+    test(`the brand's update popover (C, the default) fits at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
       await installHarness(page);
       await withUpdater(page, language, STATES[0], "brand");
       await page.setViewportSize({ width, height: 800 });
@@ -147,9 +152,13 @@ for (const language of ["en", "es"]) {
         await expect(panel.locator(".update-notice-text")).toBeVisible();
         expect(await panel.evaluate(inPage), label(status)).toEqual({ out: [], inside: true, noSpill: true, pageFits: true });
       }
-      await page.keyboard.press("Escape");
-      await page.evaluate(() => localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": "banner" })));
-      await page.reload();
+    });
+
+    test(`the banner (B) fits at ${width}px in ${language}, whatever the app's update says`, async ({ page }) => {
+      await installHarness(page);
+      await withUpdater(page, language, STATES[0], "banner");
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/voice/");
       const banner = page.locator(".update-banner");
       for (const status of STATES) {
         await page.evaluate((next) => window.__pushUpdate(next), status);
@@ -159,3 +168,40 @@ for (const language of ["en", "es"]) {
     });
   }
 }
+
+test("the brand's update popover (C, the default): the app's Update the app acts in place; a machine behind lands on its Copy in Updates", async ({ page }) => {
+  await installHarness(page);
+  // The paired machine says its Sidevoice is behind (contract gap #57).
+  await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ version: "0.8.1", update: { latest: "0.9.0", command: "sidevoice update" } }) }));
+  await withUpdater(page, "en", STATES[1], "brand");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/voice/");
+  const icon = page.locator(".sidebar-brand .update-brand");
+  await expect(icon).toHaveAccessibleName("Updates, 2 waiting");
+  await icon.click();
+  const panel = page.locator(".ui-popover:has(.updates-panel)");
+  // In place: its download starts, the popover stays.
+  await panel.getByRole("button", { name: "Update the app" }).click();
+  await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
+  await expect(panel.getByText(/^Downloading Sidevoice /)).toBeVisible();
+  // Not in place: Settings › Updates, the machine's row, its button focused.
+  await panel.getByRole("button", { name: "See updates" }).click();
+  await expect(page.locator("#language-settings")).toBeVisible();
+  await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
+  const copy = page.locator("[id^='updates-machine-'] button").first();
+  await expect(copy).toBeFocused();
+  await expect(copy).toBeInViewport();
+});
+
+test("the gear's mark (A) opens Updates on the app's Update the app, focused", async ({ page }) => {
+  await installHarness(page);
+  await withUpdater(page, "en", STATES[1], "gear");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/voice/");
+  const gear = page.locator(".sidebar-foot .sidebar-settings");
+  await expect(gear).toHaveAccessibleName("Settings, an update is waiting");
+  await gear.click();
+  await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#updates-app").getByRole("button", { name: "Update the app" })).toBeFocused();
+});
