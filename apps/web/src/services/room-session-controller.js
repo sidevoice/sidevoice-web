@@ -554,6 +554,8 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  // the stage is whole from the start rather than six seconds later.
  if(!links.get(fp)?.peopleAnswered)void refreshPeople(fp);
 }catch{state.liveNote='Servidor no disponible'}}
+const HISTORY_ROLES=new Set(['user','assistant']);
+function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
 // Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
 // conversations. The call's machine is asked on the call's beat, every other one on the machines' beat.
 async function refreshHistory(fp=state.callNode) { const link = links.get(fp), base = link?.base; if (base == null) return; try {
@@ -561,6 +563,9 @@ async function refreshHistory(fp=state.callNode) { const link = links.get(fp), b
     if (links.get(fp) !== link || link.base !== base || !Array.isArray(data?.messages)) return;
     let changed = false;
     for (const r of data.messages) {
+        // A row this page cannot draw — no id, no text, or a role it does not know (sidevoice-core#112) — is left out,
+        // not the rest of the history with it.
+        if (!readableHistoryRow(r)) continue;
         const thread = conversationKey(fp, r.thread), marker = ':voice:', suffix = r.role === 'assistant' && r.id.includes(marker) ? r.id.slice(r.id.lastIndexOf(marker)) : null;
         let row = state.history.find(h => h.segment === r.id && h.thread === thread);
         const aliases = suffix ? state.history.filter(h => h !== row && h.role === 'assistant' && h.segment?.endsWith(suffix) && h.thread === thread && h.text === r.text) : [];
@@ -1282,7 +1287,10 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
   if(NODE_AWAY.has(refused))return fail(bundled('room.failure.machineAway'),false);
   // A frame that named another reason is that reason, whatever the close code: 1013 alone means full.
   if(refused==='room_is_full'||event?.code===1013&&!refused)return fail(bundled('room.failure.full'),true);
-  if(refusal)return fail(refusedBy(refusal),true);
+  // Any other reason is said in the room's own sentence, and whether it is final is the close code's to say
+  // (sidevoice-core#112): one a reconnection must not insist on (shouldReconnect) is; a reason this page does not know
+  // yet, on any other close, is worth another try.
+  if(refusal)return fail(refusedBy(refusal),!shouldReconnect(event));
   // The question keeps a short patience of its own: a room that does not answer it cannot say why
   // either, and nobody is left looking at a join line while a request hangs.
   timer=setTimeout(()=>fail(bundled('room.failure.rejected')),3000);

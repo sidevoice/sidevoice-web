@@ -176,6 +176,21 @@ test('Background history arrives without changing focus and has an unread badge'
  assert.equal(s.run('targetId()'),'fp-mac|a');
  await s.run('refreshHistory()');assert.equal(s.run('history.length'),1);
 });
+test('A history row this page cannot draw is left out, and the rest of the history still arrives (core#112)',async()=>{
+ const s=setup();
+ s.context.fetch=async()=>({ok:true,json:async()=>({messages:[
+  {id:42,thread:'a',role:'assistant',text:'id not a string',time:1,seq:1},
+  {thread:'a',role:'assistant',text:'no id',time:2,seq:2},
+  {id:'r:3',thread:'a',role:'system',text:'a role this page does not know',time:3,seq:3},
+  {id:'r:4',thread:'a',role:'assistant',time:4,seq:4},
+  null,
+  {id:'r:5',thread:'a',role:'assistant',text:'Hecho',name:'A',time:5,seq:5,status:'playback_finished',mood:'calm',attachments:[{kind:'image'}]},
+  {id:'r:6',thread:'a',role:'user',text:'Gracias',time:6,seq:6,status:'read'},
+ ],cursor:'next-7'})});
+ await s.run('refreshHistory()');
+ assert.deepEqual(plain(s.run('history').map(r=>[r.segment,r.role,r.text])),[['r:5','assistant','Hecho'],['r:6','user','Gracias']]);
+ assert.equal(s.run('history[0].mood'),undefined,'only the fields this page reads are kept');
+});
 
 test('A composing message follows received replies and gets its final timestamp on send',()=>{
  const s=setup();
@@ -909,6 +924,24 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
  const full=await refused(null);
  assert.match(full.message,/maximum number of devices/,'the close code alone still means a full room');
  assert.equal(full.refused,true);
+});
+test('A refusal reason this page does not know is retried unless the close code says it is final (core#112)',async()=>{
+ const s=setup();s.context.crypto={randomUUID:()=>'hello-id'};
+ const refused=async(frame,code)=>{const socket={send(){},close(){}},pending=s.run('openSession')(socket,{});
+  socket.onmessage({data:JSON.stringify({type:'error',data:frame,seq:4,trace:{id:'t-1'}})});
+  socket.onclose({code});return pending.then(()=>null,error=>error)};
+ const newer={reason:'room_draining',message:'This room is moving to another server.',retry_after:5,severity:'info'};
+ // On a close that is not one of the final ones, a reason not known yet is worth another try, its sentence behind Details.
+ for(const code of [1000,1006,1011,1012]){
+  const error=await refused(newer,code);
+  assert.equal(error.refused,false,'close '+code+': a reconnection goes on');
+  assert.equal(error.message,'The room does not let this device in.','a reason with no words here reads as the room refusing');
+  assert.match(JSON.stringify(error.words),/moving to another server/,'its own sentence behind Details');
+ }
+ // Refused by policy, or with no room for this call: final, whatever the reason.
+ for(const code of [1008,1013])assert.equal((await refused(newer,code)).refused,true,'close '+code+' is final');
+ // A frame with no reason at all, only a sentence: the same rule.
+ assert.equal((await refused({message:'Something new.'},1011)).refused,false);
 });
 // ----- a dropped call taken back as it was -----
 // The room numbers its frames, parks a dropped call and takes it back on a hello naming the session, its single-use
