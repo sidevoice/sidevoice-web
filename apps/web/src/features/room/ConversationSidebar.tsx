@@ -162,7 +162,9 @@ function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }
   const news = useHighlights();
   const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
+    // Settings' own trigger (aria-controls): closed, Settings gives focus back here when what opened it has gone.
     <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label}
+      aria-haspopup="dialog" aria-controls="language-settings"
       onClick={() => { onOpen(); openSettings({}, store); }}>
       <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />
     </Button>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DialogSurface } from "../../components/ui/Dialog";
+import { useDialogFocusReturn } from "../../lib/focus-return";
 import { useRoomStore } from "../../state/room-store";
 import { hostTranslator } from "../settings/host-i18n";
 import { PairMachine } from "./PairMachine";
@@ -18,6 +19,9 @@ export function PairingDialog() {
   const [opened, setOpened] = useState(0);
   // Where the form's Connect goes: the dialog's footer, beside Cancel.
   const [actions, setActions] = useState<HTMLElement | null>(null);
+  // Closed, focus goes back to what opened it; opened by the page itself, to the room's main region (focus-return.ts).
+  const dialog = useRef<HTMLDialogElement>(null);
+  useDialogFocusReturn(dialog);
 
   // The store says whether it is open; the element follows. Escape, or the close button, tell the store.
   useEffect(() => {
@@ -40,7 +44,7 @@ export function PairingDialog() {
   const close = () => window.sidevoiceActions?.closePairing();
 
   return (
-    <dialog id="device-pairing" className="ui-dialog pair-dialog" data-layout="dialog" aria-labelledby="device-pairing-title">
+    <dialog ref={dialog} id="device-pairing" className="ui-dialog pair-dialog" data-layout="dialog" aria-labelledby="device-pairing-title">
       <DialogSurface titleId="device-pairing-title" title={t("noMachine.connect")} closeId="device-pairing-close" closeLabel={t("noMachine.closePairing")} onClose={close}
         footer={<><Button variant="ghost" tone="neutral" onClick={close}>{t("hosts.cancel")}</Button><span ref={setActions} className="pairing-submit" /></>}>
         {prompt.note && <div className="pairing-note" role="status"><Alert tone="warning" title={prompt.note} /></div>}

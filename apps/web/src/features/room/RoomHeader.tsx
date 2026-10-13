@@ -148,7 +148,8 @@ function SettingsButton({ t }: { t: CallTranslate }) {
   const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
   return (
     <span className="header-settings">
-      <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label}>
+      {/* Settings' own trigger (aria-controls) on a phone: focus comes back here when what opened Settings has gone. */}
+      <Button id="settings-open" variant="ghost" tone="neutral" size="icon" aria-label={label} title={label} aria-haspopup="dialog" aria-controls="language-settings">
         <SettingsIcon size={20} /><GearNewMark count={news.length} />
       </Button>
     </span>

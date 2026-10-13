@@ -37,7 +37,11 @@ async function checkInfoTips(page, phone) {
       expect(await tooltipOnTop(page)).toBe(true);
       await page.mouse.move(2, 2);
       await expect(page.locator(".ui-tooltip")).toHaveCount(0);
+      // By the keyboard (Tab away and back onto it): focus the browser shows, which is what opens it.
       await tip.focus();
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Tab");
+      await expect(tip).toBeFocused();
       expect(await tooltipOnTop(page)).toBe(true);
       await page.keyboard.press("Escape");
       await expect(page.locator(".ui-tooltip")).toHaveCount(0);

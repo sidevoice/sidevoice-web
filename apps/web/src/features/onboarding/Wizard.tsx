@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
 import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, BackIcon } from "../../components/ui/Icons";
 import { localHostInstallController } from "../../services/local-host-install";
+import { useDialogFocusReturn } from "../../lib/focus-return";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "../pairing/LocalHostInstallEntry";
 import { PairMachine } from "../pairing/PairMachine";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
@@ -165,6 +166,8 @@ export function Wizard() {
   const machines = useRoomStore((state) => state.machines);
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
   const dialog = useRef<HTMLDialogElement>(null);
+  // Put off or done, focus goes to the room's main region: the setup opened by itself (focus-return.ts).
+  useDialogFocusReturn(dialog);
   const title = useRef<HTMLHeadingElement>(null);
   // Where the pairing form puts its Connect: this footer, as the step's main action.
   const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);

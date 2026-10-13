@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import { Button } from "../../components/ui/Button";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { CopyIcon, RefreshIcon } from "../../components/ui/Icons";
+import { useDialogFocusReturn } from "../../lib/focus-return";
 import { diagnosticsTranslator } from "./diagnostics-i18n";
 import "./diagnostics.css";
 
@@ -9,8 +11,11 @@ import "./diagnostics.css";
  * elements below by id; this draws the frame and names each part. So none of those buttons takes a React click. */
 export function ConnectionStatsDialog() {
   const t = diagnosticsTranslator();
+  // Opened from ⋮'s menu, which shuts as it opens: closed, focus goes back to ⋮ (focus-return.ts).
+  const dialog = useRef<HTMLDialogElement>(null);
+  useDialogFocusReturn(dialog);
   return (
-    <dialog id="connection-stats" className="ui-dialog stats-dialog" data-layout="dialog" aria-labelledby="stats-title">
+    <dialog ref={dialog} id="connection-stats" className="ui-dialog stats-dialog" data-layout="dialog" aria-labelledby="stats-title">
       <DialogSurface titleId="stats-title" eyebrow={t("stats.eyebrow")} title={t("stats.title")} closeId="stats-close" closeable closeLabel={t("stats.close")}
         footer={<>
           <p className="ui-dialog-reason stats-updated"><span>{t("stats.updated")}</span> <span id="stats-updated" /></p>

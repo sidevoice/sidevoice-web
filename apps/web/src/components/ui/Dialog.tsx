@@ -1,5 +1,6 @@
 import { useEffect, useState, type PropsWithChildren, type ReactNode, type RefObject } from "react";
 import { cn } from "../../lib/cn";
+import { useDialogFocusReturn } from "../../lib/focus-return";
 import { Button } from "./Button";
 import { CloseIcon } from "./Icons";
 import { OverlayPortalProvider } from "./Tooltip";
@@ -61,6 +62,8 @@ interface DialogProps extends SurfaceProps {
 
 export function Dialog({ id, open, layout = "dialog", size = "md", className, onClose, initialFocus, ...surface }: DialogProps) {
   const [node, setNode] = useState<HTMLDialogElement | null>(null);
+  // Closed, or gone while open: focus back on what opened it (focus-return.ts).
+  useDialogFocusReturn(node);
   useEffect(() => {
     if (!node) return;
     // Where a browser has no modal dialog (an old engine, a test's DOM), it is shown open all the same.

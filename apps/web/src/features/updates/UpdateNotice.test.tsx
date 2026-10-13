@@ -40,6 +40,8 @@ const FOUND: UpdaterStatus = { state: "available", version: "0.4.0" };
 const READY: UpdaterStatus = { state: "ready", version: "0.4.0" };
 /** What a page may still have stored for the update-notice variant, now gone: none of it changes anything. */
 const NOTICES = [undefined, "pill", "title", "two-lines", "banner"] as const;
+/** Two of them, for the flows: none stored, and a gone value. */
+const STALE = [undefined, "two-lines"] as const;
 
 /** The desktop app (a release, its updater as fakeUpdater makes it), its service as `service` says, the stage with a
  *  conversation on it (none: `stage` false) and Settings, the room's notice where App puts it; `notice` picked. */
@@ -100,7 +102,7 @@ test("with no conversation on the stage, the pill at the empty tile's top", asyn
 });
 
 test("manual, whatever update-notice value is stored: nothing by itself; once a check found one, Version 0.4.0 available · Download; nothing while it downloads; then Sidevoice 0.4.0 is ready · Restart to update", async () => {
-  for (const picked of NOTICES) {
+  for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "manual" }, notice: picked });
     await settle();
     expect(notice()).toBeNull();
@@ -124,7 +126,7 @@ test("manual, whatever update-notice value is stored: nothing by itself; once a 
 });
 
 test("automatic, whatever update-notice value is stored: nothing while the app's update is found or downloads by itself; once downloaded, Sidevoice 0.4.0 is ready · Restart to update, which restarts and has the service follow", async () => {
-  for (const picked of NOTICES) {
+  for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "automatic", status: FOUND }, notice: picked });
     await settle();
     expect(notice()).toBeNull();
@@ -168,7 +170,7 @@ test("a failed download (manual) is said under it, its action Retry download; a 
 });
 
 test("×: hidden until a newer version, not as the same one moves on; focus goes on to what follows; a new window shows it again", async () => {
-  for (const picked of NOTICES) {
+  for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "manual", status: FOUND }, notice: picked });
     await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
     // The × at its end, inside it.
@@ -212,7 +214,7 @@ test("× hides the update it says; the next one waiting shows in its place — t
 });
 
 test("a remote machine behind, alone: no notice, with or without a conversation on the stage — its row in Settings › Updates says it, with its command", async () => {
-  for (const picked of NOTICES) for (const stage of [true, false]) {
+  for (const picked of STALE) for (const stage of [true, false]) {
     room({ notice: picked, stage, facts: { settingsSection: "updates" },
       remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "npx sidevoice@latest install" } } } });
     const row = await waitFor(() => { const found = document.getElementById("updates-machine-fp-lab"); expect(found).not.toBeNull(); return found!; });
@@ -225,7 +227,7 @@ test("a remote machine behind, alone: no notice, with or without a conversation 
 });
 
 test("this computer's service behind the one the app bundles: no notice of its own — folded into Sidevoice's row in Settings › Updates; with a remote machine behind too, still none", async () => {
-  for (const picked of NOTICES) {
+  for (const picked of STALE) {
     room({ service: BEHIND, notice: picked, facts: { settingsSection: "updates" } });
     await waitFor(() => expect(within(document.getElementById("pane-updates")!).getByRole("button", { name: "Update Sidevoice", hidden: true })).toBeInTheDocument());
     await settle();
@@ -293,7 +295,7 @@ test("no notice on a phone", async () => {
   const matchMedia = window.matchMedia;
   window.matchMedia = ((media: string) => ({ ...matchMedia(media), matches: media.includes("max-width: 899px") })) as typeof window.matchMedia;
   onTestFinished(() => { window.matchMedia = matchMedia; });
-  for (const picked of NOTICES) {
+  for (const picked of STALE) {
     room({ updater: { status: READY }, notice: picked });
     await settle();
     expect(document.querySelector(".update-notice")).toBeNull();

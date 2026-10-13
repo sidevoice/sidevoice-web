@@ -28,6 +28,7 @@ import { hostTranslator, type HostTranslate } from "./host-i18n";
 import type { HostMessageKey } from "./messages/en";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { remoteProviders } from "../../services/voice-settings.js";
+import { useDialogFocusReturn } from "../../lib/focus-return";
 import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
 import { MenuRow } from "./SettingsMenu";
 import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
@@ -193,6 +194,9 @@ export function SettingsDialog() {
   const content = useRef<HTMLDivElement>(null);
   const nav = useRef<HTMLElement>(null);
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  // The runtime closes it (#settings-close, Escape): focus back on what opened it, else on a Settings button
+  // (aria-controls), never on whatever follows (focus-return.ts).
+  useDialogFocusReturn(dialog);
   const { levels, said } = useSettingsLevelsOf(dialog, { nav, content });
   const { phone, level, motion } = levels;
   const machine = useRoomStore((state) => state.facts.machinesView?.machine ?? null);

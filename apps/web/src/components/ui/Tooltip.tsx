@@ -26,9 +26,16 @@ interface TooltipProps {
   children: ReactElement;
 }
 
-/* A few words more about what it points at. On a desktop: on hover, and on keyboard focus; a click keeps it open (Radix's
- * own closes it on a click, which is just what an (i) gets). On touch: a tap toggles it, a tap outside or Escape closes
- * it. Drawn in a portal (the open dialog's, else the page's), so no scrolling box clips it. */
+/** Focus the browser shows, as a key moves it (not a click's, nor a script's after one). An engine without
+ *  `:focus-visible` counts any focus. */
+function focusVisible(element: Element) {
+  try { return element.matches(":focus-visible"); } catch { return true; }
+}
+
+/* A few words more about what it points at. On a desktop: on hover, and on keyboard focus — focus the browser shows
+ * (`:focus-visible`), never focus a script put there (a dialog or a notice closing); a click keeps it open (Radix's own
+ * closes it on a click, which is just what an (i) gets). On touch: a tap toggles it, a tap outside or Escape closes it.
+ * Drawn in a portal (the open dialog's, else the page's), so no scrolling box clips it. */
 export function Tooltip({ content, children }: TooltipProps) {
   const provided = useOverlayPortal();
   const [open, setOpenState] = useState(false);
@@ -49,6 +56,8 @@ export function Tooltip({ content, children }: TooltipProps) {
       onOpenChange={(next) => { if (pressing.current) return; setOpen(next); }}>
       <TooltipPrimitive.Trigger asChild ref={trigger}
         onPointerDown={(event) => { pointer.current = event.pointerType; pressing.current = true; }}
+        // Before Radix's own, which opens it on any focus: only on focus the browser shows.
+        onFocus={(event) => { if (!focusVisible(event.currentTarget)) event.preventDefault(); }}
         onClick={(event) => {
           // Before Radix's own handler, which would close it.
           event.preventDefault();
