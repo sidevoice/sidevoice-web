@@ -3,6 +3,8 @@ export const en = {
   "card.agent.idle": "The agent is idle",
   "card.agent.working": "The agent is working",
   "card.agent.speaking": "The agent is speaking",
+  /** A state of the agent this version does not know yet (sidevoice-core#112): it is named, and nothing said of it. */
+  "card.agent.unknown": "The agent",
   "card.reconnecting": "Reconnecting…",
   "card.switchConversation": "Switch conversation",
   "card.conversations": "Conversations",

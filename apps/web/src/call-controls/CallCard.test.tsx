@@ -79,6 +79,14 @@ test("the avatar shows only the agent, the wave only you: muted crosses the wave
   expect(document.querySelector(".agent-mark")).toHaveAttribute("data-state", "speaking");
 });
 
+test("an agent state this version does not know names the agent, never a raw key (core#112)", () => {
+  const host = fakeHost();
+  render(<CallCard host={host} t={t} />);
+  host.push({ call: snapshot({ agent: "dreaming" as unknown as CallSnapshot["agent"] }) });
+  expect(screen.getByRole("img", { name: "The agent" })).toBeInTheDocument();
+  expect(document.body.innerHTML).not.toContain("card.agent.");
+});
+
 test("reconnecting overrides both and is written", () => {
   const host = fakeHost();
   render(<CallCard host={host} t={t} />);

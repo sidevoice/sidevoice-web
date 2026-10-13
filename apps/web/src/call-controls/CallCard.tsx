@@ -15,6 +15,13 @@ import type { Translate } from "./i18n";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 
+/** What the avatar says of the agent: its state's words, or — a state this version does not know (sidevoice-core#112) —
+ *  only that it is the agent, never the raw key. */
+function agentLabel(agent: unknown) {
+  return agent === "idle" ? "card.agent.idle" as const : agent === "working" ? "card.agent.working" as const
+    : agent === "speaking" ? "card.agent.speaking" as const : "card.agent.unknown" as const;
+}
+
 /** The brand mark, whose bars move with what the agent does (the mustard fourth bar is the agent's voice). */
 function AgentMark({ state }: { state: string }) {
   return (
@@ -65,7 +72,7 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
   return (
     <div ref={shell.card} className="call-card" data-expanded={expanded || undefined} {...shell.handlers}>
       <div className="card-row">
-        <span className="card-avatar" data-state={agent} role="img" aria-label={reconnecting ? t("card.reconnecting") : t(`card.agent.${call.agent}`)}>
+        <span className="card-avatar" data-state={agent} role="img" aria-label={reconnecting ? t("card.reconnecting") : t(agentLabel(call.agent))}>
           <AgentMark state={agent} />
         </span>
         <div className="card-who">
