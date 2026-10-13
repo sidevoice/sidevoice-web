@@ -1,6 +1,7 @@
 /** What a server's `GET /api/rendezvous` said it is. */
 export interface TargetDescription {
-  kind: "room" | "node";
+  /** `unknown`: a kind this version does not know yet, read only for its fingerprint and build. */
+  kind: "room" | "node" | "unknown";
   /** A node's fingerprint (sidevoice-core `control/devices.py`): whether the target is the node a pairing names. */
   fingerprint: string | null;
   /** The web build a room serves, when it said. */

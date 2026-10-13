@@ -1461,6 +1461,18 @@ test('Storage the browser refuses is found once at start and said on top',async(
  assert.deepEqual(plain(probe),{blocked:true,refused:[{store:'localStorage',code:'SecurityError'}]});
 });
 
+test('A server of a kind this page does not know yet is used for what it says: its fingerprint, and the build it serves (core#112)',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{urls:[],rv:null})]}});s.context.__fp=node.fp;
+ const replaced=[];Object.assign(s.context.location,{origin:'http://127.0.0.1:8768',pathname:'/voice/',search:'',replace:url=>replaced.push(url)});
+ s.context.window.sidevoiceBuildId='page-old';
+ const net=network({at:{'':node},target:{kind:'node+room',fingerprint:node.fp,web_build:'page-new',nodes:[]}});s.context.fetch=net.get;
+ s.run('callNode=__fp');
+ await s.run('locate(__fp,{move:true,fresh:true})');
+ assert.equal(s.run('linkBase(__fp)'),'','the page\'s own server, proved to be the paired machine');
+ assert.deepEqual(replaced,['/voice/?v=page-new'],'and the build it says it serves is followed');
+});
+
 test('the Agents API accepts and reuses a proved same-origin empty base',async()=>{
  const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
  const s=setup({stored:{pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];

@@ -45,7 +45,8 @@ export interface CandidateBase {
 }
 /** What the target's `GET /api/rendezvous` said it is. */
 export interface TargetAbout {
-  kind: "node" | "room";
+  /** `unknown`: a kind this version does not know yet (rendezvous.js `describeTarget`). */
+  kind: "node" | "room" | "unknown";
   fingerprint?: string | null;
 }
 export interface IdentityDeps {

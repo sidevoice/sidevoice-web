@@ -257,6 +257,11 @@ test("candidate addresses follow the contract's order: the target if it is that 
   expect(candidateBases(pairing, { target: "https://node.example:8768", about: { kind: "node", fingerprint: "fp-1" } })[0]).toEqual({ base: "https://node.example:8768", via: "direct" });
   // Another node is not a candidate at all.
   expect(candidateBases(pairing, { target: "https://node.example:8768", about: { kind: "node", fingerprint: "fp-2" } })).toHaveLength(3);
+  // A server of a kind this version does not know (core#112) that says it is this node: first too, to prove itself;
+  // one that says nothing of a fingerprint, or another's, is not a candidate.
+  expect(candidateBases(pairing, { target: "https://node.example:8768", about: { kind: "unknown", fingerprint: "fp-1" } })[0]).toEqual({ base: "https://node.example:8768", via: "direct" });
+  for (const fingerprint of [null, "fp-2"])
+    expect(candidateBases(pairing, { target: "https://node.example:8768", about: { kind: "unknown", fingerprint } })).toHaveLength(3);
   // Plain http off this machine is no candidate, whoever names it: the target, the pairing, the page's own origin.
   expect(candidateBases(pairing, { target: "http://10.0.0.5:8768", about: { kind: "node", fingerprint: "fp-1" } })).toHaveLength(3);
   expect(candidateBases({ ...pairing, urls: ["http://mac.lan:8768", ...pairing.urls], rv: { url: "http://room.lan", node: "c/1" } }).map((c) => c.base))

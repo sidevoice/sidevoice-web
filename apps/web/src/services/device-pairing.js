@@ -239,7 +239,8 @@ export function candidateBases(pairing, { target = '', about = null, origin = ''
         seen.add(key); list.push({ base, via });
     };
     const relay = room => room + '/nodes/' + encodeURIComponent(pairing.rv.node);
-    if (about?.kind === 'node' && about.fingerprint === pairing.fp) add(target, 'direct');
+    // A server of a kind this version does not know is that node when it says its fingerprint: it proves it all the same.
+    if ((about?.kind === 'node' || about?.kind === 'unknown') && about.fingerprint && about.fingerprint === pairing.fp) add(target, 'direct');
     if (about?.kind === 'room' && pairing.rv) add(relay(target), 'room');
     for (const url of pairing.urls || []) add(url, 'direct');
     if (pairing.rv) add(relay(pairing.rv.url), 'room');

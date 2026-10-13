@@ -268,8 +268,9 @@ async function locate(fp,{move=!(fp===state.callNode&&inCallNow()),fresh=false,h
  }catch{}
  if(asked<link.applied||links.get(fp)!==link||pairings.list.find(p=>p.fp===fp)!==pairing)return;
  link.applied=asked;
- // The page follows the build of whoever serves it: a room serving this page says which.
- if(target===''&&targetAbout?.kind==='room')followServedBuild(targetAbout.build);
+ // The page follows the build of whoever serves it: a room serving this page says which (or a server of a kind this
+ // version does not know yet, when it says it).
+ if(target===''&&(targetAbout?.kind==='room'||targetAbout?.kind==='unknown'))followServedBuild(targetAbout.build);
  if(found){
   verified.set(found.base,Date.now());hostAgentBases.set(fp,found.base);if(link.doubted===found.base)link.doubted=null;
   // A call keeps the address its socket is on.
