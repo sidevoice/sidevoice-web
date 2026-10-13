@@ -92,6 +92,18 @@ test("an update waiting puts its row in the sidebar's foot, above Settings, each
   expect(children[1]).toContainElement(foot.querySelector(".sidebar-settings") as HTMLElement);
 });
 
+test("a phone has no updates entry: none in the header, none in the dropped list, no dot on the chevron", async () => {
+  phone(190);
+  const store = room();
+  act(() => store.patch({ webUpdate: "b2" } as never));
+  expect(header().querySelector(".updates-entry")).toBeNull();
+  await act(async () => { fireEvent.click(chevron()!); });
+  expect(document.getElementById("conversations")).toHaveAttribute("data-open");
+  expect(document.querySelector(".update-line, .updates-entry")).toBeNull();
+  expect(screen.queryByRole("button", { name: /Reload to update|^Updates, / })).toBeNull();
+  expect(chevron()).not.toHaveAttribute("data-updates");
+});
+
 test("the chevron after the header's avatars drops the conversations and puts them away again, turning with them", () => {
   headerRowWidth(190);
   room();

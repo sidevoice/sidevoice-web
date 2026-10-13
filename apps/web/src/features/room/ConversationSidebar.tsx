@@ -18,7 +18,7 @@ import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
 import { hostTranslator } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
-import { UpdatesEntry, useUpdatesEntry } from "../updates/UpdatesEntry";
+import { UpdatesEntry } from "../updates/UpdatesEntry";
 import "./room.css";
 
 /** How a conversation's harness is reached, when that matters; the harness itself is its mark, never its name. */
@@ -50,7 +50,6 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
-  const updatesHere = useUpdatesEntry();
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
   const rail = collapsed || crowded;
   const modal = narrow && open;
@@ -153,9 +152,8 @@ export function ConversationSidebar() {
           <div className="sidebar-new"><NewConversation rail={rail && !narrow} /></div>
         </div>
         {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
-            opens upward from here. */}
+            opens upward from here. A phone has no updates entry: its page picks up a new version when next opened. */}
         {!narrow && <div className="sidebar-foot"><UpdatesEntry compact={rail} /><SidebarSettings rail={rail} onOpen={close} /></div>}
-        {narrow && updatesHere === "panel" && <div className="sidebar-foot sidebar-foot--updates"><UpdatesEntry side="top" /></div>}
         {/* With the voice switch (call model B) a phone's call bar has no ⋮: its connection statistics are here, under the
             same id the runtime opens them by. */}
         {narrow && voiceSwitch && <div className="sidebar-foot sidebar-foot--stats">

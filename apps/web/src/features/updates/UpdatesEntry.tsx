@@ -5,7 +5,6 @@ import { ErrorText } from "../../components/ui/ErrorText";
 import { RefreshIcon, UpdateIcon } from "../../components/ui/Icons";
 import { Popover } from "../../components/ui/Popover";
 import { ProgressBar } from "../../components/ui/ProgressBar";
-import { useVariant } from "../../lib/variants";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
@@ -19,12 +18,9 @@ import "./updates.css";
  * acting where it is. The desktop app's first: automatic, "Restart to update" once it is ready; manual, "Version X
  * available · Download", its download's progress in the same row, then "Restart to update". Then the page's (Reload to
  * update), then this computer's machine's (Updates available, opening where it is updated). The rail keeps them all
- * behind an icon with their count. On a phone they are where the preview's variant puts them (VARIANTS
- * `updates-entry`): that icon in the header before the gear, or the row at the dropped conversations' foot with a dot
- * on the chevron. Nothing opens by itself, and nothing waits for a call: Reload and Restart act when pressed. Never
- * the voice's colour, which is the agents' waiting. */
-export const UPDATES_ENTRY = ["header", "panel"] as const;
-export function useUpdatesEntry() { return useVariant("updates-entry", UPDATES_ENTRY); }
+ * behind an icon with their count. A phone has no entry (decided): its page picks up a new version the next time it
+ * is opened. Nothing opens by itself, and nothing waits for a call: Reload and Restart act when pressed. Never the
+ * voice's colour, which is the agents' waiting. */
 
 /** Where a machine's update is acted on: This computer's page, This device or its machine's page under Machines. */
 function useOpenMachineUpdate() {
@@ -111,7 +107,7 @@ function UpdatesList({ items, app, update, t }: { items: UpdateItem[]; app: Upda
     : <p className="updates-none">{t("updates.none")}</p>;
 }
 
-/** The sidebar's foot (and a phone's panel): one quiet row, its words the most pressing update's, acting where it is.
+/** The sidebar's foot: one quiet row, its words the most pressing update's, acting where it is.
  *  The app's first (restart once ready; manual: download, then its progress in the row), then the page's (reload), then
  *  a machine's service ("Updates available", opening where it is updated). One line, cut short, never wider than the
  *  sidebar. */
@@ -174,9 +170,9 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
   </div>;
 }
 
-/** The entry: at the sidebar's foot (and a phone's panel), the one row; an icon button (the rail, a phone's header)
- *  with all of them behind it and their count. Hidden while nothing waits. */
-export function UpdatesEntry({ compact = false, side = "top" }: { compact?: boolean; side?: "top" | "bottom" }) {
+/** The entry: at the sidebar's foot, the one row; an icon button (the rail) with all of them behind it and their
+ *  count. Hidden while nothing waits. */
+export function UpdatesEntry({ compact = false }: { compact?: boolean }) {
   const t = hostTranslator();
   const all = useUpdates();
   // A remote machine behind is the Updates section's to say (VARIANTS `updates-section` B); elsewhere it has no place yet.
@@ -190,17 +186,10 @@ export function UpdatesEntry({ compact = false, side = "top" }: { compact?: bool
   const trigger = <Button variant="ghost" tone="neutral" size="icon" className="updates-entry updates-entry--icon" aria-label={label} title={label} aria-haspopup="dialog">
       <UpdateIcon size={20} /><span className="updates-count" aria-hidden="true">{count}</span></Button>;
   return <>
-    {count > 0 && <Popover trigger={trigger} label={t("updates.title")} side={side} align="start">
+    {count > 0 && <Popover trigger={trigger} label={t("updates.title")} side="top" align="start">
       <div className="updates-panel">
         <h3>{t("updates.title")}</h3><UpdatesList items={items} app={behind} update={appUpdate} t={t} />
       </div>
     </Popover>}
   </>;
-}
-
-/** Whether something waits: a phone's chevron wears a dot for it where the updates live in its panel. */
-export function useUpdatesWaiting() {
-  const { items, app } = useUpdates();
-  const apart = useUpdatesSection();
-  return items.some((item) => apart || !item.machine) || !!app;
 }

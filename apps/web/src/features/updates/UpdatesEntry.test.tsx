@@ -4,7 +4,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { VARIANTS_KEY } from "../../lib/variants";
 import { fakeUpdater, withUpdater } from "../../test/updater";
-import { UpdatesEntry, useUpdatesWaiting } from "./UpdatesEntry";
+import { UpdatesEntry } from "./UpdatesEntry";
 import { useUpdates, type UpdaterStatus } from "./useUpdates";
 
 afterEach(() => {
@@ -21,16 +21,13 @@ function Items() {
   const { items } = useUpdates();
   return <p data-testid="items">{items.map((item) => item.id).join(",")}</p>;
 }
-function Waiting() {
-  return <p data-testid="waiting">{String(useUpdatesWaiting())}</p>;
-}
 
 /** The sidebar's foot with `updater` (as the app's host gives it), in a room with `facts`. */
 function foot(updater?: Parameters<typeof withUpdater>[0], facts: Record<string, unknown> = {}, compact = false) {
   withUpdater(updater);
   const store = createRoomStore();
   act(() => store.patch(facts as never));
-  render(<RoomProvider store={store} runtime={false}><UpdatesEntry compact={compact} /><Items /><Waiting /></RoomProvider>);
+  render(<RoomProvider store={store} runtime={false}><UpdatesEntry compact={compact} /><Items /></RoomProvider>);
   return store;
 }
 const line = () => document.querySelector(".update-line");
@@ -46,7 +43,6 @@ test("nothing waits: no row; a newer build of the page in a call is Reload to up
   const store = foot();
   await settle();
   expect(line()).toBeNull();
-  expect(screen.getByTestId("waiting")).toHaveTextContent("false");
   act(() => store.patch({ ws: {}, webUpdate: "b2" } as never));
   const reload = screen.getByRole("button", { name: "Reload to update" });
   expect(reload).toBeEnabled();
@@ -63,11 +59,9 @@ test("automatic: nothing while the app finds and downloads it; ready, a quiet Re
   for (const status of [{ state: "idle" }, { state: "available", version: "0.5.0" }, { state: "downloading", version: "0.5.0", progress: 0.4 }] as UpdaterStatus[]) {
     act(() => push(status));
     expect(line(), status.state).toBeNull();
-    expect(screen.getByTestId("waiting")).toHaveTextContent("false");
   }
   act(() => push({ state: "ready", version: "0.5.0" }));
   const restart = screen.getByRole("button", { name: "Restart to update · 0.5.0" });
-  expect(screen.getByTestId("waiting")).toHaveTextContent("true");
   await act(async () => { fireEvent.click(restart); });
   expect(updater.restart).toHaveBeenCalledTimes(1);
   expect(updater.restart).toHaveBeenCalledWith();
@@ -249,7 +243,6 @@ test("A: a remote machine behind has no place at the foot or in the rail; B: Upd
   foot(undefined, labBehind());
   await settle();
   expect(line()).toBeNull();
-  expect(screen.getByTestId("waiting")).toHaveTextContent("false");
   cleanup();
   foot(undefined, labBehind(), true);
   await settle();
@@ -259,7 +252,6 @@ test("A: a remote machine behind has no place at the foot or in the rail; B: Upd
   const store = foot(undefined, labBehind());
   await settle();
   expect(screen.getByTestId("items")).toHaveTextContent("machine:fp-lab");
-  expect(screen.getByTestId("waiting")).toHaveTextContent("true");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Updates available" })); });
   expect(section(store)).toEqual(["updates", "page"]);
 });
@@ -283,7 +275,6 @@ test("a machine forgotten while it was behind is not listed: no item, no count, 
   foot(undefined, { ...facts, pairings: [] }, true);
   await settle();
   expect(screen.getByTestId("items")).toHaveTextContent(/^$/);
-  expect(screen.getByTestId("waiting")).toHaveTextContent("false");
   expect(screen.queryByRole("button", { name: /^Updates, / })).toBeNull();
 });
 

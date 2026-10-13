@@ -157,7 +157,6 @@ export const JOURNEYS: Journey[] = [
       updater: { status: { state: "ready", version: "0.5.0" } }, desktop: { ...localBridge(running), version: { bridge: 1, bundled: { version: "0.5.0" }, installed: { version: "0.4.0" }, core_api: 1, update: "available" } } },
     { id: "u-app-manual", caption: "The desktop app's update in manual mode, downloading where its Download was: the progress in place, then Restart to update.",
       updater: { status: { state: "downloading", version: "0.5.0", progress: 0.4 }, mode: "manual" } },
-    { id: "u-phone-panel", caption: "On a phone, variant B: in the dropped panel, a dot on the chevron.", facts: { webUpdate: "b2" }, variants: { "updates-entry": "panel" }, views: ["phone"] },
     { id: "whats-new", caption: "What's new for someone set up on an earlier release: only what needs them, marked new where it is set up.", record: { baseline_release: 0 },
       facts: { ws: null, voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } } },
   ] },
