@@ -16,9 +16,7 @@ import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
 import { hostTranslator } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
-import { UpdateBesideSettings } from "../updates/UpdateNotice";
-import { UpdatesEntry } from "../updates/UpdatesEntry";
-import { useUpdateNotice } from "../updates/useUpdates";
+import { UpdateChipLine } from "../updates/UpdateNotice";
 import "./room.css";
 
 /** How a conversation's harness is reached, when that matters; the harness itself is its mark, never its name. */
@@ -49,7 +47,6 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
-  const notice = useUpdateNotice();
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
   const rail = collapsed || crowded;
   const modal = narrow && open;
@@ -149,11 +146,9 @@ export function ConversationSidebar() {
         {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
             opens upward from here. A phone has no updates entry: its page picks up a new version when next opened. */}
         {!narrow && <div className="sidebar-foot">
-          {/* Where an update says so (VARIANTS `update-notice`): here for B2 (a chip in Settings' row) and D (the row
-              above it, the reference). */}
-          {notice === "foot" && <UpdatesEntry compact={rail} />}
-          {notice === "beside-settings" ? <UpdateBesideSettings rail={rail} settings={(beside) => <SidebarSettings rail={rail} gear={beside} onOpen={close} />} />
-            : <SidebarSettings rail={rail} onOpen={close} />}
+          {/* An update waiting: its chip on its own line, above Settings. */}
+          <UpdateChipLine rail={rail} />
+          <SidebarSettings rail={rail} onOpen={close} />
         </div>}
       </aside>
       <div className="conversations-scrim" data-open={open || undefined} aria-hidden="true" onClick={close} />

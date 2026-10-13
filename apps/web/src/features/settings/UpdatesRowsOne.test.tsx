@@ -10,15 +10,15 @@ import type { LocalHostStatus, LocalHostVersion } from "../../services/desktop-h
 vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {
   cleanup();
-  for (const key of ["sidevoice.variants", "sidevoice.update-continue", "sidevoice.updates-checked-at"]) localStorage.removeItem(key);
+  for (const key of ["sidevoice.update-continue", "sidevoice.updates-checked-at"]) localStorage.removeItem(key);
   delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
 });
 
-/* Updates' rows, VARIANTS `updates-rows` A: this computer as ONE row, Sidevoice — one version (the app's, the Sidevoice
- * the person installed) and one button that updates the app (Download in manual, then Restart to update Sidevoice) and
- * then this computer's service (Update Sidevoice, where only it is behind), in order. Restarting into the app's update is the app's last step, so the service follows by itself in the page the new
- * app opens, once nothing stands in the way. The service's own number is not said: the row's is the app's. B, two
- * rows, is UpdatesSettings.test.tsx. */
+/* This computer in Updates (decided): ONE row, Sidevoice — one version (the app's, the Sidevoice the person
+ * installed), no hint, and one button that updates the app (Download in manual, then Restart to update Sidevoice) and
+ * then this computer's service (Update Sidevoice, where only it is behind), in order. Restarting into the app's update
+ * is the app's last step, so the service follows by itself in the page the new app opens, once nothing stands in the
+ * way. The service's own number is not said: the row's is the app's. The rest of Updates is UpdatesSettings.test.tsx. */
 
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.8.1", api: 1 }, calls: 0, product_version: "0.8.1" };
@@ -27,7 +27,6 @@ const CURRENT: LocalHostVersion = { ...BEHIND, bundled: { version: "0.8.1" }, up
 
 function open({ updater = {}, service = CURRENT, status = running, update = vi.fn(async () => running) }: { updater?: Parameters<typeof fakeUpdater>[0];
   service?: LocalHostVersion | (() => Promise<LocalHostVersion>); status?: LocalHostStatus; update?: ReturnType<typeof vi.fn> } = {}) {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "updates-rows": "one" }));
   const fake = fakeUpdater(updater);
   const version = vi.fn(typeof service === "function" ? service : async () => service);
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { build: { channel: "release", version: "0.3.0" }, updater: fake.updater,
@@ -46,7 +45,7 @@ const groups = () => [...pane().querySelectorAll(".ui-group-title")].map((title)
 const row = () => within(pane().querySelector<HTMLElement>(".ui-group")!);
 const settle = () => act(async () => {});
 
-test("one row, Sidevoice: what it is, the app's version, Up to date on the check's muted line once checked and the app and its service both say so", async () => {
+test("one row, Sidevoice: the app's version with no hint, Up to date on the check's muted line once checked and the app and its service both say so", async () => {
   localStorage.setItem("sidevoice.updates-checked-at", String(Date.parse("2026-10-12T09:30:00Z")));
   open();
   const line = () => row().getByRole("button", { name: "Check for updates" }).closest(".app-update-setting")!.querySelector(".app-update-setting-copy");
@@ -54,7 +53,7 @@ test("one row, Sidevoice: what it is, the app's version, Up to date on the check
   expect(pane().querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.3\.0$/);
   expect(pane().querySelector(".update-action-row")).toBeNull();
   expect(groups()).toEqual(["Sidevoice"]);
-  expect(row().getByText("The app, and the service that connects your agents")).toBeInTheDocument();
+  expect(pane().querySelector(".updates-part-hint")).toBeNull();
   // The app's settings stay under it; no second row, no service number.
   expect(row().getByRole("radiogroup", { name: "Updates" })).toBeInTheDocument();
   expect(row().getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
@@ -121,7 +120,7 @@ test("in Spanish: Sidevoice, Versión 0.3.0, Descargar and Reiniciar para actual
   const { fake } = open({ updater: { mode: "manual", status: { state: "available", version: "0.4.0" } } });
   await settle();
   expect(groups()).toEqual(["Sidevoice"]);
-  expect(row().getByText("La app, y el servicio que conecta tus agentes")).toBeInTheDocument();
+  expect(pane().querySelector(".updates-part-hint")).toBeNull();
   expect(pane().querySelector(".host-status-product")).toHaveTextContent(/^Versión 0\.3\.0$/);
   expect(row().getByRole("button", { name: "Descargar" })).toBeInTheDocument();
   await act(async () => { fake.push({ state: "ready", version: "0.4.0" }); });

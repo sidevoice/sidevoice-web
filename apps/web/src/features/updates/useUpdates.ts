@@ -1,23 +1,13 @@
 import { useEffect, useState } from "react";
 import { desktopBuild, localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
-import { useVariant } from "../../lib/variants";
 import { useRoomStore } from "../../state/room-store";
 import type { MachineView } from "../../state/room-types";
 import { safeLocalHostStatusDetails } from "../settings/local-host-status";
 
-/** Where the room says an update waits (VARIANTS `update-notice`, desktop only: a phone has none): a slim banner over
- *  the room (B1, the default); the same banner's look as a chip in Settings' row, at the conversations' foot (B2); or
- *  the foot's quiet row above Settings, today's, kept as the reference the other two are weighed against (D). */
-export const UPDATE_NOTICE = ["banner", "beside-settings", "foot"] as const;
-export type UpdateNotice = (typeof UPDATE_NOTICE)[number];
-export const useUpdateNotice = () => useVariant("update-notice", UPDATE_NOTICE);
-
-/** This computer in Settings › Updates (VARIANTS `updates-rows`): two rows, the app and its service, each its own
- *  version and button (B, the default); or one, Sidevoice, one version and one button that updates the app, then the
- *  service (A). Every button says what it updates: `words` names it. */
-export const UPDATES_ROWS = ["two", "one"] as const;
-export type UpdatesRows = (typeof UPDATES_ROWS)[number];
-export const useUpdatesRows = () => useVariant("updates-rows", UPDATES_ROWS);
+/** This computer in Settings › Updates: one row, Sidevoice, the app's version and one button; behind it, this
+ *  computer's service is updated with it, within what the two are compatible with — never a row or a word of its own. */
+export type UpdatesRows = "one";
+export const useUpdatesRows = (): UpdatesRows => "one";
 /** What a button names: the app, the service (two rows), or Sidevoice as one (one row). */
 export type UpdateWords = "app" | "service" | "all";
 

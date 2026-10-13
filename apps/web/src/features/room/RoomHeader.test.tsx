@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -81,62 +81,33 @@ test("Settings sits at the conversations' foot: it opens Settings through the he
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
 
-/** VARIANTS `update-notice` as the preview's panel picks it. */
-function noticeVariant(value: string) {
-  localStorage.setItem("sidevoice.variants", JSON.stringify({ "update-notice": value }));
-  onTestFinished(() => localStorage.removeItem("sidevoice.variants"));
-}
-
-test("an update waiting (B1, the default: the banner over the room): nothing by the brand; the foot keeps Settings alone, named", () => {
+test("an update waiting: nothing by the brand; its chip on its own line above Settings, Settings named as ever; nothing waiting, Settings alone", () => {
   const store = room();
-  act(() => store.patch({ webUpdate: "b2" } as never));
   expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).queryByRole("button")).toBeNull();
   const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
   expect([...foot.children]).toHaveLength(1);
-  expect(foot.querySelector(".update-line, .updates-entry, .update-chip")).toBeNull();
-  expect(foot.querySelector(".sidebar-settings")).toHaveTextContent("Settings");
-});
-
-test("an update waiting (B2): one row at the foot, Settings as its gear (named so) then the chip; nothing waiting, Settings alone", () => {
-  noticeVariant("beside-settings");
-  const store = room();
-  const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
   expect(foot.querySelector(".update-chip")).toBeNull();
   expect(foot.querySelector(".sidebar-settings")).toHaveTextContent("Settings");
   act(() => store.patch({ webUpdate: "b2" } as never));
-  expect([...foot.children]).toHaveLength(1);
-  const row = foot.querySelector<HTMLElement>(".update-beside-row")!;
-  const [gear, chip] = [...row.children] as HTMLElement[];
-  expect(gear).toHaveClass("sidebar-settings");
-  expect(gear).toHaveAccessibleName("Settings");
-  expect(gear).toHaveAttribute("title", "Settings");
-  expect(gear).not.toHaveTextContent("Settings");
-  expect(chip).toHaveClass("update-chip");
-  expect(chip).toHaveAccessibleName("Reload to update");
-  expect(document.querySelector(".update-banner")).toBeNull();
-});
-
-test("an update waiting (D, today's): its row in the sidebar's foot, above Settings, each its own child", () => {
-  noticeVariant("foot");
-  const store = room();
-  act(() => store.patch({ webUpdate: "b2" } as never));
-  const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
-  const children = [...foot.children];
-  expect(children).toHaveLength(2);
-  expect(children[0]).toContainElement(foot.querySelector(".update-line") as HTMLElement);
-  expect(children[0]).toHaveTextContent("Reload to update");
-  expect(children[1]).toContainElement(foot.querySelector(".sidebar-settings") as HTMLElement);
-  expect(document.querySelector(".update-chip, .update-banner")).toBeNull();
+  expect(within(document.querySelector<HTMLElement>(".sidebar-brand")!).queryByRole("button")).toBeNull();
+  const [line, settings] = [...foot.children] as HTMLElement[];
+  expect([...foot.children]).toHaveLength(2);
+  expect(line).toHaveClass("update-beside");
+  expect(line.querySelector(".update-chip")).toHaveAccessibleName("Reload to update");
+  expect(line.querySelector(".sidebar-settings")).toBeNull();
+  expect(settings).toHaveClass("sidebar-settings");
+  expect(settings).toHaveAccessibleName("Settings");
+  expect(settings).toHaveTextContent("Settings");
 });
 
 test("a phone has no updates entry: none in the header, none in the dropped list, no dot on the chevron", async () => {
   phone(190);
   const store = room();
   act(() => store.patch({ webUpdate: "b2" } as never));
-  expect(header().querySelector(".updates-entry")).toBeNull();
+  expect(header().querySelector(".update-chip")).toBeNull();
   await act(async () => { fireEvent.click(chevron()!); });
   expect(document.getElementById("conversations")).toHaveAttribute("data-open");
-  expect(document.querySelector(".update-line, .updates-entry, .update-chip, .update-banner")).toBeNull();
+  expect(document.querySelector(".update-chip, .update-beside")).toBeNull();
   expect(screen.queryByRole("button", { name: /Reload to update|^Updates, / })).toBeNull();
   expect(chevron()).not.toHaveAttribute("data-updates");
 });

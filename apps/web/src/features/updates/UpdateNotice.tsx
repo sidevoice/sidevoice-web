@@ -1,21 +1,18 @@
-import { useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { CloseIcon, UpdateIcon } from "../../components/ui/Icons";
+import { UpdateIcon } from "../../components/ui/Icons";
 import { Popover } from "../../components/ui/Popover";
-import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
-import { continueAfterRestart, thisComputerPlace, UPDATE_PLACE, useUpdates, useUpdatesRows, useUpdateNotice, type UpdaterStatus, type UpdatesRows } from "./useUpdates";
+import { continueAfterRestart, thisComputerPlace, UPDATE_PLACE, useUpdates, useUpdatesRows, type UpdaterStatus, type UpdatesRows } from "./useUpdates";
 import "./updates.css";
 
 /* Where the room says an update waits, on a desktop (a phone has none: its page picks up a new version when next
- * opened), as VARIANTS `update-notice` has it: a slim banner over the room with the most pressing one, dismissible until
- * it changes (B1, the default); that banner's look as a chip in Settings' row at the conversations' foot, Settings
- * then its gear — in the rail, an icon above the gear whose popover lists each one (B2); or the foot's quiet row, kept
- * as the reference (D, UpdatesEntry). The most pressing first: the desktop app's (automatic: nothing until it is ready
+ * opened): a chip on its own line above Settings at the conversations' foot — in the rail, an icon above the gear whose
+ * popover lists each one. The most pressing first: the desktop app's (automatic: nothing until it is ready
  * to restart into, as it downloads by itself; manual: available with Download, then its download's percentage, then
  * ready), the page's, this computer's service, the machines elsewhere. Restarting is only ever the person's press. What
  * can be done where it is said is done there — the app's Download and Restart, the page's Reload — and anything else
@@ -142,69 +139,33 @@ function NoticeLine({ notice, data }: { notice: Notice; data: Notices }) {
   </div>;
 }
 
-/** B1's notices hidden by the person, this window's: each comes back as its update moves on (downloaded, ready). */
-const HIDDEN_KEY = "sidevoice.update-notice-hidden";
-const readHidden = () => { try { return sessionStorage.getItem(HIDDEN_KEY); } catch { return null; } };
-
-/** B1: a slim banner over the room with the most pressing update and its action; × hides it until that update moves
- *  on, focus going to what follows it. Not a live region: it is a standing notice, and its percentage moves. */
-export function UpdateBanner() {
-  const notice = useUpdateNotice();
-  const narrow = useMedia(NARROW_QUERY);
-  if (notice !== "banner" || narrow) return null;
-  return <UpdateBannerShown />;
-}
-
-function UpdateBannerShown() {
-  const data = useNotices();
-  const { notices, t } = data;
-  const [hidden, setHidden] = useState(readHidden);
-  const banner = useRef<HTMLElement>(null);
-  const lead = notices[0];
-  if (!lead || hidden === lead.key) return null;
-  function hide() {
-    const focusable = "button:not(:disabled), a[href], input:not(:disabled), [tabindex]:not([tabindex='-1'])";
-    const next = [...document.querySelectorAll<HTMLElement>(focusable)].find((element) => !banner.current?.contains(element)
-      && !!(banner.current!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
-    try { sessionStorage.setItem(HIDDEN_KEY, lead.key); } catch { /* Hidden for this view only. */ }
-    setHidden(lead.key);
-    requestAnimationFrame(() => next?.focus());
-  }
-  return <aside ref={banner} className="room-banner update-banner" aria-label={t("updates.title")}>
-    <UpdateIcon size={16} className="update-banner-icon" />
-    <NoticeLine key={lead.kind} notice={lead} data={data} />
-    <Button variant="ghost" tone="neutral" size="icon-sm" className="update-banner-hide" aria-label={t("updates.notice.dismiss")} title={t("updates.notice.dismiss")} onClick={hide}>
-      <CloseIcon size={16} /></Button>
-  </aside>;
-}
-
 /** The chip's words for an update: the app's name and version (or how far its download is), the page's Reload to
  *  update, Update available for the rest. */
 function chipWords(notice: Notice, t: HostTranslate) {
   if (notice.kind === "app") {
     const { state, version } = notice.status;
     if (state === "downloading") return t("updates.downloadingPercent", { percent: percent(notice.status.progress) });
+    // Manual, as soon as one is found: Version X available · Download; ready, in either mode: Sidevoice X · Restart.
+    if (state === "available") return version ? t("updates.available", { version }) : t("updates.availableOne");
     return version ? t("updates.chip.app", { version }) : t("updates.chip.appOne");
   }
   if (notice.kind === "web") return t("updates.reloadToUpdate");
   return t(notice.kind === "machines" && notice.names.length > 1 ? "updates.availableAny" : "settings.updates.updateAvailable");
 }
 
-/** B2, beside the conversations' list: Settings and the most pressing update in one row, the update as a chip in the
- *  banner's look — its words cut short, never its action: "Sidevoice 0.4.0 · Restart", "· Download"; "Downloading…
- *  42 %", to read; "Reload to update"; "Update available", landing on its row in Updates — with what failed under the
- *  row. Settings is its gear then (named so, as in the rail), the chip taking the rest of the row. In the rail, the chip
- *  is an icon above the gear, its popover listing each update with its action. `settings(beside)`: the Settings button,
- *  its gear only while `beside`. Nothing waiting, Settings alone, as ever. */
-export function UpdateBesideSettings({ rail, settings }: { rail: boolean; settings: (beside: boolean) => ReactNode }) {
+/** The chip on its own line above Settings: the most pressing update, its words cut short, never its action —
+ *  "Version 0.4.0 available · Download", "Downloading… 42 %", "Sidevoice 0.4.0 · Restart", "Reload to update", "Update
+ *  available" landing on its row in Updates — with what failed under it. In the rail, an icon above the gear, its
+ *  popover listing each update with its action. Nothing waiting, nothing. */
+export function UpdateChipLine({ rail }: { rail: boolean }) {
   const data = useNotices();
   const lead = data.notices[0];
-  if (!lead) return <>{settings(false)}</>;
-  if (rail) return <div className="update-beside" data-rail=""><UpdateRailChip data={data} />{settings(true)}</div>;
-  return <BesideRow key={lead.kind} notice={lead} data={data} settings={settings(true)} />;
+  if (!lead) return null;
+  if (rail) return <div className="update-beside" data-rail=""><UpdateRailChip data={data} /></div>;
+  return <BesideRow key={lead.kind} notice={lead} data={data} />;
 }
 
-function BesideRow({ notice, data, settings }: { notice: Notice; data: Notices; settings: ReactNode }) {
+function BesideRow({ notice, data }: { notice: Notice; data: Notices }) {
   const { rows, t } = data;
   const { action, busy, error, act } = useNoticeAct(notice, data);
   const words = chipWords(notice, t);
@@ -215,7 +176,6 @@ function BesideRow({ notice, data, settings }: { notice: Notice; data: Notices; 
   const name = action && notice.kind !== "web" ? `${words} · ${action.label}` : undefined;
   return <div className="update-beside">
     <div className="update-beside-row">
-      {settings}
       {action ? <Button variant="ghost" tone="neutral" className="update-chip" data-kind={notice.kind} loading={busy} aria-label={name} title={title} onClick={() => void act()}>
           <UpdateIcon size={16} /><span className="update-chip-words">{words}</span>
           {short && <><span className="update-chip-sep" aria-hidden="true">·</span><span className="update-chip-action">{short}</span></>}</Button>

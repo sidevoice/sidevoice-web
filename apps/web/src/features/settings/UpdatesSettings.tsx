@@ -6,7 +6,7 @@ import { RoomStoreContext } from "../../state/room-store";
 import { AppUpdateSettings } from "../updates/AppUpdateSettings";
 import { LocalHostUpdateControl } from "../updates/LocalHostUpdate";
 import { useThisComputerUpdate } from "../updates/useThisComputerUpdate";
-import { appUpdater, continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines, useUpdatesRows } from "../updates/useUpdates";
+import { appUpdater, continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines } from "../updates/useUpdates";
 import { hostTranslator, type HostTranslate } from "./host-i18n";
 import "./updates-settings.css";
 
@@ -56,20 +56,19 @@ export function ThisDeviceVersion({ t }: { t: HostTranslate }) {
 
 /** A part of this computer that updates, at its card's top, under its group's title: what it is, then its version, with
  *  Up to date once its part says so, and a build's note. */
-function PartVersion({ hint, version, upToDate, note, t }: { hint: string; version: string | null | undefined; upToDate: boolean; note?: ReactNode; t: HostTranslate }) {
+function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; version: string | null | undefined; upToDate: boolean; note?: ReactNode; t: HostTranslate }) {
   return <div className="updates-settings-version">
-    <span className="updates-part-hint">{hint}</span>
+    {hint && <span className="updates-part-hint">{hint}</span>}
     {version && <span className="host-status-product">{t("settings.updates.version", { version })}
       {upToDate && <span className="updates-up-to-date">{" · "}{t("settings.updates.upToDate")}</span>}</span>}
     {note}
   </div>;
 }
 
-/** Updates: this computer — the app and its service, as two rows or one — then the machines behind; never an empty
- *  card. */
+/** Updates: this computer as one row, Sidevoice (its service updated with the app), then the machines behind; never
+ *  an empty card. */
 export function UpdatesSettings() {
   const t = hostTranslator();
-  const rows = useUpdatesRows();
   const build = desktopBuild();
   const updater = appUpdater() !== null;
   const app = build !== null || updater;
@@ -80,33 +79,18 @@ export function UpdatesSettings() {
   const [chain, setChain] = useState(continuing);
   const description = !app ? "settings.updates.descriptionMachines" : outdated.length ? "settings.updates.descriptionAll" : "settings.updates.description";
   const note = <DesktopBuildNote build={build} updater={updater} t={t} />;
-  // The service's Update; for one row, Update Sidevoice, its second step.
+  // Update Sidevoice, the row's second step: this computer's service, where the app's update did not bring it along.
   const serviceControl = (words: "service" | "all") => updatable && <LocalHostUpdateControl status={updatable} update={serviceUpdate} words={words}
     continuing={words === "all" && chain} onContinued={() => { continued(); setChain(false); }} />;
   return <Section id="updates" title={t("settings.section.updates")} description={t(description)}>
-    {rows === "one" ? (app || (service && (serviceVersion || serviceUpdate.shown))) && <Group title={t("settings.updates.one")}>
-        <div className="updates-settings" data-settings-row="">
-          <PartVersion hint={t(!app ? "settings.updates.serviceHint" : service ? "settings.updates.oneHint" : "settings.updates.appHint")}
-            version={here.version} upToDate={here.state === "current" && !here.app.can.check} note={note} t={t} />
-          {/* Up to date, for the app and its service together, on the check's line where there is one. */}
-          {app ? <AppUpdateSettings words="all" onRestart={continueAfterRestart} idle={serviceControl("all")} current={here.state === "current"} /> : serviceControl("all")}
-        </div>
-      </Group>
-      : <>
-        {app && <Group title={t("settings.updates.app")}>
-          <div className="updates-settings">
-            <PartVersion hint={t("settings.updates.appHint")} version={build?.version} upToDate={false} note={note} t={t} />
-            <AppUpdateSettings />
-          </div>
-        </Group>}
-        {/* No version to say and no update: no card. */}
-        {service && (serviceVersion || serviceUpdate.shown) && <Group title={t("settings.updates.service")}>
-          <div className="updates-settings" data-settings-row="">
-            <PartVersion hint={t("settings.updates.serviceHint")} version={serviceVersion} upToDate={here.service.state === "current"} t={t} />
-            {serviceControl("service")}
-          </div>
-        </Group>}
-      </>}
+    {(app || (service && (serviceVersion || serviceUpdate.shown))) && <Group title={t("settings.updates.one")}>
+      <div className="updates-settings" data-settings-row="">
+        <PartVersion hint={app ? undefined : t("settings.updates.serviceHint")}
+          version={here.version} upToDate={here.state === "current" && !here.app.can.check} note={note} t={t} />
+        {/* Up to date, for the app and its service together, on the check's line where there is one. */}
+        {app ? <AppUpdateSettings words="all" onRestart={continueAfterRestart} idle={serviceControl("all")} current={here.state === "current"} /> : serviceControl("all")}
+      </div>
+    </Group>}
     {outdated.length > 0 && <Group title={t("settings.updates.machines")}>
       {outdated.map(({ machine, version, latest, command }) => {
         const name = machine.host || t("hosts.unnamed");
