@@ -29,7 +29,7 @@
 .host-detail-copy { display: grid; flex: 1; min-width: 12rem; }
 .host-detail-header h3 { display: flex; align-items: center; margin: 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; }
 .host-detail-header p { margin: 0; font-size: var(--sv-font-sm); }
-/* Its state at length under its name — a word in its tone, semibold (VARIANTS `machine-state` A), or a pill (B) — and
+/* Its state at length under its name, a word in its tone, semibold, and
    Not encrypted after it, with its (i); what to do about it, when there is something, on the line under. */
 .host-detail-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); min-height: 1.25rem; }
 .host-detail-state .machine-state { font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); }

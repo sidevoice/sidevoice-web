@@ -19,7 +19,7 @@ import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
-import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName, useThisDeviceEntryStatus } from "./MachineState";
+import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName } from "./MachineState";
 import { Alert } from "../../components/ui/Alert";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
@@ -202,11 +202,10 @@ export function SettingsDialog() {
   useEffect(() => { if (!phone) content.current?.scrollTo?.({ top: 0 }); }, [current, machine]); // eslint-disable-line react-hooks/exhaustive-deps
   const waits = useVoiceReadiness();
   const news = useHighlights();
-  // This device's state, as its section's entry says it (only shown where the app reads its service): none where
-  // VARIANTS `machine-state-this-device` hides it, but for what needs the person.
+  // This device's state, as its section's entry says it (only shown where the app reads its service).
   const localMachine = useRoomStore((state) => state.machines.find((item) => item.local) ?? null);
   const localStatus = useRoomStore((state) => state.facts.localHostStatus);
-  const thisDevice = useThisDeviceEntryStatus(machineStatus(localMachine, localStatus, true, t));
+  const thisDevice = machineStatus(localMachine, localStatus, true, t);
   const summaries = useSummaries(t, thisDevice);
   const savedAt = useRoomStore((state) => state.facts.settingsSavedAt);
   const focus = useRoomStore((state) => state.facts.settingsFocus);
@@ -239,7 +238,7 @@ export function SettingsDialog() {
   // Updates shown as they stop having a section of their own: This device, where they are then.
   useEffect(() => { if (current === "updates" && !updatesApart) show(ownComputer ? "this-computer" : "general"); }, [current, updatesApart]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
-  // This device's icon wears its connected dot, as a machine's does (VARIANTS `machine-state`).
+  // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
     : id === "this-computer" ? <StateOnIcon icon={SECTIONS.find((section) => section.id === id)!.icon(size)} status={thisDevice} />
       : SECTIONS.find((section) => section.id === id)!.icon(size);

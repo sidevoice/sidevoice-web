@@ -25,7 +25,7 @@ import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
 import { DesktopBuildNote, useUpdatesSection } from "../settings/UpdatesSettings";
-import { MachineEntryCopy, MachineEntryState, MachineEntryTip, MachineState, StateOnIcon, machineEntryName } from "../settings/MachineState";
+import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeError, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
@@ -96,9 +96,8 @@ export function MachineNav({ current }: { current: boolean }) {
         // This computer, listed here only where it has no section of its own, reads as any machine.
         const state = machineStatus(machine, status, own, t);
         const isNew = notice(machine);
-        // Its tooltip: the native one, or the app's on hover and focus (VARIANTS `machine-state` B).
-        return <MachineEntryTip key={machine.id} name={name} status={state} t={t}>{(title) => (
-          <button type="button" className="ui-nav-item ui-nav-item--sub machine-entry" title={title}
+        return (
+          <button type="button" key={machine.id} className="ui-nav-item ui-nav-item--sub machine-entry" title={machineEntryTitle(name, state, t)}
             aria-label={machineEntryName(name, state, isNew, t)}
             data-name={name} data-state={machine.state} data-local={machine.local || undefined}
             aria-current={current && shown?.id === machine.id ? "page" : undefined}
@@ -111,7 +110,7 @@ export function MachineNav({ current }: { current: boolean }) {
             </span>
             <MachineEntryCopy name={name} status={state} isNew={isNew} />
           </button>
-        )}</MachineEntryTip>;
+        );
       })}
       <button type="button" className="ui-nav-item ui-nav-item--sub machine-nav-add" onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t(own ? "hosts.addRemote" : "hosts.add")}</button>
     </div>

@@ -1,5 +1,5 @@
 /* A machine's state (MachineState.tsx). In words, in its tone, as the agents' status line colours it: the machine's page,
- * and an entry's second line where VARIANTS `machine-state` says it (always for what needs the person). Never the
+ * and an entry's second line when it needs the person. Never the
  * accent: that means new (and selected), so the current entry's own colour never reaches it. */
 .machine-state { font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-medium); white-space: nowrap; color: var(--sv-text-muted); }
 .machine-state[data-tone="positive"] { color: var(--sv-positive); }
