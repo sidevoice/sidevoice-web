@@ -9,8 +9,6 @@ import { TranscriptPanel } from "../features/conversation/TranscriptPanel";
 import { CallStage } from "../features/call/CallStage";
 import { CallToolbar } from "../features/call/CallToolbar";
 import { PresenceSound } from "../features/call/PresenceSound";
-import { RoomAnnouncer } from "../features/call/RoomAnnouncer";
-import { useVoiceSwitch } from "../state/call-model";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
 import { PairingDialog } from "../features/pairing/PairingDialog";
@@ -31,7 +29,6 @@ function RoomContent() {
   const pendingLocalSelection = useRef(false);
   const noMachine = ready && machines.length === 0;
   const onboarding = useOnboarding();
-  const voiceSwitch = useVoiceSwitch();
   // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
   const setupPending = !onboarding.ready || !onboarding.record.completed_at;
 
@@ -75,8 +72,6 @@ function RoomContent() {
           </>}
         </main>
         {!noMachine && <PresenceSound />}
-        {/* Call model B's announcements (VARIANTS `call-model`). */}
-        {!noMachine && voiceSwitch && <RoomAnnouncer />}
         <ConnectionStatsDialog />
         <SettingsDialog />
       </div>

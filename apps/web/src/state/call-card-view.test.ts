@@ -37,7 +37,7 @@ test("the card names the conversation the call is on, not a transcript being bro
 
 test("FC0: the store's callCard is the card's whole snapshot but the host's stamps — rows with every field, devices in the card's words", () => {
   const view = card({ audioDevices: { inputs: [{ id: "mbp", label: "MacBook Pro" }, { id: "usb", label: "" }], outputs: [], input: "mbp", output: null, outputSelectable: false } });
-  expect(view).toMatchObject({ ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, callModel: "call", setupDone: false });
+  expect(view).toMatchObject({ ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, setupDone: false });
   expect(view).not.toHaveProperty("version");
   expect(view).not.toHaveProperty("since");
   // The model and effort reach the card with the rows (the desktop bridge's field list dropped them).
@@ -49,10 +49,9 @@ test("FC0: the store's callCard is the card's whole snapshot but the host's stam
   expect(card({}).devices).toBeNull();
 });
 
-test("FC1, FC2, FC12: setup done, the call model and the page's theme and language, as the facts say them", () => {
-  expect(card({ setupDone: true, callModel: "voice-switch", pageTheme: "dark", pageLanguage: "es" }))
-    .toMatchObject({ setupDone: true, callModel: "voice-switch", theme: "dark", language: "es" });
-  expect(card({})).toMatchObject({ callModel: "call", theme: "light", language: "en" });
+test("FC1, FC12: setup done and the page's theme and language, as the facts say them", () => {
+  expect(card({ setupDone: true, pageTheme: "dark", pageLanguage: "es" })).toMatchObject({ setupDone: true, theme: "dark", language: "es" });
+  expect(card({})).toMatchObject({ theme: "light", language: "en" });
 });
 
 test("FC4: the avatar acts out what the stage's would — listening while the turn is open, working, speaking, offline", () => {
@@ -69,30 +68,16 @@ test("FC4: the avatar acts out what the stage's would — listening while the tu
   expect(card({ botLive: true, avatarPreview: { mood: "working" } }).mood).toBe("working");
 });
 
-test("FC4 in call model B: the active conversation, heard or not; its agent works whatever the voice", () => {
-  const b = { callModel: "voice-switch", voiceOn: true };
-  expect(card({ ...b, people: [{ ...people[0], working: true }] })).toMatchObject({ mood: "working", conversation: "n|a" });
-  // Picked though it cannot hear (offline): the binding left it, the card still names it.
-  const picked = card({ ...b, roomBinding: null, viewedThread: "n|b" });
-  expect(picked).toMatchObject({ conversation: "n|b", title: "Transcript B", mood: "offline", micReason: "cantHear", micDisabled: true });
-  expect(card({ ...b, roomBinding: null })).toMatchObject({ conversation: null, micReason: "noConversation" });
-  expect(card({ ...b, voiceOn: false, botLive: true }).mood).toBe("idle");
-});
-
-test("FC6 and FC7: the idle warning in each model, and why a call ended by itself (A only: B says it in voiceOffReason)", () => {
+test("FC6 and FC7: the call's idle warning, and why a call ended by itself", () => {
   expect(card({ callIdleWarning: true }).idleWarning).toBe(true);
-  expect(card({ voiceIdleWarning: true }).idleWarning).toBe(false);
-  expect(card({ callModel: "voice-switch", voiceIdleWarning: true }).idleWarning).toBe(true);
+  expect(card({}).idleWarning).toBe(false);
   expect(card({ callEnded: { reason: "idle", detail: "" } }).ended).toEqual({ reason: "idle", detail: "" });
-  expect(card({ callModel: "voice-switch", voiceOffReason: "micLost", voiceOffDetail: "" })).toMatchObject({ ended: null, voiceOffReason: "micLost" });
 });
 
-test("FC10 and FC11: why B's microphone cannot be used, and what busy is — reconnecting, or switching and to whom", () => {
+test("FC11: what busy is — reconnecting, or switching and to whom", () => {
   expect(card({ reconnectShown: true })).toMatchObject({ busy: true, busyReason: "reconnecting", switchingTo: null });
   expect(card({ switching: true, viewedThread: "n|b" })).toMatchObject({ busy: true, busyReason: "switching", switchingTo: "Transcript B" });
   expect(card({ movingTo: "n|b" })).toMatchObject({ busyReason: "switching", switchingTo: "Transcript B" });
-  expect(card({ callModel: "voice-switch", voiceOn: true, switching: true, viewedThread: "n|a" })).toMatchObject({ micReason: "connecting" });
-  expect(card({}).micReason).toBeNull();
 });
 
 test("FC13: the microphone silent though not muted — another app holds it", () => {

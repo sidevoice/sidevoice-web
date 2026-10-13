@@ -8,9 +8,8 @@
  * growing wider and without moving anything, it offers the rest: the title becomes the conversation picker, "open
  * Sidevoice" appears in the slot kept for it beside your wave, and the room's call controls appear below. Panels open
  * below the controls and close by themselves. */
-import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, PowerIcon, SkipIcon, SpeakerIcon, SpeakerOffIcon } from "../components/ui/Icons";
+import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon } from "../components/ui/Icons";
 import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
-import { isVoiceSwitch } from "./card-view";
 import type { CallControlsHost, CallControlsState } from "./host";
 import type { Translate } from "./i18n";
 
@@ -43,8 +42,7 @@ function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolea
 export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
   const state = useHostState(host);
   if (!state) return null;
-  // With the voice switch (call model B) the card is there while the voice is on; the room's window says why it went off.
-  if (!(isVoiceSwitch(state.call) ? state.call.voiceOn : state.call.joined)) return null;
+  if (!state.call.joined) return null;
   // Each call gets a card of its own: nothing of the last one (a panel, the wave, a drag) carries over.
   return <TodayCard key={state.call.since ?? "call"} host={host} state={state} t={t} />;
 }
@@ -61,12 +59,7 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
 
   const selected = call.participants.find((participant) => participant.selected);
   const agent = reconnecting ? "reconnecting" : call.agent;
-  // With the voice switch the microphone keeps one name, its state pressed (call model B).
-  const switching = isVoiceSwitch(call);
-  const muteLabel = switching ? t("card.muteMic") : muted ? t("card.unmute") : t("card.mute");
-  const agentsMuted = !!call.agentsMuted;
-  const waiting = agentsMuted ? call.wantToTalk ?? 0 : 0;
-  const waitingText = waiting ? t(waiting === 1 ? "card.waiting.one" : "card.waiting.other", { n: waiting }) : null;
+  const muteLabel = muted ? t("card.unmute") : t("card.mute");
   const unreadElsewhere = call.participants.reduce((n, row) => n + (row.selected ? 0 : row.unread || 0), 0);
 
   return (
@@ -110,21 +103,12 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
               {muted ? <MicrophoneOffIcon size={17} /> : <MicrophoneIcon size={17} />}
             </button>
           </span>
-          {switching && <button type="button" className="card-agents" aria-pressed={agentsMuted} title={[t("card.muteAgents"), waitingText].filter(Boolean).join(" · ")}
-            aria-label={t("card.muteAgents")} aria-description={waitingText ?? undefined} onClick={() => run({ command: "toggle-agents" })}>
-            {agentsMuted ? <SpeakerOffIcon size={17} /> : <SpeakerIcon size={17} />}
-            {waiting > 0 && <span className="card-agents-badge" aria-hidden="true">{waiting > 9 ? "9+" : waiting}</span>}
-          </button>}
           <button type="button" className="card-skip" disabled={!call.canSkip} title={t("card.skip")} aria-label={t("card.skip")} onClick={() => run({ command: "skip-reply" })}>
             <SkipIcon size={17} />
           </button>
-          {switching
-            ? <button type="button" className="card-voice-off" title={t("card.voiceOff")} aria-label={t("card.voiceOff")} onClick={() => run({ command: "voice-off" })}>
-                <PowerIcon size={17} />
-              </button>
-            : <button type="button" className="card-hangup" title={t("card.hangUp")} aria-label={t("card.hangUp")} onClick={() => run({ command: "hang-up" })}>
-                <HangupIcon size={18} />
-              </button>}
+          <button type="button" className="card-hangup" title={t("card.hangUp")} aria-label={t("card.hangUp")} onClick={() => run({ command: "hang-up" })}>
+            <HangupIcon size={18} />
+          </button>
         </div>
       )}
 

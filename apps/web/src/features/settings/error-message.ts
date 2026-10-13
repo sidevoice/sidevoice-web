@@ -130,7 +130,6 @@ const VOICE_ALIASES: Record<string, string> = {
 
 function voiceFailureKnown(code: string, inApp: boolean, t: HostTranslate): string | null {
   if (code === "storage-blocked" || code === "SecurityError") return t("storage.blocked");
-  if (code === "trial-voice-on") return t("wizard.trial.voiceOn");
   if (code === "microphone-denied" && inApp) return t("voice.microphoneDeniedApp");
   if (code.startsWith("trial-")) {
     const trial = keyFor("wizard.trial.", code.slice(6));

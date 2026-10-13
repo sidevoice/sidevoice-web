@@ -242,17 +242,14 @@ export function DevicePicker({ call, run, t }: { call: CallSnapshot; run: (comma
   );
 }
 
-/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest); with the
- *  voice switch (call model B), its mark after them. */
+/** One row's line in the card's words: where it runs, and a reach that is not normal (the dot says the rest). */
 function conversationSub(row: ParticipantView, t: Translate) {
   const reach = row.reach === "holding" ? t("card.reach.holding") : row.reach === "offline" || !row.available ? t("card.reach.offline") : null;
-  const mark = row.mark === "waiting-for-you" ? t("card.mark.waitingForYou") : row.mark === "wants-to-talk" ? t("card.mark.wantsToTalk") : null;
   return (
     <>
       {row.machine && <span className="person-machine"><MachinesIcon size={11} /> {row.machine}</span>}
       {(row.harness || row.model) && <span className="person-harness">{row.harness && <HarnessIcon harness={row.harness} size={11} />} {[row.model, row.effort].filter(Boolean).join(" · ")}</span>}
       {reach && <span className="person-reach"> · {reach}</span>}
-      {mark && <span className="person-mark"> · {mark}</span>}
     </>
   );
 }
@@ -267,10 +264,7 @@ export function ConversationPicker({ call, disabled, onSelect, t }: { call: Call
         disabled={disabled}
         onSelect={onSelect}
         sub={(row) => conversationSub(row, t)}
-        aside={(row) => (<>
-          {row.mark && <span className="card-mark" data-mark={row.mark} aria-hidden="true" />}
-          {row.unread && !row.selected ? <span className="card-badge" aria-label={t("card.unread", { n: row.unread })}>{row.unread}</span> : null}
-        </>)}
+        aside={(row) => (row.unread && !row.selected ? <span className="card-badge" aria-label={t("card.unread", { n: row.unread })}>{row.unread}</span> : null)}
       />
     </div>
   );

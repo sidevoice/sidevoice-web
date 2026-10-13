@@ -4,9 +4,8 @@
  * its own reasons. Where the voice is in a reply it tells in its own count of characters, which the page turns into
  * offsets into the reply's text. Nothing here keeps state: the page holds the replies and the outbox. */
 
-/** The reasons the room takes on a playback report; the last two are call model B's, a reply stopped because the voice
- *  went off or the agents were muted (contract gap #32: core does not take them yet). */
-export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'user_skipped', 'focus_changed', 'call_ended', 'unheard', 'voice_off', 'agents_muted'];
+/** The reasons the room takes on a playback report. */
+export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'user_skipped', 'focus_changed', 'call_ended', 'unheard'];
 
 /**
  * A turn event of the voice as the room's `voice-user-turn` data (the page adds the session and the message id).

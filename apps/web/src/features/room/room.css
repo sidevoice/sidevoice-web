@@ -14,7 +14,7 @@
 .state-dot[data-state="working"] { background: var(--sv-voice); }
 .state-dot[data-state="waiting"] { background: var(--sv-accent); }
 /* On the sidebar's cards the plain dot says one thing only: connected (green). Any other state has no dot there (its
-   words are on the card); a mark with its hand stays. */
+   words are on the card). */
 .sidebar-rows .state-dot:not([data-state="in-call"]):empty { display: none; }
 
 /* ----- the header: the mark, and Settings at its end */
@@ -112,13 +112,9 @@
   .header-new[aria-expanded="true"] { border-style: solid; border-color: var(--sv-accent); color: var(--sv-accent-text); }
   .header-new:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
   @media (hover: hover) { .header-new:hover { background: var(--sv-hover); color: var(--sv-text); } }
-  /* What a conversation behind the chevron needs, as one cue on its corner, the most pressing: an avatar's own amber
-     hand (waiting for you, filled; wanting to talk, outlined), else the accent's dot for something unread. */
+  /* Something unread in a conversation behind the chevron: the accent's dot on its corner. */
   .conversations-cue { position: absolute; top: 6px; right: 6px; box-sizing: content-box; border: 2px solid var(--sv-bg); border-radius: 50%; pointer-events: none; }
   .conversations-cue[data-cue="unread"] { width: 8px; height: 8px; background: var(--sv-accent); }
-  .conversations-cue:is([data-cue="waiting-for-you"], [data-cue="wants-to-talk"]) { display: grid; place-items: center; top: 2px; right: 2px; width: 16px; height: 16px;
-    box-sizing: border-box; border-width: 1.5px; background: var(--sv-voice-soft); color: var(--sv-voice-text); }
-  .conversations-cue svg { display: block; }
 
   /* The chevron after the avatars, wherever the variant puts them: it drops the list, and turns up while it is down. */
   .conversations-toggle svg { transition: transform var(--sv-dur-base) var(--sv-ease); }
@@ -168,18 +164,3 @@
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row { border-color: transparent; background: none; box-shadow: none; }
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row[data-selected] { background: var(--sv-accent-soft); }
 }
-
-/* ----- call model B (VARIANTS `call-model`, the voice switch): its states on the same dot. Ready is the accent, working
- * and speaking the voice's mustard; a mark is an amber hand in the dot's place, cut out of the avatar like the dot —
- * filled while its agent waits for you, outlined while it wants to talk. */
-.state-dot[data-state="ready"] { background: var(--sv-accent); }
-.state-dot:is([data-state="working"], [data-state="speaking"]) { background: var(--sv-voice); }
-.state-dot:is([data-state="waiting-for-you"], [data-state="wants-to-talk"]) { display: grid; place-items: center; right: -3px; bottom: -3px; width: 16px; height: 16px;
-  border-width: 1.5px; background: var(--sv-voice-soft); color: var(--sv-voice-text); box-sizing: border-box; }
-.state-dot svg { display: block; }
-/* "Hear it" on a row with a mark: between the unread badge and ⋯, always shown (a mark is the point), 28px to touch. */
-.sidebar-rows .row-hear { flex: none; width: 28px; height: 28px; color: var(--sv-voice-text); }
-.sidebar-rows .row-hear + .participant-more { margin-inline-start: 0; }
-@media (min-width: 900px) { .conversation-sidebar[data-collapsed] .row-hear { display: none; } }
-/* A phone's connection statistics, at the panel's foot (the bar has no ⋮ there). */
-.sidebar-foot--stats #stats-open { justify-content: flex-start; }

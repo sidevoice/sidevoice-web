@@ -95,8 +95,8 @@ test("manual: Version X available · Download acts in place: the same row shows 
   expect(updater.restart).toHaveBeenCalledTimes(1);
 });
 
-test("in a call or with the voice on, Restart to update restarts at once, asking nothing", async () => {
-  for (const facts of [{ ws: {} }, { callModel: "voice-switch", voiceOn: true }]) {
+test("in a call, Restart to update restarts at once, asking nothing", async () => {
+  for (const facts of [{ ws: {} }]) {
     const { updater } = fakeUpdater({ status: { state: "ready", version: "0.5.0" } });
     foot(updater, facts);
     await settle();

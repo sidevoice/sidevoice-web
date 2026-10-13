@@ -3,25 +3,14 @@ import { SendIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Textarea } from "../../components/ui/Input";
 import { conversationTranslator } from "./conversation-i18n";
-import { useRoomStore } from "../../state/room-store";
-import { useVoiceSwitch } from "../../state/call-model";
-import { composerPlaceholder } from "./composer-view";
 
 /* The text box is always there, under the conversation (2026-10-11), as a call app's chat has it: a rounded field
  * pinned at the panel's foot with Send as an icon at its end, one row empty, growing with what is written up to eight
  * (five on a phone), never resized by hand. The runtime owns it by its ids — it sends the form, reads and clears
- * the box's value, and enables both — so React renders it once and never touches its value or its disabled state.
- * With the voice switch (call model B) the placeholder is React's: it says why the box cannot write when it cannot
- * (features/call/voice-view.ts), and the runtime leaves it alone. */
+ * the box's value, and enables both — so React renders it once and never touches its value or its disabled state. */
 export function Composer({ narrow }: { narrow: boolean }) {
   const t = conversationTranslator();
   const form = useRef<HTMLFormElement>(null);
-  const voiceSwitch = useVoiceSwitch();
-  const placeholder = useRoomStore((state) => {
-    if (!voiceSwitch) return t("transcript.placeholder");
-    const { key, title } = composerPlaceholder(state.facts, state.participants);
-    return t(key, { title });
-  });
 
   // The runtime clears the box by setting its value once the text is sent, and no input event follows: the box kept
   // the height of what was sent. Right after, it always sets the form's state again (enabled, placeholder), so that
@@ -41,7 +30,7 @@ export function Composer({ narrow }: { narrow: boolean }) {
     <form id="text-composer" className="text-composer" ref={form}>
       <div className="composer-field">
         <Textarea id="text-message" minRows={1} maxRows={narrow ? 5 : 8} maxLength={12000} aria-label={t("transcript.message")}
-          placeholder={placeholder} disabled onInput={(event) => setEmpty(!event.currentTarget.value.trim())} />
+          placeholder={t("transcript.placeholder")} disabled onInput={(event) => setEmpty(!event.currentTarget.value.trim())} />
         <Button id="text-send" type="submit" variant="ghost" size="icon-sm" className="composer-send" disabled aria-disabled={empty || undefined}
           data-empty={empty || undefined} aria-label={t("transcript.sendLabel")} title={t("transcript.sendLabel")}><SendIcon /></Button>
       </div>

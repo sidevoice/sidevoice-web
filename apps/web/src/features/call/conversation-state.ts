@@ -8,11 +8,11 @@ import type { CallTranslate } from "./call-i18n";
  * Nothing here reads a clock or the DOM. */
 
 export type { AvatarMood };
-/* Whether a conversation hears the person, and the stage's mood for it in each call model, are the room's own projections
+/* Whether a conversation hears the person, and the stage's mood for it, are the room's own projections
  * (state/room-session-state.js): the desktop card's snapshot takes its avatar's mood from them too, so the stage and the
  * card never disagree (FLOATING-CARD-SPEC FC4). */
-export { canHear, stageMood, voiceSwitchStageMood } from "../../state/room-session-state.js";
-export type { StageFacts, VoiceSwitchStageFacts } from "../../state/room-session-state.js";
+export { canHear, stageMood } from "../../state/room-session-state.js";
+export type { StageFacts } from "../../state/room-session-state.js";
 
 /** The state a conversation's dot and line show. */
 export type ConversationState = "in-call" | "working" | "waiting" | "idle";
@@ -47,39 +47,6 @@ export function stateText(row: ParticipantView, inCall: boolean, t: CallTranslat
   const words = state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
     : state === "waiting" ? t("state.waiting") : row.reach === "holding" && row.available ? t("state.holding") : t("state.offline");
   return row.unread && state !== "in-call" ? t("state.withUnread", { state: words, unread: t("state.unread", { n: row.unread }) }) : words;
-}
-
-/* ----- call model B (VARIANTS `call-model`, the voice switch): the same places, its own states -----
- * The room is always open, so "in call" goes; every row says whether its agent works (contract gap #33), and speech the
- * person could not hear is a mark on its conversation (gap #34): waiting for you, or wanting to talk. */
-
-/** What a conversation's dot and line say in call model B (the spec's §2.8), the first that applies: it cannot be
- *  reached (idle: offline, or can't receive), a mark while its agent is idle, a mark while it works or nobody knows,
- *  the active one speaking, working, ready. */
-export type VoiceSwitchState = "idle" | "waiting-for-you" | "wants-to-talk" | "speaking" | "working" | "ready";
-
-export function voiceSwitchState(row: ParticipantView): VoiceSwitchState {
-  if (!canHear(row)) return "idle";
-  if (row.mark === "waiting-for-you") return "waiting-for-you";
-  if (row.mark === "wants-to-talk") return "wants-to-talk";
-  if (row.speaking) return "speaking";
-  if (row.agentWorking) return "working";
-  return "ready";
-}
-
-/** Its words, with what is waiting to be read: unread text and unheard speech are different things, and both show. */
-export function voiceSwitchStateText(row: ParticipantView, t: CallTranslate): string {
-  const state = voiceSwitchState(row);
-  const words = state === "idle" ? (row.reach === "holding" && row.available ? t("state.holding") : t("state.offline"))
-    : state === "waiting-for-you" ? t("state.waitingForYou") : state === "wants-to-talk" ? t("state.wantsToTalk")
-    : state === "speaking" ? t("state.speaking") : state === "working" ? t("state.working") : t("state.ready");
-  return row.unread ? t("state.withUnread", { state: words, unread: t("state.unread", { n: row.unread }) }) : words;
-}
-
-/** A small avatar in call model B: working on any row its agent works (gap #33). */
-export function voiceSwitchAvatarMood(row: Pick<ParticipantView, "reach" | "agentWorking">): AvatarMood {
-  if (row.reach === "offline") return "offline";
-  return row.agentWorking ? "working" : "idle";
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */

@@ -11,7 +11,7 @@ export function row(threadId: string, extra: Partial<ParticipantView> = {}): Par
   };
 }
 
-/** A call (A) on its first row, set up, everything quiet; `overrides` on top. */
+/** A call on its first row, set up, everything quiet; `overrides` on top. */
 export function cardSnapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
   const participants = overrides.participants ?? [row("a", { title: "Sidevoice: mini call", selected: true })];
   const active = participants.find((candidate) => candidate.selected) ?? null;
@@ -19,8 +19,7 @@ export function cardSnapshot(overrides: Partial<CallSnapshot> = {}): CallSnapsho
     version: 2, ready: true, joined: true, busy: false, micEnabled: true, micDisabled: false, title: active?.title ?? "",
     agent: "idle", youTalking: false, canSkip: false, conversation: active?.threadId ?? null, since: Date.now() - 60_000,
     participants, devices: null,
-    voiceOn: false, agentsMuted: false, wantToTalk: 0, voiceOffReason: null, voiceOffDetail: "",
-    setupDone: true, callModel: "call", mood: "idle", turn: null, idleWarning: false, ended: null, micReason: null,
+    setupDone: true, mood: "idle", turn: null, idleWarning: false, ended: null,
     busyReason: null, switchingTo: null, theme: "dark", language: "en", micSilent: false,
     ...overrides,
   };

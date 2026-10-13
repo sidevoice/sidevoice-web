@@ -42,47 +42,13 @@ export function initialSessionFacts() {
         // The voice settings this device keeps (`VoiceSettings`), the ones the open settings pane is editing, the engine's
         // catalogues for its choices, and whether this device keeps a key for each remote provider (never the key).
         voiceSettings: null, voiceDraft: null, voiceCatalogue: { state: 'idle', catalogs: [], error: '' }, modelsRemovable: false, deleteUnusedDays: null, deviceName: null, providerKeys: {},
-        // Call model B (VARIANTS `call-model`: the room always open, a voice switch in the call's slot): whether the voice
-        // is on or turning on, why it last turned itself off (VOICE_OFF_REASONS, and a failure's words), whether the idle
-        // warning is up, whether the agents are muted and by what, the conversation a "Hear it" is asking (`{thread,
-        // state: 'asking' | 'no-answer'}`), and the conversation a move to another machine is taking the session to.
-        voiceOn: false, voiceStarting: false, voiceOffReason: null, voiceOffDetail: '', voiceOffDetails: '', voiceIdleWarning: false,
-        agentsMuted: false, agentsMutedBy: null, hearing: null, movingTo: null,
-        // The floating call card (briefs/FLOATING-CARD-SPEC.md): the call model this page runs (the runtime's, read once:
-        // 'call' is A, 'voice-switch' B), whether the first setup is finished with its wizard closed, call model A's idle
-        // warning and why its call ended by itself (`{reason: 'idle' | 'offline' | 'failed', detail}`), and the theme and
-        // language the page wears.
-        callModel: 'call', setupDone: false, callIdleWarning: false, callEnded: null, pageTheme: 'light', pageLanguage: 'en',
+        // The conversation a move to another machine is taking the call to.
+        movingTo: null,
+        // The floating call card (briefs/FLOATING-CARD-SPEC.md): whether the first setup is finished with its wizard
+        // closed, the call's idle warning and why it ended by itself (`{reason: 'idle' | 'offline' | 'failed', detail}`),
+        // and the theme and language the page wears.
+        setupDone: false, callIdleWarning: false, callEnded: null, pageTheme: 'light', pageLanguage: 'en',
     };
-}
-/* ----- call model B: the voice switch (CALL-MODEL-B-SPEC.md) -----
- * The room is always open; the voice is a switch, and the agents a second mute. What the page needs from the room that
- * it does not offer yet is a contract gap (briefs/CONTRACT-GAPS-75.md #32–#38), each marked where it is read. */
-/** Why the voice turned itself off, as the voice switch's note says it (the spec's §2.3). */
-export const VOICE_OFF_REASONS = ['idle', 'micLost', 'micBlocked', 'micUnavailable', 'failed', 'reloaded'];
-/** How long a "Hear it" waits for the agent's reply to start before it says the agent did not answer by voice, and how
- *  long that is said for (the spec's §9: the 45 s wait is an estimate, one agent turn taking 5–30 s). */
-export const HEAR_WAIT_MS = 45000;
-export const HEAR_NO_ANSWER_MS = 10000;
-/** The voice's failure, by its code, as the reason the voice switch says. */
-export function voiceOffReasonFor(code) {
-    return { 'microphone-lost': 'micLost', 'microphone-denied': 'micBlocked', 'microphone-unavailable': 'micUnavailable' }[code] || 'failed';
-}
-/** Whether this session's speech is heard here, as the room is told it (gap #32, G1): off with the voice off or the
- *  agents muted, and why. */
-export function speechOf(s) {
-    if (s.voiceOn && !s.agentsMuted)
-        return { on: true };
-    return { on: false, reason: s.voiceOn ? 'agents_muted' : 'voice_off' };
-}
-/** How many conversations want to talk: those with a mark that can be reached, on every machine (the badge on Mute
- *  agents, and the desktop card's). */
-export function wantToTalk(rows) { return rows.filter(row => row.mark && row.available).length; }
-/** The reasons a reply went unheard that call model B adds (gap #32), as the transcript's keys name them. */
-const SWITCH_REASONS = { agents_muted: 'agentsMuted', voice_off: 'voiceOff' };
-/** Why a reply had no audio, when it is one of call model B's reasons. */
-export function audioReasonKey(r) {
-    return r.role === 'assistant' && ['text_only', 'interrupted', 'failed'].includes(r.audio) ? SWITCH_REASONS[r.audio_reason] || null : null;
 }
 /* A conversation is a thread on a machine: the page knows it by both (`conversationKey`), and only the requests and
  * frames to that machine use the room's own `thread_id`. A fingerprint is base64url, so it never holds the separator. */
@@ -140,35 +106,6 @@ export function stageMood(facts) {
         return 'working';
     return 'idle';
 }
-/** The agent on the stage in call model B, by priority: offline, speaking and listening (with the voice on), working
- *  (whatever the voice), idle. */
-export function voiceSwitchStageMood(facts) {
-    if (facts.reach === 'offline')
-        return 'offline';
-    if (facts.voiceOn && facts.speaking)
-        return 'speaking';
-    if (facts.voiceOn && facts.personSpeaking && facts.canHear)
-        return 'listening';
-    if (facts.working)
-        return 'working';
-    return 'idle';
-}
-/** Why call model B's microphone cannot be used, with the voice on (CALL-MODEL-B-SPEC §2.4), by its code: nobody to
- *  talk to, the active conversation (the one looked at) cannot hear, or the session is still getting to it; null when
- *  it can, or with the voice off. */
-export function voiceMicCode(s, rows) {
-    if (!s.voiceOn)
-        return null;
-    const key = s.viewedThread || selectedThread(s);
-    if (!key)
-        return 'noConversation';
-    const row = rows.find(candidate => candidate.threadId === key);
-    if (!row || !canHear(row))
-        return 'cantHear';
-    if (s.switching || s.movingTo || s.connecting || selectedThread(s) !== key)
-        return 'connecting';
-    return null;
-}
 /** The voice's devices as the card offers them (call-controls/host.ts AudioDevices): the system's default first, an
  *  option of its own (id ''); a device the system lists without a name said by its place; the speaker chosen only where
  *  the voice can move it. `busy` is its host's to set: a choice it carries that the room has not answered yet. */
@@ -187,35 +124,29 @@ function cardDevices(devices) {
  *  a device choice it carries is pending —, so the app and the preview pass it through and never map the room again
  *  (briefs/FLOATING-CARD-SPEC.md FC0). The agent and the person are independent: both can speak at once, and the agent
  *  works while a turn is transcribed. The card names the conversation the call is on (the microphone's), never a
- *  transcript being browsed; its avatar acts out what the stage's would for it (stageMood, voiceSwitchStageMood, and the
- *  preview's `avatarPreview`), so the card and the stage never disagree (FC4). */
+ *  transcript being browsed; its avatar acts out what the stage's would for it (stageMood, and the preview's
+ *  `avatarPreview`), so the card and the stage never disagree (FC4). */
 export function callCardView(s, participants = participantsView(s)) {
-    const selected = selectedThread(s), voiceSwitch = s.callModel === 'voice-switch';
-    // The call's conversation (A); with the voice switch (B) the active one, the person's pick, heard or not.
-    const key = voiceSwitch ? s.viewedThread || selected : selected, isTarget = !!key && key === selected;
+    const selected = selectedThread(s);
+    const key = selected, isTarget = !!key;
     const row = key ? participants.find(p => p.threadId === key) || null : null;
     const agent = s.botLive ? 'speaking' : working(s) || s.pendingPhase === 'transcribing' ? 'working' : 'idle';
     // The person's turn to it, open: they are talking, or it is being transcribed (ConversationView.pendingPhase).
     const turn = isTarget && s.userTurn?.thread === key && !s.cancelledInput && (s.pendingPhase === 'listening' || s.pendingPhase === 'transcribing') ? s.pendingPhase : null;
     const reach = row?.reach ?? null, hears = row ? canHear(row) : isTarget, speaking = isTarget && !!s.botLive;
     const mood = s.avatarPreview ? s.avatarPreview.mood
-        : voiceSwitch ? voiceSwitchStageMood({ voiceOn: !!s.voiceOn, reach, canHear: hears && isTarget, speaking, personSpeaking: !!turn, working: !!row?.agentWorking })
-            : stageMood({ inCall: inCall(s), isTarget, canHear: hears, reach, speaking, personSpeaking: !!turn, working: working(s) });
+        : stageMood({ inCall: inCall(s), isTarget, canHear: hears, reach, speaking, personSpeaking: !!turn, working: working(s) });
     const mic = micView(s);
-    const micReason = voiceSwitch ? voiceMicCode(s, participants) : null;
     const busyReason = s.reconnectShown ? 'reconnecting' : s.switching || s.movingTo ? 'switching' : null;
     const target = busyReason === 'switching' ? s.movingTo || (s.viewedThread && s.viewedThread !== selected ? s.viewedThread : selected) : null;
     const title = row?.title || (isTarget && s.roomBinding?.title) || '';
-    return { ready: true, joined: callView(s).joined, busy: !!busyReason, micEnabled: mic.enabled, micDisabled: voiceSwitch ? !!micReason : mic.disabled,
+    return { ready: true, joined: callView(s).joined, busy: !!busyReason, micEnabled: mic.enabled, micDisabled: mic.disabled,
         // Skip stops what is sounding, as the room's own Skip (FC3).
         title, agent, youTalking: !!s.userLive, canSkip: !!s.botLive, conversation: key, participants, devices: cardDevices(s.audioDevices),
-        // Call model B (gap #38, G9): the voice, the agents' mute, how many conversations want to talk, and why the voice
-        // last turned itself off.
-        voiceOn: !!s.voiceOn, agentsMuted: !!s.agentsMuted, wantToTalk: wantToTalk(participants), voiceOffReason: s.voiceOffReason, voiceOffDetail: s.voiceOffDetail || '',
-        // The floating card's (FLOATING-CARD-SPEC FC1, FC2, FC4, FC6, FC7, FC10–FC13).
-        setupDone: !!s.setupDone, callModel: voiceSwitch ? 'voice-switch' : 'call', mood, turn,
-        idleWarning: voiceSwitch ? !!s.voiceIdleWarning : !!s.callIdleWarning, ended: voiceSwitch ? null : s.callEnded || null,
-        micReason, busyReason, switchingTo: target ? participants.find(p => p.threadId === target)?.title || (target === selected ? title : '') : null,
+        // The floating card's (FLOATING-CARD-SPEC FC1, FC4, FC6, FC7, FC11–FC13).
+        setupDone: !!s.setupDone, mood, turn,
+        idleWarning: !!s.callIdleWarning, ended: s.callEnded || null,
+        busyReason, switchingTo: target ? participants.find(p => p.threadId === target)?.title || (target === selected ? title : '') : null,
         theme: s.pageTheme === 'dark' ? 'dark' : 'light', language: s.pageLanguage || 'en',
         micSilent: !!s.ws && mic.enabled && s.voiceState?.microphone === 'muted' };
 }
@@ -318,7 +249,7 @@ export function conversationView(s) {
     }
     // A reply is said again through the call: one of another machine is not offered.
     return { messages: records.map(r => ({ ...r, replayable: !!r.replayable && conversationOf(r.thread)?.node === s.callNode, cancellable: !!activeDraft && !s.cancelledInput && r.draft === true && r.segment === activeDraft,
-            audioNote: audioNote(r, ahead.get(r)), audioReason: audioReasonKey(r), deliveryNote: deliveryNote(r),
+            audioNote: audioNote(r, ahead.get(r)), deliveryNote: deliveryNote(r),
             playback: playbackState(r, s), karaoke: saying(s, r) ? { from: s.karaokeState.from, to: s.karaokeState.to } : null })),
         pendingText: own ? s.pendingUserText : '', pendingPhase: own && !s.cancelledInput ? s.pendingPhase : '',
         pendingCancellable: own && !s.cancelledInput, working: working(s, id) };
@@ -350,16 +281,6 @@ export function participantsView(s) {
         const reach = p.reach?.state || (p.available ? 'listening' : 'offline');
         const base = reach === 'listening' ? (unread ? unread + ' nuevas' : 'Escuchando') : reach === 'holding' ? 'No puede recibir' : p.available ? 'Sin poder recibir' : 'Desconectada';
         const busy = working(s, key);
-        // Call model B. Whether its agent works, on every row: what the call's own conversation reports, else what the
-        // room lists for each (gap #33, G2), null where nobody says. What it said that this page could not play (gap #34,
-        // G3) is its mark — waiting for you while its agent is idle, wanting to talk while it works or nobody knows —
-        // hidden on the call's own conversation while the person's turn to it is open or it speaks: that turn carries it.
-        const reported = inCall(s) && typeof s.harness[key] === 'boolean' ? s.harness[key] : null;
-        const agentWorking = busy ? true : reported ?? (typeof person.working === 'boolean' ? person.working : null);
-        const count = Number(person.unheard?.count) || 0;
-        const unheard = count > 0 ? { count, since: Number(person.unheard.since) || 0 } : null;
-        const hushed = key === selected && (!!s.botLive || s.userTurn?.thread === key);
-        const mark = unheard && !hushed ? (agentWorking === false ? 'waiting-for-you' : 'wants-to-talk') : null;
         // The dot already says "listening"; the line under the title says only what the dot cannot: where the
         // conversation runs, that it is thinking, what is waiting to be read, and a reach that is not normal.
         const subtitle = [unread ? unread + ' nuevas' : null,
@@ -370,8 +291,7 @@ export function participantsView(s) {
             unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             model: p.engine?.model || null, effort: p.engine?.effort || null,
-            activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined,
-            agentWorking, unheard, mark, speaking: key === selected && !!s.botLive, hearing: s.hearing?.thread === key ? s.hearing.state : null };
+            activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
 }
 /** How long ago, said the way a person says it. The clock comes in with the facts — nothing here
@@ -535,9 +455,6 @@ export function audioNote(r, ahead = 0) {
     // Held behind another reply, not behind anybody's voice: say which wait it is, and how long the line is.
     if (r.audio === 'queued' && r.audio_reason === 'previous_reply')
         return 'Audio pendiente · ' + (ahead > 1 ? 'Hay ' + ahead + ' respuestas antes' : 'Esperando a que termine la respuesta anterior');
-    // Call model B's reasons are said by the transcript in its own words, after this (audioReasonKey).
-    if (audioReasonKey(r))
-        return 'Sin audio';
     if (r.audio === 'text_only')
         return 'Sin audio' + (reason ? ' · ' + reason : ' · Motivo no registrado');
     // Published while this device was away: none of it sounded, which is not the same as being cut off.

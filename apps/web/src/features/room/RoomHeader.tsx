@@ -1,5 +1,5 @@
 import { Button } from "../../components/ui/Button";
-import { ChevronIcon, HandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import { useLayoutEffect, useReducer, useRef, useState, type RefObject } from "react";
@@ -7,9 +7,8 @@ import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { callTranslator, type CallTranslate } from "../call/call-i18n";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { stateText, voiceSwitchState, voiceSwitchStateText } from "../call/conversation-state";
+import { stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
-import { useVoiceSwitch } from "../../state/call-model";
 import { hostTranslator } from "../settings/host-i18n";
 import { headerRow, rowCapacity, UNMEASURED_ROW } from "./header-row";
 import { NewConversation } from "./NewConversation";
@@ -34,10 +33,6 @@ export function RoomHeader() {
   );
 }
 
-/** What the chevron wears when a conversation behind it needs something, the most pressing one only, as an avatar's
- *  own dot would say it: waiting for you, wanting to talk (call model B's hands), something unread. */
-type Cue = "waiting-for-you" | "wants-to-talk" | "unread" | null;
-
 /** A phone's way to every conversation: the chevron after the header's row, with how many are not in it. A tap drops
  *  the conversations (by machine, a new one, and Settings at their foot) under the header and turns the chevron up;
  *  another tap, a tap outside or Escape puts them away. */
@@ -46,24 +41,19 @@ function ConversationsToggle({ t, hidden }: { t: CallTranslate; hidden: Particip
   const open = useCallLayout((state) => state.conversationsOpen);
   const openConversations = useCallLayout((state) => state.openConversations);
   const closeConversations = useCallLayout((state) => state.closeConversations);
-  const voiceSwitch = useVoiceSwitch();
-  const marks = voiceSwitch ? hidden.map((row) => voiceSwitchState(row)) : [];
-  const cue: Cue = marks.includes("waiting-for-you") ? "waiting-for-you" : marks.includes("wants-to-talk") ? "wants-to-talk"
-    : hidden.some((row) => row.unread > 0) ? "unread" : null;
-  // Said in words too: how many of those behind it have something new (unread, or a mark).
-  const news = hidden.filter((row, index) => row.unread > 0 || marks[index] === "waiting-for-you" || marks[index] === "wants-to-talk").length;
+  // The chevron wears a dot when a conversation behind it has something unread, and says how many in words too.
+  const news = hidden.filter((row) => row.unread > 0).length;
   const label = news ? t(news === 1 ? "header.allConversationsNews.one" : "header.allConversationsNews.other", { n: count, k: news }) : t("header.allConversations", { n: count });
   return (
     <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} title={label}
       aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
       {hidden.length > 0 && <span className="conversations-rest" aria-hidden="true">+{Math.min(hidden.length, 99)}</span>}<ChevronIcon size={18} />
-      {cue && <span className="conversations-cue" data-cue={cue} aria-hidden="true">
-        {cue !== "unread" && <HandIcon size={10} filled={cue === "waiting-for-you"} />}</span>}
+      {news > 0 && <span className="conversations-cue" data-cue="unread" aria-hidden="true" />}
     </Button>
   );
 }
 
-/** The avatars as placed, held where they were while a pointer is down on them (call model B, §2.9): nothing moves
+/** The avatars as placed, held where they were while a pointer is down on them: nothing moves
  *  under a finger when one joins or leaves. Each keeps its row as it is now. */
 function useHeldWhilePressed(placed: ParticipantView[], rows: ParticipantView[]): [ParticipantView[], { start(): void; end(): void }] {
   const held = useRef<string[] | null>(null);
@@ -107,7 +97,6 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   const inCall = useRoomStore(selectInCall);
   const stage = useStageConversation();
   const closeConversations = useCallLayout((state) => state.closeConversations);
-  const voiceSwitch = useVoiceSwitch();
   const box = useRef<HTMLDivElement>(null);
   const order = useFirstSeen(participants);
   const { avatars, chevron } = rowCapacity(useRowWidth(box), order.length);
@@ -116,7 +105,7 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
   guest.current = placed.guest;
   const [shown, hold] = useHeldWhilePressed(placed.row.map((id) => order.find((row) => row.threadId === id)!), participants);
   const hidden = order.filter((row) => !placed.row.includes(row.threadId));
-  const label = (row: ParticipantView) => t("header.otherConversation", { title: row.title, state: voiceSwitch ? voiceSwitchStateText(row, t) : stateText(row, inCall, t) });
+  const label = (row: ParticipantView) => t("header.otherConversation", { title: row.title, state: stateText(row, inCall, t) });
   const pick = (row: ParticipantView) => {
     // The one on the stage, or the call switching: nothing — focus and the tooltip stay.
     if (row.threadId === stage.threadId || row.switching) return;

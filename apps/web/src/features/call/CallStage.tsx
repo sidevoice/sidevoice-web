@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { HandIcon, HarnessIcon } from "../../components/ui/Icons";
+import { HarnessIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage } from "../../state/room-types";
@@ -15,8 +15,6 @@ import { moodText } from "./conversation-state";
 import { bubbleAt } from "./speech-chunks";
 import { sounding, useSpokenTo } from "./speech-reading";
 import { useStageConversation } from "./stage-view";
-import { useVoiceSwitch } from "../../state/call-model";
-import { StageHearIt } from "./HearIt";
 import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
@@ -70,18 +68,13 @@ export function CallStage() {
   const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
-  // With the voice switch (call model B) the stage is the active conversation's, and its heading takes focus when a
-  // "Hear it" that had it goes, or a phone's header avatar is picked (§3).
-  const voiceSwitch = useVoiceSwitch();
-  const label = voiceSwitch ? t("stage.labelActive") : t("stage.label");
-  const heading = voiceSwitch ? -1 : undefined;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
 
   if (!stage.threadId) {
     return (
-      <section className="call-stage" aria-label={label}>
+      <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
         <div className="stage-tile stage-empty">
           <p>{t("stage.empty")}</p>
@@ -94,11 +87,11 @@ export function CallStage() {
   const spec = avatarFor(stage.threadId);
   const tone = avatarColor(spec);
   return (
-    <section className="call-stage" aria-label={label}>
+    <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <header className="stage-title" translate="no">
-        <h2 title={stage.title} tabIndex={heading}>{stage.title}</h2>
+        <h2 title={stage.title}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
       </header>
       <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} style={avatarTone(tone) as CSSProperties}>
@@ -110,7 +103,7 @@ export function CallStage() {
           <StageDesk seed={stage.threadId} />
         </div>
         <div className="stage-name" translate="no">
-          <h2 title={stage.title} tabIndex={heading}>{stage.title}</h2>
+          <h2 title={stage.title}>{stage.title}</h2>
           {stage.row?.machine && <span>{stage.row.machine}</span>}
         </div>
         <VoiceModels />
@@ -118,7 +111,6 @@ export function CallStage() {
           <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
-          {voiceSwitch && stage.row && <StageHearIt row={stage.row} hand={<HandIcon size={16} filled={stage.row.mark !== "wants-to-talk"} />} />}
         </div>
         <div className="stage-tags">
           {(stage.row?.harness || stage.row?.model) && <Tooltip content={[harnessName(stage.row?.harness), stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}>

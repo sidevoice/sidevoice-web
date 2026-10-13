@@ -85,38 +85,19 @@ export interface SessionFacts {
  storageBlocked: boolean;
  /** A model of this device being installed for a voice slot: how far it has got, or why it failed. */
  voiceInstall: {task: 'stt' | 'tts'; model: string; state: 'running' | 'failed'; fraction: number | null; error: string; details?: string} | null;
- /** Call model B (VARIANTS `call-model`): the voice switch — on, turning on, and why it last turned itself off (with a
-  *  failure's words) —, the idle warning, the agents' mute and what set it, the conversation a "Hear it" is asking (by
-  *  its key), and the conversation a move to another machine is taking the session to. */
- voiceOn: boolean; voiceStarting: boolean; voiceOffReason: VoiceOffReason | null; voiceOffDetail: string; voiceOffDetails: string; voiceIdleWarning: boolean;
- agentsMuted: boolean; agentsMutedBy: 'person' | 'output-lost' | null;
- hearing: {thread: string; state: 'asking' | 'no-answer'} | null; movingTo: string | null;
- /** The floating call card (briefs/FLOATING-CARD-SPEC.md). The call model this page runs, as the runtime read it once
-  *  (`call` is A, `voice-switch` B; FC2). */
- callModel: CallModel;
- /** The first setup is finished and its wizard is not open (the onboarding provider says it; FC1). */
+ /** The conversation a move to another machine is taking the call to. */
+ movingTo: string | null;
+ /** The floating call card (briefs/FLOATING-CARD-SPEC.md). The first setup is finished and its wizard is not open (the onboarding provider says it; FC1). */
  setupDone: boolean;
- /** Call model A: the minute before a call nobody uses ends itself, and why the last call ended without the person
+ /** The minute before a call nobody uses ends itself, and why the last call ended without the person
   *  ending it (FC6, FC7); cleared as a call starts. */
  callIdleWarning: boolean; callEnded: CallEnded | null;
  /** The theme and the interface language the page wears now (its root's `data-theme` and `lang`; FC12). */
  pageTheme: 'light' | 'dark'; pageLanguage: string;
 }
-/** Call model A or B (VARIANTS `call-model`), as the card is told it. */
-export type CallModel = 'call' | 'voice-switch';
-/** Why a call (A) ended without the person ending it: nobody used it, its conversation's machine went away (`detail`:
+/** Why a call ended without the person ending it: nobody used it, its conversation's machine went away (`detail`:
  *  the conversation's title), or the room or the machine refused it (`detail`: the room's words). */
 export interface CallEnded { reason: 'idle' | 'offline' | 'failed'; detail: string }
-/** Why the voice turned itself off (call model B). */
-export type VoiceOffReason = 'idle' | 'micLost' | 'micBlocked' | 'micUnavailable' | 'failed' | 'reloaded';
-export const VOICE_OFF_REASONS: VoiceOffReason[];
-export const HEAR_WAIT_MS: number;
-export const HEAR_NO_ANSWER_MS: number;
-export function voiceOffReasonFor(code: string): VoiceOffReason;
-/** This session's speech as the room is told it (contract gap #32). */
-export function speechOf(s: Pick<SessionFacts, 'voiceOn' | 'agentsMuted'>): {on: true; reason?: undefined} | {on: false; reason: 'voice_off' | 'agents_muted'};
-export function wantToTalk(rows: Pick<ParticipantView, 'mark' | 'available'>[]): number;
-export function audioReasonKey(r: Pick<ChatMessage, 'role' | 'audio' | 'audio_reason'>): 'agentsMuted' | 'voiceOff' | null;
 export function participantsView(s: SessionFacts): ParticipantView[];
 export function conversationView(s: SessionFacts): ConversationView;
 export function initialSessionFacts(): SessionFacts;
@@ -147,18 +128,16 @@ export interface AudioDevices {
 }
 /** What the agent is doing, for today's card: its mark shows it, and only it. */
 export type AgentState = 'idle' | 'working' | 'speaking';
-/** Why call model B's microphone cannot be used (`voiceMicCode`). */
-export type MicCode = 'noConversation' | 'cantHear' | 'connecting';
 /** The desktop card's snapshot as the room projects it (`callCardView`, the store's `callCard`): the whole of
  *  call-controls/host.ts CallSnapshot but what its host stamps (FLOATING-CARD-SPEC FC0). */
 export interface CallCardView {
  ready: boolean;
- /** In the call (A), or the room open (B). */
+ /** In the call. */
  joined: boolean;
  /** Reconnecting or switching conversation (`busyReason` says which). */
  busy: boolean;
  micEnabled: boolean;
- /** The microphone cannot be used: A as its button says, B with a reason (`micReason`). */
+ /** The microphone cannot be used, as its button says. */
  micDisabled: boolean;
  /** The conversation the call is on. */
  title: string;
@@ -171,28 +150,16 @@ export interface CallCardView {
  conversation: string | null;
  participants: ParticipantView[];
  devices: AudioDevices | null;
- /* Call model B, the voice switch (contract gap #38, G9). */
- voiceOn: boolean;
- /** The agents are muted: they answer in writing. */
- agentsMuted: boolean;
- /** How many conversations want to talk (a mark, and reachable). */
- wantToTalk: number;
- /** Why the voice last turned itself off, and a failure's words. */
- voiceOffReason: VoiceOffReason | null; voiceOffDetail: string;
  /* The floating card (briefs/FLOATING-CARD-SPEC.md). */
  /** FC1: the first setup is finished, its wizard closed. */
  setupDone: boolean;
- /** FC2: call model A or B: the card follows it, and so does its host's `run()`. */
- callModel: CallModel;
  /** FC4: what the conversation's avatar acts out, as the stage's would for it; and the person's turn to it, open. */
  mood: import('../features/avatar/avatar-spec').AvatarMood;
  turn: 'listening' | 'transcribing' | null;
- /** FC6: the minute before the call (A) or the voice (B) ends itself for want of the person. */
+ /** FC6: the minute before the call ends itself for want of the person. */
  idleWarning: boolean;
- /** FC7: why the call (A) ended by itself; B says it in `voiceOffReason`. */
+ /** FC7: why the call ended by itself. */
  ended: CallEnded | null;
- /** FC10: why B's microphone cannot be used. */
- micReason: MicCode | null;
  /** FC11: what `busy` is, and the title of the conversation a switch goes to. */
  busyReason: 'reconnecting' | 'switching' | null;
  switchingTo: string | null;
@@ -219,19 +186,6 @@ export interface StageFacts {
  working: boolean;
 }
 export function stageMood(facts: StageFacts): import('../features/avatar/avatar-spec').AvatarMood;
-export interface VoiceSwitchStageFacts {
- voiceOn: boolean;
- reach: ParticipantView['reach'] | null;
- canHear: boolean;
- /** Its reply is sounding. */
- speaking: boolean;
- /** The person's turn to it is open. */
- personSpeaking: boolean;
- /** Its agent works (any voice state: the room says so for every conversation). */
- working: boolean;
-}
-export function voiceSwitchStageMood(facts: VoiceSwitchStageFacts): import('../features/avatar/avatar-spec').AvatarMood;
-export function voiceMicCode(s: SessionFacts, rows: ParticipantView[]): MicCode | null;
 export interface SessionStore {
  facts: SessionFacts;
  getState(): SessionSnapshot; getInitialState(): SessionSnapshot;

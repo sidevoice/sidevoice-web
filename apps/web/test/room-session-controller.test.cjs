@@ -396,7 +396,6 @@ test('A call with no sign of a person asks, then leaves, and only this browser l
 });
 test('The desktop card hears it too: the warning while it stands, and why the call ended, said as it ends; a hang-up says nothing',()=>{
  const s=setup();
- assert.equal(s.run('state.callModel'),'call','the card is told the call model');
  s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS+30000;checkIdle()");
  assert.equal(s.run('state.callIdleWarning'),true);
  s.run('personSignal()');

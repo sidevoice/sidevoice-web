@@ -32,8 +32,7 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
         {delivery && <span className="receipt delivery" data-state={delivery} title={receiptView(delivery).label} aria-label={receiptView(delivery).label}><DeliveryMark state={delivery} /></span>}
       </div>}
       {message.deliveryNote && <span className="chat-audio-note">{message.deliveryNote}</span>}
-      {/* Call model B's reasons (the agents muted, the voice off) are this bundle's words, after the note's "No audio". */}
-      {message.audioNote && <span className="chat-audio-note">{message.audioNote}{message.audioReason && <> · <span>{t(message.audioReason === "agentsMuted" ? "audio.agentsMuted" : "audio.voiceOff")}</span></>}</span>}
+      {message.audioNote && <span className="chat-audio-note">{message.audioNote}</span>}
     </article>
   );
 }

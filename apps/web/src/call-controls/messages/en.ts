@@ -26,14 +26,6 @@ export const en = {
   "card.deviceFailed": "The room kept the previous device: that one could not be used.",
   "card.devicesInSystem": "Choose this device in the system's settings.",
   "card.youAreMuted": "You are muted",
-  // Call model B (the voice switch): the card while the voice is on (contract gap #38).
-  "card.voiceOff": "Turn off voice",
-  "card.muteMic": "Mute microphone",
-  "card.muteAgents": "Mute agents",
-  "card.waiting.one": "1 conversation wants to talk",
-  "card.waiting.other": "{n} conversations want to talk",
-  "card.mark.waitingForYou": "waiting for you",
-  "card.mark.wantsToTalk": "wants to talk",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -8,7 +8,6 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { MicWave } from "./CallIndicators";
 import { callTranslator, type CallTranslate } from "./call-i18n";
 import type { CallMessageKey } from "./messages/en";
-import { useVoiceSwitch } from "../../state/call-model";
 import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
 
 /* The microphone and the speaker, as the old call bar had them: a chevron joined to the microphone's button opens a
@@ -49,10 +48,7 @@ function devicesError(error: unknown, t: CallTranslate): ErrorMessage {
 export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boolean; onClose(): void }) {
   const t = callTranslator();
   const devices = useRoomStore((state) => state.facts.audioDevices);
-  // With the voice switch (call model B) a device that goes is said elsewhere: a microphone turns the voice off (its
-  // note), a speaker mutes the agents (theirs).
-  const voiceSwitch = useVoiceSwitch();
-  const lost = useRoomStore((state) => (voiceSwitch ? null : state.facts.audioLost));
+  const lost = useRoomStore((state) => state.facts.audioLost);
   const store = useContext(RoomStoreContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
