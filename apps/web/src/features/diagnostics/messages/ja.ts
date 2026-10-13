@@ -1,0 +1,31 @@
+import type { DiagnosticsMessageKey } from "./en";
+
+/** The connection statistics dialog's words in Japanese. A missing key falls back to English. */
+export const ja: Partial<Record<DiagnosticsMessageKey, string>> = {
+  "stats.eyebrow": "通話の診断",
+  "stats.title": "接続と遅延",
+  "stats.close": "接続の統計を閉じる",
+  "stats.collecting": "計測値を収集しています…",
+  "stats.recognition": "発話の終了 → テキスト",
+  "stats.recognitionNote": "中央値 · このデバイスでの音声認識",
+  "stats.response": "テキスト送信 → 返答",
+  "stats.responseNote": "中央値 · 各ターンの最初の返答",
+  "stats.connection": "接続状態",
+  "stats.stages": "直近のターンの各区間",
+  "stats.stagesNote": "あなたの最後の発話から、このデバイスに返答が届くまでを発生順に示します。各区間はそれぞれの時計で計測されます。",
+  "stats.aggregates": "セッションの集計",
+  "stats.aggregatesNote": "区間ごとの件数・平均・p50・p90・最大値です。区間は重なっているため、合計しないでください。",
+  "stats.copyAggregates": "テキストとしてコピー",
+  "stats.turns": "最近の返答",
+  "stats.turnsNote": "区間は重なっているため、合計しないでください。「エージェント」には、モデルだけでなく配信・キュー・生成の時間も含まれます。",
+  "stats.turnsTable": "返答ごとの計測値",
+  "stats.column.turn": "ターン",
+  "stats.column.silence": "無音",
+  "stats.column.recognition": "認識",
+  "stats.column.agent": "エージェント",
+  "stats.column.dispatch": "返答 → デバイス",
+  "stats.column.state": "状態",
+  "stats.limitations": "これはアプリ内での計測値で、スピーカーから出る音を測ったものではありません。データがない場合は 0 ではなく「—」と表示されます。",
+  "stats.updated": "更新済み",
+  "stats.refresh": "更新",
+};

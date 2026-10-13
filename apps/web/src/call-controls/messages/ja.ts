@@ -1,0 +1,32 @@
+import type { MessageKey } from "./en";
+
+/** The call controls card's texts in Japanese. A missing key falls back to English. */
+export const ja: Partial<Record<MessageKey, string>> = {
+  "card.agent.idle": "エージェントは待機中です",
+  "card.agent.working": "エージェントが作業中です",
+  "card.agent.speaking": "エージェントが話しています",
+  "card.agent.unknown": "エージェント",
+  "card.reconnecting": "再接続中…",
+  "card.switchConversation": "会話を切り替える",
+  "card.conversations": "会話",
+  "card.openApp": "Sidevoice を開く",
+  "card.mute": "ミュート",
+  "card.unmute": "ミュート解除",
+  "card.shortcut": "{action}（{shortcut}）",
+  "card.devices": "マイクとスピーカー",
+  "card.microphone": "マイク",
+  "card.speaker": "スピーカー",
+  "card.systemDefault": "システムのデフォルト",
+  "card.skip": "再生中の音声をスキップ",
+  "card.hangUp": "通話を終了",
+  "card.yourMicrophone": "あなたのマイク",
+  "card.reach.holding": "受信できません",
+  "card.reach.offline": "オフライン",
+  "card.unread": "未読 {n} 件",
+  "card.microphoneNumber": "マイク {n}",
+  "card.speakerNumber": "スピーカー {n}",
+  "card.deviceMissing": "選択したデバイス · 未接続",
+  "card.deviceFailed": "そのデバイスを使用できなかったため、通話は以前のデバイスのまま続いています。",
+  "card.devicesInSystem": "このデバイスはシステム設定で選択してください。",
+  "card.youAreMuted": "ミュート中です",
+};
