@@ -1,5 +1,5 @@
 /* A chosen model made ready (ModelPrepare.tsx): the same block in the first-run setup and in Settings. */
-.model-prepare { display: grid; gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.model-prepare { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
 .model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
 .model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
@@ -53,7 +53,7 @@
 .model-runtime-toggle:hover { background: var(--sv-hover); color: var(--sv-text); }
 .model-runtime-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
 .model-runtime-toggle svg.model-runtime-chevron-open { transform: none; }
-.model-runtime-summary { min-width: 0; overflow: hidden; font-weight: 400; color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
+.model-runtime-summary { min-width: 0; max-width: 100%; overflow: hidden; font-weight: 400; color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
 .model-runtime-summary:not(:empty)::before { content: "· "; }
 .model-runtime-panel { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
 .model-runtime-device { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }

@@ -59,8 +59,8 @@
 .this-device-entry .machine-nav-name { font-size: var(--sv-font-md); line-height: 1.375rem; }
 
 /* Advanced → Downloaded models: one line each, its size, and Delete asking in place. */
-.downloaded-models { display: grid; gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
-.downloaded-model { display: grid; gap: var(--sv-space-2); }
+.downloaded-models { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-2); margin-top: var(--sv-space-2); }
+.downloaded-model { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-2); }
 .downloaded-model-main { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 36px; }
 .downloaded-model-copy { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
 .downloaded-model-name { font-size: var(--sv-font-sm); overflow-wrap: anywhere; }
@@ -121,6 +121,10 @@
   .providers-card { padding: var(--sv-space-4); }
   .providers-card-head { flex-direction: column; align-items: stretch; }
   .provider-search { width: 100%; }
+  /* Too narrow for the name and its button side by side: the button goes under the name, at its start. */
+  .provider-row, .provider-card { flex-wrap: wrap; }
+  .provider-row-copy, .provider-card-copy { flex: 1 1 9rem; }
+  .provider-row-action, .provider-card-action { margin-inline-start: calc(40px + var(--sv-space-3)); }
 }
 
 /* "Saved", beside the title for a moment; the error line at the content's head. */
@@ -138,7 +142,7 @@
 .downloaded-models:focus { outline: none; }
 .downloaded-model-copy { flex: 1 1 auto; justify-content: space-between; gap: var(--sv-space-3); }
 .downloaded-model-title { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); min-width: 0; }
-.downloaded-model-size { margin-inline-start: auto; white-space: nowrap; }
+.downloaded-model-size { margin-inline-start: auto; }
 .model-purpose { display: inline-flex; align-items: center; gap: 4px; padding: 1px var(--sv-space-2); border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text-muted); font-size: var(--sv-font-xs); line-height: 1.125rem; white-space: nowrap; }
 .model-purpose svg { width: 13px; height: 13px; }
 .downloaded-remove-all { display: grid; gap: var(--sv-space-2); justify-items: start; margin-top: var(--sv-space-2); }
