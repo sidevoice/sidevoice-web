@@ -8,6 +8,7 @@ import type { SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
 import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
+import { SENT_LEAVING_MS, sentShownMs } from "./speech-reading";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -154,11 +155,11 @@ test("what a spoken turn sent stays a moment, then leaves, then is gone", () => 
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
   expect(personBubble()!.querySelector(".voice-wave")).toBeNull();
   expect(personBubble()).not.toHaveAttribute("data-leaving");
-  tick(1599);
+  tick(sentShownMs("Split it into two commits.") - 1);
   expect(personBubble()).not.toHaveAttribute("data-leaving");
   tick(1);
   expect(personBubble()).toHaveAttribute("data-leaving");
-  tick(499);
+  tick(SENT_LEAVING_MS - 1);
   expect(personBubble()).toHaveTextContent("Split it into two commits.");
   tick(1);
   expect(personBubble()).toBeNull();
@@ -182,7 +183,7 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
     patch(store, { pendingPhase: "", userTurn: null, history: [...store.getState().facts.history, said(segment, text, time)] } as Partial<SessionFacts>);
   };
   speak("u-1", "First thing.", 2);
-  tick(1800);
+  tick(sentShownMs("First thing.") + 200);
   expect(personBubble()).toHaveAttribute("data-leaving");
   // The next turn: the bars while spoken, then what it sent, from the start of its moment.
   patch(store, { userLive: true, userTurn: { id: "u-2", segment: "turn:u-2", thread: "fp-1|t-login" }, pendingPhase: "listening" });
@@ -195,7 +196,7 @@ test("a second spoken turn arriving while the first leaves starts over cleanly, 
   // A message typed meanwhile neither shows nor holds it on the stage.
   patch(store, { history: [...store.getState().facts.history, said("u-3", "Typed meanwhile.", 4)] });
   expect(personBubble()).toHaveTextContent("Second thing.");
-  tick(600);
+  tick(sentShownMs("Second thing.") - 1000);
   expect(personBubble()).toHaveAttribute("data-leaving");
   tick(500);
   expect(personBubble()).toBeNull();

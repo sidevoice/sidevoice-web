@@ -63,7 +63,7 @@
 /* "leave": the sent one lifts away from the very place the bars come in, under them. */
 .person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }
 /* "stack": the bars open beneath the sent one, which rises as they do (no motion where less is asked for). */
-.person-turns[data-repeat="stack"] > .person-bubble[data-sent] + .person-bubble { animation: person-bars-open var(--sv-dur-slow) var(--sv-ease); overflow: hidden; }
+.person-turns[data-repeat="stack"] > .person-bubble[data-sent] + .person-bubble:not([data-sent]) { animation: person-bars-open var(--sv-dur-slow) var(--sv-ease); overflow: hidden; }
 @keyframes person-bars-open { from { max-height: 0; padding-block: 0; border-width: 0; opacity: 0; } to { max-height: 6rem; } }
 
 /* What was sent (VARIANTS `sent-text`): its latest words (today); its first three lines, the last fading from the text's
@@ -343,3 +343,7 @@
 .stage-mark[data-state="no-answer"] { padding-inline-end: var(--sv-space-3); font-weight: var(--sv-weight-regular); }
 .stage-title h2[tabindex], .stage-name h2[tabindex] { outline: none; }
 .stage-title h2[tabindex]:focus-visible, .stage-name h2[tabindex]:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; border-radius: var(--sv-radius-sm); }
+/* "pages" (VARIANTS `sent-text`): a window three lines tall; the run inside scrolls up three lines at a time. */
+.person-pages { display: block; max-height: calc(3 * 1.5rem); line-height: 1.5rem; overflow: hidden; }
+.person-pages-run { display: block; transition: transform 600ms var(--sv-ease); }
+@media (prefers-reduced-motion: reduce) { .person-pages-run { transition: none; } }

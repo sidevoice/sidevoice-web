@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState, useCallback } from "react";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
 
@@ -40,23 +40,27 @@ export function latestWords(text: string) {
   return "…" + cut.slice(cut.indexOf(" ") + 1);
 }
 
-/** How long what was sent stays before it leaves, and how long leaving takes (call-view.css). */
-export const SENT_SHOWN_MS = 1600;
+/** How long what was sent stays before it leaves, and how long leaving takes (call-view.css): about three seconds, a
+ *  little more for a long one, never past five. */
+export const SENT_SHOWN_MS = 3000;
+export const SENT_SHOWN_MAX_MS = 5000;
+export const sentShownMs = (text: string) => Math.min(SENT_SHOWN_MAX_MS, SENT_SHOWN_MS + Math.max(0, text.length - 120) * 8);
 export const SENT_LEAVING_MS = 500;
 
-export interface SentTurn { text: string; key: string; leaving: boolean }
+export interface SentTurn { text: string; key: string }
 
 /** What a turn just sent does when the person speaks again during its moment: stays its time ("keep"), leaves at once
  *  ("leave"), or is gone at once ("drop"). */
 export type SentOnSpeech = "keep" | "leave" | "drop";
 
-/** What the person's spoken turn sent, for its moment: from the moment the transcript has it, shown SENT_SHOWN_MS,
- *  then leaving for SENT_LEAVING_MS, then gone. Only a turn spoken here is shown as sent, never a message typed. */
-export function useSentTurn(conversation: ConversationView, onSpeech: SentOnSpeech = "keep"): SentTurn | null {
+/** The person's spoken turns just sent, oldest first, each until `done(key)`: what shows one owns its own clock
+ *  (SentBubble), so a turn sent after it never cuts or restarts it. Only a turn spoken here is shown as sent, never a
+ *  message typed. */
+export function useSentTurns(conversation: ConversationView): { turns: SentTurn[]; done: (key: string) => void } {
   const pending = !!conversation.pendingText || !!conversation.pendingPhase;
   const lastUser = [...conversation.messages].reverse().find((message) => message.role === "user") ?? null;
   const lastKey = lastUser ? lastUser.segment ?? String(lastUser.time) : null;
-  const [sent, setSent] = useState<SentTurn | null>(null);
+  const [turns, setTurns] = useState<SentTurn[]>([]);
   const spoke = useRef(false);
   const seen = useRef(lastKey);
   if (pending) spoke.current = true;
@@ -65,24 +69,8 @@ export function useSentTurn(conversation: ConversationView, onSpeech: SentOnSpee
     seen.current = lastKey;
     if (!spoke.current || !lastUser?.text.trim()) return;
     spoke.current = false;
-    setSent({ text: lastUser.text, key: lastKey!, leaving: false });
+    setTurns((now) => [...now, { text: lastUser.text, key: lastKey! }]);
   }, [lastKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Speaking again during its moment: it leaves, or goes, at once, unless it keeps its time.
-  const cut = pending && !!sent && onSpeech !== "keep";
-  useEffect(() => {
-    if (!cut) return;
-    setSent((now) => !now || onSpeech === "drop" ? null : now.leaving ? now : { ...now, leaving: true });
-  }, [cut]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Its own clock, so a message typed meanwhile cannot stop it leaving; once leaving, gone SENT_LEAVING_MS later.
-  const sentKey = sent?.key;
-  const sentLeaving = !!sent?.leaving;
-  useEffect(() => {
-    if (!sentKey) return;
-    const next = sentLeaving
-      ? window.setTimeout(() => setSent((now) => now?.key === sentKey ? null : now), SENT_LEAVING_MS)
-      : window.setTimeout(() => setSent((now) => now?.key === sentKey ? { ...now, leaving: true } : now), SENT_SHOWN_MS);
-    return () => window.clearTimeout(next);
-  }, [sentKey, sentLeaving]);
-  if (cut && sent) return onSpeech === "drop" ? null : { ...sent, leaving: true };
-  return sent;
+  const done = useCallback((key: string) => setTurns((now) => now.filter((turn) => turn.key !== key)), []);
+  return { turns, done };
 }
