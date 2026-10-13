@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -31,6 +31,7 @@ import { useVoiceSwitch } from "../../state/call-model";
 import { remoteProviders } from "../../services/voice-settings.js";
 import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
 import { MenuRow } from "./SettingsMenu";
+import { UpdatesSettings, useUpdatesSection } from "./UpdatesSettings";
 import "./settings.css";
 
 /* Settings: a screen of their own, its sections beside its content on a desktop; on a phone a menu of them, each
@@ -48,6 +49,8 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: (size?: number) => Re
   { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
   { id: "providers", label: "settings.section.providers", icon: (size) => <IntegrationsIcon size={size} /> },
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
+  // The desktop app's updates, where they have a section of their own (VARIANTS `updates-section` B).
+  { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
   { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
 ];
 
@@ -230,7 +233,11 @@ export function SettingsDialog() {
     if (phone && level === 2 && current === "this-computer" && !ownComputer) levels.back({ instantly: true, focus: "title" });
   }, [phone, level, current, ownComputer]); // eslint-disable-line react-hooks/exhaustive-deps
   const show = (section: string) => store?.patch({ settingsSection: section });
-  const sections = SECTIONS.filter((section) => section.id !== "this-computer" || ownComputer);
+  // The desktop app's updates as a section of their own, where the variant puts them there.
+  const updatesApart = useUpdatesSection();
+  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesApart));
+  // Updates shown as they stop having a section of their own: This device, where they are then.
+  useEffect(() => { if (current === "updates" && !updatesApart) show(ownComputer ? "this-computer" : "general"); }, [current, updatesApart]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
   // This device's icon wears its connected dot, as a machine's does (VARIANTS `machine-state`).
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
@@ -303,6 +310,7 @@ export function SettingsDialog() {
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
                 <Pane id="machines" current={current}><MachineList /></Pane>
+                {updatesApart && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
               </div>
             </div>

@@ -1,0 +1,6 @@
+/* Updates as a section (UpdatesSettings, VARIANTS `updates-section` B): one card — the version, its build's note under
+ * it, then the app's updates (AppUpdateSettings, its rows as on This device's card, the card's padding around them). */
+.updates-settings { display: grid; gap: var(--sv-space-3); min-width: 0; padding: 14px var(--sv-space-5); }
+.updates-settings-version { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.updates-settings-version .host-status-product { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; }
+.updates-settings-version .host-status-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }

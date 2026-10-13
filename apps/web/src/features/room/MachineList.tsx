@@ -12,7 +12,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
 import { AppUpdateSettings } from "../updates/AppUpdateSettings";
-import { DESKTOP_NIGHTLY_URL, desktopBuild, localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
+import { desktopBuild, localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -24,6 +24,7 @@ import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
+import { DesktopBuildNote, useUpdatesSection } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineEntryTip, MachineState, StateOnIcon, machineEntryName } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, localHostBridgeError, runLocalHostAction, safeLocalHostCount, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
@@ -399,6 +400,7 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
   const failureAt = dateText(details.failure?.at);
   const failed = status.state === "failed" || status.state === "service-failed";
   const build = desktopBuild();
+  const updatesApart = useUpdatesSection();
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
@@ -409,16 +411,14 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
       {/* The facts, compact; then what the state means where it says more than its word. */}
       <dl className="host-status-facts">
         {/* One version, the product's as the person installed it (never the core's or the connector's); the app's own
-            number where the product does not say it. A nightly or development app says so under it, and how it updates. */}
+            number where the product does not say it. A nightly or development app says so under it, and how it updates —
+            Updates' to say where they have a section of their own (VARIANTS `updates-section` B). */}
         {(details.product_version || build?.version) && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version || build!.version })}</div>}
-        {build?.channel === "nightly" && <div className="host-status-build">
-          {[t("hosts.build.nightly"), build.commit?.slice(0, 7), build.date?.slice(0, 10)].filter(Boolean).join(" · ")}{" — "}
-          <a href={DESKTOP_NIGHTLY_URL} target="_blank" rel="noreferrer">{t("hosts.build.byHand")}<span className="sr-only"> {t("keys.newTab")}</span></a>
-        </div>}
-        {build?.channel === "dev" && <div className="host-status-build">{t("hosts.build.dev")}</div>}
+        {!updatesApart && <DesktopBuildNote build={build} t={t} />}
       </dl>
-      {/* The desktop app's updates, by its version: a release's updater (AppUpdateSettings); none, nothing shows. */}
-      <AppUpdateSettings />
+      {/* The desktop app's updates, by its version: a release's updater (AppUpdateSettings); none, nothing shows. Updates'
+          own where they have a section of their own (VARIANTS `updates-section` B). */}
+      {!updatesApart && <AppUpdateSettings />}
       {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
       {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
           come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
