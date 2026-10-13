@@ -143,9 +143,10 @@ export function editVoiceSettings(settings, patch, catalogs = []) {
 
 const sameLanguage = (a, b) => a.toLowerCase().split('-')[0] === b.toLowerCase().split('-')[0];
 
-/** A catalogue's models of `capability`. */
+/** A catalogue's models of `capability`. A model whose capabilities are missing, or not a list, offers none
+ *  (sidevoice-core#112): it is left out, not the catalogue with it. */
 function offered(catalog, capability) {
-  return (catalog?.models ?? []).filter((model) => model.capabilities.includes(capability));
+  return (catalog?.models ?? []).filter((model) => Array.isArray(model?.capabilities) && model.capabilities.includes(capability));
 }
 
 /** Whether `model` can be used here: a remote one always (its provider runs it), a local one when a build of it runs. */

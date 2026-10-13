@@ -123,3 +123,13 @@ test("the voice detector every call uses is the local Silero VAD where it runs, 
   expect(vadModel(catalogs([vad("other-vad", "other"), vad("silero-vad", "silero-vad")]))?.id).toBe("silero-vad");
   expect(vadModel(catalogs([vad("other-vad", "other"), vad("silero-vad", "silero-vad", false)]))?.id).toBe("other-vad");
 });
+
+test("a catalogue from a newer engine is read: a model without capabilities, or with them in a shape not known, offers none (core#112)", () => {
+  const newer = [{ ...CATALOGS[0], models: [...(CATALOGS[0] as unknown as { models: unknown[] }).models,
+    { id: "future-model", family: "future", languages: ["en"], voices: [], builds: [build("future-model/int8")], tier: "pro" },
+    { id: "odd-model", family: "odd", capabilities: { stt: true }, languages: ["en"], voices: [], builds: [build("odd-model/int8")] }] },
+    ...CATALOGS.slice(1)] as unknown as CatalogView[];
+  const choices = voiceChoices(newer, defaultVoiceSettings(), ["es", "en"]);
+  expect(choices.stt.options.map((option) => option.id)).toEqual(["whisper-base", "whisper-large", "moonshine-tiny"]);
+  expect(choices.tts.options.map((option) => option.id)).toEqual(["kokoro-82m-v1.0"]);
+});
