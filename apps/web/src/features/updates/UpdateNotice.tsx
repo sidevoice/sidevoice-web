@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { CloseIcon, UpdateIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
-import { RoomStoreContext, useRoomStore } from "../../state/room-store";
+import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
 import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
@@ -13,46 +13,39 @@ import "./updates.css";
 /* Where the room says an update waits, on a desktop (a phone has none: its page picks up a new version when next
  * opened), as VARIANTS `update-notice` puts it: A, a pill floating at the top centre of the stage, over it; B, at the
  * end of the conversation's title row, in the room already there, its words cut short before they reach the title.
- * Neither takes room of its own: the room never moves for it. Both say the same — the most pressing update and its
- * action, then × — the desktop app's (manual: Version 0.4.0 available · Download once a check found one; automatic:
- * nothing while it downloads by itself; either mode, once downloaded: Sidevoice 0.4.0 is ready · Restart to update;
- * nothing while the person's own check runs: appUpdateShown), the page's (Reload), the machines elsewhere (See
- * updates). This computer's service is Sidevoice's, updated with the app: Settings › Updates says it. Restarting is
- * only ever the person's press. × hides it until a newer version, or until the app restarts. Never the voice's colour,
- * which is the agents' waiting. */
+ * Neither takes room of its own: the room never moves for it. Both say the same — this computer's most pressing update
+ * and its action, then × — the desktop app's (manual: Version 0.4.0 available · Download once a check found one;
+ * automatic: nothing while it downloads by itself; either mode, once downloaded: Sidevoice 0.4.0 is ready · Restart to
+ * update; nothing while the person's own check runs: appUpdateShown), the page's (Reload). Only this computer's: a
+ * machine elsewhere that is behind is its row's in Settings › Updates, never the room's. This computer's service is
+ * folded into the app's update (Updates' one Sidevoice row): it has no notice of its own. Restarting is only ever the
+ * person's press. × hides it until a newer version, until the app says none waits, or until the app restarts. Never the
+ * voice's colour, which is the agents' waiting. */
 
 type Notice =
   | { key: string; kind: "app"; status: UpdaterStatus }
-  | { key: string; kind: "web" }
-  | { key: string; kind: "machines"; first: string; names: string[] };
+  | { key: string; kind: "web" };
 
-/** The updates waiting, most pressing first, with what acting on each takes. */
+/** This computer's updates waiting, most pressing first, with what acting on each takes: the app's, then the page's.
+ *  A remote machine's is not one of them: Settings › Updates says it, in its row. */
 function useNotices() {
   const t = hostTranslator();
   const { items, app, appUpdate } = useUpdates();
-  const machines = useRoomStore((state) => state.machines);
   const notices: Notice[] = [];
   if (app) notices.push({ key: `app:${app.state}:${app.version ?? ""}`, kind: "app", status: app });
   if (items.some((item) => item.kind === "web")) notices.push({ key: "web", kind: "web" });
-  const remote = items.filter((item) => item.kind === "machine" && item.machine);
-  if (remote.length) {
-    // A remote machine with no name here is an unnamed one, never This computer.
-    const names = remote.map((item) => machines.find((machine) => machine.pairingId === item.machine)?.host || t("hosts.unnamed"));
-    notices.push({ key: "machines:" + remote.map((item) => item.machine).join(" "), kind: "machines", first: remote[0].machine!, names });
-  }
   return { notices, appUpdate, t };
 }
 type Notices = ReturnType<typeof useNotices>;
 
-/** What a notice says: the app's update with its version (available, ready), the page's new version, the machines'. */
+/** What a notice says: the app's update with its version (available, ready), the page's new version. */
 function noticeText(notice: Notice, t: HostTranslate) {
   if (notice.kind === "app") {
     const { state, version } = notice.status;
     if (state === "ready") return version ? t("updates.notice.ready", { version }) : t("updates.notice.readyOne");
     return version ? t("updates.available", { version }) : t("updates.availableOne");
   }
-  if (notice.kind === "web") return t("updates.web");
-  return notice.names.length === 1 ? t("updates.machine", { machine: notice.names[0] }) : t("updates.notice.machines", { n: notice.names.length });
+  return t("updates.web");
 }
 
 /** A download or an install that failed, as the app says it; a failed check is Updates' to say. */
@@ -63,7 +56,7 @@ const appFailure = (status: UpdaterStatus) => status.error && status.error.code 
 type Action = { label: string; run: () => Promise<unknown> | void; land?: string; aria?: string };
 
 /** What acting on `notice` takes where it is said: the app's Restart to update (ready) or Download (manual, or a
- *  download that failed, as Retry download), the page's Reload; else See updates, landing on its row's button. */
+ *  download that failed, as Retry download), the page's Reload; else See updates, landing on the app's row. */
 function noticeAction(notice: Notice, data: Notices, store: Parameters<typeof openSettings>[1]): Action {
   const { appUpdate, t } = data;
   if (notice.kind === "app") {
@@ -75,7 +68,7 @@ function noticeAction(notice: Notice, data: Notices, store: Parameters<typeof op
     if (state === "available" && appUpdate.can.download && (appUpdate.mode === "manual" || downloadFailed)) return {
       label: t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download"), run: () => appUpdate.download() };
   } else if (notice.kind === "web") return { label: t("updates.reload"), aria: t("updates.reloadNamed"), run: () => window.sidevoiceActions?.reloadToUpdate?.() };
-  const place = notice.kind === "machines" ? UPDATE_PLACE.machine(notice.first) : UPDATE_PLACE.app;
+  const place = UPDATE_PLACE.app;
   return { label: t("settings.updates.see"), run: () => openSettings({ section: "updates", focus: place }, store), land: place };
 }
 
@@ -129,7 +122,10 @@ export function UpdateNotice({ at }: { at: "room" | "title" }) {
 function NoticeShown() {
   const data = useNotices();
   const { t } = data;
-  const [hidden, hideNotice] = useHidden();
+  const [hidden, hideNotice, forget] = useHidden();
+  // The app saying none waits (idle: installed, or gone) spends what × hid of its update: what it finds next shows.
+  const appIdle = data.appUpdate.status?.state === "idle";
+  useEffect(() => { if (appIdle) forget("app"); }, [appIdle]); // eslint-disable-line react-hooks/exhaustive-deps
   const box = useRef<HTMLElement>(null);
   const lead = data.notices.find((each) => !hidden.includes(hideKey(each))) ?? null;
   const { notice, leaving } = useLeaving(lead, box);
@@ -170,7 +166,8 @@ function focusAfter(element: HTMLElement) {
 }
 
 /** The updates hidden by the notice's ×, this window's — an app restarted starts over — each until a newer version of
- *  it is found; every place that shows the notice hears it at once. The update stays in Settings › Updates. */
+ *  it is found, or (`forget`) until none of its kind waits; every place that shows the notice hears it at once. The
+ *  update stays in Settings › Updates. */
 const HIDDEN_KEY = "sidevoice.update-notice-hidden";
 function readHidden(): string[] {
   try { const kept: unknown = JSON.parse(sessionStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(kept) ? kept.filter((key) => typeof key === "string") : []; }
@@ -179,15 +176,16 @@ function readHidden(): string[] {
 /** What a hidden notice waits for: a version newer than this one (its state moving on — downloaded, ready — is not). */
 const hideKey = (notice: Notice) => notice.kind === "app" ? `app:${notice.status.version ?? ""}` : notice.key;
 const hiddenListeners = new Set<() => void>();
-function useHidden(): [string[], (notice: Notice) => void] {
+function useHidden(): [string[], (notice: Notice) => void, (kind: Notice["kind"]) => void] {
   const [hidden, setHidden] = useState(readHidden);
   useEffect(() => { const heard = () => setHidden(readHidden()); hiddenListeners.add(heard); return () => { hiddenListeners.delete(heard); }; }, []);
-  const hide = (notice: Notice) => {
-    // An older version of the same update hidden before is no longer kept: only what waits now.
-    const kind = hideKey(notice).split(":")[0];
-    const next = [...readHidden().filter((key) => key.split(":")[0] !== kind), hideKey(notice)];
+  const keep = (next: string[]) => {
     try { sessionStorage.setItem(HIDDEN_KEY, JSON.stringify(next)); } catch { /* This view only. */ }
     setHidden(next); hiddenListeners.forEach((heard) => heard());
   };
-  return [hidden, hide];
+  const others = (kind: string) => readHidden().filter((key) => key.split(":")[0] !== kind);
+  // An older version of the same update hidden before is no longer kept: only what waits now.
+  const hide = (notice: Notice) => keep([...others(hideKey(notice).split(":")[0]), hideKey(notice)]);
+  const forget = (kind: Notice["kind"]) => { if (others(kind).length !== readHidden().length) keep(others(kind)); };
+  return [hidden, hide, forget];
 }

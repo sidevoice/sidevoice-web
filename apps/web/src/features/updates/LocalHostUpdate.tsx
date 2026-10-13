@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { desktopBuild, localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
+import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import { hostTranslator } from "../settings/host-i18n";
 import { localHostBridgeError, safeLocalHostCount } from "../settings/local-host-status";
@@ -44,9 +44,8 @@ export function useLocalHostUpdate(status: LocalHostStatus | null) {
   return { report, setReport, shown };
 }
 
-/** This computer's service behind the one the app bundles, as `useLocalHostUpdate` found it, in Sidevoice's row: the
- *  Sidevoice this computer runs (the app's number: the service's own is not said) · Update available, and Update
- *  Sidevoice (UPDATE_PLACE `thisComputer`, where a landing focuses), disabled while calls are on; a failure with its
+/** This computer's service behind the one the app bundles, as `useLocalHostUpdate` found it, on Sidevoice's update line
+ *  (Sidevoice's version said once, above it; the service's own is not said): Update available, and Update Sidevoice (UPDATE_PLACE `thisComputer`, where a landing focuses), disabled while calls are on; a failure with its
  *  details to copy; or why there is none. `continuing` (after the app restarted into its update): it runs by itself
  *  once nothing stands in the way, and `onContinued` says it is done or not needed. */
 export function LocalHostUpdateControl({ status, update, continuing = false, onContinued }: { status: LocalHostStatus; update: ReturnType<typeof useLocalHostUpdate>;
@@ -105,9 +104,8 @@ export function LocalHostUpdateControl({ status, update, continuing = false, onC
   if (report.update !== "available") return null;
 
   const label = t(busy ? "updates.action.updatingAll" : error ? "updates.action.retryAll" : "updates.action.updateAll");
-  // Sidevoice as it runs here, the app's number; the service's new one is not the app's, so it is not said.
-  const installed = desktopBuild()?.version || null;
-  const copy = `${installed ? t("updates.row.current", { version: installed }) : t("updates.row.app")} · ${t("updates.row.availableOne")}`;
+  // Sidevoice's version is said above it, once; the service's new one is not the app's, so it is not said.
+  const copy = t("updates.row.availableOne");
   return (
     <div className="host-update-control update-action-row" data-settings-row="" aria-live="polite">
       <div className="update-action">

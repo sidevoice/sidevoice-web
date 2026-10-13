@@ -24,13 +24,14 @@ afterEach(() => {
  * the room's notice, Settings › Updates' Sidevoice row and This device's line — in each mode, whoever checked: the
  * person (Check for updates) or the app by itself (at launch, every 6 h). The updater answers as the app's does
  * (sidevoice-desktop #56): a check takes its time and pushes what it found; automatic's download then starts by itself.
- * The person's check: Checking… on its line; then, automatic, Sidevoice 0.3.0 · 0.4.0 found · Downloading… n%, then
- * Sidevoice 0.3.0 · 0.4.0 ready · Restart to update Sidevoice; manual, Sidevoice 0.3.0 · 0.4.0 available · Download,
- * its progress once pressed, then ready; nothing new, Last checked: just now · Up to date, muted, its date once a minute
- * old. The app's own check never says Checking… nor any progress: automatic shows only once ready, manual as soon as
- * one is found. The room's notice: manual, Version 0.4.0 available · Download, nothing while it downloads; either mode,
- * Sidevoice 0.4.0 is ready · Restart to update; nothing while the person's check runs. Restart is only ever the
- * person's press. */
+ * The installed version has a line of its own, Sidevoice 0.3.0 beside Check for updates; the newer one, only while it
+ * is in view, a line of its own with just its version and its one action. The person's check: Sidevoice 0.3.0 ·
+ * Checking…; then, automatic, Sidevoice 0.4.0 · Downloading… n% (no Download), then Sidevoice 0.4.0 ready · Restart to
+ * update; manual, Sidevoice 0.4.0 available · Download, its progress once pressed, then ready; nothing new, Sidevoice
+ * 0.3.0 · Up to date, never a colour, with no Last checked line. The app's own check never says Checking… nor any
+ * progress: automatic shows only once ready, manual as soon as one is found. The room's notice: manual, Version 0.4.0
+ * available · Download, nothing while it downloads; either mode, Sidevoice 0.4.0 is ready · Restart to update; nothing
+ * while the person's check runs. Restart is only ever the person's press. */
 
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const running: LocalHostStatus = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.8.1", api: 1 }, calls: 0, product_version: "0.8.1" };
@@ -85,10 +86,13 @@ function onTheClock() {
 }
 const wait = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 const updates = () => within(document.getElementById("pane-updates")!);
-const appRow = () => document.getElementById("updates-app");
+/** The newer version's line, only while one is in view (the installed version's line holds the id otherwise). */
+const appRow = () => document.querySelector<HTMLElement>("#pane-updates .update-action-row#updates-app");
 const checkButton = () => updates().getByRole("button", { name: /^(Check for updates|Buscar actualizaciones)$/, hidden: true });
-/** The muted line beside Check for updates. */
-const checkLine = () => checkButton().closest(".app-update-setting")!.querySelector<HTMLElement>(".app-update-setting-copy")!;
+/** The installed version's line, holding Check for updates. */
+const installedLine = () => checkButton().closest<HTMLElement>(".app-update-installed")!;
+/** Its words: Sidevoice 0.3.0, with · Checking… or · Up to date. */
+const installed = () => installedLine().querySelector<HTMLElement>(".update-action-copy")!;
 const press = () => act(async () => { fireEvent.click(checkButton()); });
 const percentOf = () => within(appRow()!).getByRole("progressbar", { hidden: true }).getAttribute("aria-valuenow");
 /** The room's notice in words — what it says · its action — or null. */
@@ -104,53 +108,61 @@ function noRestart() {
   expect(buttons().filter((name) => /Restart to update/.test(name))).toEqual([]);
 }
 
-test("automatic, the person's check: Checking…, then Sidevoice 0.3.0 · 0.4.0 found · Downloading… n% with no notice, then 0.4.0 ready · Restart to update Sidevoice, and the notice", async () => {
+test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevoice 0.4.0 · Downloading… n% with no notice, then Sidevoice 0.4.0 ready · Restart to update, and the notice", async () => {
   onTheClock();
   const { fake } = app("automatic");
   await wait(0);
+  // Nothing waits: the installed version's line is where a landing goes.
+  expect(document.getElementById("updates-app")).toBe(installedLine());
   await press();
-  // While the app checks: Checking…, muted, the button busy; nothing found yet, nothing in the room.
-  expect(checkLine()).toHaveTextContent(/^Checking…$/);
-  expect(checkLine()).toHaveClass("muted");
+  // While the app checks: Checking… on the installed version's line, the button busy; nothing found yet, nothing in the
+  // room.
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Checking…$/);
   expect(checkButton()).toHaveAttribute("aria-busy", "true");
   expect(appRow()).toBeNull();
   expect(notice()).toBeNull();
   await wait(CHECK_MS);
-  // Found: it downloads by itself, its progress in the row, both versions said; no Download anywhere; the room silent.
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 found · Downloading…\s?0\s?%$/);
-  expect(checkLine()).toHaveTextContent(/^Last checked: just now$/);
+  // Found: it downloads by itself, its progress in its own line with just the new version; no Download anywhere; the
+  // room silent. The installed version stays on its own line, saying neither Checking… nor Up to date.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%$/);
+  expect(appRow()).toHaveAttribute("data-state", "downloading");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(installedLine()).not.toHaveAttribute("id");
+  expect(checkButton()).not.toHaveAttribute("aria-busy");
   expect(buttons().filter((name) => /Download/.test(name))).toEqual([]);
   expect(fake.updater.download).not.toHaveBeenCalled();
   for (const percent of ["30", "60", "90"]) {
     await wait(STEP_MS);
     expect(percentOf()).toBe(percent);
-    expect(appRow()).toHaveTextContent(new RegExp(`^Sidevoice 0\\.3\\.0 · 0\\.4\\.0 found · Downloading…\\s?${percent}\\s?%$`));
+    expect(appRow()).toHaveTextContent(new RegExp(`^Sidevoice 0\\.4\\.0 · Downloading…\\s?${percent}\\s?%$`));
     expect(notice()).toBeNull();
     noRestart();
   }
   await wait(STEP_MS);
-  // Ready: both versions and Restart to update Sidevoice, pressed only by the person; the room says it; This device too.
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 readyRestart to update Sidevoice$/);
+  // Ready: the new version and Restart to update, pressed only by the person; the room says it; This device too.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
   expect(within(appRow()!).queryByRole("progressbar", { hidden: true })).toBeNull();
   expect(notice()).toBe("Sidevoice 0.4.0 is ready · Restart to update");
   expect(deviceLine()).toHaveTextContent(/· Update available$/);
   expect(fake.updater.restart).not.toHaveBeenCalled();
-  // A minute after the check, its date.
+  // A minute after the check: no line says when it last checked.
   await wait(60_000);
-  expect(checkLine().textContent).toMatch(/^Last checked: .*2026/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Last checked|Not checked yet/);
 });
 
-test("manual, the person's check: Checking…, then Sidevoice 0.3.0 · 0.4.0 available · Download and the notice; never downloads by itself; its progress once pressed, the room silent; then ready", async () => {
+test("manual, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevoice 0.4.0 available · Download and the notice; never downloads by itself; Sidevoice 0.4.0 · Downloading… once pressed, the room silent; then ready", async () => {
   onTheClock();
   const { fake } = app("manual");
   await wait(0);
   await press();
-  expect(checkLine()).toHaveTextContent(/^Checking…$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Checking…$/);
   expect(appRow()).toBeNull();
   expect(notice()).toBeNull();
   await wait(CHECK_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 availableDownload$/);
-  expect(within(appRow()!).getByRole("button", { name: "Download", description: "Sidevoice 0.3.0 · 0.4.0 available", hidden: true })).toBeInTheDocument();
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 availableDownload$/);
+  expect(within(appRow()!).getByRole("button", { name: "Download", description: "Sidevoice 0.4.0 available", hidden: true })).toBeInTheDocument();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
   expect(notice()).toBe("Version 0.4.0 available · Download");
   expect(within(appRow()!).queryByRole("progressbar", { hidden: true })).toBeNull();
   noRestart();
@@ -159,110 +171,113 @@ test("manual, the person's check: Checking…, then Sidevoice 0.3.0 · 0.4.0 ava
   expect(fake.updater.download).not.toHaveBeenCalled();
   expect(appRow()).toHaveAttribute("data-state", "available");
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Download", hidden: true })); });
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Downloading 0\.4\.0…\s?0\s?%$/);
-  // Its progress is the row's: the room says nothing while it downloads.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%$/);
+  // Its progress is the line's: the room says nothing while it downloads.
   await wait(STEP_MS);
   expect(percentOf()).toBe("30");
   expect(within(appRow()!).queryByRole("button", { hidden: true })).toBeNull();
   expect(notice()).toBeNull();
   await wait(3 * STEP_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 readyRestart to update Sidevoice$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
   expect(notice()).toBe("Sidevoice 0.4.0 is ready · Restart to update");
   expect(fake.updater.restart).not.toHaveBeenCalled();
 });
 
-test("nothing new: Checking…, then Last checked: just now · Up to date, muted; a minute on, its date", async () => {
+test("nothing new: Sidevoice 0.3.0 · Checking…, then Sidevoice 0.3.0 · Up to date, never a colour and with no Last checked line — still so a minute on", async () => {
   onTheClock();
   app("automatic", { finds: false });
   await wait(0);
   await press();
-  expect(checkLine()).toHaveTextContent(/^Checking…$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Checking…$/);
   await wait(CHECK_MS);
-  expect(checkLine()).toHaveTextContent(/^Last checked: just now · Up to date(Sidevoice is up to date\.)?$/);
-  expect(checkLine()).toHaveClass("muted");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Up to date(Sidevoice is up to date\.)?$/);
+  // Up to date is never a colour: the installed version's line is not an update's.
+  expect(installedLine().closest(".update-action-row")).toBeNull();
+  expect(document.getElementById("updates-app")).toBe(installedLine());
   expect(appRow()).toBeNull();
   expect(notice()).toBeNull();
   await wait(59_000);
-  expect(checkLine()).toHaveTextContent(/^Last checked: just now · Up to date/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Up to date/);
   await wait(1_100);
-  expect(checkLine().textContent).toMatch(/^Last checked: .*2026.* · Up to date/);
-  expect(checkLine()).not.toHaveTextContent("just now");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Up to date/);
+  expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Last checked|just now|2026/);
 });
 
-test("the app's own check, automatic: no Checking…, no progress anywhere — after the person's check found nothing too; once ready, the row, the notice and This device", async () => {
+test("the app's own check, automatic: no Checking…, no progress anywhere — after the person's check found nothing too; once ready, the line, the notice and This device", async () => {
   onTheClock();
   const { fake, appChecks, release } = app("automatic", { finds: false });
   await wait(0);
   // The person's check finds nothing; then a release comes out, and the app's own check finds it.
   await press();
   await wait(CHECK_MS);
-  expect(checkLine()).toHaveTextContent(/· Up to date/);
+  expect(installed()).toHaveTextContent(/· Up to date/);
   release();
   await wait(2 * 60_000);
   act(() => { appChecks(); });
   await wait(0);
-  expect(checkLine()).not.toHaveTextContent("Checking…");
+  expect(installed()).not.toHaveTextContent("Checking…");
   expect(checkButton()).not.toHaveAttribute("aria-busy");
   await wait(CHECK_MS);
-  // Downloading by itself: nothing in Updates, the room or This device says so, step after step.
+  // Downloading by itself: nothing in Updates, the room or This device says so, step after step; nor Up to date.
   for (let step = 0; step < 4; step++) {
     expect(appRow()).toBeNull();
     expect(document.querySelector("[role=progressbar]")).toBeNull();
     expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Checking|Downloading|found|0\.4\.0/);
     expect(notice()).toBeNull();
     expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
-    if (step === 0) expect(checkLine()).toHaveTextContent(/^Last checked: just now$/);
+    expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
     await wait(STEP_MS);
   }
-  // Ready: the row, both versions, Restart to update Sidevoice; the notice; This device's Update available.
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 readyRestart to update Sidevoice$/);
+  // Ready: its line, the new version, Restart to update; the notice; This device's Update available.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
   expect(notice()).toBe("Sidevoice 0.4.0 is ready · Restart to update");
   expect(deviceLine()).toHaveTextContent(/· Update available$/);
   expect(fake.updater.check).toHaveBeenCalledTimes(1);
   expect(fake.updater.restart).not.toHaveBeenCalled();
 });
 
-test("the app's own check, manual: no Checking…; Sidevoice 0.3.0 · 0.4.0 available · Download at once in the row, Version 0.4.0 available · Download in the room; Download from the room, its progress in the row", async () => {
+test("the app's own check, manual: no Checking…; Sidevoice 0.4.0 available · Download at once in its line, Version 0.4.0 available · Download in the room; Download from the room, its progress in the line", async () => {
   onTheClock();
   const { fake, appChecks } = app("manual");
   await wait(0);
   act(() => { appChecks(); });
   await wait(0);
-  expect(checkLine()).not.toHaveTextContent("Checking…");
+  expect(installed()).not.toHaveTextContent("Checking…");
   expect(checkButton()).not.toHaveAttribute("aria-busy");
   await wait(CHECK_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 availableDownload$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 availableDownload$/);
   expect(notice()).toBe("Version 0.4.0 available · Download");
   expect(fake.updater.check).not.toHaveBeenCalled();
-  // The person's own press, in the room: its progress in the row, as when pressed there; the room silent.
+  // The person's own press, in the room: its progress in the line, as when pressed there; the room silent.
   await act(async () => { fireEvent.click(within(document.querySelector<HTMLElement>(".update-notice")!).getByRole("button", { name: "Download", hidden: true })); });
   expect(fake.updater.download).toHaveBeenCalledOnce();
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Downloading 0\.4\.0…\s?0\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%$/);
   await wait(STEP_MS);
   expect(percentOf()).toBe("30");
   expect(notice()).toBeNull();
 });
 
-test("in Spanish: Comprobando…, Sidevoice 0.3.0 · 0.4.0 encontrada · Descargando… n %, then 0.4.0 lista; Última comprobación: hace un momento; manual's 0.4.0 disponible · Descargar", async () => {
+test("in Spanish: Sidevoice 0.3.0 · Buscando…, Sidevoice 0.4.0 · Descargando… n %, then Sidevoice 0.4.0 lista · Reiniciar para actualizar; manual's Sidevoice 0.4.0 disponible · Descargar", async () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   onTheClock();
   app("automatic");
   await wait(0);
   await press();
-  expect(checkLine()).toHaveTextContent(/^Comprobando…$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Buscando…$/);
   await wait(CHECK_MS + STEP_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 encontrada · Descargando…\s?30\s?%$/);
-  expect(checkLine()).toHaveTextContent(/^Última comprobación: hace un momento$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?30\s?%$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+  expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Última comprobación|Aún sin comprobar/);
   await wait(3 * STEP_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 listaReiniciar para actualizar Sidevoice$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 listaReiniciar para actualizar$/);
   expect(notice()).toBe("Sidevoice 0.4.0 está listo · Reiniciar para actualizar");
   cleanup();
   const { appChecks } = app("manual");
   await wait(0);
   act(() => { appChecks(); });
   await wait(CHECK_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · 0\.4\.0 disponibleDescargar$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 disponibleDescargar$/);
   expect(notice()).toBe("Versión 0.4.0 disponible · Descargar");
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Descargar", hidden: true })); });
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Descargando 0\.4\.0…\s?0\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?0\s?%$/);
 });

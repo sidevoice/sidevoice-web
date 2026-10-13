@@ -3,10 +3,15 @@
 .update-action-row { display: grid; gap: var(--sv-space-2); min-width: 0; padding: var(--sv-space-3); border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); }
 .update-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); min-width: 0; }
 .update-action-copy { display: flex; flex: 1 1 10rem; gap: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-medium); overflow-wrap: anywhere; }
-.app-update-percent { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.app-update-percent { font-size: var(--sv-font-sm); font-variant-numeric: tabular-nums; }
 .app-update-error { font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
-/* The app's updates' settings (AppUpdateSettings), under its version and its update: rows as Start at sign-in's. */
+/* Sidevoice in Updates (AppUpdateSettings): Automatic or Manual first, as Start at sign-in's rows; under it, the version
+ * installed with Check for updates, then the newer one's line (.update-action-row) while one waits. */
 .app-update-settings { display: grid; gap: var(--sv-space-3); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.app-update-settings:first-child { padding-top: 0; border-top: 0; }
+.app-update-installed[data-settings-row] { margin-inline: calc(-1 * var(--sv-space-2)); padding: var(--sv-space-1) var(--sv-space-2); border-radius: var(--sv-radius-md); }
+.app-update-installed.settings-highlight { background: var(--sv-accent-soft); }
+.app-update-progress { flex: 1 1 5rem; min-width: 4rem; }
 .app-update-setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); }
 .app-update-setting-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
 .app-update-setting-copy.muted, .app-update-setting-copy .muted { font-size: var(--sv-font-xs); }

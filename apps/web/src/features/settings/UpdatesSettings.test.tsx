@@ -19,14 +19,16 @@ afterEach(() => {
 });
 
 /* Updates (decided): a Settings section of their own, holding everything that updates, each row with its action right
- * there once an update is found — this computer as one row, Sidevoice (decided): the app's version, Automatic or
- * Manual, Check for updates; Download in manual, its progress, Restart to update Sidevoice in either mode; Update
- * Sidevoice where only this computer's service is behind the one the app bundles — then each remote machine that is
- * behind, with the command to run there. The one row's own steps (the service following the app's restart) are
- * UpdatesSidevoiceRow.test.tsx. In the desktop app always; in a browser only while a machine is behind, with only those
- * machines. The room's notice and a check that finds one land on the row's action, in view and
- * focused. This device's card says its version and whether it is up to date, Update available a link to the row's
- * button. */
+ * there once an update is found — this computer as one row, Sidevoice (decided), top to bottom: Automatic or Manual;
+ * the installed version, Sidevoice 0.9.0 (· Up to date once a check says so, · Checking… while the person's runs)
+ * beside Check for updates, with no Version line above it (only a nightly's or development build's note); then, only
+ * while a newer one is in view, its own line with just the new version and its one action — Sidevoice 0.10.0
+ * available · Download in manual, Sidevoice 0.10.0 · Downloading… with its progress, Sidevoice 0.10.0 ready · Restart
+ * to update in either mode — or, where only this computer's service is behind the one the app bundles, Update available
+ * · Update Sidevoice; then each remote machine that is behind, with the command to run there (the room's notice never
+ * says those). The one row's own steps (the service following the app's restart) are UpdatesSidevoiceRow.test.tsx. In
+ * the desktop app always; in a browser only while a machine is behind, with only those machines. A check that finds
+ * one and This device's Update available land on the row's action, in view and focused. */
 
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
 const lab: PairingSummary = { fp: "fp-lab", host: "Lab box", urls: ["https://lab.example"], rv: null, device_id: "d-lab", paired_at: 1_700_000_100, revoked: false };
@@ -89,10 +91,12 @@ const updates = () => within(pane("updates"));
 const groups = () => [...pane("updates").querySelectorAll(".ui-group-title")].map((title) => title.textContent);
 const group = (name: string) => [...pane("updates").querySelectorAll<HTMLElement>(".ui-group")].find((item) => item.querySelector(".ui-group-title")?.textContent === name)!;
 const navOrder = () => [...document.querySelectorAll(".settings-nav > button.ui-nav-item")].map((item) => item.id.replace("settings-", ""));
-/** The app's update row, once one is found. */
-const appRow = () => document.getElementById("updates-app");
-/** The muted line beside Check for updates: when it last checked, and Up to date when nothing waits. */
-const checkLine = (check: HTMLElement) => check.closest(".app-update-setting")!.querySelector<HTMLElement>(".app-update-setting-copy")!;
+/** The app's newer version's line, only while one is in view (the installed version's line holds the id otherwise). */
+const appRow = () => document.querySelector<HTMLElement>("#pane-updates .update-action-row#updates-app");
+/** The installed version's line, holding Check for updates. */
+const installedLine = () => pane("updates").querySelector<HTMLElement>(".app-update-installed");
+/** Its words: Sidevoice 0.9.0, with · Up to date or · Checking…. */
+const installed = () => installedLine()!.querySelector<HTMLElement>(".update-action-copy")!;
 /** Each machine behind as Updates says it: its name, its versions, where to run the command, the command. */
 const machineRows = () => [...pane("updates").querySelectorAll(".updates-machine")].map((row) => [
   row.querySelector(".host-status-product")?.textContent, row.querySelector(".host-status-build")?.textContent,
@@ -112,7 +116,7 @@ async function landsOn(control: () => HTMLElement | null, row?: () => HTMLElemen
 /** The line an update is acted on in, holding `control`: its words and its button. */
 const lineOf = (control: () => HTMLElement | null) => () => control()?.closest<HTMLElement>(".update-action-row") ?? null;
 
-test("Updates is a section of its own, before Advanced: this computer as one row, Sidevoice — the app's version, Automatic/Manual and Check for updates", async () => {
+test("Updates is a section of its own, before Advanced: this computer as one row, Sidevoice — Automatic/Manual first, then Sidevoice 0.9.0 with Check for updates; no Version line", async () => {
   open({ section: "updates" });
   await settle();
   expect(entry()).toHaveTextContent(/^Updates$/);
@@ -122,77 +126,93 @@ test("Updates is a section of its own, before Advanced: this computer as one row
   expect(updates().getByText("Sidevoice on this computer: its versions, and how it updates.")).toBeInTheDocument();
   // One row, Sidevoice, the app and its service as one; no machine is behind, so no Remote machines.
   expect(groups()).toEqual(["Sidevoice"]);
-  // The app's version alone, with no hint and no service's number: where it stands is its status row's to say, under
-  // Check for updates.
-  expect(group("Sidevoice").querySelectorAll(".host-status-product")).toHaveLength(1);
-  expect(group("Sidevoice").querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.9\.0$/);
+  // The app's version said once, on the installed version's line, with no hint and no service's number: no Version
+  // line above it, with the app's updater.
+  expect(group("Sidevoice").querySelector(".host-status-product, .updates-settings-version")).toBeNull();
   expect(group("Sidevoice").querySelector(".updates-part-hint")).toBeNull();
   expect(group("Sidevoice").querySelector(".updates-up-to-date")).toBeNull();
   const modes = await updates().findByRole("radiogroup", { name: "Updates" });
   const check = updates().getByRole("button", { name: "Check for updates" });
-  // Never checked here: said on the muted line beside Check for updates, and nothing claims Up to date yet; no row of
-  // its own, no colour, no badge.
-  expect(checkLine(check)).toHaveTextContent(/^Not checked yet$/);
-  expect(checkLine(check)).toHaveClass("muted");
+  // Never checked here: the version alone, nothing claims Up to date yet, and no line says when it checked; no
+  // colour, no badge, no update's line.
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(installedLine()).toContainElement(check);
+  expect(pane("updates")).not.toHaveTextContent(/Not checked yet|Last checked|Up to date/);
   expect(appRow()).toBeNull();
   expect(group("Sidevoice").querySelector(".update-action-row, .ui-badge")).toBeNull();
-  // In order: Automatic or Manual, then Check for updates.
-  expect(modes.compareDocumentPosition(check) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Nothing newer in view: a landing on the app goes to the installed version's line.
+  expect(document.getElementById("updates-app")).toBe(installedLine());
+  // In order: Automatic or Manual, then the installed version with Check for updates.
+  expect(modes.compareDocumentPosition(installedLine()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test("the row's version never says Up to date; the check's muted line says it, once checked and the app and its service both current", async () => {
+test("Sidevoice 0.9.0 · Up to date on the installed version's line once checked and the app and its service both current; never with its service behind", async () => {
   localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
   open({ section: "updates", service: SERVICE_CURRENT });
   await settle();
-  const check = () => updates().getByRole("button", { name: "Check for updates" });
-  await waitFor(() => expect(checkLine(check()).textContent).toMatch(/^Last checked: .*2026.* · Up to date$/));
-  expect(group("Sidevoice").querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.9\.0$/);
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
+  expect(group("Sidevoice").querySelector(".host-status-product")).toBeNull();
+  // Up to date is never a colour, nor a badge.
   expect(group("Sidevoice").querySelector(".update-action-row, .ui-badge")).toBeNull();
   cleanup();
   // Its service behind what the app bundles: checked, but not Up to date.
   open({ section: "updates", service: BUNDLED });
   await updates().findByRole("button", { name: "Update Sidevoice" });
-  expect(checkLine(check()).textContent).toMatch(/^Last checked: .*2026/);
-  expect(checkLine(check())).not.toHaveTextContent("Up to date");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(pane("updates")).not.toHaveTextContent("Up to date");
 });
 
-test("Up to date only after a check that went through and found nothing: never beside Not checked yet, never after a failure", async () => {
+test("Up to date only after a check that went through and found nothing: never before any check, never after a failure — which Check for updates itself tries again", async () => {
   // Its service current, as the app bundles it: what the line says is the app's check.
   const { fake } = open({ section: "updates", service: SERVICE_CURRENT, updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   const check = await updates().findByRole("button", { name: "Check for updates" });
-  expect(checkLine(check)).toHaveTextContent(/^Not checked yet$/);
-  expect(checkLine(check)).not.toHaveTextContent("Up to date");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(pane("updates")).not.toHaveTextContent("Up to date");
   // Installed elsewhere and checked again: nothing waits.
   fake.updater.check.mockResolvedValueOnce({ state: "idle" });
   await act(async () => { fake.push({ state: "idle" }); });
   await act(async () => { fireEvent.click(check); });
   // The line, then what a screen reader is told of the check.
-  await waitFor(() => expect(checkLine(check).textContent).toMatch(/^Last checked: .+ · Up to date(Sidevoice is up to date\.)?$/));
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date(Sidevoice is up to date\.)?$/));
   expect(appRow()).toBeNull();
-  // The next check fails: when it last checked, and what failed — not Up to date.
+  // The next check fails: what failed, under the installed version — not Up to date, and no Retry of its own.
   fake.updater.check.mockResolvedValueOnce({ state: "idle", error: { code: "update-check-failed" } });
   await act(async () => { fireEvent.click(check); });
-  expect(checkLine(check).textContent).toMatch(/^Last checked: /);
-  expect(checkLine(check)).not.toHaveTextContent("Up to date");
-  expect(updates().getByRole("alert")).toHaveTextContent("Couldn't check for updates.");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(pane("updates")).not.toHaveTextContent("Up to date");
+  const alert = updates().getByRole("alert");
+  expect(alert).toHaveTextContent("Couldn't check for updates.");
+  expect(alert).toHaveClass("app-update-failure");
+  expect(installedLine()!.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(updates().queryByRole("button", { name: /^Retry/ })).toBeNull();
+  // Check for updates is what tries again; a check that goes through says Up to date again.
+  await act(async () => { fireEvent.click(check); });
+  expect(fake.updater.check).toHaveBeenCalledTimes(3);
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date/));
+  expect(updates().queryByRole("alert")).toBeNull();
   cleanup();
-  // Idle and never checked: not Up to date either.
+  // Idle and never checked, its service current: not Up to date either.
   localStorage.removeItem(CHECKED);
-  open({ section: "updates" });
-  expect(checkLine(await updates().findByRole("button", { name: "Check for updates" }))).toHaveTextContent(/^Not checked yet$/);
+  open({ section: "updates", service: SERVICE_CURRENT });
+  await updates().findByRole("button", { name: "Check for updates" });
+  await settle();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
 });
 
-test("in Spanish: Última comprobación … · Al día on the muted line beside Buscar actualizaciones; Aún sin comprobar never checked", async () => {
+test("in Spanish: Sidevoice 0.9.0 · Al día beside Buscar actualizaciones once checked; never checked, Sidevoice 0.9.0 alone, then its update's line", async () => {
   inSpanish();
   localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
   open({ section: "updates", service: SERVICE_CURRENT });
   let check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
-  await waitFor(() => expect(checkLine(check).textContent).toMatch(/^Última comprobación: .* · Al día$/));
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Al día$/));
+  expect(installedLine()).toContainElement(check);
   cleanup();
   localStorage.removeItem(CHECKED);
   open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   check = await updates().findByRole("button", { name: "Buscar actualizaciones" });
-  expect(checkLine(check)).toHaveTextContent(/^Aún sin comprobar$/);
+  await settle();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(pane("updates")).not.toHaveTextContent(/Aún sin comprobar|Última comprobación|Al día/);
   expect(check.compareDocumentPosition(appRow()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
@@ -228,11 +248,11 @@ test("This device: Up to date where the app (after a check) and its service both
   await waitFor(() => expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
   expect(within(pane("this-computer")).queryByRole("button", { name: /Update available/ })).toBeNull();
   cleanup();
-  // The app's update found: Update available, landing on the app's row.
+  // The app's update found: Update available, landing on the new version's line.
   const { fake, store } = open({ service: { ...BUNDLED, update: "current" }, updater: { status: { state: "ready", version: "0.10.0" } } });
   await waitFor(() => expect(deviceLine()).toHaveTextContent(/· Update available$/));
   await act(async () => { fireEvent.click(within(pane("this-computer")).getByRole("button", { name: "Update available, see it in Updates" })); });
-  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Restart to update Sidevoice" }), appRow);
+  await landsOn(() => appRow() && within(appRow()!).getByRole("button", { name: "Restart to update" }), appRow);
   expect(store.getState().facts.settingsSection).toBe("updates");
   expect(fake.updater.restart).not.toHaveBeenCalled();
   cleanup();
@@ -242,29 +262,38 @@ test("This device: Up to date where the app (after a check) and its service both
   expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.10\.0-dev$/);
 });
 
-test("manual: an update found shows its row with Download right there; its progress in the row; then Restart to update", async () => {
+test("manual: an update found has its own line under the installed version, Sidevoice 0.10.0 available · Download; Sidevoice 0.10.0 · Downloading… with its progress in that line; then Sidevoice 0.10.0 ready · Restart to update", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   await settle();
-  const download = within(appRow()!).getByRole("button", { name: "Download", description: "Sidevoice 0.9.0 · 0.10.0 available" });
-  // Both versions said: the one it runs, the new one.
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 availableDownload$/);
-  // The row comes after Automatic/Manual and Check, last.
+  const download = within(appRow()!).getByRole("button", { name: "Download", description: "Sidevoice 0.10.0 available" });
+  // Each version said once: the installed one on its line, the new one on its own, never 0.9.0 · 0.10.0.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 availableDownload$/);
+  expect(appRow()).toHaveAttribute("data-state", "available");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(pane("updates")).not.toHaveTextContent("0.9.0 · 0.10.0");
+  // The id is the new version's line now: a landing goes there, not to the installed version.
+  expect(installedLine()).not.toHaveAttribute("id");
+  // The line comes after Automatic/Manual and the installed version with Check, last.
   expect(appRow()!.compareDocumentPosition(updates().getByRole("radiogroup", { name: "Updates" })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   expect(appRow()!.compareDocumentPosition(updates().getByRole("button", { name: "Check for updates" })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-  expect(group("Sidevoice").querySelector(".updates-settings")!.lastElementChild).toBe(appRow());
+  expect(group("Sidevoice").querySelector(".app-update-settings")!.lastElementChild).toBe(appRow());
   await act(async () => { fireEvent.click(download); });
   expect(fake.updater.download).toHaveBeenCalledTimes(1);
   act(() => fake.push({ state: "downloading", version: "0.10.0", progress: 0.4 }));
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Downloading 0\.10\.0…\s?40\s?%$/);
-  expect(within(appRow()!).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "40");
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…\s?40\s?%$/);
+  const progress = within(appRow()!).getByRole("progressbar");
+  expect(progress).toHaveAttribute("aria-valuenow", "40");
+  // Its progress and its percent in the same line as its words.
+  expect(progress.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…\s?40\s?%$/);
   expect(within(appRow()!).queryByRole("button")).toBeNull();
   act(() => fake.push({ state: "ready", version: "0.10.0" }));
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 readyRestart to update Sidevoice$/);
-  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update Sidevoice" })); });
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 readyRestart to update$/);
+  expect(updates().queryByRole("button", { name: "Restart to update Sidevoice" })).toBeNull();
+  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update" })); });
   expect(fake.updater.restart).toHaveBeenCalledTimes(1);
 });
 
-test("automatic, what the app found by itself: nothing while it downloads — no row, no progress, no Download — then Sidevoice 0.9.0 · 0.10.0 ready · Restart to update Sidevoice", async () => {
+test("automatic, what the app found by itself: nothing while it downloads — no line, no progress, no Download — then Sidevoice 0.10.0 ready · Restart to update; no version known, Update ready", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "automatic", status: { state: "available", version: "0.10.0" } } });
   await settle();
   expect(appRow()).toBeNull();
@@ -273,45 +302,62 @@ test("automatic, what the app found by itself: nothing while it downloads — no
   expect(pane("updates").querySelector("[role=progressbar]")).toBeNull();
   expect(pane("updates")).not.toHaveTextContent(/0\.10\.0|Downloading/);
   act(() => fake.push({ state: "ready", version: "0.10.0" }));
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 readyRestart to update Sidevoice$/);
-  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update Sidevoice" })); });
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 readyRestart to update$/);
+  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update" })); });
   expect(fake.updater.restart).toHaveBeenCalledTimes(1);
-  // An update whose version the app does not say (a gap of the seam): what is known, the version it runs.
+  // An update whose version the app does not say (a gap of the seam): what is known; the installed version on its line.
   act(() => fake.push({ state: "ready" }));
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update ready/);
+  expect(appRow()).toHaveTextContent(/^Update readyRestart to update$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+});
+
+test("with no version known: Update available · Download, then Downloading the update…, then Update ready", async () => {
+  const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available" } } });
+  await settle();
+  expect(appRow()).toHaveTextContent(/^Update availableDownload$/);
+  act(() => fake.push({ state: "downloading", progress: 0.5 }));
+  expect(appRow()).toHaveTextContent(/^Downloading the update…\s?50\s?%$/);
+  act(() => fake.push({ state: "ready" }));
+  expect(appRow()).toHaveTextContent(/^Update readyRestart to update$/);
 });
 
 const FAILURES = [
-  { code: "update-check-failed", state: "idle", en: "Couldn't check for updates.", es: "No se pudo comprobar si hay actualizaciones.", retry: "check", button: "Retry", boton: "Reintentar" },
+  { code: "update-check-failed", state: "idle", en: "Couldn't check for updates.", es: "No se pudo comprobar si hay actualizaciones.", retry: "check", button: "Check for updates", boton: "Buscar actualizaciones" },
   { code: "update-download-failed", state: "available", en: "The update couldn't be downloaded.", es: "No se pudo descargar la actualización.", retry: "download", button: "Retry download", boton: "Reintentar la descarga" },
   { code: "update-install-failed", state: "ready", en: "The update couldn't be installed.", es: "No se pudo instalar la actualización.", retry: null, button: null, boton: null },
 ] as const;
 
-test("each failure is said where it happened, with Retry for a check and Retry download for a download; an install is tried again by Restart to update Sidevoice", async () => {
+test("each failure is said where it happened: a check's under the installed version, Check for updates trying it again (no Retry of its own); a download's in its line, with Retry download; an install is tried again by Restart to update", async () => {
   for (const { code, state, en, retry, button } of FAILURES) {
     const { fake } = open({ section: "updates", updater: { status: { state, version: "0.10.0", error: { code } }, mode: "manual" } });
     const alert = await updates().findByRole("alert");
     expect(alert, code).toHaveTextContent(en);
-    // A check's is under Check for updates; a download's or an install's in the update's row.
+    // A check's is under the installed version's line; a download's or an install's in the new version's line.
     if (code === "update-check-failed") {
-      // Nothing found to have a row; never Up to date beside a failure.
+      // Nothing found to have a line; never Up to date beside a failure; no Retry: Check for updates retries.
       expect(appRow()).toBeNull();
+      expect(alert).toHaveClass("app-update-failure");
       expect(alert.closest(".app-update-settings")).not.toBeNull();
+      expect(installedLine()!.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(pane("updates")).not.toHaveTextContent("Up to date");
-    } else expect(appRow()).toContainElement(alert);
+      expect(updates().queryByRole("button", { name: /^Retry/ })).toBeNull();
+    } else {
+      expect(appRow()).toContainElement(alert);
+      expect(alert.closest(".update-action")).toBeNull();
+    }
     if (retry) {
       await act(async () => { fireEvent.click(updates().getByRole("button", { name: button! })); });
       expect(fake.updater[retry], code).toHaveBeenCalledTimes(1);
     } else {
       expect(updates().queryByRole("button", { name: /^Retry/ })).toBeNull();
-      await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update Sidevoice" })); });
+      await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Restart to update" })); });
       expect(fake.updater.restart).toHaveBeenCalledTimes(1);
     }
     cleanup();
   }
 });
 
-test("a check or a download the app rejected is said as that failure, its own words behind Details", async () => {
+test("a check or a download the app rejected is said as that failure, its own words behind Details; Check for updates tries the check again", async () => {
   const { fake } = open({ section: "updates", updater: { status: { state: "available", version: "0.10.0", error: { code: "update-download-failed" } }, mode: "manual" } });
   fake.updater.check.mockRejectedValueOnce(new Error("socket hang up"));
   fake.updater.download.mockRejectedValueOnce(new Error("disk full"));
@@ -319,29 +365,31 @@ test("a check or a download the app rejected is said as that failure, its own wo
   await act(async () => { fireEvent.click(updates().getByRole("button", { name: "Check for updates" })); });
   const alert = updates().getAllByRole("alert").find((item) => item.textContent?.includes("Couldn't check for updates."))!;
   expect(alert.querySelector("details")).toHaveTextContent("socket hang up");
-  await act(async () => { fireEvent.click(within(alert).getByRole("button", { name: "Retry" })); });
+  expect(within(alert).queryByRole("button", { name: "Retry" })).toBeNull();
+  await act(async () => { fireEvent.click(updates().getByRole("button", { name: "Check for updates" })); });
   expect(fake.updater.check).toHaveBeenCalledTimes(2);
-  // The app's status says the download failed: the row's Retry downloads, and a rejected download says so there.
+  // The app's status says the download failed: the line's Retry downloads, and a rejected download says so there.
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Retry download" })); });
   expect(fake.updater.download).toHaveBeenCalledTimes(1);
   expect(within(appRow()!).getByRole("alert")).toHaveTextContent("The update couldn't be downloaded.");
   expect(within(appRow()!).getByRole("alert").querySelector("details")).toHaveTextContent("disk full");
 });
 
-test("Check for updates is busy while the app checks, then says it is up to date and when it last checked", async () => {
-  const { fake } = open({ section: "updates" });
+test("Check for updates is busy while the app checks — Sidevoice 0.9.0 · Checking… — then Sidevoice 0.9.0 · Up to date, said to a screen reader too, and when it checked is kept", async () => {
+  const { fake } = open({ section: "updates", service: SERVICE_CURRENT });
   let answer!: (status: UpdaterStatus) => void;
   fake.updater.check.mockImplementationOnce(() => new Promise<UpdaterStatus>((resolve) => { answer = resolve; }));
   const button = await updates().findByRole("button", { name: "Check for updates" });
-  expect(pane("updates")).not.toHaveTextContent("Last checked");
-  expect(pane("updates")).toHaveTextContent("Not checked yet");
+  await settle();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
   await act(async () => { fireEvent.click(button); });
   expect(button).toHaveAttribute("aria-busy", "true");
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Checking…$/);
   await act(async () => { answer({ state: "idle" }); });
   expect(button).not.toHaveAttribute("aria-busy");
-  expect(pane("updates")).toHaveTextContent("Sidevoice is up to date.");
-  expect(pane("updates")).toHaveTextContent(/Last checked: \S/);
-  expect(pane("updates")).not.toHaveTextContent("Not checked yet");
+  expect(updates().getByRole("status")).toHaveTextContent(/^Sidevoice is up to date\.$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date(Sidevoice is up to date\.)?$/);
+  expect(pane("updates")).not.toHaveTextContent(/Last checked|Not checked yet|Checking…/);
   expect(Number(localStorage.getItem(CHECKED))).toBeGreaterThan(0);
 });
 
@@ -354,7 +402,7 @@ test("Check for updates in manual mode that finds one: its row's Download in vie
   expect(pane("updates")).not.toHaveTextContent("Sidevoice is up to date.");
 });
 
-test("Check for updates in automatic mode that finds one: its row, and focus stays on Check (it downloads by itself)", async () => {
+test("Check for updates in automatic mode that finds one: Sidevoice 0.10.0 · Downloading… at once, with no Download, and focus stays on Check (it downloads by itself)", async () => {
   const { fake } = open({ section: "updates", updater: { mode: "automatic" } });
   await settle();
   fake.updater.check.mockResolvedValueOnce({ state: "available", version: "0.10.0" });
@@ -362,18 +410,20 @@ test("Check for updates in automatic mode that finds one: its row, and focus sta
   check.focus();
   await act(async () => { fireEvent.click(check); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)); });
-  // The person's check found it: its download starts by itself, said as it goes.
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 found · Downloading…$/);
+  // The person's check found it: its download starts by itself, said as it goes from "available" on.
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…$/);
+  expect(appRow()).toHaveAttribute("data-state", "available");
   expect(within(appRow()!).getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
+  expect(within(appRow()!).queryByRole("button")).toBeNull();
   expect(document.activeElement).toBe(check);
 });
 
-test("when it last checked is kept: shown on the next visit; an update the app found by itself counts, a failed check doesn't", async () => {
+test("when it last checked is kept: on the next visit, Up to date at once; an update the app found by itself counts as a check, a failed check doesn't", async () => {
   const before = Date.parse("2026-10-12T09:30:00Z");
   localStorage.setItem(CHECKED, String(before));
-  const { fake } = open({ section: "updates" });
+  const { fake } = open({ section: "updates", service: SERVICE_CURRENT });
   await updates().findByRole("button", { name: "Check for updates" });
-  expect(pane("updates")).toHaveTextContent(/Last checked: .*2026/);
+  await waitFor(() => expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Up to date$/));
   await settle();
   await act(async () => { fake.push({ state: "available", version: "0.10.0" }); });
   expect(Number(localStorage.getItem(CHECKED))).toBeGreaterThan(before);
@@ -428,13 +478,17 @@ test("each part shows where the app has its method: no settings or setMode, no U
   expect(updates().queryByRole("button", { name: "Check for updates" })).toBeNull();
 });
 
-test("this computer's service behind what the app bundles: An update is available and Update Sidevoice in the one row, which updates it; no number of its own", async () => {
+test("this computer's service behind what the app bundles: under Sidevoice 0.9.0, Update available · Update Sidevoice, which updates it; no version in its words, no number of its own", async () => {
   const { update } = open({ section: "updates", service: BUNDLED });
   const row = group("Sidevoice");
-  expect(row.querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.9\.0$/);
   const button = await within(row).findByRole("button", { name: "Update Sidevoice" });
-  // The Sidevoice it runs, the app's number; the service's new one is not the app's, so it is not said.
-  expect(button.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available/);
+  // Sidevoice's version said once, on the installed version's line above (no Version line); the service's new one is
+  // not the app's, so it is not said; its line says no version at all.
+  expect(row.querySelector(".host-status-product")).toBeNull();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(button.closest(".update-action")).toHaveTextContent(/^Update availableUpdate Sidevoice$/);
+  expect(button.closest(".update-action-row")).not.toHaveAttribute("id");
+  expect(installedLine()!.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(pane("updates")).not.toHaveTextContent("0.9.1");
   expect(screen.getAllByRole("button", { name: "Update Sidevoice" })).toHaveLength(1);
   await act(async () => { fireEvent.click(button); });
@@ -499,18 +553,22 @@ test.each([
   expect(updates().queryByRole("button", { name: "Update Sidevoice" })).toBeNull();
 });
 
-test("this computer's service with no version and nothing to say: the one row is the app's alone", async () => {
+test("this computer's service with no version and nothing to say: the one row is the app's alone, Sidevoice 0.9.0", async () => {
   open({ section: "updates", status: { ...running, product_version: undefined }, service: { ...BUNDLED, update: "current" } });
   await settle();
   expect(groups()).toEqual(["Sidevoice"]);
-  expect(group("Sidevoice").querySelectorAll(".host-status-product")).toHaveLength(1);
-  expect(group("Sidevoice").querySelector(".host-status-product")).toHaveTextContent(/^Version 0\.9\.0$/);
+  expect(group("Sidevoice").querySelector(".host-status-product, .updates-settings-version")).toBeNull();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(group("Sidevoice").querySelector(".update-action-row")).toBeNull();
   expect(updates().queryByRole("button", { name: /Update Sidevoice/ })).toBeNull();
 });
 
 test("a nightly with no updater: Updates says so under its version, updated by hand; no Automatic/Manual, no Check, no Update", async () => {
   open({ build: NIGHTLY, section: "updates", service: BUNDLED });
   await settle();
+  // With no updater, its Version line, as before, its note under it.
+  expect(group("Sidevoice").querySelector(".updates-settings-version .host-status-product")).toHaveTextContent(/^Version 0\.10\.0-nightly$/);
+  expect(installedLine()).toBeNull();
   const note = pane("updates").querySelector(".host-status-build")!;
   expect(note).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — updates by hand");
   const link = within(note as HTMLElement).getByRole("link", { name: /updates by hand/ });
@@ -526,8 +584,13 @@ test("a nightly with an updater (desktop #56, for now) updates as a release: no 
   const note = pane("updates").querySelector(".host-status-build")!;
   expect(note).toHaveTextContent(/^Nightly · abcdef0 · 2026-10-13$/);
   expect(within(note as HTMLElement).queryByRole("link")).toBeNull();
-  expect(await updates().findByRole("radiogroup", { name: "Updates" })).toBeInTheDocument();
+  // Its note alone above the row, no Version line: its version is the installed version's line's to say.
+  expect(group("Sidevoice").querySelector(".host-status-product")).toBeNull();
+  const modes = await updates().findByRole("radiogroup", { name: "Updates" });
+  expect(note.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.10\.0-nightly$/);
   expect(updates().getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.11\.0-nightly availableDownload$/);
   expect(within(appRow()!).getByRole("button", { name: "Download" })).toBeInTheDocument();
   // The one row's one button: the service's waits behind the app's.
   expect(updates().queryByRole("button", { name: "Update Sidevoice" })).toBeNull();
@@ -539,6 +602,7 @@ test("a nightly with an updater (desktop #56, for now) updates as a release: no 
 test("a development build: Development build under its version, no updater's controls, no Update", async () => {
   open({ build: DEV, section: "updates", service: BUNDLED });
   await settle();
+  expect(group("Sidevoice").querySelector(".updates-settings-version .host-status-product")).toHaveTextContent(/^Version 0\.10\.0-dev$/);
   expect(pane("updates").querySelector(".host-status-build")).toHaveTextContent(/^Development build$/);
   expect(screen.queryByRole("link", { name: /updates by hand/ })).toBeNull();
   expect(screen.queryByRole("button", { name: /Check for updates|Update Sidevoice/ })).toBeNull();
@@ -594,8 +658,9 @@ test("a machine forgotten while it was behind: no longer listed, and in a browse
   expect(entry()).toBeNull();
 });
 
-/* Landing: what the room's notice can't do in place, and This device's Update available, open Updates on the row's
- * action, in view and focused, the row lit; the app's Download and Restart are done in place (UpdateNotice.test.tsx). */
+/* Landing: This device's Update available and a link to a machine's row open Updates on the row's action, in view
+ * and focused, the row lit; the room's notice is this computer's alone, the app's Download and Restart done in place
+ * (UpdateNotice.test.tsx). */
 
 test("This device's Update available, this computer's service behind: Updates, its Update Sidevoice focused, its line lit — not the version, not the card", async () => {
   const { store } = open({ service: BUNDLED, notice: true });
@@ -610,11 +675,18 @@ test("This device's Update available, this computer's service behind: Updates, i
   expect(store.getState().facts.settingsFocus).toBeNull();
 });
 
-test("the room's notice, a remote machine behind: Updates, its command's Copy focused, its row lit", async () => {
-  open({ section: "general", machines: [lab], remote: { "fp-lab": behind() }, notice: true });
-  const see = await screen.findByRole("button", { name: "See updates", description: "Lab box needs an update" });
-  await act(async () => { fireEvent.click(see); });
+test("a remote machine behind: the room's notice says nothing of it; Updates has its row and its command, a landing there focusing its Copy, its row lit", async () => {
+  const { store } = open({ section: "general", machines: [lab], remote: { "fp-lab": behind() }, notice: true });
+  await settle();
+  // The room: no notice, no See updates, no words for the machine; it is its row's in Updates to say.
+  expect(document.querySelector(".update-notice")).toBeNull();
+  expect(screen.queryByRole("button", { name: "See updates" })).toBeNull();
+  expect(document.body).not.toHaveTextContent("Lab box needs an update");
+  expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 available", "Run this on Lab box:", COMMAND]]);
+  // A landing on the machine's row (as a link to it asks): its command's Copy, in view and focused, its row lit.
+  act(() => { store.patch({ settingsSection: "updates", settingsLevel: "page", settingsFocus: "updates-machine-fp-lab" }); });
   await landsOn(() => updates().getByRole("button", { name: "Copy the command for Lab box" }), () => document.getElementById("updates-machine-fp-lab"));
+  expect(document.querySelector(".update-notice")).toBeNull();
 });
 
 test("the room's notice: the app's Download downloads in place, Settings left where it was", async () => {
@@ -625,7 +697,7 @@ test("the room's notice: the app's Download downloads in place, Settings left wh
   expect(store.getState().facts.settingsSection).toBe("general");
 });
 
-test("in Spanish: Actualizaciones, its one row, Sidevoice — the app's update, then the service's Actualizar Sidevoice — a machine behind and This device's Actualización disponible", async () => {
+test("in Spanish: Actualizaciones, its one row, Sidevoice — Sidevoice 0.10.0 disponible · Descargar, then the service's Actualización disponible · Actualizar Sidevoice — a machine behind and This device's Actualización disponible", async () => {
   inSpanish();
   open({ section: "updates", machines: [lab], remote: { "fp-lab": behind() }, service: BUNDLED, updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
   await settle();
@@ -633,31 +705,38 @@ test("in Spanish: Actualizaciones, its one row, Sidevoice — the app's update, 
   expect(groups()).toEqual(["Sidevoice", "Máquinas remotas"]);
   expect(updates().getByText("Sidevoice en este ordenador y las máquinas con un Sidevoice anterior: sus versiones y cómo se actualizan.")).toBeInTheDocument();
   expect(group("Sidevoice").querySelector(".updates-part-hint")).toBeNull();
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.9\.0 · 0\.10\.0 disponibleDescargar$/);
-  expect(within(appRow()!).getByRole("button", { name: "Descargar" })).toBeInTheDocument();
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 disponibleDescargar$/);
+  expect(within(appRow()!).getByRole("button", { name: "Descargar", description: "Sidevoice 0.10.0 disponible" })).toBeInTheDocument();
   expect(machineRows()).toEqual([["Lab box", "0.4.0 · 0.5.0 disponible", "Ejecuta esto en Lab box:", COMMAND]]);
   expect(updates().getByRole("button", { name: "Copiar el comando para Lab box" })).toBeInTheDocument();
   expect(within(pane("this-computer")).getByRole("button", { name: "Actualización disponible, verla en Actualizaciones", hidden: true })).toHaveTextContent(/^Actualización disponible$/);
   cleanup();
-  // Only the service behind: the row's one button, Actualizar Sidevoice, with no number of its own.
+  // Only the service behind: the row's one button, Actualizar Sidevoice, with no version in its words.
   open({ section: "updates", service: BUNDLED });
   const button = await updates().findByRole("button", { name: "Actualizar Sidevoice" });
-  expect(button.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.9\.0 · Actualización disponible/);
+  expect(button.closest(".update-action")).toHaveTextContent(/^Actualización disponibleActualizar Sidevoice$/);
+  expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
 });
 
-test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones, Última comprobación, each failure, and a nightly que se actualiza a mano", async () => {
+test("in Spanish: Automáticas (recomendado) | Manuales, Buscar actualizaciones (which tries a failed check again), each failure — never Al día beside one — and a nightly que se actualiza a mano", async () => {
   inSpanish();
   localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
   for (const { code, state, es, retry, boton } of FAILURES) {
-    open({ section: "updates", updater: { status: { state, version: "0.10.0", error: { code } }, mode: "manual" } });
+    open({ section: "updates", service: SERVICE_CURRENT, updater: { status: { state, version: "0.10.0", error: { code } }, mode: "manual" } });
     const modes = await updates().findByRole("radiogroup", { name: "Actualizaciones" });
     expect(within(modes).getByRole("radio", { name: "Manuales" })).toHaveAttribute("aria-checked", "true");
     expect(within(modes).getByRole("radio", { name: "Automáticas (recomendado)" })).toBeInTheDocument();
     expect(updates().getByRole("button", { name: "Buscar actualizaciones" })).toBeInTheDocument();
-    expect(pane("updates")).toHaveTextContent("Última comprobación:");
+    expect(installed()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+    expect(pane("updates")).not.toHaveTextContent(/Última comprobación|Al día/);
     expect(updates().getByRole("alert")).toHaveTextContent(es);
     if (retry) expect(updates().getByRole("button", { name: boton! })).toBeInTheDocument();
-    else expect(within(appRow()!).getByRole("button", { name: "Reiniciar para actualizar Sidevoice" })).toBeInTheDocument();
+    else {
+      expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 listaReiniciar para actualizar/);
+      expect(within(appRow()!).getByRole("button", { name: "Reiniciar para actualizar" })).toBeInTheDocument();
+    }
+    if (retry === "check") expect(updates().queryByRole("button", { name: /^Reintentar/ })).toBeNull();
     cleanup();
   }
   open({ build: NIGHTLY, section: "updates" });

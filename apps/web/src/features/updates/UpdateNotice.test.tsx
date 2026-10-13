@@ -25,8 +25,9 @@ afterEach(() => {
  * the same: the most pressing update, its action, then ×, which hides it until a newer version (the next one waiting
  * shows instead). Manual: nothing by itself — once a check found one, Version 0.4.0 available · Download; nothing while
  * it downloads (its progress is Updates'); then Sidevoice 0.4.0 is ready · Restart to update. Automatic: nothing while
- * it downloads by itself; once downloaded, the same ready. Nothing while the person's own check runs. This computer's
- * service is Sidevoice's, said in Settings › Updates only. The steps on the app's clock, in Updates too, are
+ * it downloads by itself; once downloaded, the same ready. Nothing while the person's own check runs. Only this
+ * computer's: a remote machine behind is its row's in Settings › Updates, never the room's; this computer's service is
+ * folded into Sidevoice's row there, with no notice of its own. The steps on the app's clock, in Updates too, are
  * UpdateFlow.test.tsx. */
 
 const local: PairingSummary = { fp: "fp-local", host: "MacBook", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d-local", paired_at: 1_700_000_000, revoked: false };
@@ -197,7 +198,7 @@ test("×, in A and in B: hidden until a newer version, not as the same one moves
   }
 });
 
-test("× hides the update it says; the next one waiting shows in its place — the page's Reload, then a remote machine's", async () => {
+test("× hides the update it says; the next one waiting shows in its place — the page's Reload; a remote machine's never", async () => {
   const { reloadToUpdate } = room({ updater: { mode: "manual", status: READY }, facts: { webUpdate: "b2" },
     remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
   await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
@@ -207,23 +208,59 @@ test("× hides the update it says; the next one waiting shows in its place — t
   await act(async () => { fireEvent.click(action()); });
   expect(reloadToUpdate).toHaveBeenCalledTimes(1);
   await act(async () => { fireEvent.click(hide()); });
-  await waitFor(() => expect(said()).toBe("Lab box needs an update · See updates"));
+  // Nothing of this computer's waits: the remote machine behind is not the room's to say.
+  await gone();
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+});
+
+test("a remote machine behind, alone: no notice, in A and in B, with or without a conversation on the stage — its row in Settings › Updates says it, with its command", async () => {
+  for (const picked of NOTICES) for (const stage of [true, false]) {
+    room({ notice: picked, stage, facts: { settingsSection: "updates" },
+      remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "npx sidevoice@latest install" } } } });
+    const row = await waitFor(() => { const found = document.getElementById("updates-machine-fp-lab"); expect(found).not.toBeNull(); return found!; });
+    expect(row).toHaveTextContent("Lab box");
+    expect(row).toHaveTextContent("npx sidevoice@latest install");
+    await settle();
+    expect(document.querySelector(".update-notice")).toBeNull();
+    cleanup();
+  }
+});
+
+test("this computer's service behind the one the app bundles: no notice of its own, in A and in B — folded into Sidevoice's row in Settings › Updates; with a remote machine behind too, still none", async () => {
+  for (const picked of NOTICES) {
+    room({ service: BEHIND, notice: picked, facts: { settingsSection: "updates" } });
+    await waitFor(() => expect(within(document.getElementById("pane-updates")!).getByRole("button", { name: "Update Sidevoice", hidden: true })).toBeInTheDocument());
+    await settle();
+    expect(document.querySelector(".update-notice")).toBeNull();
+    cleanup();
+  }
+  room({ service: BEHIND, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
+  await waitFor(() => expect(document.getElementById("updates-machine-fp-lab") ?? document.querySelector(".stage-notice")).not.toBeNull());
+  await settle();
+  expect(document.querySelector(".update-notice")).toBeNull();
+});
+
+test("this computer's app update shows next to a remote machine behind: the app's, never the machine's", async () => {
+  room({ updater: { mode: "manual", status: FOUND }, service: BEHIND, remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
+  await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
   await act(async () => { fireEvent.click(hide()); });
   await gone();
-});
-
-test("what can't be done in place lands on its button in Updates: a remote machine's Copy", async () => {
-  const { store } = room({ remote: { [lab.fp]: { state: "connected", checkedAt: 1, version: "0.4.0", update: { latest: "0.5.0", command: "x" } } } });
-  await waitFor(() => expect(said()).toBe("Lab box needs an update · See updates"));
-  await act(async () => { fireEvent.click(action()); });
-  expect(store.getState().facts.settingsSection).toBe("updates");
-  expect(store.getState().facts.settingsFocus).toBe("updates-machine-fp-lab");
-});
-
-test("this computer's service behind the one the app bundles: no notice — Sidevoice's, said in Settings › Updates", async () => {
-  room({ service: BEHIND, facts: { settingsSection: "updates" } });
-  await waitFor(() => expect(within(document.getElementById("pane-updates")!).getByRole("button", { name: "Update Sidevoice", hidden: true })).toBeInTheDocument());
+  await settle();
   expect(document.querySelector(".update-notice")).toBeNull();
+});
+
+test("× spent once the app says none waits (idle): the same version found again shows", async () => {
+  const { fake } = room({ updater: { mode: "manual", status: FOUND } });
+  await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
+  await act(async () => { fireEvent.click(hide()); });
+  await gone();
+  await act(async () => { fake.push(READY); });
+  expect(notice()).toBeNull();
+  await act(async () => { fake.push({ state: "idle" }); });
+  await waitFor(() => expect(sessionStorage.getItem("sidevoice.update-notice-hidden")).toBe("[]"));
+  await act(async () => { fake.push(FOUND); });
+  await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
 });
 
 test("in Spanish: Versión 0.4.0 disponible · Descargar, then Sidevoice 0.4.0 está listo · Reiniciar para actualizar; its × Ocultar hasta una versión más nueva", async () => {

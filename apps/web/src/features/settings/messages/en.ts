@@ -65,14 +65,9 @@ export const en = {
   "updates.mode.manualHint": "You're told when one is out, and download it when you choose.",
   "updates.modeFailed": "Couldn't change it. Try again.",
   "updates.check": "Check for updates",
-  "updates.lastChecked": "Last checked: {when}",
-  "updates.neverChecked": "Not checked yet",
-  "updates.checkedUpToDate": "{checked} · Up to date",
-  // While the person's own check runs, on its line; a check under a minute old was just now.
+  // While the person's own check runs, on the installed version's line.
   "updates.checking": "Checking…",
-  "updates.justNow": "just now",
   "updates.upToDate": "Sidevoice is up to date.",
-  "updates.retry": "Retry",
   "updates.failure.update-check-failed": "Couldn't check for updates.",
   "updates.failure.update-download-failed": "The update couldn't be downloaded.",
   "updates.failure.update-install-failed": "The update couldn't be installed.",
@@ -755,7 +750,6 @@ export const en = {
   // What wants updating (UpdateNotice).
   "updates.title": "Updates",
   "updates.web": "A new version of Sidevoice is ready",
-  "updates.machine": "{machine} needs an update",
   "updates.reload": "Reload",
   "updates.reloadNamed": "Reload Sidevoice",
   // The desktop app's own: at the sidebar's foot, and its row in Updates.
@@ -765,13 +759,11 @@ export const en = {
   // says it.
   "updates.row.current": "Sidevoice {version}",
   "updates.row.app": "Sidevoice",
-  "updates.row.available": "{version} available",
+  "updates.row.available": "Sidevoice {version} available",
   "updates.row.availableOne": "Update available",
-  "updates.row.found": "{version} found · Downloading…",
-  "updates.row.foundOne": "Update found · Downloading…",
-  "updates.row.downloading": "Downloading {version}…",
+  "updates.row.downloading": "Sidevoice {version} · Downloading…",
   "updates.row.downloadingOne": "Downloading the update…",
-  "updates.row.ready": "{version} ready",
+  "updates.row.ready": "Sidevoice {version} ready",
   "updates.row.readyOne": "Update ready",
   // Every update button says what it does: the app's update downloaded (manual), then restarted into; Sidevoice (the
   // app and its service, as one) updated.
@@ -780,11 +772,10 @@ export const en = {
   "updates.action.updateAll": "Update Sidevoice",
   "updates.action.updatingAll": "Updating Sidevoice…",
   "updates.action.retryAll": "Retry updating Sidevoice",
-  "updates.action.restartAll": "Restart to update Sidevoice",
+  "updates.action.restartAll": "Restart to update",
   // Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`): its words, its Restart, its ×.
   "updates.notice.ready": "Sidevoice {version} is ready",
   "updates.notice.readyOne": "A Sidevoice update is ready",
-  "updates.notice.machines": "{n} machines need an update",
   "updates.notice.restart": "Restart to update",
   "updates.notice.hide": "Hide until a newer version",
   // What's new (features/whats-new/catalogue).

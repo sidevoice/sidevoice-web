@@ -148,7 +148,7 @@ for (const language of ["en", "es"]) {
   }
 }
 
-test("the notice's Download acts in place, its download said in Updates only; the next one waiting shows meanwhile, a machine behind, which lands on its Copy in Updates", async ({ page }) => {
+test("the notice's Download acts in place, its download said in Updates only; a machine behind is never the room's — Updates lists it with its command", async ({ page }) => {
   await installHarness(page);
   // The paired machine says its Sidevoice is behind (contract gap #57).
   await page.route("**/api/host/status", (route) => route.fulfill({ status: 200, contentType: "application/json",
@@ -160,12 +160,12 @@ test("the notice's Download acts in place, its download said in Updates only; th
   await expect(shown.locator(".update-notice-text")).toHaveText(`Version ${VERSION} available`);
   await shown.getByRole("button", { name: "Download" }).click();
   await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
-  // Downloading: the room says nothing of the app's; the next one waiting shows, the machine's.
-  await expect(shown.locator(".update-notice-text")).toHaveText(/needs an update$/);
-  await shown.getByRole("button", { name: "See updates" }).click();
-  await expect(page.locator("#language-settings")).toBeVisible();
-  await expect(page.locator("#settings-updates")).toHaveAttribute("aria-current", "page");
-  const copy = page.locator("[id^='updates-machine-'] button").first();
-  await expect(copy).toBeFocused();
-  await expect(copy).toBeInViewport();
+  // Downloading: the room says nothing of the app's, and nothing of the machine behind elsewhere.
+  await expect(page.locator(".update-notice")).toHaveCount(0);
+  await page.locator(".sidebar-settings").click();
+  await page.locator("#settings-updates").click();
+  await expect(page.locator("#updates-app")).toHaveAttribute("data-state", "downloading");
+  const machine = page.locator("[id^='updates-machine-']").first();
+  await expect(machine).toContainText("sidevoice update");
+  await expect(page.locator(".update-notice")).toHaveCount(0);
 });
