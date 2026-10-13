@@ -1,0 +1,31 @@
+import type { DiagnosticsMessageKey } from "./en";
+
+/** The connection statistics dialog's words in German. A missing key falls back to English. */
+export const de: Partial<Record<DiagnosticsMessageKey, string>> = {
+  "stats.eyebrow": "Anrufdiagnose",
+  "stats.title": "Verbindung und Latenz",
+  "stats.close": "Verbindungsstatistik schließen",
+  "stats.collecting": "Messwerte werden gesammelt…",
+  "stats.recognition": "Beitrag beendet → Text",
+  "stats.recognitionNote": "Median · Erkennung auf diesem Gerät",
+  "stats.response": "Text gesendet → Antwort",
+  "stats.responseNote": "Median · erste Antwort pro Beitrag",
+  "stats.connection": "Verbindungsstatus",
+  "stats.stages": "Abschnitte des letzten Beitrags",
+  "stats.stagesNote": "Von deiner letzten Sprache bis zur an dieses Gerät gesendeten Antwort, in der Reihenfolge ihres Auftretens; jeder Abschnitt wird mit seiner eigenen Uhr gemessen.",
+  "stats.aggregates": "Sitzungswerte",
+  "stats.aggregatesNote": "Anzahl, Mittelwert, p50, p90 und Maximum pro Abschnitt. Die Abschnitte überlappen sich: Nicht addieren.",
+  "stats.copyAggregates": "Als Text kopieren",
+  "stats.turns": "Letzte Antworten",
+  "stats.turnsNote": "Die Abschnitte überlappen sich: Nicht addieren. „Agent“ umfasst Zustellung, Warteschlangen und Generierung, nicht nur das Modell.",
+  "stats.turnsTable": "Messwerte pro Antwort",
+  "stats.column.turn": "Beitrag",
+  "stats.column.silence": "Stille",
+  "stats.column.recognition": "Erkennung",
+  "stats.column.agent": "Agent",
+  "stats.column.dispatch": "Antwort → Gerät",
+  "stats.column.state": "Status",
+  "stats.limitations": "Das sind Messwerte der App, nicht des Tons am Lautsprecher. Fehlende Daten erscheinen als „—“, nie als null.",
+  "stats.updated": "Aktualisiert",
+  "stats.refresh": "Aktualisieren",
+};
