@@ -285,7 +285,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "agents.manual.file": "Archivo: {file}",
   "agents.manual.snippet": "Configuración",
   "agents.manual.waiting": "Sidevoice volverá a comprobarlo automáticamente cuando lo conectes.",
-  "agents.manual.removeWaiting": "Sidevoice volverá a comprobarlo solo cuando lo quites.",
+  "agents.manual.removeWaiting": "Sidevoice volverá a comprobarlo automáticamente cuando lo quites.",
   "agents.hint.connect": "Sidevoice se añade a los servidores MCP de {agent} por ti.",
   "agents.hint.update": "Sidevoice reescribe la entrada que añadió una versión anterior en los servidores MCP de {agent}.",
   "agents.update": "Actualizar",

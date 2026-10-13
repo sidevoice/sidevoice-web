@@ -9,7 +9,7 @@ export const en = {
   "stats.recognitionNote": "Median · recognition on this device",
   "stats.response": "Text sent → reply",
   "stats.responseNote": "Median · first reply per turn",
-  "stats.connection": "Connection",
+  "stats.connection": "Connection status",
   "stats.stages": "Stages of the last turn",
   "stats.stagesNote": "From your last words to the reply sent to this device, in the order they happen; each stage is measured on its own clock.",
   "stats.aggregates": "Session aggregates",
