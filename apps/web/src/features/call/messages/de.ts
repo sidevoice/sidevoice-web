@@ -65,7 +65,7 @@ export const de: Partial<Record<CallMessageKey, string>> = {
   "voiceModels.state.downloading": "Download läuft",
   "voiceModels.state.verifying": "Download wird geprüft",
   "voiceModels.state.loading": "wird geladen",
-  "voiceModels.state.absent": "nicht geladen",
+  "voiceModels.state.absent": "Download fehlt",
   "voiceModels.state.failed": "Download fehlgeschlagen",
   "voiceModels.state.unavailable": "gerade nicht verfügbar",
   "voiceModels.state.needsKey": "Schlüssel fehlt",

@@ -55,3 +55,13 @@ test("English is unchanged, and anything not offered is English", () => {
   roomI18n().setLanguage("es");
   expect(roomI18n().translate("Vista hace 5 min")).toBe("Vista hace 5 min");
 });
+
+test("Japanese and Chinese close what they open: a whole parenthesis in full-width, its content kept", () => {
+  roomI18n().setLanguage("ja");
+  expect(roomI18n().translate("Automática (WebGPU)")).toBe("自動（WebGPU）");
+  expect(roomI18n().translate("No se pudo guardar la clave (403)")).toBe("キーを保存できませんでした（403）");
+  roomI18n().setLanguage("zh-Hans");
+  expect(roomI18n().translate("Automático (CPU)")).toBe("自动（CPU）");
+  roomI18n().setLanguage("it");
+  expect(roomI18n().translate("Automática (CPU)")).toBe("Automatica (CPU)");
+});

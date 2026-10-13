@@ -12,7 +12,7 @@ export const it: Partial<Record<DiagnosticsMessageKey, string>> = {
   "stats.responseNote": "Mediana · prima risposta per turno",
   "stats.connection": "Stato della connessione",
   "stats.stages": "Fasi dell’ultimo turno",
-  "stats.stagesNote": "Dalla tua ultima voce alla risposta inviata a questo dispositivo, nell’ordine in cui avvengono; ogni fase è misurata con il proprio orologio.",
+  "stats.stagesNote": "Dalle tue ultime parole alla risposta inviata a questo dispositivo, nell’ordine in cui avvengono; ogni fase è misurata con il proprio orologio.",
   "stats.aggregates": "Aggregati della sessione",
   "stats.aggregatesNote": "Conteggio, media, p50, p90 e massimo per fase. Le fasi si sovrappongono: non vanno sommate.",
   "stats.copyAggregates": "Copia come testo",

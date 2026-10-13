@@ -22,11 +22,11 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "card.yourMicrophone": "Votre micro",
   "card.reach.holding": "ne peut pas recevoir",
   "card.reach.offline": "hors ligne",
-  "card.unread": "Non lus : {n}",
+  "card.unread": "Non lus : {n}",
   "card.microphoneNumber": "Micro {n}",
   "card.speakerNumber": "Haut-parleur {n}",
   "card.deviceMissing": "Appareil choisi · déconnecté",
-  "card.deviceFailed": "L’appel a gardé l’appareil précédent : celui-ci n’a pas pu être utilisé.",
+  "card.deviceFailed": "L’appel a gardé l’appareil précédent : celui-ci n’a pas pu être utilisé.",
   "card.devicesInSystem": "Choisissez cet appareil dans les réglages du système.",
   "card.youAreMuted": "Votre micro est coupé",
 };

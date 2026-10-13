@@ -70,7 +70,7 @@ export const zhHans: Partial<Record<CallMessageKey, string>> = {
   "voiceModels.state.unavailable": "暂不可用",
   "voiceModels.state.needsKey": "需要密钥",
   "voiceModels.state.unknown": "尚未检查",
-  "voiceModels.attention": "你的语音需要处理",
+  "voiceModels.attention": "请检查语音设置",
   "voiceModels.addKey": "添加密钥",
   "voiceModels.download": "下载",
   "voiceModels.retry": "重试",

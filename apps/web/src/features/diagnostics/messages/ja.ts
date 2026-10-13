@@ -12,7 +12,7 @@ export const ja: Partial<Record<DiagnosticsMessageKey, string>> = {
   "stats.responseNote": "中央値 · 各ターンの最初の返答",
   "stats.connection": "接続状態",
   "stats.stages": "直近のターンの各区間",
-  "stats.stagesNote": "あなたの最後の発話から、このデバイスに返答が届くまでを発生順に示します。各区間はそれぞれの時計で計測されます。",
+  "stats.stagesNote": "あなたの最後の発話から、このデバイスへの返答が送信されるまでを発生順に示します。各区間はそれぞれの時計で計測されます。",
   "stats.aggregates": "セッションの集計",
   "stats.aggregatesNote": "区間ごとの件数・平均・p50・p90・最大値です。区間は重なっているため、合計しないでください。",
   "stats.copyAggregates": "テキストとしてコピー",

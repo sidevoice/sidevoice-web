@@ -51,7 +51,7 @@ export const it: Partial<Record<CallMessageKey, string>> = {
   "stage.poster.status": "VIVO O IN PAUSA",
   "stage.poster.fine1": "QUESTA CREATURA È IMMAGINARIA. OGNI SOMIGLIANZA CON UN AGENTE",
   "stage.poster.fine2": "REALE RIMASTO SENZA CONNESSIONE È PURAMENTE",
-  "stage.poster.fine3": "CASUALE. SE LA VEDETE, AVVISATE IL SUO UMANO.",
+  "stage.poster.fine3": "CASUALE. SE LA VEDI, AVVISA IL SUO UMANO.",
 
   "toolbar.micLevel": "Livello del microfono",
   "toolbar.skip": "Salta quello che sta suonando",

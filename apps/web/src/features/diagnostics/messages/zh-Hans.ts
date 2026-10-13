@@ -20,7 +20,7 @@ export const zhHans: Partial<Record<DiagnosticsMessageKey, string>> = {
   "stats.turnsNote": "各阶段有重叠：不要把它们相加。“智能体”包括传递、排队和生成，而不只是模型。",
   "stats.turnsTable": "每条回复的测量数据",
   "stats.column.turn": "轮次",
-  "stats.column.silence": "静音",
+  "stats.column.silence": "无声时长",
   "stats.column.recognition": "识别",
   "stats.column.agent": "智能体",
   "stats.column.dispatch": "回复 → 设备",

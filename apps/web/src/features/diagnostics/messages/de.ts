@@ -12,7 +12,7 @@ export const de: Partial<Record<DiagnosticsMessageKey, string>> = {
   "stats.responseNote": "Median · erste Antwort pro Beitrag",
   "stats.connection": "Verbindungsstatus",
   "stats.stages": "Abschnitte des letzten Beitrags",
-  "stats.stagesNote": "Von deiner letzten Sprache bis zur an dieses Gerät gesendeten Antwort, in der Reihenfolge ihres Auftretens; jeder Abschnitt wird mit seiner eigenen Uhr gemessen.",
+  "stats.stagesNote": "Von deinen letzten gesprochenen Worten bis zur an dieses Gerät gesendeten Antwort, in der Reihenfolge ihres Auftretens; jeder Abschnitt wird mit seiner eigenen Uhr gemessen.",
   "stats.aggregates": "Sitzungswerte",
   "stats.aggregatesNote": "Anzahl, Mittelwert, p50, p90 und Maximum pro Abschnitt. Die Abschnitte überlappen sich: Nicht addieren.",
   "stats.copyAggregates": "Als Text kopieren",
