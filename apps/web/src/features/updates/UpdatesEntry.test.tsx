@@ -79,7 +79,7 @@ test("manual: Version X available · Download acts in place: the same row shows 
   expect(line()).toBeNull();
   act(() => push({ state: "available", version: "0.5.0" }));
   const foot0 = document.querySelector(".update-foot");
-  const download = screen.getByRole("button", { name: "Download Sidevoice 0.5.0" });
+  const download = screen.getByRole("button", { name: /^Version 0.5.0 available\s*Download$/ });
   expect(download).toHaveTextContent("Version 0.5.0 available");
   expect(download).toHaveTextContent("Download");
   await act(async () => { fireEvent.click(download); });
@@ -141,7 +141,7 @@ test("a download or a restart the app rejected is said as that failure", async (
   updater.download.mockRejectedValueOnce(new Error("disk full"));
   foot(updater);
   await settle();
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Download Sidevoice 0.5.0" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Version 0.5.0 available\s*Download$/ })); });
   expect(screen.getByRole("alert")).toHaveTextContent("The update couldn't be downloaded.");
   cleanup();
   const ready = fakeUpdater({ status: { state: "ready", version: "0.5.0" } });
@@ -157,7 +157,7 @@ test("in Spanish: Versión X disponible · Descargar, Descargando…, Reiniciar 
   const { updater, push } = fakeUpdater({ mode: "manual", status: { state: "available", version: "0.5.0" } });
   foot(updater);
   await settle();
-  const download = screen.getByRole("button", { name: "Descargar Sidevoice 0.5.0" });
+  const download = screen.getByRole("button", { name: /^Versión 0.5.0 disponible\s*Descargar$/ });
   expect(download).toHaveTextContent("Versión 0.5.0 disponible");
   act(() => push({ state: "downloading", version: "0.5.0", progress: 0.4 }));
   expect(line()).toHaveTextContent(/Descargando… 40\s?%/);

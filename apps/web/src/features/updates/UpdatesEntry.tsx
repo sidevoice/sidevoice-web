@@ -85,7 +85,7 @@ export function AppUpdateLine({ status, update, t }: { status: UpdaterStatus; up
           <RefreshIcon size={16} /><span>{t("updates.restartToUpdate")}</span></Button>
         : status.state === "downloading" ? <div className="app-update-progress">
           <span className="app-update-copy">{t("updates.downloading", { version })}
-            {progress != null && <span className="app-update-percent">{new Intl.NumberFormat(undefined, { style: "percent" }).format(progress)}</span>}</span>
+            {progress != null && <span className="app-update-percent">{new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(progress)}</span>}</span>
           <ProgressBar value={progress} label={t("updates.downloading", { version })} />
         </div>
         : <div className="app-update-row">
@@ -122,8 +122,8 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
     finally { setBusy(null); }
   }
   const error = app ? failure ?? (app.error && app.error.code !== "update-check-failed" ? app.error : null) : null;
-  const row = (text: string, act?: { label?: string; onClick: () => void; loading?: boolean; named?: string }, extra?: React.ReactNode) => act
-    ? <Button variant="ghost" tone="neutral" block className="update-line" title={text} aria-label={act.named} loading={act.loading} onClick={act.onClick}>
+  const row = (text: string, act?: { label?: string; onClick: () => void; loading?: boolean }, extra?: React.ReactNode) => act
+    ? <Button variant="ghost" tone="neutral" block className="update-line" title={text} loading={act.loading} onClick={act.onClick}>
         <UpdateIcon /><span className="update-line-text">{text}</span>{act.label && <span className="update-line-act">{act.label}</span>}</Button>
     : <div className="update-line" role="status" title={text}><UpdateIcon /><span className="update-line-text">{text}</span>{extra}</div>;
   let line: React.ReactNode = null;
@@ -134,7 +134,7 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
       : null;
     else if (app.state === "downloading") {
       const progress = app.progress == null ? null : Math.max(0, Math.min(1, app.progress));
-      const percent = progress == null ? "" : new Intl.NumberFormat(undefined, { style: "percent" }).format(progress);
+      const percent = progress == null ? "" : new Intl.NumberFormat(document.documentElement.lang || undefined, { style: "percent" }).format(progress);
       line = <div className="update-line update-line--progress" role="status" title={t("updates.downloadingPercent", { percent })}>
         <UpdateIcon /><span className="update-line-text">{t("updates.downloadingPercent", { percent })}</span>
         <ProgressBar className="update-line-bar" value={progress} label={t("updates.downloading", { version })} />
@@ -143,7 +143,7 @@ function UpdateLine({ items, app, update, t }: { items: UpdateItem[]; app: Updat
       const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed";
       line = update.can.download
         ? row(t("updates.available", { version }), { label: t(downloadFailed ? "updates.retry" : "updates.download"), onClick: () => void run("download"),
-            loading: busy === "download", named: downloadFailed ? undefined : t("updates.downloadNamed", { version }) })
+            loading: busy === "download" })
         : row(t("updates.available", { version }));
     }
   } else if (items.some((item) => item.kind === "web")) {
