@@ -469,6 +469,21 @@ test("its last words said, a reply stays whole AGENT_LINGER_MS, then lifts away;
   expect(stageBubbles()).toEqual([now]);
 }, WHOLE_APP_MS);
 
+test("another conversation on the stage takes no reply of the one before with it", () => {
+  const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 20, to: 20 } });
+  vi.useFakeTimers();
+  patch(store, { botLive: false, karaokeState: null, history: [reply("h-2", REPLY, "played", 1)] } as Partial<SessionFacts>);
+  expect(stageBubbles()).toHaveLength(1);
+  patch(store, { viewedThread: "fp-1|t-pay" });
+  expect(document.querySelector(".stage-title h2")).toHaveTextContent("Migrate the payments API");
+  expect(stageBubbles()).toHaveLength(0);
+  // Back on the one that spoke, its reply is over: nothing comes back.
+  patch(store, { viewedThread: "fp-1|t-login" });
+  expect(stageBubbles()).toHaveLength(0);
+  tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
+  expect(stageBubbles()).toHaveLength(0);
+}, WHOLE_APP_MS);
+
 test("Escape closes only the topmost: a dialog, a menu or a handler above the transcript answers it first", async () => {
   room();
   const transcript = document.getElementById("transcript")!;

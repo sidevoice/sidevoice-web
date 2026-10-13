@@ -117,7 +117,8 @@ export function CallStage() {
         </div>
         <VoiceModels />
         <div className="stage-top">
-          <AgentBubbles reply={reply} spokenTo={spokenTo} />
+          {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
+          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} />
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>
