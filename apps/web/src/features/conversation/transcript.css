@@ -46,16 +46,29 @@
 .transcript .chat-character .sv-avatar { background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
 [data-theme="dark"] .transcript .chat-character .sv-avatar { background: var(--av-bg); }
 
-/* ----- a bubble: the agent's in lila at the left, the person's in crema at the right; the corner at a run's foot,
+/* ----- a bubble: the agent's at the left, the person's at the right, each in the chat's colours (theme.css --sv-chat-*:
+ * a fill, its text, its quieter text, which what the bubble holds reads as the theme's); the corner at a run's foot,
  * beside the face, is the tight one */
 .chat-bubble {
+  --sv-text: var(--sv-chat-agent-fg); --sv-text-subtle: var(--sv-chat-agent-subtle);
   position: relative; min-width: 0; max-width: min(80%, 34rem); padding: 10px 14px 6px;
-  border-radius: var(--sv-radius-xl); background: var(--sv-bubble-agent); color: var(--sv-text);
+  border-radius: var(--sv-radius-xl); background: var(--sv-chat-agent-bg); color: var(--sv-text);
   font-size: 1rem; line-height: 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 /* Without a meta line (a draft has no time yet) the text sits in the middle. */
 .chat-bubble:not(:has(> .chat-meta)) { padding-bottom: 10px; }
-.chat-bubble[data-role="user"] { background: var(--sv-bubble-self); }
+/* The person's, here and on the call's stage (call-view.css .person-bubble): one rule, so the two never differ. */
+.chat-bubble[data-role="user"], .person-bubble {
+  --sv-text: var(--sv-chat-person-fg); --sv-text-subtle: var(--sv-chat-person-subtle); background: var(--sv-chat-person-bg); color: var(--sv-text);
+}
+/* A person's bubble filled in the deep colour (VARIANTS `chat-colors` "filled") is an island of light inks: the time,
+ * the marks, the waveform, a draft's edge, the cancel button and its hover and focus ring all take them. */
+[data-chat-colors="filled"] :is(.chat-bubble[data-role="user"], .person-bubble) {
+  --sv-text-muted: var(--sv-chat-person-subtle); --sv-border-strong: var(--sv-chat-person-subtle); --sv-border: var(--sv-chat-person-bg);
+  --sv-accent: var(--sv-chat-person-mark); --sv-accent-text: var(--sv-chat-person-mark); --sv-focus: var(--sv-chat-person-mark);
+  --sv-danger: var(--sv-chat-person-danger); --sv-disabled-text: var(--sv-chat-person-quiet);
+  --sv-hover: var(--sv-chat-person-wash); --sv-pressed: var(--sv-chat-person-wash); --sv-accent-soft: var(--sv-chat-person-wash); --sv-danger-soft: var(--sv-chat-person-wash);
+}
 .chat-bubble[data-role="assistant"]:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: var(--sv-radius-xs); }
 .chat-bubble[data-role="user"]:is([data-position="last"], [data-position="only"]) { border-bottom-right-radius: var(--sv-radius-xs); }
 /* Cut off while it played: a bar in the voice's colour down its edge. */

@@ -51,11 +51,12 @@
 .stage-tag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .stage-tile:has(.person-bubble) .stage-tags { display: none; }
 
-/* What the person is saying, at the tile's foot on their side while they say it, with a way to take it back. */
+/* What the person is saying, at the tile's foot on their side while they say it, with a way to take it back; its fill
+ * and text are the person's in the transcript (transcript.css: one rule for both). */
 .person-bubble { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1) var(--sv-space-2);
   width: max-content; max-width: min(75%, 28rem); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4);
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); border-bottom-right-radius: var(--sv-radius-xs);
-  background: var(--sv-bubble-self); box-shadow: var(--sv-shadow-sm); color: var(--sv-text); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
+  box-shadow: var(--sv-shadow-sm); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
 .person-bubble > span { flex: 1 1 8rem; min-width: 0; padding-block: var(--sv-space-1); }
 .person-bubble .cancel-input { flex: none; }
 /* What was sent: a moment on the stage, then it lifts toward the agent, shrinks and fades (a plain fade, reduced). */

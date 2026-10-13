@@ -22,6 +22,7 @@ import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner"
 import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboarding-context";
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
+import { useChatColors } from "../features/conversation/chat-colors";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 
 function RoomContent() {
@@ -32,6 +33,7 @@ function RoomContent() {
   const noMachine = ready && machines.length === 0;
   const onboarding = useOnboarding();
   const voiceSwitch = useVoiceSwitch();
+  const chatColors = useChatColors();
   // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
   const setupPending = !onboarding.ready || !onboarding.record.completed_at;
 
@@ -62,7 +64,7 @@ function RoomContent() {
         {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
           <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
-        <main className={noMachine ? undefined : "call-layout"}>
+        <main className={noMachine ? undefined : "call-layout"} data-chat-colors={chatColors}>
           {noMachine ? <NoMachineScreen source="no-machine" /> : <>
             <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
             {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and

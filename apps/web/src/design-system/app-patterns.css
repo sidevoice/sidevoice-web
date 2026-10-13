@@ -80,7 +80,7 @@
 .pt-bubble--agent { background: var(--sv-surface); border-bottom-left-radius: var(--sv-radius-xs); color: var(--sv-text-subtle); }
 .pt-bubble-previous { font-size: var(--sv-font-sm); color: var(--sv-text-subtle); }
 .pt-spoken { color: var(--sv-text); }
-.pt-bubble--person { justify-self: end; display: flex; align-items: center; gap: var(--sv-space-2); max-width: 75%; background: var(--sv-bubble-self); border-bottom-right-radius: var(--sv-radius-xs); }
+.pt-bubble--person { justify-self: end; display: flex; align-items: center; gap: var(--sv-space-2); max-width: 75%; background: var(--sv-chat-person-bg); border-bottom-right-radius: var(--sv-radius-xs); }
 .pt-working { display: inline-flex; align-items: center; gap: var(--sv-space-2); margin: 0; height: 36px; padding: 0 var(--sv-space-4); border-radius: var(--sv-radius-pill); background: var(--sv-voice-soft); color: var(--sv-voice-text); font-size: var(--sv-font-sm); font-weight: 600; }
 .pt-stage-tags { min-height: 24px; }
 .pt-tag { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); height: 26px; padding: 0 var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: color-mix(in srgb, var(--sv-surface) 80%, transparent); font-size: var(--sv-font-xs); font-weight: 600; color: var(--sv-text-muted); }
@@ -150,9 +150,9 @@
 .pt-message[data-role="user"] { justify-content: flex-end; }
 .pt-message .pt-avatar { width: 32px; height: 32px; }
 .pt-avatar-spacer { flex: none; width: 32px; }
-.pt-chat { max-width: min(80%, 34rem); padding: 10px 14px 6px; border-radius: var(--sv-radius-xl); background: var(--sv-bubble-agent); color: var(--sv-text); }
+.pt-chat { max-width: min(80%, 34rem); padding: 10px 14px 6px; border-radius: var(--sv-radius-xl); background: var(--sv-chat-agent-bg); color: var(--sv-text); }
 .pt-chat[data-role="assistant"][data-last] { border-bottom-left-radius: var(--sv-radius-xs); }
-.pt-chat[data-role="user"] { background: var(--sv-bubble-self); }
+.pt-chat[data-role="user"] { background: var(--sv-chat-person-bg); }
 .pt-chat[data-role="user"][data-last] { border-bottom-right-radius: var(--sv-radius-xs); }
 .pt-message { align-items: flex-end; }
 .pt-chat[data-interrupted] { box-shadow: inset 3px 0 0 var(--sv-voice); }
