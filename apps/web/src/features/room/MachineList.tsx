@@ -11,7 +11,7 @@ import { Switch } from "../../components/ui/Switch";
 import { Badge } from "../../components/ui/Badge";
 import { Section } from "../../components/ui/Card";
 import "./machines.css";
-import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
+import { DESKTOP_NIGHTLY_URL, desktopBuild, localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -398,6 +398,7 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
   const cause = status.failure ? hostCause(status, t) : "";
   const failureAt = dateText(details.failure?.at);
   const failed = status.state === "failed" || status.state === "service-failed";
+  const build = desktopBuild();
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
@@ -407,8 +408,14 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
       <dl className="host-status-facts">
-        {/* One version, the product's as the person installed it (never the core's or the connector's). */}
-        {details.product_version && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version })}</div>}
+        {/* One version, the product's as the person installed it (never the core's or the connector's); the app's own
+            number where the product does not say it. A nightly or development app says so under it, and how it updates. */}
+        {(details.product_version || build?.version) && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version || build!.version })}</div>}
+        {build?.channel === "nightly" && <div className="host-status-build">
+          {[t("hosts.build.nightly"), build.commit?.slice(0, 7), build.date?.slice(0, 10)].filter(Boolean).join(" · ")}{" — "}
+          <a href={DESKTOP_NIGHTLY_URL} target="_blank" rel="noreferrer">{t("hosts.build.byHand")}<span className="sr-only"> {t("keys.newTab")}</span></a>
+        </div>}
+        {build?.channel === "dev" && <div className="host-status-build">{t("hosts.build.dev")}</div>}
       </dl>
       {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
       {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
@@ -443,7 +450,8 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
           {failed && typeof navigator.clipboard?.writeText === "function" && <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void copyDetails()}>{copied ? t("hosts.detailsCopied") : t("hosts.copyDetails")}</Button>}
         </div>}
       {note && <p className="muted" role="status">{note}</p>}
-      <LocalHostUpdateControl status={status} />
+      {/* Updating from here is a release's: a nightly or development app is updated by hand. */}
+      {(!build || build.channel === "release") && <LocalHostUpdateControl status={status} />}
     </div>
   );
 }

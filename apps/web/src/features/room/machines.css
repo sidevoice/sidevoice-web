@@ -152,3 +152,6 @@ span.host-insecure { color: var(--sv-warning); font-weight: var(--sv-weight-semi
 .host-forget { display: grid; justify-items: start; gap: var(--sv-space-2); }
 .host-forget p { margin: 0; }
 .host-forget-actions { display: flex; gap: var(--sv-space-2); }
+
+/* A nightly or development app, under its version: what it is, and how it updates. */
+.host-status-build { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }

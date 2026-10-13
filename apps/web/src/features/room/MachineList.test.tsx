@@ -733,3 +733,71 @@ test("Cancel closes Forget's question without forgetting, and the focus goes bac
   await waitFor(() => expect(within(forgetFoot()!).getByRole("button", { name: "Forget NUC" })).toHaveFocus());
   expect(done.forgetMachine).not.toHaveBeenCalled();
 });
+
+/** This device's app, with its build (sidevoice-desktop #56) and an update on offer where the updater would allow it. */
+function buildBridge(build: Record<string, unknown> | undefined) {
+  const version: LocalHostVersion = { bridge: 3, bundled: {}, installed: {}, core_api: 2, update: "available" };
+  setBridge({ version: vi.fn(async () => version), update: vi.fn().mockResolvedValue(running) });
+  const desktop = (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop;
+  desktop.host.build = build;
+  actions();
+}
+const versionLine = () => document.querySelector(".host-status-product");
+const buildLine = () => document.querySelector(".host-status-build");
+
+test("a release app says its version alone, and keeps Update this machine", async () => {
+  buildBridge({ channel: "release", version: "0.4.0", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" });
+  room([local], { localHostStatus: { ...running, product_version: "0.4.0" } });
+  expect(versionLine()).toHaveTextContent("Sidevoice 0.4.0");
+  expect(buildLine()).toBeNull();
+  expect(await screen.findByRole("button", { name: "Update this machine" })).toBeInTheDocument();
+});
+
+test("a nightly app says so under its version, with its short commit and day, and is updated by hand from the nightly release", async () => {
+  buildBridge({ channel: "nightly", version: "0.5.0-nightly", commit: "abcdef0123456789", date: "2026-10-13T08:00:00Z" });
+  room([local], { localHostStatus: { ...running, product_version: "0.5.0" } });
+  expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0");
+  expect(buildLine()).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — updates by hand");
+  const link = within(buildLine() as HTMLElement).getByRole("link", { name: /updates by hand/ });
+  expect(link).toHaveAttribute("href", "https://github.com/sidevoice/sidevoice-desktop/releases/tag/nightly");
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(link).toHaveTextContent("(opens in a new tab)");
+  await act(async () => {});
+  expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
+});
+
+test("a development app says Development build under its version, and offers no update", async () => {
+  buildBridge({ channel: "dev", version: "0.5.0-dev" });
+  room([local], { localHostStatus: { ...running, product_version: "0.5.0" } });
+  expect(buildLine()).toHaveTextContent(/^Development build$/);
+  expect(screen.queryByRole("link", { name: /updates by hand/ })).toBeNull();
+  await act(async () => {});
+  expect(screen.queryByRole("button", { name: "Update this machine" })).toBeNull();
+});
+
+test("where the product does not say its version, the card shows the app's own", () => {
+  buildBridge({ channel: "nightly", version: "0.5.0-nightly" });
+  room([local], { localHostStatus: running });
+  expect(versionLine()).toHaveTextContent("Sidevoice 0.5.0-nightly");
+  // No commit nor date: only what the build says.
+  expect(buildLine()).toHaveTextContent(/^Nightly — updates by hand/);
+});
+
+test("an app too old to say its build shows no build line and keeps Update this machine", async () => {
+  buildBridge(undefined);
+  room([local], { localHostStatus: { ...running, product_version: "0.3.0" } });
+  expect(buildLine()).toBeNull();
+  expect(await screen.findByRole("button", { name: "Update this machine" })).toBeInTheDocument();
+});
+
+test("in Spanish, a nightly app se actualiza a mano and a development one is a Versión de desarrollo", () => {
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
+  onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
+  buildBridge({ channel: "nightly", version: "0.5.0", commit: "abcdef0123456789", date: "2026-10-13" });
+  room([local], { localHostStatus: running });
+  expect(buildLine()).toHaveTextContent("Nightly · abcdef0 · 2026-10-13 — se actualiza a mano (se abre en una pestaña nueva)");
+  cleanup();
+  buildBridge({ channel: "dev", version: "0.5.0" });
+  room([local], { localHostStatus: running });
+  expect(buildLine()).toHaveTextContent(/^Versión de desarrollo$/);
+});
