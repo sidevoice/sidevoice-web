@@ -10,10 +10,12 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
  * @typedef {import('./model-catalogs.js').CatalogView} CatalogView
  * @typedef {import('./model-catalogs.js').CatalogModel} CatalogModel
  * @typedef {{
- *   stt: {catalog: string, model: string, language: string | null},
- *   tts: {catalog: string, model: string, voice: string | null, speed: number},
+ *   stt: {catalog: string, model: string, language: string | null, build?: string},
+ *   tts: {catalog: string, model: string, voice: string | null, speed: number, build?: string},
  *   patience: NonNullable<VoiceSettings['patience']>,
  *   end_of_turn: NonNullable<VoiceSettings['end_of_turn']>,
+ *   idle_unload_minutes: number,
+ *   turn_model?: string,
  * }} DeviceVoiceSettings The settings this device keeps: every field filled, so they are the voice's `VoiceSettings` as they are.
  * @typedef {{key: string, params?: Record<string, string | number>, reasons?: string[], detail?: string}} Note What the pane
  *   says about a choice: a message key and its params, the codes of why a model does not run here, and a provider's own
@@ -23,20 +25,24 @@ import { LOCAL_CATALOG } from './model-catalogs.js';
 export const VOICE_SETTINGS_KEY = 'sidevoice.voice-settings';
 export const PATIENCE = ['fast', 'normal', 'calm'];
 export const END_OF_TURN = ['silence', 'smart-turn'];
+/** How long models stay loaded with nothing to do, in minutes, as Settings offers it; the voice's own default is 10. */
+export const IDLE_UNLOAD_MINUTES = [5, 10, 30, 60];
 /** The normal pace, and the step the pane moves a speed by. */
 export const SPEED = { normal: 1, step: 0.05 };
 
 /**
- * What a call starts with when the person chose nothing, in `language`.
- * @param {string | null | undefined} language
+ * What a call starts with when the person chose nothing: this device's models, the language heard detected rather than
+ * assumed (`null`), the model's own voice at the normal pace.
  * @returns {DeviceVoiceSettings}
  */
-export function defaultVoiceSettings(language) {
+export function defaultVoiceSettings() {
   return {
-    stt: { catalog: LOCAL_CATALOG, model: 'whisper-base', language: language || null },
+    stt: { catalog: LOCAL_CATALOG, model: 'whisper-base', language: null },
     tts: { catalog: LOCAL_CATALOG, model: 'kokoro-82m-v1.0', voice: null, speed: SPEED.normal },
     patience: 'normal',
-    end_of_turn: 'silence',
+    // The model that hears when you have finished, where it runs; silence where it does not (voiceSettingsHere).
+    end_of_turn: 'smart-turn',
+    idle_unload_minutes: 10,
   };
 }
 
@@ -58,26 +64,29 @@ export function normaliseVoiceSettings(value, defaults) {
       catalog: sttNamed ? stt.catalog : defaults.stt.catalog,
       model: sttNamed ? stt.model : defaults.stt.model,
       language: stt.language === null ? null : text(stt.language) ?? defaults.stt.language,
+      ...(sttNamed && text(stt.build) ? { build: stt.build } : {}),
     },
     tts: {
       catalog: ttsNamed ? tts.catalog : defaults.tts.catalog,
       model: ttsNamed ? tts.model : defaults.tts.model,
       voice: ttsNamed ? text(tts.voice) : null,
       speed: Number.isFinite(speed) && speed > 0 ? speed : defaults.tts.speed,
+      ...(ttsNamed && text(tts.build) ? { build: tts.build } : {}),
     },
     patience: PATIENCE.includes(value?.patience) ? value.patience : defaults.patience,
     end_of_turn: END_OF_TURN.includes(value?.end_of_turn) ? value.end_of_turn : defaults.end_of_turn,
+    idle_unload_minutes: IDLE_UNLOAD_MINUTES.includes(value?.idle_unload_minutes) ? value.idle_unload_minutes : defaults.idle_unload_minutes,
+    ...(text(value?.turn_model) ? { turn_model: value.turn_model } : {}),
   };
 }
 
 /**
- * The settings this device keeps, or the defaults for `language`.
+ * The settings this device keeps, or the defaults.
  * @param {Storage | null | undefined} storage
- * @param {string | null | undefined} language
  * @returns {DeviceVoiceSettings}
  */
-export function readVoiceSettings(storage, language) {
-  const defaults = defaultVoiceSettings(language);
+export function readVoiceSettings(storage) {
+  const defaults = defaultVoiceSettings();
   try {
     const stored = JSON.parse(storage?.getItem(VOICE_SETTINGS_KEY) || 'null');
     return stored && typeof stored === 'object' ? normaliseVoiceSettings(stored, defaults) : defaults;
@@ -117,6 +126,10 @@ export function editVoiceSettings(settings, patch, catalogs = []) {
       slot.model = first?.id ?? '';
     }
   }
+  // A build is one model's: another model, or none asked for, is the engine's own choice again.
+  for (const [slot, before, asked] of [[stt, settings.stt, patch.stt], [tts, settings.tts, patch.tts]]) {
+    if (slot.catalog !== before.catalog || slot.model !== before.model || (asked && 'build' in asked && !asked.build)) delete slot.build;
+  }
   if (stt.catalog !== settings.stt.catalog || stt.model !== settings.stt.model) {
     const languages = findModel(catalogs, stt.catalog, stt.model)?.languages ?? [];
     if (stt.language && languages.length && !languages.some((tag) => sameLanguage(tag, stt.language))) stt.language = null;
@@ -130,9 +143,10 @@ export function editVoiceSettings(settings, patch, catalogs = []) {
 
 const sameLanguage = (a, b) => a.toLowerCase().split('-')[0] === b.toLowerCase().split('-')[0];
 
-/** A catalogue's models of `capability`. */
+/** A catalogue's models of `capability`. A model whose capabilities are missing, or not a list, offers none
+ *  (sidevoice-core#112): it is left out, not the catalogue with it. */
 function offered(catalog, capability) {
-  return (catalog?.models ?? []).filter((model) => model.capabilities.includes(capability));
+  return (catalog?.models ?? []).filter((model) => Array.isArray(model?.capabilities) && model.capabilities.includes(capability));
 }
 
 /** Whether `model` can be used here: a remote one always (its provider runs it), a local one when a build of it runs. */
@@ -185,6 +199,47 @@ function slotChoices(catalogs, capability, slot) {
 }
 
 /**
+ * This device's end-of-turn model: the one chosen (`id`) when it runs here, else the first of the local catalogue's
+ * that does, or none.
+ * @param {CatalogView[]} catalogs
+ * @param {string} [id]
+ */
+export function endOfTurnModel(catalogs, id) {
+  const models = endOfTurnModels(catalogs);
+  return models.find((model) => model.id === id && runs(model)) ?? models.find(runs) ?? null;
+}
+
+/**
+ * The local catalogue's end-of-turn models, those that run here and those that do not.
+ * @param {CatalogView[]} catalogs
+ */
+export function endOfTurnModels(catalogs) {
+  return offered(catalogs.find((catalog) => catalog.id === LOCAL_CATALOG), 'end-of-turn');
+}
+
+/**
+ * The voice activity detector every call uses on this device (voice-source.ts chooses it the same way): the local
+ * catalogue's Silero VAD when it runs here, else another `vad` model that does, or none. Never a person's choice.
+ * @param {CatalogView[]} catalogs
+ */
+export function vadModel(catalogs) {
+  const runsHere = offered(catalogs.find((catalog) => catalog.id === LOCAL_CATALOG), 'vad').filter(runs);
+  return runsHere.find((model) => model.family === 'silero-vad') ?? runsHere[0] ?? null;
+}
+
+/**
+ * `settings` as this device can take them: the smart end of turn where no end-of-turn model runs here is silence. With
+ * no catalogues read yet, as they are.
+ * @param {DeviceVoiceSettings} settings
+ * @param {CatalogView[]} catalogs
+ * @returns {DeviceVoiceSettings}
+ */
+export function voiceSettingsHere(settings, catalogs) {
+  if (settings.end_of_turn !== 'smart-turn' || !catalogs.some((catalog) => catalog.id === LOCAL_CATALOG) || endOfTurnModel(catalogs, settings.turn_model)) return settings;
+  return { ...settings, end_of_turn: 'silence' };
+}
+
+/**
  * What the pane offers, for `settings`, from `catalogs` (the engine's). `languages` are the tags offered for a model
  * that lists none (a remote one).
  * @param {CatalogView[]} catalogs
@@ -216,4 +271,45 @@ export function voiceChoices(catalogs, settings, languages = []) {
  */
 export function remoteProviders(catalogs) {
   return catalogs.filter((catalog) => catalog.id !== LOCAL_CATALOG).map((catalog) => ({ id: catalog.id, name: catalog.name ?? catalog.id }));
+}
+
+/**
+ * Whether what `settings` chose for `task` can be used now: a provider's model its catalogue lists, or one of this
+ * device's that is on disk (the build chosen, else any). The end of turn is ready when it is silence, or its model is.
+ * @param {DeviceVoiceSettings} settings
+ * @param {'stt' | 'tts' | 'end-of-turn'} task
+ * @param {CatalogView[]} catalogs
+ */
+export function modelReady(settings, task, catalogs) {
+  if (task === 'end-of-turn') {
+    if (settings.end_of_turn !== 'smart-turn') return true;
+    const model = endOfTurnModel(catalogs, settings.turn_model);
+    return !!model && (model.installed === true || !!model.builds?.some((build) => build.installed));
+  }
+  const slot = settings[task];
+  const model = catalogs.find((catalog) => catalog.id === slot.catalog)?.models.find((candidate) => candidate.id === slot.model);
+  if (!model) return false;
+  if (slot.catalog !== LOCAL_CATALOG) return true;
+  const chosen = slot.build ? model.builds?.find((build) => build.id === slot.build) : null;
+  return chosen ? chosen.installed : model.installed === true || !!model.builds?.some((build) => build.installed);
+}
+
+/**
+ * The settings in use when `draft` is what was chosen and `saved` what is in use: each choice that is ready now, and
+ * for one that is not (a model still to download), what is in use — it switches once it is ready.
+ * @param {DeviceVoiceSettings} draft
+ * @param {DeviceVoiceSettings} saved
+ * @param {CatalogView[]} catalogs
+ */
+export function readyVoiceSettings(draft, saved, catalogs) {
+  // The same model as in use takes its other changes (language, voice, speed) at once, ready or not.
+  const same = (task) => draft[task].catalog === saved[task].catalog && draft[task].model === saved[task].model;
+  const turnReady = (draft.end_of_turn === saved.end_of_turn && draft.turn_model === saved.turn_model) || modelReady(draft, 'end-of-turn', catalogs);
+  return {
+    ...draft,
+    stt: same('stt') || modelReady(draft, 'stt', catalogs) ? draft.stt : saved.stt,
+    tts: same('tts') || modelReady(draft, 'tts', catalogs) ? draft.tts : saved.tts,
+    end_of_turn: turnReady ? draft.end_of_turn : saved.end_of_turn,
+    ...(turnReady ? {} : { turn_model: saved.turn_model }),
+  };
 }

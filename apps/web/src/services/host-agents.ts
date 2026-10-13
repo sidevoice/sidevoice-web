@@ -20,12 +20,6 @@ export function actionableAgent(agent: DetectedAgent): boolean {
     (agent.connect === "auto" || agent.connect === "manual");
 }
 
-export function actionableHostFingerprints(hostAgents: Record<string, HostAgentsState>, activeFingerprints?: ReadonlySet<string>): string[] {
-  return Object.entries(hostAgents).filter(([, listing]) =>
-    listing.status === "ready" && listing.value?.agents.some(actionableAgent))
-    .map(([fp]) => fp)
-    .filter((fp) => !activeFingerprints || activeFingerprints.has(fp));
-}
 
 export function isHostAgentsListing(value: unknown): value is HostAgentsListing {
   if (!value || typeof value !== "object") return false;

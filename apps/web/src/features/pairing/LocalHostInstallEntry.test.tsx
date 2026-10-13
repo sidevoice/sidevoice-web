@@ -49,19 +49,17 @@ test("NoMachine keeps remote pairing available while local preparation reports b
     report.mockImplementation(onProgress);
     return operation("room-job", result.promise);
   });
-  const agents = vi.fn();
   const openPairing = vi.fn();
   window.sidevoiceActions = { openPairing } as unknown as typeof window.sidevoiceActions;
-  const controller = fakeController({ install, cancel: vi.fn(() => cancelResult.promise), agents });
+  const controller = fakeController({ install, cancel: vi.fn(() => cancelResult.promise) });
   const store = createRoomStore();
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<RoomProvider store={store}><NoMachineScreen installController={controller} /></RoomProvider>);
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   expect(install).toHaveBeenCalledOnce();
-  expect(agents).not.toHaveBeenCalled();
   await act(async () => { report({ step: "download", done: 1_572_864, total: 3_145_728 }); });
-  expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("max", "3145728");
+  expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("aria-valuenow", "50");
   expect(screen.getByText("1.5 of 3 MB")).toBeInTheDocument();
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect to a machine" })); });
@@ -178,4 +176,33 @@ test("connecting to another machine dismisses a settled failure without changing
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect to another machine" })); });
   expect(openPairing).toHaveBeenCalledOnce();
   expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("outside the setup it offers another machine in every state of the install; anotherMachine={false} never does", async () => {
+  let settle!: { resolve(status: LocalHostStatus): void; reject(error: unknown): void };
+  const install = vi.fn(() => operation("job", new Promise<LocalHostStatus>((resolve, reject) => { settle = { resolve, reject }; })));
+  const controller = fakeController({ install });
+  render(<>
+    <div data-testid="room"><LocalHostInstallEntry showCta={false} holdSuccess source="no-machine" controller={controller} /></div>
+    <div data-testid="setup"><LocalHostInstallEntry showCta={false} holdSuccess source="no-machine" anotherMachine={false} controller={controller} /></div>
+  </>);
+  const offered = (where: string) =>
+    [...screen.getByTestId(where).querySelectorAll("button")].some((button) => button.textContent === "Connect to another machine");
+  const check = (phase: string) => {
+    expect(controller.getSnapshot().phase).toBe(phase);
+    expect(offered("room")).toBe(true);
+    expect(offered("setup")).toBe(false);
+  };
+  try {
+    await act(async () => { controller.start("no-machine"); });
+    check("installing");
+    await act(async () => { settle.reject({ key: "install.unknown", step: "download" }); await Promise.resolve(); });
+    check("failed");
+    await act(async () => { controller.start("no-machine"); });
+    await act(async () => { settle.reject({ key: "install.cancelled", step: "download" }); await Promise.resolve(); });
+    check("cancelled");
+    await act(async () => { controller.start("no-machine"); });
+    await act(async () => { settle.resolve(running); await Promise.resolve(); });
+    check("succeeded");
+  } finally { act(() => controller.clear()); }
 });

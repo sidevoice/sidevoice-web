@@ -1,0 +1,21 @@
+/* A machine's state (MachineState.tsx). In words, in its tone, as the agents' status line colours it: the machine's page,
+ * and an entry's second line when it needs the person. Never the
+ * accent: that means new (and selected), so the current entry's own colour never reaches it. */
+.machine-state { font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-medium); white-space: nowrap; color: var(--sv-text-muted); }
+/* Connected: the models' "Ready" badge itself (Badge tone positive, its dot); only its size is the line's. */
+.machine-state.machine-state-badge { font-size: inherit; line-height: inherit; }
+.machine-state[data-tone="warning"] { color: var(--sv-warning); }
+.machine-state[data-tone="danger"] { color: var(--sv-danger); }
+
+/* Connected, on an entry's icon (StateOnIcon; A, B): a small green dot at its bottom corner, ringed in the ground behind
+ * it (--new-ground, the "new" mark's: the nav, the current entry's tint, a phone's list), opposite the "new" dot's. */
+.state-on-icon { position: relative; display: inline-grid; place-items: center; flex: none; }
+.state-on-icon-dot { position: absolute; bottom: -2px; inset-inline-end: -3px; width: 7px; height: 7px; box-sizing: content-box;
+  border: 2px solid var(--new-ground, var(--sv-bg-subtle)); border-radius: 50%; background: var(--sv-positive); }
+
+/* An entry's words (MachineEntryCopy): the name on its line — it gives way (an ellipsis), "New" after it never — and,
+ * where it is said, the state on the next, whole. */
+.machine-entry-copy { display: grid; flex: 1 1 auto; justify-items: start; gap: 2px; min-width: 0; text-align: start; }
+.machine-entry-line { display: flex; align-items: center; gap: var(--sv-space-1); width: 100%; min-width: 0; }
+.machine-entry-line .machine-nav-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.machine-entry-line .new-end-dot { margin-inline-start: auto; }

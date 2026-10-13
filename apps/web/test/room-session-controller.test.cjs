@@ -2,12 +2,12 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),asse
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pairings:[PAIRED]}:null,localHost=null,localHostSelected=false,indexedDB=null,outboxScope=null}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
- if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','settings-close','stats-recognition','stats-response'])elements.set(id,new Element(id))}
- const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};if(localHostSelected)saved['sidevoice.local-host-selected']='true';
+ if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
+ const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
  if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
  // The outbox's storage across reloads, and this tab's scope in it.
@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js'};
+ const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./host-i18n':'HostI18n'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -31,7 +31,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{in_use:PAIRED.fp,pair
  const loaded=imports(source,sourceRoot+'/services');
  vm.runInContext('"use strict";\n'+loaded,context);
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
- if(paired)vm.runInContext("nodeBase='';verified.set('',Date.now());roomStore.patch({node:pairings.inUse,nodeReach:'ok'})",context);
+ // Paired: the first machine proved itself at the page's own origin, and the call is on it.
+ if(paired)vm.runInContext("verified.set('',Date.now());callNode=pairings.list[0]?.fp??null;if(callNode){const link=linkOf(callNode);link.base='';link.reach='ok';link.via='node';publishLinks()}",context);
  vm.runInContext("roomBinding={thread_id:'a',title:'A'};sessionId='s'",context);
  // An event dispatched to the document, as one bubbles up from `target`: every listener there hears it.
  const dispatch=(name,event)=>Promise.all((documentHandlers[name]||[]).map(fn=>fn({preventDefault(){},...event})));
@@ -63,23 +64,24 @@ test('The controller publishes serializable snapshots through the React store br
   setLanguageModels:value=>snapshots.languageModels=value,
   setBootError:value=>snapshots.bootError=value
  };
- s.run("add('assistant','Hola','voice:1','a');markHistorySeen();people=[{thread_id:'a',title:'Agente',available:true}];rosterSignature=''");
+ s.run("add('assistant','Hola','voice:1','fp-mac|a');markHistorySeen();people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true}];rosterSignature=''");
  assert.equal(snapshots.conversation.messages[0].text,'Hola');
- assert.equal(snapshots.conversation.messages[0].thread,'a');
- assert.equal(snapshots.participants[0].threadId,'a');
+ assert.equal(snapshots.conversation.messages[0].thread,'fp-mac|a','a conversation is its machine and its thread');
+ assert.equal(snapshots.participants[0].threadId,'fp-mac|a');
+ assert.equal(snapshots.participants[0].machine,'macbook','grouped under the paired machine, as this device names it');
  assert.equal(snapshots.participants[0].selected,true);
  assert.match(snapshots.participants[0].activityNote,/No sabemos/,'an undeclared capability remains unknown');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported'}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported'}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/no informa/,'unsupported is explained explicitly');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported'}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported'}}];rosterSignature=''");
  assert.equal(snapshots.participants[0].activityNote,null,'supported activity needs no warning');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported',deliver:'supported',experimental:['deliver']}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported',deliver:'supported',experimental:['deliver']}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/Entrega experimental/,'an experimental delivery is said');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported',deliver:'supported',sessionIdentity:'supported',experimental:['deliver','sessionIdentity']}}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported',deliver:'supported',sessionIdentity:'supported',experimental:['deliver','sessionIdentity']}}];rosterSignature=''");
  assert.match(snapshots.participants[0].activityNote,/Identificación experimental/,'an experimental identity is said too');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,harness:'cursor',route:'cursor-editor-view'}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,harness:'cursor',route:'cursor-editor-view'}];rosterSignature=''");
  assert.equal(snapshots.participants[0].harness,'cursor'); assert.equal(snapshots.participants[0].route,'tarjeta (experimental)');
- s.run("people=[{thread_id:'a',title:'Agente',available:true,harness:'cursor'}];rosterSignature=''");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,harness:'cursor'}];rosterSignature=''");
  assert.equal(snapshots.participants[0].route,null,'a room that does not say the route leaves the harness name alone');
  assert.equal(s.run("setRoomError('fallo')"),undefined);
  assert.equal(snapshots.bootError,'fallo');
@@ -116,13 +118,17 @@ test('Delivery tick is immediate, follows the matching receipt and does not impl
  assert.equal(s.run('history[0].delivery'),'delivered');
 });
 test('A joined empty room selects its only listening conversation automatically',async()=>{
- const s=setup();s.run("roomBinding=null;ws={};people=[{thread_id:'only',available:true,reach:{state:'listening'}}];closedThreads=[];var chosen=null;select=async id=>{chosen=id}");
+ const s=setup();s.run("roomBinding=null;ws={};people=[{node:'fp-mac',thread_id:'only',available:true,reach:{state:'listening'}}];closedThreads=[];var chosen=null;select=async id=>{chosen=id}");
  assert.equal(await s.run('selectOnlyListeningConversation()'),true);
- assert.equal(s.run('chosen'),'only');
+ assert.equal(s.run('chosen'),'fp-mac|only','by its key: the machine the call is on, and the thread');
  // With several and none remembered, the first in the list: joining always lands somewhere (2026-09-26).
- s.run("people.unshift({thread_id:'first',available:true,reach:{state:'listening'}});chosen=null");
+ s.run("people.unshift({node:'fp-mac',thread_id:'first',available:true,reach:{state:'listening'}});chosen=null");
  assert.equal(await s.run('selectOnlyListeningConversation()'),true);
- assert.equal(s.run('chosen'),'first');
+ assert.equal(s.run('chosen'),'fp-mac|first');
+ // Another machine's conversation is not where a join on this one lands: moving the call is the person's pick.
+ s.run("people=[{node:'fp-pc',thread_id:'there',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'here',available:true,reach:{state:'listening'}}];chosen=null");
+ assert.equal(await s.run('selectOnlyListeningConversation()'),true);
+ assert.equal(s.run('chosen'),'fp-mac|here');
  // With none, the list opens by itself, once per call.
  const opened=[];s.context.Event=class{constructor(type){this.type=type}};s.context.window.dispatchEvent=event=>{opened.push(event.type);return true};
  s.run("people=[];chosen=null;sessionId='call-1'");
@@ -163,12 +169,27 @@ test('A delivery receipt never fabricates a typing or working indicator',()=>{
 test('Background history arrives without changing focus and has an unread badge',async()=>{
  const s=setup();s.context.fetch=async()=>({ok:true,json:async()=>({messages:[{id:'old:voice:reply',thread:'b',role:'assistant',text:'Listo B',name:'B',time:1,seq:5,status:'text_only'}]})});
  await s.run('refreshHistory()');
- assert.equal(s.run('targetId()'),'a');assert.equal(s.run("SessionState.unreadCount(state,'b')"),1);
+ assert.equal(s.run('targetId()'),'fp-mac|a');assert.equal(s.run("SessionState.unreadCount(state,'fp-mac|b')"),1);
  assert.equal(s.run("history[0].text"),'Listo B');
- s.run("viewedThread='b';markHistorySeen()");
- assert.equal(s.run("SessionState.unreadCount(state,'b')"),0);
- assert.equal(s.run('targetId()'),'a');
+ s.run("viewedThread='fp-mac|b';markHistorySeen()");
+ assert.equal(s.run("SessionState.unreadCount(state,'fp-mac|b')"),0);
+ assert.equal(s.run('targetId()'),'fp-mac|a');
  await s.run('refreshHistory()');assert.equal(s.run('history.length'),1);
+});
+test('A history row this page cannot draw is left out, and the rest of the history still arrives (core#112)',async()=>{
+ const s=setup();
+ s.context.fetch=async()=>({ok:true,json:async()=>({messages:[
+  {id:42,thread:'a',role:'assistant',text:'id not a string',time:1,seq:1},
+  {thread:'a',role:'assistant',text:'no id',time:2,seq:2},
+  {id:'r:3',thread:'a',role:'system',text:'a role this page does not know',time:3,seq:3},
+  {id:'r:4',thread:'a',role:'assistant',time:4,seq:4},
+  null,
+  {id:'r:5',thread:'a',role:'assistant',text:'Hecho',name:'A',time:5,seq:5,status:'playback_finished',mood:'calm',attachments:[{kind:'image'}]},
+  {id:'r:6',thread:'a',role:'user',text:'Gracias',time:6,seq:6,status:'read'},
+ ],cursor:'next-7'})});
+ await s.run('refreshHistory()');
+ assert.deepEqual(plain(s.run('history').map(r=>[r.segment,r.role,r.text])),[['r:5','assistant','Hecho'],['r:6','user','Gracias']]);
+ assert.equal(s.run('history[0].mood'),undefined,'only the fields this page reads are kept');
 });
 
 test('A composing message follows received replies and gets its final timestamp on send',()=>{
@@ -231,10 +252,19 @@ test('Microphone preference can be toggled before joining',()=>{
  assert.equal(s.run('SessionState.micView(state).pressed'),false);
 });
 test('The call socket follows the page scheme and host',()=>{
- const s=setup();assert.equal(s.run('roomSocketUrl()'),'wss://room.example/api/presentation/ws');
+ const s=setup();assert.equal(s.run('roomSocketUrl(callNode)'),'wss://room.example/api/presentation/ws');
+});
+test('The screen is left to the device unless keeping it on was chosen',async()=>{
+ const s=setup();let requests=0;
+ s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
+ s.run('ws={}');
+ await s.run('keepScreenAwake()');
+ assert.equal(requests,0);
 });
 test('Wake lock is released if hangup wins the pending request',async()=>{
  const s=setup();let grant,requests=0,released=0;
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:()=>{requests++;return new Promise(resolve=>grant=resolve)}}};
  s.run('ws={}');
  const pending=s.run('keepScreenAwake()');
@@ -247,6 +277,8 @@ test('Wake lock is released if hangup wins the pending request',async()=>{
 });
 test('The tap that starts the call asks for the lock, before there is a socket',async()=>{
  const s=setup();let requests=0;
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener(){}}}}};
  s.run('connecting=true');
  await s.run('keepScreenAwake()');
@@ -255,6 +287,8 @@ test('The tap that starts the call asks for the lock, before there is a socket',
 });
 test('A refused lock shows red and says so, instead of failing silently',async()=>{
  const s=setup();
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.navigator={wakeLock:{request:async()=>{throw Error('NotAllowedError')}}};
  s.run('ws={}');
  await s.run('keepScreenAwake()');
@@ -263,6 +297,8 @@ test('A refused lock shows red and says so, instead of failing silently',async()
 });
 test('A lock the system takes back is asked for again while the call is up, and not after it ends',async()=>{
  const s=setup();let requests=0,release=null;const scheduled=[];
+ // Keeping the screen on is chosen in Settings (off by default).
+ s.run("localStorage.setItem('sidevoice.call-preferences',JSON.stringify({keepAwake:true}))");
  s.context.setTimeout=fn=>{scheduled.push(fn);return 0};
  s.context.navigator={wakeLock:{request:async()=>{requests++;return {release:async()=>{},addEventListener:(name,fn)=>{if(name==='release')release=fn}}}}};
  s.run('ws={}');
@@ -286,6 +322,15 @@ test('Settings are reached from the header menu',()=>{
  // The ⋯ menu's Settings entry is the very button the runtime opens the dialog from: one entry, nothing relaying to it.
  const s=setup({strictDOM:true});
  assert.equal(typeof s.elements.get('settings-open').onclick,'function');
+});
+test('Settings are left by the back arrow before their title',()=>{
+ // The arrow is the UI's own #settings-close (found in its source, not stubbed here): its click closes Settings.
+ const s=setup({strictDOM:true});
+ const settings=s.elements.get('language-settings');
+ settings.showModal();
+ assert.equal(settings.open,true);
+ s.elements.get('settings-close').click();
+ assert.equal(settings.open,false);
 });
 test('Stats omit missing durations and use first reply per turn, only for selected thread',()=>{
  const s=setup({strictDOM:true});
@@ -362,7 +407,21 @@ test('A call with no sign of a person asks, then leaves, and only this browser l
  assert.equal(s.run('state.liveNote'),'');
  s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS-1;checkIdle()");
  assert.equal(s.run('state.ws'),null,'with no answer the browser leaves the call');
- assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/Saliste de la llamada/);
+ assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/^You left the call: 15 minutes without a sign from you/);
+});
+test('The desktop card hears it too: the warning while it stands, and why the call ended, said as it ends; a hang-up says nothing',()=>{
+ const s=setup();
+ s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS+30000;checkIdle()");
+ assert.equal(s.run('state.callIdleWarning'),true);
+ s.run('personSignal()');
+ assert.equal(s.run('state.callIdleWarning'),false,'Keep, or any sign of the person, answers it');
+ // The snapshot that says the call is over already says why.
+ s.run("var seen=[];roomStore.subscribe(v=>seen.push([!!v.facts.ws,v.facts.callEnded&&v.facts.callEnded.reason]))");
+ s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS-1;checkIdle()");
+ assert.equal(s.run('JSON.stringify(seen.find(([ws])=>!ws))'),'[false,"idle"]');
+ assert.equal(s.run('state.callIdleWarning'),false);
+ s.run("state.callEnded=null;state.ws={close(){},readyState:1,send(){}};disconnect()");
+ assert.equal(s.run('state.callEnded'),null,'the person hanging up is no reason to say');
 });
 test('The waveform bubble draws the level the voice reports, and nothing without a call',()=>{
  const s=setup();
@@ -406,7 +465,7 @@ test('Aggregates keep one row per stage, named as the last-turn view names them'
 test('Copying the aggregates puts a plain-text table on the clipboard and says so',async()=>{
  const s=setup();const copied=[];
  s.context.navigator={clipboard:{writeText:async text=>{copied.push(text)}}};
- s.run("people=[{thread_id:'a',title:'Claude'},{thread_id:'b',title:'Astra'}]");
+ s.run("people=[{node:'fp-mac',thread_id:'a',title:'Claude'},{node:'fp-mac',thread_id:'b',title:'Astra'}]");
  s.run(`renderLatencyStats({replies:[
  {thread_id:'a',reply_revision:1,input_ms:{endpoint_silence_ms:600},server_ms:{input_queued_to_reply_received_ms:3000}},
  {thread_id:'b',reply_revision:2,server_ms:{input_queued_to_reply_received_ms:21000}}
@@ -439,12 +498,12 @@ test('Selecting a conversation is this tab\'s own choice: it names the session, 
  s.context.fetch=async(path,init)=>{posted.push([path,init?.body?JSON.parse(init.body):null]);
   if(path.includes('/select'))return {ok:true,json:async()=>({status:'activated',binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'}})};
   return {ok:true,json:async()=>({binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'},room:{revision:1},clients:[],call:null})}};
- s.run("sessionId='sess-1';ws={readyState:1};roomBinding=null;people=[{thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'}},{thread_id:'t-2',title:'Dos',available:true,reach:{state:'listening'}}]");
- await s.run('select')('t-1');
+ s.run("sessionId='sess-1';ws={readyState:1};roomBinding=null;people=[{node:'fp-mac',thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'}},{node:'fp-mac',thread_id:'t-2',title:'Dos',available:true,reach:{state:'listening'}}]");
+ await s.run('select')('fp-mac|t-1');
  const select=posted.find(([path])=>path.endsWith('/api/presentation/select'));
- assert.deepEqual(select[1],{thread_id:'t-1',session_id:'sess-1'},'the room is told which browser chose');
- assert.equal(store['sidevoice.selected'],'t-1','remembered for this tab only');
- assert.equal(s.run('rememberedThread')(),'t-1');
+ assert.deepEqual(select[1],{thread_id:'t-1',session_id:'sess-1'},'the room is told which browser chose, by its own name for the thread');
+ assert.equal(store['sidevoice.selected'],'fp-mac|t-1','remembered for this tab only, with its machine');
+ assert.equal(s.run('rememberedThread')(),'fp-mac|t-1');
  // A new socket for this tab (reload, reconnect) goes back to the same conversation and never picks another.
  posted.length=0;s.run("roomBinding=null;sessionId='sess-2'");
  assert.equal(await s.run('reselectRemembered')(),true);
@@ -481,7 +540,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const socket=await firstSocket(room.sockets);
  socket.onerror();socket.onclose({code:1006});   // everything the socket could have said, lost on the way
  await joined;
- assert.equal(full.run('roomStore.getState().join.text'),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.',
+ assert.equal(full.run('roomStore.getState().join.text'),'The room already has the maximum number of devices connected. Wait for someone to leave and join again.',
   'the reason came from the room, asked over a request no proxy rewrites');
  assert.deepEqual(room.voice.calls.at(-1),['stop'],'and the voice the join started is stopped');
 
@@ -494,7 +553,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
   message:'The room already has the maximum number of browsers connected.'}})});
  telling.onclose({code:1006});
  await tellJoined;
- assert.equal(told.run('roomStore.getState().join.text'),'La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.');
+ assert.equal(told.run('roomStore.getState().join.text'),'The room already has the maximum number of devices connected. Wait for someone to leave and join again.');
 
  // A room that answers nothing at all is not a room that refused: the page says which it was.
  const gone=setup({strictDOM:true});
@@ -503,18 +562,30 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const lost=await firstSocket(away.sockets);
  lost.onerror();lost.onclose({code:1006});
  await awayJoined;
- assert.equal(gone.run('roomStore.getState().join.text'),'No se pudo conectar con la sala.');
+ assert.equal(gone.run('roomStore.getState().join.text'),'Could not connect to the room.');
+
+ // A refusal this page has no words for is the room refusing: what the room said is only behind Details, and a device
+ // set to Spanish reads it in Spanish.
+ const other=setup({strictDOM:true});other.saved['sidevoice.settings']=JSON.stringify({ui_language:'es'});
+ const odd=joining(other,{admission:{admitted:false,reason:'device_quarantined',message:'This device is quarantined by policy.'}});
+ const oddJoined=odd.tap();
+ const oddSocket=await firstSocket(odd.sockets);
+ oddSocket.onerror();oddSocket.onclose({code:1006});
+ await oddJoined;
+ assert.equal(other.run('roomStore.getState().join.text'),'La sala no deja entrar a este dispositivo.');
+ assert.equal(other.run('roomStore.getState().join.details'),'device_quarantined\nThis device is quarantined by policy.');
 });
 test('A voice that cannot start says why, and opens no socket',async()=>{
  const s=setup({strictDOM:true});
  const room=joining(s,{start:async()=>{throw Object.assign(Error('denied'),{code:'microphone-denied'})}});
  await room.tap();
- assert.match(s.run('roomStore.getState().join.text'),/micrófono está bloqueado para esta página/);
+ assert.match(s.run('roomStore.getState().join.text'),/^The microphone is blocked for this page/);
+ assert.equal(s.run('roomStore.getState().join.details'),'denied','what the voice said is only a detail');
  assert.equal(room.sockets.length,0);
  const missing=setup({strictDOM:true});
  const none=joining(missing,{voice:null});
  await none.tap();
- assert.match(missing.run('roomStore.getState().join.text'),/aún no está disponible/,'a page with no voice module says so');
+ assert.match(missing.run('roomStore.getState().join.text'),/not available in this version of the page yet/,'a page with no voice module says so');
 });
 test('The page answers when the room asks whether anybody is still there',()=>{
  // The room asks because a closed tab behind a tunnel leaves its socket up and its seat taken.
@@ -601,7 +672,7 @@ function network({at={},target=null,roomSays=null,refuse=false}={}){
   if(path.startsWith('/api/device/identity?nonce='))return reply(200,{fingerprint:node.fp,public_key:node.public_key,host:node.host,signature:await node.sign(decodeURIComponent(path.split('nonce=')[1]))});
   if(path==='/api/device/pair'){const body=JSON.parse(init.body);if(body.secret!=='fresh')return reply(403,{detail:'Código de emparejamiento desconocido, usado o caducado.'});node.tokens.add('tok-new');return reply(200,{device_id:'dev-9',token:'tok-new',node:{fingerprint:node.fp,public_key:node.public_key,host:node.host}})}
   if(refuse||!node.tokens.has(String(auth).replace('Bearer ','')))return reply(401,{detail:'Dispositivo no emparejado con esta máquina.'});
-  return reply(200,{binding:null,participants:[],messages:[],room:{revision:0},clients:[],call:null});
+  return reply(200,{binding:null,participants:node.people||[],messages:node.messages||[],room:{revision:0},clients:[],call:null});
  };
  return {get,asked};
 }
@@ -616,70 +687,82 @@ function socketsOf(s){
 }
 const stored=s=>JSON.parse(s.saved['sidevoice.pairings']||'null');
 
-test('The machine in use is reached at the first of its addresses that proves it is that machine, and the token goes nowhere else',async()=>{
+test('A machine is reached at the first of its addresses that proves it is that machine, and the token goes nowhere else',async()=>{
  const node=await fakeNode(),squatter=await fakeNode('squatter');node.tokens.add('tok-1');
- const s=setup({paired:false,stored:{in_use:node.fp,pairings:[pairingOf(node)]}});
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node)]}});s.context.__fp=node.fp;s.run('callNode=__fp');
  // The loopback URL answers as someone else; the machine is behind its room.
  const net=network({at:{'http://127.0.0.1:8768':squatter,'https://room.example/nodes/mac':node}});s.context.fetch=net.get;
- await s.run('locate({move:true,fresh:true})');
- assert.equal(s.run('nodeBase'),'https://room.example/nodes/mac');
- assert.equal(s.run('state.rendezvous'),'room');
+ await s.run('locate(__fp,{move:true,fresh:true})');
+ assert.equal(s.run('linkBase(__fp)'),'https://room.example/nodes/mac');
+ assert.equal(s.run('state.machineLinks[__fp].via'),'room');
  assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
  assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
  await s.run('refresh()');
  assert.ok(net.asked.some(r=>r.url==='https://room.example/nodes/mac/api/presentation?session_id=s'&&r.auth==='Bearer tok-1'));
  assert.equal(net.asked.filter(r=>r.url.startsWith('http://127.0.0.1')&&r.auth).length,0,'nothing carrying the token went to the address that could not prove itself');
  // Within a few minutes a proven address is not asked to prove itself again.
- net.asked.length=0;await s.run('locate()');
+ net.asked.length=0;await s.run('locate(__fp)');
  assert.equal(net.asked.length,0);
  // Once the machine answers directly, a fresh look prefers it: the contract's order, not the fastest.
  const direct=network({at:{'http://127.0.0.1:8768':node,'https://room.example/nodes/mac':node}});s.context.fetch=direct.get;
- await s.run('locate({move:true,fresh:true})');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:8768');
+ await s.run('locate(__fp,{move:true,fresh:true})');
+ assert.equal(s.run('linkBase(__fp)'),'http://127.0.0.1:8768');
  assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
  assert.equal(s.run('roomStore.getState().machines[0].reachLabel'),undefined,'normal host rows do not expose the route');
 });
 
-test('The native local pairing is projected before selection validation and uses only its per-launch proxy',async()=>{
+test('The native local pairing is one more machine, listed first, and uses only its per-launch proxy',async()=>{
  const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
- const s=setup({paired:false,stored:{in_use:'fp-local',pairings:[PAIRED]},localHost:bridge}),asked=[];
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge}),asked=[];
  s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return {ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
  await new Promise(resolve=>setTimeout(resolve,10));
  const snapshot=s.run('roomStore.getState()');
- assert.equal(snapshot.facts.pairingInUse,'fp-local');
  assert.equal(snapshot.facts.machinesReady,true);
- assert.equal(snapshot.facts.nodeReach,'ok');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
+ assert.equal(snapshot.facts.machineLinks['fp-local'].reach,'ok');
+ assert.equal(s.run("linkBase('fp-local')"),'http://127.0.0.1:43127');
  assert.equal(JSON.stringify(snapshot.machines.map(machine=>[machine.id,machine.local])),JSON.stringify([['local-host',true],[PAIRED.fp,false]]));
  assert.equal(asked.some(([url])=>url.startsWith('http://127.0.0.1:43127/')&&url.includes('/api/device/identity?nonce=')),false,'native already verified the local identity over its peer-checked socket');
  assert.ok(asked.every(([url,options])=>!options.headers?.Authorization||url.startsWith('http://127.0.0.1:43127/')),'the session token stays on the app-owned proxy; other paired hosts may receive unauthenticated identity probes');
  const saved=JSON.parse(s.saved['sidevoice.pairings']);
- assert.equal(saved.in_use,'fp-local');
+ assert.equal('in_use' in saved,false,'no machine is "the one in use"');
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
  assert.equal(JSON.stringify(saved).includes('local-session-secret'),false,'the proxy credential never reaches page storage');
 });
 
-test('A local row survives reload with no native pairing or stored local fingerprint',async()=>{
+test('A local row survives reload with no native pairing',async()=>{
  const status={state:'backoff',reachable:false,attempts:3,limit:8};
  const bridge={state:()=>status,subscribe:()=>()=>{},pairing:()=>null};
- const s=setup({paired:false,stored:{in_use:'@sidevoice/local-host',pairings:[PAIRED]},localHost:bridge,localHostSelected:true});
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
  await new Promise(resolve=>setTimeout(resolve,10));
  const snapshot=s.run('roomStore.getState()'),local=snapshot.machines.find(machine=>machine.local);
  assert.ok(local,'the native failure still projects a local machine row');
  assert.equal(local.id,'local-host');
- assert.equal(local.inUse,true);
- assert.equal(local.selectable,false);
- assert.equal(snapshot.facts.localHostSelected,true);
- assert.equal(snapshot.facts.pairingInUse,'@sidevoice/local-host');
- assert.equal(s.run('nodeBase'),null);
- assert.equal(snapshot.facts.nodeReach,'away');
+ assert.equal(local.state,'offline');
+ assert.equal(local.pairingId,undefined,'with no pairing to route through');
  assert.equal(JSON.stringify(local).includes('127.0.0.1'),false);
  assert.equal(JSON.stringify(local).includes('local-session-secret'),false);
  const saved=JSON.parse(s.saved['sidevoice.pairings']);
- assert.equal(saved.in_use,'@sidevoice/local-host');
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
- assert.equal(s.saved['sidevoice.local-host-selected'],'true');
+});
+
+test('In the desktop app, this device\'s agents are asked for in This device and another machine\'s under Remote machines; in a browser, all under Machines',async()=>{
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(s.run('roomStore.getState()').facts.localHostAvailable,true);
+ // The harness mirrors each fact as a global, `settingsSection` among them: the controller's own helper is put back.
+ Object.defineProperty(s.context,'settingsSection',{value:name=>s.run('roomStore').patch({settingsSection:name}),writable:true,configurable:true});
+ const section=fp=>{s.run(`openAgentSettings(${JSON.stringify(fp)})`);return s.run('roomStore.getState()').facts.settingsSection};
+ // A browser talking to a local Sidevoice: it can host, but it isn't the app — every machine's agents are under Machines.
+ assert.equal(s.run('roomStore.getState()').facts.inApp,false);
+ assert.equal(section('fp-local'),'machines');
+ // The desktop app: this device's are This device's.
+ s.run('roomStore').patch({inApp:true});
+ assert.equal(section('fp-local'),'this-computer');
+ assert.equal(section(PAIRED.fp),'machines');
 });
 
 test('A native status event that wins the initial state read still completes machine readiness',async()=>{
@@ -703,12 +786,12 @@ test('A lost local pairing clears its per-launch locator and a reachable non-run
  const nextLocal={...oldLocal,token:'new-launch-secret',urls:['http://127.0.0.1:43218']};
  let status={state:'running',reachable:true,installed:true,service:'launchd'},pairing=oldLocal,onStatus=()=>{},pendingPairing=null;
  const bridge={state:()=>status,subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>pendingPairing||pairing};
- const s=setup({paired:false,stored:{in_use:'fp-local',pairings:[]},localHost:bridge});
+ const s=setup({paired:false,stored:{pairings:[]},localHost:bridge});
  const asked=[];
  s.context.fetch=async(url,options={})=>{asked.push([String(url),options]);return{ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''}};
  await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:43127');
- assert.equal(s.run('state.nodeReach'),'ok');
+ assert.equal(s.run("linkBase('fp-local')"),'http://127.0.0.1:43127');
+ assert.equal(s.run("state.machineLinks['fp-local'].reach"),'ok');
 
  let resolveStalePairing;
  pendingPairing=new Promise(resolve=>{resolveStalePairing=resolve});
@@ -718,12 +801,10 @@ test('A lost local pairing clears its per-launch locator and a reachable non-run
  resolveStalePairing(oldLocal);
  await new Promise(resolve=>setTimeout(resolve,0));
  let snapshot=s.run('roomStore.getState()');
- assert.equal(s.run('nodeBase'),null,'the per-launch proxy is cleared as soon as reachability is lost');
- assert.equal(snapshot.facts.node,null);
- assert.equal(snapshot.facts.nodeReach,'away');
+ assert.equal(s.run("linkBase('fp-local')"),null,'the per-launch proxy is cleared as soon as reachability is lost');
+ assert.equal(snapshot.facts.machineLinks['fp-local'].reach,'away','its conversations stay listed, unreachable');
  assert.equal(snapshot.machines[0].id,'local-host');
- assert.equal(snapshot.machines[0].inUse,true);
- assert.equal(snapshot.machines[0].selectable,false);
+ assert.equal(snapshot.machines[0].state,'offline');
  assert.equal(JSON.stringify(snapshot).includes('old-launch-secret'),false);
  assert.equal(JSON.stringify(snapshot).includes('127.0.0.1:43127'),false);
  assert.equal(JSON.stringify(JSON.parse(s.saved['sidevoice.pairings'])).includes('old-launch-secret'),false);
@@ -731,14 +812,14 @@ test('A lost local pairing clears its per-launch locator and a reachable non-run
  status={state:'stopped-by-person',reachable:true,installed:true,service:'launchd'};pairing=nextLocal;onStatus(status);
  await new Promise(resolve=>setTimeout(resolve,10));
  snapshot=s.run('roomStore.getState()');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:43218');
- assert.equal(snapshot.facts.nodeReach,'ok');
+ assert.equal(s.run("linkBase('fp-local')"),'http://127.0.0.1:43218');
+ assert.equal(snapshot.facts.machineLinks['fp-local'].reach,'ok');
  assert.equal(snapshot.machines[0].state,'connected','native reachable remains usable although the service state is not running');
- assert.equal(snapshot.machines[0].selectable,true);
- assert.deepEqual([...s.run('callProtocols()')],['sidevoice','sidevoice.token.new-launch-secret']);
+ assert.deepEqual([...s.run("callProtocols('fp-local')")],['sidevoice','sidevoice.token.new-launch-secret']);
  assert.equal(asked.some(([url])=>url.includes('/api/device/identity?nonce=')),false,'native already verified this local identity');
  const requestsBeforeRecovery=asked.length;
- await s.run("refreshPeople()");
+ await s.run("refreshPeople('fp-local')");
+ assert.ok(asked.length>requestsBeforeRecovery,'its conversations are asked for again');
  assert.ok(asked.slice(requestsBeforeRecovery).every(([url,options])=>!options.headers?.Authorization||options.headers.Authorization==='Bearer new-launch-secret'), 'only the current per-launch secret is sent after recovery');
 });
 
@@ -768,35 +849,45 @@ test('A code is redeemed where its machine proves itself, and the page starts ta
  assert.equal(answer.host,'macbook');
  const pair=net.asked.find(r=>r.url==='http://127.0.0.1:8768/api/device/pair'&&JSON.parse(r.init.body).secret==='fresh');
  assert.deepEqual(JSON.parse(pair.init.body),{secret:'fresh',name:'Mi portátil'});
- assert.equal(stored(s).in_use,node.fp);
+ assert.equal('in_use' in stored(s),false,'no machine is "the one in use": every one is live');
  assert.equal(stored(s).pairings[0].token,'tok-new','the token is kept on this device');
  assert.doesNotMatch(JSON.stringify(s.run('roomStore.getState().facts.pairings')),/tok-new/,'and never reaches the interface\'s store');
  assert.equal(s.run('roomStore.getState().pairing.open'),false,'the dialog closes');
- assert.equal(s.run('nodeBase'),'http://127.0.0.1:8768','the address that proved itself is the one used');
- assert.equal(s.run('roomStore.getState().machines[0].inUse'),true);
- await s.run('refresh()');
+ s.context.__fp=node.fp;
+ assert.equal(s.run('linkBase(__fp)'),'http://127.0.0.1:8768','the address that proved itself is the one used');
+ assert.equal(s.run('roomStore.getState().machines[0].state'),'connected');
+ await s.run('refreshPeople(__fp)');
  assert.equal(net.asked.at(-1).auth,'Bearer tok-new');
 });
 
-test('Usar changes machine: it hangs up, joins the other machine\'s call, and the choice is kept on this device',async()=>{
- const mac=await fakeNode('macbook'),pc=await fakeNode('linux');
- const s=setup({stored:{in_use:mac.fp,pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',urls:['http://10.0.0.9:8768']})]}});
- s.run(`people=[{thread_id:'a',title:'A',available:true}];ws={readyState:1};var calls=[];disconnect=()=>{calls.push('hang-up');ws=null};toggleCall=async()=>{calls.push('join '+pairings.inUse.slice(0,4))}`);
- s.run(`window.sidevoiceActions.chooseMachine(${JSON.stringify(pc.fp)})`);
- assert.equal(JSON.stringify(s.run('calls')),JSON.stringify(['hang-up','join '+pc.fp.slice(0,4)]),'hung up first, then joined the other one\'s call');
- assert.equal(stored(s).in_use,pc.fp);
- assert.equal(s.run('people.length'),0,'the other machine\'s conversations are not this one\'s');
- assert.equal(s.run('roomBinding'),null);
- assert.equal(s.run('nodeBase'),null,'the other machine proves where it is before anything is asked of it');
- // The one in use, or one this device is not paired with, changes nothing.
- s.run("calls.length=0;ws={readyState:1}");
- s.run(`window.sidevoiceActions.chooseMachine(${JSON.stringify(pc.fp)});window.sidevoiceActions.chooseMachine('gone')`);
- assert.equal(s.run('calls.length'),0);
+test('Every paired machine at once: each at its own address with its own token, their conversations in one list by machine',async()=>{
+ const mac=await fakeNode('macbook'),pc=await fakeNode('linux');mac.tokens.add('tok-1');pc.tokens.add('tok-pc');
+ // The same thread name on both machines is two conversations.
+ mac.people=[{thread_id:'t',title:'Mac',available:true,reach:{state:'listening'}}];pc.people=[{thread_id:'t',title:'PC',available:true,reach:{state:'listening'}}];
+ pc.messages=[{id:'pc:voice:1',thread:'t',role:'assistant',text:'Hecho en el PC',time:1,seq:3,status:'text_only'}];
+ const s=setup({paired:false,stored:{pairings:[pairingOf(mac,{rv:null}),pairingOf(pc,{token:'tok-pc',urls:['https://pc.example'],rv:null})]}});
+ const net=network({at:{'http://127.0.0.1:8768':mac,'https://pc.example':pc}});s.context.fetch=net.get;
+ s.run('sessionId=null;roomBinding=null');
+ await s.run('Promise.all(liveMachines().map(fp=>locate(fp,{fresh:true})))');
+ s.context.__mac=mac.fp;s.context.__pc=pc.fp;
+ await s.run('Promise.all([refreshPeople(__mac),refreshPeople(__pc),refreshHistory(__pc)])');
+ const rows=s.run('roomStore.getState().participants');
+ assert.deepEqual(plain(rows.map(row=>[row.threadId,row.machine,row.title])),[[mac.fp+'|t','macbook','Mac'],[pc.fp+'|t','linux','PC']]);
+ assert.equal(rows[1].unread,1,'unread is each machine\'s own');assert.equal(rows[0].unread,0);
+ for(const [base,token] of [['http://127.0.0.1:8768','tok-1'],['https://pc.example','tok-pc']])
+  assert.ok(net.asked.filter(r=>r.url.startsWith(base+'/api/presentation')).every(r=>r.auth==='Bearer '+token),'each machine is asked with its own token, never another\'s');
+ assert.deepEqual(plain(s.run('roomStore.getState().machines').map(m=>m.state)),['connected','connected']);
+ // A machine that stops answering keeps its conversations listed, unreachable; the other is untouched.
+ s.run('settleLink(__pc,null,"away")');
+ const after=s.run('roomStore.getState().participants');
+ assert.deepEqual(plain(after.map(row=>[row.available,row.reach])),[[true,'listening'],[false,'offline']]);
 });
 
 test('Olvidar forgets the machine here at once, and asks it to revoke this device only where it proves itself',async()=>{
  const mac=await fakeNode('macbook'),pc=await fakeNode('linux'),squatter=await fakeNode('squatter');
- const s=setup({stored:{in_use:mac.fp,pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
+ const s=setup({stored:{pairings:[pairingOf(mac),pairingOf(pc,{token:'tok-pc',device_id:'dev-pc',urls:['http://10.0.0.9:8768'],rv:null})]}});
+ // A call on the Mac, and conversations of both machines listed.
+ s.context.__pc=pc.fp;s.run(`ws={readyState:1,close(){}};var hungUp=0;const hangUp=disconnect;disconnect=()=>{hungUp++;hangUp()};people=[{node:callNode,thread_id:'a',title:'A',available:true},{node:__pc,thread_id:'b',title:'B',available:true}];history=[{thread:callNode+'|a',role:'assistant',text:'x',seq:1},{thread:__pc+'|b',role:'assistant',text:'y',seq:1}]`);
  const net=network({at:{'':mac,'http://10.0.0.9:8768':squatter}});s.context.fetch=net.get;
  s.run(`roomStore.patch({hostAgents:{[${JSON.stringify(mac.fp)}]:{status:'ready',value:{agents:[{id:'codex',present:true,registration:'not-connected',actionable:true}],scanned_at:1},error:null,busy:{},actionErrors:{}}}})`);
  // The one in use, at the address that proved itself a moment ago.
@@ -805,7 +896,10 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  assert.equal(revoke.url,'/api/device/devices/dev-1');
  assert.equal(revoke.auth,'Bearer tok-1');
  assert.deepEqual(stored(s).pairings.map(p=>p.fp),[pc.fp]);
- assert.equal(stored(s).in_use,pc.fp,'the one left is the one in use');
+ assert.equal(s.run('hungUp'),1,'the call was on it: it ends');
+ assert.equal(s.run('callNode'),null);
+ assert.deepEqual(plain(s.run('people').map(p=>p.thread_id)),['b'],'what the page knew of it goes with it, the other machine\'s stays');
+ assert.deepEqual(plain(s.run('history').map(r=>r.text)),['y']);
  assert.equal(s.run('roomStore.getState().machines.length'),1);
  assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(mac.fp)}]`),undefined,'forgetting a host clears its connector state');
  // The other one's only address answers as somebody else: forgotten here, and its token sent nowhere.
@@ -813,8 +907,9 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  await s.run(`window.sidevoiceActions.forgetMachine(${JSON.stringify(pc.fp)})`);
  assert.equal(net.asked.filter(r=>r.method==='DELETE').length,0);
  assert.equal(net.asked.filter(r=>r.auth==='Bearer tok-pc').length,0);
- assert.deepEqual(stored(s),{in_use:null,pairings:[]});
- assert.equal(s.run('state.nodeReach'),'unpaired');
+ assert.deepEqual(stored(s),{pairings:[]});
+ assert.equal(s.run('hungUp'),1,'no call was on it: nothing hung up');
+ assert.match(s.run('roomStore.getState().join.text'),/no está emparejado con ninguna máquina/);
 });
 
 test('A machine the room cannot reach is not a full room: its own sentence, and not a refusal to stop at',async()=>{
@@ -823,11 +918,30 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
   if(frame)socket.onmessage({data:JSON.stringify({type:'error',data:frame})});
   socket.onclose({code:1013});return pending.then(()=>null,error=>error)};
  const away=await refused({message:'Esa máquina no está conectada a la sala ahora mismo.',reason:'node_offline'});
- assert.equal(away.message,'Esa máquina no está conectada a la sala ahora mismo.');
+ assert.equal(away.message,'The machine is not connected to the room right now.');
+ assert.equal(away.words.text,away.message);
  assert.equal(away.refused,false,'a machine restarting may be back at the next attempt');
  const full=await refused(null);
- assert.match(full.message,/máximo de dispositivos/,'the close code alone still means a full room');
+ assert.match(full.message,/maximum number of devices/,'the close code alone still means a full room');
  assert.equal(full.refused,true);
+});
+test('A refusal reason this page does not know is retried unless the close code says it is final (core#112)',async()=>{
+ const s=setup();s.context.crypto={randomUUID:()=>'hello-id'};
+ const refused=async(frame,code)=>{const socket={send(){},close(){}},pending=s.run('openSession')(socket,{});
+  socket.onmessage({data:JSON.stringify({type:'error',data:frame,seq:4,trace:{id:'t-1'}})});
+  socket.onclose({code});return pending.then(()=>null,error=>error)};
+ const newer={reason:'room_draining',message:'This room is moving to another server.',retry_after:5,severity:'info'};
+ // On a close that is not one of the final ones, a reason not known yet is worth another try, its sentence behind Details.
+ for(const code of [1000,1006,1011,1012]){
+  const error=await refused(newer,code);
+  assert.equal(error.refused,false,'close '+code+': a reconnection goes on');
+  assert.equal(error.message,'The room does not let this device in.','a reason with no words here reads as the room refusing');
+  assert.match(JSON.stringify(error.words),/moving to another server/,'its own sentence behind Details');
+ }
+ // Refused by policy, or with no room for this call: final, whatever the reason.
+ for(const code of [1008,1013])assert.equal((await refused(newer,code)).refused,true,'close '+code+' is final');
+ // A frame with no reason at all, only a sentence: the same rule.
+ assert.equal((await refused({message:'Something new.'},1011)).refused,false);
 });
 // ----- a dropped call taken back as it was -----
 // The room numbers its frames, parks a dropped call and takes it back on a hello naming the session, its single-use
@@ -874,13 +988,13 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
  s.handlers.beforeunload();
  assert.equal(first.readyState,3);
  assert.equal(first.closedWith,undefined,'not 1000: the room parks the call');
- assert.deepEqual(JSON.parse(c.store['sidevoice.resume']),{session_id:'s1',token:'tok-a',last_seq:2});
+ assert.deepEqual(JSON.parse(c.store['sidevoice.resume']),{session_id:'s1',token:'tok-a',last_seq:2,node:'fp-mac'},'kept with the machine it is for');
  // The next load of the same tab joins with it.
  const next=setup(),{sockets,tap}=joining(next);
  next.context.sessionStorage=storageOf(c.store);next.context.crypto={randomUUID:()=>'hello-id'};
  const joined=tap();
  const socket=await firstSocket(sockets);socket.readyState=1;socket.onopen();
- assert.deepEqual(plain(JSON.parse(socket.sent[0]).data.resume),{session_id:'s1',token:'tok-a',last_seq:2});
+ assert.deepEqual(plain(JSON.parse(socket.sent[0]).data.resume),{session_id:'s1',token:'tok-a',last_seq:2},'the room gets the ticket, not which machine this page kept it for');
  socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'s1',resume:{token:'tok-b',seconds:60},resumed:true}})});
  await joined;
  assert.equal(next.run('sessionId'),'s1','the same session, taken back');
@@ -921,20 +1035,20 @@ function withVoice(s,voice,engine){const desktop=s.context.window.__sidevoiceDes
 function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,max:8},start,voice=fakeVoice({start})}={}){
  const sockets=socketsOf(s);
  s.context.crypto={randomUUID:()=>'hello-id'};
- s.context.sessionStorage={getItem:()=>'t-1',setItem(){},removeItem(){}};
+ s.context.sessionStorage={getItem:key=>key==='sidevoice.selected'?'fp-mac|t-1':null,setItem(){},removeItem(){}};
  s.context.fetch=async path=>{if(admission==='unreachable'&&path.includes('/admission'))throw Error('Failed to fetch');return {ok:true,json:async()=>
   path.includes('/admission')?admission
   :path.includes('/participants')?{participants:[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]}
   :{binding:null,room:{revision:0},clients:[],call:null,participants:[]}}};
  withVoice(s,voice);
- s.run("keepScreenAwake=()=>{};people=[{thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
+ s.run("keepScreenAwake=()=>{};people=[{node:'fp-mac',thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
-async function callOnRoom({timers=null,indexedDB=null,outboxScope=null}={}){
- const s=setup({indexedDB,outboxScope});const sockets=socketsOf(s);let ids=0;
+async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=undefined}={}){
+ const s=setup({indexedDB,outboxScope,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
- const store={'sidevoice.selected':'a'};s.context.sessionStorage=storageOf(store);
+ const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  const voice=withVoice(s,fakeVoice());
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
@@ -1062,7 +1176,7 @@ test('The room\'s withdrawals cancel what it names, and each reply\'s end goes t
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
- await s.run("$('ui-language').value='en';saveSettings()");
+ await s.run("saveLanguage('en')");
  assert.deepEqual(sent.filter(m=>m.type==='voice-settings').map(m=>Object.keys(m.data).sort()),[['session_id','ui_language']]);
 });
 
@@ -1092,26 +1206,28 @@ test('Opening the settings reads the engine\'s catalogues and which providers ha
  assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false},'one key per remote catalogue');
  assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
 });
-test('Saved voice settings are checked by the voice, kept on this device, and the next call starts with them',async()=>{
+test('Voice settings apply as they change: checked by the voice, kept on this device, and the next call starts with them',async()=>{
  const {s,voice,engine,asked}=settingsPage();
  await engine.setCredential('openai','sk-1');
  s.run("$('settings-open').onclick()");await settleSoon();
  s.run("window.sidevoiceActions.editVoice({stt:{catalog:'openai'},patience:'calm'})");
  assert.deepEqual(plain(s.run('voiceDraft.stt')),{catalog:'openai',model:'gpt-4o-transcribe',language:s.run('voiceSettings.stt.language')},'another source takes its first model');
- await s.run("saveSettings()");
- assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),plain(s.run('voiceDraft')));
+ await s.run("applying");
+ // As this device can take them: no end-of-turn model here, so the smart end of turn is silence.
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='setSettings')[1]),{...plain(s.run('voiceDraft')),end_of_turn:'silence'});
  const kept=JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')"));
  assert.deepEqual([kept.stt.catalog,kept.stt.model,kept.patience],['openai','gpt-4o-transcribe','calm']);
  assert.equal(s.run('voiceSettings.stt.model'),'gpt-4o-transcribe');
  assert.equal(asked.some(({init})=>String(init.body||'').includes('gpt-4o-transcribe')),false,'the room is not told');
 });
 test('Settings the voice refuses are not kept, and the reason is said with the provider\'s own words',async()=>{
- const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('no'),{code:'credential-missing',detail:'invalid_api_key'})}});
+ const {s}=settingsPage({setSettings:async()=>{throw Object.assign(Error('credential-rejected'),{code:'credential-rejected',detail:'invalid_api_key: Incorrect API key'})}});
  s.run("$('settings-open').onclick()");await settleSoon();
  const before=plain(s.run('voiceSettings'));
- s.run("window.sidevoiceActions.editVoice({tts:{catalog:'elevenlabs',model:'eleven_flash_v2_5'}})");
- s.run("$('language-form').onsubmit({preventDefault(){}})");await settleSoon();
- assert.match(s.run("$('settings-error').textContent"),/Falta la clave del proveedor.*invalid_api_key/);
+ // A change that is ready at once (a model still to come waits, and never reaches the voice).
+ s.run("window.sidevoiceActions.editVoice({patience:'calm'})");
+ await s.run("applying");await settleSoon();
+ assert.deepEqual(plain(s.run('settingsError')),{text:"The provider didn't accept the key: it was revoked or mistyped.",said:'invalid_api_key: Incorrect API key'});
  assert.deepEqual(plain(s.run('voiceSettings')),before);
  assert.equal(s.run("localStorage.getItem('sidevoice.voice-settings')"),null);
 });
@@ -1131,17 +1247,17 @@ test('An app that does not give the page its catalogues yet says so, and still k
  const s=setup({strictDOM:true});withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
  s.run("$('settings-open').onclick()");await settleSoon();
  assert.equal(s.run('voiceCatalogue.state'),'failed');
- assert.match(s.run('voiceCatalogue.error'),/lista de modelos/);
+ assert.match(s.run('voiceCatalogue.error'),/does not give the page the list of models yet/);
 });
 test('A page with no voice keeps its settings unchecked and says why it cannot keep a key',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
  s.run("$('settings-open').onclick()");await settleSoon();
  assert.equal(s.run('voiceCatalogue.state'),'failed');
- assert.match(s.run('voiceCatalogue.error'),/aún no está disponible/);
+ assert.match(s.run('voiceCatalogue.error'),/not available in this version of the page yet/);
  s.run("window.sidevoiceActions.editVoice({patience:'fast'})");
- await s.run('saveSettings()');
+ await s.run('applying');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).patience,'fast');
- await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),/aún no está disponible/);
+ await assert.rejects(s.run("window.sidevoiceActions.saveProviderKey('openai','sk-1')"),{code:'voice-module-unavailable'},'its code, for the key\'s dialog to say');
 });
 
 // ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
@@ -1199,11 +1315,6 @@ test('Messages a reload kept go once the outbox has them back, though the call f
  c.s.run('disconnect()');
 });
 
-test('An in-use fingerprint no pairing knows does not select the local host by itself',()=>{
- const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd'}),subscribe:()=>()=>{},pairing:()=>null};
- const s=setup({paired:false,stored:{in_use:'obsolete-fingerprint',pairings:[]},localHost:bridge});
- assert.equal(s.run('localHostSelected'),false,'only the page\'s own selection selects it');
-});
 test('A hang-up while the settings are taken never starts the microphone, and one while starting stops it',async()=>{
  const s=setup();let release;
  const pending=new Promise(resolve=>{release=resolve});
@@ -1224,7 +1335,7 @@ test('A voice failure is said and logged',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
  const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,name)=>name==='setBootError'?value=>said.push(value):()=>{}});
  voice.emit('error',{code:'credential-missing'});
- assert.match(said.at(-1)||'',/Falta la clave del proveedor/);
+ assert.match(said.at(-1)?.text||'',/^The provider's key is missing/);
  assert.deepEqual(plain(c.frames(c.first).filter(m=>m.type==='voice-client-error').map(m=>[m.data.kind,m.data.message])),[['voice','credential-missing']]);
  s.run('disconnect()');
 });
@@ -1233,8 +1344,8 @@ test('A move to another conversation leaves its replies to the room, which withd
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'old-reply',revision:1,reply_revision:1,thread_id:'a',history_id:'row',text:'old conversation'}});
  const before=voice.calls.length;
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
- await s.run("select('b')");await settleSoon();
- assert.equal(s.run('targetId()'),'b');
+ await s.run("select('fp-mac|b')");await settleSoon();
+ assert.equal(s.run('targetId()'),'fp-mac|b');
  assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),[],'not stopped: what is stale is the room\'s to say');
  c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['old-reply'],reason:'focus_changed'}});
  assert.equal(voice.said[0].cancelled,true);
@@ -1315,17 +1426,23 @@ test('A held turn refused again keeps its words, and starts again at the next en
 });
 
 // ----- a browser that blocks site data, and a page served as a static site -----
-test('A browser\'s own refusal is said in words, by its name: never its legacy number',()=>{
+test('A browser\'s own refusal is said in words, its name behind Details: never its legacy number',()=>{
  const s=setup({strictDOM:true});
  // A DOMException carries a numeric code (18 for a SecurityError): that is never what the person reads.
  const security={name:'SecurityError',code:18,message:'The operation is insecure.'};
- assert.match(s.run('voiceErrorText')(security),/blocking site data for this page/);
- assert.match(s.run('voiceErrorText')({code:'storage-blocked'}),/blocking site data for this page/);
- const denied=s.run('voiceErrorText')({name:'NotAllowedError',code:0});
- assert.match(denied,/NotAllowedError/);assert.doesNotMatch(denied,/\(\d+\)/);
- assert.doesNotMatch(s.run('voiceErrorText')({name:'InvalidStateError',code:11}),/\b11\b/);
- // The engine's own codes keep their sentence, and a provider's words follow.
- assert.match(s.run('voiceErrorText')({code:'credential-missing',detail:'invalid_api_key'}),/Falta la clave del proveedor.*invalid_api_key/);
+ assert.match(s.run('voiceError')(security).text,/blocking site data for this page/);
+ assert.match(s.run('voiceError')({code:'storage-blocked'}).text,/blocking site data for this page/);
+ const denied=s.run('voiceError')({name:'NotAllowedError',code:0});
+ assert.equal(denied.text,"The browser refused something the call's voice needs.");
+ assert.equal(denied.details,'NotAllowedError');
+ const state=s.run('voiceError')({name:'InvalidStateError',code:11});
+ assert.doesNotMatch(state.text+(state.details||''),/\b11\b/);
+ // The engine's own codes keep their sentence; a provider's words follow its refusal, and any other detail is behind
+ // Details, never the sentence.
+ assert.deepEqual(plain(s.run('voiceError')({code:'credential-missing',detail:'no key'})),{text:"The provider's key is missing. Add it in Settings → Providers.",details:'no key'});
+ assert.deepEqual(plain(s.run('voiceError')({code:'credential-rejected',detail:'invalid_api_key'})),{text:"The provider didn't accept the key: it was revoked or mistyped.",said:'invalid_api_key'});
+ // A code with no words here: the generic line, the code and what came with it behind Details.
+ assert.deepEqual(plain(s.run('voiceError')({code:'format-model',message:'format model q5 unsupported'})),{text:'Something went wrong with the voice.',details:'format-model\nformat model q5 unsupported'});
 });
 test('A static site asks its own origin nothing; a page with a room in front of it still does',async()=>{
  const s=setup({strictDOM:true}),asked=[];
@@ -1344,9 +1461,21 @@ test('Storage the browser refuses is found once at start and said on top',async(
  assert.deepEqual(plain(probe),{blocked:true,refused:[{store:'localStorage',code:'SecurityError'}]});
 });
 
+test('A server of a kind this page does not know yet is used for what it says: its fingerprint, and the build it serves (core#112)',async()=>{
+ const node=await fakeNode();node.tokens.add('tok-1');
+ const s=setup({paired:false,stored:{pairings:[pairingOf(node,{urls:[],rv:null})]}});s.context.__fp=node.fp;
+ const replaced=[];Object.assign(s.context.location,{origin:'http://127.0.0.1:8768',pathname:'/voice/',search:'',replace:url=>replaced.push(url)});
+ s.context.window.sidevoiceBuildId='page-old';
+ const net=network({at:{'':node},target:{kind:'node+room',fingerprint:node.fp,web_build:'page-new',nodes:[]}});s.context.fetch=net.get;
+ s.run('callNode=__fp');
+ await s.run('locate(__fp,{move:true,fresh:true})');
+ assert.equal(s.run('linkBase(__fp)'),'','the page\'s own server, proved to be the paired machine');
+ assert.deepEqual(replaced,['/voice/?v=page-new'],'and the build it says it serves is followed');
+});
+
 test('the Agents API accepts and reuses a proved same-origin empty base',async()=>{
  const node=await fakeNode(),pairing=pairingOf(node);node.tokens.add(pairing.token);
- const s=setup({stored:{in_use:node.fp,pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];
+ const s=setup({stored:{pairings:[pairing]}}),net=network({at:{'':node,'http://127.0.0.1:8768':node},target:{kind:'node',fingerprint:node.fp}}),agentRequests=[];
  s.context.location.origin='http://127.0.0.1:8768';
  s.context.fetch=async(url,init={})=>{
   if(String(url).startsWith('/api/host/agents')){
@@ -1356,7 +1485,7 @@ test('the Agents API accepts and reuses a proved same-origin empty base',async()
   return net.get(String(url),init);
  };
 
- await s.run('locate({move:true,fresh:true})');
+ await s.run(`locate(${JSON.stringify(node.fp)},{move:true,fresh:true})`);
  assert.equal(s.run(`hostAgentBases.get(${JSON.stringify(node.fp)})`),'','rendezvous identifies the page origin as the paired host');
  const identityProofs=net.asked.filter(request=>request.url.includes('/api/device/identity?nonce=')).length;
 
@@ -1370,4 +1499,366 @@ test('the Agents API accepts and reuses a proved same-origin empty base',async()
  assert.equal(identities.length,identityProofs,'both scans reuse the previously proved empty base');
  assert.ok(identities.every(request=>request.auth===null),'identity proof remains unauthenticated');
  assert.equal(s.run(`roomStore.getState().facts.hostAgents[${JSON.stringify(node.fp)}].status`),'ready');
+});
+
+// ----- trying this device's voice settings, outside any call (the first-run setup) -----
+test('A try of the voice settings being edited goes through the page\'s voice, outside the room, and keeps what worked on this device',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const asked=[];s.context.fetch=async(url,init={})=>{asked.push(url);return {ok:true,status:200,json:async()=>({})}};
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'moonshine-tiny',language:null}}})");
+ const tried=s.run("window.sidevoiceActions.tryVoiceSettings('stt')");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+ const result=plain(await tried);assert.equal(result.text,'hola');
+ // With how long its phases took (the fake voice says nothing of its recognition).
+ assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop'],'the voice is started for the try and stopped after it');
+ assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
+ assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
+ assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
+ // During a call the voice is the call's: no try takes it.
+ s.run('state.connecting=true');
+ await assert.rejects(s.run("window.sidevoiceActions.tryVoiceSettings('stt')"),{code:'trial-in-call'});
+});
+
+test('A try tells whoever shows it how it goes: the voice listening and the microphone\'s level, the part of the sentence sounding in the page\'s offsets',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const told=[];s.context.told=told;
+ const listened=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false,onListening:()=>told.push('listening'),onLevel:level=>told.push(level)})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ voice.emit('level',0.5);voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+ await listened;
+ assert.deepEqual([...told],['listening',0.5]);
+ // The voice counts characters as Unicode does; the page indexes the sentence as JavaScript does (the 👋 is two).
+ const say=voice.say;voice.say=(text,options)=>{const handle=say(text,options);handle.outcome=new Promise(resolve=>{handle.finish=resolve});return handle};
+ told.length=0;
+ const said=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'¡Hola 👋! Qué tal.',keep:false,onProgress:range=>told.push(range)})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ const handle=voice.said.at(-1);
+ handle.step({type:'playing'});handle.step({type:'progress',sounding:[9,17],heard_chars:9});handle.step({type:'progress',sounding:null,heard_chars:17});
+ handle.finish({status:'heard'});await said;
+ assert.deepEqual(plain(told),[{from:0,to:0},{from:10,to:18},{from:18,to:18}]);
+});
+
+test('A try that records the person hands on the take its voice gives once stopped (contract gap #40); a voice without one is asked for none',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const takes=[];s.context.takes=takes;
+ const ask=async task=>{
+  const tried=s.run("window.sidevoiceActions."+task);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+  await tried;
+ };
+ await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop']);
+ assert.deepEqual(takes,[],'0.3.x hands none');
+ // A voice with a take: asked for one as it starts, and it is handed on once the voice has stopped.
+ const listeners=new Set();voice.calls.length=0;
+ voice.start=async options=>{voice.calls.push(['start',options])};
+ voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
+ voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
+ await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop']]);
+ assert.deepEqual([...takes],[1]);
+ assert.equal(listeners.size,0,'and the voice is let go');
+ // The end of turn's too, once stopped.
+ const turn=s.run("window.sidevoiceActions.tryTurnSettings({onTake:take=>takes.push(take.ended_at+1)})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.run('window.sidevoiceActions.cancelVoiceTry()');
+ await assert.rejects(turn,{code:'trial-cancelled'});
+ assert.deepEqual([...takes],[1,2]);
+});
+
+// ----- a model of this device installed for a voice slot -----
+test('A model the slot names but that is not on this device installs, its progress in the store, and the catalogues are read again',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[{id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],installed:false,recommendedBuild:'kokoro/q8',
+  builds:[{id:'kokoro/q8',backend:'transformers-js',precision:'q8',downloadBytes:92e6,memoryMb:300,available:true,reasons:[],installed:false}]}]}];
+ const engine=fakeEngine(catalogs),progress=[];let finish,fail;
+ engine.install=(model,{build,engine:backend,onProgress,signal})=>{engine.calls.push(['install',model,build,backend]);signal.addEventListener('abort',()=>fail(Object.assign(Error('x'),{code:'install-cancelled'})));
+  return new Promise((resolve,reject)=>{finish=()=>{onProgress({fraction:0.5,done:46e6,total:92e6});progress.push(s.run('state.voiceInstall'));catalogs[0].models[0].installed=true;resolve()};fail=reject})};
+ withVoice(s,fakeVoice(),engine);
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({tts:{catalog:'local',model:'kokoro-82m-v1.0'}})");
+ const installing=s.run("window.sidevoiceActions.installVoiceModel('tts')");await settleSoon();
+ assert.deepEqual(plain(s.run('state.voiceInstall')),{task:'tts',model:'kokoro-82m-v1.0',state:'running',fraction:null,error:''});
+ finish();await installing;await settleSoon();
+ assert.deepEqual(engine.calls.find(([name])=>name==='install'),['install','kokoro-82m-v1.0','kokoro/q8','transformers-js'],'its recommended build, by its engine');
+ assert.equal(plain(progress[0]).fraction,0.5);
+ assert.equal(s.run('state.voiceInstall'),null,'done: nothing left in progress');
+ assert.equal(s.run("voiceCatalogue.catalogs[0].models[0].installed"),true,'the catalogue says it is here now');
+ // A cancel leaves nothing behind; a failure says why.
+ catalogs[0].models[0].installed=false;
+ const cancelled=s.run("window.sidevoiceActions.installVoiceModel('tts')");await settleSoon();
+ s.run('window.sidevoiceActions.cancelVoiceInstall()');await cancelled;
+ assert.equal(s.run('state.voiceInstall'),null);
+ engine.install=async()=>{throw Object.assign(Error('net'),{code:'download-failed'})};
+ await s.run("window.sidevoiceActions.installVoiceModel('tts')");
+ assert.equal(s.run('state.voiceInstall.state'),'failed');
+ assert.equal(s.run('state.voiceInstall.error'),'The model could not be downloaded. Check the connection and try again.');
+ assert.equal(s.run('state.voiceInstall.details'),'net','what the engine said is only a detail');
+});
+
+test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{
+ const notHere=CATALOGS.map(c=>c.id==='local'?{...c,models:[...c.models,{id:'whisper-small',family:'whisper',capabilities:['stt'],languages:['es'],voices:[],installed:false,builds:[build('whisper-small/int8',{installed:false})]}]}:c);
+ const s=setup({strictDOM:true});
+ const engine={...fakeEngine(notHere),install:async model=>{const m=notHere[0].models.find(x=>x.id===model);m.installed=true;m.builds=m.builds.map(b=>({...b,installed:true}))}};
+ withVoice(s,fakeVoice(),engine);
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({})});s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({stt:{model:'whisper-small'},patience:'calm'})");await s.run('applying');
+ assert.equal(s.run('voiceSettings.stt.model'),'whisper-base','the one in use stays');
+ assert.equal(s.run('voiceSettings.patience'),'calm','the rest applies at once');
+ assert.equal(s.run('voiceDraft.stt.model'),'whisper-small','the choice waits');
+ await s.run("window.sidevoiceActions.installVoiceModel('stt')");await s.run('applying');await settleSoon();
+ assert.equal(s.run('voiceSettings.stt.model'),'whisper-small','switched once it is here');
+});
+
+// ----- several machines at once: the call follows the conversation picked -----
+const PC={...PAIRED,fp:'fp-pc',host:'pc',urls:['https://pc.example'],rv:null,device_id:'dev-pc',token:'tok-pc'};
+// A call on the Mac, the PC answering at its own address, and a conversation of each listed.
+async function callWithTwoMachines(){
+ const c=await callOnRoom({stored:{pairings:[PAIRED,PC]}});
+ c.s.run("{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';link.via='node';publishLinks()}");
+ c.s.run("people=[{node:'fp-mac',thread_id:'a',title:'A',available:true,reach:{state:'listening'}},{node:'fp-pc',thread_id:'p',title:'P',available:true,reach:{state:'listening'}}]");
+ c.first.close=function(code){this.closedWith=code;this.readyState=3};
+ return c;
+}
+test('Picking another machine\'s conversation moves the call there: the open turn is cancelled, its replies stopped and told, then a new session',async()=>{
+ const c=await callWithTwoMachines();const {s,voice,first}=c;
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r1',revision:1,reply_revision:1,thread_id:'a',history_id:'row-r1',text:'Sigo en el Mac'}});
+ voice.said[0].step({type:'playing'});
+ voice.emit('turn',started('u1'));
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(s.run('state.switching'),true);
+ assert.ok(voice.calls.some(([name])=>name==='cancelInput'),'what was being said was for the conversation left');
+ assert.equal(voice.said[0].cancelled,true,'the reply sounding is stopped');
+ assert.equal(voice.calls.filter(([name,muted])=>name==='mute').at(-1)[1],true,'nobody hears the person while the call moves');
+ voice.said[0].step({type:'done',outcome:{status:'interrupted',heard_chars:4}});
+ // The Mac acknowledges what it is owed; only then is its socket closed, as a hang-up.
+ await c.until(()=>sentOf(c,first,'voice-playback').some(d=>d.utterance_id==='r1'&&d.status!=='playing'),'the stopped reply told to its machine');
+ for(const frame of c.frames(first).filter(m=>m.data?.client_msg_id))c.push(first,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
+ await c.until(()=>c.sockets.length===2,'a socket on the PC');
+ assert.equal(first.closedWith,1000,'the Mac\'s session ends as a hang-up');
+ const second=c.sockets[1];
+ // The PC's room binds the new session to the conversation picked.
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'p',title:'P',binding_id:'bp'},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
+ assert.equal(second.url,'wss://pc.example/api/presentation/ws');
+ assert.deepEqual([...second.protocols],['sidevoice','sidevoice.token.tok-pc'],'the PC\'s own token');
+ const {hello}=await c.answer({session_id:'s2',resume:{token:'tok-p',seconds:60},resumed:false});
+ assert.equal(hello.data.conversation,'p','the conversation picked, by the PC\'s own name for it');
+ assert.equal(hello.data.resume,undefined,'no ticket of the Mac\'s goes to the PC');
+ await moved;
+ assert.equal(s.run('callNode'),'fp-pc');assert.equal(s.run('sessionId'),'s2');assert.equal(s.run('state.switching'),false);
+ assert.equal(voice.calls.some(([name])=>name==='stop'),false,'the voice goes on: no new microphone, no model loaded again');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'and hears the person again');
+ assert.equal(JSON.parse(c.store['sidevoice.resume']).node,'fp-pc');
+ assert.equal(c.store['sidevoice.selected'],'fp-pc|p');assert.equal(s.run('targetId()'),'fp-pc|p');
+ s.run('disconnect()');
+});
+test('A reply that arrives while the call leaves its machine is written, never said; unacknowledged debts are let go in time',async()=>{
+ const c=await callWithTwoMachines();const {s,voice,first}=c;
+ s.run('MOVE_DRAIN_MS=60');
+ // A turn said to the Mac that the Mac never acknowledges.
+ voice.emit('turn',started('u7'));voice.emit('turn',finished('u7','Para el Mac'));
+ const reported=[];s.context.window.sidevoiceTelemetry=null;const report=s.run('reportClientError');s.context.__report=e=>{reported.push(e);report(e)};s.run('reportClientError=__report');
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:2,reply_revision:2,thread_id:'a',history_id:'row-late',text:'Tarde'}});
+ assert.equal(voice.said.length,0,'not said: the person has moved on');
+ assert.ok(s.run("history.some(r=>r.text==='Tarde'&&r.thread==='fp-mac|a')"),'but written in its own conversation');
+ await c.until(()=>c.sockets.length===2,'the move does not wait for ever');
+ assert.ok(turnSent(c,first,'u7','finished').length,'what the Mac was owed was said to the Mac');
+ assert.equal(s.run("outbox.list().filter(entry=>entry.node==='fp-mac').length"),0,'and let go once its time was up');
+ assert.ok(reported.some(entry=>entry.kind==='move'),'saying so in the machine\'s log');
+ await c.answer({session_id:'s2',resume:{token:'t',seconds:60},resumed:false});await moved;
+ assert.equal(s.run('callNode'),'fp-pc');
+ assert.equal(sentOf(c,c.sockets[1],'voice-user-turn').length,0,'nothing of the Mac\'s goes to the PC');
+ s.run('disconnect()');
+});
+test('A conversation of a machine that does not answer is only looked at: the call stays where it is',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;
+ s.run("settleLink('fp-pc',null,'offline')");
+ s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(s.run('viewedThread'),'fp-pc|p');
+ assert.equal(s.run('state.switching'),false);assert.equal(c.sockets.length,1);assert.equal(s.run('callNode'),'fp-mac');
+ assert.match(s.run('SessionState.reachNote(state)'),/«macbook»|^$/,'the note speaks of the call\'s machine');
+ s.run('disconnect()');
+});
+test('A machine that refuses this device while merely watched says so in its row; the call on another goes on',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;
+ s.context.fetch=async url=>String(url).startsWith('https://pc.example')?{ok:false,status:401,json:async()=>({detail:'no'})}:{ok:true,status:200,json:async()=>({participants:[],messages:[]})};
+ await s.run("refreshPeople('fp-pc')");
+ assert.equal(s.run('roomStore.getState().machines.find(m=>m.id===\'fp-pc\').state'),'revoked');
+ assert.ok(s.run('state.ws'),'the call on the Mac goes on');
+ assert.equal(s.run('roomStore.getState().pairing.open'),false,'met while merely watching it: nobody is asked for a code');
+ assert.deepEqual(plain(s.run('roomStore.getState().participants').map(row=>[row.threadId,row.reach])),[['fp-mac|a','listening'],['fp-pc|p','offline']]);
+ // The person's own act on that machine's page is answered: a new code is asked for, about that machine.
+ s.run("pairings={list:pairings.list.map(p=>p.fp==='fp-pc'?{...p,revoked:false}:p)};hostAgentBases.set('fp-pc','https://pc.example');verified.set('https://pc.example',Date.now())");
+ await assert.rejects(s.run("hostApi('fp-pc','/api/host/agents')"));
+ assert.equal(s.run('roomStore.getState().pairing.open'),true);
+ assert.match(s.run('roomStore.getState().pairing.note'),/«pc» ya no reconoce este dispositivo/);
+ assert.ok(s.run('state.ws'),'and the call on the Mac still goes on');
+ s.run('disconnect()');
+});
+test('A join goes to the machine of the conversation looked at, and a ticket kept for another machine is not used there',async()=>{
+ const s=setup({stored:{pairings:[PAIRED,PC]}});const {sockets,tap}=joining(s);
+ const store={'sidevoice.selected':'fp-mac|a','sidevoice.resume':JSON.stringify({session_id:'old',token:'tok-old',last_seq:4,node:'fp-mac'})};
+ s.context.sessionStorage=storageOf(store);
+ s.run("disconnect();{const link=linkOf('fp-pc');link.base='https://pc.example';link.reach='ok';publishLinks()};viewedThread='fp-pc|p'");
+ const joined=tap();
+ const socket=await firstSocket(sockets);
+ assert.equal(socket.url,'wss://pc.example/api/presentation/ws');
+ socket.readyState=1;socket.onopen();
+ const hello=JSON.parse(socket.sent[0]).data;
+ assert.equal(hello.resume,undefined,'the Mac\'s ticket is the Mac\'s');assert.equal(hello.conversation,null);
+ socket.onmessage({data:JSON.stringify({type:'voice-session',data:{session_id:'n1',resume:{token:'x',seconds:60},resumed:false}})});
+ await joined;
+ assert.equal(s.run('callNode'),'fp-pc');
+ s.run('disconnect()');
+});
+// What the adversarial review of the move found (GPT-6 Astra), each kept from coming back.
+test('Words the voice transcribes late, after the call moved, never reach the other machine',async()=>{
+ const c=await callWithTwoMachines();const {s,voice,first}=c;
+ voice.emit('turn',started('u1'));
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ for(const frame of c.frames(first).filter(m=>m.data?.client_msg_id))c.push(first,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
+ await c.until(()=>c.sockets.length===2,'a socket on the PC');
+ await c.answer({session_id:'s2',resume:{token:'t',seconds:60},resumed:false});await moved;
+ voice.emit('turn',finished('u1','Dicho al Mac'));await settleSoon();
+ assert.equal(c.frames(c.sockets[1]).some(m=>JSON.stringify(m).includes('Dicho al Mac')),false,'not sent to the PC');
+ assert.equal(s.run("history.some(r=>r.text==='Dicho al Mac')"),false,'nor written in its conversation');
+ s.run('disconnect()');
+});
+test('A row of one machine is never another\'s, even under the same id',async()=>{
+ const c=await callWithTwoMachines();const {s,first}=c;
+ s.run("history=[{segment:'shared',thread:'fp-pc|p',role:'assistant',text:'Del PC',seq:1}]");
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r9',revision:1,reply_revision:1,thread_id:'a',history_id:'shared',text:'Del Mac'}});
+ assert.deepEqual(plain(s.run('history').map(r=>[r.thread,r.text])),[['fp-pc|p','Del PC'],['fp-mac|a','Del Mac']]);
+ s.run("karaokeState={segment:'shared',from:0,to:3}");
+ const lit=s.run("SessionState.conversationView({...roomStore.getState().facts,viewedThread:'fp-pc|p'}).messages[0].karaoke");
+ assert.equal(lit,null,'the reply sounding is the call machine\'s, not the other row');
+ s.run('disconnect()');
+});
+test('A machine looked for again stays unreachable until it answers: picking it does not move the call',async()=>{
+ const c=await callWithTwoMachines();const {s}=c;
+ s.run("settleLink('fp-pc',null,'offline')");
+ s.context.fetch=()=>new Promise(()=>{});
+ void s.run("locate('fp-pc',{fresh:true})");await settleSoon();
+ assert.equal(s.run("state.machineLinks['fp-pc'].reach"),'offline');
+ assert.equal(s.run('roomStore.getState().participants')[1].reach,'offline');
+ s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(c.sockets.length,1);assert.equal(s.run('callNode'),'fp-mac');assert.equal(c.first.closedWith,undefined);
+ s.run('disconnect()');
+});
+test('A move given up leaves the next call\'s debts alone, and takes over a join still on its way',async()=>{
+ const c=await callWithTwoMachines();const {s,voice}=c;
+ s.run('MOVE_DRAIN_MS=80;state.connecting=true');
+ voice.emit('turn',started('u3'));voice.emit('turn',finished('u3','Sin acuse'));
+ const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
+ assert.equal(s.run('state.connecting'),false,'the move owns the call now');
+ // Hung up mid-move, and a new call on the Mac owes its machine something.
+ s.run("disconnect();callNode='fp-mac';sessionId='s9';keepMessage('playback','voice-playback',{utterance_id:'nueva'})");
+ await new Promise(resolve=>setTimeout(resolve,200));await moved;
+ assert.ok(s.run("outbox.list().some(entry=>entry.payload.data.utterance_id==='nueva')"),'the abandoned drain deleted nothing of it');
+ s.run('disconnect()');
+});
+test('A refusal of a credential a new pairing has replaced does not revoke the new one',()=>{
+ const s=setup();
+ s.run("pairingRefused('fp-mac',{token:'tok-old'})");
+ assert.equal(s.run("pairings.list[0].revoked"),undefined);
+ s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ assert.equal(s.run("pairings.list[0].revoked"),true);
+});
+test('No more machines are watched than the bound, and the call\'s always is',()=>{
+ const many=Array.from({length:9},(_,i)=>({...PAIRED,fp:'fp-'+i,device_id:'d'+i}));
+ const s=setup({stored:{pairings:many}});
+ assert.equal(s.run('liveMachines().length'),s.run('MAX_LINKS'));
+ s.run("callNode='fp-8'");
+ assert.ok(s.run("liveMachines().includes('fp-8')"));
+ s.run("pairingRefused('fp-1')");
+ assert.equal(s.run("liveMachines().includes('fp-1')"),false,'a revoked one is not watched');
+});
+
+test('The first answer from the room asks for the conversations at once, not on their slower beat',async()=>{
+ const s=setup();const asked=[];
+ s.context.fetch=async path=>{asked.push(String(path));return {ok:true,json:async()=>path.includes('/participants')
+  ?{participants:[{thread_id:'t-1',title:'Uno',available:true,reach:{state:'listening'},engine:{model:'claude-opus-5-5',effort:'high'}}]}
+  :{binding:{thread_id:'t-1',title:'Uno',binding_id:'b-1'},room:{revision:1},clients:[],call:null}}};
+ await s.run('refresh')();await settleSoon();
+ assert.ok(asked.some(path=>path.includes('/api/presentation/participants')),'asked with the first answer');
+ assert.equal(s.run('people[0].engine.model'),'claude-opus-5-5');
+});
+
+// ----- the microphone and the speaker: this device's choices given to the voice, its list followed -----
+function voiceWithDevices(){
+ const voice=fakeVoice();let chosen={input:null,output:null};const listeners=new Set();
+ const list=()=>({inputs:[{id:'mic-a',label:'Built-in'},{id:'mic-b',label:'Headset'}],outputs:[{id:'out-a',label:'Speakers'}],...chosen,outputSelectable:true});
+ Object.assign(voice,{
+  audioDevices:async()=>list(),
+  setAudioDevices:async choice=>{voice.calls.push(['setAudioDevices',choice]);chosen={...chosen,...choice};return list()},
+  onAudioDevices:listener=>{listeners.add(listener);return ()=>listeners.delete(listener)},
+  lose:kind=>{chosen={...chosen,[kind]:null};for(const listener of listeners)listener({...list(),lost:{[kind]:kind==='input'?'mic-b':'out-a'}})},
+ });
+ return voice;
+}
+test('This device\'s microphone and speaker are given to the voice when it is made, kept as chosen, and a lost one is said once',async()=>{
+ const s=setup();const voice=withVoice(s,voiceWithDevices());
+ s.context.localStorage.setItem('sidevoice.audio-devices',JSON.stringify({input:'mic-b'}));
+ await s.run('watchAudioDevices')();
+ assert.deepEqual(plain(voice.calls.find(([name])=>name==='setAudioDevices')[1]),{input:'mic-b'},'the kept choice, given to the voice');
+ assert.equal(s.run('audioDevices.input'),'mic-b');
+ await s.run("window.sidevoiceActions.setAudioDevices({output:'out-a'})");
+ assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{input:'mic-b',output:'out-a'});
+ // The system's default keeps nothing.
+ await s.run("window.sidevoiceActions.setAudioDevices({output:null})");
+ assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{input:'mic-b'});
+ // The headset unplugged: the default in use, the choice dropped, and said once.
+ voice.lose('input');
+ assert.equal(s.run('audioDevices.input'),null);
+ assert.deepEqual(plain(s.run('audioLost')),{input:'mic-b'});
+ assert.deepEqual(JSON.parse(s.run("localStorage.getItem('sidevoice.audio-devices')")),{});
+});
+
+// ----- a paired machine's Sidevoice: its version, and whether it is behind (contract gap #57) -----
+test('A paired machine that says it is behind says how to update it there; anything less is no update, and one question is out at a time',async()=>{
+ const s=setup();
+ s.run("hostAgentBases.set('fp-mac','https://mac.example');verified.set('https://mac.example',Date.now())");
+ let says={version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}};const asked=[];
+ s.context.fetch=async(url,init={})=>{asked.push([String(url),init.headers?.Authorization]);return {ok:true,status:200,json:async()=>says}};
+ const status=()=>plain(s.run("roomStore.getState().facts.remoteHostStatus['fp-mac']"));
+ await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(asked,[['https://mac.example/api/host/status','Bearer tok-1']],'asked of the machine itself, with this device\'s token');
+ assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'curl -fsSL https://sidevoice.app/install | sh'}});
+ // A latest version with no command, or a blank one, is behind all the same, its command unknown (Updates says the
+ // documented one); what is not a latest version is not an update: a number, none, a word.
+ for(const update of [{latest:'0.5.0'},{latest:'0.5.0',command:'  '},{latest:'0.5.0',command:7}]){
+  says={version:'0.4.0',update};
+  await s.run("loadMachineInfo('fp-mac')");
+  assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:null}},JSON.stringify(update));
+ }
+ for(const update of [{latest:5,command:'x'},{latest:' ',command:'x'},{command:'x'},'yes',null]){
+  says={version:'0.4.0',update};
+  await s.run("loadMachineInfo('fp-mac')");
+  assert.deepEqual(status(),{version:'0.4.0',update:null},JSON.stringify(update));
+ }
+ // Up to date once more: no update; a version that is not one is unknown.
+ says={version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}};await s.run("loadMachineInfo('fp-mac')");
+ says={version:'v0.5'};await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(status(),{version:null,update:null});
+ // A machine that cannot be asked keeps what it last said.
+ says={version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}};await s.run("loadMachineInfo('fp-mac')");
+ s.context.fetch=async()=>{throw new TypeError('Failed to fetch')};
+ await s.run("loadMachineInfo('fp-mac')");
+ assert.deepEqual(status(),{version:'0.4.0',update:{latest:'0.5.0',command:'sidevoice update'}});
+ // Asked from several places at once (its page's card, each place the updates show): one request, one answer for all.
+ let answer;asked.length=0;
+ s.context.fetch=async url=>{asked.push([String(url)]);return new Promise(resolve=>{answer=()=>resolve({ok:true,status:200,json:async()=>({version:'0.5.0'})})})};
+ const loads=s.run("[loadMachineInfo('fp-mac'),loadMachineInfo('fp-mac'),loadMachineInfo('fp-mac')]");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(asked.length,1);
+ answer();await Promise.all(loads);
+ assert.deepEqual(status(),{version:'0.5.0',update:null});
+ // Once answered, the next question goes out again.
+ await Promise.all([s.run("loadMachineInfo('fp-mac')"),new Promise(resolve=>setTimeout(()=>{answer();resolve()},0))]);
+ assert.equal(asked.length,2);
 });

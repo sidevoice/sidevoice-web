@@ -1,5 +1,6 @@
 import type { KaraokeRange } from "../../state/room-types";
 import { conversationTranslator } from "./conversation-i18n";
+import "./transcript.css";
 
 /** Where the said part ends, carried to the end of the word it falls in: a word lights whole or not at all. */
 export function wordEnd(text: string, at: number) {

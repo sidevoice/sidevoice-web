@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useRef, type CSSProperties } from "react";
+import { useCallback, useMemo, useRef, type CSSProperties, useLayoutEffect, useState } from "react";
 import { backdropFromSeed, backdropSvg } from "./engine/backdrop";
 import { rng } from "./engine/core";
 import { DESK_TOPS, deskFromSeed, deskSvg } from "./engine/desk";
 import type { AvatarSpec } from "./avatar-spec";
 import { withOwnIds } from "./bicho-draw";
+import { usePageTheme } from "../../lib/theme";
 import { CharacterAvatar } from "./CharacterAvatar";
 
 /* The stage as the avatar lab draws it: a backdrop behind the agent, the desk it works at, and the wanted poster that
@@ -29,10 +30,15 @@ export function useSceneScale() {
   }, []);
 }
 
-/** The seed's backdrop, in the dark theme (the app has no other). */
+/** The seed's backdrop, in the theme it is drawn in (its light and dark drawings are the engine's): the nearest one
+ *  above it — the page's, or a part of a page shown in the other theme (the design system's columns). */
 export function StageBackdrop({ seed, tone }: { seed: string; tone: string }) {
-  const html = useMemo(() => backdropSvg(backdropFromSeed(seed), tone, "dark"), [seed, tone]);
-  return <div className="stage-backdrop" aria-hidden="true" dangerouslySetInnerHTML={{ __html: html }} />;
+  const page = usePageTheme();
+  const ref = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useState(page);
+  useLayoutEffect(() => { setTheme(ref.current?.closest("[data-theme]")?.getAttribute("data-theme") === "dark" ? "dark" : "light"); }, [page]);
+  const html = useMemo(() => backdropSvg(backdropFromSeed(seed), tone, theme), [seed, tone, theme]);
+  return <div ref={ref} className="stage-backdrop" aria-hidden="true" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 /** The seed's desk, in front of the agent; it slides in while the agent works (styles/call.css). Beside the drawing, the

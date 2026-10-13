@@ -1,0 +1,33 @@
+/* The "new" highlights (highlights.tsx): how many on the gear, a mark on what leads to it, "New" on the thing itself —
+   VARIANTS `section-new`: "New" at an entry's end (A), how many at its end (B), a dot on its icon (C). Information,
+   never a warning — amber is for what needs an action. No motion. */
+.new-mark { display: inline-flex; align-items: center; gap: 2px; margin-inline-start: var(--sv-space-2); vertical-align: middle; }
+.new-mark-dismiss { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--sv-radius-sm); background: none; color: var(--sv-text-muted); cursor: pointer; }
+.new-mark-dismiss:hover { color: var(--sv-text); background: var(--sv-bg-sunken); }
+.new-mark-dismiss:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 1px; }
+@media (pointer: coarse) { .new-mark-dismiss { width: 32px; height: 32px; } }
+
+/* On an item's icon (NewOnIcon, C): a dot at its top-left corner, outlined in the ground behind it (--new-ground):
+   Settings' nav, the current entry's tint, a phone's list on the page. A machine's state dot, when it has one, is at
+   the opposite corner (machine-state.css). */
+.new-on-icon { --new-ground: var(--sv-bg-subtle); position: relative; display: inline-grid; place-items: center; flex: none; }
+.ui-nav-item[aria-current] .new-on-icon { --new-ground: var(--sv-accent-soft); }
+.new-on-icon-dot { position: absolute; top: -3px; inset-inline-end: -3px; width: 8px; height: 8px; box-sizing: content-box; border: 2px solid var(--new-ground); border-radius: 50%; background: var(--sv-accent); }
+/* VARIANTS `section-new-dot`: centred at the icon's side; apart, in a wider space before the label; at the entry's end. */
+.new-on-icon[data-dot="side"] .new-on-icon-dot { top: 50%; inset-inline-end: -8px; transform: translateY(-50%); border: 0; }
+.new-on-icon[data-dot="label"] { margin-inline-end: 10px; }
+.new-on-icon[data-dot="label"] .new-on-icon-dot { top: 50%; inset-inline-end: -14px; transform: translateY(-50%); border: 0; }
+.new-end-dot { flex: none; width: 8px; height: 8px; margin-inline-start: auto; border-radius: 50%; background: var(--sv-accent); }
+.ui-nav-item > .ui-nav-badge + .new-end-dot { margin-inline-start: var(--sv-space-2); }
+
+/* The gear's count. */
+.settings-notice[data-mark="count"] {
+  box-sizing: border-box; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
+  background: var(--sv-accent); color: var(--sv-on-accent);
+  font: var(--sv-weight-semibold) var(--sv-font-xs) / 16px var(--sv-font-sans); font-variant-numeric: tabular-nums; text-align: center;
+}
+
+/* On the Settings gear (GearNewMark): how many on its top-right corner, ringed in the ground behind the gear (--dot-ring,
+   as the conversations' dots are). The sidebar's gear places it from its left (room.css). */
+.settings-notice { --new-ground: var(--dot-ring, var(--sv-bg)); position: absolute; display: grid; place-items: center; pointer-events: none; }
+.settings-notice[data-mark="count"] { top: 3px; right: 3px; box-shadow: 0 0 0 2px var(--new-ground); }

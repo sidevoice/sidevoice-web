@@ -39,10 +39,8 @@ export function stageConversation({ participants, title, viewed, selected, inCal
   const speaking = isTarget && botLive;
   const busy = isTarget && working;
   const personSpeaking = pendingPhase === "listening" || pendingPhase === "transcribing";
-  return {
-    threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: row?.unread ?? 0,
-    mood: stageMood({ inCall, isTarget, canHear: hears, reach: row?.reach ?? null, speaking, personSpeaking, working: busy }),
-  };
+  const mood = stageMood({ inCall, isTarget, canHear: hears, reach: row?.reach ?? null, speaking, personSpeaking, working: busy });
+  return { threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: row?.unread ?? 0, mood };
 }
 
 export function useStageConversation(): StageConversation {
@@ -54,5 +52,8 @@ export function useStageConversation(): StageConversation {
   const botLive = useRoomStore((state) => state.facts.botLive);
   const working = useRoomStore((state) => state.session.working);
   const pendingPhase = useRoomStore((state) => state.conversation.pendingPhase);
-  return stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase });
+  const preview = useRoomStore((state) => state.facts.avatarPreview);
+  const stage = stageConversation({ participants, title, viewed, selected, inCall, botLive, working, pendingPhase });
+  // The preview holding the avatar in a mood (the playground's card): that mood, and something unheard when it says.
+  return preview ? { ...stage, mood: preview.mood, unread: preview.unread ? Math.max(1, stage.unread) : 0 } : stage;
 }

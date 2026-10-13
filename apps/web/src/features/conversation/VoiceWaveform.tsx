@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { conversationTranslator } from "./conversation-i18n";
+import "./transcript.css";
 
 /* The bubble of the turn being recorded is the microphone itself: a canvas that pulls the meter's analyser
  * once per animation frame and paints its own pixels. React renders this element once per phase, never per
- * frame, and the runtime keeps owning the audio graph. */
+ * frame, and the runtime keeps owning the audio graph. Where there is no call (a voice try), `level` is where the
+ * microphone's level comes from instead, 0 to 1, read the same way each frame. */
 
 const COLUMN_MS = 55; // one column of history per ~55 ms, so the scroll follows time and not the frame rate
 const CELL = 5; // column pitch in CSS pixels
@@ -11,10 +14,10 @@ const FLOOR = 2; // a silent column is still a line, never a gap
 
 export type WaveformPhase = "listening" | "transcribing";
 
-const LABELS: Record<WaveformPhase, { aria: string; title: string }> = {
-  listening: { aria: "Escuchando", title: "Escuchando…" },
-  transcribing: { aria: "Transcribiendo tu intervención", title: "Transcribiendo…" },
-};
+const LABELS = {
+  listening: { aria: "wave.listening", title: "wave.listeningTitle" },
+  transcribing: { aria: "wave.transcribing", title: "wave.transcribingTitle" },
+} as const;
 
 /** The same 60 dB window the call meter uses (`measureMic`), so bubble and meter agree on how loud this is. */
 export function waveColumn(samples: Float32Array): number {
@@ -43,10 +46,13 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-export function VoiceWaveform({ phase }: { phase: WaveformPhase }) {
+export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: () => number }) {
   const reduced = usePrefersReducedMotion();
   const canvas = useRef<HTMLCanvasElement>(null);
   const columns = useRef<number[]>([]);
+  // Read at each frame: a new function on a render changes nothing drawn.
+  const ownLevel = useRef(level);
+  ownLevel.current = level;
 
   useEffect(() => {
     const node = canvas.current;
@@ -99,8 +105,9 @@ export function VoiceWaveform({ phase }: { phase: WaveformPhase }) {
     if (reduced || phase !== "listening") return () => observer.disconnect();
 
     const tick = () => {
-      const samples = window.sidevoiceAudio?.readWaveform() ?? null;
-      const value = samples ? waveColumn(samples) : 0;
+      const own = ownLevel.current;
+      const samples = own ? null : window.sidevoiceAudio?.readWaveform() ?? null;
+      const value = own ? Math.max(0, Math.min(1, own() || 0)) : samples ? waveColumn(samples) : 0;
       const values = columns.current;
       const now = performance.now();
       if (!values.length || now - lastColumn >= COLUMN_MS) { values.push(value); lastColumn = now; }
@@ -117,7 +124,8 @@ export function VoiceWaveform({ phase }: { phase: WaveformPhase }) {
     return () => { stop(); observer.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, [phase, reduced]);
 
-  const label = LABELS[phase];
+  const t = conversationTranslator();
+  const label = { aria: t(LABELS[phase].aria), title: t(LABELS[phase].title) };
   if (reduced) return <span className="voice-bars" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
   return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><canvas ref={canvas} aria-hidden="true" /></span>;
 }

@@ -1,20 +1,21 @@
 import type { ParticipantView } from "../../state/room-types";
+import { canHear } from "../../state/room-session-state.js";
 import type { AvatarMood } from "../avatar/avatar-spec";
 import type { CallTranslate } from "./call-i18n";
 
 /* What the call view says about a conversation, derived in one place from the room's own row (participantsView)
- * and whether this page is in the call: the dot beside its avatar, the line under its title, how its avatar moves,
- * and which ones earn a place in a phone's header. Nothing here reads a clock or the DOM. */
+ * and whether this page is in the call: the dot beside its avatar, the line under its title, and how its avatar moves.
+ * Nothing here reads a clock or the DOM. */
 
 export type { AvatarMood };
+/* Whether a conversation hears the person, and the stage's mood for it, are the room's own projections
+ * (state/room-session-state.js): the desktop card's snapshot takes its avatar's mood from them too, so the stage and the
+ * card never disagree (FLOATING-CARD-SPEC FC4). */
+export { canHear, stageMood } from "../../state/room-session-state.js";
+export type { StageFacts } from "../../state/room-session-state.js";
 
 /** The state a conversation's dot and line show. */
 export type ConversationState = "in-call" | "working" | "waiting" | "idle";
-
-/** The conversation hears the person right now. */
-export function canHear(row: Pick<ParticipantView, "available" | "reach">) {
-  return row.available && row.reach === "listening";
-}
 
 /** In call: the call's own conversation, while this page is in the call — the room keeps its binding before a join
  *  and after a hang-up, and that is not a call. Working: its harness says so (a room only knows this during a call).
@@ -34,53 +35,10 @@ export function smallAvatarMood(row: Pick<ParticipantView, "reach" | "working">)
   return row.working ? "working" : "idle";
 }
 
-export interface StageFacts {
-  /** The page is in the call. */
-  inCall: boolean;
-  /** The conversation on the stage is the one the microphone talks to. */
-  isTarget: boolean;
-  canHear: boolean;
-  /** How the room reaches it; null while the room has not listed it yet. */
-  reach: ParticipantView["reach"] | null;
-  /** Its reply is sounding. */
-  speaking: boolean;
-  /** The person's turn to it is open: they are talking, or it is being transcribed (ConversationView.pendingPhase). */
-  personSpeaking: boolean;
-  working: boolean;
-}
-
-/** The agent on the stage, by priority: offline (the room cannot reach it: the stage shows its wanted poster), then
- *  speaking, listening (the person is talking to it and it can hear them), working, and idle for everything else.
- *  Short of offline it is idle whenever it cannot hear the person: out of the call, not the one the microphone talks
- *  to, or holding what it is sent — a conversation that is holding does not react to the person at all. */
-export function stageMood(facts: StageFacts): AvatarMood {
-  if (facts.reach === "offline") return "offline";
-  if (!facts.inCall || !facts.isTarget || !facts.canHear) return "idle";
-  if (facts.speaking) return "speaking";
-  if (facts.personSpeaking && (facts.reach === "listening" || facts.reach === null)) return "listening";
-  if (facts.working) return "working";
-  return "idle";
-}
-
 /** The person in the picture-in-picture. */
 export function personMood({ inCall, speaking }: { inCall: boolean; speaking: boolean }): AvatarMood {
   if (!inCall) return "idle";
   return speaking ? "speaking" : "present";
-}
-
-const HEADER_RANK: Partial<Record<ConversationState, number>> = { waiting: 0, working: 1 };
-const HEADER_LIMIT = 2;
-
-/** A phone's header has room for two other conversations: those waiting for you first, then those working — the
- *  more unread first within each, the room's order otherwise. Idle ones, and the one on the stage, are not there;
- *  the pill beside them opens all of them. */
-export function headerConversations(rows: ParticipantView[], onStage: string | null, inCall: boolean): ParticipantView[] {
-  return rows
-    .map((row, index) => ({ row, index, rank: HEADER_RANK[conversationState(row, inCall)] }))
-    .filter((entry): entry is { row: ParticipantView; index: number; rank: number } => entry.rank !== undefined && entry.row.threadId !== onStage)
-    .sort((a, b) => a.rank - b.rank || b.row.unread - a.row.unread || a.index - b.index)
-    .slice(0, HEADER_LIMIT)
-    .map((entry) => entry.row);
 }
 
 /** The words for a conversation's state, with what is waiting to be read when it is not the call's. */

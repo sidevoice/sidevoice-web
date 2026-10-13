@@ -1,0 +1,71 @@
+/* The connection statistics dialog (ConnectionStatsDialog), on the shared dialog: the medians as figures, the
+ * connection's facts, the last turn's stages, the session's aggregates and the last replies. Everything inside the
+ * lists and tables is built by the runtime (room-session-controller.js), so it is styled here by element, not by
+ * component. */
+
+#connection-stats { --ui-dialog-width: 880px; }
+.stats-dialog .ui-dialog-body { gap: var(--sv-space-6); }
+
+.stats-status { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.stats-status:empty { display: none; }
+
+.stats-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--sv-space-3); }
+.stats-metric { display: grid; gap: 2px; min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.stats-metric span { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.stats-metric strong { font-size: var(--sv-font-2xl); line-height: 2rem; font-weight: var(--sv-weight-bold); font-variant-numeric: tabular-nums; letter-spacing: -.02em; color: var(--sv-text); }
+.stats-metric small { font-size: var(--sv-font-xs); color: var(--sv-text-subtle); }
+
+.stats-section { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.stats-section h3 { margin: 0; font-size: var(--sv-font-md); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.stats-note { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.stats-note:empty { display: none; }
+
+/* The facts arrive as plain dt/dd pairs: a label column beside its value, two pairs a line when there is room. */
+.stats-facts { display: grid; grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr); gap: var(--sv-space-2) var(--sv-space-4); margin: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.stats-facts:empty { display: none; }
+.stats-facts dt { color: var(--sv-text-muted); }
+.stats-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; color: var(--sv-text); }
+@media (min-width: 820px) { .stats-facts { grid-template-columns: repeat(2, minmax(8rem, max-content) minmax(0, 1fr)); } }
+
+/* Each stage: its name, a bar against the longest one, and its duration. */
+.stats-stages { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
+.stats-stages:empty { display: none; }
+.stats-stages li { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) 4.5rem; align-items: center; gap: var(--sv-space-3); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.stats-stages li span { min-width: 0; color: var(--sv-text-muted); }
+.stats-stages li i { display: block; grid-column: 2; height: 8px; min-width: 2px; border-radius: var(--sv-radius-pill); background: var(--sv-accent); }
+.stats-stages li i[hidden] { display: none; }
+.stats-stages li b { grid-column: 3; justify-self: end; font-weight: var(--sv-weight-semibold); font-variant-numeric: tabular-nums; color: var(--sv-text); }
+
+.stats-aggregates { display: grid; gap: var(--sv-space-3); }
+.stats-aggregates:empty { display: none; }
+.stats-aggregates-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-3); }
+
+.stats-table-wrap { overflow-x: auto; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); }
+.stats-table-wrap:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: var(--sv-font-sm); line-height: 1.25rem; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: start; }
+.stats-table caption { padding: var(--sv-space-2) var(--sv-space-3); border-bottom: 1px solid var(--sv-border); font-weight: var(--sv-weight-semibold); text-align: start; color: var(--sv-text); }
+.stats-table th { padding: var(--sv-space-2) var(--sv-space-3); background: var(--sv-bg-subtle); font-weight: var(--sv-weight-semibold); text-align: start; color: var(--sv-text-muted); }
+.stats-table td { padding: var(--sv-space-2) var(--sv-space-3); border-top: 1px solid var(--sv-border); color: var(--sv-text); }
+
+.stats-limitations { margin: 0; font-size: var(--sv-font-xs); line-height: 1.125rem; color: var(--sv-text-subtle); }
+
+/* "Updated" waits for the time the runtime writes beside it. */
+.stats-updated:has(#stats-updated:empty) { visibility: hidden; }
+
+@media (max-width: 599px) {
+  /* A figure a line: its name and note on the left, the figure beside them. */
+  .stats-metrics { gap: var(--sv-space-2); }
+  .stats-metric { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--sv-space-3); padding: var(--sv-space-3) var(--sv-space-4); }
+  .stats-metric strong { grid-column: 2; grid-row: 1 / 3; align-self: center; font-size: var(--sv-font-xl); }
+  .stats-metric small { grid-column: 1; }
+  .stats-facts { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .stats-facts dd { margin-bottom: var(--sv-space-2); }
+  .stats-stages li { grid-template-columns: minmax(0, 1fr) 4.5rem; row-gap: var(--sv-space-1); }
+  .stats-stages li span { grid-column: 1 / -1; }
+  .stats-stages li i { grid-column: 1; }
+  .stats-stages li b { grid-column: 2; }
+  /* The footer keeps the time and Refresh on one line rather than the shared full-width reason line. */
+  .stats-dialog .ui-dialog-foot { flex-wrap: nowrap; }
+  .stats-dialog .ui-dialog-foot > .ui-button { flex: none; }
+  .stats-dialog .stats-updated { flex: 1 1 auto; }
+}

@@ -1,4 +1,6 @@
 import type { DeviceVoiceSettings } from '../services/voice-settings.js';
+import type { TurnStep } from '../services/voice-trial.js';
+import type { VoiceTake } from '../services/voice-take';
 /** The part of a reply sounding now, as offsets into its text; `from` and `to` are the same between its chunks. */
 export interface KaraokeRange {
   from: number;
@@ -59,11 +61,14 @@ export interface ParticipantView {
    *  the dot says both. */
   subtitle: string;
   working: boolean;
-  /** The machine this conversation runs on, by the name it gave when it paired; null when unknown. */
+  /** The paired machine this conversation runs on, as this device names it; `machineId` is its fingerprint. */
   machine?: string | null;
   machineId?: string | null;
   /** The harness the conversation runs in ("claude", "codex"), shown as its icon; null when unknown. */
   harness?: string | null;
+  /** The agent's model ("claude-opus-5-5") and its thinking effort ("xhigh"), exactly as the harness reports them; null when not. */
+  model?: string | null;
+  effort?: string | null;
   /** How that harness is reached, when the room says it (Cursor: its editor card, its CLI under persist, or
    *  listening only); null against a room that does not. */
   route?: string | null;
@@ -72,21 +77,20 @@ export interface ParticipantView {
 /** One machine this device is paired with, as its row reads. A pairing the machine revoked is still a row:
  *  it stays, saying so, until the person pairs again or forgets it. */
 export interface MachineView {
+  /** Renamed on this device (an alias): `host` is that name, `machineHost` the machine's own. */
+  alias?: boolean;
+  machineHost?: string | null;
   /** Stable UI row identity. The local row remains stable while its native pairing is unavailable. */
   id: string;
   /** The pairing fingerprint, when this row currently has a usable pairing. */
   pairingId?: string;
   host: string;
-  /** The one this page talks to: its conversations and its call. */
-  inUse: boolean;
   revoked: boolean;
-  /** Where this device reaches it: directly, through the room, not at all, or — not in use — not asked. */
-  reach: "direct" | "room" | "away" | "offline" | "checking" | "idle" | "revoked";
+  /** Where this device reaches it: directly, through the room, or not at all. Every paired machine is live at once. */
+  reach: "direct" | "room" | "away" | "offline" | "checking" | "revoked";
   state: "connected" | "checking" | "offline" | "revoked" | "failed";
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
-  /** Whether this row has a pairing that may be selected for routing. */
-  selectable?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
   pairedLabel: string;
 }
@@ -97,12 +101,28 @@ export interface DetectedAgent {
   label: string;
   present: boolean;
   version: string | null;
-  registration: "connected" | "not-connected" | "foreign" | "unknown";
+  /** `foreign`: the agent's MCP configuration already has an entry named "sidevoice" that Sidevoice did not add (made by
+   *  hand or by another tool) — never touched. `outdated`: Sidevoice's own entry, from an older version — Connect updates it.
+   *  `invalid`: the agent's MCP configuration file cannot be read (broken JSON/TOML): nothing is changed until it is fixed. */
+  registration: "connected" | "not-connected" | "foreign" | "outdated" | "invalid" | "unknown";
   connect: "auto" | "manual";
   dismissed?: boolean;
   actionable?: boolean;
-  instructions?: { command?: string; snippet?: string; file?: string | null } | null;
+  /** How to add Sidevoice by hand (the connector's older form of manual.connect). */
+  instructions?: AgentManualStep | null;
+  /** What the connector can do itself for this agent: add Sidevoice (`connect`, its CLI found — or Cursor, whose file
+   *  it edits), rewrite an entry an older Sidevoice made (`update`), take it out (`disconnect`). */
+  can?: { connect?: boolean; update?: boolean; disconnect?: boolean };
+  /** How to do each by hand, as the connector writes it for this harness: connecting; updating an entry an older
+   *  Sidevoice made (remove it, then add ours); disconnecting; and replacing another "sidevoice" entry (remove it, then
+   *  connect) — in order. */
+  manual?: { connect?: AgentManualStep[]; update?: AgentManualStep[]; disconnect?: AgentManualStep[]; replace?: AgentManualStep[] } | null;
+  /** How to take Sidevoice out of the agent by hand (the connector's, as `instructions` is for adding it). */
+  removal?: { command?: string; snippet?: string; file?: string | null } | null;
 }
+
+/** One step done by hand: a command to run, or a snippet for a file. */
+export interface AgentManualStep { command?: string; snippet?: string; file?: string | null }
 
 export interface HostAgentsListing {
   agents: DetectedAgent[];
@@ -145,6 +165,8 @@ export interface JoinStatusView {
   failed: boolean;
   /** A standing note rather than a step (no machine to talk to): no progress dot, and no alert. */
   note?: boolean;
+  /** A failure's raw text, for its Details (error-message.ts). */
+  details?: string;
 }
 
 /** The dialog that pairs this device with a machine, and the sentence it opens with when the page opened it. */
@@ -155,32 +177,109 @@ export interface PairingPromptView {
 
 export interface SidevoiceActions {
   cancelInput(): Promise<void>;
+  /** Stops the reply sounding now on this device; the reply stays written and what is queued after it plays on. */
+  skipReply(): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
-  editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]>; tts?: Partial<DeviceVoiceSettings["tts"]>; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"] }): void;
+  editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]> & { build?: string | null }; tts?: Partial<DeviceVoiceSettings["tts"]> & { build?: string | null }; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number; turn_model?: string }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
   saveProviderKey(provider: string, key: string | null): Promise<void>;
+  /** A key tried with the provider and kept only when it takes it; a refusal throws its `code` and `detail`. */
+  connectProviderKey?(provider: string, key: string): Promise<void>;
+  interfaceLanguage?(): string;
+  reloadToUpdate?(): void;
+  setAudioDevices?(choice: { input?: string | null; output?: string | null }): Promise<unknown>;
+  refreshAudioDevices?(): Promise<void>;
+  setInterfaceLanguage?(value: string): void;
+  /** Asks a provider again about its key, and reads the catalogues with what it said. */
+  testProviderKey?(provider: string): Promise<void>;
   /** Reads the engine's catalogues, and which providers have a key, again. */
   loadVoiceCatalogue(): Promise<void>;
   replayReply(historyId: string | null): Promise<void>;
   toggleMic(): void;
   toggleCall(): Promise<void>;
+  /** A sign of the person: the desktop card's Keep on the idle warning (its `keep-alive`, FLOATING-CARD-SPEC FC6),
+   *  which keeps the call on. */
+  keepVoiceOn?(): void;
+  /** A conversation by its key (machine and thread, ParticipantView.threadId): looked at, and the call goes to it — on
+   *  another machine the call moves there. */
   selectParticipant(threadId: string): void;
   closeParticipant(threadId: string): Promise<void>;
-  /** Talk to this paired machine from now on, on this device. In a call it hangs up and joins that machine's. */
-  chooseMachine(id: string): void;
   /** Forget this pairing here, and ask the machine (best effort) to revoke this device's token. */
   forgetMachine(id: string): Promise<void>;
   /** Redeem a pairing code under this device's name. Rejects with the sentence to show. */
-  pairDevice(code: string, name: string): Promise<{ host: string | null }>;
+  /** Redeems a machine's pairing code; `address` is where the person says the machine is (host:port or a URL). */
+  /** `insecure`: the person agreed to pair over plain http with a machine on a private network (device-pairing.js). */
+  pairDevice(code: string, name: string, address?: string, options?: { insecure?: boolean }): Promise<{ host: string | null }>;
   openPairing(): void;
   closePairing(): void;
+  /** Tries the voice settings being edited, outside any call: the words heard (`stt`), or `text` said (`tts`). Settings
+   *  that work become this device's (`keep`). Resolves with the words heard and how long each phase took (voice-trial.js's
+   *  TrialTimings); rejects with a sentence and the failure's `code`. What it tells while it runs: TrialProgress. */
+  tryVoiceSettings?(task: "stt" | "tts", options?: { text?: string; language?: string | null; keep?: boolean } & TrialProgress): Promise<{ text?: string; timings?: TrialTimings | null }>;
+  /** Tries the end of turn being edited (Smart or Silence, with its patience), outside any call: it listens, telling each
+   *  step of the person's turns (TrialProgress `onTurnStep`) and the microphone's level, until `cancelVoiceTry`, 30 s
+   *  with no speech or a failure of the voice; it never resolves, and rejects with a sentence and why it ended
+   *  (`trial-cancelled`, `trial-silence`, the voice's code). A change of the end of turn while it runs restarts it with
+   *  the change; Smart without its model ready stops it. */
+  tryTurnSettings?(progress?: Pick<TrialProgress, "onLevel" | "onTurnStep" | "onTake">): Promise<void>;
+  /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
+  installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
+  /** Cancels that install: nothing of it is kept. */
+  cancelVoiceInstall?(): void;
+  uninstallVoiceModel?(model: string): Promise<void>;
+  /** Delete downloaded models not used for `days` (null: never), now and whenever the catalogues are read again. */
+  setDeleteUnusedModels?(days: number | null): Promise<void>;
+  /** Stops the try in progress, which then rejects `trial-cancelled`. */
+  cancelVoiceTry?(): void;
+  /** Stop on a try that records (transcription): its take ends with what was said and is transcribed. */
+  finishVoiceTry?(): void;
   /** Read a paired machine's host-owned coding agent state. */
   loadHostAgents?(fp: string, options?: { rescan?: boolean; watch?: string }): Promise<void>;
   /** Connect, disconnect, or dismiss an agent on the identified machine. */
   hostAgentAction?(fp: string, id: string, action: "connect" | "disconnect" | "dismiss"): Promise<void>;
   /** Open Settings → Machines at that machine's agents (all machines when null). */
   openAgentSettings?(fp: string | null): void;
+  /** Shows a section of Settings: general, transcription, voice, providers, machines, advanced. */
+  showSettingsSection?(section: string): void;
   /** List or revoke another device on the desktop-owned local host. */
   localHostDevices?(): Promise<HostDeviceView[]>;
   revokeLocalHostDevice?(id: string): Promise<void>;
+  machineDevices?(fp: string): Promise<HostDeviceView[]>;
+  revokeMachineDevice?(fp: string, id: string): Promise<void>;
+  /** Renames a device in a machine's list (this computer's, or a paired machine's): the machine keeps the name. */
+  renameLocalHostDevice?(id: string, name: string): Promise<void>;
+  renameMachineDevice?(fp: string, id: string, name: string): Promise<void>;
+  /** A machine's name on this device only (null: back to the machine's own). */
+  renameMachine?(fp: string, name: string | null): void;
+  /** Asks a paired machine for its Sidevoice's version (remoteHostStatus), where it says. */
+  loadMachineInfo?(fp: string): Promise<void>;
+  /** This device's name as machines list it: kept for pairing, and sent to each machine it is paired with. Resolves with
+   *  how many machines could not be told. */
+  setDeviceName?(name: string): Promise<number>;
+}
+
+/** What a voice try tells while it runs, for whatever shows it. Transcription: `onListening` once the voice hears the
+ *  microphone (its models loaded, the microphone open), and `onLevel`, the microphone's level from 0 to 1, many times a
+ *  second. The voice: `onProgress` from its first sound on, the part of the sentence sounding now, in offsets into that
+ *  text as JavaScript indexes it; between parts `from` and `to` meet at the end of what was heard, and the first sound
+ *  is `{from: 0, to: 0}`. The end of turn: `onTurnStep`, each step of the person's turns as the voice tells it
+ *  (voice-trial.js TurnStep), and `onLevel`. A try that records the person (transcription, the end of turn): `onTake`,
+ *  once it has stopped, what the microphone gave the voice, kept in memory by whoever shows it and nowhere else —
+ *  contract gap #40, pending in @sidevoice/voice: no voice hands one yet, and then it is never called. */
+export interface TrialProgress {
+  onListening?(): void;
+  onLevel?(level: number): void;
+  onProgress?(range: KaraokeRange): void;
+  onTurnStep?(step: TurnStep): void;
+  onTake?(take: VoiceTake): void;
+}
+
+/** How long a voice try's phases took, in ms (null where the voice did not say): transcription's readiness, the
+ *  speech, the pause waited for and the recognition; the voice's readiness and its first sound. */
+export interface TrialTimings {
+  ready_ms: number | null;
+  audio_ms?: number | null;
+  endpoint_silence_ms?: number | null;
+  recognition_ms?: number | null;
+  first_sound_ms?: number | null;
 }

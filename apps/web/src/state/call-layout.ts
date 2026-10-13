@@ -15,6 +15,9 @@ export const RAIL_WITH_TRANSCRIPT_QUERY = "(max-width: 1199px)";
 
 export interface CallLayoutState {
   transcriptOpen: boolean;
+  /** The last message the transcript showed (its segment): what came after it, while it was closed, is unread. */
+  transcriptSeen: string | null;
+  markTranscriptSeen(segment: string | null): void;
   sidebarCollapsed: boolean;
   conversationsOpen: boolean;
   toggleTranscript(): void;
@@ -39,6 +42,8 @@ export function createCallLayoutStore(storage: LayoutStorage | null = localStora
   try { collapsed = storage?.getItem(SIDEBAR_COLLAPSED_KEY) === "1"; } catch { /* A storage that cannot be read is an expanded sidebar. */ }
   return createStore<CallLayoutState>((set, get) => ({
     transcriptOpen: false,
+    transcriptSeen: null,
+    markTranscriptSeen: (segment) => { if (get().transcriptSeen !== segment) set({ transcriptSeen: segment }); },
     sidebarCollapsed: collapsed,
     conversationsOpen: false,
     toggleTranscript: () => set(get().transcriptOpen ? { transcriptOpen: false }

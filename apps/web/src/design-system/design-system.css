@@ -1,0 +1,54 @@
+/* The design system page's own layout (design-system.html): a column per theme, each a page of specimens. */
+html, body { margin: 0; min-height: 100%; background: var(--sv-bg-subtle); }
+*, *::before, *::after { box-sizing: border-box; }
+.ds-page { min-height: 100dvh; }
+.ds-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-4); min-height: var(--sv-header-height); padding: var(--sv-space-2) var(--sv-space-6); background: var(--sv-bg); border-bottom: 1px solid var(--sv-border); }
+.ds-brand { display: flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-lg); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.ds-brand svg { color: var(--sv-accent-text); }
+.ds-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ds-columns[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.ds-columns[data-count="1"] .ds-showcase { max-width: 46rem; margin-inline: auto; }
+.ds-column { min-width: 0; padding: var(--sv-space-6); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.ds-column-label { margin: 0 0 var(--sv-space-4); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.ds-showcase { display: grid; gap: var(--sv-space-5); }
+.ds-specimen { min-width: 0; padding: var(--sv-space-6); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-bg); }
+.ds-specimen-title { margin: 0; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.ds-specimen-note { margin: var(--sv-space-1) 0 0; color: var(--sv-text-muted); font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.ds-specimen-body { display: grid; gap: var(--sv-space-4); margin-top: var(--sv-space-5); }
+.ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); }
+/* The Settings gear as the room shows it, its "new" mark on its corner. */
+.ds-gear { position: relative; display: inline-grid; place-items: center; width: var(--sv-control-md); height: var(--sv-control-md); color: var(--sv-text-muted); }
+.ds-stack { display: grid; gap: var(--sv-space-5); min-width: 0; }
+.ds-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sv-space-3); }
+.ds-grid-2 p { margin: var(--sv-space-1) 0 0; }
+.ds-tab-panel { padding-top: var(--sv-space-3); }
+.ds-state { display: grid; gap: var(--sv-space-1-5); }
+.ds-state > code, .ds-swatch code { font: var(--sv-font-xs) / 1rem var(--sv-font-mono); color: var(--sv-text-muted); }
+.ds-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: var(--sv-space-3); }
+.ds-swatch { display: grid; gap: var(--sv-space-1); }
+.ds-swatch span { height: 2.75rem; border-radius: var(--sv-radius-md); border: 1px solid var(--sv-border); }
+.ds-type { display: grid; gap: var(--sv-space-2); }
+.ds-dialog-preview { display: grid; padding: var(--sv-space-6); border-radius: var(--sv-radius-xl); background: var(--sv-scrim); }
+.ds-dialog-preview .ui-dialog-surface { border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); box-shadow: var(--sv-shadow-lg); }
+.ds-settings { display: grid; grid-template-columns: 240px minmax(0, 1fr); height: 100%; min-height: 0; }
+.ds-settings-nav { padding: var(--sv-space-3); border-inline-end: 1px solid var(--sv-border); background: var(--sv-bg-subtle); overflow: auto; }
+.ds-settings-scroll { min-height: 0; overflow: auto; }
+.ds-settings-content { max-width: 720px; padding: var(--sv-space-8) var(--sv-space-10) var(--sv-space-12); }
+@media (max-width: 1100px) { .ds-columns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) {
+  .ds-settings { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .ds-settings-nav { display: flex; overflow-x: auto; border-inline-end: 0; border-bottom: 1px solid var(--sv-border); }
+  .ds-settings-nav .ui-nav-item { width: auto; flex: none; }
+  .ds-settings-content { padding: var(--sv-space-4); }
+}
+@media (max-width: 640px) {
+  .ds-column { padding: var(--sv-space-3); }
+  .ds-specimen { padding: var(--sv-space-4); }
+  .ds-top { padding: var(--sv-space-2) var(--sv-space-4); }
+  .ds-brand > span { display: none; }
+  .ds-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+.ds-top { flex-wrap: wrap; row-gap: var(--sv-space-2); }
+.ds-sections { border-bottom: 0; }
+.ds-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-4); }
+.ds-control { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xs); font-weight: 600; color: var(--sv-text-muted); }

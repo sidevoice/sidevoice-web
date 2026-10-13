@@ -37,7 +37,19 @@ test("what a target is: a node by its fingerprint, a room by the build it serves
   expect(describeTarget({ kind: "node", fingerprint: "fp-1" })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
   expect(describeTarget({ kind: "room", nodes: [], web_build: "b1" })).toEqual({ kind: "room", fingerprint: null, build: "b1" });
   // A 404's body, a static server's page, a room from before rendezvous: not a node, not a room.
-  for (const answer of [null, {}, { binding: null }, { kind: "other" }]) expect(describeTarget(answer)).toBeNull();
+  for (const answer of [null, {}, { binding: null }, { kind: "" }, { kind: 3 }]) expect(describeTarget(answer)).toBeNull();
+});
+
+test("a newer server's rendezvous answer is read for what this version knows of it (core#112)", () => {
+  // Extra fields ignored.
+  expect(describeTarget({ kind: "node", fingerprint: "fp-1", api: 4, features: ["relay"] })).toEqual({ kind: "node", fingerprint: "fp-1", build: null });
+  expect(describeTarget({ kind: "room", web_build: "b1", region: "eu" })).toEqual({ kind: "room", fingerprint: null, build: "b1" });
+  // Optional fields missing, or of a shape it does not know: none.
+  expect(describeTarget({ kind: "node" })).toEqual({ kind: "node", fingerprint: null, build: null });
+  expect(describeTarget({ kind: "room", web_build: { id: "b1" } })).toEqual({ kind: "room", fingerprint: null, build: null });
+  // A kind it does not know yet: what it says of its fingerprint and build, all the same.
+  expect(describeTarget({ kind: "node+room", fingerprint: "fp-1", web_build: "b2" })).toEqual({ kind: "unknown", fingerprint: "fp-1", build: "b2" });
+  expect(describeTarget({ kind: "other" })).toEqual({ kind: "unknown", fingerprint: null, build: null });
 });
 
 test("asking the target: a failure, or anything that is not a node or a room, is no answer at all", async () => {

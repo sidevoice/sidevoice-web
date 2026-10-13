@@ -4,18 +4,31 @@
  * calls, `ModelCatalogs`, and the settings pane asks nothing else. */
 
 /**
- * @typedef {{reason?: {code: string, params?: Record<string, number>}, stale: boolean, detail?: string}} CatalogStatus
+ * @typedef {{reason?: {code: string, params?: Record<string, number>, detail?: string}, stale: boolean, detail?: string}} CatalogStatus
  *   How a catalogue stands, as the engine says: why it is not current (absent when it is), whether its models are the
  *   last kept, and what a provider said when it last refused.
- * @typedef {import('@sidevoice/engine').ModelInfo & Partial<import('@sidevoice/engine').LocalModelInfo>} CatalogModel
- *   A model as its catalogue lists it; a local one also has its family and builds.
+ * @typedef {import('@sidevoice/engine').ModelInfo & Partial<import('@sidevoice/engine').LocalModelInfo> & {lastUsedAt?: number | null}} CatalogModel
+ *   A model as its catalogue lists it; a local one also has its family and builds, and — where the engine keeps it —
+ *   when it was last loaded (`lastUsedAt`, ms since the epoch; absent where the engine does not say).
  * @typedef {{id: string, name: string | null, status: CatalogStatus, models: CatalogModel[]}} CatalogView
  *   One catalogue: `local` first, then each remote provider's, its id the provider's.
+ * @typedef {{fraction: number | null, done: number | null, total: number | null}} InstallProgress How far an install has
+ *   got: the share of it done (null while unknown), and its bytes when the engine counts them.
+ * @typedef {{build?: string | null, engine?: string | null, onProgress?: (progress: InstallProgress) => void, signal?: AbortSignal}} InstallOptions
+ *   Which build (its id, and its engine for a native engine), where progress goes, and the signal that cancels it.
  * @typedef {{
  *   catalogs(): Promise<CatalogView[]>,
+ *   install(model: string, options?: InstallOptions): Promise<void>,
  *   setCredential(provider: string, key: string | null): Promise<void>,
  *   hasCredential(provider: string): Promise<boolean>,
+ *   refresh?(provider: string): Promise<void>,
+ *   uninstall?(model: string): Promise<void>,
+ *   testCredential?(provider: string, key: string): Promise<CatalogStatus['reason'] | null>,
  * }} ModelCatalogs
+ *   `testCredential`, where the host can, asks the provider with a key without keeping it: what it said against it
+ *   (its code, and the provider's own words as `detail` where the host passes them on)
+ *   (its catalogue's reason), or null when it took it.
+ *   `uninstall`, where the engine has it, takes a model off this device: every build of it.
  */
 
 /** The id of the catalogue of models that run on this device. */
@@ -31,12 +44,27 @@ const KEY_PREFIX = 'sidevoice.provider-key.';
  * @param {Storage | undefined} [storage]
  */
 export function localStorageCredentials(storage = globalThis.localStorage) {
+  /** Keys being tried, by provider: read in place of the kept one while a try lasts, and never stored. */
+  const trying = new Map();
   return {
     /** @param {string} provider */
-    get: (provider) => storage?.getItem(KEY_PREFIX + provider) ?? null,
+    get: (provider) => trying.get(provider) ?? storage?.getItem(KEY_PREFIX + provider) ?? null,
+    /** A key read instead of the kept one until `null` ends the try (`testCredential`). @param {string} provider @param {string | null} key */
+    trial: (provider, key) => { if (key == null) trying.delete(provider); else trying.set(provider, key); },
     /** @param {string} provider @param {string | null} key */
     set: (provider, key) => (key == null ? storage?.removeItem(KEY_PREFIX + provider) : storage?.setItem(KEY_PREFIX + provider, key)),
   };
+}
+
+/** A cancelled install, whoever ran it, by one code. */
+const cancelled = () => Object.assign(new Error('install-cancelled'), { code: 'install-cancelled' });
+
+/** The web engine's progress (files done of all, and the bytes of the one downloading) as a share of the install. */
+export function webInstallProgress(progress) {
+  const files = progress?.files || 0;
+  if (!files) return { fraction: null, done: null, total: null };
+  const current = progress.size ? Math.min(1, (progress.received || 0) / progress.size) : 0;
+  return { fraction: Math.min(1, ((progress.done || 0) + current) / files), done: null, total: null };
 }
 
 /** What a catalogue that failed to answer stands as: its error as the reason it is not current. */
@@ -49,7 +77,7 @@ function failed(error) {
  * (a provider with no key, say) is listed with none, and its status says why: when the catalogue itself gave no
  * reason, the failure of its listing is the reason.
  * @param {import('@sidevoice/engine').WebEngine} engine
- * @param {{get(provider: string): string | null, set(provider: string, key: string | null): void}} credentials
+ * @param {{get(provider: string): string | null, set(provider: string, key: string | null): void, trial?(provider: string, key: string | null): void}} credentials
  * @returns {ModelCatalogs}
  */
 export function engineCatalogs(engine, credentials) {
@@ -62,11 +90,36 @@ export function engineCatalogs(engine, credentials) {
       const models = await list().catch((error) => { failure = error; return []; });
       return { id: catalog.id, name: catalog.name ?? null, status: failure && !status.reason ? failed(failure) : status, models };
     })),
+    // On this device, in its private storage: the build named, or the one the engine recommends.
+    install: (model, { build = null, onProgress, signal } = {}) =>
+      engine.install(model, build ?? undefined, (progress) => onProgress?.(webInstallProgress(progress)), signal)
+        .catch((error) => { throw signal?.aborted || error?.code === 'cancelled' ? cancelled() : error; }),
+    // Off this device, every build; refused `model-in-use` while one is loaded.
+    uninstall: (model) => engine.uninstall(model),
     async setCredential(provider, key) {
       credentials.set(provider, typeof key === 'string' && key.trim() ? key.trim() : null);
     },
     async hasCredential(provider) {
       return credentials.get(provider) != null;
+    },
+    // Asks the provider again, past any list kept: what a test of its key needs.
+    async refresh(provider) {
+      await engine.catalogs().find((catalog) => catalog.id === provider)?.refresh();
+    },
+    // The provider asked with `key` in place of the kept one, then asked again with the kept one: nothing is kept.
+    async testCredential(provider, key) {
+      const catalog = engine.catalogs().find((entry) => entry.id === provider);
+      if (!catalog || !credentials.trial) return null;
+      credentials.trial(provider, key.trim());
+      try {
+        await catalog.refresh().catch(() => undefined);
+        const status = await catalog.status().catch(failed);
+        const listed = await /** @type {() => Promise<unknown[]>} */ (/** @type {unknown} */ (catalog.models.bind(catalog)))().then(() => null, failed);
+        return status.reason ?? listed?.reason ?? null;
+      } finally {
+        credentials.trial(provider, null);
+        await catalog.refresh().catch(() => undefined);
+      }
     },
   };
 }

@@ -1,0 +1,164 @@
+/* The first-run setup (Wizard): a fixed-height dialog, so nothing jumps between steps — its brand and "later", the
+ * step in words and a five-part bar, the title, a body that alone scrolls, and a footer with Back at the start and the
+ * step's main action at the end. The whole screen on a phone, its footer pinned. Then the screen a put-off setup
+ * leaves (SetupPending). From the design system's "First-run setup" pattern. */
+
+.wizard-dialog {
+  width: min(640px, calc(100vw - 32px)); height: min(720px, calc(100dvh - 32px)); max-width: none; max-height: none; margin: auto; padding: 0;
+  overflow: hidden; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-surface); color: var(--sv-text); box-shadow: var(--sv-shadow-lg);
+}
+[data-theme="dark"] .wizard-dialog { background: var(--sv-surface-raised); }
+.wizard-dialog[open] { display: flex; flex-direction: column; }
+/* Nothing of the room is behind it yet: the page's quiet ground, not a scrim over an empty room. */
+.wizard-dialog::backdrop { background: var(--sv-bg-subtle); }
+
+.wizard-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-3); flex: none; min-height: 32px; padding: var(--sv-space-5) var(--sv-space-6) 0; }
+.wizard-brand { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.wizard-brand svg { color: var(--sv-accent-text); }
+/* Feature styles load before ui.css: a rule that moves a shared button says where it is, to outweigh the button's own. */
+.wizard-head .wizard-later { margin-inline-end: calc(-1 * var(--sv-space-2)); }
+
+.wizard-stepper { display: grid; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6) 0; }
+.wizard-stepper-label { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-steps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sv-space-1); margin: 0; padding: 0; list-style: none; }
+.wizard-steps li { height: 4px; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); }
+[data-theme="dark"] .wizard-steps li { background: var(--sv-border); }
+.wizard-steps li[data-state="done"], .wizard-steps li[data-state="current"] { background: var(--sv-accent); }
+
+/* The space under the title is the title's, not the body's: scrolled content then stops short of it. */
+.wizard-title { flex: none; margin: 0; padding: var(--sv-space-4) var(--sv-space-6) var(--sv-space-3); font-size: var(--sv-font-2xl); line-height: 2rem; font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; color: var(--sv-text); }
+.wizard-title:focus { outline: none; }
+
+.wizard-body { display: grid; align-content: start; gap: var(--sv-space-4); flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--sv-space-1) var(--sv-space-6) var(--sv-space-6); }
+/* A new step slides in from the side it came from (Continue: the right; Back: the left), once, in 200 ms; under reduced
+   motion it is simply there. */
+.wizard-body[data-travel] { animation: wizard-step-in 200ms var(--sv-ease) both; }
+.wizard-body[data-travel="back"] { --wizard-from: -16px; }
+@keyframes wizard-step-in { from { opacity: 0; transform: translateX(var(--wizard-from, 16px)); } }
+@media (prefers-reduced-motion: reduce) { .wizard-body[data-travel] { animation: none; } }
+.wizard-title:has(+ .wizard-body[data-scrolled]) { position: relative; z-index: 1; box-shadow: 0 1px 0 var(--sv-border); }
+.wizard-body[data-scrolled] { mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sv-space-4)); }
+.wizard-body > section { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
+.wizard-body > section > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.wizard-loading { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+
+.wizard-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6); border-top: 1px solid var(--sv-border); }
+.wizard-actions:not(:has(.ui-button)) { display: none; }
+.wizard-actions .wizard-back { margin-inline-end: auto; }
+.wizard-actions .ui-dialog-reason { margin: 0; }
+/* A model step's footer is always one line, at every width and in every language: Back, then why it waits (cut short,
+   its whole text kept for hover and assistive tech), then its actions, none of them wrapping. */
+.wizard-actions .ui-button { white-space: nowrap; }
+.wizard-actions .wizard-back { gap: var(--sv-space-1); }
+.wizard-actions[data-model-step] { flex-wrap: nowrap; }
+.wizard-actions[data-model-step] > .ui-button { flex: none; }
+.wizard-actions .wizard-reason { flex: 1 1 auto; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: end; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+/* The pairing form's Connect lands here, laid out as one of the footer's own buttons. */
+.wizard-slot { display: contents; }
+
+/* ----- where you work: two choice cards, each with a line on what it means */
+.wizard-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--sv-space-3); }
+.wizard-choices .ui-card { display: grid; align-content: start; justify-items: start; gap: var(--sv-space-2); }
+.wizard-choices .ui-card > svg { color: var(--sv-accent-text); }
+.wizard-choices .ui-card > strong { padding-inline-end: var(--sv-space-6); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; }
+.wizard-chips { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
+.wizard-choice-note { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: start; }
+.wizard-choices .ui-card > .wizard-choice-note { padding-inline-end: var(--sv-space-2); }
+
+/* ----- transcription and voice: the choices (Settings' own), the try in the model's block; the sentence to hear is
+   edited there too, or beside it while the try has its own dialog */
+.wizard-stage-step { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
+.wizard-stage-step > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.wizard-stage { min-width: 0; }
+
+
+/* ----- Ready (ReadyStep): the mark arriving, the title, what was set up, what to tell an agent; Enter in the footer —
+   in the setup's frame, its last bar mustard. Only transform and opacity move; nothing arrives later than half a second;
+   Enter, Back and the phrase never move. Under reduced motion all of it shows as it ends. */
+.wizard-ready { display: grid; gap: var(--sv-space-6); min-width: 0; }
+.wizard-ready-hero { display: grid; justify-items: center; gap: var(--sv-space-4); text-align: center; }
+.wizard-ready-title { padding: 0; text-wrap: balance; }
+.wizard-ready-mark { display: grid; place-items: center; color: var(--sv-accent-text); }
+.wizard-ready-mark rect { transform-box: fill-box; transform-origin: center; animation: wizard-ready-bar 560ms var(--sv-ease) both; }
+.wizard-ready-mark rect:nth-child(2) { animation-delay: 70ms; }
+.wizard-ready-mark rect:nth-child(3) { animation-delay: 140ms; }
+.wizard-ready-mark rect:nth-child(4) { animation-delay: 210ms; }
+.wizard-ready-mark rect:nth-child(5) { animation-delay: 280ms; }
+@keyframes wizard-ready-bar { 0% { transform: scaleY(.2); opacity: 0; } 60% { transform: scaleY(1.12); opacity: 1; } }
+@keyframes wizard-ready-rise { from { transform: translateY(8px); opacity: 0; } }
+@keyframes wizard-ready-pop { 0% { transform: scale(0); } 70% { transform: scale(1.15); } }
+.wizard-ready-title { animation: wizard-ready-rise var(--sv-dur-slow) var(--sv-ease) 200ms both; }
+
+.wizard-recap { display: grid; gap: var(--sv-space-3); min-width: 0; }
+.wizard-recap-list { display: grid; gap: var(--sv-space-3); margin: 0; }
+.wizard-recap-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; grid-template-areas: "icon label check" "icon value check"; align-items: center; column-gap: var(--sv-space-3); min-width: 0; animation: wizard-ready-rise var(--sv-dur-slow) var(--sv-ease) both; }
+.wizard-recap-row:nth-child(1) { animation-delay: 280ms; }
+.wizard-recap-row:nth-child(2) { animation-delay: 330ms; }
+.wizard-recap-row:nth-child(3) { animation-delay: 380ms; }
+.wizard-recap-row:nth-child(4) { animation-delay: 430ms; }
+.wizard-recap-icon { grid-area: icon; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.wizard-recap-row dt { grid-area: label; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-recap-row dd { grid-area: value; margin: 0; font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); overflow-wrap: anywhere; }
+.wizard-recap-detail { font-weight: var(--sv-weight-regular, 400); color: var(--sv-text-muted); }
+.wizard-recap-check { grid-area: check; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--sv-positive-soft); color: var(--sv-positive); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
+.wizard-recap-row:nth-child(1) .wizard-recap-check { animation-delay: 420ms; }
+.wizard-recap-row:nth-child(2) .wizard-recap-check { animation-delay: 470ms; }
+.wizard-recap-row:nth-child(3) .wizard-recap-check { animation-delay: 520ms; }
+.wizard-recap-row:nth-child(4) .wizard-recap-check { animation-delay: 570ms; }
+.wizard-recap-check svg { width: 12px; height: 12px; }
+.wizard-recap-note { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.wizard-ready-connect { min-width: 0; }
+.wizard-ready-error { scroll-margin: var(--sv-space-4); }
+.wizard-actions .wizard-enter svg { transition: transform var(--sv-dur-fast) var(--sv-ease); }
+@media (hover: hover) { .wizard-actions .wizard-enter:hover svg { transform: translateX(2px); } }
+
+/* The stepper's last bar mustard, drawn in; the mark in a halo; recap as four tiles, then the phrase under a rule. */
+[data-ready] .wizard-steps li:last-child { background: var(--sv-voice); transform-origin: left; animation: wizard-ready-draw 400ms var(--sv-ease) 300ms both; }
+@keyframes wizard-ready-draw { from { transform: scaleX(0); } }
+.wizard-ready .wizard-ready-mark { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(closest-side, var(--sv-accent-soft), transparent); animation: wizard-ready-halo 400ms var(--sv-ease) both; }
+[data-theme="dark"] .wizard-ready .wizard-ready-mark { background: radial-gradient(closest-side, color-mix(in srgb, var(--sv-accent) 18%, transparent), transparent); }
+@keyframes wizard-ready-halo { from { transform: scale(.85); opacity: 0; } }
+.wizard-ready .wizard-recap-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wizard-ready .wizard-recap-row { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+[data-theme="dark"] .wizard-ready .wizard-recap-row { background: var(--sv-surface); }
+.wizard-ready .wizard-ready-connect { padding-top: var(--sv-space-5); border-top: 1px solid var(--sv-border); }
+
+@media (max-width: 599px), (max-height: 520px) {
+  .wizard-ready .wizard-ready-title { font-size: var(--sv-font-xl); line-height: 1.625rem; }
+  .wizard-ready .wizard-ready-mark { width: 72px; height: 72px; }
+  .wizard-ready .wizard-ready-mark svg { width: 48px; height: 48px; }
+  .wizard-ready .wizard-recap-list { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); }
+  .wizard-ready .wizard-recap-row { min-height: 48px; border: 0; border-radius: 0; background: none; }
+  [data-theme="dark"] .wizard-ready .wizard-recap-row { background: none; }
+  .wizard-ready .wizard-recap-row + .wizard-recap-row { border-top: 1px solid var(--sv-border); }
+}
+@media (max-height: 520px) { .wizard-ready-mark { display: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-ready] *, [data-ready] *::before, [data-ready] *::after, [data-ready] .wizard-steps li { animation: none !important; }
+}
+/* ----- the screen a put-off setup leaves */
+.setup-pending {
+  display: grid; justify-items: center; gap: var(--sv-space-2); width: min(34rem, 100%); padding: var(--sv-space-10) var(--sv-space-6);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); background: var(--sv-stage-bg); text-align: center;
+}
+.setup-pending-mark { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--sv-radius-xl); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.setup-pending h1 { margin: var(--sv-space-2) 0 0; font-size: var(--sv-font-xl); line-height: 1.625rem; font-weight: var(--sv-weight-bold); letter-spacing: -.015em; color: var(--sv-text); }
+.setup-pending p { max-width: 40ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.setup-pending > .ui-button { margin-top: var(--sv-space-3); }
+
+/* ----- a phone, or a screen too short for the dialog: the whole screen, the footer pinned at the bottom */
+@media (max-width: 599px), (max-height: 520px) {
+  .wizard-dialog { position: fixed; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .wizard-head { padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) var(--sv-space-4) 0; }
+  .wizard-stepper { padding: var(--sv-space-3) var(--sv-space-4) 0; }
+  .wizard-title { padding: var(--sv-space-3) var(--sv-space-4); font-size: var(--sv-font-xl); line-height: 1.625rem; }
+  .wizard-body { padding: var(--sv-space-1) var(--sv-space-4) var(--sv-space-4); }
+  .wizard-actions { padding: var(--sv-space-3) var(--sv-space-4) calc(var(--sv-space-3) + env(safe-area-inset-bottom)); }
+  .wizard-actions > .ui-button--primary, .wizard-slot > .ui-button { flex: 1 1 auto; }
+  .wizard-actions .ui-dialog-reason { flex: 1 0 100%; }
+  /* A model step on a phone keeps its one line: Back is its chevron (its name still said), the actions their own width. */
+  .wizard-actions[data-model-step] > .ui-button--primary { flex: none; }
+  .wizard-actions[data-model-step] .wizard-back { padding-inline: var(--sv-space-2); }
+  .wizard-actions[data-model-step] .wizard-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .wizard-actions[data-model-step] > .ui-button:not(.wizard-back) { padding-inline: var(--sv-space-3); }
+}

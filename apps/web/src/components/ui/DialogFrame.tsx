@@ -1,4 +1,5 @@
 import { useState, type PropsWithChildren, type ReactNode } from "react";
+import { useDialogFocusReturn } from "../../lib/focus-return";
 import { Button } from "./Button";
 import { CloseIcon } from "./Icons";
 import { OverlayPortalProvider } from "./Tooltip";
@@ -19,6 +20,8 @@ interface DialogFrameProps extends PropsWithChildren {
 
 export function DialogFrame({ id, labelledBy, eyebrow, title, closeId, closeLabel, closeTitle, footer, className = "", onClose, children }: DialogFrameProps) {
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
+  // However the controller closes it: focus back on what opened it (focus-return.ts).
+  useDialogFocusReturn(dialog);
   return (
     <dialog ref={setDialog} id={id} className={className} aria-labelledby={labelledBy}>
       <OverlayPortalProvider container={dialog}>

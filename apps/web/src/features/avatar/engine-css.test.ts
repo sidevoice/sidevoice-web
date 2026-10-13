@@ -41,5 +41,6 @@ test("the stylesheet loads after the app's own avatar rules, and nothing of an a
   const main = readFileSync(resolve(process.cwd(), "src/main.tsx"), "utf8");
   expect(main.indexOf('"./styles/bichos.css"')).toBeGreaterThan(main.indexOf('"./styles/call.css"'));
   const call = readFileSync(resolve(process.cwd(), "src/styles/call.css"), "utf8");
-  expect(call).toMatch(/\.sv-avatar\[data-style=bichos\] \{ --bx-sv:var\(--sv-primary\);--bx-sv-face:var\(--sv-on-primary\)/);
+  // Its theme inks are the design tokens', so they follow the light theme and the dark one.
+  expect(call).toMatch(/\.sv-avatar\[data-style=bichos\] \{ --bx-sv:var\(--sv-accent\);--bx-sv-face:var\(--sv-on-accent\)/);
 });

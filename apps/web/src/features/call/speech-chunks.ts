@@ -1,74 +1,8 @@
-/* A reply on the stage is read in chunks, the way the voice says it: a clause or two at a time, never more than a
- * short line's worth of words, with the previous chunk kept as a dim line above. Where the voice is comes from its
- * cue — the part of the reply sounding now — so the chunk follows the voice; within that part, which may be a whole
- * sentence, the words move on at a speaking pace and never past its end. */
+/* Where the voice is in a reply on the stage, the way it says it: its cue — the part of the reply sounding now — so the
+ * words lit follow the voice; within that part, which may be a whole sentence, the words move on at a speaking pace and
+ * never past its end. */
 
 import type { KaraokeRange } from "../../state/room-types";
-
-export interface SpeechChunk {
-  /** Offsets into the reply's text: the chunk is `text.slice(start, end)`. */
-  start: number;
-  end: number;
-  text: string;
-}
-
-const MAX_WORDS = 11;
-/** How many of the previous chunk's last words stay above the current one. */
-const TAIL_WORDS = 6;
-const CLAUSE_END = /[.?!,;:…]["'”’)\]]*$/;
-
-/** The reply's words grouped into chunks: whole clauses, merged while they fit in MAX_WORDS; a clause longer than
- *  that is cut into as few even pieces as fit, so no piece is left a lone word. */
-export function speechChunks(text: string): SpeechChunk[] {
-  const words = [...text.matchAll(/\S+/g)].map((match) => ({ start: match.index ?? 0, end: (match.index ?? 0) + match[0].length, word: match[0] }));
-  const clauses: (typeof words)[] = [];
-  let clause: typeof words = [];
-  for (const word of words) {
-    clause.push(word);
-    if (CLAUSE_END.test(word.word)) { clauses.push(...evenly(clause)); clause = []; }
-  }
-  if (clause.length) clauses.push(...evenly(clause));
-
-  const chunks: (typeof words)[] = [];
-  let current: typeof words = [];
-  for (const next of clauses) {
-    if (current.length && current.length + next.length > MAX_WORDS) { chunks.push(current); current = []; }
-    current = current.concat(next);
-  }
-  if (current.length) chunks.push(current);
-  return chunks.map((chunk) => {
-    const start = chunk[0].start, end = chunk[chunk.length - 1].end;
-    return { start, end, text: text.slice(start, end) };
-  });
-}
-
-function evenly<T>(words: T[]): T[][] {
-  const pieces = Math.ceil(words.length / MAX_WORDS);
-  const size = Math.ceil(words.length / pieces);
-  return Array.from({ length: pieces }, (_, index) => words.slice(index * size, (index + 1) * size)).filter((piece) => piece.length);
-}
-
-export interface BubbleView {
-  current: SpeechChunk;
-  /** The chunk before, as its last few words, or null at the start of the reply. */
-  previous: string | null;
-  /** How many characters of the current chunk have been said. */
-  spoken: number;
-}
-
-/** What the bubble shows when the voice has said up to `spokenTo` characters of `text`. */
-export function bubbleAt(text: string, spokenTo: number): BubbleView | null {
-  const chunks = speechChunks(text);
-  if (!chunks.length) return null;
-  const reached = Number.isFinite(spokenTo) ? Math.max(0, spokenTo) : 0;
-  let index = chunks.findIndex((chunk) => reached <= chunk.end);
-  if (index < 0) index = chunks.length - 1;
-  const current = chunks[index];
-  const before = chunks[index - 1];
-  const words = before ? before.text.split(/\s+/) : [];
-  const previous = before ? (words.length > TAIL_WORDS ? "…" + words.slice(-TAIL_WORDS).join(" ") : before.text) : null;
-  return { current, previous, spoken: Math.max(0, Math.min(current.text.length, reached - current.start)) };
-}
 
 /** A calm speaking pace, in characters a second: how fast the words move on where the voice says nothing finer. */
 export const PACE = 15;

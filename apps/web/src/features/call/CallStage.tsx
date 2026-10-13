@@ -1,127 +1,97 @@
-import { useEffect, useReducer, useRef, type CSSProperties } from "react";
-import { HARNESS_NAMES, HarnessIcon } from "../../components/ui/Icons";
-import { useCallLayout } from "../../state/call-layout";
+import type { CSSProperties, ReactNode } from "react";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { HarnessIcon } from "../../components/ui/Icons";
+import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
-import type { ChatMessage, ConversationView } from "../../state/room-types";
-import { avatarFor, avatarTone, PERSON_AVATAR } from "../avatar/avatar-spec";
+import type { ChatMessage } from "../../state/room-types";
+import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
-import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
-import { moodText, personMood } from "./conversation-state";
-import { bubbleAt, readingMoves, readingPosition, readOn, type Reading } from "./speech-chunks";
+import { moodText } from "./conversation-state";
+import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
+import { PagedText } from "./PagedText";
 import { useStageConversation } from "./stage-view";
+import { PersonTurn } from "./PersonTurn";
+import { TranscriptEntry } from "./TranscriptEntry";
+import { VoiceModels } from "./VoiceModels";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { errorLine } from "../settings/error-message";
+
+/** A harness by its product name, for the badge's tooltip; one not known, as it is reported. */
+function harnessName(id: string | null | undefined) {
+  if (!id) return "";
+  if (/^claude/.test(id)) return "Claude Code";
+  if (/^codex/.test(id)) return "Codex";
+  if (/^cursor/.test(id)) return "Cursor";
+  return id;
+}
+import "./call-view.css";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
  * a time as the voice reaches it, the spoken words lit and the chunk before kept dim above. Between turns its
- * activity stands where the bubble was. The person is the picture-in-picture in the corner, with a bubble of their
- * own while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button
- * away (TranscriptPanel).
+ * activity stands where the bubble was. The person has no picture: a bubble of their own rises at the stage's foot
+ * while they speak. One agent: the call talks to one conversation at a time. The whole transcript is a button away
+ * (TranscriptPanel). Its look is call-view.css.
  *
  * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
  * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
 
-/** The reply sounding now. Until its row says so the voice may already be playing it: then it is the oldest one
- *  waiting, since replies are said in order. */
-function sounding(messages: ChatMessage[], voiceLive: boolean) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role === "assistant" && message.playback === "playing") return message;
-  }
-  return voiceLive ? messages.find((message) => message.role === "assistant" && message.playback === "pending") ?? null : null;
-}
-
-/** How far into `reply` the voice is (speech-chunks.ts `readOn`): the part sounding now, its words moving on at a
- *  speaking pace within it, or that pace from the start while the voice gives no cue yet. A reply that has finished,
- *  or left the list, is read from the start if it sounds again (listening again). */
-function useSpokenTo(reply: ChatMessage | null, sounding: boolean, messages: ChatMessage[]): number | null {
-  const reading = useRef<Reading | null>(null);
-  const kept = reading.current && messages.some((message) => message.segment === reading.current!.segment && message.playback !== "complete") ? reading.current : null;
-  reading.current = readOn(kept, reply?.segment ?? null, sounding, reply?.karaoke ?? null, Date.now());
-  const ticking = !!reply && !!reading.current && readingMoves(reading.current);
-  const [, tick] = useReducer((count: number) => count + 1, 0);
-  useEffect(() => {
-    if (!ticking) return;
-    const timer = setInterval(tick, 200);
-    return () => clearInterval(timer);
-  }, [ticking]);
-  return reply && reading.current?.segment === reply.segment ? readingPosition(reading.current) : null;
-}
-
-function AgentBubble({ reply, spokenTo, visible }: { reply: ChatMessage | null; spokenTo: number | null; visible: boolean }) {
-  const view = reply && spokenTo !== null ? bubbleAt(reply.text, spokenTo) : null;
+/** One reply on the stage, as the person's sent turn shows (PagedText): three lines at a time, lit as the voice says
+ *  them, its pages turning with the words heard. */
+function AgentBubble({ turn }: { turn: AgentTurn }) {
   return (
-    <div className="speech-bubble stage-bubble" data-visible={(visible && !!view) || undefined} aria-hidden={!visible || !view} translate="no">
-      {view?.previous && <span className="stage-bubble-previous">{view.previous}</span>}
-      {view && <KaraokeText text={view.current.text} playback="playing" range={view.spoken > 0 ? { from: 0, to: view.spoken } : null} />}
+    <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
+      <PagedText measure={turn.text} follow=".karaoke-played">
+        <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
+      </PagedText>
     </div>
   );
 }
 
-/** How much of what the person is saying their bubble holds: the latest words, a few lines; the transcript has all. */
-const LIVE_TAIL = 90;
-function latestWords(text: string) {
-  if (text.length <= LIVE_TAIL) return text;
-  const cut = text.slice(-LIVE_TAIL);
-  return "…" + cut.slice(cut.indexOf(" ") + 1);
+/** The agent's replies on the stage: the one sounding, followed as it is heard; once its last words are said it stays
+ *  PAGE_MS, then leaves. A new reply over it: the one before lifts away at once (as the person's sent turn does). */
+function AgentBubbles({ reply, spokenTo }: { reply: ChatMessage | null; spokenTo: number | null }) {
+  const turns = useAgentTurns(reply, spokenTo);
+  return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
 }
 
-function PersonPip({ inCall, speaking, conversation, t }: { inCall: boolean; speaking: boolean; conversation: ConversationView; t: CallTranslate }) {
-  const avatar = useRef<HTMLSpanElement>(null);
-  // While the person speaks their mouth follows the microphone, written straight onto the avatar: no render per level.
-  useEffect(() => {
-    const node = avatar.current;
-    const channel = window.sidevoiceUI?.micLevel;
-    if (!speaking || !node || !channel) return;
-    const unsubscribe = channel.subscribe((level) => node.style.setProperty("--mouth", String(Math.min(1, level / 45))));
-    return () => { unsubscribe(); node.style.removeProperty("--mouth"); };
-  }, [speaking]);
-  const turn = !!(conversation.pendingText || conversation.pendingPhase);
-  return (
-    <div className="stage-pip" data-speaking={speaking || undefined} style={avatarTone(avatarColor(PERSON_AVATAR)) as CSSProperties}>
-      {turn && (
-        <div className="speech-bubble pip-bubble" translate="no">
-          {conversation.pendingText ? <span>{latestWords(conversation.pendingText)}</span>
-            : <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />}
-          {conversation.pendingCancellable && <button type="button" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</button>}
-        </div>
-      )}
-      <CharacterAvatar ref={avatar} spec={PERSON_AVATAR} mood={personMood({ inCall, speaking })} size="pip" mouth="level" label={t("stage.yourAvatar")} />
-      <span className="stage-tag">{t("stage.you")}</span>
-    </div>
-  );
-}
-
+/** The room's errors, above the stage (#error is the runtime's id), as people read them: what was raw about one is
+ *  behind its Details. The box stays in the page so what appears in it is read out at once. */
 function BootError() {
   const error = useRoomStore((state) => state.bootError);
-  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error}</div>;
+  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={errorLine(error)} details={error.details} />}</div>;
 }
 
 function posterWords(t: CallTranslate): PosterWords {
   return { title: t("stage.poster.title"), status: t("stage.poster.status"), fine: [t("stage.poster.fine1"), t("stage.poster.fine2"), t("stage.poster.fine3")] };
 }
 
-export function CallStage() {
+/** The stage; `notice`, what the room says over it (App: where an update waits), at the tile's top, taking no room of
+ *  its own. */
+export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const t = callTranslator();
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
   const conversation = useRoomStore((state) => state.conversation);
-  const userLive = useRoomStore((state) => state.facts.userLive);
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
-  const personSpeaking = stage.inCall && (userLive || conversation.pendingPhase === "listening");
-  const harness = stage.row?.harness ? HARNESS_NAMES[stage.row.harness] : null;
+  // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
+  const narrow = useMedia(NARROW_QUERY);
 
   if (!stage.threadId) {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
         <div className="stage-tile stage-empty">
+          <div className="stage-notice">{notice}</div>
           <p>{t("stage.empty")}</p>
-          <button type="button" className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</button>
+          <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
+          {narrow && <TranscriptEntry />}
         </div>
       </section>
     );
@@ -131,7 +101,13 @@ export function CallStage() {
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
+      {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
+      <header className="stage-title" translate="no">
+        <h2 title={stage.title}>{stage.title}</h2>
+        {stage.row?.machine && <span>{stage.row.machine}</span>}
+      </header>
       <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} style={avatarTone(tone) as CSSProperties}>
+        <div className="stage-notice">{notice}</div>
         <div className="stage-scene">
           <StageBackdrop seed={stage.threadId} tone={tone} />
           {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={callLanguage()} />}
@@ -139,14 +115,27 @@ export function CallStage() {
             mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           <StageDesk seed={stage.threadId} />
         </div>
+        <div className="stage-name" translate="no">
+          <h2 title={stage.title}>{stage.title}</h2>
+          {stage.row?.machine && <span>{stage.row.machine}</span>}
+        </div>
+        <VoiceModels />
         <div className="stage-top">
-          <AgentBubble reply={reply} spokenTo={spokenTo} visible={stage.mood === "speaking"} />
-          {stage.mood === "working" && <p className="stage-activity" role="status"><i className="stage-spinner" aria-hidden="true" />{t("stage.working")}</p>}
+          {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
+          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} />
+          {/* Working is said only to assistive tech here: the sidebar shows it. */}
+          {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>
         <div className="stage-tags">
-          {harness && <span className="stage-tag">{stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}{harness}</span>}
+          {(stage.row?.harness || stage.row?.model) && <Tooltip content={[harnessName(stage.row?.harness), stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}>
+            <span className="stage-tag stage-badge" tabIndex={0}>
+              {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
+              <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
+            </span>
+          </Tooltip>}
         </div>
-        <PersonPip inCall={stage.inCall} speaking={personSpeaking} conversation={conversation} t={t} />
+        <PersonTurn conversation={conversation} t={t} />
+        {narrow && <TranscriptEntry />}
       </div>
     </section>
   );

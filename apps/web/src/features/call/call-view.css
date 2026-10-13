@@ -1,0 +1,287 @@
+/* The call (CallStage, CallToolbar): the stage the conversation's agent fills, and the call bar under it, as the design
+ * system's "Call · stage" and "Call · bar" patterns draw them (design-system/app-patterns.css), on its tokens alone.
+ * The shared components' CSS (components/ui/ui.css) is loaded after this file, so whatever restyles a component here
+ * goes through an id of the call's rather than through the order of the files. Below 900px is a phone
+ * (state/call-layout.ts NARROW_QUERY). */
+
+/* ---------- the stage ---------- */
+.call-stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--sv-space-2); padding: var(--sv-space-4) var(--sv-space-4) var(--sv-space-1); }
+#error.stage-error { flex: none; }
+
+/* The tile fills the call; what sits on it keeps one inset from its edges, smaller on a small tile. */
+.stage-tile { container: stage / inline-size; position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl);
+  background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg);
+  transition: border-color var(--sv-dur-base) var(--sv-ease), box-shadow var(--sv-dur-base) var(--sv-ease); }
+.stage-tile > * { --stage-inset: var(--sv-space-4); }
+@container stage (max-width: 480px) { .stage-tile > * { --stage-inset: var(--sv-space-3); } }
+/* Speaking: a quiet ring in the accent around the whole tile. */
+.stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-accent) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 20%, transparent); }
+
+/* The conversation's name and its machine, in the tile's top corner as a call names whoever is on screen. */
+.stage-name { position: absolute; z-index: 2; top: var(--stage-inset); left: calc(var(--stage-inset) + var(--sv-space-1)); display: grid; max-width: min(60%, calc(100% - 2 * var(--stage-inset))); }
+.stage-name h2 { overflow: hidden; font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
+.stage-name span { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text-muted); }
+@container stage (max-width: 480px) { .stage-name h2 { font-size: var(--sv-font-md); line-height: 1.375rem; } }
+
+/* Under the name, the agent's bubble; between turns its activity is said there to assistive tech only (the sidebar
+ * shows it). */
+.stage-top { position: absolute; z-index: 2; top: calc(var(--stage-inset) + var(--sv-space-12) + var(--sv-space-3)); left: var(--stage-inset); right: var(--stage-inset);
+  display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; pointer-events: none; }
+.stage-top > * { grid-area: 1 / 1; align-self: start; }
+/* One width whatever the chunk, so the bubble does not jump as the voice moves from one chunk to the next. The words
+ * said are the text's colour; the rest, and the chunk before, the subtle one (5:1 and more on the bubble). */
+.stage-bubble { display: grid; gap: var(--sv-space-1); width: 100%; max-width: 34rem; min-width: 0; padding: var(--sv-space-3) var(--sv-space-4);
+  border: 1px solid var(--sv-stage-bubble-edge); border-radius: var(--sv-radius-xl); border-bottom-left-radius: var(--sv-radius-xs);
+  background: var(--sv-surface); box-shadow: var(--sv-stage-bubble-shadow); color: var(--sv-text-subtle); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere;
+  opacity: 0; transform: translateY(-6px) scale(.98); transition: opacity var(--sv-dur-base) var(--sv-ease), transform var(--sv-dur-base) var(--sv-ease); }
+.stage-bubble[data-visible] { opacity: 1; transform: none; }
+/* A reply leaving (its time over, or a new one over it): it lifts away and fades where the next comes in. */
+.stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
+@keyframes stage-bubble-out { to { opacity: 0; transform: translateY(-28px) scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .stage-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; } }
+.stage-bubble .karaoke-text { white-space: pre-wrap; }
+.stage-bubble .karaoke-text .karaoke-played { color: var(--sv-text); opacity: 1; }
+.stage-bubble .karaoke-text .karaoke-upcoming { color: var(--sv-text-subtle); opacity: 1; }
+@container stage (max-width: 480px) { .stage-bubble { font-size: var(--sv-font-md); line-height: 1.375rem; } }
+
+/* The harness and model, at the tile's foot; they step aside while the person's bubble is up. */
+.stage-tags { position: absolute; z-index: 2; left: 50%; bottom: var(--stage-inset); display: flex; justify-content: center; gap: var(--sv-space-1-5); max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); }
+.stage-tag { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; height: calc(var(--sv-space-6) + var(--sv-space-0-5)); padding: 0 var(--sv-space-3);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: color-mix(in srgb, var(--sv-surface) 80%, transparent);
+  font-size: var(--sv-font-xs); font-weight: var(--sv-weight-semibold); white-space: nowrap; color: var(--sv-text-muted); }
+.stage-tag > svg { flex: none; }
+.stage-tag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.stage-tile:has(.person-bubble) .stage-tags { display: none; }
+
+/* What the person is saying, at the tile's foot on their side while they say it, with a way to take it back; its fill
+ * and text are the person's in the transcript (transcript.css: one rule for both). Speaking again during what was just
+ * sent's moment, the sent one lifts away under the new bars (PersonTurn). */
+.person-turns { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-direction: column; align-items: flex-end; gap: var(--sv-space-2); }
+.person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1) var(--sv-space-2);
+  width: max-content; max-width: min(75cqi, 28rem); padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4);
+  border: 1px solid var(--sv-stage-bubble-edge); border-radius: var(--sv-radius-xl); border-bottom-right-radius: var(--sv-radius-xs);
+  box-shadow: var(--sv-stage-bubble-shadow); font-size: 1rem; line-height: 1.5rem; overflow-wrap: anywhere; }
+.person-bubble .cancel-input { flex: none; }
+/* Speaking again: the sent one lifts away from the very place the bars come in, under them. */
+.person-turns > .person-bubble[data-under] { position: absolute; right: 0; bottom: 0; }
+
+/* What was sent: its space above and below is margin, so a page is cut at its last line and not a sliver below it. */
+.person-said { flex: 1 1 8rem; min-width: 0; margin-block: var(--sv-space-1); }
+/* What was sent: a moment on the stage, then it lifts toward the agent, shrinks and fades (a plain fade, reduced). */
+.person-bubble[data-leaving] { animation: person-sent-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
+@keyframes person-sent-out { to { opacity: 0; transform: translateY(-48px) scale(.72); } }
+@media (prefers-reduced-motion: reduce) {
+  /* Its own duration: app.css cuts every animation short under reduced motion, and this fade is the reduced one. */
+  .person-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; }
+  @keyframes person-sent-fade { to { opacity: 0; } }
+}
+.person-bubble .voice-wave { display: block; flex: none; width: 10rem; height: 1.75rem; color: var(--sv-accent); }
+.person-bubble .voice-wave canvas { display: block; width: 100%; height: 100%; }
+.person-bubble .voice-wave[data-phase="transcribing"] canvas { animation: call-wave-rest 1.9s ease-in-out infinite; }
+/* The bars stand in for the waveform where the device asks for less motion: still, at rest heights. */
+.person-bubble .voice-bars { display: inline-flex; flex: none; align-items: center; gap: 3px; height: 20px; color: var(--sv-accent); }
+.person-bubble .voice-bars i { display: block; width: 3px; height: 12px; border-radius: 2px; background: currentColor; }
+.person-bubble .voice-bars i:nth-child(even) { height: 6px; }
+.person-bubble .voice-bars[data-phase="transcribing"] i { opacity: .55; }
+@keyframes call-wave-rest { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* No conversation on the stage. Its button only does something where the conversations are not already beside it. */
+.stage-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sv-space-3); padding: var(--sv-space-6);
+  background: var(--sv-stage-bg); text-align: center; color: var(--sv-text-muted); }
+@media (min-width: 900px) { .stage-empty .stage-choose { display: none; } }
+
+/* ---------- the call bar: one tray of round buttons in the middle, under the join's line; the transcript at the
+ * right edge. The call's own colour says join (positive) or leave (danger). ---------- */
+.call-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; column-gap: var(--sv-space-3);
+  padding: var(--sv-space-3) var(--sv-space-4) calc(var(--sv-space-4) + env(safe-area-inset-bottom, 0px)); background: var(--sv-bg); }
+/* The join's line keeps its row whether or not it says anything, so the tray never moves when it comes and goes. */
+.call-bar .controls { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: minmax(var(--sv-space-5), auto) auto; justify-items: center; row-gap: var(--sv-space-2); min-width: 0; }
+.call-bar .call-actions { grid-row: 2; display: flex; align-items: center; gap: var(--sv-space-3); padding: var(--sv-space-2);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: var(--sv-surface); box-shadow: var(--sv-shadow-md); }
+.call-bar-end { grid-column: 3; grid-row: 1; justify-self: end; display: flex; align-items: center; gap: var(--sv-space-2); padding-bottom: calc(var(--sv-space-2) + 1px); }
+.call-bar-end:empty { display: none; }
+.call-bar-end .transcript-entry { position: static; width: var(--sv-call-button); height: var(--sv-call-button); }
+
+/* Centred, its mark inline with the first line however many lines it takes. */
+.join-status { grid-row: 1; align-self: end; max-width: min(100%, 30rem); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); text-align: center; color: var(--sv-text-muted); }
+.join-status > svg { display: inline-block; margin-inline-end: var(--sv-space-1-5); vertical-align: -3px; }
+.join-status[data-state="failed"] { color: var(--sv-danger); }
+.join-status-dot { display: inline-block; width: 8px; height: 8px; margin-inline-end: var(--sv-space-1-5); vertical-align: 0; border-radius: 50%; background: var(--sv-accent); animation: call-join-pulse 1.4s ease-in-out infinite; }
+/* A failed join's raw text, closed under its line (ErrorText.tsx): quiet, and read from the start. */
+.join-status .ui-error-details { font-weight: var(--sv-weight-regular); }
+.join-status .ui-error-details > summary { margin-inline: auto; }
+.join-status .ui-error-details > pre { text-align: start; }
+@keyframes call-join-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* The round buttons: the microphone, skip, the call, ⋮ and the transcript. */
+:is(#call-controls, .call-bar-end) .call-button { display: grid; place-items: center; flex: none; width: var(--sv-call-button); height: var(--sv-call-button); padding: 0;
+  border: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); color: var(--sv-text); box-shadow: none; cursor: pointer;
+  transition: background-color var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease), transform var(--sv-dur-fast) var(--sv-ease); }
+:is(#call-controls, .call-bar-end) .call-button svg { width: 22px; height: 22px; }
+@media (hover: hover) { :is(#call-controls, .call-bar-end) .call-button:not(:disabled):hover { background: var(--sv-accent-soft); } }
+:is(#call-controls, .call-bar-end) .call-button:not(:disabled):active { background: var(--sv-accent-soft-hover); }
+:is(#call-controls, .call-bar-end) .call-button:disabled { background: var(--sv-bg-sunken); color: var(--sv-disabled-text); cursor: not-allowed; }
+:is(#call-controls, .call-bar-end) .call-button:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.call-bar-end #transcript-toggle[aria-expanded="true"], #call-menu[open] > summary { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+
+/* The microphone: one pill — the devices' button at its left showing the level, then the microphone (as Meet, and the
+ * room's v0.6.0). The runtime writes the level as `--mic-fill` (0%–100%) on #mic-control on every reading
+ * (room-session-controller.js voiceLevel); each bar grows from it, so the wave draws itself with no render. On hover, on
+ * focus, with the bar open or muted, the bars give way to the chevron. Muted, the pill turns danger; held to talk while
+ * muted, it turns positive. */
+#call-controls .mic-control { display: flex; align-items: center; gap: 0; border-radius: var(--sv-radius-pill); background: var(--sv-bg-sunken); isolation: isolate; }
+#call-controls #mute { border-radius: var(--sv-radius-pill); }
+.mic-wave { display: flex; align-items: center; gap: 2.4px; height: 22px; transition: opacity var(--sv-dur-fast) var(--sv-ease); }
+.mic-wave i { display: block; width: 2.6px; height: calc(3px + var(--mic-fill, 0%) * var(--bar) * .86); max-height: 22px; border-radius: 2px; background: var(--sv-accent); transition: height 70ms linear; }
+.mic-wave i:nth-child(1) { --bar: .45; }
+.mic-wave i:nth-child(2) { --bar: .8; }
+.mic-wave i:nth-child(3) { --bar: 1; }
+.mic-wave i:nth-child(4) { --bar: .7; }
+.mic-wave i:nth-child(5) { --bar: .4; }
+#mic-control[data-muted="true"] { background: var(--sv-danger-soft); }
+#mic-control[data-muted="true"] #mute { background: var(--sv-danger-soft); color: var(--sv-danger); }
+@media (hover: hover) { #mic-control[data-muted="true"] #mute:not(:disabled):hover { background: color-mix(in srgb, var(--sv-danger) 14%, var(--sv-danger-soft)); } }
+#mic-control[data-muted] #mute:disabled { background: var(--sv-bg-sunken); color: var(--sv-disabled-text); }
+#mic-control #mute.holding { background: var(--sv-positive-soft); color: var(--sv-positive); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-positive) 25%, transparent); }
+
+#call-controls #connect { width: 64px; background: var(--sv-positive); color: var(--sv-positive-soft); }
+#call-controls #connect:not(.joined) svg { transform: rotate(-135deg); }
+#call-controls #connect.joined { background: var(--sv-danger-fill); color: var(--sv-on-danger-fill); }
+@media (hover: hover) {
+  #call-controls #connect:not(:disabled):hover { background: color-mix(in srgb, var(--sv-positive) 85%, var(--sv-text)); }
+  #call-controls #connect.joined:not(:disabled):hover { background: var(--sv-danger-fill-hover); }
+}
+/* Getting the call back: the call button breathes until it is. */
+#call-controls #connect.reconnecting { animation: call-reconnecting 1.4s ease-in-out infinite; }
+@keyframes call-reconnecting { 50% { opacity: .6; } }
+
+/* ⋮: a menu that opens upwards, over the stage. */
+.call-menu { position: relative; margin: 0; }
+.call-menu > summary { list-style: none; }
+.call-menu > summary::-webkit-details-marker { display: none; }
+.call-menu-panel { position: absolute; right: 0; bottom: calc(100% + var(--sv-space-5)); z-index: 25; display: grid; min-width: 13rem; max-width: calc(100vw - 2 * var(--sv-space-3));
+  padding: var(--sv-space-1-5); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface-raised); box-shadow: var(--sv-shadow-md); }
+.call-menu-panel #stats-open { justify-content: flex-start; width: 100%; height: calc(var(--sv-space-8) + var(--sv-space-1)); padding: 0 var(--sv-space-3); border-radius: var(--sv-radius-sm);
+  font-size: var(--sv-font-md); font-weight: var(--sv-weight-regular); color: var(--sv-text); }
+.call-menu-panel #stats-open:focus-visible { background: var(--sv-accent-soft); outline: none; }
+@media (hover: hover) { .call-menu-panel #stats-open:hover { background: var(--sv-accent-soft); color: var(--sv-text); } }
+
+/* ---------- a phone: the tray alone in the bar, a little tighter; the transcript's button is on the stage ---------- */
+@media (max-width: 899px) {
+  .call-stage { padding: var(--sv-space-3) var(--sv-space-3) var(--sv-space-1); }
+  .call-bar { grid-template-columns: minmax(0, 1fr); padding: var(--sv-space-2) var(--sv-space-2) calc(var(--sv-space-3) + env(safe-area-inset-bottom, 0px)); }
+  .call-bar .controls { grid-column: 1; }
+  .call-bar .call-actions { gap: var(--sv-space-2); }
+}
+
+/* Nothing here moves for a device that asks for less motion: the dot, the call and the waveform hold still. */
+@media (prefers-reduced-motion: reduce) {
+  .join-status-dot, #call-controls #connect.reconnecting, .person-bubble .voice-wave canvas { animation: none; }
+  .join-status-dot { opacity: .8; }
+}
+
+/* The stage's conversation named above its tile on a desktop (no header there); on a phone the tile names it. */
+.stage-title { display: none; }
+@media (min-width: 900px) {
+  .room-shell .call-stage { padding-top: var(--sv-space-5); }
+  .room-shell .stage-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--sv-space-3); flex: none; min-width: 0; padding: 0 var(--sv-space-1); }
+  .room-shell .stage-title h2 { min-width: 0; overflow: hidden; margin: 0; font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-semibold); letter-spacing: -.015em; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
+  .room-shell .stage-title > span { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+  .room-shell .stage-name { display: none; }
+}
+
+/* What the room says over the stage (CallStage's `notice`: where an update waits, the pill):
+ * a pill floating at the tile's top centre, in the band kept clear above the agent's replies and clear of the voice
+ * models' corner; it takes no room of its own. */
+.stage-notice { position: absolute; z-index: 4; top: var(--stage-inset); left: 50%; display: flex; justify-content: center; width: max-content;
+  max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); pointer-events: none; }
+.stage-notice:empty { display: none; }
+.stage-tile:has(> .voice-models, > .voice-attention) > .stage-notice { max-width: calc(100% - 2 * (var(--stage-inset) + min(40%, 14rem) + var(--sv-space-2))); }
+.stage-notice > * { pointer-events: auto; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border);
+  border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); box-shadow: var(--sv-shadow-md); }
+
+/* The call's voice models (VoiceModels): the tile's top-right corner, one under the other, small; the conversation's
+ * name holds the top-left and the agent's badge the foot. */
+.voice-models { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; justify-items: end; gap: var(--sv-space-1); max-width: min(40%, 14rem); }
+/* Quiet while ready: no fill, a faint edge, the muted text colour (AA on the tile) and a softer icon; full contrast on
+ * hover or focus. Not ready, the attention style, its state in words. */
+.voice-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1); max-width: 100%; height: 24px; padding: 0 var(--sv-space-2);
+  border: 1px solid color-mix(in srgb, var(--sv-border) 60%, transparent); border-radius: var(--sv-radius-pill); background: transparent;
+  color: var(--sv-text-muted); font-size: var(--sv-font-xs); font-weight: var(--sv-weight-medium); white-space: nowrap;
+  transition: color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), border-color var(--sv-dur-fast) var(--sv-ease); }
+.voice-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.voice-chip svg { flex: none; opacity: .7; }
+.voice-chip:is(:hover, :focus-visible) { border-color: var(--sv-border); background: var(--sv-surface); color: var(--sv-text); }
+.voice-chip:is(:hover, :focus-visible) svg { opacity: 1; }
+.voice-chip[data-attention] { border-color: color-mix(in srgb, var(--sv-warning) 45%, transparent); background: var(--sv-warning-soft); color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
+.voice-chip[data-attention] svg { opacity: 1; color: var(--sv-warning); }
+.voice-chip-state { flex: none; color: var(--sv-text); }
+.voice-chip-state::before { content: "·"; margin-inline-end: var(--sv-space-1); color: var(--sv-text-muted); }
+@media (prefers-reduced-motion: reduce) { .voice-chip { transition: none; } }
+.voice-chip:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.voice-models-details { display: grid; gap: 2px; }
+.voice-models-line b { font-weight: var(--sv-weight-semibold); }
+
+/* The way into the transcript, in the tile's corner (TranscriptEntry): round, opaque for contrast over the tile's glow,
+ * 44px to touch, a dot when something arrived unread; the person's bubble and the agent's badge keep clear of it. */
+.transcript-entry { position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); width: 44px; height: 44px; padding: 0; border-radius: 50%; box-shadow: var(--sv-shadow-xs); }
+.transcript-entry[aria-expanded="true"] { background: var(--sv-accent-soft); color: var(--sv-accent-text); }
+.transcript-entry-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
+.stage-tile:has(.transcript-entry) .person-turns { right: calc(var(--stage-inset) + 44px + var(--sv-space-2)); }
+.stage-tile:has(.transcript-entry) .stage-tags { max-width: calc(100% - 2 * (var(--stage-inset) + 44px + var(--sv-space-2))); }
+
+.stage-badge:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+
+/* A phone's voice models: a dot in the corner while one needs something, opening what and what to do. */
+.voice-attention { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.voice-attention span { width: 10px; height: 10px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-warning); }
+.voice-attention:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.voice-attention-list { display: grid; gap: var(--sv-space-3); width: min(280px, calc(100vw - 48px)); margin: 0; padding: 0; list-style: none; }
+.voice-attention-list li { display: grid; gap: var(--sv-space-2); }
+.voice-attention-list li > span { display: grid; gap: 2px; font-size: var(--sv-font-sm); }
+.voice-attention-list li > span > span { color: var(--sv-text-muted); }
+.voice-attention-list .ui-button { justify-self: start; }
+
+/* Over the bicho's backdrop (dark or light, whatever its seed rolled) the tile's words sit on a frosted surface of the
+ * theme, so they read on any of them: the conversation's name on a phone, the voice models, the agent's badge. */
+.stage-name { padding: var(--sv-space-1-5) var(--sv-space-3); border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+/* The microphone and the speaker (AudioDevices): the devices' button at the microphone's left, in its pill, and the bar
+ * it opens above the call's controls. The level and the chevron share its place, one showing at a time. */
+.audio-devices-toggle { display: grid; place-items: center; width: 44px; height: var(--sv-call-button, 48px); padding: 0 0 0 4px; border: 0; border-radius: var(--sv-radius-pill) 0 0 var(--sv-radius-pill);
+  background: transparent; color: var(--sv-text-muted); cursor: pointer; transition: background-color var(--sv-dur-fast) var(--sv-ease); }
+.audio-devices-toggle > * { grid-area: 1 / 1; }
+.audio-devices-toggle .audio-chevron { opacity: 0; transform: rotate(180deg); transition: opacity var(--sv-dur-fast) var(--sv-ease), transform var(--sv-dur-fast) var(--sv-ease); }
+:is(.audio-devices-toggle:hover, .audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .mic-wave { opacity: 0; }
+:is(.audio-devices-toggle:hover, .audio-devices-toggle:focus-visible, .audio-devices-toggle[aria-expanded="true"], #mic-control[data-muted="true"] .audio-devices-toggle) .audio-chevron { opacity: 1; }
+.audio-devices-toggle[aria-expanded="true"] .audio-chevron { transform: none; }
+#mic-control[data-muted="true"] .audio-devices-toggle { color: var(--sv-danger); }
+@media (hover: hover) { .audio-devices-toggle:hover { background: var(--sv-hover); color: var(--sv-text); } }
+.audio-devices-toggle:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.call-bar { position: relative; }
+.audio-devices { position: absolute; z-index: 5; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sv-space-3);
+  width: min(640px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-3) var(--sv-space-3) var(--sv-space-3) var(--sv-space-4);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-md); }
+.audio-devices-field { flex: 1 1 200px; min-width: 0; }
+.audio-devices-actions { display: flex; gap: var(--sv-space-1); margin-inline-start: auto; }
+.audio-devices-note, .audio-devices-lost, .audio-devices-error { flex-basis: 100%; display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.audio-devices-lost { color: var(--sv-text); }
+.audio-devices-error { flex-direction: column; align-items: flex-start; gap: 0; color: var(--sv-danger); }
+@media (prefers-reduced-motion: reduce) { .audio-devices-toggle, .audio-devices-toggle .audio-chevron, .mic-wave, .mic-wave i { transition: none; } }
+
+/* The microphone gives no sound though the person has not muted it (another app holds it): said above it, and the
+ * button wears the warning. */
+#call-controls .mic-control { position: relative; }
+.mic-silent-note { position: absolute; z-index: 4; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sv-space-1-5);
+  width: max-content; max-width: min(320px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-1-5) var(--sv-space-3); border: 1px solid color-mix(in srgb, var(--sv-warning) 45%, transparent);
+  border-radius: var(--sv-radius-lg); background: var(--sv-warning-soft); color: var(--sv-text); font-size: var(--sv-font-sm); line-height: 1.25rem; box-shadow: var(--sv-shadow-sm); }
+.mic-silent-note svg { flex: none; color: var(--sv-warning); }
+#mic-control[data-silent] #mute { box-shadow: 0 0 0 2px var(--sv-warning); }
+
+/* What is said on the stage, in pages (PagedText): a window three lines tall; the run inside scrolls up a page at a time. */
+.paged-text { display: block; max-height: 3lh; overflow: hidden; }
+.paged-text-run { display: block; transition: transform 600ms var(--sv-ease); }
+@media (prefers-reduced-motion: reduce) { .paged-text-run { transition: none; } }

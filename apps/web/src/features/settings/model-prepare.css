@@ -1,0 +1,88 @@
+/* A chosen model made ready (ModelPrepare.tsx): the same block in the first-run setup and in Settings. */
+.model-prepare { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sv-space-3); min-width: 0; padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
+.model-prepare-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sv-space-3); }
+.model-prepare-meta { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.model-prepare-pickers + .model-prepare-status, .model-prepare-meta + .model-prepare-status { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-prepare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-3); min-height: 48px; min-width: 0; }
+.model-prepare-state { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; }
+.model-prepare-note { white-space: nowrap; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; }
+.model-prepare-working { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text); }
+.model-prepare-state .ui-spinner { color: var(--sv-accent-text); }
+.model-prepare-progress { display: grid; gap: var(--sv-space-2); flex: 1; min-width: 0; }
+.model-prepare-progress-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sv-space-3); }
+.model-prepare-progress-line strong { font-size: var(--sv-font-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.model-prepare-alert { flex: 1; }
+
+/* A ready model's try (ModelSetup.tsx TryPanel), in its block under the state: getting ready, then the microphone's
+   level or the sentence lit as it is heard, then what was heard and how quick it was. In the try's dialog, the same. */
+.model-prepare > .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.model-try { display: grid; gap: var(--sv-space-3); min-width: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.model-try[data-empty] { display: none; }
+.model-try-live { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.model-try-live:empty { display: none; }
+.model-try-hint, .model-try-state { margin: 0; color: var(--sv-text-muted); }
+.model-try-state { display: flex; align-items: center; gap: var(--sv-space-2); }
+.model-try-state .ui-spinner { color: var(--sv-accent-text); }
+.model-try-listening { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-3); min-width: 0; }
+/* How long the take has run, filling to its longest (MAX_TAKE_MS, set as its animation's length) from when it listens. */
+.model-try-take { flex: 1 0 100%; height: 3px; border-radius: 2px; background: var(--sv-accent) no-repeat 0 0 / 0% 100%; background-color: var(--sv-bg-sunken);
+  background-image: linear-gradient(var(--sv-accent), var(--sv-accent)); animation: model-try-take linear forwards; }
+@keyframes model-try-take { to { background-size: 100% 100%; } }
+.model-try-wave { display: inline-flex; flex: none; color: var(--sv-accent-text); }
+.model-try .voice-wave { width: min(9rem, 36vw); height: 28px; }
+/* The voice's sentence: what was heard in the text's colour, the rest quieter until it is. */
+.model-try-sentence { margin: 0; font-size: var(--sv-font-md); line-height: 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sv-text); }
+.model-try-unsaid { color: var(--sv-text-subtle); }
+/* What was heard, quoted: two lines in the block, the rest behind See all (a Popover); in full in the dialog. */
+.model-try-heard { display: grid; justify-items: start; gap: var(--sv-space-1); margin: 0; min-width: 0; }
+.model-try-heard figcaption { color: var(--sv-text-muted); }
+.model-try-heard blockquote { justify-self: stretch; margin: 0; padding-inline-start: var(--sv-space-3); border-inline-start: 3px solid var(--sv-accent); font-size: var(--sv-font-md); line-height: 1.5rem; color: var(--sv-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.model-try-heard blockquote[data-clamped] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.model-try-heard .model-try-all { margin-inline-start: calc(-1 * var(--sv-space-2)); }
+.ui-popover .model-try-full { max-height: 14rem; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sv-text); }
+/* With the try in its dialog, the block keeps one line on how the last one went. */
+.model-try-summary { margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text-muted); }
+.model-try-summary q { color: var(--sv-text); }
+.model-try-summary[data-failed] { color: var(--sv-danger); }
+
+/* How a model runs (ModelRuntime): folded under its block; this device's capabilities, then each build to choose. */
+.model-runtime { margin-top: var(--sv-space-2); }
+.model-runtime-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sv-space-1); min-width: 0; }
+.model-runtime-info { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.model-runtime-toggle { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); max-width: 100%; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-1); border: 0; border-radius: var(--sv-radius-sm); background: none; color: var(--sv-text-muted); font: 600 var(--sv-font-sm) / 1.25rem var(--sv-font-sans); cursor: pointer; }
+.model-runtime-toggle:hover { background: var(--sv-hover); color: var(--sv-text); }
+.model-runtime-toggle svg { transform: rotate(-90deg); transition: transform var(--sv-dur-fast) var(--sv-ease); }
+.model-runtime-toggle svg.model-runtime-chevron-open { transform: none; }
+.model-runtime-summary { min-width: 0; max-width: 100%; overflow: hidden; font-weight: 400; color: var(--sv-text-subtle); white-space: nowrap; text-overflow: ellipsis; }
+.model-runtime-summary:not(:empty)::before { content: "· "; }
+.model-runtime-panel { display: grid; gap: var(--sv-space-3); margin-top: var(--sv-space-2); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.model-runtime-device { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.model-runtime-options { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.model-runtime-option { display: flex; align-items: flex-start; gap: var(--sv-space-3); padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); cursor: pointer; }
+.model-runtime-option:hover { border-color: var(--sv-border-strong); }
+.model-runtime-option[data-checked] { border-color: var(--sv-accent); box-shadow: inset 0 0 0 1px var(--sv-accent); background: color-mix(in srgb, var(--sv-accent-soft) 50%, transparent); }
+.model-runtime-option[data-disabled] { cursor: not-allowed; opacity: 1; }
+.model-runtime-option[data-disabled] .model-runtime-title, .model-runtime-option[data-disabled] .model-runtime-detail { color: var(--sv-disabled-text); }
+.model-runtime-option input { margin: 3px 0 0; accent-color: var(--sv-accent); }
+.model-runtime-copy { display: grid; gap: 2px; min-width: 0; }
+.model-runtime-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sv-space-2); font-size: var(--sv-font-sm); font-weight: 600; }
+.model-runtime-detail, .model-runtime-why { font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
+.model-runtime-why { color: var(--sv-warning); }
+
+/* The model in use stays until this one is ready (there is no Save: it switches by itself). */
+.model-prepare-pending { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+
+/* The voice's sentence in its try (TtsTry): editable in place, its pencil beside it. */
+.voice-try-text { flex: 1; min-width: 0; }
+.tts-try-sentence { display: flex; align-items: flex-start; gap: var(--sv-space-2); min-width: 0; }
+.tts-try-sentence > :first-child { flex: 1; min-width: 0; }
+.tts-try-said { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: start; font: inherit; font-size: var(--sv-font-md); line-height: 1.5rem; color: var(--sv-text); cursor: text; }
+.tts-try-said::before { content: "“"; } .tts-try-said::after { content: "”"; }
+
+/* The transcription try (SttTry): the button and the microphone's level on one row, always; under it an area of a fixed
+   height — listening and the take's length, then what was heard in their place — so nothing below it moves. */
+.stt-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.stt-try-head { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 32px; }
+.stt-try-head .model-try-wave { flex: 1; min-width: 0; }
+.stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-height: 3.75rem; min-width: 0; }
+.stt-try-area .model-try-take { flex: none; width: 100%; }

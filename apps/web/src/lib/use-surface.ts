@@ -8,8 +8,8 @@ import { useEffect, useRef, type RefObject } from "react";
 interface Surface { close(): void }
 const stack: Surface[] = [];
 /** What sits above these surfaces and answers Escape and Tab itself: a dialog the page opened (the pairing dialog can
- *  open over a phone's sheet), the header menu, a row's options menu. */
-const ABOVE = "dialog[open], details.call-menu[open], [role=menu]";
+ *  open over a phone's sheet), the header menu, a row's options menu, a popover (New conversation's), a select's list. */
+const ABOVE = "dialog[open], details.call-menu[open], [role=menu], .ui-popover, .ui-select-content";
 const above = () => !!document.querySelector(ABOVE);
 
 function escape(event: KeyboardEvent) {
@@ -33,11 +33,13 @@ export interface SurfaceOptions {
   initialFocus?(): HTMLElement | null | undefined;
   /** Where focus goes back when what opened it is gone. */
   fallbackFocus?(): HTMLElement | null | undefined;
+  /** Where focus goes as it closes, rather than back to what opened it (what was chosen in it, now elsewhere). */
+  returnFocus?(): HTMLElement | null | undefined;
 }
 
-export function useSurface({ open, close, container, modal, initialFocus, fallbackFocus }: SurfaceOptions) {
-  const latest = useRef({ close, initialFocus, fallbackFocus });
-  latest.current = { close, initialFocus, fallbackFocus };
+export function useSurface({ open, close, container, modal, initialFocus, fallbackFocus, returnFocus }: SurfaceOptions) {
+  const latest = useRef({ close, initialFocus, fallbackFocus, returnFocus });
+  latest.current = { close, initialFocus, fallbackFocus, returnFocus };
 
   useEffect(() => {
     if (!open) return;
@@ -75,7 +77,7 @@ export function useSurface({ open, close, container, modal, initialFocus, fallba
       const now = document.activeElement;
       // Back only from inside, or from nowhere: never pulled away from where the person has since moved it.
       if (now && now !== document.body && !node?.contains(now)) return;
-      (opener?.isConnected ? opener : latest.current.fallbackFocus?.())?.focus({ preventScroll: true });
+      (latest.current.returnFocus?.() ?? (opener?.isConnected ? opener : latest.current.fallbackFocus?.()))?.focus({ preventScroll: true });
     };
   }, [open, modal, container]);
 }

@@ -1,19 +1,24 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,NO_MACHINE,reachNote} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,NO_MACHINE,reachNote,conversationKey,conversationOf,personKey} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
-import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,usingPairing,revokedPairing,pairingInUse,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
+import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {hostTranslator} from '../features/settings/host-i18n.ts';
+import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
+import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
 import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders} from './voice-settings.js';
+import {readCallPreferences} from './call-preferences.ts';
+import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
+import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
-import {refusalText as sayRefusal} from './refusals.js';
+import {refusalError} from './refusals.js';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -23,108 +28,109 @@ roomStore.patch({speechLanguage:systemLanguage(SPEECH_LANGUAGES),inApp:!!window.
 void probeSiteStorage().then(probe=>roomStore.patch({storageBlocked:probe.blocked}),()=>{});
 // Browser room orchestration. Loaded once after React mounts the stable UI shell.
 const $=id=>document.getElementById(id);
-function setRoomError(message){const value=message||null;if(window.sidevoiceUI)window.sidevoiceUI.setBootError(value);else $("error").textContent=value||""}
+// The room's error above the stage: a failure as people read it (`ErrorMessage`, error-message.ts), never a raw text.
+function setRoomError(message){const value=message||null;if(window.sidevoiceUI)window.sidevoiceUI.setBootError(value);else $("error").textContent=value?typeof value==='string'?value:errorLine(value):""}
 /* One quiet line from the tap until this browser is in the room, naming the step the join is on.
  * It reuses the events that already existed — the voice starting, the room's hello, the conversation this tab goes
  * back to — and measures nothing of its own. A step that fails leaves its reason, and what to do about it, in the
  * same place. */
-function joinStatus(step,{detail='',progress=null,subject=''}={}){roomStore.patch({joinStep:step,joinFailure:'',joinDetail:detail?String(detail).slice(0,80):'',joinProgress:progress==null?null:Number(progress),joinSubject:subject})}
-function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinDetail:'',joinProgress:null,joinSubject:'',liveNote:''})}
-function failJoin(text){roomStore.patch({joinStep:null,joinFailure:text||'',joinDetail:'',joinProgress:null,joinSubject:''})}
+function joinStatus(step,{detail='',progress=null,subject=''}={}){roomStore.patch({joinStep:step,joinFailure:'',joinFailureDetails:'',joinDetail:detail?String(detail).slice(0,80):'',joinProgress:progress==null?null:Number(progress),joinSubject:subject})}
+function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinFailureDetails:'',joinDetail:'',joinProgress:null,joinSubject:'',liveNote:''})}
+// A join that failed, in words (`ErrorMessage`): its sentence on the join line, what was raw about it behind Details.
+function failJoin(message){roomStore.patch({joinStep:null,joinFailure:message?errorLine(message):'',joinFailureDetails:message?.details||'',joinDetail:'',joinProgress:null,joinSubject:''})}
+// Why a call ended without the person ending it, for the desktop card's exit notice (FLOATING-CARD-SPEC FC7): idle,
+// its machine gone (`detail`: the conversation's title) or refused (`detail`: the sentence the join line shows). Said
+// before the call ends, so the snapshot that says the call is over already says why; cleared as a call starts; a hang-up
+// never sets it.
+function callEndedBy(reason,detail){roomStore.patch({callEnded:{reason,detail:detail||''}})}
 // What this tab already calls the conversation it is going back to; the room is not asked again for a title.
-function conversationTitle(id){return state.people.find(p=>p.thread_id===id)?.title||state.history.find(r=>r.thread===id)?.name||'tu conversación'}
-/* The failures the person can do something about, by the voice's code. Any other code is quoted as it is, because
- * inventing a remedy for it would be worse than quoting it. */
-const VOICE_FAILURES={
- 'microphone-denied':()=>state.inApp?'El micrófono está bloqueado para Sidevoice. Dale permiso en los ajustes del sistema y vuelve a pulsar para entrar.'
-  :'El micrófono está bloqueado para esta página. Dale permiso en el navegador y vuelve a pulsar para entrar.',
- 'microphone-unavailable':()=>'No se pudo usar el micrófono. Conéctalo o elige otro en el sistema, y vuelve a entrar.',
- 'speaker-unavailable':()=>'No se pudo usar el altavoz. Conéctalo o elige otro en el sistema, y vuelve a entrar.',
- 'audio-device-unavailable':()=>'Falta el dispositivo de audio de la llamada. Conéctalo y vuelve a entrar.',
- 'audio-device-failed':()=>'El dispositivo de audio de la llamada falló. Conéctalo de nuevo y vuelve a entrar.',
- 'voice-module-unavailable':()=>'La voz de la llamada aún no está disponible en esta versión de la página.',
- 'catalogs-unavailable':()=>'Esta versión de la app aún no da a la página la lista de modelos.',
- 'end-of-turn-unavailable':()=>'El fin de turno inteligente aún no está disponible: el turno termina con el silencio.',
- 'credential-missing':()=>'Falta la clave del proveedor. Añádela en Configuración → Proveedores.',
- 'model-unknown':()=>'Ese modelo no está en el catálogo de la voz.',
- 'model-unfit':()=>'Ese modelo no se puede ejecutar en este dispositivo. Elige otro.',
-};
-// What failed in the call's voice, as the person reads it: a known code in words, any other one as it is.
-// A provider's own words, when it is the one refusing, follow as it said them.
-// A browser's own refusal (a DOMException) is said by its name, never by its legacy number; one that blocks the page's
-// storage is the message of a blocked site.
-function voiceErrorText(error){
- const code=failureCode(error,''),t=hostTranslator();
- if(code==='storage-blocked'||code==='SecurityError')return t('storage.blocked');
- const text=VOICE_FAILURES[code]?.()||(/^[A-Z][A-Za-z]*Error$/.test(code)?t('voice.error.browser',{name:code}):'La voz de la llamada falló'+(code?' ('+code+')':'')+'.');
- return error?.detail?text+' '+String(error.detail):text;
-}
-function joinFailureText(step,error){
- if(step==='voice')return voiceErrorText(error);
- const message=String(error?.message||error||'');
- return message+(/[.!?…]$/.test(message)?'':'.');
-}
+function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||'tu conversación'}
+/* What failed in the voice, its models or the room, as the person reads it (error-message.ts): a known code in the
+ * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
+ * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
+ * follow the sentence. `what` names what failed. */
+function voiceError(error,what='voice'){return voiceFailure(error,{what,inApp:!!state.inApp,t:hostTranslator()})}
+function roomError(error,what='room',generic){return roomFailure(error,{what,generic,t:hostTranslator()})}
+// A sentence of this page's bundle, as a failure.
+const bundled=(key,params)=>({text:hostTranslator()(key,params)});
+function joinError(step,error){return step==='voice'?voiceError(error):roomError(error)}
+// A failure of the voice handed to the interface: its code kept (for what the interface does about it), its words
+// with it (`words`, what error-message.ts says of it).
+function voiceRefused(error,what='voice'){const words=voiceError(error,what);return Object.assign(Error(words.text),{code:failureCode(error,''),words})}
+// A download of a model that failed, as the slot's install says it (`voiceInstall`): its sentence, and its Details.
+function installFailure(error){const words=voiceError(error,'download');return {error:errorLine(words),details:words.details||''}}
 
 // The room holds several browsers at once, so every question this page asks the
-// room carries its own session: the answer is about this browser and no other.
-function roomQuery(path){return state.sessionId?path+(path.includes('?')?'&':'?')+'session_id='+encodeURIComponent(state.sessionId):path}
-/* Where each request goes (`rendezvous.js`, `device-pairing.js`): a conversation's, the call and this
- * device's own pairing to the node this device is paired with; telemetry to the target. The node base is an
- * address that proved — with the key pinned when pairing — that it is that node. Until one has there is none,
- * null, and nothing of a node is asked: every such request carries this device's token. */
+// room carries its own session: the answer is about this browser and no other. Only the call's machine knows it.
+function roomQuery(path,fp=state.callNode){return state.sessionId&&fp===state.callNode?path+(path.includes('?')?'&':'?')+'session_id='+encodeURIComponent(state.sessionId):path}
+/* Where each request goes (`rendezvous.js`, `device-pairing.js`): a conversation's, the call and this device's own
+ * pairing to the machine it belongs to; telemetry to the target. Every paired machine is reached at once, each at its
+ * own node base: an address that proved — with the key pinned when pairing — that it is that machine. Until one has
+ * there is none, null, and nothing of that machine is asked: every such request carries that pairing's token. */
 const target=pageTarget();
 // What the target is: asked only of a server that may answer (`targetAnswers`); a static site's origin is none.
 const describeTarget=()=>targetAnswers(target)?askTarget(target,fetch):Promise.resolve(null);
-let nodeBase=null;
-// This device's pairings: several, one in use, kept across tabs and reloads. The tokens stay in here and in
+// This device's pairings, every one of them live, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
 const pairingStorage=pageStorage(),storedPairingState=readPairingState(pairingStorage);
 let localPairing=null;
-// Keep the stored `in_use` pointer until the bridge has supplied its local projection. It can name that
-// projection, so validating against only browser pairings here would silently switch machines on app launch.
-let pairings={inUse:storedPairingState.inUse,list:storedPairingState.list};
+let pairings={list:storedPairingState.list};
 const desktopLocalHost=localHostBridge();
-const LOCAL_HOST_SELECTION_KEY='sidevoice.local-host-selected',LOCAL_HOST_SELECTION_ID='@sidevoice/local-host';
-function readLocalHostSelected(){try{return pairingStorage?.getItem(LOCAL_HOST_SELECTION_KEY)==='true'}catch{return false}}
-function saveLocalHostSelected(){try{if(localHostSelected)pairingStorage?.setItem(LOCAL_HOST_SELECTION_KEY,'true');else pairingStorage?.removeItem(LOCAL_HOST_SELECTION_KEY)}catch{}}
-// The local host is selected only when this page said so (LOCAL_HOST_SELECTION_KEY) and the app offers it.
-let localHostSelected=!!desktopLocalHost&&readLocalHostSelected();
-roomStore.patch({localHostAvailable:!!desktopLocalHost,localHostSelected});
-function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary),pairingInUse:pairings.inUse,localHostSelected,machinesAt:Date.now()})}
-function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);saveLocalHostSelected();publishPairings()}
-function keepPairings(next){
- const keepUnavailableLocal=localHostSelected&&!localPairing&&next.inUse===pairings.inUse;
- const previous=pairings,projected=projectPairings(next,localPairing);
- if(keepUnavailableLocal)projected.inUse=pairings.inUse;
- const moved=projected.inUse!==pairings.inUse;
- localHostSelected=localPairing?projected.inUse===localPairing.fp:localHostSelected&&projected.inUse===pairings.inUse;
- pairings=projected;storedPairingState.inUse=projected.inUse;storedPairingState.list=projected.list.filter(p=>!p.local);
- discardChangedHostAgents(previous,projected);
- persistPairingProjection()
+roomStore.patch({localHostAvailable:!!desktopLocalHost});
+// What this device calls a machine, if the person renamed it here (a hostname they would rather not read): this
+// device's alone, shown everywhere here in place of the machine's own name, which stays as `machine_host`.
+const ALIASES_KEY='sidevoice.machine-aliases';
+function machineAliases(){try{const kept=JSON.parse(pageStorage()?.getItem(ALIASES_KEY)||'{}');return kept&&typeof kept==='object'&&!Array.isArray(kept)?kept:{}}catch{return {}}}
+function aliased(summary){const alias=machineAliases()[summary.fp];return typeof alias==='string'&&alias.trim()?{...summary,host:alias.trim(),machine_host:summary.host,alias:true}:summary}
+function publishPairings(){roomStore.patch({pairings:pairings.list.map(pairingSummary).map(aliased),machinesAt:Date.now()})}
+/** Renames a machine on this device only; null goes back to the machine's own name. */
+function renameMachine(fp,name){
+ const next={...machineAliases()},text=typeof name==='string'?clampDeviceName(name):'';
+ if(text)next[fp]=text;else delete next[fp];
+ try{pageStorage()?.setItem(ALIASES_KEY,JSON.stringify(next))}catch{}
+ publishPairings();
 }
+/** This device's name, as machines list it: kept for the next pairing, and asked of each machine it is paired with now
+ *  (renaming this device in their lists). Resolves with how many could not be told. */
+async function setDeviceName(name){
+ const text=clampDeviceName(name||'');
+ // One a machine would refuse is not kept, nor sent (the field says why).
+ if(text&&deviceNameProblem(text))throw Object.assign(Error('device.name_invalid'),{key:'device.name_invalid'});
+ try{if(text)pageStorage()?.setItem('sidevoice.deviceName',text);else pageStorage()?.removeItem('sidevoice.deviceName')}catch{}
+ roomStore.patch({deviceName:text||null});
+ if(!text)return 0;
+ const asked=pairings.list.filter(p=>!p.revoked&&p.device_id).map(p=>p.local
+  ?renameLocalHostDevice(p.device_id,text):renameMachineDevice(p.fp,p.device_id,text));
+ const results=await Promise.allSettled(asked);
+ return results.filter(r=>r.status==='rejected').length;
+}
+function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);publishPairings()}
+function keepPairings(next){
+ const previous=pairings,projected=projectPairings(next,localPairing);
+ pairings=projected;storedPairingState.list=projected.list.filter(p=>!p.local);
+ discardChangedHostAgents(previous,projected);
+ persistPairingProjection();
+ syncLinks();
+}
+// The local host's fingerprint, kept while the app says it has one even when it does not answer for a while (its core
+// restarting): its conversations stay listed, unreachable, rather than vanishing and coming back.
+let localFp=null;
 function setLocalPairing(value){
  const next=normalizeLocalHostPairing(value),duplicates=next?storedPairingState.list.filter(p=>p.fp===next.fp):[];
- const previousLocal=localPairing,previous=pairings,wasSelected=localHostSelected||!!previousLocal&&previous.inUse===previousLocal.fp;
+ const previousLocal=localPairing,previous=pairings;
  localPairing=next;
- if(next){localHostSelected=wasSelected||storedPairingState.inUse===next.fp;if(localHostSelected)storedPairingState.inUse=next.fp}
- else if(state.localHostStatus?.state==='absent'){
-  localHostSelected=false;
-  if(wasSelected)storedPairingState.inUse=null;
- }
- else if(wasSelected){localHostSelected=true;storedPairingState.inUse=previousLocal?.fp||previous.inUse||LOCAL_HOST_SELECTION_ID}
+ if(next)localFp=next.fp;else if(state.localHostStatus?.state==='absent')localFp=null;
  const projected=projectPairings(storedPairingState,localPairing);
- if(localHostSelected&&!localPairing)projected.inUse=storedPairingState.inUse||previous.inUse||LOCAL_HOST_SELECTION_ID;
- const moved=projected.inUse!==previous.inUse;
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
- storedPairingState.inUse=projected.inUse;
  discardChangedHostAgents(previous,projected);
  persistPairingProjection();
  // An unreachable report invalidates the app-owned per-launch proxy immediately. Never keep its URL or
  // session secret around to be reused after native starts a new core.
- if(wasSelected&&!next)settleBase(null,'away',null);
- else if(next){hostAgentBases.set(next.fp,next.urls[0]);if(localHostSelected)void locate({move:true,fresh:true})}
+ if(previousLocal&&previousLocal.fp!==next?.fp)settleLink(previousLocal.fp,null,'away');
+ if(next){hostAgentBases.set(next.fp,next.urls[0]);void locate(next.fp,{move:true,fresh:true})}
+ syncLinks();
  // A stale code pairing for the same fingerprint is removed from storage, then revoked at an address which
  // proves itself as that host. The app-owned local pairing always remains the one in the machine list.
  for(const pairing of duplicates)void revokePairingCopy(pairing);
@@ -138,12 +144,31 @@ function setLocalHostStatus(status){
  roomStore.patch({localHostStatus:status});
 }
 let localHostEpoch=0;
-function setRemoteHostStatus(fp,status){
- roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{state:status,checkedAt:Date.now()}}});
+// What a paired machine says of its Sidevoice — its version, and whether it is behind — for its page's card: asked of it with this
+// device's pairing (core GET /api/host/status, which core does not serve yet: a contract gap). Unknown stays unknown.
+// One question per machine at a time: every place asking while it is out (its page's card, each place the updates
+// show) shares its answer.
+const machineInfoLoads=new Map();
+function loadMachineInfo(fp){
+ let load=machineInfoLoads.get(fp);
+ if(!load){load=readMachineInfo(fp).finally(()=>machineInfoLoads.delete(fp));machineInfoLoads.set(fp,load)}
+ return load;
+}
+async function readMachineInfo(fp){
+ try{
+  const answer=await hostApi(fp,'/api/host/status',{headers:{accept:'application/json'},cache:'no-store'});
+  const info=answer&&typeof answer==='object'?answer:{};
+  const version=typeof info.version==='string'&&/^\d+\.\d+\.\d+/.test(info.version)?info.version:null;
+  // Behind the latest, and the command that updates it there where it names one (contract gap #57: no core says it
+  // yet; with none, Updates says the documented one).
+  const u=info.update&&typeof info.update==='object'?info.update:null;
+  const update=u&&typeof u.latest==='string'&&u.latest.trim()?{latest:u.latest,command:typeof u.command==='string'&&u.command.trim()?u.command:null}:null;
+  roomStore.patch({remoteHostStatus:{...state.remoteHostStatus,[fp]:{...state.remoteHostStatus?.[fp],version,update}}});
+ }catch{}
 }
 async function refreshLocalHost(){
  if(!desktopLocalHost){
-  pairings=projectPairings(storedPairingState,null);storedPairingState.inUse=pairings.inUse;storedPairingState.list=pairings.list;
+  pairings=projectPairings(storedPairingState,null);storedPairingState.list=pairings.list;
   roomStore.patch({machinesReady:true,localHostStatus:{state:'absent'}});publishPairings();return
  }
  const epoch=++localHostEpoch;
@@ -166,20 +191,117 @@ if(desktopLocalHost){
   }).catch(()=>{if(epoch===localHostEpoch){setLocalPairing(null);roomStore.patch({machinesReady:true})}});
  })}catch{}
 }
-function routed(path){const url=routeUrl(path,target,nodeBase);if(url==null)throw Error(reachNote(state)||NO_MACHINE);return url}
+/* ----- every paired machine at once: one link each -----
+ * A link is how this page reaches one machine: the node base that proved itself, how (directly or through the room
+ * it links with), and the conversations it last listed. Every pairing has one, up to MAX_LINKS — the local host
+ * first, then the newest — and the call's machine always; past the bound a machine is listed, not watched. A link
+ * that loses its machine keeps its conversations, shown unreachable, until the machine is forgotten. */
+const MAX_LINKS=6;
+const links=new Map();
+function linkOf(fp){let link=links.get(fp);if(!link){link={fp,base:null,reach:'checking',via:'',asked:0,applied:0,doubted:null,people:[],peopleAnswered:false};links.set(fp,link)}return link}
+function linkBase(fp){return fp!=null&&links.has(fp)?links.get(fp).base:null}
+/** The machines this page watches now: unrevoked pairings in the list's order, bounded, and the call's. */
+function liveMachines(){
+ const live=pairings.list.filter(p=>!p.revoked).slice(0,MAX_LINKS).map(p=>p.fp);
+ if(state.callNode&&!live.includes(state.callNode)&&pairings.list.some(p=>p.fp===state.callNode&&!p.revoked))live.push(state.callNode);
+ return live;
+}
+// A machine no longer paired leaves with everything this page knew of it; the call's stays while the call is on it.
+function syncLinks(){
+ const keep=new Set(pairings.list.map(p=>p.fp));
+ if(state.callNode)keep.add(state.callNode);
+ if(localFp)keep.add(localFp);
+ for(const fp of [...links.keys()])if(!keep.has(fp)){links.delete(fp);forgetMachineState(fp)}
+ publishLinks();
+}
+function forgetMachineState(fp){
+ roomStore.batch(()=>{
+  state.people=state.people.filter(p=>p.node!==fp);
+  state.history=state.history.filter(r=>conversationOf(r.thread)?.node!==fp);save();
+  if(conversationOf(state.viewedThread)?.node===fp)state.viewedThread=null;
+ });
+}
+function publishLinks(){
+ const next={};
+ for(const p of pairings.list){const link=links.get(p.fp);next[p.fp]={reach:p.revoked?'revoked':link?.reach||'checking',via:link?.via||''}}
+ if(localFp&&!next[localFp]){const link=links.get(localFp);if(link)next[localFp]={reach:link.reach,via:link.via}}
+ roomStore.patch({machineLinks:next});
+}
+// Every link's conversations, in the order of the machines: the page's one list.
+function mergePeople(){
+ const order=[...new Set([...pairings.list.map(p=>p.fp),...links.keys()])];
+ state.people=order.flatMap(fp=>links.get(fp)?.people||[]);
+}
+/* Which address each machine answers at is asked when it matters: on load, on the beat while it has none or its
+ * proof is old, before a join that has none, and before each reconnection attempt after the first. An address that
+ * proved itself is trusted for a few minutes. The call's machine is never moved by it while the call is on — only
+ * its reconnection moves it (`move`). A reconnecting call (`hold`) keeps the address it had while that one's proof is
+ * recent: the machine may be restarting, and the socket is the better probe. */
+const verified=new Map(),hostAgentBases=new Map();
+let settingsAgentRequestId=0;
+let targetAbout=null,reachFailure=null;
+const inCallNow=()=>!!(state.ws||state.connecting||state.reconnecting);
+async function locate(fp,{move=!(fp===state.callNode&&inCallNow()),fresh=false,hold=false}={}){
+ if(!move||fp==null)return;
+ const pairing=pairings.list.find(p=>p.fp===fp);
+ if(!pairing){settleLink(fp,null,'away');return}
+ if(pairing.revoked){settleLink(fp,null,'revoked');return}
+ // Native verified the local identity over the peer-checked socket. Its per-launch proxy is the locator: never
+ // send the app's session secret to the core's TCP listener or probe another address with it.
+ if(pairing.local){
+  const local=localHostLocator(pairing,state.localHostStatus);
+  settleLink(fp,local,local?'ok':'away');
+  return;
+ }
+ const link=linkOf(fp),recent=base=>base!=null&&Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
+ if(!fresh&&link.reach==='ok'&&recent(link.base)&&link.doubted!==link.base)return;
+ const asked=++link.asked,deps={get:fetch},started=new Map();
+ let found=null,reach='away';
+ try{
+  // The pairing's own addresses are asked while the target says what it is: its answer can only add one more.
+  void firstProven(candidateBases(pairing,{origin:location.origin}),pairing,deps,started).catch(()=>{});
+  const about=await describeTarget();
+  if(about)targetAbout=about;
+  found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,deps,started);
+  // With nothing proven, the room the machine links with says whether it is there at all.
+  if(!found&&pairing.rv&&await askRoomNode(pairing.rv.url,pairing.rv.node,fetch)===false)reach='offline';
+ }catch{}
+ if(asked<link.applied||links.get(fp)!==link||pairings.list.find(p=>p.fp===fp)!==pairing)return;
+ link.applied=asked;
+ // The page follows the build of whoever serves it: a room serving this page says which (or a server of a kind this
+ // version does not know yet, when it says it).
+ if(target===''&&(targetAbout?.kind==='room'||targetAbout?.kind==='unknown'))followServedBuild(targetAbout.build);
+ if(found){
+  verified.set(found.base,Date.now());hostAgentBases.set(fp,found.base);if(link.doubted===found.base)link.doubted=null;
+  // A call keeps the address its socket is on.
+  if(!(fp===state.callNode&&state.ws)||found.base===link.base)settleLink(fp,found,'ok');
+  return;
+ }
+ if(hold&&fp===state.callNode&&recent(link.base))return;
+ settleLink(fp,null,reach);
+}
+function settleLink(fp,found,reach){
+ const link=linkOf(fp),base=found?.base??null,moved=base!==link.base;
+ link.base=base;link.reach=found?'ok':reach;link.via=found?(found.via==='room'?'room':'node'):'';
+ if(found&&reachFailure&&(reachFailure.node==null||reachFailure.node===fp)&&state.joinFailure===reachFailure.text){roomStore.patch({joinFailure:'',joinFailureDetails:''});reachFailure=null}
+ publishLinks();
+ if(moved&&base!=null){if(fp===state.callNode)void refresh();void refreshPeople(fp);void refreshHistory(fp)}
+}
+function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(reachNote(state)||NO_MACHINE);return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
 function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
-// Every request to the node carries the token of the pairing in use; one the node refuses means that pairing is
-// gone. An address that stops answering is looked at again on the next beat, in case another one answers.
-const request=async(path,options)=>{
- const url=routed(path);if(!isNodePath(path))return fetch(url,options);
- const pairing=pairingInUse(pairings),base=nodeBase;if(!pairing)throw Error(NO_MACHINE);
+// Every request to a machine carries the token of that machine's pairing — never another's; one the machine refuses
+// means that pairing is gone. An address that stops answering is looked at again on the next beat.
+const request=async(path,options,fp=state.callNode)=>{
+ const url=routed(path,fp);if(!isNodePath(path))return fetch(url,options);
+ const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw worded(NO_MACHINE);
  let response;
- try{response=await fetch(url,withToken(options,pairing.token))}catch(error){doubted=base;throw error}
- if(response.status===401)pairingRefused(pairing.fp);
+ try{response=await fetch(url,withToken(options,pairing.token))}catch(error){if(link&&link.base===base)link.doubted=base;throw error}
+ if(response.status===401)pairingRefused(fp,{token:pairing.token});
  return response;
 };
-// Which conversation this tab talks to is this tab's own state: the room routes, it never chooses for anyone.
+// Which conversation this tab talks to is this tab's own state: the room routes, it never chooses for anyone. It is
+// kept by its key — the machine and the thread — so a reload goes back to the same machine too.
 const SELECTED_KEY='sidevoice.selected';
 function rememberedThread(){try{return sessionStorage.getItem(SELECTED_KEY)||null}catch{return null}}
 function rememberThread(id){try{if(id)sessionStorage.setItem(SELECTED_KEY,id);else sessionStorage.removeItem(SELECTED_KEY)}catch{}}
@@ -192,12 +314,13 @@ let resumeToken=null,lastSeq=0,ticketTimer=null;
 function keepTicket(now=false){
  if(!now){if(!ticketTimer)ticketTimer=setTimeout(()=>keepTicket(true),1000);return}
  clearTimeout(ticketTimer);ticketTimer=null;
- try{const ticket=resumeTicket();if(ticket)sessionStorage.setItem(RESUME_KEY,JSON.stringify(ticket));else sessionStorage.removeItem(RESUME_KEY)}catch{}
+ try{const ticket=resumeTicket();if(ticket)sessionStorage.setItem(RESUME_KEY,JSON.stringify({...ticket,node:state.callNode}));else sessionStorage.removeItem(RESUME_KEY)}catch{}
 }
-// A join finds the ticket an earlier load of this tab kept, and takes that call back with it.
-function storedTicket(){
- try{const ticket=JSON.parse(sessionStorage.getItem(RESUME_KEY)||'null');
-  if(typeof ticket?.session_id!=='string'||typeof ticket.token!=='string'||!Number.isInteger(ticket.last_seq))return null;
+// A join finds the ticket an earlier load of this tab kept, and takes that call back with it: only on the machine
+// that call was with — a ticket is that machine's to honour, and no other's to see.
+function storedTicket(fp){
+ try{const {node,...ticket}=JSON.parse(sessionStorage.getItem(RESUME_KEY)||'null')||{};
+  if(node!==fp||typeof ticket.session_id!=='string'||typeof ticket.token!=='string'||!Number.isInteger(ticket.last_seq))return null;
   resumeToken=ticket.token;lastSeq=ticket.last_seq;return ticket}catch{return null}
 }
 window.sidevoiceSessionId=()=>state.sessionId;
@@ -211,12 +334,16 @@ let voice=null;
 const relay=createTurnRelay();
 // The voice listens only when the person wants it and there is a conversation to say it to: in a call with none
 // selected nothing is heard (2026-09-26).
-function applyMicState(){voice?.mute(!state.micEnabled||!!(state.ws&&!targetId()))}
+// Nor while the call moves to another machine (`moveCall`): nobody is there to hear it.
+let moving=false;
+function applyMicState(){voice?.mute(!state.micEnabled||moving||!!(state.ws&&!targetId()))}
 function showScreenLock(lockState,note){state.screenLock={state:lockState,note}}
 async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
  // call, and by the end of the preparation chain that gesture has expired.
  if(!(state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
+ // Settings → Advanced may leave the screen to the system: a call that goes on with it off.
+ if(!readCallPreferences().keepAwake)return;
  if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','Este dispositivo no permite mantener la pantalla encendida.');return}
  const epoch=wakeEpoch;
  const request=(async()=>{
@@ -244,13 +371,23 @@ function releaseScreenWakeLock(){
 let textAttempt=null;
 try{state.roomSeen=JSON.parse(sessionStorage.getItem('voice-room-seen')||'{}')}catch{}
 try{state.history=JSON.parse(sessionStorage.getItem('voice-room-transcript')||'[]');if(!Array.isArray(state.history))state.history=[]}catch{}
-function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringify(state.history.slice(-1000)))}catch{}}
-function targetId(){return state.roomBinding?.thread_id||null}
+// Kept per machine too: the newest rows of each, so a reload finds every machine's conversations, not the busiest's.
+const SAVED_PER_MACHINE=300;
+function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringify(newestPerMachine(state.history,SAVED_PER_MACHINE)))}catch{}}
+function newestPerMachine(rows,limit){
+ const counts=new Map(),kept=[];
+ for(let i=rows.length-1;i>=0;i--){const node=conversationOf(rows[i].thread)?.node||'',n=(counts.get(node)||0)+1;counts.set(node,n);if(n<=limit)kept.push(rows[i])}
+ return kept.length===rows.length?rows:kept.reverse();
+}
+// The conversation the call talks to, by its key (machine and thread); the room's own name for it is `targetThread`.
+function targetId(){return conversationKey(state.callNode,state.roomBinding?.thread_id)}
+function targetThread(){return state.roomBinding?.thread_id||null}
 function historyThreadId(){return state.viewedThread||targetId()}
 
-// A refusal is a sentence, or a key with its English sentence (sidevoice-core's newer refusals): the sentence is said.
-async function api(path,options){const r=await request(path,options);if(r.status===401)throw Error(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw Error(sayRefusal(d.detail,'No se pudo completar la operación'));return d}
-const post=(path,body,method='POST')=>api(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+// A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
+// to say by its key — the sentence, in whatever language it came, only behind Details.
+async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw worded(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
+const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},fp);
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
  * remembers: sent twice it is taken once and acknowledged either way. So each waits here until acknowledged, and is
@@ -265,7 +402,7 @@ outbox.ready.then(()=>flushOutbox(),()=>{});
 // While a new session's room has not said which conversation this browser is on, nothing goes on its socket.
 let outboxHold=null;
 // A message for the room, kept under the `client_msg_id` the page gives it.
-function keepMessage(kind,type,data,id=crypto.randomUUID()){return outbox.add({id,kind,session_id:state.sessionId,node:state.node,payload:{type,data}})}
+function keepMessage(kind,type,data,id=crypto.randomUUID()){return outbox.add({id,kind,session_id:state.sessionId,node:state.callNode,payload:{type,data}})}
 /* Everything waiting, in order, on the socket the call has now, under the session it has now. A turn belongs to the
  * conversation, not to the session that heard it: the room knows it by its `turn_id` on the session that took its start,
  * and as words said while away when this session never took that start (`turn-relay.js`). One socket keeps them in
@@ -277,7 +414,7 @@ function flushOutbox(socket=state.ws){
   again=false;
   for(const entry of outbox.list()){
    if(entry.sentOn===socket)continue;
-   if(entry.node!==state.node){outbox.remove(entry.id);continue}
+   if(entry.node!==state.callNode){outbox.remove(entry.id);continue}
    // What a reply of a replaced session became is that session's; the room ended its replies with it.
    if(entry.kind==='playback'&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
    let data=entry.payload.data;
@@ -320,7 +457,7 @@ function sayReply(reply){
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
   // From `playing` to `done` the reply is being said: where the voice is in it lights its words.
-  if(event.type==='playing'){state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
+  if(event.type==='playing'){said.playing=true;state.karaokeState={segment:speechSegment(reply),from:0,to:0};report({status:'playing',heard_chars:0})}
   else if(event.type==='progress')state.karaokeState={segment:speechSegment(reply),...sayingRange(event,reply.text)};
   else if(event.type==='done'){
    replies.delete(reply.utterance_id);
@@ -329,6 +466,9 @@ function sayReply(reply){
   }
  });
 }
+// Skipping what sounds now, without saying anything: only this device stops hearing it, the reply stays written, and
+// what is queued after it plays on.
+function skipReply(){for(const said of replies.values())if(said.playing){said.saying.cancel();return}}
 // The room took back replies it sent and this call has not finished: each is cancelled, and its end says why.
 function withdrawReplies(d){
  if(d.session_id!==state.sessionId)return;
@@ -344,20 +484,24 @@ function markHistorySeen() {
         catch { }
     }
 }
-function add(role, text, segment, thread = targetId(), metadata = {}) { if (!text?.trim())
-    return; const key = metadata.history_id || (segment == null ? null : state.sessionId + ':' + segment); const existing = key && state.history.find(r => r.segment === key); if (existing) {
+function add(role, text, segment, thread = targetId(), metadata = {}) { // thread: the conversation's key
+ if (!text?.trim())
+    return; const key = metadata.history_id || (segment == null ? null : state.sessionId + ':' + segment), node = conversationOf(thread)?.node; const existing = key && state.history.find(r => r.segment === key && conversationOf(r.thread)?.node === node); if (existing) {
     state.history = state.history.map(r => r === existing ? { ...r, text, ...metadata } : r);
     save();
     markHistorySeen();
     return;
-} state.history = [...state.history, { segment: key, thread, role, text, session: state.sessionId, revision: segment?.toString().startsWith('user-turn:') ? Number(segment.slice(10)) : undefined, ...metadata, name: role === 'user' ? 'Tú' : state.people.find(p => p.thread_id === thread)?.title || state.roomBinding?.title || 'Conversación', time: metadata.time || Date.now() }]; state.history = state.history.slice(-1000); save(); markHistorySeen(); }
+} state.history = [...state.history, { segment: key, thread, role, text, session: state.sessionId, revision: segment?.toString().startsWith('user-turn:') ? Number(segment.slice(10)) : undefined, ...metadata, name: role === 'user' ? 'Tú' : state.people.find(p => personKey(p) === thread)?.title || state.roomBinding?.title || 'Conversación', time: metadata.time || Date.now() }]; capHistory(); save(); markHistorySeen(); }
+// What this page keeps of each machine's conversations: its newest rows, so a busy machine never pushes another's out.
+const HISTORY_PER_MACHINE=1000;
+function capHistory(){const kept=newestPerMachine(state.history,HISTORY_PER_MACHINE);if(kept!==state.history)state.history=kept}
 function cancelCurrentInput(){if(!state.userTurn||state.cancelledInput)return;voice?.cancelInput();cancelDraft(state.userTurn)}
 
-function cancelDraft(turn){state.cancelledInput=true;state.history=state.history.filter(r=>r.segment!==turn.segment);save();partial('');markHistorySeen()}
+function cancelDraft(turn){state.cancelledInput=true;state.history=state.history.filter(r=>!(r.segment===turn.segment&&r.thread===turn.thread));save();partial('');markHistorySeen()}
 function partial(text){state.pendingUserText=text||''}
 // The text box comes and goes with the call view: with none mounted there is nothing to update.
-function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;input.placeholder=ready?'Escribe un mensaje…':'Entra en la sala y selecciona una conversación';}
-async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetId(),key=JSON.stringify([state.sessionId,destination,text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory()}catch(e){setRoomError(e.message||'No se pudo confirmar el envío. El texto se conserva.')}finally{state.textSending=false;updateComposer()}}
+function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;input.placeholder=ready?'Envía un mensaje':'Únete a la llamada para escribir';}
+async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
@@ -370,7 +514,15 @@ function releaseHold(){spaceDown=false;state.holding=false;if(holding){holding=f
 
 document.addEventListener('click',event=>{for(const menu of document.querySelectorAll('.participant-menu[open],.call-menu[open]'))if(!menu.contains(event.target))menu.open=false});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')for(const menu of document.querySelectorAll('.participant-menu[open],.call-menu[open]'))menu.open=false});
-async function select(id){if(state.switching||id===targetId()||!state.sessionId)return;state.switching=true;try{await post('/api/presentation/select',{thread_id:id,session_id:state.sessionId});rememberThread(id);await refresh()}catch(e){setRoomError(e.message)}finally{state.switching=false}}
+// A conversation, by its key, for the call: on the call's machine the room is asked to move the binding; on another
+// machine the call moves there (`moveCall`).
+async function select(key){
+ const to=conversationOf(key);
+ if(!to||state.switching||key===targetId()||!state.sessionId)return;
+ if(to.node!==state.callNode)return moveCall(to.node,to.thread);
+ state.switching=true;
+ try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){setRoomError(roomError(e))}finally{state.switching=false}
+}
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
 let refreshAsked=0,refreshApplied=0;
@@ -380,32 +532,44 @@ let refreshAsked=0,refreshApplied=0;
 function followServedBuild(served){
  const page=window.sidevoiceBuildId||'dev';
  if(!served||page==='dev'||served===page)return;
- if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';return}
+ // In a call it waits, said in the updates' list too (webUpdate, whose Reload loads it at once), and loads after the hang-up.
+ if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
  try{if(sessionStorage.getItem('sidevoice.reloadedFor')===served)return;sessionStorage.setItem('sidevoice.reloadedFor',served)}catch{}
  const query=new URLSearchParams(location.search);query.set('v',served);
  location.replace(location.pathname+'?'+query);
 }
-async function refresh(){if(nodeBase==null)return;const asked=++refreshAsked,session=state.sessionId;try{
- const d=await api(roomQuery('/api/presentation'));
- if(asked<refreshApplied||session!==state.sessionId)return;
+async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;const asked=++refreshAsked,session=state.sessionId;try{
+ const d=await api(roomQuery('/api/presentation',fp),undefined,fp);
+ if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  refreshApplied=asked;
- const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(d.binding.thread_id);
+ const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
  if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on.
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
- const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(call.error);});
+ const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
  applyMicState();
- // The page follows the build of whoever serves it: this answer's only when the node itself served the page.
- if(target===''&&nodeBase==='')followServedBuild(d.room?.web_build);
+ // The page follows the build of whoever serves it: this answer's only when the machine itself served the page.
+ if(target===''&&linkBase(fp)==='')followServedBuild(d.room?.web_build);
+ // The conversations (and each one's model and effort) come on a slower beat: the first answer asks for them at once, so
+ // the stage is whole from the start rather than six seconds later.
+ if(!links.get(fp)?.peopleAnswered)void refreshPeople(fp);
 }catch{state.liveNote='Servidor no disponible'}}
-async function refreshHistory() { try {
-    const data = await api(roomQuery('/api/presentation/history'));
+const HISTORY_ROLES=new Set(['user','assistant']);
+function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
+// Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
+// conversations. The call's machine is asked on the call's beat, every other one on the machines' beat.
+async function refreshHistory(fp=state.callNode) { const link = links.get(fp), base = link?.base; if (base == null) return; try {
+    const data = await api(roomQuery('/api/presentation/history', fp), undefined, fp);
+    if (links.get(fp) !== link || link.base !== base || !Array.isArray(data?.messages)) return;
     let changed = false;
     for (const r of data.messages) {
-        const marker = ':voice:', suffix = r.role === 'assistant' && r.id.includes(marker) ? r.id.slice(r.id.lastIndexOf(marker)) : null;
-        let row = state.history.find(h => h.segment === r.id);
-        const aliases = suffix ? state.history.filter(h => h !== row && h.role === 'assistant' && h.segment?.endsWith(suffix) && h.thread === r.thread && h.text === r.text) : [];
+        // A row this page cannot draw — no id, no text, or a role it does not know (sidevoice-core#112) — is left out,
+        // not the rest of the history with it.
+        if (!readableHistoryRow(r)) continue;
+        const thread = conversationKey(fp, r.thread), marker = ':voice:', suffix = r.role === 'assistant' && r.id.includes(marker) ? r.id.slice(r.id.lastIndexOf(marker)) : null;
+        let row = state.history.find(h => h.segment === r.id && h.thread === thread);
+        const aliases = suffix ? state.history.filter(h => h !== row && h.role === 'assistant' && h.segment?.endsWith(suffix) && h.thread === thread && h.text === r.text) : [];
         if (!row && aliases.length) {
             row = aliases.shift();
             changed = true;
@@ -414,7 +578,7 @@ async function refreshHistory() { try {
             state.history = state.history.filter(h => !aliases.includes(h));
             changed = true;
         }
-        const patch = { segment: r.id, thread: r.thread, role: r.role, text: r.text, name: r.role === 'user' ? 'Tú' : state.people.find(p => p.thread_id === r.thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, audio_reason: r.audio_reason, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
+        const patch = { segment: r.id, thread, role: r.role, text: r.text, name: r.role === 'user' ? 'Tú' : state.people.find(p => personKey(p) === thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, audio_reason: r.audio_reason, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
         if (!row) {
             state.history = [...state.history, patch];
             changed = true;
@@ -425,116 +589,86 @@ async function refreshHistory() { try {
         }
     }
     if (changed) {
-        state.history = state.history.slice(-1000);
+        capHistory();
         save();
         markHistorySeen();
     }
+    if (fp !== state.callNode) return;
     for (const r of state.history) {
+        if (conversationOf(r.thread)?.node !== fp) continue;
         const turn = (r.session || state.sessionId) + ':user-turn:' + r.revision;
         if (state.turns[turn] && r.delivery && r.delivery !== state.turns[turn].status)
             presenceReceipt(turn, r.delivery);
     }
 }
 catch { } }
-// Joining a room lands on a conversation: the one this tab remembers, else the first one listening in the
-// list. With none at all, the list opens by itself — empty, which says so — once per call (2026-09-26).
+// Joining a room lands on a conversation of the machine joined: the one this tab remembers, else the first one
+// listening in the list. With none at all, the list opens by itself — empty, which says so — once per call (2026-09-26).
 let emptyListShownFor=null;
 async function selectOnlyListeningConversation(){
  if(targetId()||state.switching||!state.ws)return false;
- const listening=state.people.filter(person=>person.available&&person.reach?.state==='listening');
+ const listening=state.people.filter(person=>person.node===state.callNode&&person.available&&person.reach?.state==='listening');
  if(!listening.length){
   if(emptyListShownFor!==state.sessionId){emptyListShownFor=state.sessionId;window.dispatchEvent(new Event('sidevoice-conversations-open'))}
   return false;
  }
- await select(listening[0].thread_id);return true;
+ await select(personKey(listening[0]));return true;
 }
-// An answer from the machine this page has just left describes nobody it can talk to.
-async function refreshPeople(){const base=nodeBase;try{const data=await api(roomQuery('/api/presentation/participants'));if(base!==nodeBase)return;state.people=data.participants;await reselectRemembered()||await selectOnlyListeningConversation()}catch{}finally{refreshMachines()}}
-// Where the machine in use answers rides the conversations' beat, and so does the clock the rows read.
-function refreshMachines(){roomStore.patch({machinesAt:Date.now()});void locate()}
-/* Which address the machine in use answers at is asked when it matters: on load, on the beat while there is
- * none, before a join that has none, and before each reconnection attempt after the first. An address that
- * proved itself is trusted for a few minutes. A call in progress is never moved by it
- * — changing machine is a hang-up, and the person's to make. A reconnecting call (`hold`) keeps the address it
- * had while that one's proof is recent: the machine may be restarting, and the socket is the better probe. */
-const verified=new Map(),hostAgentBases=new Map();
-let settingsAgentRequestId=0;
-let locateAsked=0,locateApplied=0,targetAbout=null,reachFailure='',doubted=null;
-async function locate({move=!(state.ws||state.connecting||state.reconnecting),fresh=false,hold=false}={}){
- if(!move)return;
- const pairing=pairingInUse(pairings);
- if(!pairing){settleBase(null,localHostSelected?'away':'unpaired',null);return}
- if(pairing.revoked){settleBase(null,'revoked',pairing);return}
- // Native verified the local identity over the peer-checked socket. Its per-launch proxy is the locator: never
- // send the app's session secret to the core's TCP listener or probe another address with it.
- if(pairing.local){
-  const local=localHostLocator(pairing,state.localHostStatus);
-  settleBase(local,local?'ok':'away',pairing);
-  return;
- }
- const recent=base=>base!=null&&Date.now()-(verified.get(base)||0)<VERIFIED_FOR_MS;
- if(!fresh&&state.node===pairing.fp&&recent(nodeBase)&&doubted!==nodeBase)return;
- setRemoteHostStatus(pairing.fp,'checking');
- const asked=++locateAsked,deps={get:fetch},started=new Map();
- let found=null,reach='away';
+// A machine's conversations, each row the room's own with the machine it came from. An answer from a link that has
+// moved since describes nobody it can talk to.
+async function refreshPeople(fp=state.callNode){
+ const link=links.get(fp),base=link?.base;if(base==null)return;
  try{
-  // The pairing's own addresses are asked while the target says what it is: its answer can only add one more.
-  void firstProven(candidateBases(pairing,{origin:location.origin}),pairing,deps,started).catch(()=>{});
-  const about=await describeTarget();
-  if(about)targetAbout=about;
-  found=await firstProven(candidateBases(pairing,{target,about,origin:location.origin}),pairing,deps,started);
-  // With nothing proven, the room the machine links with says whether it is there at all.
-  if(!found&&pairing.rv&&await askRoomNode(pairing.rv.url,pairing.rv.node,fetch)===false)reach='offline';
+  const data=await api(roomQuery('/api/presentation/participants',fp),undefined,fp);
+  if(links.get(fp)!==link||link.base!==base||!Array.isArray(data?.participants))return;
+  link.peopleAnswered=true;link.people=data.participants.map(person=>({...person,node:fp}));mergePeople();
+  if(fp===state.callNode)await reselectRemembered()||await selectOnlyListeningConversation();
  }catch{}
- if(asked<locateApplied||pairingInUse(pairings)!==pairing)return;
- locateApplied=asked;
- // The page follows the build of whoever serves it: a room serving this page says which.
- if(target===''&&targetAbout?.kind==='room')followServedBuild(targetAbout.build);
- if(found){verified.set(found.base,Date.now());hostAgentBases.set(pairing.fp,found.base);setRemoteHostStatus(pairing.fp,'connected');if(doubted===found.base)doubted=null;if(!state.ws||found.base===nodeBase)settleBase(found,'ok',pairing);return}
- if(hold&&state.node===pairing.fp&&recent(nodeBase))return;
- setRemoteHostStatus(pairing.fp,'offline');
- settleBase(null,reach,pairing);
 }
-function settleBase(found,reach,pairing){
- const base=found?.base??null,moved=base!==nodeBase,machine=pairing?.fp??null,other=machine!==state.node;
- nodeBase=base;
- roomStore.batch(()=>{
-  state.nodeReach=reach;state.rendezvous=found?(found.via==='room'?'room':'node'):'';
-  // Another machine's conversations are not this one's: what the page knew of the last one goes with it.
-  if(other){state.node=machine;state.people=[];state.roomBinding=null;state.viewedThread=null}
-  if(base!=null&&reachFailure&&state.joinFailure===reachFailure){state.joinFailure='';reachFailure=''}
- });
- if(moved&&base!=null){refresh();refreshPeople();refreshHistory()}
+/* The machines' beat: every live machine is located while it has no address (or its proof is old), and asked for its
+ * conversations — and, unless the call is on it, its history — once it has one. The call's machine also has the call's
+ * own quicker beat (`callBeat`). */
+function machinesBeat(){
+ roomStore.patch({machinesAt:Date.now()});
+ for(const fp of liveMachines()){
+  const link=links.get(fp),fresh=link?.base!=null&&Date.now()-(verified.get(link.base)||0)<VERIFIED_FOR_MS&&link.doubted!==link.base;
+  if(!link||link.base==null||!fresh&&!pairings.list.find(p=>p.fp===fp)?.local)void locate(fp);
+  if(link?.base!=null){void refreshPeople(fp);if(fp!==state.callNode)void refreshHistory(fp)}
+ }
 }
+function callBeat(){if(state.callNode==null)return;void refresh();void refreshHistory(state.callNode)}
 /* ----- pairing this device with a machine (`device-pairing.js`) ----- */
 function openPairing(note=''){roomStore.patch({pairingOpen:true,pairingNote:note})}
 function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
-// The machine no longer knows this device's token: the pairing is kept, saying so, and a new code is asked for.
-function pairingRefused(fp,{call=false}={}){
- const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked)return;
+// A machine no longer knows this device's token: the pairing is kept, saying so, and its conversations with it. When it
+// is the call's machine the call ends. A new code is asked for only when the refusal answers something the person did
+// on that machine — the call, or an action on its page (`asked`): one the page met while merely watching it says so in
+// its row, and asks nothing of a person who may be busy with another.
+// `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
+function pairingRefused(fp,{call=false,token=null,asked=false}={}){
+ const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
  keepPairings(revokedPairing(pairings,fp));
- if(pairings.inUse!==fp)return;
- const inCall=call||!!(state.ws||state.connecting||state.reconnecting);
- if(inCall)disconnect();
- settleBase(null,'revoked',pairingInUse(pairings));
- reachFailure=reachNote(state);
- if(inCall)failJoin(reachFailure);
- openPairing(reachFailure);
+ settleLink(fp,null,'revoked');
+ const onCall=fp===state.callNode&&(call||inCallNow());
+ if(!onCall&&!asked)return;
+ // Said of the machine that refused, whichever one the call is on.
+ const text=reachNote({...roomStore.getState().facts,callNode:fp});
+ if(onCall){callEndedBy('failed',text);disconnect();reachFailure={text,node:fp};failJoin({text})}
+ openPairing(text);
 }
-// A code, redeemed where the machine proves it is itself. Paired during a call, it waits for its "Usar".
-async function pairDevice(code,name){
+// A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
+async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
- const t=hostTranslator(),defaultName=currentDeviceName(where=>t('pair.deviceName',{where}));
- const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,target,about,origin:location.origin,get:fetch});
+ const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t('pair.deviceNameBrowser',params));
+ const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch,insecure});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
   closePairing();return {host:localPairing.host};
  }
- const inCall=!!(state.ws||state.connecting||state.reconnecting),use=!inCall||pairings.inUse===pairing.fp;
- keepPairings(withPairing(pairings,pairing,{use}));
+ keepPairings(withPairing(pairings,pairing));
  void hostAgentsController.load(pairing.fp);
- verified.set(base.base,Date.now());
- if(use&&!inCall)settleBase(base,'ok',pairing);
+ verified.set(base.base,Date.now());hostAgentBases.set(pairing.fp,base.base);
+ if(!(pairing.fp===state.callNode&&state.ws))settleLink(pairing.fp,base,'ok');
  closePairing();
  return {host:pairing.host};
 }
@@ -543,18 +677,50 @@ async function pairDevice(code,name){
 async function forgetMachine(fp){
  if(pairings.list.some(p=>p.fp===fp&&p.local))return;
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing)return;
- const wasInUse=pairings.inUse===fp,known=wasInUse&&state.node===fp?nodeBase:null;
- if(wasInUse&&(state.ws||state.connecting||state.reconnecting))disconnect();
- const remaining=withoutPairing(pairings,fp);
- keepPairings(localHostSelected&&!localPairing&&!wasInUse?{...remaining,inUse:pairings.inUse}:remaining);
- if(wasInUse){const next=pairingInUse(pairings);settleBase(null,next?'':'unpaired',next);if(next)void locate({move:true})}
+ const known=linkBase(fp);
+ // The call ends only when it is with the machine forgotten.
+ if(fp===state.callNode&&inCallNow())disconnect();
+ keepPairings(withoutPairing(pairings,fp));
  if(pairing.revoked)return;
- try{
-  const place=known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?{base:known}
-   :await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
-  if(place)await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
- }catch{}
+ // Gone from here at once; the machine is told now if it answers, else whenever it does (pendingRevokes).
+ const told=await revokeOn(pairing,known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?known:null);
+ if(!told)keepPendingRevoke(pairing);
 }
+// A forgotten machine that could not be told: its token is still good there until it is. What is needed to tell it is
+// kept (this device's storage, as the pairing was) and tried again — on start, and every few minutes — until it hears.
+const PENDING_REVOKES_KEY='sidevoice.pending-revokes';
+function pendingRevokes(){try{const kept=JSON.parse(pageStorage()?.getItem(PENDING_REVOKES_KEY)||'[]');return Array.isArray(kept)?kept.filter(p=>p&&typeof p.fp==='string'&&typeof p.token==='string'&&typeof p.device_id==='string'):[]}catch{return []}}
+function writePendingRevokes(list){try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}}
+function keepPendingRevoke(pairing){
+ const {fp,device_id,token,urls,rv,public_key,host,insecure}=pairing;
+ writePendingRevokes([...pendingRevokes().filter(p=>p.fp!==fp),{fp,device_id,token,urls,rv,public_key,host,...(insecure?{insecure}:{})}]);
+}
+/** Tells a machine this device is gone (its token revoked there), at an address that proves it is that machine. */
+async function revokeOn(pairing,knownBase=null){
+ try{
+  // The page's own origin is the base '', which is known all the same.
+  const place=knownBase!=null?{base:knownBase}:await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch});
+  if(!place)return false;
+  const response=await fetch(place.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token));
+  // Gone there already (401/404) is as good as told.
+  return response.ok||response.status===401||response.status===404;
+ }catch{return false}
+}
+let revokingPending=false;
+async function retryPendingRevokes(){
+ if(revokingPending)return;revokingPending=true;
+ try{
+  const left=[];
+  for(const pending of pendingRevokes()){
+   // Paired again since: nothing to revoke.
+   if(pairings.list.some(p=>p.fp===pending.fp))continue;
+   if(!await revokeOn(pending))left.push(pending);
+  }
+  writePendingRevokes(left);
+ }finally{revokingPending=false}
+}
+// (Never holding a process open where timers can: the runtime's tests.)
+if(typeof setInterval==='function'){setTimeout(()=>void retryPendingRevokes(),5000)?.unref?.();setInterval(()=>void retryPendingRevokes(),5*60*1000)?.unref?.()}
 async function localHostApi(path,options={}){
  const pairing=localPairing;
  if(!pairing||!pairing.urls[0])throw Error('local-host-unavailable');
@@ -572,7 +738,10 @@ async function hostApi(fp,path,options={}){
    let place=null;
    try{place=await firstProven(candidateBases(pairing,{target,about:targetAbout,origin:location.origin}),pairing,{get:fetch})}catch{}
    if(!place)throw Object.assign(Error('unreachable'),{key:'unreachable'});
-   base=place.base;verified.set(base,Date.now());hostAgentBases.set(fp,base);setRemoteHostStatus(fp,'connected');
+   base=place.base;verified.set(base,Date.now());hostAgentBases.set(fp,base);
+   // A machine found here is found for its conversations too — one watched, still paired as it was asked, and not
+   // the call's on another address.
+   if(linkBase(fp)==null&&liveMachines().includes(fp)&&pairings.list.find(p=>p.fp===fp)===pairing&&!(fp===state.callNode&&state.ws))settleLink(fp,place,'ok');
   }
  }
  // The page's own origin is a valid, empty prefix. Keep it distinct from a missing base so a node
@@ -585,7 +754,8 @@ async function hostApi(fp,path,options={}){
  finally{clearTimeout(timer)}
  let data=null;
  try{data=await response.json()}catch{}
- if(response.status===401){pairingRefused(fp);throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ // Asked of the machine from its page — its agents, its devices, its card: the person's own act on it.
+ if(response.status===401){pairingRefused(fp,{token:pairing.token,asked:true});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
  if(!response.ok){
   const failure=data?.error&&typeof data.error==='object'?data.error:data;
   const key=typeof failure?.key==='string'&&/^[a-z0-9._-]+$/.test(failure.key)?failure.key:response.status===503?'no-connector':'request-failed';
@@ -612,26 +782,39 @@ function discardChangedHostAgents(previous,next){
 function scanPairedAgents(rescan=false){
  for(const pairing of pairings.list)if(!pairing.revoked)void hostAgentsController.load(pairing.fp,{rescan});
 }
+// This device in a section of its own, in the desktop app only: its agents and its preparing are asked for
+// there, not under Remote machines.
+function ownComputerSection(){return !!(state.inApp&&state.localHostAvailable)}
 function openAgentSettings(fp){
- settingsSection('machines');
+ settingsSection(ownComputerSection()&&localPairing?.fp===fp?'this-computer':'machines');
  roomStore.patch({settingsAgentRequest:{fp,id:++settingsAgentRequestId}});
 }
-async function localHostDevices(){
- const data=await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json();
+function deviceRows(data){
  const rows=Array.isArray(data)?data:Array.isArray(data?.devices)?data.devices:[];
  return rows.filter(row=>row&&(typeof row.device_id==='string'||typeof row.id==='string')).map(row=>({device_id:row.device_id||row.id,name:row.name||null,kind:row.kind||'code',current:!!row.current,
   created_at:row.created_at??row.created??null,last_seen_at:row.last_seen_at??row.last_seen??null}));
 }
+async function localHostDevices(){
+ return deviceRows(await(await localHostApi('/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'})).json());
+}
 async function revokeLocalHostDevice(id){
  await localHostApi('/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}});
 }
+// Any paired machine's devices, asked of it with this device's own pairing: every paired device may list them and
+// revoke another (never itself: that is forgetting the machine).
+async function machineDevices(fp){return deviceRows(await hostApi(fp,'/api/device/devices',{headers:{accept:'application/json'},cache:'no-store'}))}
+async function revokeMachineDevice(fp,id){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),{method:'DELETE',headers:{accept:'application/json'}})}
+// A device renamed in a machine's list: the machine keeps its name (PATCH, sidevoice-web #75; a contract gap in core).
+const renameBody=name=>({method:'PATCH',headers:{'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({name:clampDeviceName(name)})});
+async function renameMachineDevice(fp,id,name){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
+async function renameLocalHostDevice(id,name){await localHostApi('/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
-function callProtocols(){const token=pairingInUse(pairings)?.token;if(!token)throw Error(NO_MACHINE);return ['sidevoice','sidevoice.token.'+token]}
+function callProtocols(fp){const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing?.token||pairing.revoked)throw worded(NO_MACHINE);return ['sidevoice','sidevoice.token.'+pairing.token]}
 async function reselectRemembered(){
  // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
  const wanted=rememberedThread();
- if(!wanted||targetId()||state.switching||!state.ws)return false;
- if(!state.people.some(person=>person.thread_id===wanted&&person.available))return false;
+ if(!wanted||targetId()||state.switching||!state.ws||conversationOf(wanted)?.node!==state.callNode)return false;
+ if(!state.people.some(person=>personKey(person)===wanted&&person.available))return false;
  await select(wanted);return true;
 }
 // Stats poll only while the modal is open; each opening owns its requests.
@@ -700,7 +883,7 @@ function statsAggregate(replies,stages=LATENCY_STAGES){
 }
 const AGGREGATE_COLUMNS=['Tramo','n','Media','p50','p90','Máx'];
 function statsThreads(replies){return [...new Set(replies.map(reply=>reply.thread_id).filter(Boolean))]}
-function statsConversationName(threadId){return state.people.find(person=>person.thread_id===threadId)?.title||threadId}
+function statsConversationName(threadId){return state.people.find(person=>person.node===state.callNode&&person.thread_id===threadId)?.title||threadId}
 function statsAggregateCaption(count){return count+(count===1?' respuesta medida':' respuestas medidas')}
 function statsAggregateTable(caption,rows){
  const wrap=document.createElement('div');wrap.className='stats-table-wrap';
@@ -791,7 +974,10 @@ function reportClientError(report){
  }
  // Before the call exists, or once its socket is gone, a request that outlives the page still reaches the machine.
  // Not a beacon: a beacon cannot carry this device's token.
- request('/api/presentation/client-error',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)}).catch(()=>{});
+ // The call's machine, else the first one this page reaches.
+ const fp=state.callNode??[...links.values()].find(link=>link.base!=null)?.fp;
+ if(fp==null)return;
+ request('/api/presentation/client-error',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)},fp).catch(()=>{});
 }
 window.sidevoiceReportError=reportClientError;
 for(const queued of window.sidevoiceClientErrors||[])reportClientError(queued);
@@ -825,7 +1011,7 @@ function renderConnectionStats(data,roundTrip){
 function resetStats(){renderLatencyStats(null,null);$('stats-connection').replaceChildren();$('stats-updated').textContent=''}
 async function refreshConnectionStats(){
  if(!$('connection-stats').open||statsRequest)return;
- const epoch=statsEpoch,callId=state.sessionId,thread=targetId(),controller=new AbortController();
+ const epoch=statsEpoch,callId=state.sessionId,thread=targetThread(),controller=new AbortController();
  statsRequest=controller;$('stats-refresh').disabled=true;
  const timeout=setTimeout(()=>controller.abort(),5000);
  const started=latencyNow();
@@ -839,7 +1025,7 @@ async function refreshConnectionStats(){
    })
   ]);
   if(epoch!==statsEpoch||!$('connection-stats').open)return;
-  if(callId!==state.sessionId||thread!==targetId()){resetStats();$('stats-status').textContent='La conversación ha cambiado. Actualizando…';return}
+  if(callId!==state.sessionId||thread!==targetThread()){resetStats();$('stats-status').textContent='La conversación ha cambiado. Actualizando…';return}
   if(connection.status==='fulfilled')renderConnectionStats(connection.value.data,connection.value.elapsed);
   else renderConnectionStats(null,null);
   const snapshot=latency.status==='fulfilled'?latency.value:null;
@@ -850,7 +1036,7 @@ async function refreshConnectionStats(){
   else if(!callId)$('stats-status').textContent='Entra en la sala para medir esta llamada.';
   else if(!matches)$('stats-status').textContent='Esperando las mediciones de esta sesión.';
   else $('stats-status').textContent='Mediciones de esta conversación · actualización cada 2 segundos';
-  $('stats-updated').textContent=new Date().toLocaleTimeString();
+  $('stats-updated').textContent=new Date().toLocaleTimeString(document.documentElement?.lang||undefined);
  }finally{
   clearTimeout(timeout);
   if(statsRequest===controller){statsRequest=null;$('stats-refresh').disabled=false}
@@ -861,7 +1047,7 @@ function stopConnectionStats(){
  ++statsEpoch;clearTimeout(statsTimer);statsTimer=null;statsRequest?.abort();statsRequest=null;$('stats-refresh').disabled=false;
 }
 function openConnectionStats(){
- stopConnectionStats();$('call-menu').open=false;resetStats();
+ stopConnectionStats();const menu=$('call-menu');if(menu)menu.open=false;resetStats();
  $('stats-status').textContent='Recogiendo mediciones…';
  if(!$('connection-stats').open)$('connection-stats').showModal();
  return refreshConnectionStats();
@@ -952,12 +1138,12 @@ function recordMessage(raw, socket) {
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
         if (state.userTurn?.id === d.turn_id)
-            state.userTurn = { ...state.userTurn, thread: d.thread_id };
+            state.userTurn = { ...state.userTurn, thread: conversationKey(state.callNode, d.thread_id) };
         return;
     }
     if (t === 'voice-input-receipt') {
         const receiptId = d.history_id || (d.session_id || state.sessionId) + ':user-turn:' + d.turn_id;
-        const row = state.history.find(r => r.thread === d.thread_id && r.segment === receiptId);
+        const row = state.history.find(r => r.thread === conversationKey(state.callNode, d.thread_id) && r.segment === receiptId);
         if (row) {
             state.history = state.history.map(r => r === row ? { ...r, delivery: d.status } : r);
             save();
@@ -965,18 +1151,19 @@ function recordMessage(raw, socket) {
         }
         else
             state.inputReceipts = { ...state.inputReceipts, [receiptId]: d.status };
-        if ((d.session_id || state.sessionId) === state.sessionId && d.thread_id === targetId())
+        if ((d.session_id || state.sessionId) === state.sessionId && conversationKey(state.callNode, d.thread_id) === targetId())
             presenceReceipt((d.session_id || state.sessionId) + ':user-turn:' + d.revision, d.status);
     }
     if (t === 'voice-conversation' && d.thread_id) {
+        const key = conversationKey(state.callNode, d.thread_id);
         if (typeof d.working === 'boolean') {
-            state.harness = { ...state.harness, [d.thread_id]: d.working };
-            if (d.turn_phase === 'end' && d.session_id === state.sessionId && d.thread_id === targetId()
+            state.harness = { ...state.harness, [key]: d.working };
+            if (d.turn_phase === 'end' && d.session_id === state.sessionId && key === targetId()
                     && Number.isInteger(d.revision)) {
                 const id = d.session_id + ':user-turn:' + d.revision;
                 const previous = state.turns[id] || {};
                 state.turns = { ...state.turns, [id]: { ...previous, session: d.session_id,
-                    thread: d.thread_id, settled: true, harnessEnded: true } };
+                    thread: key, settled: true, harnessEnded: true } };
                 if (!previous.harnessEnded)
                     window.sidevoiceTelemetry?.endTurn?.(d.thread_id, d.revision, 'harness_finished');
             }
@@ -994,13 +1181,18 @@ function recordMessage(raw, socket) {
             flushOutbox();
             return;
         }
-        setRoomError(sayRefusal(d, d.error || 'Error de conexión'));
+        setRoomError(roomError(refusalError(d)));
     }
 }
 /* ----- the voice's reports -----
  * The person's turn, as the voice heard it: a draft bubble while it is open, the words once it is finished, and the
  * message itself in the outbox for the room. */
+// Which machine each of the voice's turns was said to. What the voice reports of a turn after the call moved to another
+// machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
+const turnNodes=new Map();
 function voiceTurn(turn){
+ if(turn.phase==='started'){turnNodes.set(turn.turn_id,state.callNode);if(turnNodes.size>64)turnNodes.delete(turnNodes.keys().next().value)}
+ else if(turnNodes.has(turn.turn_id)){const node=turnNodes.get(turn.turn_id);turnNodes.delete(turn.turn_id);if(node!==state.callNode)return}
  roomStore.batch(()=>{
   if(turn.phase==='started'){
    personSignal();
@@ -1013,9 +1205,9 @@ function voiceTurn(turn){
    const thread=state.userTurn.thread,segment=state.userTurn.segment;
    state.pendingPhase='';partial('');state.userTurn=null;
    if(turn.phase==='finished'&&turn.text?.trim()){
-    state.history=state.history.filter(r=>r.segment!==segment);
+    state.history=state.history.filter(r=>!(r.segment===segment&&r.thread===thread));
     add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
-   }else state.history=state.history.filter(r=>r.segment!==segment);
+   }else state.history=state.history.filter(r=>!(r.segment===segment&&r.thread===thread));
    markHistorySeen();
   }
  });
@@ -1025,7 +1217,7 @@ function voiceTurn(turn){
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 // Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
 // be acted on, and in the machine's log.
-function voiceFailed(error){setRoomError(voiceErrorText(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
+function voiceFailed(error){setRoomError(voiceError(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
 function voiceStateChanged(next){
  roomStore.batch(()=>{
   state.voiceState=next;
@@ -1041,7 +1233,7 @@ const waveLevels=new Float32Array(256);
 function voiceLevel(level){
  const value=Math.max(0,Math.min(100,Math.round(Number(level)*100)||0));
  waveLevels.copyWithin(0,1);waveLevels[waveLevels.length-1]=value/100;
- $('mute')?.style.setProperty('--mic-fill',value+'%');
+ $('mic-control')?.style.setProperty('--mic-fill',value+'%');
  $('mic-level-meter')?.setAttribute('aria-valuenow',String(value));
  const channel=window.sidevoiceUI?.micLevel;if(typeof channel?.publish==='function')channel.publish(value);
 }
@@ -1053,11 +1245,11 @@ function receiveReply(d){
  if(d.session_id!==state.sessionId)return;
  state.roomRevision=Math.max(state.roomRevision,d.revision);
  if(!d.replay)state.turns=recordReply(state,d);
- add('assistant',d.text,'voice:'+d.utterance_id,d.thread_id,{history_id:d.history_id,session:d.session_id,revision:d.revision});
- if(!replies.has(d.utterance_id))sayReply(d);
+ add('assistant',d.text,'voice:'+d.utterance_id,conversationKey(state.callNode,d.thread_id),{history_id:d.history_id,session:d.session_id,revision:d.revision});
+ // A reply that arrives while the call leaves its machine is written, never said: the person has moved on.
+ if(!replies.has(d.utterance_id)&&!moving)sayReply(d);
 }
-function roomSocketUrl(){if(nodeBase==null)throw Error(reachNote(state)||NO_MACHINE);return callSocketUrl(nodeBase,location)}
-const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espera a que salga alguien y vuelve a entrar.';
+function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(reachNote(state)||NO_MACHINE);return callSocketUrl(base,location)}
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
  * can lose both: a phone read only «La sala rechazó la conexión» while the room had written that it
@@ -1067,38 +1259,44 @@ const ROOM_IS_FULL='La sala ya tiene el máximo de dispositivos conectados. Espe
  * is a truthful answer to a question asked a moment too late, and it costs only the generic line. */
 async function roomRefusal(){try{const answer=await request('/api/presentation/admission',{cache:'no-store'});if(!answer.ok)return null;const admission=await answer.json();return admission&&typeof admission==='object'?admission:{}}catch{return null}}
 const NODE_AWAY=new Set(['node_offline','node_unreachable','node_timeout','choose_node']);
-function refusalText(admission,broken){
- if(admission===null)return 'No se pudo conectar con la sala';
- if(admission.reason==='room_is_full')return ROOM_IS_FULL;   // the room's reason, in this page's language
- if(admission.admitted===false&&admission.message)return admission.message;
- return broken?'No se pudo conectar con la sala':'La sala rechazó la conexión';
+// Why the room refused, in this page's words: its reason by its key; a refusal this page has no words for is the room
+// refusing, its own sentence behind Details.
+function admissionFailure(admission,broken){
+ if(admission===null)return bundled('room.failure.unreachable');
+ if(admission.reason==='room_is_full')return bundled('room.failure.full');
+ if(admission.admitted===false&&(admission.message||admission.key||admission.reason))return refusedBy(refusalError(admission));
+ return bundled(broken?'room.failure.unreachable':'room.failure.rejected');
 }
+const refusedBy=refusal=>roomError(refusal,'room',bundled('room.failure.refused').text);
 // The room speaks first: its call id and how this call is resumed. Anything else arriving meanwhile is an ordinary room event.
-function openSession(socket,hello={}){return new Promise((resolve,reject)=>{const fail=(text,forGood=false)=>{clearTimeout(timer);const error=Error(text);error.refused=forGood;reject(error)};let timer=setTimeout(()=>lateFail(),25000),refusal=null,refused=null,broken=false;const lateFail=()=>{
+function openSession(socket,hello={},fp=state.callNode,token=null){return new Promise((resolve,reject)=>{const fail=(words,forGood=false)=>{clearTimeout(timer);reject(Object.assign(Error(words.text),{words,refused:forGood}))};let timer=setTimeout(()=>lateFail(),25000),refusal=null,refused=null,broken=false;const lateFail=()=>{
   // Asking why keeps the same short patience as after a close: a room that never answered the hello may not answer this either.
-  timer=setTimeout(()=>fail('Este dispositivo tardó demasiado en entrar. Vuelve a intentarlo.'),3000);
-  roomRefusal().then(admission=>fail(admission&&admission.admitted?'Este dispositivo tardó demasiado en entrar. Vuelve a intentarlo.':refusalText(admission,false),admission?.admitted===false))};socket.onopen=()=>socket.send(JSON.stringify({label:'rtvi-ai',type:'client-ready',id:crypto.randomUUID(),data:hello}));
+  timer=setTimeout(()=>fail(bundled('room.failure.slow')),3000);
+  roomRefusal().then(admission=>fail(admission&&admission.admitted?bundled('room.failure.slow'):admissionFailure(admission,false),admission?.admitted===false))};socket.onopen=()=>socket.send(JSON.stringify({label:'rtvi-ai',type:'client-ready',id:crypto.randomUUID(),data:hello}));
  // An error event is always followed by a close event, and the close is the one that can find out
  // why: failing here would answer «no se pudo conectar» to a room that knows it is full.
  socket.onerror=()=>{broken=true};
  socket.onclose=event=>{clearTimeout(timer);timer=null;
   // The machine no longer knows this device's token: final, and the pairing is what has to change.
-  if(event?.code===4401){pairingRefused(pairings.inUse);return fail(reachNote(state)||NO_MACHINE,true)}
+  if(event?.code===4401){pairingRefused(fp,{call:true,token});return fail({text:reachNote(state)||NO_MACHINE},true)}
   // However the reason arrived — the close code, the frame's own name for it, the frame's sentence —
   // the person reads one sentence for one reason.
   // A room that answered and said no is not a room that is away: these are the refusals a reconnection
   // must not insist on. Everything else — no answer at all — is worth another try.
   // A room whose relay cannot reach the machine says so with the same close code as a full room, and a
   // machine that is restarting is not a refusal: its own sentence, and the next attempt may find it back.
-  if(NODE_AWAY.has(refused))return fail(refusal||'La máquina no está conectada a la sala ahora mismo.',false);
+  if(NODE_AWAY.has(refused))return fail(bundled('room.failure.machineAway'),false);
   // A frame that named another reason is that reason, whatever the close code: 1013 alone means full.
-  if(refused==='room_is_full'||event?.code===1013&&!refused)return fail(ROOM_IS_FULL,true);
-  if(refusal)return fail(refusal,true);
+  if(refused==='room_is_full'||event?.code===1013&&!refused)return fail(bundled('room.failure.full'),true);
+  // Any other reason is said in the room's own sentence, and whether it is final is the close code's to say
+  // (sidevoice-core#112): one a reconnection must not insist on (shouldReconnect) is; a reason this page does not know
+  // yet, on any other close, is worth another try.
+  if(refusal)return fail(refusedBy(refusal),!shouldReconnect(event));
   // The question keeps a short patience of its own: a room that does not answer it cannot say why
   // either, and nobody is left looking at a join line while a request hangs.
-  timer=setTimeout(()=>fail('La sala rechazó la conexión'),3000);
-  roomRefusal().then(admission=>fail(refusalText(admission,broken),admission?.admitted===false))};
- socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=sayRefusal(m.data,m.data?.error||refusal);refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
+  timer=setTimeout(()=>fail(bundled('room.failure.rejected')),3000);
+  roomRefusal().then(admission=>fail(admissionFailure(admission,broken),admission?.admitted===false))};
+ socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
 function disconnect() {
     window.sidevoiceTelemetry?.endCall?.('left');
     // A hang-up ends what the call still owed its session.
@@ -1132,26 +1330,82 @@ function disconnect() {
     partial('');
     state.holding = false;
     state.liveNote = '';
+    // The call's machine is no longer the call's: the conversation it was on stays on screen, as one looked at.
+    if (!state.viewedThread)
+        state.viewedThread = targetId();
+    state.roomBinding = null;
+    state.callNode = null;
+    state.switching = state.reconnecting = state.reconnectShown = moving = false;
     voiceLevel(0);
     updateMic();
     applyLockScreen(false);
+    syncLinks();
 }
 // The voice's reports, for as long as this call has it.
 const voiceListeners=[];
 function attachVoice(next){
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
+ void watchAudioDevices();
+}
+/* The microphone and the speaker the voice uses (the same seam on the web and in the desktop app): this device's
+ * choices, kept here and given to the voice when it is made, and its list followed as it changes. A chosen device that
+ * goes away leaves the system's default in use: the choice is dropped, and said once (audioLost). */
+const AUDIO_KEY='sidevoice.audio-devices';
+function storedAudio(){try{const kept=JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}');return kept&&typeof kept==='object'?kept:{}}catch{return {}}}
+function keepAudio(choice){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(choice))}catch{}}
+let audioWatched=null;
+async function watchAudioDevices(){
+ const host=await voiceHost().catch(()=>null);if(!host||audioWatched===host)return;audioWatched=host;
+ if(typeof host.audioDevices!=='function'){roomStore.patch({audioDevices:null});return}
+ host.onAudioDevices(audioDevicesChanged);
+ const kept=storedAudio();
+ let devices=null;
+ try{devices=Object.keys(kept).length?await host.setAudioDevices(kept):await host.audioDevices()}
+ catch{devices=await host.audioDevices().catch(()=>null)}
+ if(devices)audioDevicesChanged(devices);
+}
+function audioDevicesChanged(devices){
+ if(devices.lost){const kept=storedAudio();if(devices.lost.input)delete kept.input;if(devices.lost.output)delete kept.output;keepAudio(kept)}
+ roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
+  ...(devices.lost?{audioLost:devices.lost}:{})});
+}
+async function setAudioDevices(choice){
+ const host=await voiceHost();
+ let devices;
+ try{devices=await host.setAudioDevices(choice)}catch(error){throw voiceRefused(error,'devices')}
+ // Kept for this device; the system's default keeps nothing.
+ const kept=storedAudio();
+ for(const kind of ['input','output'])if(kind in choice){if(choice[kind]==null)delete kept[kind];else kept[kind]=choice[kind]}
+ keepAudio(kept);audioDevicesChanged(devices);return devices;
+}
+async function refreshAudioDevices(){
+ await watchAudioDevices();
+ const host=await voiceHost();if(typeof host.audioDevices==='function')audioDevicesChanged(await host.audioDevices());
 }
 // Joining and leaving are the same button, and it belongs to React: this is what it calls.
+/* Which machine a join goes to: the one of the conversation being looked at (or the one this tab remembers) — and
+ * then that one or none, so the call never lands somewhere the person did not pick —, else the first watched machine
+ * with a conversation listening, else the first that answers. One with no address yet is looked for first. */
+async function callMachine(epoch){
+ const live=liveMachines(),wanted=conversationOf(state.viewedThread||rememberedThread())?.node;
+ if(wanted&&pairings.list.some(p=>p.fp===wanted)){if(linkBase(wanted)==null)await locate(wanted,{move:true,fresh:true});return wanted}
+ const listening=fp=>links.get(fp)?.people.some(p=>p.available&&p.reach?.state==='listening');
+ const pick=()=>live.filter(fp=>linkBase(fp)!=null).sort((a,b)=>Number(listening(b))-Number(listening(a)))[0]??null;
+ if(pick()==null)await Promise.all(live.map(fp=>locate(fp,{move:true,fresh:true})));
+ return epoch===connectEpoch?pick()??wanted??live[0]??null:null;
+}
 async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){disconnect();return}
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
- const pairing=pairingInUse(pairings);if(!pairing||pairing.revoked){openPairing(pairing?reachNote(state):'');return}
- personSignal();primeNowPlaying();state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
+ if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
+ personSignal();primeNowPlaying();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
  try{
-  if(nodeBase==null){await locate({move:true,fresh:true});if(epoch!==connectEpoch)return}
-  if(nodeBase==null){reachFailure=reachNote(state)||NO_MACHINE;throw Error(reachFailure)}
+  const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
+  // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said.
+  state.callNode=fp;
+  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
-  await next.setSettings(state.voiceSettings);
+  await next.setSettings(voiceSettingsHere(state.voiceSettings,state.voiceCatalogue.catalogs));
   // A hang-up while the settings were taken leaves this join: nothing of it may start the microphone after it.
   if(epoch!==connectEpoch)return;
   await next.start();
@@ -1159,12 +1413,12 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   if(epoch!==connectEpoch){if(voice!==next)next.stop().catch(()=>{});return}
   applyMicState();applyLockScreen(true);
   joinStatus('room');
-  const session=await joinRoom(epoch,{resume:storedTicket()});if(epoch!==connectEpoch||!session)return;
+  const session=await joinRoom(epoch,{resume:storedTicket(fp)});if(epoch!==connectEpoch||!session)return;
   updateMic();
-  const remembered=rememberedThread();if(remembered)joinStatus('conversation',{subject:conversationTitle(remembered)});
-  await refresh();await refreshPeople();
+  const remembered=rememberedThread();if(rememberedOn(fp))joinStatus('conversation',{subject:conversationTitle(remembered)});
+  await refresh();await refreshPeople(fp);
   if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}
- }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinFailureText(failed,e))}}
+ }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinError(failed,e))}}
  finally{if(epoch===connectEpoch)state.connecting=false}
 }
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
@@ -1177,22 +1431,27 @@ const RECONNECT_DELAYS_MS=[1000,2000,5000];
 function shouldReconnect(event){return ![1008,1013,4401].includes(event?.code)}   // refused by policy, full, or not paired: do not insist
 // A room that answers and refuses this browser is not a room that is away: insisting would never end.
 function refusedForGood(error){return error?.refused===true}
+// The conversation this tab goes back to on a machine, by the room's own name for it: none of another machine's.
+function rememberedOn(fp){const wanted=conversationOf(rememberedThread());return wanted?.node===fp?wanted.thread:null}
 async function joinRoom(epoch,context){
- const socket=new WebSocket(roomSocketUrl(),callProtocols());
+ const fp=state.callNode,protocols=callProtocols(fp);
+ const socket=new WebSocket(roomSocketUrl(fp),protocols);
+ // The credential this socket carries, to tell its refusal from one of a pairing made since.
+ socket.token=protocols[1].slice('sidevoice.token.'.length);
  state.ws=socket;
  let session;
  // The hello carries this browser's call span, so the room's own spans are inside it instead of
  // being a second trace about the same call. With no collector configured there is no span to carry.
  const traceparent=window.sidevoiceTelemetry?.startCall?.({});
- try{session=await openSession(socket,{conversation:rememberedThread(),ui_language:devicePreferences().ui_language,...(context.resume?{resume:context.resume}:{}),...(traceparent?{telemetry:{traceparent}}:{})})}
+ try{session=await openSession(socket,{conversation:rememberedOn(fp),ui_language:devicePreferences().ui_language,...(context.resume?{resume:context.resume}:{}),...(traceparent?{telemetry:{traceparent}}:{})},fp,socket.token)}
  // A join that failed leaves nothing behind. A room that is not told keeps the seat for the length of its keepalive
  // budget while the page tries again, so one local failure became a reconnect loop that ate the room's seats one every
  // thirty seconds (2026-09-22).
  catch(error){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}if(state.ws===socket)state.ws=null;throw error}
  if(epoch!==connectEpoch){socket.close(1000);return null}
  socket.onerror=null;
- if(socket.readyState!==WebSocket.OPEN)throw Error('La sala cerró la conexión');
- socket.onclose=event=>{if(state.ws===socket)lostConnection(event,epoch)};
+ if(socket.readyState!==WebSocket.OPEN)throw worded(bundled('room.failure.dropped').text);
+ socket.onclose=event=>{if(state.ws===socket)lostConnection(event,epoch,socket.token)};
  socket.onmessage=e=>{if(state.ws===socket)message(e.data,socket)};
  // Every session and every resume hands over a fresh single-use token: the newest is the one a drop will name.
  resumeToken=session.resume?.token||null;
@@ -1222,14 +1481,14 @@ async function settleRejoin(epoch,hold){
  try{for(const step of [refresh,refreshPeople]){await within(Promise.resolve().then(step),REJOIN_STEP_MS).catch(()=>{});if(epoch!==connectEpoch)return}}
  finally{if(hold&&outboxHold===hold){outboxHold=null;flushOutbox()}}
 }
-async function lostConnection(event,epoch){
+async function lostConnection(event,epoch,token=null){
  if(epoch!==connectEpoch||state.reconnecting)return;
  state.ws=null;keepTicket(true);
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
  // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
- if(event?.code===4401){pairingRefused(pairings.inUse,{call:true});return}
- if(!shouldReconnect(event)){disconnect();failJoin('La sala cerró la llamada. Vuelve a pulsar para entrar cuando esté disponible.');return}
+ if(event?.code===4401){pairingRefused(state.callNode,{call:true,token});return}
+ if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect();failJoin(message);return}
  state.reconnecting=true;
  // The first seconds of a drop are the network's, not the person's: no line, no control held. One that outlasts the
  // grace is said.
@@ -1242,11 +1501,11 @@ async function lostConnection(event,epoch){
    // An attempt past its deadline is let go, and its socket with it: a late answer to it changes nothing.
    const ticket=resumeTicket(),mine=++current;
    let session;
-   try{session=await within((async()=>{await locate({move:true,fresh:attempt>0,hold:true});return epoch===connectEpoch&&mine===current?joinRoom(epoch,{resume:ticket}):null})(),RECONNECT_ATTEMPT_MS)}
+   try{session=await within((async()=>{await locate(state.callNode,{move:true,fresh:attempt>0,hold:true});return epoch===connectEpoch&&mine===current?joinRoom(epoch,{resume:ticket}):null})(),RECONNECT_ATTEMPT_MS)}
    catch(e){
     if(epoch!==connectEpoch)return;
     ++current;const pending=state.ws;state.ws=null;try{pending?.close()}catch{}
-    if(refusedForGood(e)){disconnect();failJoin(e.message||'La sala no deja entrar a este dispositivo.');return}
+    if(refusedForGood(e)){const message=roomError(e,'room',bundled('room.failure.refused').text);callEndedBy('failed',message.text);disconnect();failJoin(message);return}
     continue;
    }
    if(epoch!==connectEpoch||!session)return;
@@ -1265,12 +1524,79 @@ async function lostConnection(event,epoch){
    setRoomError('');clearJoinStatus();
    return;
   }
- }finally{clearTimeout(grace);roomStore.batch(()=>{state.reconnecting=false;state.reconnectShown=false})}
+ }finally{clearTimeout(grace);if(epoch===connectEpoch)roomStore.batch(()=>{state.reconnecting=false;state.reconnectShown=false})}
+}
+/* ----- the call follows the conversation: moving it to another machine -----
+ * One call, one voice, with one machine at a time. Picking a conversation of another machine moves the call there and
+ * keeps the voice (no new microphone prompt, no model loaded again, nothing that needs the tap's gesture):
+ *  - what the person was saying was for the conversation being left: the open turn is cancelled;
+ *  - the replies of the machine left that are queued or sounding are stopped, and what became of them (how much was
+ *    heard) is told to that machine, so its room records them unheard — they are never said later;
+ *  - what that machine is still owed is given MOVE_DRAIN_MS to be acknowledged on its socket, then the socket is closed
+ *    as a hang-up (1000) and its resume ticket forgotten; anything left unacknowledged is let go, and reported;
+ *  - a new session on the other machine, with the conversation picked.
+ * A machine that cannot be reached, or refuses, ends the call with its reason, as a join that failed. */
+var MOVE_DRAIN_MS=3000;
+async function moveCall(fp,thread){
+ if(!state.ws&&!state.reconnecting)return;
+ const from=state.callNode,epoch=++connectEpoch,socket=state.ws;
+ // From here the call is the move's: a join or a reconnection still on its way is not any more.
+ roomStore.batch(()=>{state.switching=true;state.connecting=state.reconnecting=state.reconnectShown=false;state.movingTo=conversationKey(fp,thread)});
+ moving=true;applyMicState();
+ joinStatus('conversation',{subject:conversationTitle(conversationKey(fp,thread))});
+ try{
+  cancelCurrentInput();
+  for(const said of replies.values())said.saying.cancel();
+  await drainOutbox(from,MOVE_DRAIN_MS,()=>epoch===connectEpoch&&state.ws===socket);
+  if(epoch!==connectEpoch)return;
+  leaveSession();
+  rememberThread(conversationKey(fp,thread));
+  state.callNode=fp;syncLinks();
+  if(linkBase(fp)==null)await locate(fp,{move:true,fresh:true});
+  if(epoch!==connectEpoch)return;
+  if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
+  const session=await joinRoom(epoch,{});
+  if(epoch!==connectEpoch||!session)return;
+  // In the call again: what the room still has to say of it (the binding, the conversations) never holds it in a move.
+  moving=false;state.switching=false;applyMicState();clearJoinStatus();
+  void settleRejoin(epoch,null);
+ }catch(e){
+  if(epoch!==connectEpoch)return;
+  const message=joinError('room',e),gone=reachFailure?.node===fp;callEndedBy(gone?'offline':'failed',gone?conversationTitle(conversationKey(fp,thread)):message.text);disconnect();failJoin(message)
+ }
+ finally{if(epoch===connectEpoch){state.switching=false;moving=false;state.movingTo=null;applyMicState()}}
+}
+// What the call still owes a machine it is leaving, given a moment to be acknowledged on its open socket: the
+// person's finished turns, and what became of each reply stopped. A stopped reply reports itself as it ends.
+// `mine`: whether the move still owns the call — a hang-up or another join meanwhile, and the drain lets everything be.
+async function drainOutbox(node,ms,mine){
+ const owed=()=>outbox.list().some(entry=>entry.node===node)||replies.size>0;
+ const until=Date.now()+ms;
+ if(mine())flushOutbox();
+ while(mine()&&owed()&&Date.now()<until&&state.ws?.readyState===WebSocket.OPEN){await new Promise(resolve=>setTimeout(resolve,50));if(mine())flushOutbox()}
+ if(!mine())return;
+ const left=outbox.list().filter(entry=>entry.node===node);
+ for(const entry of left)outbox.remove(entry.id);
+ if(left.length)reportClientError({kind:'move',message:'unacknowledged '+left.map(entry=>entry.kind).join(',')});
+}
+// The call's session ends, its voice does not: the socket is closed as a hang-up, and nothing of that session stays.
+function leaveSession(){
+ const socket=state.ws;
+ if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
+ window.sidevoiceTelemetry?.endCall?.('moved');
+ resumeToken=null;lastSeq=0;keepTicket(true);outboxHold=null;relay.reset();replies.clear();
+ roomStore.batch(()=>{
+  state.ws=null;state.sessionId=null;state.roomBinding=null;state.roomRevision=0;
+  state.harness={};state.turns={};state.userTurn=null;state.pendingPhase='';state.pendingUserText='';
+  state.karaokeState=null;state.userLive=state.botLive=false;
+ });
 }
 async function replayReply(historyId){
  if(!historyId||!state.sessionId)return;
+ // A reply is said again by the call's session: only one of the call's machine can be.
+ if(!state.history.some(r=>r.segment===historyId&&conversationOf(r.thread)?.node===state.callNode))return;
  try{await post('/api/presentation/replay',{session_id:state.sessionId,history_id:historyId})}
- catch(error){setRoomError(error.message||'No se pudo volver a reproducir.')}
+ catch(error){setRoomError(roomError(error,'room',bundled('room.failure.replay').text))}
 }
 
 /* ----- the voice's settings and the remote providers' keys: this device's, never the room's -----
@@ -1285,43 +1611,187 @@ function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
- try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)})}
- catch(error){roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:voiceErrorText(error)}})}
+ try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)});
+  // A model chosen while it was not here yet is put in use once it is.
+  if(state.voiceDraft)void applyVoiceSettings();
+  void deleteUnusedModels(models,catalogs)}
+ catch(error){const words=voiceError(error,'models');roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:errorLine(words),details:words.details||''}})}
 }
-function editVoice(patch){roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)})}
+// Settings apply as they change (there is no Save): the draft is what was chosen, and what of it is ready is put in use
+// at once; a model still to download waits in the draft, the one in use stays, and it switches once it is ready (the
+// catalogues read again after its install). A download cancelled or failed leaves the one in use as it was.
+function editVoice(patch){
+ roomStore.patch({voiceDraft:editVoiceSettings(state.voiceDraft||state.voiceSettings,patch,state.voiceCatalogue.catalogs)});
+ // A try of the end of turn that runs takes a change of it at once, before the voice is given the settings to keep.
+ if(turnTry&&TURN_FIELDS.some(key=>key in patch))retuneTurnTry();
+ void applyVoiceSettings();
+}
+let applying=Promise.resolve();
+function applyVoiceSettings(){
+ applying=applying.then(saveVoiceSettings).catch(error=>{roomStore.patch({settingsError:voiceError(error)})});
+ return applying;
+}
 // The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
 async function saveVoiceSettings(){
- const draft=state.voiceDraft;if(!draft||JSON.stringify(draft)===JSON.stringify(state.voiceSettings))return;
+ const draft=state.voiceDraft,saved=state.voiceSettings;if(!draft||!saved)return;
+ const next=readyVoiceSettings(draft,saved,state.voiceCatalogue.catalogs);
+ if(JSON.stringify(next)===JSON.stringify(saved))return;
  const host=await voiceHost().catch(()=>null);
- if(host)await host.setSettings(draft);
- writeVoiceSettings(pageStorage(),draft);roomStore.patch({voiceSettings:draft});
+ if(host)await host.setSettings(voiceSettingsHere(next,state.voiceCatalogue.catalogs));
+ writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now(),settingsError:null});
+}
+// A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
+// one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
+// whoever shows it (room-types.ts TrialProgress): transcription, that the voice listens and the microphone's level;
+// the voice, the part of `text` sounding, in the page's offsets into it as the room's karaoke has them (`sayingRange`).
+// A try that records the person hands its take (`onTake`, contract gap #40) to whoever shows it, and keeps nothing.
+let voiceTry=null;
+// Never during a call: the try would take its voice.
+function refuseTryInCall(){
+ if(state.ws||state.connecting||state.reconnecting)throw voiceRefused({code:'trial-in-call'},'try');
+}
+async function tryVoiceSettings(task,{text='',language=null,keep=true,onListening,onLevel,onProgress,onTake}={}){
+ refuseTryInCall();
+ voiceTry?.abort();const abort=voiceTry=new AbortController();
+ // Stop on a transcription try ends its take with what was said (finishVoiceTry), rather than dropping it.
+ const finish=voiceTryFinish=new AbortController();
+ const settings=voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
+ try{
+  const host=await voiceHost();
+  // What each phase took, for the try to say how quick it was.
+  let timings=null;const onTimings=value=>{timings=value};
+  const result=task==='stt'?{text:await tryTranscription(host,settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTake})}
+   :(await tryVoice(host,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
+  result.timings=timings;
+  if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
+  return result;
+ }catch(error){throw voiceRefused(error,'try')}
+ finally{if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
+}
+let voiceTryFinish=null;
+function cancelVoiceTry(){voiceTry?.abort()}
+// Stop on a try that records: its take ends with what was said, and is transcribed; any other try is cancelled.
+function finishVoiceTry(){if(voiceTryFinish)voiceTryFinish.abort();else cancelVoiceTry()}
+// A try of the end of turn being edited (`voice-trial.js` tryEndOfTurn), as `tryVoiceSettings` tries the rest: through
+// the page's voice, outside any call, in the same place (one try at a time, stopped by `cancelVoiceTry`). It listens
+// until stopped, 30 s with no speech or a failure of the voice, telling whoever shows it each step of the person's
+// turns (TrialProgress `onTurnStep`) and the microphone's level. A change of the end of turn while it runs (`editVoice`)
+// restarts it with the change; the smart one without its model ready stops it. It keeps nothing: settings apply as
+// they change.
+const TURN_FIELDS=['patience','end_of_turn','turn_model'];
+let turnTry=null;
+const turnTrySettings=()=>voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
+async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
+ refuseTryInCall();
+ voiceTry?.abort();const abort=voiceTry=new AbortController();
+ try{
+  const host=await voiceHost();
+  const run=tryEndOfTurn(host,turnTrySettings(),{signal:abort.signal,onLevel,onTurnStep,onTake});
+  turnTry={abort,run};
+  await run.done;
+ }catch(error){throw voiceRefused(error,'try')}
+ finally{if(voiceTry===abort)voiceTry=null;if(turnTry?.abort===abort)turnTry=null}
+}
+function retuneTurnTry(){
+ const settings=turnTrySettings();
+ if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs)){turnTry.abort.abort();return}
+ void turnTry.run.retune(settings);
+}
+// A model of this device's catalogue the slot names but that is not on disk: installed on this device (the build the
+// slot names, else its recommended one), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
+let voiceInstall=null;
+async function installVoiceModel(task){
+ // The end of turn has no slot: its model is this device's end-of-turn model.
+ const turn=task==='end-of-turn'?endOfTurnModel(state.voiceCatalogue.catalogs,(state.voiceDraft||state.voiceSettings)?.turn_model):null;
+ const slot=turn?{catalog:'local',model:turn.id}:(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
+ const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
+ const build=(slot.build&&model?.builds?.find(b=>b.id===slot.build))??model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
+ voiceInstall?.abort();const abort=voiceInstall=new AbortController();
+ const at=fraction=>roomStore.patch({voiceInstall:{task,model:slot.model,state:'running',fraction,error:''}});
+ at(null);
+ try{
+  const models=await modelCatalogs();
+  await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
+  roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
+ }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,...installFailure(error)}})}
+ finally{if(voiceInstall===abort)voiceInstall=null}
+}
+function cancelVoiceInstall(){voiceInstall?.abort()}
+// Models not used for as long as the person chose (model-housekeeping.js), deleted where the engine can: none in use,
+// none the engine says nothing about; the catalogues read again once one went.
+async function deleteUnusedModels(models,catalogs){
+ if(typeof models.uninstall!=='function')return;
+ const stale=staleModels(catalogs,state.voiceSettings,state.deleteUnusedDays,Date.now());if(!stale.length)return;
+ for(const model of stale)await models.uninstall(model).catch(()=>undefined);
+ await loadVoiceCatalogue();
+}
+async function setDeleteUnusedModels(days){
+ writeDeleteUnused(pageStorage(),days);roomStore.patch({deleteUnusedDays:readDeleteUnused(pageStorage())});
+ if(state.voiceCatalogue.state==='ready')await deleteUnusedModels(await modelCatalogs(),state.voiceCatalogue.catalogs);
+}
+// A model taken off this device, every build of it, where the engine can (`modelsRemovable`); the catalogues read again.
+// Its code stays on what it throws, for the pane to say a model in use as such.
+async function uninstallVoiceModel(model){
+ const models=await modelCatalogs();
+ try{await models.uninstall(model)}catch(error){throw voiceRefused(error,'delete')}
+ await loadVoiceCatalogue();
 }
 // A key changes what a provider lists: its catalogue is read again with it.
+// A provider's key tested: the provider asked again, and the catalogues read with what it said. A host without a way to
+// ask again (an older desktop app) reads them as they are.
+async function testProviderKey(provider){
+ const models=await modelCatalogs();
+ await models.refresh?.(provider).catch(()=>undefined);
+ const catalogs=await models.catalogs();
+ roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
+}
+// Only a key the provider takes is kept: tried first where the host can (`testCredential`), else kept, checked, and
+// taken back when it was not taken and there was none before. A key the provider refuses, or one it could not be asked
+// about (unreachable), throws its code and the provider's words; one taken that hits a limit (no credit, too many
+// requests) is kept, and the provider's card says it.
+const KEY_REFUSALS=new Set(['credential-rejected','listing-not-permitted','provider-unreachable','listing-failed']);
+async function connectProviderKey(provider,key){
+ const refused=reason=>Object.assign(Error(reason.code),{code:reason.code,detail:reason.detail??''});
+ const models=await modelCatalogs();
+ if(models.testCredential){
+  const reason=await models.testCredential(provider,key);
+  if(reason&&KEY_REFUSALS.has(reason.code))throw refused(reason);
+  await saveProviderKey(provider,key);return;
+ }
+ const had=state.providerKeys[provider]===true;
+ await saveProviderKey(provider,key);
+ const status=state.voiceCatalogue.catalogs.find(catalog=>catalog.id===provider)?.status;
+ if(status?.reason&&KEY_REFUSALS.has(status.reason.code)){if(!had)await saveProviderKey(provider,null);throw refused({...status.reason,detail:status.detail})}
+}
 async function saveProviderKey(provider,key){
- let models;
- try{models=await modelCatalogs();await models.setCredential(provider,key||null)}catch(error){throw Error(voiceErrorText(error))}
+ // What the engine refuses goes as it is, its code and a provider's words with it: the dialog says it (ProviderConnect).
+ const models=await modelCatalogs();await models.setCredential(provider,key||null);
+ // A key just given is checked with the provider at once, past any list kept from the key before.
+ if(key)await models.refresh?.(provider).catch(()=>undefined);
  const catalogs=await models.catalogs().catch(()=>null);
  if(catalogs)roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},providerKeys:await keptProviderKeys(models,catalogs)});
 }
-roomStore.patch({voiceSettings:readVoiceSettings(pageStorage(),state.speechLanguage)});
+roomStore.patch({voiceSettings:readVoiceSettings(pageStorage()),deleteUnusedDays:readDeleteUnused(pageStorage())});
 
 $('settings-open').onclick=()=>{try{
  // Every opening reads each paired machine's agents again.
  scanPairedAgents(true);
- if(nodeBase==null)settingsSection('machines');
- roomStore.patch({voiceDraft:state.voiceSettings});void loadVoiceCatalogue();
+ // Opened with no machine reachable, it shows where to get one; pressed again while open (Advanced › Reset), it stays
+ // where it is.
+ if(!$('language-settings').open&&![...links.values()].some(link=>link.base!=null))settingsSection(ownComputerSection()&&!localPairing?'this-computer':'machines');
+ // What was chosen and is still on its way stays chosen across openings.
+ roomStore.patch({voiceDraft:state.voiceDraft||state.voiceSettings});void loadVoiceCatalogue();
  const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
- $('ui-language').value=p.ui_language;
- $('settings-error').textContent='';
+ // Empty is Automatic: the system's language, followed as it is rather than kept.
+ roomStore.patch({uiLanguage:storedPreferences().ui_language||''});
+ roomStore.patch({settingsError:null});
  if(!$('language-settings').open)$('language-settings').showModal();
-}catch(e){$('settings-error').textContent=e.message;setRoomError(e.message)}};
-function settingsSection(name){for(const section of ['general','voice','providers','machines']){$('pane-'+section).hidden=section!==name;$('settings-'+section).setAttribute('aria-pressed',String(section===name))}}
-$('settings-general').onclick=()=>settingsSection('general');
-$('settings-voice').onclick=()=>settingsSection('voice');
-$('settings-providers').onclick=()=>settingsSection('providers');
-$('settings-machines').onclick=()=>settingsSection('machines');
-$('ui-language').onchange=()=>window.roomI18n?.setLanguage($('ui-language').value);
-$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();roomStore.patch({voiceDraft:defaultVoiceSettings(state.speechLanguage)});$('reset-settings-note').textContent='Restablecido a los valores por defecto. Guarda para aplicarlo.'};
+}catch(e){const words=roomError(e,'settings');roomStore.patch({settingsError:words});setRoomError(words)}};
+// Which section Settings shows is the page's (SettingsDialog): asked for here when Settings opens on the machines
+// (no machine yet) or on an agent waiting to be connected — that section's own page on a phone, not the list of them.
+function settingsSection(name){roomStore.patch({settingsSection:name,settingsLevel:'page'})}
+$('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();saveLanguage('');
+ roomStore.patch({voiceDraft:defaultVoiceSettings()});void applyVoiceSettings();$('reset-settings-note').textContent='Restablecido a los valores por defecto.'};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
 // says. Only the settings of today's shape are read back.
@@ -1331,55 +1801,85 @@ function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]]))}
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))))}catch{}}
 function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
-// The interface's language is this device's: saved here, said to the call in progress, applied at once.
-async function saveSettings(){
- await saveVoiceSettings();
- const p={...devicePreferences(),ui_language:$('ui-language').value||devicePreferences().ui_language};
- storePreferences(p);window.roomI18n?.setLanguage(p.ui_language);
+// The interface's language is this device's: saved here as it is chosen ('' is Automatic), said to the call in
+// progress, applied at once; Settings shows it from the store.
+function saveLanguage(chosen){
+ // Automatic keeps no language: the system's is read again at each start.
+ storePreferences(chosen?{ui_language:chosen}:{});
+ const p={...systemPreferences(),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
- $('language-settings').close();state.liveNote='Preferencias guardadas';
+ roomStore.patch({uiLanguage:chosen,settingsSavedAt:Date.now()});
 }
-$('language-form').onsubmit=e=>{e.preventDefault();$('settings-error').textContent='';saveSettings().catch(error=>{$('settings-error').textContent=error?.code?voiceErrorText(error):error?.message||String(error)})};
+// Nothing to submit: every setting applies as it changes. Enter in a field submits nothing.
+$('language-form').onsubmit=e=>e.preventDefault();
 window.sidevoiceActions={
  cancelInput:cancelCurrentInput,
+ skipReply,
  editVoice,
  saveProviderKey,
+ connectProviderKey,
+ setAudioDevices,
+ refreshAudioDevices,
+ // The interface's language, as the first-run setup asks it: '' is Automatic.
+ interfaceLanguage:()=>storedPreferences().ui_language||'',
+ // The newer build the room serves, loaded now (the updates' Reload), in a call or not: the person said so.
+ reloadToUpdate(){
+  const served=state.webUpdate;if(!served)return;
+  const query=new URLSearchParams(location.search);query.set('v',served);location.replace(location.pathname+'?'+query);
+ },
+ setInterfaceLanguage(value){saveLanguage(value||'')},
+ testProviderKey,
  loadVoiceCatalogue,
  replayReply,
  toggleMic,
  toggleCall,
- selectParticipant(threadId){
-  const participant=state.people.find(item=>item.thread_id===threadId);
-  state.viewedThread=threadId;markHistorySeen();
-  if(participant?.available)void select(threadId);
+ // A sign of the person: the desktop card's Keep on the idle warning (its `keep-alive`).
+ keepVoiceOn:()=>personSignal(),
+ // A conversation picked, by its key: looked at at once; the call goes to it when it can hear — on its machine, moving
+ // the call there when it is another's. Out of a call it is the one the next join goes to. Picked while a join is still
+ // on its way to another machine, that join is left and the call joined afresh, inside the person's own tap.
+ selectParticipant(key){
+  const participant=state.people.find(item=>personKey(item)===key),to=conversationOf(key);
+  state.viewedThread=key;markHistorySeen();
+  if(!state.sessionId)rememberThread(key);
+  // Only a machine that has proved where it is: one being looked for again is not reachable until it answers.
+  const hears=!!participant?.available&&state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;
+  if(state.connecting&&!state.sessionId&&to&&to.node!==state.callNode){if(hears){disconnect();state.viewedThread=key;void toggleCall()}}
+  else if(hears)void select(key);
   updateComposer();
  },
- async closeParticipant(threadId){
-  try{await post('/api/presentation/close',{thread_id:threadId})}
+ async closeParticipant(key){
+  const to=conversationOf(key);if(!to)return;
+  try{await post('/api/presentation/close',{thread_id:to.thread},to.node)}
   catch(e){
    // The room does not know it (it was closed elsewhere, or the room restarted): only this page remembered it.
-   if(!/No se encuentra/.test(e.message||'')){setRoomError(e.message);throw e}
-   forgetThread(threadId)
+   if(!/No se encuentra/.test(e.message||'')){setRoomError(roomError(e));throw e}
+   forgetThread(key)
   }
-  await refresh();await refreshPeople();await refreshHistory()
+  if(to.node===state.callNode)await refresh();await refreshPeople(to.node);await refreshHistory(to.node)
  },
+ tryVoiceSettings,
+ tryTurnSettings,
+ cancelVoiceTry,finishVoiceTry,
+ installVoiceModel,
+ cancelVoiceInstall,
+ uninstallVoiceModel,
+ setDeleteUnusedModels,
  loadHostAgents:(fp,options={})=>hostAgentsController.load(fp,options),
  hostAgentAction:(fp,id,action)=>hostAgentsController.act(fp,id,action),
  openAgentSettings,
- // Changing machine is a hang-up: a call is with one machine, and the other one's is joined afresh — right
- // away, inside the person's own tap. The choice is this device's, kept for next time.
- chooseMachine(id){
-  if(!pairings.list.some(p=>p.fp===id)||id===pairings.inUse)return;
-  const rejoin=!!(state.ws||state.connecting||state.reconnecting);
-  if(rejoin)disconnect();
-  keepPairings(usingPairing(pairings,id));
-  settleBase(null,'',pairingInUse(pairings));
-  if(rejoin)void toggleCall();else void locate({move:true});
- },
+ showSettingsSection:settingsSection,
  forgetMachine,
  pairDevice,
  localHostDevices,
  revokeLocalHostDevice,
+ renameLocalHostDevice,
+ renameMachineDevice,
+ renameMachine,
+ setDeviceName,
+ loadMachineInfo,
+ machineDevices,
+ revokeMachineDevice,
  openPairing:()=>openPairing(),
  closePairing,
 };
@@ -1454,19 +1954,19 @@ window.addEventListener('blur',releaseHold);document.addEventListener('visibilit
 // A page going away is not a hang-up: its call is parked, and the ticket kept here lets the next load take it back.
 window.addEventListener('pagehide',()=>keepTicket(true));
 window.addEventListener('beforeunload',()=>{keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();
-// Discover the desktop-owned host before validating the persisted selection. Pairing remains an explicit action:
+// Discover the desktop-owned host first: it is one more machine, listed first. Pairing remains an explicit action:
 // an unpaired browser shows setup guidance, and an unpaired desktop does not open a modal by itself.
 window.roomI18n?.setLanguage(devicePreferences().ui_language);
+// The conversation this tab was looking at is looked at again: the next join goes to its machine.
+if(rememberedThread())state.viewedThread=rememberedThread();
 function startInitialLocate(){
  publishPairings();
  scanPairedAgents();
- void locate().finally(()=>window.roomI18n?.setLanguage(devicePreferences().ui_language));
+ void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>window.roomI18n?.setLanguage(devicePreferences().ui_language));
 }
-// A normal browser has no native projection to wait for, so keep its existing first locate timing. The desktop
-// app must wait until its local pairing is projected before the persisted in-use pointer is resolved.
 if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
 else{void refreshLocalHost();startInitialLocate()}
-setInterval(refreshHistory,1500);setInterval(refresh,1500);setInterval(refreshPeople,6000);
+setInterval(callBeat,1500);setInterval(machinesBeat,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupIdleWatch();
 
@@ -1478,19 +1978,20 @@ setupIdleWatch();
 // a sign of anybody: an agent can talk to an empty car for ever.
 function personSignal(){
  lastPersonSignal=Date.now();
- if(idleWarned){idleWarned=false;state.liveNote=''}
+ if(idleWarned){idleWarned=false;state.liveNote='';roomStore.patch({callIdleWarning:false})}
 }
 function checkIdle(){
  if(!state.ws){idleWarned=false;return}
  const quiet=Date.now()-lastPersonSignal;
  if(quiet>=IDLE_MS){
-  idleWarned=false;disconnect();
-  failJoin('Saliste de la llamada: '+Math.round(IDLE_MS/60000)+' minutos sin señales tuyas. Pulsa para volver a entrar.');
+  idleWarned=false;callEndedBy('idle','');disconnect();
+  failJoin(bundled('room.failure.idle',{minutes:Math.round(IDLE_MS/60000)}));
   return;
  }
  if(!idleWarned&&quiet>=IDLE_MS-IDLE_WARN_MS){
   idleWarned=true;
-  state.liveNote='¿Sigues ahí? Sin señales tuyas, saldrás de la llamada en '+Math.round(IDLE_WARN_MS/1000)+' segundos. Habla o toca la pantalla para seguir.';
+  // Said in the room's line, and shown on the desktop card with its Keep (FLOATING-CARD-SPEC FC6).
+  roomStore.batch(()=>{state.liveNote='¿Sigues ahí? Sin señales tuyas, saldrás de la llamada en '+Math.round(IDLE_WARN_MS/1000)+' segundos. Habla o toca la pantalla para seguir.';state.callIdleWarning=true});
  }
 }
 function setupIdleWatch(){
@@ -1498,7 +1999,7 @@ function setupIdleWatch(){
  // output owner), so no second listener competes with those.
  idleTimer=setInterval(checkIdle,5000);
 }
-function stopIdleWatch(){lastPersonSignal=Date.now();idleWarned=false}
+function stopIdleWatch(){lastPersonSignal=Date.now();idleWarned=false;if(state.callIdleWarning)state.callIdleWarning=false}
 
 
 let lastBridge=null,lastJoin;

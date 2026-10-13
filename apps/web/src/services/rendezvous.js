@@ -60,13 +60,17 @@ export function callSocketUrl(nodeBase, location) {
     return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + path;
 }
 /** What a `GET /api/rendezvous` answer says the server is: a node (and which, by its fingerprint — all a node
- *  tells a caller without a token), a room (and the web build it serves), or — anything else, a 404, a static
- *  server's page — neither. */
+ *  tells a caller without a token), a room (and the web build it serves), a kind of server this version does not
+ *  know yet (`unknown`: what it says of the two, all the same — sidevoice-core#112), or — no kind at all, a 404, a
+ *  static server's page — neither. */
 export function describeTarget(answer) {
+    const text = value => typeof value === 'string' && value ? value : null;
     if (answer?.kind === 'node')
-        return { kind: 'node', fingerprint: typeof answer.fingerprint === 'string' ? answer.fingerprint : null, build: null };
+        return { kind: 'node', fingerprint: text(answer.fingerprint), build: null };
     if (answer?.kind === 'room')
-        return { kind: 'room', fingerprint: null, build: typeof answer.web_build === 'string' ? answer.web_build : null };
+        return { kind: 'room', fingerprint: null, build: text(answer.web_build) };
+    if (text(answer?.kind))
+        return { kind: 'unknown', fingerprint: text(answer.fingerprint), build: text(answer.web_build) };
     return null;
 }
 /** A question to a server that does not answer is no answer, after a while: an address that swallows packets
