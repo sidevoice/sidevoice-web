@@ -29,16 +29,16 @@ export function PagedText({ children, measure, onPages, follow }: { children: Re
     const next = window.setTimeout(() => setPage((now) => now + 1), PAGE_MS);
     return () => window.clearTimeout(next);
   }, [follow, page, pages]);
-  // With the voice: the page where the last word heard ends.
+  // With the voice: the page where the last word heard ends — back to the first when it is heard again from the start.
   useLayoutEffect(() => {
     if (!follow || !run.current || !step) return;
     const mark = run.current.querySelector(follow);
-    const rects = mark?.getClientRects();
-    const last = rects && rects.length ? rects[rects.length - 1] : null;
-    if (!last) return;
-    const top = run.current.getBoundingClientRect().top + page * step;
-    const at = Math.max(0, Math.min(pages - 1, Math.floor((last.bottom - top - 1) / step)));
-    if (at > page) setPage(at);
+    if (!mark) return;
+    const rects = mark.getClientRects();
+    const last = mark.textContent && rects.length ? rects[rects.length - 1] : null;
+    // Measured from the run's own top: the transform moves the run and the words in it alike, mid-turn too.
+    const at = !last ? 0 : Math.max(0, Math.min(pages - 1, Math.floor((last.bottom - run.current.getBoundingClientRect().top - 1) / step)));
+    if (at !== page) setPage(at);
   });
   return <span ref={box} className="paged-text" data-more={page < pages - 1 || undefined}>
     <span ref={run} className="paged-text-run" style={{ transform: `translateY(${-page * step}px)` }}>{children}</span>
