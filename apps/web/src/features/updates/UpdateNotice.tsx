@@ -2,6 +2,7 @@ import { useContext, useEffect, useId, useLayoutEffect, useReducer, useRef, useS
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { CloseIcon, UpdateIcon } from "../../components/ui/Icons";
+import { returnFocus } from "../../lib/focus-return";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
@@ -114,7 +115,7 @@ export function UpdateNotice() {
 }
 
 /** The most pressing update that × did not hide (hidden, the next one waiting shows): its icon, its line, then ×. It comes and goes softly (none under reduced
- *  motion); going while focus is in it — hidden, or acted on — focus goes to what follows it. Not a live region: a
+ *  motion); going while focus is in it — hidden, or acted on — focus goes to the room's main region. Not a live region: a
  *  standing notice. */
 function NoticeShown() {
   const data = useNotices();
@@ -147,19 +148,11 @@ function useLeaving(shown: Notice | null, box: RefObject<HTMLElement | null>) {
   const leaving = !shown && last.current !== null;
   useLayoutEffect(() => {
     if (!leaving) return;
-    if (box.current?.contains(document.activeElement)) focusAfter(box.current);
+    if (box.current?.contains(document.activeElement)) returnFocus();
     const timer = setTimeout(() => { last.current = null; gone(); }, reducedMotion() ? 0 : LEAVE_MS);
     return () => clearTimeout(timer);
   }, [leaving, box]);
   return { notice: shown ?? last.current, leaving };
-}
-
-/** Focus on what follows `element`, in the page's order. */
-function focusAfter(element: HTMLElement) {
-  const focusable = "button:not(:disabled), a[href], input:not(:disabled), [tabindex]:not([tabindex='-1'])";
-  const next = [...document.querySelectorAll<HTMLElement>(focusable)].find((other) => !element.contains(other)
-    && !!(element.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING));
-  next?.focus();
 }
 
 /** The updates hidden by the notice's ×, this window's — an app restarted starts over — each until a newer version of

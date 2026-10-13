@@ -62,8 +62,9 @@ function room({ updater = {}, service = CURRENT, remote = {}, facts = {}, stage 
     ...(stage ? { callNode: "fp-local", roomBinding: { thread_id: "t-login", title: "Fix the slow login", binding_id: "b1" },
       people: [{ thread_id: "t-login", title: "Fix the slow login", available: true, reach: { state: "listening" }, node: "fp-local", machine: { host: "MacBook", id: "m1" } }] } : {}),
     ...facts } as never); });
-  render(<RoomProvider store={store}>{sidebar && <ConversationSidebar />}
-    <CallStage notice={<UpdateNotice />} /><SettingsDialog /></RoomProvider>);
+  // As App lays it out: the conversations and the stage in the room's main region.
+  render(<RoomProvider store={store}><main>{sidebar && <ConversationSidebar />}
+    <CallStage notice={<UpdateNotice />} /></main><SettingsDialog /></RoomProvider>);
   return { store, fake, update, reloadToUpdate };
 }
 const settle = () => act(async () => {});
@@ -169,19 +170,17 @@ test("a failed download (manual) is said under it, its action Retry download; a 
   expect(within(notice()!).queryByRole("alert")).toBeNull();
 });
 
-test("×: hidden until a newer version, not as the same one moves on; focus goes on to what follows; a new window shows it again", async () => {
+test("×: hidden until a newer version, not as the same one moves on; focus goes to the room's main region, never on the stage's chips; a new window shows it again", async () => {
   for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "manual", status: FOUND }, notice: picked });
     await waitFor(() => expect(said()).toBe("Version 0.4.0 available · Download"));
     // The × at its end, inside it.
     expect(notice()!.lastElementChild).toBe(hide());
-    const after = document.querySelector<HTMLElement>(".stage-title-end ~ *, .stage-scene button, .stage-tile button:not(.update-notice *)");
     hide().focus();
     await act(async () => { fireEvent.click(hide()); });
     expect(notice()).toBeNull();
     await gone();
-    expect(document.activeElement).not.toBe(document.body);
-    if (after) expect(document.activeElement).toBe(after);
+    expect(document.activeElement).toBe(within(document.body).getByRole("main"));
     // The same update, downloaded: still hidden.
     await act(async () => { fake.push(READY); });
     expect(notice()).toBeNull();
