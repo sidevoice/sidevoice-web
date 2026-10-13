@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, type ReactNode } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { ProgressBar } from "../../components/ui/ProgressBar";
@@ -25,8 +25,11 @@ function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: R
  *  mode; ready, Restart to update, in either mode; a download or an install that failed, said there, with Retry for a
  *  download. Then Updates, automatic or manual, as the app keeps it; Check for updates, busy while it checks, and when
  *  it last checked — a check that finds one with a button lands on it; and a check that failed, with Retry. Each part
- *  shows where the app has the method for it. */
-export function AppUpdateSettings() {
+ *  shows where the app has the method for it. Its buttons say what they update (`words`): the app (two rows), or
+ *  Sidevoice (one row, which restarts with `onRestart` first, and shows `idle` in the update's place while the app has
+ *  none: its service's). Where its card already says it is up to date, a check that finds none says so to a screen
+ *  reader only. */
+export function AppUpdateSettings({ words = "app", idle, onRestart }: { words?: "app" | "all"; idle?: ReactNode; onRestart?: () => void } = {}) {
   const t = hostTranslator();
   const store = useContext(RoomStoreContext);
   const update = useAppUpdate();
@@ -38,7 +41,7 @@ export function AppUpdateSettings() {
   const { status, mode, can, checkedAt } = update;
   // What the app says next replaces what a call of this page's said.
   useEffect(() => { setFailure(null); }, [status?.state]);
-  if (!update.updater) return null;
+  if (!update.updater) return <>{idle}</>;
 
   function change(next: UpdateMode) {
     setModeFailed(false);
@@ -49,7 +52,7 @@ export function AppUpdateSettings() {
     setFailure(null); setUpToDate(false);
     setBusy(action);
     try {
-      if (action === "restart") { await update.restart(); return; }
+      if (action === "restart") { onRestart?.(); await update.restart(); return; }
       const next = action === "check" ? await update.check() : await update.download();
       if (action !== "check" || !next || next.error) return;
       if (next.state === "idle") setUpToDate(true);
@@ -66,9 +69,9 @@ export function AppUpdateSettings() {
   const checkError = rowError ? null : error;
   const retry = code === "update-check-failed" && can.check ? "check" : code === "update-download-failed" && can.download ? "download" : null;
   const settings = (can.mode && mode) || can.check || !!checkError;
-  if (!found && !settings) return null;
+  if (!found && !settings) return <>{idle}</>;
   return <>
-    {found && <AppUpdateRow status={found} mode={mode} can={can} busy={busy} error={rowError} act={(action) => void act(action)} t={t} />}
+    {found ? <AppUpdateRow status={found} mode={mode} can={can} busy={busy} error={rowError} act={(action) => void act(action)} words={words} t={t} /> : idle}
     {settings && <div className="app-update-settings">
       {can.mode && mode && <div className="app-update-setting">
         <span className="app-update-setting-copy"><span className="host-status-login-label">{t("updates.mode")}</span>
@@ -79,7 +82,8 @@ export function AppUpdateSettings() {
       </div>}
       {can.check && <div className="app-update-setting">
         <span className="app-update-setting-copy muted">{checkedAt && t("updates.lastChecked", { when: when(checkedAt) })}
-          {upToDate && !found && <span role="status">{t("updates.upToDate")}</span>}</span>
+          {/* The card's version line says Up to date already: the check's finding is for a screen reader. */}
+          {upToDate && !found && <span role="status" className="sr-only">{t("updates.upToDate")}</span>}</span>
         <Button size="sm" variant="secondary" loading={busy === "check"} onClick={() => void act("check")}>{t("updates.check")}</Button>
       </div>}
       {!!checkError && <div className="app-update-failure" role="alert">
@@ -90,16 +94,19 @@ export function AppUpdateSettings() {
   </>;
 }
 
-/** The app's update once found, its action right there: Version X available · Download (or Retry), Downloading… with
- *  its progress, Version X ready · Restart to update; what failed under it. The row is where a landing goes. */
-function AppUpdateRow({ status, mode, can, busy, error, act, t }: { status: UpdaterStatus; mode: UpdateMode | null; can: ReturnType<typeof useAppUpdate>["can"];
-  busy: "check" | "download" | "restart" | null; error: unknown; act: (action: "download" | "restart") => void; t: HostTranslate }) {
+/** The app's update once found, its action right there: Version X available · Update the app (or Retry), Downloading…
+ *  with its progress, Version X ready · Restart to update the app (one row: Update Sidevoice, Restart to update
+ *  Sidevoice); what failed under it. The row is where a landing goes. */
+function AppUpdateRow({ status, mode, can, busy, error, act, words, t }: { status: UpdaterStatus; mode: UpdateMode | null; can: ReturnType<typeof useAppUpdate>["can"];
+  busy: "check" | "download" | "restart" | null; error: unknown; act: (action: "download" | "restart") => void; words: "app" | "all"; t: HostTranslate }) {
   const version = status.version ?? "";
   const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed";
   const progress = status.progress == null ? null : Math.max(0, Math.min(1, status.progress));
-  const button = status.state === "ready" ? can.restart && <Button size="sm" variant="primary" loading={busy === "restart"} onClick={() => act("restart")}>{t("updates.restartToUpdate")}</Button>
-    : status.state === "available" && hasAction(status, mode, can) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"} onClick={() => act("download")}
-        aria-label={downloadFailed ? undefined : version ? t("updates.downloadNamed", { version }) : undefined}>{t(downloadFailed ? "updates.retry" : "updates.download")}</Button>
+  const all = words === "all";
+  const button = status.state === "ready" ? can.restart && <Button size="sm" variant="primary" loading={busy === "restart"} onClick={() => act("restart")}>
+      {t(all ? "updates.action.restartAll" : "updates.action.restartApp")}</Button>
+    : status.state === "available" && hasAction(status, mode, can) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"} onClick={() => act("download")}>
+        {t(downloadFailed ? all ? "updates.action.retryAll" : "updates.action.retryApp" : all ? "updates.action.updateAll" : "updates.action.updateApp")}</Button>
       : null;
   const copy = status.state === "ready" ? version ? t("updates.ready", { version }) : t("updates.readyOne")
     : status.state === "downloading" ? version ? t("updates.downloading", { version }) : t("updates.downloadingOne")

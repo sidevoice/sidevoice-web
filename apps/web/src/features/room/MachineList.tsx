@@ -21,7 +21,7 @@ import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
 import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
-import { SeeUpdates, useUpdatesSection } from "../settings/UpdatesSettings";
+import { ThisDeviceVersion } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
 import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
@@ -395,8 +395,6 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
   const cause = status.failure ? hostCause(status, t) : "";
   const failureAt = dateText(details.failure?.at);
   const failed = status.state === "failed" || status.state === "service-failed";
-  const build = desktopBuild();
-  const updates = useUpdatesSection();
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
@@ -406,11 +404,10 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
       <dl className="host-status-facts">
-        {/* One version, the product's as the person installed it (never the core's or the connector's); the app's own
-            number where the product does not say it. Everything that updates — the app, this service, a nightly's note —
-            is in Updates, a link away. */}
-        {(details.product_version || build?.version) && <div className="host-status-product">{t("hosts.productVersion", { version: details.product_version || build!.version })}</div>}
-        {updates && <SeeUpdates t={t} />}
+        {/* One version — the app's, the Sidevoice the person installed, else its service's (never the core's or the
+            connector's) — and whether it is up to date: Update available is a link to its row in Updates, where
+            everything that updates is. */}
+        <ThisDeviceVersion t={t} />
       </dl>
       {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
       {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not

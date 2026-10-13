@@ -19,3 +19,10 @@
 @media (prefers-reduced-motion: reduce) { [data-settings-row].settings-highlight { transition: none; } }
 /* A 320px screen: the card's inner padding narrower, so Automatic (recommended) | Manual fits inside it in Spanish too. */
 @media (max-width: 360px) { .updates-settings { padding-inline: var(--sv-space-3); } }
+/* A part of this computer that updates (VARIANTS `updates-rows`): what it is, under its group's title, then its version
+ * and whether it is up to date. */
+.updates-part-hint { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.updates-settings-version .updates-part-hint + .host-status-product { margin-top: 2px; }
+.updates-up-to-date { font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
+/* This device's version line: Update available a link in the line's own size. */
+.this-device-version .see-updates { font-size: inherit; font-weight: var(--sv-weight-medium); }

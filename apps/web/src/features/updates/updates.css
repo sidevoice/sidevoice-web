@@ -3,7 +3,7 @@
 .updates-badge { margin-inline-start: auto; }
 .updates-entry--icon .updates-count { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--sv-radius-pill);
   background: var(--sv-accent); color: var(--sv-on-accent); font-size: 10px; line-height: 16px; font-weight: var(--sv-weight-semibold); text-align: center; }
-.updates-panel { display: grid; gap: var(--sv-space-2); width: min(340px, calc(100vw - 32px)); }
+.updates-panel { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .updates-panel h3 { margin: 0; font-size: var(--sv-font-sm); font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
 .updates-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
 .update-row { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
@@ -33,3 +33,31 @@
 .update-line-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
 /* Automatic | Manual fits a 320px card in Spanish too: narrower padding in its segments. */
 .app-update-setting .ui-segment { padding-inline: 10px; }
+/* Where the room says an update waits (UpdateNotice, VARIANTS `update-notice`). Each update's line: its words, its
+ * action beside them (under them where it is narrow), what failed under both. */
+.update-notice-list { display: grid; gap: var(--sv-space-2); margin: 0; padding: 0; list-style: none; }
+.updates-panel .update-notice-list > li { padding: var(--sv-space-3); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-surface); }
+.update-notice-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2) var(--sv-space-3); min-width: 0; }
+.update-notice-line .update-notice-text { flex: 1 1 10rem; min-width: 0; margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.update-notice-text:focus:not(:focus-visible) { outline: none; }
+.update-notice-error { flex-basis: 100%; font-size: var(--sv-font-xs); overflow-wrap: anywhere; }
+/* C: the update icon at the brand's end (under the mark in the rail), an accent dot on its corner ringed in the
+ * column's ground. */
+.sidebar-brand .update-brand { position: relative; flex: none; margin-inline-start: auto; color: var(--sv-text-muted); }
+.sidebar-brand .update-brand:hover { color: var(--sv-text); }
+.update-brand-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--sv-accent); box-shadow: 0 0 0 2px var(--dot-ring, var(--sv-bg)); }
+@media (min-width: 900px) {
+  .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand:has(.update-brand) { flex-direction: column; gap: var(--sv-space-1); }
+  .conversation-sidebar[data-collapsed] .sidebar-brand .update-brand { margin-inline-start: 0; }
+}
+/* A: the update's icon on the gear's corner, where the "new" count would be, ringed as it is. */
+.settings-notice[data-mark="update"] { top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sv-accent); color: var(--sv-on-accent); box-shadow: 0 0 0 2px var(--new-ground); }
+.settings-notice[data-mark="update"] svg { width: 10px; height: 10px; stroke-width: 2.4; }
+.sidebar-settings .settings-notice[data-mark="update"] { right: auto; left: 22px; }
+/* B: a slim bar across the room, the accent's soft ground; its words and action, then × at its end. */
+.update-banner { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 44px; padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-1) var(--sv-space-5);
+  border-bottom: 1px solid var(--sv-border); background: var(--sv-accent-soft); color: var(--sv-text); }
+.update-banner-icon { flex: none; color: var(--sv-accent-text); }
+.update-banner .update-notice-line { flex: 1 1 auto; }
+.update-banner .update-notice-text { flex: 0 1 auto; font-weight: var(--sv-weight-medium); }
+.update-banner-hide { flex: none; margin-inline-start: auto; }

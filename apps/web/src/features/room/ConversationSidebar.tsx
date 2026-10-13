@@ -18,7 +18,9 @@ import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
 import { hostTranslator } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
+import { GearUpdateMark, UpdateNoticeByBrand, useGearUpdate } from "../updates/UpdateNotice";
 import { UpdatesEntry } from "../updates/UpdatesEntry";
+import { useUpdateNotice } from "../updates/useUpdates";
 import "./room.css";
 
 /** How a conversation's harness is reached, when that matters; the harness itself is its mark, never its name. */
@@ -50,6 +52,7 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
+  const notice = useUpdateNotice();
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
   const rail = collapsed || crowded;
   const modal = narrow && open;
@@ -106,7 +109,8 @@ export function ConversationSidebar() {
       <aside id="conversations" ref={panel} className="conversation-sidebar" data-collapsed={rail || undefined} data-open={open || undefined}
         role={modal ? "dialog" : undefined} aria-modal={modal || undefined} aria-label={t("sidebar.title")}>
         {/* The brand at the column's head, where the room has no header (VARIANTS layout "meet"); hidden otherwise. */}
-        <div className="sidebar-brand" translate="no"><SidevoiceMark size={22} /><span>Sidevoice</span></div>
+        {/* With VARIANTS `update-notice` C, the update icon beside it (a desktop's: a phone has no updates entry). */}
+        <div className="sidebar-brand"><SidevoiceMark size={22} /><span translate="no">Sidevoice</span>{!narrow && <UpdateNoticeByBrand />}</div>
         <div className="sidebar-head">
           <h2><ConversationsIcon />{t("sidebar.title")}</h2>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
@@ -153,7 +157,11 @@ export function ConversationSidebar() {
         </div>
         {/* Settings holds a desktop's foot (a phone has its gear in the header); what joins it later (notifications…)
             opens upward from here. A phone has no updates entry: its page picks up a new version when next opened. */}
-        {!narrow && <div className="sidebar-foot"><UpdatesEntry compact={rail} /><SidebarSettings rail={rail} onOpen={close} /></div>}
+        {!narrow && <div className="sidebar-foot">
+          {/* Where an update says so (VARIANTS `update-notice`): here for D (today's row) and A (the gear's mark). */}
+          {notice === "foot" && <UpdatesEntry compact={rail} />}
+          {notice === "gear" ? <GearSettings rail={rail} onOpen={close} /> : <SidebarSettings rail={rail} onOpen={close} />}
+        </div>}
         {/* With the voice switch (call model B) a phone's call bar has no ⋮: its connection statistics are here, under the
             same id the runtime opens them by. */}
         {narrow && voiceSwitch && <div className="sidebar-foot sidebar-foot--stats">
@@ -165,15 +173,23 @@ export function ConversationSidebar() {
   );
 }
 
-/** Settings at the conversations' foot: named beside the list, a gear in the rail; its mark when something is new. */
-function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
+/** Settings at the conversations' foot: named beside the list, a gear in the rail; its mark when something is new. With
+ *  `update` (VARIANTS `update-notice` A), the update's mark instead, and it opens on that update's button in Updates. */
+function SidebarSettings({ rail, onOpen, update }: { rail: boolean; onOpen: () => void; update?: { place: string; label: string } | null }) {
   const t = callTranslator();
   const hosts = hostTranslator();
+  const store = useContext(RoomStoreContext);
   const news = useHighlights();
-  const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
+  const label = news.length ? hosts("highlights.gear", { n: news.length }) : update ? update.label : t("header.settings");
   return (
-    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label} onClick={() => { onOpen(); openSettings(); }}>
-      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />
+    <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label}
+      onClick={() => { onOpen(); openSettings(update ? { section: "updates", focus: update.place } : {}, store); }}>
+      <SettingsIcon size={20} />{!rail && <span>{t("header.settings")}</span>}<GearNewMark count={news.length} />{update && !news.length && <GearUpdateMark />}
     </Button>
   );
+}
+
+/** A: Settings with the update's mark while one waits that Settings holds. */
+function GearSettings(props: { rail: boolean; onOpen: () => void }) {
+  return <SidebarSettings {...props} update={useGearUpdate()} />;
 }
