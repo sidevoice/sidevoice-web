@@ -14,3 +14,28 @@
 /* A phone's chevron, when the updates live in its panel. */
 .conversations-toggle[data-updates]::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border: 2px solid var(--sv-bg); border-radius: 50%; background: var(--sv-accent); box-sizing: content-box; }
 .conversations-toggle { position: relative; }
+/* The desktop app's update, in place at the sidebar's foot (and in the panel's list where the entry is an icon). */
+.app-update { display: grid; gap: var(--sv-space-1); min-width: 0; font-size: var(--sv-font-sm); }
+.app-update-restart { justify-content: flex-start; gap: var(--sv-space-2); }
+.app-update-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-2); min-height: var(--sv-control-sm); padding-inline-start: var(--sv-space-3); }
+.app-update-copy { display: flex; gap: var(--sv-space-2); min-width: 0; color: var(--sv-text-muted); }
+.app-update-percent { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.app-update-progress { display: grid; gap: var(--sv-space-1); padding: var(--sv-space-1) var(--sv-space-3); }
+.app-update-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); }
+.update-row--app .app-update-row, .update-row--app .app-update-progress, .update-row--app .app-update-error { padding-inline: 0; }
+/* The desktop app's updates on This device's card (AppUpdateSettings), by its version: rows as Start at sign-in's. */
+.app-update-settings { display: grid; gap: var(--sv-space-3); padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.app-update-setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sv-space-2) var(--sv-space-3); }
+.app-update-setting-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.app-update-setting-copy.muted, .app-update-setting-copy .muted { font-size: var(--sv-font-xs); }
+.app-update-failure { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sv-space-2); font-size: var(--sv-font-sm); }
+/* The sidebar foot's one row (UpdateLine): the update icon, the words cut short on one line, the act at its end. */
+.update-foot { display: grid; gap: var(--sv-space-1); min-width: 0; }
+.update-line { display: flex; align-items: center; justify-content: flex-start; gap: var(--sv-space-2); min-width: 0; max-width: 100%; overflow: hidden; font-size: var(--sv-font-sm); }
+div.update-line { min-height: var(--sv-control-md, 40px); padding-inline: var(--sv-space-3); color: var(--sv-text-muted); }
+.update-line > svg { flex: none; color: var(--sv-accent); }
+.update-line-text { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; }
+.update-line-act { flex: none; color: var(--sv-accent-text, var(--sv-accent)); font-weight: var(--sv-weight-semibold); }
+.update-line--progress { flex-wrap: wrap; row-gap: 4px; padding-block: var(--sv-space-1); }
+.update-line-bar { flex: 1 0 100%; }
+.update-line-error { padding-inline: var(--sv-space-3); font-size: var(--sv-font-xs); overflow-wrap: anywhere; }

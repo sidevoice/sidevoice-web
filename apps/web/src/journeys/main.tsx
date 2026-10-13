@@ -40,7 +40,12 @@ function renderShot(shot: Shot) {
   Storage.prototype.getItem = function (key: string) {
     return this === localStorage && key === "sidevoice.variants" ? JSON.stringify(shot.variants ?? {}) : getItem.call(this, key);
   };
-  if (shot.updater) (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { updater: { status: async () => shot.updater, restart: later } } };
+  if (shot.updater) {
+    const { status, mode = "automatic" } = shot.updater;
+    (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { updater: {
+      status: async () => status, settings: async () => ({ mode }), setMode: async () => ({ mode }), subscribe: () => noop,
+      check: async () => status, download: async () => status, restart: later } } };
+  }
   if (shot.desktop) {
     const status = shot.desktop.state as Record<string, unknown>;
     const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};

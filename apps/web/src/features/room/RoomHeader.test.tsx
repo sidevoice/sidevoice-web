@@ -81,13 +81,14 @@ test("Settings sits at the conversations' foot: it opens Settings through the he
   expect(document.querySelectorAll("#settings-open")).toHaveLength(1);
 });
 
-test("an update waiting puts its entry in the sidebar's foot, above Settings, each its own child", () => {
+test("an update waiting puts its row in the sidebar's foot, above Settings, each its own child", () => {
   const store = room();
   act(() => store.patch({ webUpdate: "b2" } as never));
   const foot = document.querySelector(".conversation-sidebar .sidebar-foot")!;
   const children = [...foot.children];
   expect(children).toHaveLength(2);
-  expect(children[0]).toContainElement(foot.querySelector(".updates-entry") as HTMLElement);
+  expect(children[0]).toContainElement(foot.querySelector(".update-line") as HTMLElement);
+  expect(children[0]).toHaveTextContent("Reload to update");
   expect(children[1]).toContainElement(foot.querySelector(".sidebar-settings") as HTMLElement);
 });
 

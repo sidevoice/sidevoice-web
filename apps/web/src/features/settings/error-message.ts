@@ -105,6 +105,12 @@ export function roomFailure(error: unknown, { what = "room", generic, t = hostTr
   return errorMessage(error, { what, generic, t, known: (code) => ROOM_FAILURES[code] ? t(ROOM_FAILURES[code]) : null });
 }
 
+/** A failure of the desktop app's updater (sidevoice-desktop #56: its status's `error`, or a call it rejected) as a
+ *  person reads it: a check, a download or an install that failed, by its code. */
+export function updaterFailure(error: unknown, { t = hostTranslator() }: { t?: HostTranslate } = {}): ErrorMessage {
+  return errorMessage(error, { what: "app", t, known: (code) => { const key = keyFor("updates.failure.", code); return key ? t(key) : null; } });
+}
+
 /** Codes said in another code's words: the same failure as the engine, the voice module, the desktop app or this page
  *  names it. */
 const VOICE_ALIASES: Record<string, string> = {

@@ -8,6 +8,8 @@ import { createRoomStore } from "../../state/room-store";
 import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
+import type { UpdaterStatus } from "../updates/useUpdates";
+import { fakeUpdater } from "../../test/updater";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -802,85 +804,178 @@ test("in Spanish, a nightly app se actualiza a mano and a development one is a V
   expect(buildLine()).toHaveTextContent(/^Versión de desarrollo$/);
 });
 
-/** This device's app, with an updater (sidevoice-desktop #56) that may offer downloading updates by itself. */
-function updaterBridge(updater: Record<string, unknown> | undefined) {
+/** This device's app with an updater (sidevoice-desktop #56: a release's), as a test drives it. */
+function updaterBridge(options?: Parameters<typeof fakeUpdater>[0]) {
   setBridge({});
-  const desktop = (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop;
-  if (updater) desktop.host.updater = { status: vi.fn(async () => ({ available: false })), restart: vi.fn(async () => {}), ...updater };
+  const fake = fakeUpdater(options);
+  (window as unknown as { __sidevoiceDesktop: { host: Record<string, unknown> } }).__sidevoiceDesktop.host.updater = fake.updater;
   actions();
+  return fake;
 }
-const autoDownload = (name = "Download updates automatically") => screen.findByRole("switch", { name });
-
-test("an app that does not offer the choice shows no Download updates automatically", async () => {
-  updaterBridge(undefined);
-  room([local]);
-  await act(async () => {});
-  expect(screen.queryByRole("switch", { name: "Download updates automatically" })).toBeNull();
-  cleanup();
-  // An updater with only one of the two methods does not offer it either.
-  const settings = vi.fn(async () => ({ autoDownload: true }));
-  updaterBridge({ settings });
-  room([local]);
-  await act(async () => {});
-  expect(screen.queryByRole("switch", { name: "Download updates automatically" })).toBeNull();
-  expect(settings).not.toHaveBeenCalled();
-});
-
-test("where the app offers it, Download updates automatically says what the app has, with its hint", async () => {
-  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: false })), setAutoDownload: vi.fn() });
-  room([local]);
-  const toggle = await autoDownload();
-  expect(toggle).not.toBeChecked();
-  expect(thisDevice()).toHaveTextContent("Off: you're told an update exists and it downloads when you restart into it.");
-  cleanup();
-  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload: vi.fn() });
-  room([local]);
-  expect(await autoDownload()).toBeChecked();
-  cleanup();
-  // An app that can't say: on, its default.
-  updaterBridge({ settings: vi.fn(async () => { throw new Error("nope"); }), setAutoDownload: vi.fn() });
-  room([local]);
-  expect(await autoDownload()).toBeChecked();
-});
-
-test("turning it off asks the app, and shows what the app answers", async () => {
-  const setAutoDownload = vi.fn(async (_enabled: boolean) => ({ autoDownload: true }));
-  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload });
-  room([local]);
-  const toggle = await autoDownload();
-  await act(async () => { fireEvent.click(toggle); });
-  expect(setAutoDownload).toHaveBeenCalledWith(false);
-  // The app kept it on: on is what shows.
-  expect(toggle).toBeChecked();
-  setAutoDownload.mockResolvedValueOnce({ autoDownload: false });
-  await act(async () => { fireEvent.click(toggle); });
-  expect(toggle).not.toBeChecked();
-  expect(screen.queryByRole("alert")).toBeNull();
-});
-
-test("a change the app couldn't make goes back and says so", async () => {
-  const setAutoDownload = vi.fn(async (_enabled: boolean): Promise<{ autoDownload: boolean }> => { throw new Error("disk"); });
-  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload });
-  room([local]);
-  const toggle = await autoDownload();
-  await act(async () => { fireEvent.click(toggle); });
-  expect(setAutoDownload).toHaveBeenCalledWith(false);
-  expect(toggle).toBeChecked();
-  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't change it. Try again.");
-  // Trying again clears it.
-  setAutoDownload.mockResolvedValueOnce({ autoDownload: false });
-  await act(async () => { fireEvent.click(toggle); });
-  expect(toggle).not.toBeChecked();
-  expect(screen.queryByRole("alert")).toBeNull();
-});
-
-test("in Spanish, Descargar las actualizaciones automáticamente, and its failure", async () => {
+const CHECKED = "sidevoice.updates-checked-at";
+const modes = (name = "Updates") => screen.findByRole("radiogroup", { name });
+const checkButton = (name = "Check for updates") => screen.findByRole("button", { name });
+const inSpanish = () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
-  updaterBridge({ settings: vi.fn(async () => ({ autoDownload: true })), setAutoDownload: vi.fn(async () => { throw new Error("x"); }) });
+};
+afterEach(() => localStorage.removeItem(CHECKED));
+
+test("an app without an updater (a nightly, a development build, an older app) shows no Updates and no Check for updates", async () => {
+  for (const build of [{ channel: "nightly", version: "0.5.0" }, { channel: "dev", version: "0.5.0" }, { channel: "release", version: "0.4.0" }, undefined]) {
+    buildBridge(build);
+    room([local], { localHostStatus: running });
+    await act(async () => {});
+    expect(screen.queryByRole("radiogroup", { name: "Updates" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check for updates" })).toBeNull();
+    // Update this computer stays as it was: a release's, or an app too old to say its build.
+    if (!build || build.channel === "release") expect(await screen.findByRole("button", { name: "Update this machine" })).toBeInTheDocument();
+    cleanup();
+  }
+});
+
+test("Updates says the app's mode with its hint, and a change shows what the app answers", async () => {
+  const { updater } = updaterBridge({ mode: "manual" });
   room([local]);
-  const toggle = await autoDownload("Descargar las actualizaciones automáticamente");
-  expect(thisDevice()).toHaveTextContent("Desactivado: te avisa de que hay una actualización y se descarga al reiniciar para instalarla.");
-  await act(async () => { fireEvent.click(toggle); });
-  expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cambiar. Vuelve a intentarlo.");
+  const group = await modes();
+  const radio = (name: string) => within(group).getByRole("radio", { name });
+  expect(radio("Manual")).toHaveAttribute("aria-checked", "true");
+  expect(thisDevice()).toHaveTextContent("You're told when one is out, and download it when you choose.");
+  await act(async () => { fireEvent.click(radio("Automatic (recommended)")); });
+  expect(updater.setMode).toHaveBeenCalledWith("automatic");
+  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
+  expect(thisDevice()).toHaveTextContent("They download by themselves; you restart when it suits you.");
+  // The app kept automatic when asked for manual: automatic is what shows.
+  updater.setMode.mockResolvedValueOnce({ mode: "automatic" });
+  await act(async () => { fireEvent.click(radio("Manual")); });
+  expect(updater.setMode).toHaveBeenLastCalledWith("manual");
+  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("an app that can't say its mode is on automatic; a change it couldn't make goes back and says so", async () => {
+  const { updater } = updaterBridge();
+  updater.settings.mockRejectedValueOnce(new Error("nope"));
+  updater.setMode.mockRejectedValueOnce(new Error("disk"));
+  room([local]);
+  const group = await modes();
+  const radio = (name: string) => within(group).getByRole("radio", { name });
+  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
+  await act(async () => { fireEvent.click(radio("Manual")); });
+  expect(radio("Automatic (recommended)")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByRole("alert")).toHaveTextContent("Couldn't change it. Try again.");
+  // Trying again clears it.
+  await act(async () => { fireEvent.click(radio("Manual")); });
+  expect(radio("Manual")).toHaveAttribute("aria-checked", "true");
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("each part shows where the app has its method: no settings or setMode, no Updates; no check, no Check for updates", async () => {
+  const { updater } = updaterBridge({ without: ["settings"] });
+  room([local]);
+  expect(await checkButton()).toBeInTheDocument();
+  await act(async () => {});
+  expect(screen.queryByRole("radiogroup", { name: "Updates" })).toBeNull();
+  expect(updater.status).toHaveBeenCalled();
+  cleanup();
+  updaterBridge({ without: ["check"] });
+  room([local]);
+  expect(await modes()).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Check for updates" })).toBeNull();
+});
+
+test("Check for updates is busy while the app checks, then says what it found and when it last checked", async () => {
+  const { updater } = updaterBridge();
+  let answer!: (status: UpdaterStatus) => void;
+  updater.check.mockImplementationOnce(() => new Promise<UpdaterStatus>((resolve) => { answer = resolve; }));
+  room([local]);
+  const button = await checkButton();
+  expect(thisDevice()).not.toHaveTextContent("Last checked");
+  await act(async () => { fireEvent.click(button); });
+  expect(button).toHaveAttribute("aria-busy", "true");
+  await act(async () => { answer({ state: "idle" }); });
+  expect(button).not.toHaveAttribute("aria-busy");
+  expect(thisDevice()).toHaveTextContent("Sidevoice is up to date.");
+  expect(thisDevice()).toHaveTextContent(/Last checked: \S/);
+  expect(Number(localStorage.getItem(CHECKED))).toBeGreaterThan(0);
+  updater.check.mockResolvedValueOnce({ state: "available", version: "0.5.0" });
+  await act(async () => { fireEvent.click(button); });
+  expect(thisDevice()).toHaveTextContent("Sidevoice 0.5.0 is available.");
+});
+
+test("when it last checked is kept: shown on the next visit; an update the app found by itself counts, a failed check doesn't", async () => {
+  const before = Date.parse("2026-10-12T09:30:00Z");
+  localStorage.setItem(CHECKED, String(before));
+  const fake = updaterBridge();
+  room([local]);
+  await checkButton();
+  expect(thisDevice()).toHaveTextContent(/Last checked: .*2026/);
+  await act(async () => {});
+  await act(async () => { fake.push({ state: "available", version: "0.5.0" }); });
+  const found = Number(localStorage.getItem(CHECKED));
+  expect(found).toBeGreaterThan(before);
+  localStorage.setItem(CHECKED, String(before));
+  fake.updater.check.mockResolvedValueOnce({ state: "idle", error: { code: "update-check-failed" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check for updates" })); });
+  expect(Number(localStorage.getItem(CHECKED))).toBe(before);
+});
+
+const FAILURES = [
+  { code: "update-check-failed", state: "idle", en: "Couldn't check for updates.", es: "No se pudo comprobar si hay actualizaciones.", retry: "check" },
+  { code: "update-download-failed", state: "available", en: "The update couldn't be downloaded.", es: "No se pudo descargar la actualización.", retry: "download" },
+  { code: "update-install-failed", state: "ready", en: "The update couldn't be installed.", es: "No se pudo instalar la actualización.", retry: null },
+] as const;
+
+test("each failure the app reports is said in words, with Retry for a check or a download", async () => {
+  for (const { code, state, en, retry } of FAILURES) {
+    const { updater } = updaterBridge({ status: { state, version: "0.5.0", error: { code } }, mode: "manual" });
+    room([local]);
+    const alert = await within(thisDevice()).findByRole("alert");
+    expect(alert).toHaveTextContent(en);
+    const again = within(alert).queryByRole("button", { name: "Retry" });
+    if (!retry) expect(again, code).toBeNull();
+    else {
+      await act(async () => { fireEvent.click(again!); });
+      expect(updater[retry], code).toHaveBeenCalledTimes(1);
+    }
+    cleanup();
+  }
+});
+
+test("a check or a download the app rejected is said as that failure, its own words behind Details", async () => {
+  const { updater } = updaterBridge({ status: { state: "available", version: "0.5.0", error: { code: "update-download-failed" } } });
+  updater.check.mockRejectedValueOnce(new Error("socket hang up"));
+  updater.download.mockRejectedValueOnce(new Error("disk full"));
+  room([local]);
+  await act(async () => { fireEvent.click(await checkButton()); });
+  const alert = within(thisDevice()).getByRole("alert");
+  expect(alert).toHaveTextContent("Couldn't check for updates.");
+  expect(alert.querySelector("details")).toHaveTextContent("socket hang up");
+  await act(async () => { fireEvent.click(within(alert).getByRole("button", { name: "Retry" })); });
+  expect(updater.check).toHaveBeenCalledTimes(2);
+  // The app's status says the download failed: its Retry downloads, and a rejected download says so.
+  updater.check.mockResolvedValueOnce({ state: "available", version: "0.5.0", error: { code: "update-download-failed" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Check for updates" })); });
+  await act(async () => { fireEvent.click(within(within(thisDevice()).getByRole("alert")).getByRole("button", { name: "Retry" })); });
+  expect(updater.download).toHaveBeenCalledTimes(1);
+  expect(within(thisDevice()).getByRole("alert")).toHaveTextContent("The update couldn't be downloaded.");
+  expect(within(thisDevice()).getByRole("alert").querySelector("details")).toHaveTextContent("disk full");
+});
+
+test("in Spanish: Actualizaciones, Automáticas (recomendado) | Manuales, Buscar actualizaciones, Última comprobación, and each failure", async () => {
+  inSpanish();
+  localStorage.setItem(CHECKED, String(Date.parse("2026-10-12T09:30:00Z")));
+  for (const { code, state, es, retry } of FAILURES) {
+    updaterBridge({ status: { state, version: "0.5.0", error: { code } }, mode: "manual" });
+    room([local]);
+    const group = await modes("Actualizaciones");
+    expect(within(group).getByRole("radio", { name: "Manuales" })).toHaveAttribute("aria-checked", "true");
+    expect(within(group).getByRole("radio", { name: "Automáticas (recomendado)" })).toBeInTheDocument();
+    expect(await checkButton("Buscar actualizaciones")).toBeInTheDocument();
+    expect(thisDevice()).toHaveTextContent("Última comprobación:");
+    const alert = within(thisDevice()).getByRole("alert");
+    expect(alert).toHaveTextContent(es);
+    if (retry) expect(within(alert).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    cleanup();
+  }
 });

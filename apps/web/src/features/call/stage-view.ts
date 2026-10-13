@@ -68,8 +68,8 @@ export function useStageConversation(): StageConversation {
   return preview ? { ...stage, mood: preview.mood, unread: preview.unread ? Math.max(1, stage.unread) : 0 } : stage;
 }
 
-/** Whether the voice is live: in a call (A), or the voice on or turning on (B). What keeps "reload to update" and the
- *  "what's new" dialog waiting. */
+/** Whether the voice is live: in a call (A), or the voice on or turning on (B). What keeps the "what's new" dialog
+ *  waiting. */
 export function useVoiceLive(): boolean {
   const voiceSwitch = useVoiceSwitch();
   return useRoomStore((state) => (voiceSwitch ? !!(state.facts.voiceOn || state.facts.voiceStarting) : selectInCall(state)));

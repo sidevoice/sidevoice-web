@@ -1,68 +1,161 @@
 import { useEffect, useState } from "react";
 import { localHostBridge, type LocalHostVersion } from "../../services/desktop-host";
 import { useRoomStore } from "../../state/room-store";
-import { useVoiceLive } from "../call/stage-view";
 
-/* What wants updating, from three places: this page (a newer build the room serves, held while a call is on — out of a
- * call the page reloads itself), the desktop app (its updater, behind the host's `updater` seam; the app has none yet,
- * so nothing shows until it does), and this computer's machine (the bridge's `version()`). A paired machine elsewhere
- * reports no version to this page today, so it cannot be listed. "Later" hides an item for a day, or until a newer
- * version comes. */
+/* What wants updating, from three places: this page (a newer build the room serves: out of a call the page reloads
+ * itself, in one Reload loads it when the person says), the desktop app (its updater, behind the host's `updater`
+ * seam: a release's only), and this computer's machine (the bridge's `version()`). A paired machine elsewhere reports
+ * no version to this page today, so it cannot be listed. */
 
-export type UpdateKind = "web" | "app" | "machine";
+export type UpdateKind = "web" | "machine";
 export interface UpdateItem { id: string; kind: UpdateKind; version: string; required: boolean; machine?: string }
 
-/** The desktop app's updater (sidevoice-desktop #56; a release's only). Downloading an update by itself is on unless the
- *  person turns it off (`settings`, `setAutoDownload`); off, an update is said to exist as soon as it is found, and
- *  `restart` downloads it first. An app without those two does not offer the choice. */
+export type UpdateMode = "automatic" | "manual";
+export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed";
+export interface UpdaterStatus {
+  state: "idle" | "available" | "downloading" | "ready";
+  version?: string;
+  /** While downloading: 0 to 1. */
+  progress?: number;
+  error?: { code: UpdaterFailure };
+}
+/** The desktop app's updater (sidevoice-desktop #56; a release's only: a nightly, a development build or an older app
+ *  has none, and then nothing of it shows). Each method is looked for before it is used. Automatic downloads an update
+ *  by itself; manual says one exists and `download` fetches it. `restart` installs a ready one at once. */
 export interface AppUpdater {
-  status(): Promise<{ available: boolean; version?: string; required?: boolean }>;
-  subscribe?(listener: () => void): () => void;
-  restart(): Promise<void>;
-  settings?(): Promise<{ autoDownload: boolean }>;
-  setAutoDownload?(enabled: boolean): Promise<{ autoDownload: boolean }>;
+  settings?(): Promise<{ mode: UpdateMode }>;
+  setMode?(mode: UpdateMode): Promise<{ mode: UpdateMode }>;
+  status(): Promise<UpdaterStatus>;
+  subscribe?(listener: (status: UpdaterStatus) => void): () => void;
+  check?(): Promise<UpdaterStatus>;
+  download?(): Promise<UpdaterStatus>;
+  restart?(): Promise<void>;
 }
 export function appUpdater(): AppUpdater | null {
   const host = (globalThis.window as unknown as { __sidevoiceDesktop?: { host?: { updater?: AppUpdater } } } | undefined)?.__sidevoiceDesktop?.host;
   return host?.updater && typeof host.updater.status === "function" ? host.updater : null;
 }
 
-const LATER_KEY = "sidevoice.updates-later";
-const DAY = 24 * 60 * 60 * 1000;
-type Later = Record<string, { version: string; at: number }>;
-function readLater(): Later {
-  try { return JSON.parse(localStorage.getItem(LATER_KEY) || "{}") ?? {}; } catch { return {}; }
+/* When the app last checked successfully: the seam does not say, so this page keeps it — a check it asked for that did
+ * not fail, or an update the app's own check found while the page listened. */
+const CHECKED_KEY = "sidevoice.updates-checked-at";
+const CHANGED = "sidevoice-app-update";
+function readCheckedAt(): number | null {
+  try { const at = Number(localStorage.getItem(CHECKED_KEY)); return at > 0 ? at : null; } catch { return null; }
 }
-export function updateLater(item: UpdateItem) {
-  try { localStorage.setItem(LATER_KEY, JSON.stringify({ ...readLater(), [item.id]: { version: item.version, at: Date.now() } })); } catch { /* For this visit only. */ }
-  window.dispatchEvent(new Event("sidevoice-updates-later"));
+function checkedNow() {
+  try { localStorage.setItem(CHECKED_KEY, String(Date.now())); } catch { /* For this visit only. */ }
+  window.dispatchEvent(new Event(CHANGED));
+}
+/** The mode as each app's updater last answered it, for every place that shows its update. */
+const knownModes = new WeakMap<AppUpdater, UpdateMode>();
+function modeKnown(updater: AppUpdater, mode: UpdateMode) {
+  knownModes.set(updater, mode);
+  window.dispatchEvent(new Event(CHANGED));
 }
 
-export function useUpdates() {
-  const web = useRoomStore((state) => state.facts.webUpdate);
-  // A call (A), or the voice on (call model B): what a reload or a restart waits for.
-  const inCall = useVoiceLive();
-  const status = useRoomStore((state) => state.facts.localHostStatus);
-  const [app, setApp] = useState<{ version: string; required: boolean } | null>(null);
-  const [machine, setMachine] = useState<LocalHostVersion | null>(null);
-  const [later, setLater] = useState<Later>(readLater);
+/** The desktop app's update, wherever it shows (the sidebar's foot, This device): its status as the app pushes it, its
+ *  mode, when it last checked, and its actions. Without an updater, `updater` is null and nothing else is used. */
+export function useAppUpdate() {
+  const [updater] = useState(appUpdater);
+  const [status, setStatus] = useState<UpdaterStatus | null>(null);
+  const [mode, setModeShown] = useState<UpdateMode | null>(() => updater ? knownModes.get(updater) ?? null : null);
+  const [checkedAt, setCheckedAt] = useState(readCheckedAt);
 
   useEffect(() => {
-    const changed = () => setLater(readLater());
-    window.addEventListener("sidevoice-updates-later", changed);
-    return () => window.removeEventListener("sidevoice-updates-later", changed);
-  }, []);
+    const changed = () => { setCheckedAt(readCheckedAt()); if (updater && knownModes.has(updater)) setModeShown(knownModes.get(updater)!); };
+    window.addEventListener(CHANGED, changed);
+    return () => window.removeEventListener(CHANGED, changed);
+  }, [updater]);
   useEffect(() => {
-    const updater = appUpdater();
     if (!updater) return;
     let current = true;
-    const read = () => void updater.status().then((answer) => {
-      if (current) setApp(answer.available ? { version: answer.version ?? "", required: !!answer.required } : null);
-    }).catch(() => undefined);
-    read();
-    const stop = updater.subscribe?.(read);
+    let last: UpdaterStatus["state"] | null = null;
+    const show = (next: UpdaterStatus) => {
+      if (!current || !next || typeof next.state !== "string") return;
+      // An update found while this page listened: the app's own check went through.
+      if (last === "idle" && next.state !== "idle") checkedNow();
+      last = next.state;
+      setStatus(next);
+    };
+    void updater.status().then(show).catch(() => undefined);
+    // An app that cannot say its mode is on its default, automatic.
+    if (typeof updater.settings === "function") void updater.settings().then((value) => { if (current) modeKnown(updater, value.mode === "manual" ? "manual" : "automatic"); })
+      .catch(() => { if (current && !knownModes.has(updater)) modeKnown(updater, "automatic"); });
+    const stop = typeof updater.subscribe === "function" ? updater.subscribe(show) : undefined;
     return () => { current = false; stop?.(); };
-  }, []);
+  }, [updater]);
+
+  /** Asks the app to check; its answer is the status. A check that did not fail is when it last checked. */
+  async function check() {
+    if (typeof updater?.check !== "function") return null;
+    try {
+      const next = await updater.check();
+      if (next?.error?.code !== "update-check-failed") checkedNow();
+      if (next && typeof next.state === "string") setStatus(next);
+      return next;
+    } catch (error) {
+      throw failedAs("update-check-failed", error);
+    }
+  }
+  async function download() {
+    if (typeof updater?.download !== "function") return null;
+    try {
+      const next = await updater.download();
+      if (next && typeof next.state === "string") setStatus(next);
+      return next;
+    } catch (error) {
+      throw failedAs("update-download-failed", error);
+    }
+  }
+  /** Restarts into the ready update, now, whether a call is on or not. */
+  async function restart() {
+    if (typeof updater?.restart !== "function") return;
+    try { await updater.restart(); } catch (error) { throw failedAs("update-install-failed", error); }
+  }
+  async function setMode(next: UpdateMode) {
+    if (typeof updater?.setMode !== "function") return;
+    const before = knownModes.get(updater) ?? "automatic";
+    // Shown at once; then what the app answers, or back as it was.
+    modeKnown(updater, next);
+    try { modeKnown(updater, (await updater.setMode(next)).mode === "manual" ? "manual" : "automatic"); } catch (error) { modeKnown(updater, before); throw error; }
+  }
+  return {
+    updater, status, mode: updater ? mode : null, checkedAt, check, download, restart, setMode,
+    can: {
+      mode: typeof updater?.settings === "function" && typeof updater.setMode === "function",
+      check: typeof updater?.check === "function",
+      download: typeof updater?.download === "function",
+      restart: typeof updater?.restart === "function",
+    },
+  };
+}
+
+/** A rejected call, as the app's failure for it: its own code when it has one, the call's otherwise. */
+function failedAs(code: UpdaterFailure, error: unknown) {
+  const own = (error as { code?: unknown } | null)?.code;
+  if (typeof own === "string" && own) return error;
+  return Object.assign(new Error(error instanceof Error ? error.message : String(error ?? "")), { code });
+}
+
+/** What the sidebar's foot says of the app's update. Automatic: nothing until it is ready to restart into. Manual: that
+ *  one is available, then its download, then ready. A download or install that failed is said there too; a failed
+ *  check is This device's to say. */
+export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null): UpdaterStatus | null {
+  if (!status) return null;
+  if (status.state === "ready") return status;
+  if (mode !== "manual") return null;
+  return status.state === "available" || status.state === "downloading" ? status : null;
+}
+
+/** The page's and this computer's machine's updates waiting (`items`), and the desktop app's as the sidebar shows it
+ *  (`app`, with its actions in `appUpdate`). */
+export function useUpdates() {
+  const web = useRoomStore((state) => state.facts.webUpdate);
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const appUpdate = useAppUpdate();
+  const [machine, setMachine] = useState<LocalHostVersion | null>(null);
+
   useEffect(() => {
     const bridge = localHostBridge();
     if (typeof bridge?.version !== "function") return;
@@ -72,11 +165,7 @@ export function useUpdates() {
   }, [status.state, status.core?.version]);
 
   const items: UpdateItem[] = [];
-  if (app) items.push({ id: "app", kind: "app", version: app.version, required: app.required });
   if (web) items.push({ id: "web", kind: "web", version: web, required: false });
   if (machine?.update === "available") items.push({ id: "machine:local", kind: "machine", version: typeof machine.bundled?.version === "string" ? machine.bundled.version : "", required: false });
-  // Required ones first, then this device's, then machines'; one put off waits a day or a newer version.
-  const shown = items.filter((item) => item.required || !later[item.id] || later[item.id].version !== item.version || Date.now() - later[item.id].at > DAY)
-    .sort((a, b) => Number(b.required) - Number(a.required));
-  return { items: shown, inCall };
+  return { items, app: appUpdateShown(appUpdate.status, appUpdate.mode), appUpdate };
 }

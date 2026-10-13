@@ -9,7 +9,7 @@ import {
   Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
-  Box, AudioWaveform, ArrowUp, ArrowRight, Pencil, Laptop, Server,
+  Box, AudioWaveform, ArrowUp, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
   Timer, ScrollText, Link, Unlink, Search, ChevronLeft, ChevronRight, Eye, EyeOff, Square, Hand, VolumeX, Power, LockOpen, Sparkle, Maximize2, Minimize2,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -130,6 +130,8 @@ export const TranscriptionIcon = mark(Mic, 16);
 export const EndOfTurnIcon = mark(Timer, 16);
 /** On into what comes next: the setup's last button. */
 export const ArrowRightIcon = mark(ArrowRight, 18);
+/** Something of Sidevoice's own has a newer version: the app, the page, a machine's service. Not a model's download. */
+export const UpdateIcon = mark(RefreshCcwDot, 18);
 /** The call's own behaviour: your turn, the sound while the agent works, the screen. */
 export const CallSettingsIcon = mark(Phone, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);
