@@ -40,8 +40,19 @@ describe("desktopBuild", () => {
     expect(desktopBuild()).toBeNull();
   });
 
-  test.each([{ channel: "beta", version: "0.5.0" }, { version: "0.5.0" }, "nightly"])("an unknown channel is no build: %j", (build) => {
+  // A newer app's channel (sidevoice-core#112) is a build all the same, of a channel this version does not know.
+  test.each([{ channel: "beta", version: "0.5.0" }, { version: "0.5.0" }, { channel: 7, version: "0.5.0", arch: "arm64" }])("an unknown channel is an unknown one: %j", (build) => {
     withHost({ build });
+    expect(desktopBuild()).toEqual({ channel: "unknown", version: "0.5.0", commit: null, date: null });
+  });
+
+  test("extra fields are ignored, and a field of a shape it does not know is none", () => {
+    withHost({ build: { channel: "release", version: "0.5.0", commit: 42, date: { at: "x" }, signed: true } });
+    expect(desktopBuild()).toEqual({ channel: "release", version: "0.5.0", commit: null, date: null });
+  });
+
+  test("a build that is not an object is no build", () => {
+    withHost({ build: "nightly" });
     expect(desktopBuild()).toBeNull();
   });
 });

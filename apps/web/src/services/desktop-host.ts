@@ -111,7 +111,9 @@ export function desktopHost() {
 /** The desktop app's own build (sidevoice-desktop #56, `host.build`): a release — the only one with an updater
  *  (`host.updater`) —, a nightly, or a development build; its version, and where the build came from. */
 export interface DesktopBuild {
-  channel: "release" | "nightly" | "dev";
+  /** `unknown`: a channel this version does not know yet (sidevoice-core#112) — said of no channel, and updated as an app
+   *  with its updater, or without one, is. */
+  channel: "release" | "nightly" | "dev" | "unknown";
   version: string;
   commit?: string | null;
   date?: string | null;
@@ -149,11 +151,14 @@ export function callControlsBridge(): CallControlsBridge | null {
 /** Where nightly builds are published, to update one by hand. */
 export const DESKTOP_NIGHTLY_URL = "https://github.com/sidevoice/sidevoice-desktop/releases/tag/nightly";
 
-/** This page's desktop app build, or null outside the app (or an app too old to say). */
+/** This page's desktop app build, or null outside the app (or an app too old to say). A channel this version does not
+ *  know yet is `unknown`, not no build: the app is still there, with its version. */
 export function desktopBuild(): DesktopBuild | null {
-  const build = desktopHost()?.build as Partial<DesktopBuild> | undefined;
-  if (!build || (build.channel !== "release" && build.channel !== "nightly" && build.channel !== "dev")) return null;
-  return { channel: build.channel, version: typeof build.version === "string" ? build.version : "", commit: build.commit ?? null, date: build.date ?? null };
+  const build = desktopHost()?.build as Record<string, unknown> | undefined;
+  if (!build || typeof build !== "object") return null;
+  const channel = build.channel === "release" || build.channel === "nightly" || build.channel === "dev" ? build.channel : "unknown";
+  const text = (value: unknown) => typeof value === "string" ? value : null;
+  return { channel, version: text(build.version) ?? "", commit: text(build.commit), date: text(build.date) };
 }
 
 export function desktopComputerName() {
