@@ -109,7 +109,7 @@ export function LocalHostUpdateControl({ status, update, words = "service", cont
   const label = busy ? t(continuing || all ? "updates.action.updatingAll" : "updates.action.updatingService")
     : error ? t(all ? "updates.action.retryAll" : "updates.action.retryService") : t(all ? "updates.action.updateAll" : "updates.action.updateService");
   return (
-    <div className="host-update-control update-action-row" aria-live="polite">
+    <div className="host-update-control update-action-row" data-settings-row="" aria-live="polite">
       <div className="update-action">
         <span className="update-action-copy">{bundled ? t("updates.available", { version: bundled }) : t("updates.availableOne")}</span>
         <Button id={UPDATE_PLACE.thisComputer} size="sm" variant="primary" disabled={busy || waitingForCalls} onClick={() => void run()}>{label}</Button>

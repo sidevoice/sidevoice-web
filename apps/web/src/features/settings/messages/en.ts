@@ -804,6 +804,7 @@ export const en = {
   "updates.notice.dismiss": "Hide this notice",
   // The chip beside Settings (VARIANTS `update-notice` B2): the app's update in a few words, its action after them.
   "updates.chip.app": "Sidevoice {version}",
+  "updates.chip.hide": "Hide until a newer version",
   "updates.chip.appOne": "Sidevoice update",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "A smart end of turn",

@@ -13,8 +13,9 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 afterEach(() => {
   cleanup();
   for (const key of ["sidevoice.variants", "sidevoice.settings", "sidevoice.updates-checked-at", "sidevoice.update-continue"]) localStorage.removeItem(key);
-  // The rail is a test's own: the next one starts beside the list.
+  // The rail is a test's own: the next one starts beside the list; a chip hidden is this test's window's.
   localStorage.removeItem("sidevoice.sidebar-collapsed");
+  sessionStorage.removeItem("sidevoice.update-chip-hidden");
   delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
   delete (window as { sidevoiceActions?: unknown }).sidevoiceActions;
 });
@@ -60,6 +61,8 @@ const foot = () => document.querySelector<HTMLElement>(".sidebar-foot")!;
 const gear = () => document.querySelector<HTMLElement>(".sidebar-foot .sidebar-settings")!;
 const line = () => document.querySelector<HTMLElement>(".sidebar-foot .update-beside");
 const chip = () => document.querySelector<HTMLElement>(".sidebar-foot .update-chip");
+/** The chip's ×, at its end. */
+const hide = () => document.querySelector<HTMLElement>(".sidebar-foot .update-chip-hide");
 const collapse = () => act(async () => { fireEvent.click(document.querySelector(".sidebar-collapse")!); });
 /** The rail's chip's popover, opened. */
 async function popover() {
@@ -148,6 +151,53 @@ test("a failed download or install is said under the chip's row, Retry in the ch
   expect(line()!.querySelector("[role=alert]")).not.toBeNull();
 });
 
+test("the chip's × hides it until a newer version — not as the same one moves on; its update stays in Updates; a new window shows it again", async () => {
+  const { fake } = room({ updater: { mode: "manual", status: { state: "available", version: "0.4.0" } } });
+  await waitFor(() => expect(chip()).not.toBeNull());
+  // At the chip's end, in its row: what it does, said.
+  expect([...document.querySelector(".sidebar-foot .update-beside-row")!.children]).toEqual([chip(), hide()]);
+  expect(hide()).toHaveAccessibleName("Hide until a newer version");
+  expect(hide()).toHaveAttribute("title", "Hide until a newer version");
+  await act(async () => { fireEvent.click(hide()!); });
+  settingsAlone();
+  expect(fake.updater.download).not.toHaveBeenCalled();
+  // Its update is still where it is acted on.
+  expect(document.getElementById("updates-app")).toHaveTextContent(/^Version 0\.4\.0 available/);
+  expect(within(document.getElementById("updates-app")!).getByRole("button", { name: "Download", hidden: true })).toBeInTheDocument();
+  // The same version moving on (downloading, ready): still hidden.
+  await act(async () => { fake.push({ state: "downloading", version: "0.4.0", progress: 0.5 }); });
+  settingsAlone();
+  await act(async () => { fake.push({ state: "ready", version: "0.4.0" }); });
+  settingsAlone();
+  // A newer one: back.
+  await act(async () => { fake.push({ state: "available", version: "0.5.0" }); });
+  expect(chip()).toHaveAccessibleName("Version 0.5.0 available · Download");
+  await act(async () => { fireEvent.click(hide()!); });
+  settingsAlone();
+  // This window again: still hidden. A new window (the app restarted): back.
+  cleanup();
+  room({ updater: { mode: "manual", status: { state: "available", version: "0.5.0" } } });
+  await settle();
+  settingsAlone();
+  cleanup();
+  sessionStorage.removeItem("sidevoice.update-chip-hidden");
+  room({ updater: { mode: "manual", status: { state: "available", version: "0.5.0" } } });
+  await waitFor(() => expect(chip()).toHaveAccessibleName("Version 0.5.0 available · Download"));
+});
+
+test("the ×, for the page's update and this computer's service: hidden until a newer one, as the app's", async () => {
+  room({ facts: { webUpdate: "b2" } });
+  await waitFor(() => expect(chip()).toHaveAccessibleName("Reload to update"));
+  await act(async () => { fireEvent.click(hide()!); });
+  settingsAlone();
+  cleanup();
+  room({ service: BEHIND });
+  await waitFor(() => expect(chip()).toHaveAccessibleName("Update available · See updates"));
+  await act(async () => { fireEvent.click(hide()!); });
+  settingsAlone();
+  expect(sessionStorage.getItem("sidevoice.update-chip-hidden")).toBe("service:0.9.0");
+});
+
 test("what can't be done in place lands on its button in Updates: the service's Update, a remote machine's Copy; the page's Reload reloads", async () => {
   room({ service: BEHIND });
   await waitFor(() => expect(chip()).toHaveAccessibleName("Update available · See updates"));
@@ -177,7 +227,10 @@ test("in the rail: an icon above the gear, its count in its name; its popover li
   expect(footOrder()).toEqual(["chip", "settings"]);
   expect(gear()).toHaveAccessibleName("Settings");
   expect(gear()).not.toHaveTextContent("Settings");
+  // The rail's icon has no ×, nor its popover.
+  expect(hide()).toBeNull();
   const list = await popover();
+  expect(list.queryByRole("button", { name: "Hide until a newer version" })).toBeNull();
   expect([...document.querySelectorAll(".update-notice-text")].map((text) => text.textContent)).toEqual(["Sidevoice 0.4.0 is available", "A Sidevoice update is available"]);
   await act(async () => { fireEvent.click(list.getByRole("button", { name: "Download", description: "Sidevoice 0.4.0 is available" })); });
   expect(fake.updater.download).toHaveBeenCalledOnce();
@@ -221,6 +274,7 @@ test("in Spanish: Versión 0.4.0 disponible · Descargar, then Sidevoice 0.4.0 �
   await act(async () => { fake.push({ state: "ready", version: "0.4.0" }); });
   expect(chip()).toHaveAccessibleName("Sidevoice 0.4.0 · Reiniciar para actualizar Sidevoice");
   expect(chip()!.querySelector(".update-chip-action")).toHaveTextContent(/^Reiniciar$/);
+  expect(hide()).toHaveAccessibleName("Ocultar hasta una versión más nueva");
   await collapse();
   expect(chip()).toHaveAccessibleName("Actualizaciones, 1 pendientes");
 });

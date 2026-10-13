@@ -84,7 +84,8 @@ export function UpdatesSettings() {
     continuing={words === "all" && chain} onContinued={() => { continued(); setChain(false); }} />;
   return <Section id="updates" title={t("settings.section.updates")} description={t(description)}>
     {(app || (service && (serviceVersion || serviceUpdate.shown))) && <Group title={t("settings.updates.one")}>
-      <div className="updates-settings" data-settings-row="">
+      {/* A landing lights the update's own line (its row with its button), never the whole card. */}
+      <div className="updates-settings">
         <PartVersion hint={app ? undefined : t("settings.updates.serviceHint")}
           version={here.version} upToDate={here.state === "current" && !here.app.can.check} note={note} t={t} />
         {/* Up to date, for the app and its service together, on the check's line where there is one. */}

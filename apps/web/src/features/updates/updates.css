@@ -68,3 +68,11 @@
 .update-beside[data-rail] { display: flex; flex-direction: column; align-items: center; gap: var(--sv-space-1); }
 .update-beside[data-rail] .update-chip--icon { flex: none; width: var(--sv-control-md); padding: 0; }
 .update-beside[data-rail] .update-chip--icon .ui-button-content { justify-content: center; }
+/* The chip's ×, inside it at its right end: one pill, the action and the × sharing its ground and its height; the ×
+ * hides the chip until a newer version (the update stays in Updates). */
+.update-beside-row:has(> .update-chip-hide) { gap: 0; border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); }
+.update-beside-row:has(> .update-chip-hide) > .update-chip { border-start-end-radius: 0; border-end-end-radius: 0; }
+.update-beside-row > .update-chip-hide.ui-button { flex: none; width: 32px; height: var(--sv-control-md); padding: 0; border-radius: 0 var(--sv-radius-md) var(--sv-radius-md) 0;
+  background: transparent; color: var(--sv-text-muted); }
+.update-beside-row > .update-chip-hide.ui-button:hover { background: var(--sv-accent-soft-hover); color: var(--sv-text); }
+.update-beside-row > .update-chip-hide:dir(rtl) { border-radius: var(--sv-radius-md) 0 0 var(--sv-radius-md); }

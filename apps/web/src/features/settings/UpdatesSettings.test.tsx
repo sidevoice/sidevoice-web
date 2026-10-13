@@ -102,11 +102,15 @@ const inSpanish = () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   onTestFinished(() => localStorage.removeItem("sidevoice.settings"));
 };
-/** Focus lands where a landing asked, its row lit for a moment. */
+/** Focus lands where a landing asked, its row lit for a moment — that row alone: never the version, never the card. */
 async function landsOn(control: () => HTMLElement | null, row?: () => HTMLElement | null) {
   await waitFor(() => expect(document.activeElement).toBe(control()), { timeout: 3000 });
-  if (row) expect(row()).toHaveClass("settings-highlight");
+  if (!row) return;
+  expect(row()).toHaveClass("settings-highlight");
+  expect([...document.querySelectorAll(".settings-highlight")]).toEqual([row()]);
 }
+/** The line an update is acted on in, holding `control`: its words and its button. */
+const lineOf = (control: () => HTMLElement | null) => () => control()?.closest<HTMLElement>(".update-action-row") ?? null;
 
 test("Updates is a section of its own, before Advanced: this computer as one row, Sidevoice — the app's version, Automatic/Manual and Check for updates", async () => {
   open({ section: "updates" });
@@ -210,7 +214,7 @@ test("This device says its version and Update available, a link to the row's but
   await act(async () => { fireEvent.click(link); });
   expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["updates", "page"]);
   expect(entry()).toHaveAttribute("aria-current", "page");
-  await landsOn(() => document.getElementById("updates-this-computer"));
+  await landsOn(() => document.getElementById("updates-this-computer"), lineOf(() => document.getElementById("updates-this-computer")));
 });
 
 test("This device: Up to date where the app (after a check) and its service both say so, with no link; nothing said where neither can", async () => {
@@ -587,12 +591,12 @@ test("a machine forgotten while it was behind: no longer listed, and in a browse
 /* Landing: what the chip above Settings and the rail's popover can't do in place opens Updates on the row's action, in
  * view and focused, the row lit; the app's Download and Restart are done in place (UpdateNotice.test.tsx). */
 
-test("the chip, this computer's service behind: Updates, its Update Sidevoice focused, the row lit", async () => {
+test("the chip, this computer's service behind: Updates, its Update Sidevoice focused, its line lit — not the version, not the card", async () => {
   const { store } = open({ section: "general", service: BUNDLED, chip: "foot" });
   const chip = await screen.findByRole("button", { name: "Update available · See updates" });
   await act(async () => { fireEvent.click(chip); });
   expect([store.getState().facts.settingsSection, store.getState().facts.settingsLevel]).toEqual(["updates", "page"]);
-  await landsOn(() => document.getElementById("updates-this-computer"), () => group("Sidevoice").querySelector(".updates-settings"));
+  await landsOn(() => document.getElementById("updates-this-computer"), lineOf(() => document.getElementById("updates-this-computer")));
   expect(document.activeElement).toHaveAccessibleName("Update Sidevoice");
   expect(store.getState().facts.settingsFocus).toBeNull();
 });

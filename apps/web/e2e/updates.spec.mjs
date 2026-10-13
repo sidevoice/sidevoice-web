@@ -85,19 +85,24 @@ const inPage = (element) => {
 };
 
 
-/** Where the chip's line sits against the sidebar's foot: the chip inside it and above Settings, the row and the
- *  sidebar not scrolling sideways, its action never cut short (its words may be), what failed under it inside the foot
- *  too. */
+/** Where the chip's line sits against the sidebar's foot: the chip — one pill, its words and action then its × at its
+ *  end, sharing its ground and its height — inside the foot and above Settings, the row and the sidebar not scrolling
+ *  sideways, its action never cut short (its words may be), what failed under it inside the foot too. */
 const chipFits = (row) => {
   const foot = row.closest(".sidebar-foot");
   const sidebar = row.closest(".conversation-sidebar");
   const edge = foot.getBoundingClientRect();
+  const pill = row.getBoundingClientRect();
   const chip = row.querySelector(".update-chip").getBoundingClientRect();
+  const hide = row.querySelector(".update-chip-hide").getBoundingClientRect();
   const settings = foot.querySelector(":scope > .sidebar-settings").getBoundingClientRect();
   const action = row.querySelector(".update-chip-action");
   const error = foot.querySelector(".update-line-error")?.getBoundingClientRect() ?? null;
   return {
-    inside: chip.left >= edge.left - 0.5 && chip.right <= edge.right + 0.5,
+    inside: pill.left >= edge.left - 0.5 && pill.right <= edge.right + 0.5,
+    hideInChip: hide.left >= chip.right - 0.5 && hide.right <= pill.right + 0.5 && hide.top >= pill.top - 0.5 && hide.bottom <= pill.bottom + 0.5,
+    hideAtEnd: Math.abs(hide.right - pill.right) <= 1,
+    hideChipHigh: Math.abs(hide.height - chip.height) <= 1 && Math.abs(hide.top - chip.top) <= 1,
     above: chip.bottom <= settings.top + 0.5 && (!error || error.bottom <= settings.top + 0.5),
     rowFits: row.scrollWidth <= row.clientWidth + 1,
     actionWhole: !action || action.scrollWidth <= action.clientWidth + 1,
@@ -108,7 +113,7 @@ const chipFits = (row) => {
 
 for (const language of ["en", "es"]) {
   for (const width of [1024, 1280]) {
-    test(`the chip stays on its line above Settings inside the sidebar at ${width}px in ${language}, its action whole, whatever it says`, async ({ page }) => {
+    test(`the chip stays on its line above Settings inside the sidebar at ${width}px in ${language}, its action whole and its × within it, whatever it says`, async ({ page }) => {
       await installHarness(page);
       await withUpdater(page, language);
       await page.setViewportSize({ width, height: 800 });
@@ -119,7 +124,9 @@ for (const language of ["en", "es"]) {
         await expect(row.locator(".update-chip")).toBeVisible();
         if (status.state !== "downloading") await expect(row.locator(".update-chip")).toHaveAttribute("title", new RegExp(VERSION.replace(/[.+]/g, "\\$&")));
         await expect(page.locator(".sidebar-foot > .sidebar-settings")).toBeVisible();
-        expect(await row.evaluate(chipFits), label(status)).toEqual({ inside: true, above: true, rowFits: true, actionWhole: true, errorInside: true, sidebarFits: true });
+        await expect(row.locator(".update-chip-hide")).toBeVisible();
+        expect(await row.evaluate(chipFits), label(status)).toEqual({ inside: true, hideInChip: true, hideAtEnd: true, hideChipHigh: true, above: true, rowFits: true,
+          actionWhole: true, errorInside: true, sidebarFits: true });
       }
     });
 

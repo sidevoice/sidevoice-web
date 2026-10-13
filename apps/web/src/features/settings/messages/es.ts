@@ -797,6 +797,7 @@ export const es: Partial<Record<HostMessageKey, string>> = {
   "updates.notice.machines": "{n} máquinas necesitan actualizarse",
   "updates.notice.dismiss": "Ocultar este aviso",
   "updates.chip.app": "Sidevoice {version}",
+  "updates.chip.hide": "Ocultar hasta una versión más nueva",
   "updates.chip.appOne": "Actualización de Sidevoice",
   // What's new (features/whats-new/catalogue).
   "whatsNew.endOfTurn.title": "Un fin de turno inteligente",

@@ -1,7 +1,7 @@
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { UpdateIcon } from "../../components/ui/Icons";
+import { CloseIcon, UpdateIcon } from "../../components/ui/Icons";
 import { Popover } from "../../components/ui/Popover";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
@@ -159,13 +159,34 @@ function chipWords(notice: Notice, t: HostTranslate) {
  *  popover listing each update with its action. Nothing waiting, nothing. */
 export function UpdateChipLine({ rail }: { rail: boolean }) {
   const data = useNotices();
+  const [hidden, hide] = useHidden();
   const lead = data.notices[0];
-  if (!lead) return null;
+  if (!lead || hidden === hideKey(lead)) return null;
   if (rail) return <div className="update-beside" data-rail=""><UpdateRailChip data={data} /></div>;
-  return <BesideRow key={lead.kind} notice={lead} data={data} />;
+  return <BesideRow key={lead.kind} notice={lead} data={data} onHide={() => hide(lead)} />;
 }
 
-function BesideRow({ notice, data }: { notice: Notice; data: Notices }) {
+/** The notice hidden by its × (the chip's or the banner's), this window's — an app restarted starts over — until a
+ *  newer version is found; every place that shows it hears it at once. */
+const hiddenListeners = new Set<() => void>();
+function useHidden(): [string | null, (notice: Notice) => void] {
+  const [hidden, setHidden] = useState(readHidden);
+  useEffect(() => { const heard = () => setHidden(readHidden()); hiddenListeners.add(heard); return () => { hiddenListeners.delete(heard); }; }, []);
+  const hide = (notice: Notice) => {
+    try { sessionStorage.setItem(HIDDEN_KEY, hideKey(notice)); } catch { /* This view only. */ }
+    setHidden(hideKey(notice)); hiddenListeners.forEach((heard) => heard());
+  };
+  return [hidden, hide];
+}
+
+/** The notice hidden by its ×, this window's (an app restarted starts over): until a newer version is found. The
+ *  update stays in Settings › Updates. */
+const HIDDEN_KEY = "sidevoice.update-chip-hidden";
+const readHidden = () => { try { return sessionStorage.getItem(HIDDEN_KEY); } catch { return null; } };
+/** What a hidden chip waits for: a version newer than this one (its state moving on — downloaded, ready — is not). */
+const hideKey = (notice: Notice) => notice.kind === "app" ? `app:${notice.status.version ?? ""}` : notice.kind === "service" ? `service:${notice.version}` : notice.key;
+
+function BesideRow({ notice, data, onHide }: { notice: Notice; data: Notices; onHide: () => void }) {
   const { rows, t } = data;
   const { action, busy, error, act } = useNoticeAct(notice, data);
   const words = chipWords(notice, t);
@@ -180,6 +201,8 @@ function BesideRow({ notice, data }: { notice: Notice; data: Notices }) {
           <UpdateIcon size={16} /><span className="update-chip-words">{words}</span>
           {short && <><span className="update-chip-sep" aria-hidden="true">·</span><span className="update-chip-action">{short}</span></>}</Button>
         : <span className="update-chip" data-kind={notice.kind} title={title}><UpdateIcon size={16} /><span className="update-chip-words">{words}</span></span>}
+      <Button variant="ghost" tone="neutral" size="icon-sm" className="update-chip-hide" aria-label={t("updates.chip.hide")} title={t("updates.chip.hide")} onClick={onHide}>
+        <CloseIcon size={14} /></Button>
     </div>
     {!!error && <ErrorText className="update-line-error" role="alert" message={updaterFailure(error, { t })} />}
   </div>;
