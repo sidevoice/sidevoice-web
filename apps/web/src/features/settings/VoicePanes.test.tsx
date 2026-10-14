@@ -195,6 +195,34 @@ test("a try is all in its block — getting ready, listening with the level, wha
   expect(document.getElementById("stt-heard-all")).toHaveAttribute("aria-expanded", "false");
 });
 
+test("Stop ends the take on screen at once: Transcribing… where Listening… was, the take's bar stopped, until what was heard", async () => {
+  const { actions } = renderPane();
+  window.sidevoiceActions!.finishVoiceTry = vi.fn();
+  const block = document.getElementById("stt-try-block")!;
+  const area = () => block.querySelector(".stt-try-area")!;
+  const running = pendingTry(actions);
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  act(() => running.told.onListening!());
+  expect(area().querySelector(".model-try-take")).not.toHaveAttribute("data-ended");
+  fireEvent.click(document.getElementById("stt-try")!);
+  expect(window.sidevoiceActions!.finishVoiceTry).toHaveBeenCalled();
+  // The voice says the take has ended and what was said is being transcribed.
+  act(() => running.told.onTranscribing!(true));
+  expect(area()).toHaveTextContent("Transcribing…");
+  expect(area()).not.toHaveTextContent("Listening…");
+  expect(area().querySelector(".model-try-take")).toHaveAttribute("data-ended");
+  await act(async () => { running.finish({ text: "hasta aquí", timings: { ready_ms: 900, recognition_ms: 300 } }); });
+  expect(area()).not.toHaveTextContent("Transcribing…");
+  expect(area().querySelector("#stt-heard")).toHaveTextContent("hasta aquí");
+  // A turn that came to nothing: listening again, the bar going on.
+  await act(async () => { fireEvent.click(document.getElementById("stt-try")!); });
+  act(() => running.told.onListening!());
+  act(() => running.told.onTranscribing!(true));
+  act(() => running.told.onTranscribing!(false));
+  expect(area()).toHaveTextContent("Listening…");
+  expect(area().querySelector(".model-try-take")).not.toHaveAttribute("data-ended");
+});
+
 test("the transcription try is one steady layout: the button and the level first, then listening or what was heard in one area", async () => {
   const { actions } = renderPane();
   const block = document.getElementById("stt-try-block")!;

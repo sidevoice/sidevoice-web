@@ -28,6 +28,8 @@
 .model-try-take { flex: 1 0 100%; height: 3px; border-radius: 2px; background: var(--sv-accent) no-repeat 0 0 / 0% 100%; background-color: var(--sv-bg-sunken);
   background-image: linear-gradient(var(--sv-accent), var(--sv-accent)); animation: model-try-take linear forwards; }
 @keyframes model-try-take { to { background-size: 100% 100%; } }
+/* The take ended (Stop, its longest, a silence): its length stays where it stopped while it is transcribed. */
+.model-try-take[data-ended] { animation-play-state: paused; }
 .model-try-wave { display: inline-flex; flex: none; color: var(--sv-accent-text); }
 .model-try .voice-wave { width: min(9rem, 36vw); height: 28px; }
 /* The voice's sentence: what was heard in the text's colour, the rest quieter until it is. */

@@ -143,6 +143,67 @@ test("Stop ends the take with what was said, and it is transcribed; before anyth
   expect(quiet.calls.at(-1)).toEqual(["stop"]);
 });
 
+test("Stop says at once that the take has ended and is being transcribed; the voice's own end of a turn says so too", async () => {
+  const told: boolean[] = [];
+  const spoken = fakeVoice();
+  const finish = new AbortController();
+  const heard = tryTranscription(spoken as unknown as Voice, SETTINGS as never, { finish: finish.signal, onTranscribing: (on) => told.push(on) });
+  await vi.waitFor(() => expect(spoken.calls).toContainEqual(["start"]));
+  spoken.emit("turn", { phase: "started", turn_id: "t1" });
+  spoken.emit("state", { listening: "speaking", recognising: 0 });
+  expect(told).toEqual([]);
+  finish.abort();
+  expect(told).toEqual([true]);
+  spoken.emit("state", { listening: "muted", recognising: 1 });
+  spoken.emit("turn", { phase: "finished", turn_id: "t1", text: "hasta aquí" });
+  await expect(heard).resolves.toBe("hasta aquí");
+  expect(told).toEqual([true]);
+
+  // A turn the voice ended on its silence is transcribed; one that came to nothing (a cough) leaves it listening.
+  const steps: boolean[] = [];
+  const voice = fakeVoice();
+  const listened = tryTranscription(voice as unknown as Voice, SETTINGS as never, { onTranscribing: (on) => steps.push(on) });
+  await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", { listening: "listening", recognising: 1 });
+  voice.emit("turn", { phase: "cancelled", turn_id: "t1", merged: false });
+  voice.emit("state", { listening: "listening", recognising: 0 });
+  expect(steps).toEqual([true, false]);
+  voice.emit("turn", { phase: "started", turn_id: "t2" });
+  voice.emit("state", { listening: "listening", recognising: 1 });
+  voice.emit("turn", { phase: "finished", turn_id: "t2", text: "hola" });
+  await expect(listened).resolves.toBe("hola");
+  expect(steps).toEqual([true, false, true]);
+});
+
+test("after a turn that came to nothing, Stop is a cancel: there is nothing to transcribe, and nothing is muted", async () => {
+  const voice = fakeVoice();
+  const finish = new AbortController();
+  const tried = tryTranscription(voice as unknown as Voice, SETTINGS as never, { finish: finish.signal });
+  await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  voice.emit("state", { listening: "speaking", recognising: 0 });
+  voice.emit("state", { listening: "listening", recognising: 1 });
+  voice.emit("turn", { phase: "cancelled", turn_id: "t1", merged: false });
+  voice.emit("state", { listening: "listening", recognising: 0 });
+  finish.abort();
+  await expect(tried).rejects.toMatchObject({ code: "trial-cancelled" });
+  expect(voice.calls.filter(([name]) => name === "mute")).toEqual([]);
+});
+
+test("a take ended by Stop whose turn comes to no words is nothing heard at once, not a wait on a muted microphone", async () => {
+  const voice = fakeVoice();
+  const finish = new AbortController();
+  const tried = tryTranscription(voice as unknown as Voice, SETTINGS as never, { finish: finish.signal });
+  await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
+  voice.emit("turn", { phase: "started", turn_id: "t1" });
+  finish.abort();
+  expect(voice.calls.at(-1)).toEqual(["mute", true]);
+  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "  " });
+  await expect(tried).rejects.toMatchObject({ code: "trial-silence" });
+  expect(voice.calls.slice(-2)).toEqual([["mute", false], ["stop"]]);
+});
+
 test("a try says how long each phase took, once it is heard", async () => {
 
   const turns: Array<(turn: unknown) => void> = [];

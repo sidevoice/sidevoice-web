@@ -734,6 +734,7 @@ export const messages: Messages = {
   "try.slow": "Lent sur cet appareil — un modèle plus petit lui conviendrait peut-être mieux.",
   "try.starting": "Préparation…",
   "try.listening": "Écoute… dites une phrase courte",
+  "try.transcribing": "Transcription…",
   "try.stop": "Arrêter",
   "try.speakAgain": "Parler à nouveau",
   "try.listenAgain": "Réécouter",
