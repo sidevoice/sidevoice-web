@@ -4,7 +4,7 @@ import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
-import type { SessionFacts } from "../../state/room-session-state.js";
+import { WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
 import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
@@ -23,6 +23,8 @@ const REPLY = "Okay. I'll start with the login and then look at the cart tests. 
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
   ({ thread_id, title, available: true, reach: { state: "listening" }, node: "fp-1", machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
 const pairing = (fp: string, host: string | null) => ({ fp, host, urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false });
+/** These conversations busy for as long as Working waits before it shows (the runtime's start and clock facts). */
+const lasted = (...keys: string[]) => ({ workingSince: Object.fromEntries(keys.map((key) => [key, 0])), now: WORKING_SHOWN_AFTER_MS });
 const live = (...fps: string[]) => Object.fromEntries(fps.map((fp) => [fp, { reach: "ok" as const, via: "node" as const }]));
 
 function room(extra: Partial<SessionFacts> = {}) {
@@ -36,7 +38,7 @@ function room(extra: Partial<SessionFacts> = {}) {
       person("t-backup", "Review the nightly backups", { node: "fp-2", machine: { host: "Home server", id: "m2" } }),
       person("t-week", "Plan the week", { available: false, reach: { state: "offline" }, node: "fp-2", machine: { host: "Home server", id: "m2" } }),
     ],
-    harness: { "fp-1|t-pay": true },
+    harness: { "fp-1|t-pay": true }, ...lasted("fp-1|t-pay"),
     history: [{ segment: "h-2", thread: "fp-1|t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }],
     ...extra,
   }));
@@ -94,7 +96,7 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Its last words said, it stays a moment, whole; what the agent is doing stands under it.
-  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true },
+  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
@@ -678,7 +680,7 @@ test("the transcript button wears a dot for what arrives while it is closed; ope
 test("the Working… line over the agent is an sr-only status, with no visible badge in its place", () => {
   const store = room();
   expect(workingLine()).toBeNull();
-  patch(store, { harness: { "fp-1|t-login": true } });
+  patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
@@ -695,7 +697,7 @@ test("the Working… line over the agent is an sr-only status, with no visible b
 test("a working-badge choice left in storage changes nothing: the line stays sr-only", () => {
   localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "working-badge": "show" }));
   const store = room();
-  patch(store, { harness: { "fp-1|t-login": true } });
+  patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   expect(workingLine()).toHaveClass("sr-only");
   expect(document.querySelector(".stage-activity")).toBeNull();
 }, WHOLE_APP_MS);

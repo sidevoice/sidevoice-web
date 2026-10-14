@@ -1,5 +1,6 @@
 import type { CatalogView } from "../services/model-catalogs.js";
 import { defaultVoiceSettings } from "../services/voice-settings.js";
+import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
 import type { UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
@@ -188,7 +189,8 @@ export const JOURNEYS: Journey[] = [
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
-    { id: "working", caption: "The agent working.", facts: { harness: { "fp-nuc|t-web": true } } },
+    { id: "working", caption: "The agent working, for longer than the 3 s Working waits before it shows.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS } },
+    { id: "working-soon", caption: "The agent busy for less than 3 s: nothing says Working yet, so a quick back-and-forth never flashes it.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS - 1000 } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
     { id: "transcript", caption: "The transcript open.", after: press("transcript-toggle") },
     { id: "transcript-unread", caption: "A reply arrived while the transcript was closed: a dot on its button.", after: arrives("Both tests pass now. Shall I push the fix?") },

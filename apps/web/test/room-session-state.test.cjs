@@ -3,52 +3,87 @@ const moduleReady=import('../src/state/room-session-state.js');
 // A call on machine m, bound to its thread a: the conversation is m|a, the machine's thread b another one.
 function facts(api,patch={}){return {...api.initialSessionFacts(),ws:{},sessionId:'s',callNode:'m',roomBinding:{thread_id:'a'},...patch}}
 function turn(patch={}){return {session:'s',thread:'m|a',status:'read',...patch}}
+// m|a busy for as long as it takes to show as working.
+const lasted=api=>({workingSince:{'m|a':0},now:api.WORKING_SHOWN_AFTER_MS});
 
 test('A harness report, including idle, overrides every receipt, settled turn and microphone state',async()=>{
  const api=await moduleReady;
  for(const busy of [false,true])for(const userLive of [false,true])for(const botLive of [false,true])for(const settled of [false,true]){
   const s=facts(api,{harness:{'m|a':busy},userLive,botLive,turns:{one:turn({settled})}});
-  assert.equal(api.working(s),busy);
+  assert.equal(api.busy(s),busy);
  }
 });
 test('Harness activity belongs to its conversation; another conversation cannot light these dots',async()=>{
  const api=await moduleReady;
- assert.equal(api.working(facts(api,{harness:{'m|b':true}})),false);
- assert.equal(api.working(facts(api,{harness:{'m|a':true,'m|b':false}})),true);
+ assert.equal(api.busy(facts(api,{harness:{'m|b':true}})),false);
+ assert.equal(api.busy(facts(api,{harness:{'m|a':true,'m|b':false}})),true);
 });
 test('A reply settles only its own turn, and late receipts cannot reopen it',async()=>{
  const api=await moduleReady;let s=facts(api,{turns:{'s:user-turn:1':turn(),'s:user-turn:2':turn()}});
  s.turns=api.recordReply(s,{session_id:'s',thread_id:'a',revision:2,reply_revision:1});
- assert.equal(api.working(s),true);
+ assert.equal(api.busy(s),true);
  s.turns=api.recordReply(s,{session_id:'s',thread_id:'a',revision:2});
- assert.equal(api.working(s),false);
+ assert.equal(api.busy(s),false);
  s.turns=api.recordReceipt(s,'s:user-turn:2','read',100);
- assert.equal(api.working(s),false);
+ assert.equal(api.busy(s),false);
 });
 test('A reply settles fallback work without a model-authored turn marker',async()=>{
  const api=await moduleReady;const s=facts(api);
  s.turns=api.recordReceipt(s,'s:user-turn:1','read',100);
- assert.equal(api.working(s),true);
+ assert.equal(api.busy(s),true);
  s.turns=api.recordReply(s,{session_id:'s',thread_id:'a',revision:1});
- assert.equal(api.working(s),false);
+ assert.equal(api.busy(s),false);
 });
 test('Read means working immediately; delivery means working after the fallback deadline',async()=>{
  const api=await moduleReady;
  for(const status of ['delivered','unconfirmed']){
   const s=facts(api,{now:100});s.turns=api.recordReceipt(s,'one',status,100);
-  assert.equal(api.working(s),false);s.now=1599;assert.equal(api.working(s),false);
-  s.now=1600;assert.equal(api.working(s),true);
+  assert.equal(api.busy(s),false);s.now=1599;assert.equal(api.busy(s),false);
+  s.now=1600;assert.equal(api.busy(s),true);
  }
- assert.equal(api.working(facts(api,{turns:{one:turn()}})),true);
+ assert.equal(api.busy(facts(api,{turns:{one:turn()}})),true);
 });
 test('Failed delivery and another browser never count as this conversation working',async()=>{
  const api=await moduleReady;
  for(const patch of [{status:'pending'},{status:'not_sent'},{status:'channel_closed'},{session:'other'},{thread:'m|b'}])
-  assert.equal(api.working(facts(api,{turns:{one:turn(patch)}})),false);
+  assert.equal(api.busy(facts(api,{turns:{one:turn(patch)}})),false);
+});
+test('Working shows only once the conversation has been busy for 3 s without a break',async()=>{
+ const api=await moduleReady;
+ assert.equal(api.WORKING_SHOWN_AFTER_MS,3000,'one wait, the decided one');
+ // Busy from 10 s on, as the runtime records it (busySince), and the clock read as it moves.
+ const s=facts(api,{harness:{'m|a':true},now:10_000});
+ assert.equal(api.busy(s),true);
+ assert.equal(api.working(s),false,'busy with no start recorded yet is not shown');
+ s.workingSince=api.busySince(s,10_000);
+ assert.deepEqual(s.workingSince,{'m|a':10_000});
+ assert.equal(api.workingDeadline(s),13_000);
+ s.now=12_999;assert.equal(api.working(s),false);assert.equal(api.sessionStatus(s).conversation,'idle');
+ s.now=13_000;assert.equal(api.working(s),true);assert.equal(api.sessionStatus(s).conversation,'working');
+ assert.equal(api.workingDeadline(s),null,'nothing left to wait for');
+ // Still busy: the start is kept, not moved on.
+ assert.deepEqual(api.busySince(s,20_000),{'m|a':10_000});
+ // A break starts the wait again: idle drops the start, and the next busy stretch has its own.
+ s.harness={'m|a':false};s.workingSince=api.busySince(s,14_000);
+ assert.deepEqual(s.workingSince,{});assert.equal(api.working(s),false);
+ s.harness={'m|a':true};s.workingSince=api.busySince(s,14_500);s.now=14_500;
+ assert.equal(api.working(s),false);assert.equal(api.workingDeadline(s),17_500);
+});
+test('Each conversation waits on its own start; one out of the call is never busy',async()=>{
+ const api=await moduleReady;
+ const s=facts(api,{harness:{'m|a':true,'m|b':true},now:5_000});
+ s.workingSince=api.busySince(s,5_000);
+ s.harness={'m|a':true,'m|b':true,'m|c':true};s.workingSince=api.busySince(s,7_000);
+ assert.deepEqual(s.workingSince,{'m|a':5_000,'m|b':5_000,'m|c':7_000});
+ s.now=8_000;
+ assert.deepEqual(['m|a','m|b','m|c'].map(key=>api.working(s,key)),[true,true,false]);
+ assert.equal(api.workingDeadline(s),10_000);
+ assert.equal(api.participantsView({...s,people:[{node:'m',thread_id:'a',title:'A',available:true}]})[0].working,true);
+ assert.deepEqual(api.busySince({...s,ws:null},9_000),{},'out of the call nothing is busy');
 });
 test('The person and room speaking are independent of harness work and tab transcription',async()=>{
  const api=await moduleReady;
- const v=api.sessionStatus(facts(api,{harness:{'m|a':true},userLive:true,botLive:true,pendingPhase:'transcribing'}));
+ const v=api.sessionStatus(facts(api,{harness:{'m|a':true},...lasted(api),userLive:true,botLive:true,pendingPhase:'transcribing'}));
  assert.equal(v.speaker,'user');assert.equal(v.conversation,'working');assert.equal(v.tab,'transcribing');
  assert.equal(api.sessionStatus(facts(api,{botLive:true})).conversation,'speaking');
  assert.equal(api.sessionStatus(facts(api)).conversation,'idle');
@@ -100,7 +135,7 @@ test('The reply being said carries the part sounding to its bubble, and only tha
  assert.equal(api.conversationView(s).messages[1].playback,'complete');
 });
 test('One store transition publishes one coherent projection, without calls from a handler to render or sound',async()=>{
- const api=await moduleReady;const store=api.createRoomSessionStore(facts(api));const seen=[];store.subscribe(s=>seen.push(s));
+ const api=await moduleReady;const store=api.createRoomSessionStore(facts(api,lasted(api)));const seen=[];store.subscribe(s=>seen.push(s));
  store.batch(()=>{store.facts.harness={'m|a':true};store.facts.userLive=true});
  assert.equal(seen.length,1);assert.equal(seen[0].session.working,true);assert.equal(seen[0].session.speaker,'user');
  store.facts.userLive=false;assert.equal(seen[1].session.speaker,'nobody');

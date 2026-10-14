@@ -19,6 +19,7 @@ import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSetti
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalError} from './refusals.js';
+import {followWorking} from './working-clock.ts';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -2047,3 +2048,5 @@ function publishSessionView(view = roomStore.getState()) {
 }
 roomStore.subscribe(reconcileSession);
 reconcileSession(roomStore.getState());
+// Working shows once a conversation has been busy for a while (WORKING_SHOWN_AFTER_MS): this keeps its start and clock.
+followWorking(roomStore);
