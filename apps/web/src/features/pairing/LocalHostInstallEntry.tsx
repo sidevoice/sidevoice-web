@@ -11,6 +11,7 @@ import {
 } from "../../services/local-host-install";
 import { translator, type MessageKey } from "../../i18n/translator";
 import { localHostBridgeError } from "../settings/local-host-status";
+import { InstallCommandHere } from "./ConnectorSteps";
 import "./pairing.css";
 import { uiLocale } from "../../i18n/locale";
 
@@ -62,6 +63,8 @@ export function LocalHostInstallEntry({
   const attemptActive = isVisibleLocalHostInstall(snapshot);
   const [note, setNote] = useState("");
 
+  // A desktop app that does not install Sidevoice itself offers the command to run here instead; a browser, nothing.
+  if (showCta && !supportsInstall && !showingAttempt) return bridge ? <div className={cn("local-install-entry", className)}><InstallCommandHere /></div> : null;
   if ((!supportsInstall && !showingAttempt) || (!showCta && !showingAttempt) || (snapshot.phase === "succeeded" && !holdSuccess)) return null;
 
   function start() {

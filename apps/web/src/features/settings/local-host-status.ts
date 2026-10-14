@@ -175,6 +175,19 @@ export function canRunLocalHostAction(action: LocalHostAction, bridge = localHos
   return !!bridge && typeof bridge[methodFor[action]] === "function";
 }
 
+/** What brings this computer's Sidevoice back from where it stands, where this app can: Start when it is stopped or its
+ *  service is not set up (setting it up starts it), Retry (a restart, never the install again) while it retries or
+ *  once it failed, Reconnect once it no longer recognizes this app; none while it runs or starts, nor where nothing is
+ *  installed. */
+export function localHostRecovery(status: LocalHostStatus, bridge = localHostBridge()): { action: LocalHostAction; label: MessageKey } | null {
+  const recovery: { action: LocalHostAction; label: MessageKey } | null =
+    status.state === "not-installed" ? { action: "serviceInstall", label: "hosts.start" }
+      : status.state === "stopped-by-person" ? { action: "start", label: "hosts.start" }
+        : status.state === "backoff" || status.state === "failed" || status.state === "service-failed" ? { action: "restart", label: "hosts.retry" }
+          : status.state === "refused" ? { action: "reconnect", label: "hosts.reconnect" } : null;
+  return recovery && canRunLocalHostAction(recovery.action, bridge) ? recovery : null;
+}
+
 export async function runLocalHostAction(action: LocalHostAction, bridge = localHostBridge()) {
   if (!bridge) return false;
   const method = bridge[methodFor[action]];

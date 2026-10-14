@@ -501,6 +501,8 @@ export const messages: Messages = {
   "pairing.incompatible": "Maszyna z tego kodu nie jest zgodna z tą wersją Sidevoice.",
   "localInstall.cta": "Używaj agentów na tym komputerze",
   "localInstall.description": "Przygotuj Sidevoice na tym komputerze. Ten krok nie rejestruje ani nie łączy agentów.",
+  "localInstall.runHere": "Uruchom to w terminalu na tym komputerze:",
+  "localInstall.askAgent": "Możesz też poprosić jednego ze swoich agentów, żeby zrobił to za ciebie.",
   "localInstall.panelTitle": "Przygotowywanie tego komputera",
   "localInstall.preparing": "Sidevoice przygotowuje ten komputer…",
   "localInstall.step.download": "Pobieranie Sidevoice",
@@ -1081,7 +1083,7 @@ export const messages: Messages = {
   "whatsNew.speechLanguage.line": "Podaj transkrypcji swój język, zamiast za każdym razem go wykrywać.",
   "wizard.prepareStarting": "Uruchamianie Sidevoice na tym komputerze…",
   "wizard.prepareAnswering": "Sprawdzanie, czy ten komputer odpowiada…",
-  "wizard.prepareRetry": "Spróbuj ponownie",
+  "wizard.prepareWaiting": "Oczekiwanie na Sidevoice na tym komputerze…",
   // Trying the end of turn (TurnTry).
   "turnTry.title": "Wypróbuj koniec wypowiedzi",
   "turnTry.listeningSimple": "Słucham… mów i zakończ naturalnie",

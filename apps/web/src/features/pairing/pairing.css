@@ -11,6 +11,11 @@
 }
 .connector-steps > li > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
 
+/* ----- the install command to run on this computer, where the app does not install Sidevoice itself */
+.install-here { display: grid; gap: var(--sv-space-2); min-width: 0; }
+.install-here > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
+.install-here > .install-here-agent { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+
 /* ----- "Connect to your machine" (PairMachine): the form */
 .pair-machine { display: grid; gap: var(--sv-space-5); min-width: 0; }
 .pairing-form { position: relative; display: grid; gap: var(--sv-space-4); min-width: 0; }

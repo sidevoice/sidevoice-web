@@ -97,6 +97,17 @@ test("This device offers local setup when no local host is projected; Remote mac
   expect(install).not.toHaveBeenCalled();
 });
 
+test("This device, where the app does not install Sidevoice itself, offers the install command to run here instead", () => {
+  actions();
+  setBridge({});
+  room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true, inApp: true });
+
+  expect(within(thisDevice()).queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
+  expect(within(thisDevice()).getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
+  expect(document.getElementById("machines")!.querySelector(".local-install-entry")).toBeNull();
+});
+
 test("an existing stopped local R1 host keeps its page and does not show the install CTA", () => {
   actions();
   setBridge({ install: vi.fn() });
