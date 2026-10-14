@@ -122,7 +122,7 @@ test("with this computer prepared: This device shows its page; Remote machines l
   const pane = document.getElementById("pane-this-computer")!;
   expect(pane).not.toHaveAttribute("hidden");
   expect(pane.querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
-  expect(within(pane).getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
+  expect(within(pane).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
   expect(within(pane).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(within(pane).queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   // Remote machines: the others alone, then Add a remote machine — in the nav and in its pane.
@@ -131,7 +131,7 @@ test("with this computer prepared: This device shows its page; Remote machines l
   addSays("Add a remote machine");
   expect(machinesPane().querySelector('.machine-entry[data-name="MacBook"]')).toBeNull();
   expect(machinesPane().querySelector('.machine-entry[data-name="NUC"]')).not.toBeNull();
-  expect(within(machinesPane()).queryByRole("heading", { name: "Sidevoice on MacBook" })).toBeNull();
+  expect(within(machinesPane()).queryByRole("heading", { name: "Sidevoice service" })).toBeNull();
   expect(within(machinesPane()).getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
 });
 
@@ -139,7 +139,7 @@ test("on a host not yet prepared: This device offers to prepare it, with no othe
   open([paired()], { localHostAvailable: true, inApp: true, localHostStatus: { state: "absent" }, settingsSection: "this-computer" });
   expect(sections()).toContain("This device");
   const pane = document.getElementById("pane-this-computer")!;
-  expect(pane.querySelector(".this-computer-prepare")).toHaveTextContent("Install Sidevoice on this computer.");
+  expect(pane.querySelector(".this-computer-prepare")).toHaveTextContent("To use the agents on this computer, Sidevoice needs a background service.");
   expect(within(pane).getByRole("button", { name: "Prepare this computer" })).toBeInTheDocument();
   expect(within(pane).getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
   expect(within(pane).queryByRole("button", { name: /another machine/i })).toBeNull();

@@ -25,7 +25,8 @@ export function LocalHostBanner() {
       : status.state === "not-installed" ? "serviceInstall"
         : status.state === "refused" ? "reconnect" : "restart";
   const available = action ? canRunLocalHostAction(action) : false;
-  const cause = hostStatusText(status, t);
+  // No install command follows a banner's line: incompatible is said without "Update it:".
+  const cause = hostStatusText(status, t, { command: false });
   async function retry() {
     if (busy || !action) return;
     setBusy(true);setError(false);

@@ -14,6 +14,7 @@ import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
+import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
@@ -279,7 +280,7 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
       </header>
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
-        {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} name={machine.host || null} />
+        {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} />
           : <RemoteHostCard machine={machine} name={name} titleId={"host-status-" + machine.id} />}
       </section>
       <section className="host-section" ref={agents}>
@@ -337,7 +338,7 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
  * the app reads the service here), said as it changes; its version ("Sidevoice 0.8.1");
  * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
  * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
-function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: MachineView; status: LocalHostStatus; titleId: string; name: string | null }) {
+function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineView; status: LocalHostStatus; titleId: string }) {
   const t = translator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
@@ -391,8 +392,8 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
   return (
     <div className="host-status-card" data-state={status.state} data-tone={state.tone}>
       <div className="host-status-head">
-        {/* "Sidevoice on MacBook"; with no name to say yet (its pairing lost), "Sidevoice on this computer". */}
-        <h4 id={titleId} tabIndex={-1}>{name ? t("hosts.serviceOn", { machine: name }) : t("hosts.section.service")}</h4>
+        {/* "Sidevoice service": the page is this computer's already, so its name is not said again. */}
+        <h4 id={titleId} tabIndex={-1}>{t("hosts.section.service")}</h4>
         <span className="host-status-state" role="status"><span className="host-status-dot" aria-hidden="true" />{state.short}</span>
       </div>
       {/* The facts, compact; then what the state means where it says more than its word. */}
@@ -403,6 +404,8 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
         <ThisDeviceVersion t={t} />
       </dl>
       {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
+      {/* Incompatible ends on "Update it:": the install command, which updates it, follows — as in the setup. */}
+      {status.state === "incompatible" && <InstallCommandHere />}
       {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
           come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
       {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}

@@ -10,6 +10,7 @@ import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
 import { fakeUpdater } from "../../test/updater";
 import { localHostInstallController } from "../../services/local-host-install";
+import { CONNECTOR_INSTALL } from "../pairing/connector-commands";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -94,7 +95,7 @@ test("This device offers local setup when no local host is projected; Remote mac
 
   // The setup's two ways: the app's Prepare, then I'll do it myself, closed.
   const device = within(thisDevice());
-  expect(thisDevice().querySelector(".this-computer-prepare > p")).toHaveTextContent("Install Sidevoice on this computer.");
+  expect(thisDevice().querySelector(".this-computer-prepare > p")).toHaveTextContent("To use the agents on this computer, Sidevoice needs a background service.");
   expect(device.getByRole("button", { name: "Prepare this computer" })).toHaveClass("ui-button--primary");
   expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
   expect(thisDevice().querySelector(".ui-snippet")).toBeNull();
@@ -105,14 +106,14 @@ test("This device offers local setup when no local host is projected; Remote mac
   // Opened: the command, and the wait for this computer.
   await act(async () => { device.getByRole("button", { name: "I’ll do it myself" }).click(); });
   expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
-  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
   await act(async () => { device.getByRole("button", { name: "I’ll do it myself" }).click(); });
   expect(thisDevice().querySelector(".ui-snippet")).toBeNull();
   // The app's install failing (this one answers nothing usable): what failed, Retry, and the command open by itself.
   await act(async () => { device.getByRole("button", { name: "Prepare this computer" }).click(); });
   expect(install).toHaveBeenCalledOnce();
   expect(thisDevice().querySelector(".local-install-panel")).toHaveAttribute("data-phase", "failed");
-  expect(device.getByRole("button", { name: "Retry setup" })).toBeInTheDocument();
+  expect(device.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   expect(device.queryByRole("button", { name: "Prepare this computer" })).toBeNull();
   expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "true");
   expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
@@ -128,7 +129,7 @@ test("This device, where the app does not install Sidevoice itself, offers the i
   expect(within(thisDevice()).queryByRole("button", { name: "I’ll do it myself" })).toBeNull();
   expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
   expect(within(thisDevice()).getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
-  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
   expect(document.getElementById("machines")!.querySelector(".local-install-entry")).toBeNull();
 });
 
@@ -176,9 +177,9 @@ test("local F6 status shows only supported service actions", async () => {
   setBridge({ serviceInstall, start: undefined, restart: undefined, stop: undefined });
   actions();
   room([local], { localHostStatus: { state: "not-installed", installed: false, service: "none" } });
-  expect(screen.getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(document.querySelector(".host-status-summary")).toHaveTextContent("Does not start when you sign in");
+  expect(document.querySelector(".host-status-summary")).toHaveTextContent("The service is installed, but doesn't start by itself.");
   // Not installed: its one action is Start, which installs the service; Start at sign-in comes once there is one.
   expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
   expect(screen.queryByRole("switch", { name: "Start at sign-in" })).toBeNull();
@@ -187,6 +188,22 @@ test("local F6 status shows only supported service actions", async () => {
   expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   await act(async () => { screen.getByRole("button", { name: "Start" }).click(); });
   expect(serviceInstall).toHaveBeenCalledOnce();
+});
+
+test("incompatible, this computer's card ends on Update it: and the install command follows; the banner, with no command, says it without", () => {
+  setBridge({ serviceInstall: vi.fn() });
+  actions();
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], machinesAt: 1_700_086_400_000, machinesReady: true, localHostAvailable: true, inApp: true,
+    localHostStatus: { ...running, state: "incompatible", reachable: false } }); });
+  render(<RoomProvider store={store}><Panes /><LocalHostBanner /></RoomProvider>);
+  const card = thisDevice().querySelector<HTMLElement>(".host-status-card")!;
+  expect(within(card).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
+  const summary = card.querySelector(".host-status-summary")!;
+  expect(summary).toHaveTextContent("The service on this computer isn't compatible with this version of the app. Update it:");
+  expect(summary.nextElementSibling).toHaveClass("install-here");
+  expect(summary.nextElementSibling).toHaveTextContent(CONNECTOR_INSTALL);
+  expect(screen.getByText("This computer is unavailable: The service on this computer isn't compatible with this version of the app.")).toBeInTheDocument();
 });
 
 test("service failure display and copied diagnostics omit secret-bearing native fields", async () => {
@@ -237,7 +254,7 @@ test("stopping the local host while calls are active asks first, and Cancel leav
   room([local], { localHostStatus: { ...running, calls: 1 } });
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
-  expect(screen.getByText("Stop Sidevoice on this computer? Active calls will end.")).toBeInTheDocument();
+  expect(screen.getByText("Stop the service on this computer? Active calls will end.")).toBeInTheDocument();
   expect(stop).not.toHaveBeenCalled();
   await act(async () => { screen.getByRole("button", { name: "Cancel" }).click(); });
   expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent("Running");
@@ -256,7 +273,7 @@ test("with no active calls, Stop stops the local host without asking", async () 
   await act(async () => {});
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
-  expect(screen.queryByText("Stop Sidevoice on this computer? Active calls will end.")).toBeNull();
+  expect(screen.queryByText("Stop the service on this computer? Active calls will end.")).toBeNull();
   expect(stop).toHaveBeenCalledOnce();
 });
 
@@ -475,7 +492,7 @@ test("a lost native pairing keeps This device's page and recovery action, with n
   expect(document.querySelector(".machines-inline .machine-entry")).toBeNull();
   expect(screen.queryByRole("button", { name: "Use This computer" })).toBeNull();
   expect(screen.getByText(/This computer is unavailable/)).toBeInTheDocument();
-  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
+  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
   await act(async () => { screen.getAllByRole("button", { name: "Retry" })[0].click(); });
   expect(restart).toHaveBeenCalledOnce();
@@ -579,8 +596,8 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
   // Remote machines alone is the first remote machine; this computer's page is This device's.
   expect(within(machines).getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
-  expect(within(machines).queryByRole("heading", { name: "Sidevoice on MacBook" })).toBeNull();
-  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
+  expect(within(machines).queryByRole("heading", { name: "Sidevoice service" })).toBeNull();
+  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
   await act(async () => { entry("Other PC").click(); });
   expect(store.getState().facts.machinesView.machine).not.toBeNull();
   // Every machine's page has its Sidevoice card: another machine's, to read.
@@ -612,7 +629,7 @@ test("this computer is not among the remote machines; stopped, its page says Sta
   expect(entry("MacBook")).toBeNull();
   expect(entry("NUC")).not.toHaveTextContent("This computer");
   expect(within(thisDevice()).getByRole("button", { name: "Start" })).toBeInTheDocument();
-  expect(screen.getByText(/does not start when you sign in\. Start it here/)).toBeInTheDocument();
+  expect(screen.getByText(/doesn't start when you sign in\. Start it here/)).toBeInTheDocument();
 });
 
 

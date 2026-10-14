@@ -281,9 +281,9 @@ test("preparing this computer never offers Prepare again: the install, then wait
   await act(async () => { finish({ state: "starting", installed: true, reachable: false }); await Promise.resolve(); });
   act(() => { localHostInstallController.clear(); store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }); });
   expect(document.getElementById("wizard-prepare")).toBeNull();
-  expect(screen.getByText("Starting Sidevoice on this computer…")).toBeInTheDocument();
+  expect(screen.getByText("Starting the service…")).toBeInTheDocument();
   act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true } }));
-  expect(screen.getByText("Checking that this computer answers…")).toBeInTheDocument();
+  expect(screen.getByText("Checking that the service answers…")).toBeInTheDocument();
   expect(document.getElementById("wizard-prepare")).toBeNull();
   // Answering: its agents, in the same step.
   act(() => store.patch({ pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
@@ -310,11 +310,11 @@ test("where the app does not install Sidevoice itself, preparing this computer i
   expect(wizard().getByRole("button", { name: "Copy setup command" })).toHaveClass("ui-copy-button");
   expect(wizard().getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
   expect(document.getElementById("wizard")).not.toHaveTextContent("@sidevoice/uplink");
-  expect(document.querySelector("#wizard .prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  expect(document.querySelector("#wizard .prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
   // Run: it starts, and the command goes.
   act(() => store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }));
   expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
-  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting Sidevoice on this computer…");
+  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting the service…");
   // Answering: on to its agents by itself, in the same step.
   act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true },
     pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
@@ -333,7 +333,7 @@ test("where the app installs Sidevoice itself, the command is the other way, und
   render(<App store={store} />);
   expect(title()).toHaveTextContent("Prepare this computer");
   // Two ways, one under the other: the app's (the step's main action), then the person's, closed, the description true to both.
-  expect(wizard().getByText("Install Sidevoice on this computer.")).toBeInTheDocument();
+  expect(wizard().getByText("To use the agents on this computer, Sidevoice needs a background service.")).toBeInTheDocument();
   const prepare = document.getElementById("wizard-prepare")!;
   expect(prepare).toHaveTextContent("Prepare this computer");
   expect(prepare).toHaveClass("ui-button--primary");
@@ -346,7 +346,7 @@ test("where the app installs Sidevoice itself, the command is the other way, und
   const manual = document.getElementById(manualToggle().getAttribute("aria-controls")!)!;
   expect([...manual.querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
   expect(manual).toHaveTextContent("You can also ask one of your agents to run it for you.");
-  expect(manual.querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  expect(manual.querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
   expect(wizard().queryByRole("button", { name: /^Check/ })).toBeNull();
   // Prepare is still there, and nothing was installed by opening it.
   expect(document.getElementById("wizard-prepare")).not.toBeNull();
@@ -358,7 +358,7 @@ test("where the app installs Sidevoice itself, the command is the other way, und
   await act(async () => { fireEvent.click(manualToggle()); });
   act(() => store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }));
   expect(manualToggle(true)).toBeNull();
-  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting Sidevoice on this computer…");
+  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting the service…");
   act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true },
     pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));

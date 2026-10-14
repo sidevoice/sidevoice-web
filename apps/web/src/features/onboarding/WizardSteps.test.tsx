@@ -89,10 +89,10 @@ test("preparing this computer, the setup offers no other machine in any state of
     noOtherMachine("installing");
     await act(async () => { settle.reject({ key: "install.unknown", step: "download" }); await Promise.resolve(); });
     noOtherMachine("failed");
-    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry setup" })); });
+    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry" })); });
     await act(async () => { settle.reject({ key: "install.cancelled", step: "download" }); await Promise.resolve(); });
     noOtherMachine("cancelled");
-    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry setup" })); });
+    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry" })); });
     await act(async () => { settle.resolve({ state: "starting", installed: true, reachable: false }); await Promise.resolve(); });
     noOtherMachine("succeeded");
     expect(setup.getByText("Preparing this computer")).toBeInTheDocument();
@@ -119,17 +119,17 @@ test("an install that fails says what failed and opens I'll do it myself by itse
     // What failed, in its words and at which step, as the install's panel says it; the command open under it, unasked.
     const panel = document.querySelector("#wizard .local-install-panel")!;
     expect(panel).toHaveAttribute("data-phase", "failed");
-    expect(within(panel as HTMLElement).getByRole("alert")).toHaveTextContent("Downloading Sidevoice");
+    expect(within(panel as HTMLElement).getByRole("alert")).toHaveTextContent("Downloading the service");
     expect(toggle()).toHaveAttribute("aria-expanded", "true");
     expect(command()).toEqual(["npx sidevoice@latest install"]);
-    expect(document.querySelector("#wizard .prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+    expect(document.querySelector("#wizard .prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
     // The panel's Retry is the app's way again (no second Prepare beside it); it closes like any other.
     expect(document.getElementById("wizard-prepare")).toBeNull();
-    expect(setup.getByRole("button", { name: "Retry setup" })).toBeInTheDocument();
+    expect(setup.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     await act(async () => { fireEvent.click(toggle()!); });
     expect(command()).toEqual([]);
     await act(async () => { fireEvent.click(toggle()!); });
-    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry setup" })); });
+    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry" })); });
     expect(install).toHaveBeenCalledTimes(2);
     expect(toggle()).toBeNull();
     expect(command()).toEqual([]);
@@ -158,14 +158,14 @@ test("installed here but not running, preparing this computer offers what starts
     expect(setup.queryByRole("button", { name: "I’ll do it myself" })).toBeNull();
   };
   // Stopped: Start.
-  expect(setup.getByText("Stopped until the next sign-in")).toBeInTheDocument();
+  expect(setup.getByText("The service is stopped until you sign in again.")).toBeInTheDocument();
   expect(action()).toHaveTextContent("Start");
   nothingElse();
   await act(async () => { fireEvent.click(action()); });
   expect(start).toHaveBeenCalledOnce();
   // Failed: Retry is a restart (contract gap #12), said as an alert.
   act(() => store.patch({ localHostStatus: { state: "failed", service: "launchd", reachable: false, failure: { key: "start.failed" } } }));
-  expect(setup.getByRole("alert")).toHaveTextContent(/^Could not start: /);
+  expect(setup.getByRole("alert")).toHaveTextContent(/^The service couldn't start: /);
   expect(action()).toHaveTextContent("Retry");
   nothingElse();
   await act(async () => { fireEvent.click(action()); });
@@ -176,4 +176,22 @@ test("installed here but not running, preparing this computer offers what starts
   await act(async () => { fireEvent.click(action()); });
   expect(serviceInstall).toHaveBeenCalledOnce();
   expect(install).not.toHaveBeenCalled();
+}, WHOLE_APP_MS);
+
+test("incompatible here, preparing this computer says so, ending on Update it:, and the install command follows", async () => {
+  // The desktop app as it ships: no install of its own, so the command is shown as is (#101).
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "incompatible" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
+    start: vi.fn(), restart: vi.fn(), serviceInstall: vi.fn(),
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "incompatible", service: "launchd", reachable: false },
+    voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  const setup = within(document.getElementById("wizard")!);
+  const said = setup.getByText("The service on this computer isn't compatible with this version of the app. Update it:");
+  expect(said.nextElementSibling).toHaveClass("prepare-here");
+  expect(said.nextElementSibling!.querySelector(".ui-snippet")).toHaveTextContent("npx sidevoice@latest install");
+  expect(document.getElementById("wizard-prepare-recover")).toBeNull();
 }, WHOLE_APP_MS);

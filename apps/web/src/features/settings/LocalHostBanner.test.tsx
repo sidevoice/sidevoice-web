@@ -29,7 +29,7 @@ test("this computer's service in a state this app does not know says so, and off
   const newer = { state: "migrating", reachable: false, progress: { done: 1, total: 3 } } as unknown as LocalHostStatus;
   act(() => { store.patch({ pairings: [local], localHostStatus: newer }); });
   render(<RoomProvider store={store}><LocalHostBanner /></RoomProvider>);
-  expect(screen.getByText("This computer is unavailable: Sidevoice on this computer reports a state this app does not recognize.")).toBeInTheDocument();
+  expect(screen.getByText("This computer is unavailable: The service on this computer reports a state this app doesn't recognize.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   // A state it knows keeps its action.
   act(() => { store.patch({ localHostStatus: { state: "failed", reachable: false } }); });

@@ -64,13 +64,13 @@ test("NoMachine keeps remote pairing available while local preparation reports b
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Connect to a machine" })); });
   expect(openPairing).toHaveBeenCalledOnce();
-  expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cancel setup" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cancel" })); });
   await waitFor(() => expect(controller.getSnapshot()).toMatchObject({ phase: "installing", cancelling: true }));
   await act(async () => { cancelResult.resolve(true);await cancelResult.promise; });
   await act(async () => { result.reject({ key: "install.cancelled", step: "download" });await Promise.resolve(); });
-  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Setup was canceled"));
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Cancelled. Nothing was installed."));
   act(() => controller.clear());
 });
 
@@ -84,9 +84,9 @@ test("a non-cancellable commit progress frame hides Cancel", async () => {
   render(<LocalHostInstallEntry showCta controller={controller} />);
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
-  expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   await act(async () => { report({ step: "commit", done: null, total: null, cancellable: false }); });
-  expect(screen.queryByRole("button", { name: "Cancel setup" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 
   await act(async () => { result.resolve(running); await Promise.resolve(); });
   act(() => controller.clear());
@@ -124,7 +124,7 @@ test("failure shows translated key copy, safe details and a retry action", async
   expect(copied).not.toContain("demo-secret");
   expect(copied).not.toContain("demo-credential");
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry setup" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
   expect(install).toHaveBeenCalledTimes(2);
   await waitFor(() => expect(screen.queryByRole("heading", { name: "Preparing this computer" })).toBeNull());
 });
