@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { LocalHostBanner } from "./LocalHostBanner";
 import { hostStatusText, knownLocalHostState, safeLocalHostStatusDetails } from "./local-host-status";
 import { translator } from "../../i18n/translator";
@@ -7,6 +7,7 @@ import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostStatus } from "../../services/desktop-host";
+import { localHostInstallController } from "../../services/local-host-install";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -49,6 +50,40 @@ test("stopped, the banner says only that, and offers Start", async () => {
   await act(async () => { screen.getByRole("button", { name: "Start" }).click(); });
   expect(start).toHaveBeenCalledOnce();
   expect(restart).not.toHaveBeenCalled();
+});
+
+test("uninstall clears the unavailable banner; Retry only restarts a failed installed service", async () => {
+  const restart = bridge();
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], localHostStatus: { state: "running", reachable: true } }); });
+  render(<RoomProvider store={store}><LocalHostBanner /></RoomProvider>);
+  act(() => { store.patch({ pairings: [], localHostStatus: { state: "absent", installed: false, reachable: false } }); });
+  expect(document.querySelector(".local-host-banner")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  act(() => { store.patch({ pairings: [local], localHostStatus: { state: "starting", reachable: false } }); });
+  expect(document.querySelector(".local-host-banner")).toBeNull();
+  act(() => { store.patch({ localHostStatus: { state: "installing", reachable: false } }); });
+  expect(document.querySelector(".local-host-banner")).toBeNull();
+  act(() => { store.patch({ localHostStatus: { state: "failed", installed: true, reachable: false } }); });
+  expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  await act(async () => { screen.getByRole("button", { name: "Retry" }).click(); });
+  expect(restart).toHaveBeenCalledOnce();
+});
+
+test("a failed preparation reports its install error without an installed-service banner", async () => {
+  act(() => localHostInstallController.clear());
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
+    install: vi.fn(() => Object.assign(Promise.reject({ key: "install.network", step: "download" }), { job: "failed-install" })),
+    restart: vi.fn(async () => undefined),
+  } } } });
+  const store = createRoomStore();
+  act(() => store.patch({ pairings: [local], localHostStatus: { state: "failed", installed: false, reachable: false } }));
+  render(<RoomProvider store={store}><LocalHostBanner /></RoomProvider>);
+  act(() => { expect(localHostInstallController.start("no-machine")).toBe(true); });
+  await waitFor(() => expect(localHostInstallController.getSnapshot().phase).toBe("failed"));
+  expect(document.querySelector(".local-host-banner")).toBeNull();
+  act(() => localHostInstallController.clear());
 });
 
 test("a state this app does not know is never worded as one it knows; extra fields are not copied into the details", () => {

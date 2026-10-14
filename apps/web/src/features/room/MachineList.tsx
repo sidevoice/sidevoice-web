@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useContext, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { AddIcon, EditIcon, OtherMachineIcon, ThisComputerIcon } from "../../components/ui/Icons";
@@ -13,6 +13,7 @@ import { desktopBuild, localHostBridge, type LocalHostStatus } from "../../servi
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
+import { localHostInstallController } from "../../services/local-host-install";
 import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { InstallCommandHere } from "../pairing/ConnectorSteps";
 import { useThisComputerSection } from "../../state/this-computer";
@@ -216,6 +217,10 @@ export function MachineList() {
 export function ThisComputerSettings() {
   const t = translator();
   const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
+  const status = useRoomStore((state) => state.facts.localHostStatus);
+  const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot);
+  const preparing = install.phase !== "idle" && install.source === "no-machine"
+    && (install.phase === "installing" || install.phase === "succeeded" || status.installed !== true);
   const store = useContext(RoomStoreContext);
   // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
   const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
@@ -224,8 +229,9 @@ export function ThisComputerSettings() {
     <Section id="this-computer" title={<span className="this-device-title">{name}
       <Button variant="ghost" tone="neutral" size="icon-sm" className="this-device-rename" aria-label={t("hosts.renameDevice")} title={t("hosts.renameDevice")} onClick={rename}><EditIcon size={14} /></Button>
     </span>}>
-      {local ? <HostDetail machine={local} name={machineName(local, t)} untitled />
+      {local && status.state !== "absent" && !preparing ? <HostDetail machine={local} name={machineName(local, t)} untitled />
         : <div className="this-computer-prepare">
+            {status.state === "absent" && install.phase === "idle" && <p className="this-computer-absent">{t("hosts.status.absent")}</p>}
             <p>{t("localInstall.description")}</p>
             <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
             <PrepareThisComputer id="this-computer-prepare" />

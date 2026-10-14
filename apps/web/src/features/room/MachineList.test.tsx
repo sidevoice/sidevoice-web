@@ -95,7 +95,8 @@ test("This device offers local setup when no local host is projected; Remote mac
 
   // The setup's two ways: the app's Prepare, then I'll do it myself, closed.
   const device = within(thisDevice());
-  expect(thisDevice().querySelector(".this-computer-prepare > p")).toHaveTextContent("To use the agents on this computer, Sidevoice needs a background service.");
+  expect(device.getByText("This computer isn't prepared yet.")).toBeInTheDocument();
+  expect(device.getByText("To use the agents on this computer, Sidevoice needs a background service.")).toBeInTheDocument();
   expect(device.getByRole("button", { name: "Prepare this computer" })).toHaveClass("ui-button--primary");
   expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
   expect(thisDevice().querySelector(".ui-snippet")).toBeNull();

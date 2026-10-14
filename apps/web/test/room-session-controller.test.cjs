@@ -804,6 +804,21 @@ test('A local row survives reload with no native pairing',async()=>{
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
 });
 
+test('An external uninstall projects absent and removes the former local machine',async()=>{
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ let onStatus;
+ const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd'}),subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>local};
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(s.run('roomStore.getState().machines.some(machine=>machine.local)'),true);
+ onStatus({state:'absent',installed:false,reachable:false});
+ const snapshot=s.run('roomStore.getState()');
+ assert.equal(snapshot.facts.localHostStatus.state,'absent');
+ assert.equal(snapshot.machines.some(machine=>machine.local),false);
+ assert.equal(snapshot.machines.some(machine=>machine.id===PAIRED.fp),true,'another paired machine remains in the room');
+});
+
 test('In the desktop app, this device\'s agents are asked for in This device and another machine\'s under Remote machines; in a browser, all under Machines',async()=>{
  const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
