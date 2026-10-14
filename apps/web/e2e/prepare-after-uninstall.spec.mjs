@@ -41,7 +41,7 @@ async function mockLocalHost(page) {
 }
 
 for (const width of [1280, 390]) {
-  test(`prepare after external uninstall stays in Settings at ${width}px`, async ({ page }) => {
+  test(`prepare after an absent host projection stays in Settings at ${width}px`, async ({ page }) => {
     await installHarness(page);
     await mockLocalHost(page);
     await page.setViewportSize({ width, height: 800 });
@@ -115,3 +115,56 @@ for (const width of [1280, 390]) {
     expect(await page.evaluate(() => window.__hostTest.calls)).toEqual({ install: 2, restart: 0 });
   });
 }
+
+test("manual recovery retires a failed install even with start-at-sign-in off", async ({ page }) => {
+  await installHarness(page);
+  await page.addInitScript(() => localStorage.setItem("sidevoice.pairings", JSON.stringify({ pairings: [] })));
+  await mockLocalHost(page);
+  await page.goto("/voice/");
+  await page.waitForFunction(() => window.sidevoiceUI?.store?.getState().machines.some((machine) => machine.local));
+  await page.evaluate(() => window.__hostTest.uninstall());
+  const empty = page.locator(".no-machine-screen");
+  await expect(empty).toBeVisible();
+  await empty.getByRole("button", { name: "Prepare this computer" }).click();
+  await page.evaluate(() => window.__hostTest.failInstall());
+  await expect(empty.locator('.local-install-panel[data-phase="failed"]')).toBeVisible();
+
+  // The manual CLI path recovers the local pairing while the renderer still holds the failed download.
+  await page.evaluate(() => window.sidevoiceUI.store.patch({
+    pairings: [{ fp: "recovered-local", public_key: "pk", device_id: "recovered-device",
+      urls: ["http://127.0.0.1:1"], rv: null, host: "Recovered local", local: true, paired_at: 1, revoked: false }],
+    localHostStatus: { state: "running", reachable: true, installed: false, service: "launchd" },
+  }));
+  await page.waitForFunction(() => window.sidevoiceUI.store.getState().machines.some(
+    (machine) => machine.local && machine.state === "connected" && machine.pairingId,
+  ));
+  await page.locator("#settings-open").evaluate((button) => button.click());
+  await page.locator("#settings-this-computer").click();
+  const pane = page.locator("#pane-this-computer");
+  await expect(pane.locator('.host-status-card[data-state="running"]')).toBeVisible();
+  await expect(pane.getByRole("button", { name: "Restart" })).toBeVisible();
+  await expect(pane.locator(".local-install-panel")).toHaveCount(0);
+  await expect(empty).toHaveCount(0);
+  await expect(page.locator(".local-host-banner")).toHaveCount(0);
+
+  for (const installed of [true, false, undefined]) {
+    await page.evaluate((value) => window.sidevoiceUI.store.patch({
+      localHostStatus: { state: "running", reachable: true, service: "launchd", ...(value === undefined ? {} : { installed: value }) },
+    }), installed);
+    await expect(pane.locator('.host-status-card[data-state="running"]')).toBeVisible();
+    await expect(pane.getByRole("button", { name: "Restart" })).toBeVisible();
+    await expect(pane.locator(".local-install-panel")).toHaveCount(0);
+  }
+
+  await page.evaluate(() => window.sidevoiceUI.store.patch({
+    localHostStatus: { state: "service-failed", reachable: false, installed: false, service: "launchd",
+      failure: { key: "start.failed" } },
+  }));
+  await expect(pane.locator('.host-status-card[data-state="service-failed"]')).toBeVisible();
+  await expect(pane.getByRole("button", { name: "Retry" })).toBeVisible();
+  await pane.getByRole("button", { name: "Retry" }).click();
+  expect(await page.evaluate(() => window.__hostTest.calls)).toEqual({ install: 1, restart: 1 });
+  await page.locator("#language-settings").evaluate((dialog) => dialog.close());
+  await expect(page.locator(".local-host-banner")).toBeVisible();
+  await expect(page.locator(".local-host-banner").getByRole("button", { name: "Retry" })).toBeVisible();
+});

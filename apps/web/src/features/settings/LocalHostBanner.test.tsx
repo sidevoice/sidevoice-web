@@ -78,7 +78,7 @@ test("a failed preparation reports its install error without an installed-servic
     restart: vi.fn(async () => undefined),
   } } } });
   const store = createRoomStore();
-  act(() => store.patch({ pairings: [local], localHostStatus: { state: "failed", installed: false, reachable: false } }));
+  act(() => store.patch({ localHostAvailable: true, pairings: [], localHostStatus: { state: "failed", installed: false, reachable: false } }));
   render(<RoomProvider store={store}><LocalHostBanner /></RoomProvider>);
   act(() => { expect(localHostInstallController.start("no-machine")).toBe(true); });
   await waitFor(() => expect(localHostInstallController.getSnapshot().phase).toBe("failed"));

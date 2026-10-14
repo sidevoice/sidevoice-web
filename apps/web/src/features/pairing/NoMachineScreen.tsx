@@ -23,8 +23,7 @@ export function NoMachineScreen({
   const install = useSyncExternalStore(installController.subscribe, installController.getSnapshot, installController.getSnapshot);
   const offer = useLocalInstallOffer(installController);
   const projectedLocalOnly = machines.length === 1 && machines[0].local && !machines[0].pairingId;
-  const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === source
-    && (install.phase === "installing" || install.phase === "succeeded" || localHostStatus.installed !== true);
+  const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === source;
   const localInstallPanel = machines.length > 0 && isVisibleLocalHostInstall(install, source);
   if (!ready || (machines.length > 0 && !localInstallPanel)) return null;
   const noMachines = machines.length === 0 || preparingWithoutPairing;

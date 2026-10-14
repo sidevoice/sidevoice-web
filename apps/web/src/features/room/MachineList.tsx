@@ -127,7 +127,7 @@ export function MachineList() {
   const picked = useRoomStore((state) => state.facts.machinesView.machine);
   const store = useContext(RoomStoreContext);
   const localMachine = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
-  const hasLocalHost = !!localMachine || status.state !== "absent" || status.installed === true;
+  const hasLocalHost = !!localMachine || status.state !== "absent";
 
   // Asked for a machine's agents (an agent waiting): that machine's page, once per request. `machines` is a new list
   // after every change to the store, this patch included: the request is answered once, and only with a change, or
@@ -220,7 +220,7 @@ export function ThisComputerSettings() {
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot);
   const preparing = install.phase !== "idle" && install.source === "no-machine"
-    && (install.phase === "installing" || install.phase === "succeeded" || status.installed !== true);
+    && (install.phase === "installing" || !local?.pairingId);
   const store = useContext(RoomStoreContext);
   // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
   const name = currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));

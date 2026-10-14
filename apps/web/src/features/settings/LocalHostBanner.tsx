@@ -22,7 +22,7 @@ export function LocalHostBanner() {
   const otherAnswering = machines.some((machine) => !machine.local && machine.state === "connected");
   // Preparation reports its own progress. An absent host belongs to the setup entry; starting is still in progress.
   if (!local || status.reachable === true || ["absent", "starting", "installing"].includes(status.state)
-    || install.phase === "installing" || (install.phase === "failed" && status.installed !== true)
+    || install.phase === "installing" || (install.phase === "failed" && !local.pairingId)
     || (!onlyLocalMachine && otherAnswering)) return null;
   // A state this app does not know (sidevoice-core#112) is offered nothing: restarting is not known to be what it needs.
   const action: LocalHostAction | null = !knownLocalHostState(status.state) || status.state === "incompatible" ? null

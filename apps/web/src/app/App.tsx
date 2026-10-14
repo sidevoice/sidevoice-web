@@ -31,8 +31,7 @@ function RoomContent() {
   const pendingLocalSelection = useRef(false);
   // Native projects an installing service as a local row before it has a pairing; preparation still belongs in the empty state.
   const projectedLocalOnly = machines.length === 1 && machines[0].local && !machines[0].pairingId;
-  const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === "no-machine"
-    && (install.phase === "installing" || install.phase === "succeeded" || localHostStatus.installed !== true);
+  const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === "no-machine";
   const noMachine = ready && (machines.length === 0 || preparingWithoutPairing);
   const onboarding = useOnboarding();
   // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
@@ -41,6 +40,13 @@ function RoomContent() {
   useEffect(() => {
     if (install.phase === "installing") {
       pendingLocalSelection.current = true;
+      return;
+    }
+    const recovered = localHostStatus.state === "running" && localHostStatus.reachable === true
+      && machines.some((machine) => machine.local && machine.state === "connected" && machine.pairingId);
+    if ((install.phase === "failed" || install.phase === "cancelled") && recovered) {
+      pendingLocalSelection.current = false;
+      localHostInstallController.clear();
       return;
     }
     if (install.phase === "idle" || install.phase === "failed" || install.phase === "cancelled") {
@@ -54,7 +60,7 @@ function RoomContent() {
       pendingLocalSelection.current = false;
       localHostInstallController.clear();
     }
-  }, [install.phase, machines]);
+  }, [install.phase, machines, localHostStatus.state, localHostStatus.reachable]);
 
   return (
     <>
