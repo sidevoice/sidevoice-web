@@ -278,9 +278,12 @@ export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel
       if (again) {
         retuning = true;
         await voice.stop().finally(() => { retuning = false; });
+        if (finished) return;
       }
       await voice.setSettings(current);
+      if (finished) return;
       await take.listening();
+      if (finished) return;
       if (!wanted) break;
       current = wanted;
       wanted = null;
@@ -315,6 +318,9 @@ export function tryEndOfTurn(voice, settings, { signal, quietMs = 30000, onLevel
       hush();
       signal?.removeEventListener('abort', abort);
       for (const stop of stops) stop();
+      // A restart already in flight must settle before the final stop: otherwise it can reopen the microphone
+      // after this try has reported cancellation and removed its take listener.
+      await opening?.catch(() => {});
       await voice.stop().catch(() => {});
       take.stop();
       take.hand();

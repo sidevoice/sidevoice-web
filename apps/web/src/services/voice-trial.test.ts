@@ -425,6 +425,55 @@ test("settings asked for while the voice starts are put in place once it has, th
   expect(steps).toEqual([{ step: "listening", again: true }]);
 });
 
+test.each(["stop", "settings", "start"])("cancelling during a pending restart %s leaves no recording or listeners after the try", async (pending) => {
+  const voice = takingVoice();
+  const abort = new AbortController();
+  const takes: unknown[] = [];
+  let release = () => {};
+  let active = false;
+  const originalSettings = voice.setSettings;
+  const originalStart = voice.start;
+  const originalStop = voice.stop;
+  let settingsCalls = 0;
+  let startCalls = 0;
+  let stopCalls = 0;
+  voice.setSettings = async (settings: unknown) => {
+    settingsCalls++;
+    if (pending === "settings" && settingsCalls === 2) await new Promise<void>((done) => { release = done; });
+    await originalSettings(settings);
+  };
+  voice.start = async (...asked: unknown[]) => {
+    startCalls++;
+    if (pending === "start" && startCalls === 2) await new Promise<void>((done) => { release = done; });
+    await originalStart(...asked);
+    active = true;
+  };
+  voice.stop = async () => {
+    stopCalls++;
+    if (pending === "stop" && stopCalls === 1) await new Promise<void>((done) => { release = done; });
+    await originalStop(); active = false;
+  };
+  const run = tryEndOfTurn(voice as unknown as Voice, SETTINGS as never, { signal: abort.signal, onTake: (take) => takes.push(take) });
+  await vi.waitFor(() => expect(active).toBe(true));
+  const retuned = run.retune({ ...SETTINGS, patience: "calm" } as never);
+  await vi.waitFor(() => expect(pending === "stop" ? stopCalls : pending === "settings" ? settingsCalls : startCalls).toBe(pending === "stop" ? 1 : 2));
+  abort.abort();
+  let settled = false;
+  void run.done.catch(() => {}).finally(() => { settled = true; });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  release();
+  await retuned;
+  await expect(run.done).rejects.toMatchObject({ code: "trial-cancelled" });
+  expect(active).toBe(false);
+  expect(voice.calls.at(-1)).toEqual(["stop"]);
+  expect(startCalls).toBe(pending === "start" ? 2 : 1);
+  expect(listeners(voice)).toBe(0);
+  const handed = takes.length;
+  voice.emit("take", { ended_at: 999 });
+  expect(takes).toHaveLength(handed);
+});
+
 /* A try requests a take only when the UI wants it, and hands it once the voice has stopped. */
 
 /** `fakeVoice`, with a take: `start` says what it was asked, and each stop hands the take of the stretch it ends. */

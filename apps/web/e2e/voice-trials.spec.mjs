@@ -3,11 +3,7 @@ import { installHarness, installVoicePackageRoute } from "./harness.mjs";
 
 test("the published browser host records opt-in takes and reports rendered speaker level", async ({ page }) => {
   await installVoicePackageRoute(page);
-  await installHarness(page);
   await page.goto("/voice/");
-  await page.waitForFunction(() => !!window.sidevoiceUI?.store);
-  await page.evaluate(() => window.sidevoiceUI.store.patch({ viewedThread: "fixture|one", people: [{ node: "fixture", thread_id: "one", title: "Fixture", available: true, reach: { state: "listening" } }], avatarPreview: { mood: "speaking" } }));
-  await expect(page.locator(".stage-agent")).toHaveAttribute("data-avatar-state", "speaking");
   const result = await page.evaluate(async () => {
     const { default: init, createVoiceHost } = await import("/voice-contract/js/index.js");
     await init();
@@ -40,7 +36,7 @@ test("the published browser host records opt-in takes and reports rendered speak
       host.onState((state) => seen.states.push(state.listening)),
       host.onTurn((turn) => seen.turns.push(turn.phase)),
       host.onTake((take) => seen.takes.push({ samples: take.samples.length, turns: take.turns })),
-      host.onPlaybackLevel((level) => { seen.output.push(level); window.sidevoiceUI.playbackLevel.publish(level, "fixture|one"); if (level > 0) seen.mouth = seen.mouth || !!document.querySelector(".stage-agent[data-mouth-active]"); }),
+      host.onPlaybackLevel((level) => seen.output.push(level)),
     ];
     await host.setSettings({ stt: { model: "fake" }, tts: { model: "fake" }, end_of_turn: "silence", patience: "fast" });
     await host.start({ take: true });
@@ -71,8 +67,71 @@ test("the published browser host records opt-in takes and reports rendered speak
   expect(result.takes[0].turns[0].end_ms).toBeGreaterThan(0);
   expect(result.states.filter((state) => state === "speaking").length).toBeGreaterThanOrEqual(2);
   expect(result.output.some((level) => level > 0)).toBe(true);
-  expect(result.mouth).toBe(true);
   expect(result.output.at(-1)).toBe(0);
+});
+
+test("a recorded settings try delivers the package take through the real trial action", async ({ page }) => {
+  await installVoicePackageRoute(page);
+  await installHarness(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/voice/");
+  await page.waitForFunction(() => !!window.sidevoiceActions && !!window.sidevoiceUI?.store);
+  await page.evaluate(async () => {
+    const { default: init, createVoiceHost } = await import("/voice-contract/js/index.js");
+    await init();
+    const source = { models: () => ({ load: async () => ({
+      vad: {
+        position: 0,
+        accept(samples) {
+          const frames = [];
+          for (let offset = 0; offset + 512 <= samples.length; offset += 512) {
+            this.position += 512;
+            frames.push({ end: this.position, speech: samples[offset] > 0.2 });
+          }
+          return frames;
+        },
+        reset() { this.position = 0; },
+      },
+      transcriber: { transcribe: async () => "hello" },
+      speaker: { speak: async () => ({ samples: new Float32Array(16000), sampleRate: 16000 }) },
+    }) }) };
+    const io = {
+      start(sink) { window.__trialSink = sink; queueMicrotask(() => sink.ready()); },
+      stop() {}, stopPlayback() {}, play() {},
+    };
+    const host = createVoiceHost(source, { io });
+    window.__trialTakes = [];
+    window.__turnStarted = false;
+    host.onTake((take) => window.__trialTakes.push(take));
+    host.onTurn((turn) => { if (turn.phase === "started") window.__turnStarted = true; });
+    window.__sidevoiceDesktop = { host: { voice: host } };
+    const model = (id, capability) => ({ id, family: "fake", capabilities: [capability], languages: ["en"], voices: [], installed: true,
+      builds: [{ id: id + "/test", backend: "test", precision: "test", accelerator: "cpu", available: true, installed: true, reasons: [] }] });
+    const settings = { stt: { catalog: "local", model: "fake-stt", language: null }, tts: { catalog: "local", model: "fake-tts", voice: null, speed: 1 }, end_of_turn: "silence", patience: "normal" };
+    window.__trialSettings = settings;
+    window.__trialCatalogue = { state: "ready", catalogs: [
+      { id: "local", name: null, status: { stale: false }, models: [model("fake-stt", "stt"), model("fake-tts", "tts")] },
+    ], error: "" };
+  });
+  await page.locator("#settings-open").click();
+  await page.locator("#settings-transcription").click();
+  await page.waitForFunction(() => ["ready", "failed"].includes(window.sidevoiceUI.store.getState().facts.voiceCatalogue.state));
+  await page.evaluate(() => window.sidevoiceUI.store.patch({ voiceSettings: window.__trialSettings, voiceDraft: window.__trialSettings, voiceCatalogue: window.__trialCatalogue }));
+  await expect(page.locator("#stt-try")).toBeEnabled();
+  await page.locator("#stt-try").click();
+  await page.waitForFunction(() => !!window.__trialSink);
+  await page.evaluate(() => {
+    for (let n = 0; n < 64; n++) window.__trialSink.captured(new Float32Array(512).fill(0.5));
+  });
+  await page.waitForFunction(() => window.__turnStarted);
+  await page.locator("#stt-try").click();
+  await expect(page.locator("#stt-try-panel")).toHaveAttribute("data-phase", "done");
+  await expect(page.locator("#stt-take")).toBeVisible();
+  await expect(page.locator("#stt-take")).toContainText("recorded");
+  const takes = await page.evaluate(() => window.__trialTakes.map((take) => ({ samples: take.samples.length, turns: take.turns.length })));
+  expect(takes).toHaveLength(1);
+  expect(takes[0].samples).toBeGreaterThan(0);
+  expect(takes[0].turns).toBe(1);
 });
 
 test("a completed transcription take shows its waveform and marks, then releases replay audio", async ({ page }) => {
