@@ -82,8 +82,15 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(bubble.querySelector(".karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look at the cart");
   expect(bubble.querySelector(".karaoke-upcoming")?.textContent).toBe(" tests. I'll tell you as soon as I have something.");
   expect(document.querySelectorAll(".stage-bubble")).toHaveLength(1);
-  // Each spoken word is a beat of the mouth, "a" and "b" in turn.
-  expect(stageAgent().getAttribute("data-beat")).toMatch(/^[ab]$/);
+  // Karaoke progress never makes the mouth move without a speaker level.
+  expect(stageAgent()).toHaveAttribute("data-mouth", "playback");
+  expect(stageAgent()).not.toHaveAttribute("data-beat");
+  expect(stageAgent()).not.toHaveAttribute("data-mouth-active");
+  const output = window.sidevoiceUI?.playbackLevel;
+  act(() => output?.publish(0.8, "fp-1|t-login"));
+  expect(stageAgent()).toHaveAttribute("data-mouth-active");
+  act(() => output?.publish(0, "fp-1|t-login"));
+  expect(stageAgent()).not.toHaveAttribute("data-mouth-active");
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Its last words said, it stays a moment, whole; what the agent is doing stands under it.

@@ -22,6 +22,8 @@ declare global {
       setBootError(value: string | import("../components/ui/ErrorText").ErrorMessage | null): void;
       /** The microphone's level as the meter measures it (state/mic-level.ts). */
       micLevel?: import("../state/mic-level").MicLevelChannel;
+      /** The agent's rendered output level, separate from the microphone. */
+      playbackLevel?: import("../state/playback-level").PlaybackLevelChannel;
     };
     /** The meter's analyser, pulled per animation frame by the waveform bubble; null while no call captures. */
     sidevoiceAudio?: { readWaveform(): Float32Array | null };
