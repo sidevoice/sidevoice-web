@@ -16,6 +16,15 @@
 .install-here > p { margin: 0; line-height: 1.5rem; color: var(--sv-text); }
 .install-here > .install-here-agent { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 
+/* ----- preparing this computer, two ways one under the other (PrepareThisComputer): the app's Prepare, then "I'll do it
+ * myself" opening the command and the wait, as an agent's manual option opens its steps: under a hairline. The toggle's
+ * text lines up with the text above it (its own padding pulled back), as the pairing's "how to get a code" does. */
+.prepare-here { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; }
+.prepare-here > .prepare-here-toggle { margin-inline-start: calc(-1 * var(--sv-space-3)); }
+.prepare-here-manual { display: grid; gap: var(--sv-space-3); justify-self: stretch; min-width: 0; }
+.prepare-here-toggle + .prepare-here-manual { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+.prepare-here-wait { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+
 /* ----- "Connect to your machine" (PairMachine): the form */
 .pair-machine { display: grid; gap: var(--sv-space-5); min-width: 0; }
 .pairing-form { position: relative; display: grid; gap: var(--sv-space-4); min-width: 0; }

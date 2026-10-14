@@ -99,6 +99,46 @@ test("preparing this computer, the setup offers no other machine in any state of
   } finally { act(() => localHostInstallController.clear()); }
 }, WHOLE_APP_MS);
 
+test("an install that fails says what failed and opens I'll do it myself by itself, Retry still there; a retry hides both ways while it runs, a cancel brings them back", async () => {
+  let settle!: { resolve(status: unknown): void; reject(error: unknown): void };
+  const install = vi.fn(() => Object.assign(new Promise((resolve, reject) => { settle = { resolve, reject }; }), { job: "prep-job" }));
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" }, voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  const setup = within(document.getElementById("wizard")!);
+  const toggle = () => setup.queryByRole("button", { name: "I’ll do it myself" });
+  const command = () => [...document.querySelectorAll("#wizard .ui-snippet code")].map((code) => code.textContent);
+  try {
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    await act(async () => { fireEvent.click(document.getElementById("wizard-prepare")!); });
+    await act(async () => { settle.reject({ key: "install.network", step: "download" }); await Promise.resolve(); });
+    // What failed, in its words and at which step, as the install's panel says it; the command open under it, unasked.
+    const panel = document.querySelector("#wizard .local-install-panel")!;
+    expect(panel).toHaveAttribute("data-phase", "failed");
+    expect(within(panel as HTMLElement).getByRole("alert")).toHaveTextContent("Downloading Sidevoice");
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    expect(command()).toEqual(["npx sidevoice@latest install"]);
+    expect(document.querySelector("#wizard .prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+    // The panel's Retry is the app's way again (no second Prepare beside it); it closes like any other.
+    expect(document.getElementById("wizard-prepare")).toBeNull();
+    expect(setup.getByRole("button", { name: "Retry setup" })).toBeInTheDocument();
+    await act(async () => { fireEvent.click(toggle()!); });
+    expect(command()).toEqual([]);
+    await act(async () => { fireEvent.click(toggle()!); });
+    await act(async () => { fireEvent.click(setup.getByRole("button", { name: "Retry setup" })); });
+    expect(install).toHaveBeenCalledTimes(2);
+    expect(toggle()).toBeNull();
+    expect(command()).toEqual([]);
+    // Cancelled: the app's Retry again, and the person's way as they left it (open).
+    await act(async () => { settle.reject({ key: "install.cancelled", step: "download" }); await Promise.resolve(); });
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+  } finally { act(() => localHostInstallController.clear()); }
+}, WHOLE_APP_MS);
+
 test("installed here but not running, preparing this computer offers what starts it: never the install, nor its command", async () => {
   const install = vi.fn(), start = vi.fn(async () => undefined), restart = vi.fn(async () => undefined), serviceInstall = vi.fn(async () => undefined);
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
@@ -115,6 +155,7 @@ test("installed here but not running, preparing this computer offers what starts
   const nothingElse = () => {
     expect(document.getElementById("wizard-prepare")).toBeNull();
     expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
+    expect(setup.queryByRole("button", { name: "I’ll do it myself" })).toBeNull();
   };
   // Stopped: Start.
   expect(setup.getByText("Stopped until the next sign-in")).toBeInTheDocument();

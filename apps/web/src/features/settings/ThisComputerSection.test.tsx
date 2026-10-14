@@ -124,7 +124,7 @@ test("with this computer prepared: This device shows its page; Remote machines l
   expect(pane.querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
   expect(within(pane).getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
   expect(within(pane).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(within(pane).queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(within(pane).queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   // Remote machines: the others alone, then Add a remote machine — in the nav and in its pane.
   await act(async () => { document.getElementById("settings-machines")!.click(); });
   expect(machinesNav()).toEqual([expect.stringMatching(/^NUC/), "Add"]);
@@ -139,12 +139,13 @@ test("on a host not yet prepared: This device offers to prepare it, with no othe
   open([paired()], { localHostAvailable: true, inApp: true, localHostStatus: { state: "absent" }, settingsSection: "this-computer" });
   expect(sections()).toContain("This device");
   const pane = document.getElementById("pane-this-computer")!;
-  expect(pane.querySelector(".this-computer-prepare")).toHaveTextContent("Prepare Sidevoice on this computer. This step does not register or connect agents.");
-  expect(within(pane).getByRole("button", { name: "Use agents on this computer" })).toBeInTheDocument();
+  expect(pane.querySelector(".this-computer-prepare")).toHaveTextContent("Install Sidevoice on this computer. It also connects the agents it finds here.");
+  expect(within(pane).getByRole("button", { name: "Prepare this computer" })).toBeInTheDocument();
+  expect(within(pane).getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
   expect(within(pane).queryByRole("button", { name: /another machine/i })).toBeNull();
   expect(pane.querySelector(".host-detail")).toBeNull();
   expect(machinesPane().querySelector(".local-install-entry")).toBeNull();
-  expect(within(machinesPane()).queryByRole("button", { name: "Use agents on this computer", hidden: true })).toBeNull();
+  expect(within(machinesPane()).queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/, hidden: true })).toBeNull();
 });
 
 test("Machines empty: in the app it says no other machines; in a browser, that this device is paired with none", () => {

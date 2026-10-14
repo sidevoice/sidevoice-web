@@ -13,6 +13,7 @@ import { desktopBuild, localHostBridge, type LocalHostStatus } from "../../servi
 import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
+import { PrepareThisComputer } from "../pairing/PrepareThisComputer";
 import { useThisComputerSection } from "../../state/this-computer";
 import { translator, type Translate } from "../../i18n/translator";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
@@ -208,8 +209,8 @@ export function MachineList() {
   );
 }
 
-/** This computer as a section of its own: not prepared, preparing it — the setup's
- *  block; prepared, its page as Machines shows it — whether it answers, its Sidevoice service, its agents, the devices
+/** This computer as a section of its own: not prepared, preparing it — the setup's two ways (PrepareThisComputer),
+ *  under the install's panel; prepared, its page as Machines shows it — whether it answers, its Sidevoice service, its agents, the devices
  *  paired with it. */
 export function ThisComputerSettings() {
   const t = translator();
@@ -225,7 +226,8 @@ export function ThisComputerSettings() {
       {local ? <HostDetail machine={local} name={machineName(local, t)} untitled />
         : <div className="this-computer-prepare">
             <p>{t("localInstall.description")}</p>
-            <LocalHostInstallEntry showCta source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
+            <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess anotherMachine={false} className="local-install-entry--machines" />
+            <PrepareThisComputer id="this-computer-prepare" />
           </div>}
     </Section>
   );

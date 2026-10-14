@@ -56,6 +56,12 @@ const tryButton = () => document.getElementById("wizard-try") as HTMLButtonEleme
 // Settings is drawn under the setup with the same slots: the setup's are the ones in #wizard.
 // The try, last in the slot, in its own block after the slot's settings (outside the model's card).
 const tryBlock = (task: "stt" | "tts") => document.querySelector("#wizard #" + task + "-try-block")!;
+/** Preparing this computer's "I'll do it myself", in the setup (`absent`: may be missing). */
+function manualToggle(absent: true): HTMLElement | null;
+function manualToggle(): HTMLElement;
+function manualToggle(absent?: true) {
+  return absent ? wizard().queryByRole("button", { name: "I’ll do it myself" }) : wizard().getByRole("button", { name: "I’ll do it myself" });
+}
 const paired = (store: ReturnType<typeof createRoomStore>) => act(() => store.patch({ pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }));
 
 test("a browser starts by pairing another machine, shown how to prepare it, and moves on once it answers", () => {
@@ -266,8 +272,11 @@ test("preparing this computer never offers Prepare again: the install, then wait
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" }, voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
   render(<App store={store} />);
   expect(title()).toHaveTextContent("Prepare this computer");
+  expect(manualToggle()).toHaveAttribute("aria-expanded", "false");
   await act(async () => { fireEvent.click(document.getElementById("wizard-prepare")!); });
+  // Installing: one install at a time, so neither way while it runs.
   expect(document.getElementById("wizard-prepare")).toBeNull();
+  expect(manualToggle(true)).toBeNull();
   // Installed: the room lets the install's state go, nothing to choose, before this device reaches it.
   await act(async () => { finish({ state: "starting", installed: true, reachable: false }); await Promise.resolve(); });
   act(() => { localHostInstallController.clear(); store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }); });
@@ -295,11 +304,13 @@ test("where the app does not install Sidevoice itself, preparing this computer i
   // Never an empty step: no Prepare that could not work, but the command to run here, as another machine's, and that one
   // of the person's agents can run it.
   expect(document.getElementById("wizard-prepare")).toBeNull();
+  // The only way, so nothing to open: shown as it is.
+  expect(manualToggle(true)).toBeNull();
   expect([...document.querySelectorAll("#wizard .ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
   expect(wizard().getByRole("button", { name: "Copy setup command" })).toHaveClass("ui-copy-button");
   expect(wizard().getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
   expect(document.getElementById("wizard")).not.toHaveTextContent("@sidevoice/uplink");
-  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  expect(document.querySelector("#wizard .prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
   // Run: it starts, and the command goes.
   act(() => store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }));
   expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
@@ -310,6 +321,50 @@ test("where the app does not install Sidevoice itself, preparing this computer i
     machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
   expect(wizard().getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
 });
+
+test("where the app installs Sidevoice itself, the command is the other way, under I'll do it myself: closed until opened, then the command and the wait, and on by itself once it answers", async () => {
+  const install = vi.fn();
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install,
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" }, voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  expect(title()).toHaveTextContent("Prepare this computer");
+  // Two ways, one under the other: the app's (the step's main action), then the person's, closed, the description true to both.
+  expect(wizard().getByText("Install Sidevoice on this computer. It also connects the agents it finds here.")).toBeInTheDocument();
+  const prepare = document.getElementById("wizard-prepare")!;
+  expect(prepare).toHaveTextContent("Prepare this computer");
+  expect(prepare).toHaveClass("ui-button--primary");
+  expect(prepare.compareDocumentPosition(manualToggle()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(manualToggle()).toHaveAttribute("aria-expanded", "false");
+  expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
+  // Opened: the command, that an agent can run it, and the wait — nothing to press: this computer is listened for.
+  await act(async () => { fireEvent.click(manualToggle()); });
+  expect(manualToggle()).toHaveAttribute("aria-expanded", "true");
+  const manual = document.getElementById(manualToggle().getAttribute("aria-controls")!)!;
+  expect([...manual.querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
+  expect(manual).toHaveTextContent("You can also ask one of your agents to run it for you.");
+  expect(manual.querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  expect(wizard().queryByRole("button", { name: /^Check/ })).toBeNull();
+  // Prepare is still there, and nothing was installed by opening it.
+  expect(document.getElementById("wizard-prepare")).not.toBeNull();
+  expect(install).not.toHaveBeenCalled();
+  // Closed again.
+  await act(async () => { fireEvent.click(manualToggle()); });
+  expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
+  // Run by hand: it starts, then answers, and the step moves on to its agents by itself.
+  await act(async () => { fireEvent.click(manualToggle()); });
+  act(() => store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }));
+  expect(manualToggle(true)).toBeNull();
+  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting Sidevoice on this computer…");
+  act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true },
+    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
+  expect(wizard().getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
+  expect(install).not.toHaveBeenCalled();
+}, WHOLE_APP_MS);
 
 // Chosen on this device: the default settings' transcription and voice.
 const CHOSEN = { stt: trialKey(defaultVoiceSettings().stt)!, tts: trialKey(defaultVoiceSettings().tts)! };

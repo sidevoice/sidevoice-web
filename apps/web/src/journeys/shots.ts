@@ -15,8 +15,8 @@ export interface Shot {
   facts?: Record<string, unknown>;
   /** The setup open at this step (its record as given, or the base's). */
   setup?: { step: OnboardingStep; record?: Partial<OnboardingRecord> };
-  /** The desktop app's bridge, for this computer's machine (absent: a browser): its status, and `install: true` where
-   *  the app installs Sidevoice itself (the desktop app does not: the command does). */
+  /** The desktop app's bridge, for this computer's machine (absent: a browser): its status, and `install` where the app
+   *  installs Sidevoice itself — `true`, an install that runs on; `"fails"`, one that fails at its download. */
   desktop?: Record<string, unknown>;
   /** What is pressed once the page is drawn. */
   after?: (doc: Document) => void | Promise<void>;
@@ -96,6 +96,8 @@ const openSettings = (section: string) => (doc: Document) => {
   if (dialog && !dialog.open) dialog.showModal();
 };
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
+/** What `id` opens, opened (a disclosure: DisclosureButton). */
+const disclose = (id: string) => (doc: Document) => { doc.querySelector<HTMLElement>(`[aria-controls="${id}"][aria-expanded="false"]`)?.click(); };
 const running = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.4.0", api: 1 }, calls: 0 };
 const localBridge = (status: Record<string, unknown>) => ({ state: status, pairingCode: true });
 const stopped = { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" };
@@ -106,11 +108,15 @@ export const JOURNEYS: Journey[] = [
   { id: "first-run", title: "First run", note: "The setup, step by step, on a device that has none yet.", shots: [
     { id: "w0", caption: "The basics: appearance (System), the interface's language and the one you speak (Automatic).", setup: { step: "W0", record: {} } },
     { id: "w1", caption: "Where you use your agents: this computer preselected in the desktop app; another machine.", setup: { step: "W1", record: { basics_done: true } }, desktop: localBridge({ state: "absent" }) },
-    { id: "w2", caption: "Prepare this computer: the command to install Sidevoice here (or an agent runs it); on by itself once it answers.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } }, desktop: localBridge({ state: "absent" }) },
+    { id: "w2", caption: "Prepare this computer: the app installs Sidevoice here (its progress in place); under it, I'll do it myself, closed.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
+      desktop: { ...localBridge({ state: "absent" }), install: true } },
+    { id: "w2-manual", caption: "I'll do it myself, opened: the command to run here (or an agent runs it); on by itself once this computer answers.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
+      desktop: { ...localBridge({ state: "absent" }), install: true }, after: disclose("wizard-prepare-manual") },
+    { id: "w2-failed", caption: "The app's install failed: what failed and Retry, and I'll do it myself opened by itself.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
+      desktop: { ...localBridge({ state: "absent" }), install: "fails" }, after: press("wizard-prepare") },
+    { id: "w2-command", caption: "Where the app does not install Sidevoice: the command alone, shown as it is.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } }, desktop: localBridge({ state: "absent" }) },
     { id: "w2-stopped", caption: "Prepare this computer, installed but stopped: Start, not the command.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
       desktop: localBridge(stopped), facts: { localHostStatus: stopped, localHostAvailable: true } },
-    { id: "w2-install", caption: "Prepare this computer where the app installs Sidevoice itself: one button, its progress in place.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
-      desktop: { ...localBridge({ state: "absent" }), install: true } },
     { id: "w3", caption: "Ready here: the agents on this computer, Connect or Disconnect each.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], callNode: null, machineLinks: {} } },
@@ -147,6 +153,8 @@ export const JOURNEYS: Journey[] = [
     { id: "s-providers-none", caption: "Providers: none connected.", facts: { providerKeys: { elevenlabs: false, openai: false } }, after: openSettings("providers") },
     { id: "s-providers", caption: "Providers: one connected, one to connect.", after: openSettings("providers") },
     { id: "s-providers-error", caption: "Providers: a key the provider refused, in its words.", facts: { voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((c) => c.id === "elevenlabs" ? { ...c, status: { stale: false, reason: { code: "credential-rejected" }, detail: "invalid_api_key" } } : c) } }, after: openSettings("providers") },
+    { id: "s-this-computer-prepare", caption: "This device, not prepared yet: the setup's two ways, the app's Prepare and I'll do it myself.", desktop: { ...localBridge({ state: "absent" }), install: true },
+      facts: { localHostAvailable: true, inApp: true }, after: openSettings("this-computer") },
     { id: "s-machine-local", caption: "Machines: this computer, running — its service, agents, devices.", desktop: localBridge(running),
       facts: { pairings: [THIS, NUC], machineLinks: { [THIS.fp]: { reach: "ok", via: "node" }, [NUC.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-stopped", caption: "Machines: this computer, stopped — Start brings it back.", desktop: localBridge(stopped),

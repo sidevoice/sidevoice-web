@@ -490,7 +490,7 @@ export const messages: Messages = {
   "pairing.identityMismatch": "La machine qui a répondu ne correspond pas à ce code. Rien n’a été enregistré.",
   "pairing.incompatible": "La machine de ce code n’est pas compatible avec cette version de Sidevoice.",
   "localInstall.cta": "Utiliser des agents sur cet ordinateur",
-  "localInstall.description": "Préparez Sidevoice sur cet ordinateur. Cette étape n’enregistre ni ne connecte aucun agent.",
+  "localInstall.description": "Installez Sidevoice sur cet ordinateur. Il connecte aussi les agents qu’il trouve ici.",
   "localInstall.runHere": "Exécutez ceci dans un terminal sur cet ordinateur :",
   "localInstall.askAgent": "Vous pouvez aussi demander à l’un de vos agents de l’exécuter pour vous.",
   "localInstall.panelTitle": "Préparation de cet ordinateur",

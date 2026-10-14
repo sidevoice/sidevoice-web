@@ -9,6 +9,7 @@ import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
 import { fakeUpdater } from "../../test/updater";
+import { localHostInstallController } from "../../services/local-host-install";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -88,13 +89,33 @@ test("This device offers local setup when no local host is projected; Remote mac
   const install = vi.fn();
   const done = actions();
   setBridge({ install });
+  onTestFinished(() => localHostInstallController.clear());
   room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true, inApp: true });
 
-  expect(within(thisDevice()).getByRole("button", { name: "Use agents on this computer" })).toBeInTheDocument();
+  // The setup's two ways: the app's Prepare, then I'll do it myself, closed.
+  const device = within(thisDevice());
+  expect(thisDevice().querySelector(".this-computer-prepare > p")).toHaveTextContent("Install Sidevoice on this computer. It also connects the agents it finds here.");
+  expect(device.getByRole("button", { name: "Prepare this computer" })).toHaveClass("ui-button--primary");
+  expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
+  expect(thisDevice().querySelector(".ui-snippet")).toBeNull();
   expect(document.getElementById("machines")!.querySelector(".local-install-entry")).toBeNull();
   await act(async () => { screen.getAllByRole("button", { name: "Add a remote machine" })[0].click(); });
   expect(done.openPairing).toHaveBeenCalledOnce();
   expect(install).not.toHaveBeenCalled();
+  // Opened: the command, and the wait for this computer.
+  await act(async () => { device.getByRole("button", { name: "I’ll do it myself" }).click(); });
+  expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
+  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  await act(async () => { device.getByRole("button", { name: "I’ll do it myself" }).click(); });
+  expect(thisDevice().querySelector(".ui-snippet")).toBeNull();
+  // The app's install failing (this one answers nothing usable): what failed, Retry, and the command open by itself.
+  await act(async () => { device.getByRole("button", { name: "Prepare this computer" }).click(); });
+  expect(install).toHaveBeenCalledOnce();
+  expect(thisDevice().querySelector(".local-install-panel")).toHaveAttribute("data-phase", "failed");
+  expect(device.getByRole("button", { name: "Retry setup" })).toBeInTheDocument();
+  expect(device.queryByRole("button", { name: "Prepare this computer" })).toBeNull();
+  expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "true");
+  expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
 });
 
 test("This device, where the app does not install Sidevoice itself, offers the install command to run here instead", () => {
@@ -102,9 +123,12 @@ test("This device, where the app does not install Sidevoice itself, offers the i
   setBridge({});
   room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true, inApp: true });
 
-  expect(within(thisDevice()).queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(within(thisDevice()).queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
+  // The only way: shown as it is, nothing to open.
+  expect(within(thisDevice()).queryByRole("button", { name: "I’ll do it myself" })).toBeNull();
   expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
   expect(within(thisDevice()).getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
+  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
   expect(document.getElementById("machines")!.querySelector(".local-install-entry")).toBeNull();
 });
 
@@ -114,7 +138,7 @@ test("an existing stopped local R1 host keeps its page and does not show the ins
   room([local], { localHostStatus: { state: "stopped-by-person", installed: true, reachable: false } });
 
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
-  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
 });
 
 test("an already-running local R1 host is shown without starting another install", () => {
@@ -124,7 +148,7 @@ test("an already-running local R1 host is shown without starting another install
   room([local], { localHostStatus: running });
 
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
-  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   expect(install).not.toHaveBeenCalled();
 });
 
@@ -160,7 +184,7 @@ test("local F6 status shows only supported service actions", async () => {
   expect(screen.queryByRole("switch", { name: "Start at sign-in" })).toBeNull();
   expect(screen.queryByRole("button", { name: /agent/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /copy from another machine/i })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   await act(async () => { screen.getByRole("button", { name: "Start" }).click(); });
   expect(serviceInstall).toHaveBeenCalledOnce();
 });

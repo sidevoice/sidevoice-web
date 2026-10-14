@@ -48,6 +48,8 @@
 .ui-button--lg svg { width: 20px; height: 20px; }
 .ui-button--icon { width: var(--sv-control-md); padding: 0; }
 .ui-button--icon.ui-button--sm { width: var(--sv-control-sm); }
+/* A disclosure (DisclosureButton): its chevron points up while what it opens shows. */
+.ui-disclosure-chevron--open { transform: rotate(180deg); }
 .ui-button--block { display: flex; width: 100%; }
 .ui-spinner { position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: ui-spin .7s linear infinite; }
 .ui-spinner--inline { position: static; flex: none; margin: 0; }
