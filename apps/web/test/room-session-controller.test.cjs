@@ -1297,6 +1297,56 @@ test('T11 a delayed transcript keeps its captured focus through a later selectio
  assert.deepEqual([end.thread_id,end.binding_id],['a','b']);
  c.s.run('disconnect()');
 });
+test('T02 an accepted reply cannot start while a voice turn or its start acknowledgement is open',async()=>{
+ const c=await callOnRoom();
+ c.voice.emit('turn',started('new-turn'));
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'waiting',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'waiting',text:'Old answer'}});
+ assert.equal(c.voice.said.length,0);
+ c.voice.emit('turn',finished('new-turn','New question'));
+ assert.equal(c.voice.said.length,0,'the final transcript does not clear the unacknowledged start');
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-turn',revision:2,thread_id:'a',epoch:1}});
+ assert.equal(c.voice.said.length,0);
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='waiting').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']]);
+ c.s.run('disconnect()');
+});
+test('T06b enabling voice again leaves muted replies written and unheard until an explicit fresh reply',async()=>{
+ const c=await callOnRoom();
+ c.s.run("setSpeechOutput('voice_off')");
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'muted',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'muted',text:'While off'}});
+ assert.equal(c.voice.said.length,0);
+ assert.equal(c.s.run('history.at(-1).text'),'While off');
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='muted').map(d=>[d.status,d.reason])),[['unplayed','voice_off']]);
+ c.s.run("setSpeechOutput('on')");
+ assert.equal(c.voice.said.length,0);
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'fresh',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'fresh',text:'Fresh answer'}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['Fresh answer']);
+ c.s.run('disconnect()');
+});
+test('T08 typing during playback adds context without cutting audio or advancing an epoch',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'talking',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'talking',text:'I am speaking'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.s.run("$('text-message').value='One more detail'");
+ let typed=null;
+ c.s.context.fetch=async(path,options)=>{if(options?.body)typed=JSON.parse(options.body);return {ok:true,status:200,json:async()=>({messages:[]})}};
+ await c.s.run('sendText()');
+ assert.equal(typed.text,'One more detail');
+ assert.equal(handle.cancelled,false);
+ assert.equal(c.s.run("threadEpochs.get('a')"),0);
+ assert.equal(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').length,0);
+ c.s.run('disconnect()');
+});
+test('T13 microphone mute leaves the captured turn to finish through the ordinary voice path',async()=>{
+ const c=await callOnRoom();
+ c.voice.emit('turn',started('ordinary'));
+ c.s.run('setMic(false)');
+ assert.ok(c.voice.calls.some(([name,value])=>name==='mute'&&value===true));
+ assert.equal(c.voice.calls.some(([name])=>name==='cancelInput'),false);
+ assert.equal(turnSent(c,c.first,'ordinary','finished').length,0);
+ c.voice.emit('turn',finished('ordinary','Words already captured'));
+ assert.equal(turnSent(c,c.first,'ordinary','finished')[0].text,'Words already captured');
+ c.s.run('disconnect()');
+});
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");
