@@ -93,16 +93,17 @@ export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, p
     if (!element) return;
     let shown = 0;
     let stale: number | undefined;
-    const paint = (level: number) => {
+    const paint = (level: number, receivedAt = Date.now()) => {
+      if (level > 0 && Date.now() - receivedAt >= 300) level = 0;
       shown = smoothPlaybackLevel(shown, level);
       element.style.setProperty("--mouth", String(shown));
       if (shown > 0) element.setAttribute("data-mouth-active", "");
       else element.removeAttribute("data-mouth-active");
       window.clearTimeout(stale);
-      if (shown > 0) stale = window.setTimeout(() => paint(0), 300);
+      if (shown > 0) stale = window.setTimeout(() => paint(0), Math.max(0, receivedAt + 300 - Date.now()));
     };
     const read = (sample: PlaybackLevelSample) =>
-      paint(mood === "speaking" && sample.threadId === playbackThreadId ? sample.level : 0);
+      paint(mood === "speaking" && sample.threadId === playbackThreadId ? sample.level : 0, sample.receivedAt);
     read(playbackLevel.current());
     const stop = playbackLevel.subscribe(read);
     return () => { stop(); window.clearTimeout(stale); paint(0); };

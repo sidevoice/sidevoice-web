@@ -451,10 +451,17 @@ test('Optional speaker levels follow the active conversation and clear on silenc
  output(0.8);
  assert.deepEqual(events.at(-1),[0,null],'no mouth while synthesis waits');
  host.emit('state',{playback:'playing'});
+ s.run("sayReply({utterance_id:'old',thread_id:'one',text:'Old reply',history_id:'old-row'})");
+ host.said[0].step({type:'playing'});
  output(0.7);
  assert.deepEqual(events.at(-1),[0.7,'fp-mac|one']);
  output(0);
  assert.deepEqual(events.at(-1),[0,'fp-mac|one'],'a pause within playback rests the mouth');
+ s.run("roomStore.patch({roomBinding:{thread_id:'two'}})");
+ assert.deepEqual(events.at(-1),[0,null],'switching conversations closes the old mouth');
+ const beforeOldSample=events.length;
+ output(0.8);
+ assert.equal(events.length,beforeOldSample,'late old-playback samples cannot open the newly selected mouth');
  host.emit('state',{playback:'idle'});
  assert.deepEqual(events.at(-1),[0,null]);
  s.run('disconnect()');

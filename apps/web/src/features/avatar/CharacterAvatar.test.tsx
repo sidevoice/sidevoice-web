@@ -44,3 +44,24 @@ test("smoothing is bounded and silence is immediate", () => {
   expect(smoothPlaybackLevel(0.8, 0.04)).toBe(0);
   expect(smoothPlaybackLevel(0.8, Number.NaN)).toBe(0);
 });
+
+test("a stale cached level stays silent across remount and mood changes", () => {
+  vi.useFakeTimers();
+  playbackLevel.clear();
+  const props = { spec: avatarFor("fp|one"), size: "stage" as const, mouth: "playback" as const, playbackThreadId: "fp|one" };
+  const view = render(<CharacterAvatar {...props} mood="speaking" />);
+  act(() => playbackLevel.publish(0.8, "fp|one"));
+  expect(view.container.firstElementChild).toHaveAttribute("data-mouth-active");
+  act(() => vi.advanceTimersByTime(200));
+  view.unmount();
+  const again = render(<CharacterAvatar {...props} mood="speaking" />);
+  expect(again.container.firstElementChild).toHaveAttribute("data-mouth-active");
+  act(() => vi.advanceTimersByTime(100));
+  expect(again.container.firstElementChild).not.toHaveAttribute("data-mouth-active");
+  again.unmount();
+  const stale = render(<CharacterAvatar {...props} mood="speaking" />);
+  expect(stale.container.firstElementChild).not.toHaveAttribute("data-mouth-active");
+  stale.rerender(<CharacterAvatar {...props} mood="idle" />);
+  stale.rerender(<CharacterAvatar {...props} mood="speaking" />);
+  expect(stale.container.firstElementChild).not.toHaveAttribute("data-mouth-active");
+});

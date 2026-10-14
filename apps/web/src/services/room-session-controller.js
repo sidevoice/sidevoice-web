@@ -452,7 +452,7 @@ function nameOfflineRow(turnId,id){
 const replies=new Map(); // utterance_id → {reply, saying, withdrawn}
 function sayReply(reply){
  const saying=voice?.say(reply.text,reply.language?{language:reply.language}:undefined);if(!saying)return;
- const said={reply,saying,withdrawn:null};replies.set(reply.utterance_id,said);
+ const said={reply,saying,withdrawn:null,thread:conversationKey(state.callNode,reply.thread_id)};replies.set(reply.utterance_id,said);
  const report=data=>{keepMessage('playback','voice-playback',{utterance_id:reply.utterance_id,...data});flushOutbox()};
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
@@ -1249,7 +1249,11 @@ function voiceLevel(level){
 // This is the speaker's level, never the microphone's. A host without the optional output channel leaves it at rest.
 function voicePlaybackLevel(level){
  if(!voice||state.voiceState?.playback!=='playing')return;
- window.sidevoiceUI?.playbackLevel?.publish?.(level,targetId());
+ // The host's level has no reply id. Use the replies whose handles say they are playing, not the binding at callback
+ // time: a prior reply may still sound after a same-machine conversation switch. Mixed threads are ambiguous.
+ const sounding=[...replies.values()].filter(said=>said.playing);
+ if(!sounding.length||sounding.some(said=>said.thread!==sounding[0].thread)||sounding[0].thread!==targetId())return;
+ window.sidevoiceUI?.playbackLevel?.publish?.(level,sounding[0].thread);
 }
 // The bubble of the turn being recorded draws the level the voice reports, as a waveform of the last moments.
 window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
