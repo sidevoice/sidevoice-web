@@ -1,5 +1,8 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
+/* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
+ * light and its avatar's work wait for it, so a plain back-and-forth does not flash Working between turns. */
+export const WORKING_SHOWN_AFTER_MS = 3000;
 // A dropped socket is the network's business for this long: the call goes on as if nothing happened (no tone, no
 // line, no control held), and only a drop that outlasts it says the call is reconnecting.
 export const RECONNECT_GRACE_MS = 30000;
@@ -25,6 +28,9 @@ export function initialSessionFacts() {
         joinStep: null, joinFailure: '', joinFailureDetails: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0,
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
+        // Since when each conversation has been busy without a break (busySince): the runtime keeps it, and the clock
+        // fact `now` above, so Working shows WORKING_SHOWN_AFTER_MS later (working).
+        workingSince: {},
         // The machines this device is paired with (never their tokens), and when they were read. Every one of them is live
         // at once (`machineLinks`).
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
@@ -71,7 +77,9 @@ export function selectedThread(s) { return conversationKey(s.callNode, s.roomBin
 function inCall(s) { return !!(s.ws || s.reconnecting); }
 export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
 export function speechSegment(speech) { return speech.history_id || speech.session_id + ':voice:' + speech.utterance_id; }
-export function working(s, thread = selectedThread(s)) {
+/** Whether the conversation is working on what this browser said, as soon as that is known: the harness's own report,
+ *  else the turn's receipts. Shown only once it has lasted (working). */
+export function busy(s, thread = selectedThread(s)) {
     if (!inCall(s) || !thread)
         return false;
     // false is an authoritative report too. Receipts and replies can never override it.
@@ -80,6 +88,27 @@ export function working(s, thread = selectedThread(s)) {
     return Object.values(s.turns).some(t => t.thread === thread && t.session === s.sessionId && !t.settled &&
         !['not_sent', 'channel_closed'].includes(t.status) &&
         (t.status === 'read' || (['delivered', 'unconfirmed'].includes(t.status) && s.now >= t.readyAt)));
+}
+/** Whether the conversation shows as working: busy without a break since `workingSince` for WORKING_SHOWN_AFTER_MS, by
+ *  the clock fact. One busy with no start recorded yet is not shown. */
+export function working(s, thread = selectedThread(s)) {
+    const since = thread ? s.workingSince?.[thread] : undefined;
+    return since !== undefined && busy(s, thread) && s.now - since >= WORKING_SHOWN_AFTER_MS;
+}
+/** Since when each conversation has been busy without a break, as known at `at`: a start kept while it stays busy, `at`
+ *  for one that just became busy, none for the rest. */
+export function busySince(s, at) {
+    const since = {};
+    for (const thread of new Set([...Object.keys(s.harness), ...Object.values(s.turns).map(t => t.thread)]))
+        if (thread && busy(s, thread))
+            since[thread] = s.workingSince?.[thread] ?? at;
+    return since;
+}
+/** When the next conversation busy for a while is due to show as working, by the clock fact; null when none is waiting. */
+export function workingDeadline(s) {
+    const due = Object.entries(s.workingSince || {}).map(([thread, since]) => since + WORKING_SHOWN_AFTER_MS)
+        .filter(at => at > s.now);
+    return due.length ? Math.min(...due) : null;
 }
 export function sessionStatus(s) {
     const speaker = s.userLive ? 'user' : s.botLive ? 'room' : 'nobody';

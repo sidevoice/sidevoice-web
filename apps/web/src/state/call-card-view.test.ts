@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createRoomSessionStore } from "./room-session-state.js";
+import { createRoomSessionStore, WORKING_SHOWN_AFTER_MS } from "./room-session-state.js";
 
 // The card's view comes from the room's own facts (the desktop bridge relays it as is): these drive the real store.
 // The page knows a conversation by its machine and thread ("n|a"); the room's binding keeps the bare thread.
@@ -60,7 +60,9 @@ test("FC4: the avatar acts out what the stage's would — listening while the tu
   // The stage shows listening while the turn is transcribed (the old agent field said working).
   expect(card({ ...turn, pendingPhase: "transcribing" })).toMatchObject({ mood: "listening", turn: "transcribing", agent: "working" });
   expect(card({ ...turn, pendingPhase: "listening", cancelledInput: true })).toMatchObject({ turn: null });
-  expect(card({ harness: { "n|a": true } }).mood).toBe("working");
+  expect(card({ harness: { "n|a": true }, workingSince: { "n|a": 0 }, now: WORKING_SHOWN_AFTER_MS }).mood).toBe("working");
+  // Busy, but not yet for as long as Working waits: the avatar does not work yet.
+  expect(card({ harness: { "n|a": true }, workingSince: { "n|a": 0 }, now: WORKING_SHOWN_AFTER_MS - 1 }).mood).toBe("idle");
   expect(card({ botLive: true, ...turn, pendingPhase: "listening" }).mood).toBe("speaking"); // barge-in: speaking wins
   expect(card({ people: [{ ...people[0], available: false, reach: { state: "offline" } }] }).mood).toBe("offline");
   expect(card({ ws: null, reconnecting: false }).mood).toBe("idle");
