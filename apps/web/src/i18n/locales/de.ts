@@ -1066,7 +1066,7 @@ export const messages: Messages = {
   "whatsNew.speechLanguage.title": "Deine Sprechsprache",
   "whatsNew.speechLanguage.line": "Teile der Transkription deine Sprache mit, statt sie jedes Mal erkennen zu lassen.",
   "wizard.prepareStarting": "Dienst wird gestartet…",
-  "wizard.prepareAnswering": "Wird geprüft, ob der Dienst antwortet…",
+  "wizard.prepareAnswering": "Es wird geprüft, ob der Dienst antwortet…",
   "wizard.prepareWaiting": "Warte auf den Sidevoice-Dienst…",
   "turnTry.title": "Redeende ausprobieren",
   "turnTry.listeningSimple": "Ich höre zu… sprich und hör ganz natürlich auf",

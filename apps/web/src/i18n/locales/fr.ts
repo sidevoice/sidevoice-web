@@ -1063,7 +1063,7 @@ export const messages: Messages = {
   "whatsNew.speechLanguage.title": "La langue que vous parlez",
   "whatsNew.speechLanguage.line": "Indiquez votre langue à la transcription au lieu de la laisser la détecter à chaque fois.",
   "wizard.prepareStarting": "Démarrage du service…",
-  "wizard.prepareAnswering": "Vérification que le service répond…",
+  "wizard.prepareAnswering": "Vérification de la réponse du service…",
   "wizard.prepareWaiting": "En attente du service Sidevoice…",
   "turnTry.title": "Essayer la fin de tour",
   "turnTry.listeningSimple": "Écoute… parlez et terminez naturellement",

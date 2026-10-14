@@ -517,7 +517,7 @@ export const messages: Messages = {
   "localInstall.cancel": "Annulla",
   "localInstall.cancelling": "Annullamento dell’installazione…",
   "localInstall.cancelTooLate": "L’installazione sta terminando e non si può più annullare.",
-  "localInstall.cancelFailed": "Impossibile confermare l’annullamento. L’installazione potrebbe essere ancora in chiusura.",
+  "localInstall.cancelFailed": "Impossibile confermare l’annullamento. L’installazione potrebbe essere ancora in fase di completamento.",
   "localInstall.cancelled": "Annullato. Non è stato installato niente.",
   "localInstall.selecting": "Connessione a questo computer…",
   "localInstall.retry": "Riprova",
@@ -1083,7 +1083,7 @@ export const messages: Messages = {
   "whatsNew.speechLanguage.title": "La lingua in cui parli",
   "whatsNew.speechLanguage.line": "Indica alla trascrizione la tua lingua invece di farla rilevare ogni volta.",
   "wizard.prepareStarting": "Avvio del servizio…",
-  "wizard.prepareAnswering": "Verifica che il servizio risponda…",
+  "wizard.prepareAnswering": "Verifica della risposta del servizio…",
   "wizard.prepareWaiting": "In attesa del servizio di Sidevoice…",
   // Trying the end of turn (TurnTry).
   "turnTry.title": "Prova il fine turno",

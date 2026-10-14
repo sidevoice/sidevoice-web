@@ -1033,7 +1033,7 @@ export const messages: Messages = {
   "hosts.devices.done": "完了",
   "hosts.devices.pairIntro": "ここで 1 回限りのコードを作成し、ペアリングするデバイスで入力してください。",
   "hosts.devices.codeExpiresIn": "有効期限は {time} です。ペアリングするデバイスとだけ共有してください。",
-  "hosts.stoppedNote": "このコンピュータのサービスは停止しています。ここで起動するか、次回のサインイン時に自動で起動します。",
+  "hosts.stoppedNote": "このコンピュータのサービスは停止しています。ここで起動できます。起動しない場合は、次回のサインイン時に自動で起動します。",
   "hosts.stoppedNoLoginNote": "このコンピュータのサービスは停止しており、サインイン時にも起動しません。必要なときにここで起動してください。",
   "updates.title": "アップデート",
   "updates.web": "Sidevoice の新しいバージョンを利用できます",
