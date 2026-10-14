@@ -232,7 +232,7 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
 }, WHOLE_APP_MS);
 
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
-  room();
+  const store = room();
   const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");
   const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-avatar-state");
   // The dot says whether it hears you; the bicho is offline, working or resting.
@@ -248,11 +248,17 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
-  // The sidebar's cards show a dot only when connected (room.css hides an empty one that is not in call): one is, and
-  // the others' dots are empty, with no mark to keep.
+  // The light is the dot: green while it hears you, blinking while it works (room.css); a card hides the one of a
+  // conversation that cannot hear you, whose words say so. A dot carries no mark of its own.
   const cardDots = [...document.querySelectorAll(".sidebar-rows .state-dot")];
-  expect(cardDots.filter((d) => d.getAttribute("data-state") === "in-call")).toHaveLength(1);
+  expect(cardDots.map((d) => d.getAttribute("data-state"))).toEqual(["in-call", "working", "waiting", "idle"]);
   expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
+  // The call's own conversation at work says Working, on its line and its light (desktop trial, item 11).
+  patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": true } });
+  expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["working", "working"]);
+  expect(rowOf("Fix the slow login").querySelector(".sidebar-state-text")).toHaveTextContent(/^Working$/);
+  patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": false } });
+  expect(rowOf("Fix the slow login").querySelector(".sidebar-state-text")).toHaveTextContent(/^In call$/);
 });
 
 test("an offline conversation on the stage is a wanted poster, in the interface's language", () => {

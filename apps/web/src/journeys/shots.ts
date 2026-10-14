@@ -179,6 +179,10 @@ export const JOURNEYS: Journey[] = [
   { id: "room", title: "The room", note: "The call with a conversation on the stage, and around it.", shots: [
     { id: "no-machine", caption: "No machine yet: connect one.", facts: { pairings: [], callNode: null, machineLinks: {} } },
     { id: "no-conversation", caption: "In the room, no conversation on the stage: choose one.", facts: { roomBinding: null, people: [] } },
+    { id: "titles", caption: "Titles as the agents gave them, built one way: one line, no quotes, no part naming the harness or the model (its icon and the stage's badge say them); cut with an ellipsis, whole on hover.",
+      facts: { roomBinding: { thread_id: "t-web", title: "Sidevoice: supervisión", binding_id: "b1" }, people: [person("t-web", "Sidevoice: supervisión"),
+        person("t-release", "Codex — release notes for 0.3 (gpt-6-astra)", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
+        person("t-review", "\"Review of PR #109: every language and the end-of-turn try\"", { harness: "claude-code" }), person("t-notes", "notes (Cursor)", { harness: "cursor", reach: { state: "holding" } })] } },
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },

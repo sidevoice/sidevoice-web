@@ -203,6 +203,8 @@ export function speakWith(translate: (key: import('../i18n/translator').MessageK
 /** No machine this device can talk to, in one sentence. */
 export function noMachine(): string;
 export const RECONNECT_GRACE_MS: number;
+/** A conversation's title as every surface shows it: one line, unquoted, without a part naming its harness or model. */
+export function displayTitle(title: string | null | undefined, person?: { harness?: string | null; engine?: { model?: string | null } | null } | null): string;
 export function machinesView(s: SessionFacts): MachineView[];
 /** A conversation as the page knows it: the machine (fingerprint) and the room's thread, as one key. */
 export function conversationKey(node: string | null | undefined, thread: string | null | undefined): string | null;

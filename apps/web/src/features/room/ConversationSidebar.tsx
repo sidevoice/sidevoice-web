@@ -10,7 +10,7 @@ import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
-import { conversationState, machineGroups, stateText } from "../call/conversation-state";
+import { conversationState, isCallRow, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
@@ -89,8 +89,9 @@ export function ConversationSidebar() {
     if (collapsed) toggleSidebar();
     if (crowded) closeTranscript();
   };
-  // The unread count is the row's badge, so the line under the title says the state alone; the tooltip says both.
-  const unread = (row: ParticipantView) => row.unread > 0 && conversationState(row, inCall) !== "in-call";
+  // The unread count is the row's badge, so the line under the title says the state alone; the tooltip says both. The
+  // call's own conversation has none: what it says is heard.
+  const unread = (row: ParticipantView) => row.unread > 0 && !isCallRow(row, inCall);
 
   return (
     <>

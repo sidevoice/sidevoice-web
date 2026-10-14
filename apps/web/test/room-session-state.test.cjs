@@ -46,6 +46,42 @@ test('Failed delivery and another browser never count as this conversation worki
  for(const patch of [{status:'pending'},{status:'not_sent'},{status:'channel_closed'},{session:'other'},{thread:'m|b'}])
   assert.equal(api.working(facts(api,{turns:{one:turn(patch)}})),false);
 });
+test('A conversation\'s title is built one way: one line, unquoted, without naming its harness or its model',async()=>{
+ const api=await moduleReady;
+ const codex={harness:'codex',engine:{model:'gpt-6-luna'}},claude={harness:'claude-code',engine:{model:'claude-opus-5-5'}};
+ // What its agent gave, kept as it is when there is nothing to take away.
+ assert.equal(api.displayTitle('Sidevoice: supervisión',claude),'Sidevoice: supervisión');
+ assert.equal(api.displayTitle('infra · terraform',{harness:'cursor'}),'infra · terraform');
+ assert.equal(api.displayTitle('Codex session',codex),'Codex session','a name inside the words stays');
+ assert.equal(api.displayTitle('10:30 standup',codex),'10:30 standup');
+ // One line, and no quotes around the whole.
+ assert.equal(api.displayTitle('  Revisión\nde   la PR #109 ',null),'Revisión de la PR #109');
+ assert.equal(api.displayTitle('"Engine #9: backends.json"',claude),'Engine #9: backends.json');
+ assert.equal(api.displayTitle('\u201cnotes\u201d',null),'notes');
+ assert.equal(api.displayTitle('"Fix" the "bug"',null),'"Fix" the "bug"','quotes inside are its own');
+ // A part that only names its harness (its icon says it) or its model (the stage's badge says it) goes.
+ assert.equal(api.displayTitle('Codex — sidevoice-desktop (gpt-6-luna)',codex),'sidevoice-desktop');
+ assert.equal(api.displayTitle('sidevoice-web (Claude Code)',claude),'sidevoice-web');
+ assert.equal(api.displayTitle('Claude Code: review the PR',claude),'review the PR');
+ assert.equal(api.displayTitle('Cursor | landing copy | cursor',{harness:'cursor'}),'landing copy');
+ assert.equal(api.displayTitle('release - Codex - GPT-6-Luna',codex),'release');
+ // Another harness's name is not this one's, and a title that is only the name keeps it.
+ assert.equal(api.displayTitle('Codex: port',claude),'Codex: port');
+ assert.equal(api.displayTitle('Claude Code',claude),'Claude Code');
+ assert.equal(api.displayTitle(undefined,null),'');
+});
+test('Every surface shows the same title: the rows, the transcript\'s, the desktop card\'s',async()=>{
+ const api=await moduleReady;
+ const s=facts(api,{roomBinding:{thread_id:'a',title:'Codex: Pagos (gpt-6-luna)'},
+  people:[{node:'m',thread_id:'a',title:'Codex: Pagos (gpt-6-luna)',available:true,harness:'codex',engine:{model:'gpt-6-luna'}}]});
+ assert.equal(api.participantsView(s)[0].title,'Pagos');
+ assert.equal(api.viewedTitle(s),'Pagos');
+ assert.equal(api.callCardView(s).title,'Pagos');
+ // Before the room lists it, the binding's title, one line.
+ const bound=facts(api,{roomBinding:{thread_id:'a',title:' Pagos\n'}});
+ assert.equal(api.participantsView(bound)[0].title,'Pagos');
+ assert.equal(api.viewedTitle(bound),'Pagos');
+});
 test('The person and room speaking are independent of harness work and tab transcription',async()=>{
  const api=await moduleReady;
  const v=api.sessionStatus(facts(api,{harness:{'m|a':true},userLive:true,botLive:true,pendingPhase:'transcribing'}));

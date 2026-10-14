@@ -9,9 +9,11 @@ const row = (threadId: string, extra: Partial<ParticipantView> = {}): Participan
 });
 const en = translator("en");
 
-test("a conversation's state: the call's own, working, waiting for you, or out of reach", () => {
+test("a conversation's state: working, the call's own, waiting for you, or out of reach", () => {
   expect(conversationState(row("a", { selected: true }), true)).toBe("in-call");
-  expect(conversationState(row("a", { selected: true, working: true }), true)).toBe("in-call");
+  // The call's own conversation at work says so (desktop trial, item 11): "In call" no longer hides it.
+  expect(conversationState(row("a", { selected: true, working: true }), true)).toBe("working");
+  expect(stateText(row("a", { selected: true, working: true }), true, en)).toBe("Working");
   expect(conversationState(row("a", { working: true }), true)).toBe("working");
   expect(conversationState(row("a"), true)).toBe("waiting");
   // Busy but unable to receive is still busy; idle is only for one that cannot hear you and has nothing in hand.
@@ -28,6 +30,9 @@ test("the room's binding before a join or after a hang-up is not a call: no conv
   expect(smallAvatarMood(bound)).toBe("idle");
   expect(stateText(bound, false, en)).toBe("Waiting for you · 2 new");
   expect(stateText(bound, true, en)).toBe("In call");
+  // Its unread count stays off the call's own row while it works, as while it is in call.
+  expect(stateText({ ...bound, working: true }, true, en)).toBe("Working");
+  expect(stateText({ ...bound, working: true }, false, en)).toBe("Working · 2 new");
 });
 
 test("a small avatar is offline, working or idle: waiting for you is idle, and the dot says it hears you", () => {
