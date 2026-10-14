@@ -71,6 +71,10 @@ export function Select({ id, value, defaultValue, onValueChange, options, size =
   const hasEmpty = flat.some((option) => option.value === "");
   const inner = (external: string) => external === "" && hasEmpty ? EMPTY : external;
   const choose = (next: string) => {
+    // Only an option is a choice. In a form, Radix keeps a hidden native select that it sets to a new value before the
+    // options that hold it are drawn in it, and reports what it then holds: "", no option. Taken, that clears the value
+    // it echoes, and whatever gives the value again (a slot with no model takes its first) loops until React gives up.
+    if (!flat.some((option) => inner(option.value) === next)) return;
     const external = next === EMPTY ? "" : next;
     setOwn(external);
     onValueChange?.(external);
