@@ -1068,7 +1068,7 @@ export const messages: Messages = {
   "turnTry.title": "ターン終了の検出を試す",
   "turnTry.state.listening": "聞き取り中 — まだ話し始めていません",
   "turnTry.state.speaking": "話しています",
-  "turnTry.state.pause": "一時停止中 — まだあなたのターンです",
+  "turnTry.state.pause": "間を置いています — まだあなたのターンです",
   "turnTry.state.ended": "あなたのターンが終了しました",
   "turnTry.detected": "話すのをやめてから {s} 秒後に、話し終えたと検出しました",
   "turnTry.detectedNow": "話し終えたと検出しました",

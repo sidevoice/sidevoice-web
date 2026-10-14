@@ -1070,7 +1070,7 @@ export const messages: Messages = {
   "turnTry.title": "Redeende ausprobieren",
   "turnTry.state.listening": "Ich höre zu – du hast noch nicht angefangen zu sprechen",
   "turnTry.state.speaking": "Du sprichst",
-  "turnTry.state.pause": "Pause – du bist weiter an der Reihe",
+  "turnTry.state.pause": "Pause – dein Redebeitrag läuft weiter",
   "turnTry.state.ended": "Dein Redebeitrag ist beendet",
   "turnTry.detected": "Erkannt, dass du fertig warst – {s} s nachdem du aufgehört hast zu sprechen",
   "turnTry.detectedNow": "Erkannt, dass du fertig warst",

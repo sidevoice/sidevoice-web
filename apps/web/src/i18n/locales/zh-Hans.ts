@@ -1067,7 +1067,7 @@ export const messages: Messages = {
   "turnTry.title": "试用发言结束判定",
   "turnTry.state.listening": "正在听，你还没开始说话",
   "turnTry.state.speaking": "你正在说话",
-  "turnTry.state.pause": "停顿中，仍轮到你发言",
+  "turnTry.state.pause": "停顿中，你的发言还未结束",
   "turnTry.state.ended": "你的发言已结束",
   "turnTry.detected": "在你停止说话 {s} 秒后检测到你已说完",
   "turnTry.detectedNow": "检测到你已说完",
