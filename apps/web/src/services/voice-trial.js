@@ -12,6 +12,11 @@
  *  not this one's (its Smart model, its patience). The voice's shortest is 2 s of silence (`fast`); 1.5 s, as the
  *  operator asked, waits on the voice taking a silence of its own per call (contract gap). */
 const TAKE_ENDS = { end_of_turn: 'silence', patience: 'fast' };
+/** A voice try says a sentence and ends no turn, so it asks for no end-of-turn model: the voice loads every model its
+ *  settings name, downloading what is not on disk, and with Smart it would fetch Smart's model behind the catalogue the
+ *  page shows — End of turn would then offer to download a model already on disk, and this try's ready time would
+ *  include that download. End of turn downloads its model, with progress, and tries it itself. */
+const SAY_ENDS = { end_of_turn: 'silence' };
 /** The longest take, from when the voice listens: past it, still talking, the take ends there and what was said is
  *  transcribed — the voice's mute ends the open turn with what was said (`VoiceHost.mute`). */
 export const MAX_TAKE_MS = 10_000;
@@ -135,8 +140,9 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
 }
 
 /**
- * `text` said through `settings`, in `language`: the voice is set to them and started, says it, and the try succeeds
- * once it was heard to its end. Cut short or not played, it fails with why (the voice's own code when it failed).
+ * `text` said through `settings`, in `language`: the voice is set to them (its end of turn aside: `SAY_ENDS`) and
+ * started, says it, and the try succeeds once it was heard to its end. Cut short or not played, it fails with why (the
+ * voice's own code when it failed).
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * @param {string} text
@@ -150,7 +156,7 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
   let saying = null;
   let readyMs = null, firstSoundMs = null;
   try {
-    await voice.setSettings(settings);
+    await voice.setSettings({ ...settings, ...SAY_ENDS });
     const starting = now();
     const outcome = await bounded(voice.start().then(() => {
       readyMs = Math.round(now() - starting);
