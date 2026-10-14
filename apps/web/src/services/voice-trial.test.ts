@@ -72,11 +72,21 @@ test("nothing heard in time, a cancel, a voice error or a start that fails: each
 test("a sentence said through the settings, in its language, heard to its end; cut short or failed, the try says why", async () => {
   const voice = fakeVoice();
   await expect(tryVoice(voice as unknown as Voice, SETTINGS as never, "Hola", { language: "es" })).resolves.toMatchObject({ status: "heard" });
-  expect(voice.calls).toEqual([["setSettings", SETTINGS], ["start"], ["say", "Hola", { language: "es" }], ["stop"]]);
+  expect(voice.calls).toEqual([["setSettings", { ...SETTINGS, end_of_turn: "silence" }], ["start"], ["say", "Hola", { language: "es" }], ["stop"]]);
   await expect(tryVoice(fakeVoice({ outcome: { status: "heard-up-to", heard_chars: 2, reason: "barge-in" } }) as unknown as Voice, SETTINGS as never, "Hola"))
     .rejects.toMatchObject({ code: "trial-not-heard", detail: "barge-in" });
   await expect(tryVoice(fakeVoice({ outcome: { status: "not-played", reason: "failed", code: "credential-missing" } }) as unknown as Voice, SETTINGS as never, "Hola"))
     .rejects.toMatchObject({ code: "credential-missing" });
+});
+
+// The voice loads, downloading it when it is not on disk, every model its settings name: a voice try handed Smart
+// fetched Smart's model behind the catalogue the page shows, and End of turn then offered a download that ended at once.
+test("a voice try asks for no end-of-turn model, whatever the person's end of turn is; its patience and model stay theirs", async () => {
+  for (const turn of [{ end_of_turn: "smart-turn", patience: "calm", turn_model: "smart-turn-v3.2" }, { end_of_turn: "silence", patience: "fast" }, {}]) {
+    const voice = fakeVoice();
+    await tryVoice(voice as unknown as Voice, { ...SETTINGS, ...turn } as never, "Hola");
+    expect(voice.calls[0]).toEqual(["setSettings", { ...SETTINGS, ...turn, end_of_turn: "silence" }]);
+  }
 });
 
 test("a transcription try ends its take on a short silence, whatever the person's end of turn is", async () => {
