@@ -4,6 +4,8 @@ import { avatarKey, avatarTone, type AvatarMood, type AvatarSpec } from "./avata
 import { drawAvatar, engineSize, type AvatarSize } from "./bicho-draw";
 import { ENTER_MS, enterFrom } from "./engine/styles/bichos";
 import { useRotation } from "./rotation";
+import { smoothPlaybackLevel } from "./playback-mouth";
+import { playbackLevel, type PlaybackLevelSample } from "../../state/playback-level";
 
 /* An avatar is a drawing and a state. The drawing is the bichos engine's SVG, made once per figure and size; the state
  * is a handful of attributes on its root that CSS keys on (src/styles/bichos.css, the engine's; styles/call.css, the
@@ -13,7 +15,7 @@ import { useRotation } from "./rotation";
  *   data-avatar-state  the app's state (AvatarMood): offline | speaking | listening | working | idle | present
  *   data-mood          what the drawing acts out, in the engine's words: idle | speaking | listening | working
  *   data-size          the engine's size (stage | sidebar)
- *   data-beat          a | b, flipping on every spoken word; data-mouth=level, the mouth follows --mouth instead
+ *   data-beat          a | b for legacy voice animation; data-mouth=playback follows the speaker's output level
  *   data-work          the working style in hand (rotation.ts); data-idle, the idle step (quiet, or a pastime)
  *   data-enter         for a moment after it starts listening, the state it left (the engine's startle), with what it
  *                      had in hand still on so it can drop away
@@ -34,10 +36,10 @@ export interface CharacterAvatarProps {
   spec: AvatarSpec;
   mood: AvatarMood;
   size: AvatarSize;
-  /** How the mouth follows the voice while speaking: a beat for every spoken word (a new `mouthKey` each), or a
-   *  level somebody else writes as `--mouth`, 0–1, on this element (the microphone's, for the person). */
-  mouth?: "voice" | "level";
+  /** How the mouth follows the voice: legacy word beats, an externally written level, or the output channel. */
+  mouth?: "voice" | "level" | "playback";
   mouthKey?: string | number;
+  playbackThreadId?: string | null;
   /** It has said something this browser has not seen yet. */
   unread?: boolean;
   /** A desk stands in front of it (the stage scene, while it works). */
@@ -83,7 +85,29 @@ function useLast(value: string | undefined): string | undefined {
   return value ?? last.current;
 }
 
-export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, unread, desk, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, playbackThreadId, unread, desk, label, className, ref }: CharacterAvatarProps) {
+  const avatar = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (mouth !== "playback") return;
+    const element = avatar.current;
+    if (!element) return;
+    let shown = 0;
+    let stale: number | undefined;
+    const paint = (level: number, receivedAt = Date.now()) => {
+      if (level > 0 && Date.now() - receivedAt >= 300) level = 0;
+      shown = smoothPlaybackLevel(shown, level);
+      element.style.setProperty("--mouth", String(shown));
+      if (shown > 0) element.setAttribute("data-mouth-active", "");
+      else element.removeAttribute("data-mouth-active");
+      window.clearTimeout(stale);
+      if (shown > 0) stale = window.setTimeout(() => paint(0), Math.max(0, receivedAt + 300 - Date.now()));
+    };
+    const read = (sample: PlaybackLevelSample) =>
+      paint(mood === "speaking" && sample.threadId === playbackThreadId ? sample.level : 0, sample.receivedAt);
+    read(playbackLevel.current());
+    const stop = playbackLevel.subscribe(read);
+    return () => { stop(); window.clearTimeout(stale); paint(0); };
+  }, [mouth, mood, playbackThreadId]);
   const key = avatarKey(spec);
   // The key names the figure: a new spec object for the same conversation is the same drawing.
   const drawing = useMemo(() => drawAvatar(spec, size), [key, size]);
@@ -98,7 +122,7 @@ export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, u
   const work = working ?? (enter === "working" ? lastWork : undefined);
   const idle = mood === "present" ? "quiet" : resting ?? (enter === "idle" ? lastIdle : undefined);
   return (
-    <span ref={ref} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={mood} data-mood={acts}
+    <span ref={(element) => { avatar.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={mood} data-mood={acts}
       data-size={engineSize(size)} data-mouth={mouth} data-beat={beat} data-work={work} data-idle={idle} data-enter={enter ?? undefined}
       data-unread={unread || undefined} data-desk={desk || undefined} data-offline={mood === "offline" || undefined}
       style={avatarTone(drawing.tone) as CSSProperties}

@@ -1,5 +1,6 @@
 import type { CatalogView } from "../services/model-catalogs.js";
 import { defaultVoiceSettings } from "../services/voice-settings.js";
+import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
 import type { UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
@@ -102,6 +103,12 @@ const openSettings = (section: string) => (doc: Document) => {
   if (dialog && !dialog.open) dialog.showModal();
 };
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
+/** A reply of the agent's arriving once the page is drawn, after the transcript has marked the rest seen. */
+const arrives = (text: string) => (doc: Document) => {
+  const history = BASE_FACTS.history as Record<string, unknown>[];
+  const reply = { ...history[1], segment: "h-3", text, time: Date.now(), seq: 3 };
+  (doc.defaultView as unknown as { __journeyStore: { patch(facts: unknown): void } }).__journeyStore.patch({ history: [...history, reply] });
+};
 /** What `id` opens, opened (a disclosure: DisclosureButton). */
 const disclose = (id: string) => (doc: Document) => { doc.querySelector<HTMLElement>(`[aria-controls="${id}"][aria-expanded="false"]`)?.click(); };
 const running = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.4.0", api: 1 }, calls: 0 };
@@ -182,15 +189,21 @@ export const JOURNEYS: Journey[] = [
   { id: "room", title: "The room", note: "The call with a conversation on the stage, and around it.", shots: [
     { id: "no-machine", caption: "No machine yet: connect one.", facts: { pairings: [], callNode: null, machineLinks: {} } },
     { id: "no-conversation", caption: "In the room, no conversation on the stage: choose one.", facts: { roomBinding: null, people: [] } },
+    { id: "titles", caption: "Titles as the agents gave them, built one way: one line, no quotes, no part naming the harness or the model (its icon and the stage's badge say them); cut with an ellipsis, whole on hover.",
+      facts: { roomBinding: { thread_id: "t-web", title: "Sidevoice: supervisión", binding_id: "b1" }, people: [person("t-web", "Sidevoice: supervisión"),
+        person("t-release", "Codex — release notes for 0.3 (gpt-6-astra)", { harness: "codex", engine: { model: "gpt-6-astra", effort: "medium" } }),
+        person("t-review", "\"Review of PR #109: every language and the end-of-turn try\"", { harness: "claude-code" }), person("t-notes", "notes (Cursor)", { harness: "cursor", reach: { state: "holding" } })] } },
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
     { id: "speaking-long", caption: "A long reply: three lines at a time, its pages following the voice, the end of the page before fading above.",
       facts: { botLive: true, karaokeState: { segment: "h-3", from: 160, to: 200 }, history: [...(BASE_FACTS.history as unknown[]),
         { segment: "h-3", thread: "fp-nuc|t-web", role: "assistant", text: LONG_REPLY, name: "sidevoice-web", time: Date.now() - 5_000, session: "s1", seq: 3, audio: "playing" }] } },
-    { id: "working", caption: "The agent working.", facts: { harness: { "fp-nuc|t-web": true } } },
+    { id: "working", caption: "The agent working, for longer than the 3 s Working waits before it shows.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS } },
+    { id: "working-soon", caption: "The agent busy for less than 3 s: nothing says Working yet, so a quick back-and-forth never flashes it.", facts: { harness: { "fp-nuc|t-web": true }, workingSince: { "fp-nuc|t-web": 0 }, now: WORKING_SHOWN_AFTER_MS - 1000 } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
     { id: "transcript", caption: "The transcript open.", after: press("transcript-toggle") },
+    { id: "transcript-unread", caption: "A reply arrived while the transcript was closed: a dot on its button.", after: arrives("Both tests pass now. Shall I push the fix?") },
   ] },
   { id: "settings", title: "Settings", note: "Each section, applied as it changes (no Save).", shots: [
     { id: "s-general", caption: "General: language and appearance.", after: openSettings("general") },

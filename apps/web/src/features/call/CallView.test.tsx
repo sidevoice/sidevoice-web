@@ -4,7 +4,7 @@ import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
 import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
-import type { SessionFacts } from "../../state/room-session-state.js";
+import { WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
 import { headerRowWidth } from "../../test/header-row";
 import { VARIANTS_KEY } from "../../lib/variants";
@@ -23,6 +23,8 @@ const REPLY = "Okay. I'll start with the login and then look at the cart tests. 
 const person = (thread_id: string, title: string, extra: Record<string, unknown> = {}) =>
   ({ thread_id, title, available: true, reach: { state: "listening" }, node: "fp-1", machine: { host: "Laptop", id: "m1" }, harness: "claude", ...extra });
 const pairing = (fp: string, host: string | null) => ({ fp, host, urls: [], rv: null, device_id: "d", paired_at: 1, revoked: false });
+/** These conversations busy for as long as Working waits before it shows (the runtime's start and clock facts). */
+const lasted = (...keys: string[]) => ({ workingSince: Object.fromEntries(keys.map((key) => [key, 0])), now: WORKING_SHOWN_AFTER_MS });
 const live = (...fps: string[]) => Object.fromEntries(fps.map((fp) => [fp, { reach: "ok" as const, via: "node" as const }]));
 
 function room(extra: Partial<SessionFacts> = {}) {
@@ -36,7 +38,7 @@ function room(extra: Partial<SessionFacts> = {}) {
       person("t-backup", "Review the nightly backups", { node: "fp-2", machine: { host: "Home server", id: "m2" } }),
       person("t-week", "Plan the week", { available: false, reach: { state: "offline" }, node: "fp-2", machine: { host: "Home server", id: "m2" } }),
     ],
-    harness: { "fp-1|t-pay": true },
+    harness: { "fp-1|t-pay": true }, ...lasted("fp-1|t-pay"),
     history: [{ segment: "h-2", thread: "fp-1|t-login", role: "assistant", text: REPLY, name: "Fix the slow login", time: 1, session: "s1", audio: "playing" }],
     ...extra,
   }));
@@ -82,12 +84,19 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(bubble.querySelector(".karaoke-played")?.textContent).toBe("Okay. I'll start with the login and then look at the cart");
   expect(bubble.querySelector(".karaoke-upcoming")?.textContent).toBe(" tests. I'll tell you as soon as I have something.");
   expect(document.querySelectorAll(".stage-bubble")).toHaveLength(1);
-  // Each spoken word is a beat of the mouth, "a" and "b" in turn.
-  expect(stageAgent().getAttribute("data-beat")).toMatch(/^[ab]$/);
+  // Karaoke progress never makes the mouth move without a speaker level.
+  expect(stageAgent()).toHaveAttribute("data-mouth", "playback");
+  expect(stageAgent()).not.toHaveAttribute("data-beat");
+  expect(stageAgent()).not.toHaveAttribute("data-mouth-active");
+  const output = window.sidevoiceUI?.playbackLevel;
+  act(() => output?.publish(0.8, "fp-1|t-login"));
+  expect(stageAgent()).toHaveAttribute("data-mouth-active");
+  act(() => output?.publish(0, "fp-1|t-login"));
+  expect(stageAgent()).not.toHaveAttribute("data-mouth-active");
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Its last words said, it stays a moment, whole; what the agent is doing stands under it.
-  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true },
+  patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
@@ -232,7 +241,7 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
 }, WHOLE_APP_MS);
 
 test("state dots and small avatars follow each conversation's state, grouped by machine", () => {
-  room();
+  const store = room();
   const dot = (title: string) => rowOf(title).querySelector(".state-dot")!.getAttribute("data-state");
   const mood = (title: string) => rowOf(title).querySelector(".sv-avatar")!.getAttribute("data-avatar-state");
   // The dot says whether it hears you; the bicho is offline, working or resting.
@@ -248,11 +257,18 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect([...document.querySelectorAll(".sidebar-group-label")].map((label) => label.textContent)).toEqual(["Laptop", "Home server"]);
   expect(rowOf("Migrate the payments API")).toHaveTextContent("Working");
   expect(rowOf("Plan the week")).toHaveTextContent("Offline");
-  // The sidebar's cards show a dot only when connected (room.css hides an empty one that is not in call): one is, and
-  // the others' dots are empty, with no mark to keep.
+  // The light is the dot: green while it hears you, blinking while it works (room.css); a card hides the one of a
+  // conversation that cannot hear you, whose words say so. A dot carries no mark of its own.
   const cardDots = [...document.querySelectorAll(".sidebar-rows .state-dot")];
-  expect(cardDots.filter((d) => d.getAttribute("data-state") === "in-call")).toHaveLength(1);
+  expect(cardDots.map((d) => d.getAttribute("data-state"))).toEqual(["in-call", "working", "waiting", "idle"]);
   expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
+  // The call's own conversation at work says Working, on its line and its light (desktop trial, item 11).
+  // At work for a minute: past any wait before Working shows (#112).
+  patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": true }, workingSince: { "fp-1|t-pay": 0, "fp-1|t-login": 0 }, now: 60_000 } as Partial<SessionFacts>);
+  expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["working", "working"]);
+  expect(rowOf("Fix the slow login").querySelector(".sidebar-state-text")).toHaveTextContent(/^Working$/);
+  patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": false } });
+  expect(rowOf("Fix the slow login").querySelector(".sidebar-state-text")).toHaveTextContent(/^In call$/);
 });
 
 test("an offline conversation on the stage is a wanted poster, in the interface's language", () => {
@@ -671,7 +687,7 @@ test("the transcript button wears a dot for what arrives while it is closed; ope
 test("the Working… line over the agent is an sr-only status, with no visible badge in its place", () => {
   const store = room();
   expect(workingLine()).toBeNull();
-  patch(store, { harness: { "fp-1|t-login": true } });
+  patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
@@ -688,7 +704,7 @@ test("the Working… line over the agent is an sr-only status, with no visible b
 test("a working-badge choice left in storage changes nothing: the line stays sr-only", () => {
   localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "working-badge": "show" }));
   const store = room();
-  patch(store, { harness: { "fp-1|t-login": true } });
+  patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
   expect(workingLine()).toHaveClass("sr-only");
   expect(document.querySelector(".stage-activity")).toBeNull();
 }, WHOLE_APP_MS);

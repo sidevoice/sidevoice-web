@@ -27,6 +27,8 @@ export interface SessionFacts {
  /** The reply being said, and where the voice is in it: the part of `segment`'s text sounding now (`from`, `to`;
   *  both the end of what was heard between its chunks). */
  now: number; karaokeState: (KaraokeRange & {segment: string}) | null;
+ /** Since when each conversation (by its key) has been busy without a break; Working shows WORKING_SHOWN_AFTER_MS later. */
+ workingSince: Record<string, number>;
  /** The room's error above the stage, as people read it (error-message.ts). */
  bootError: import('../components/ui/ErrorText').ErrorMessage | null;
  /** The machines this device is paired with (never their tokens), and the clock they were read at. */
@@ -195,6 +197,8 @@ export interface SessionStore {
 }
 export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionStore;
 export function receiptView(status: string): {symbol: string; label: string};
+/** A conversation's title as every surface shows it: one line, unquoted, without a part naming its harness or model. */
+export function displayTitle(title: string | null | undefined, person?: { harness?: string | null; engine?: { model?: string | null } | null } | null): string;
 export function speechSegment(reply: {history_id?: string; session_id?: string; utterance_id?: string}): string;
 export function recordReply(s: SessionFacts, reply: {session_id?: string; thread_id?: string; revision?: number; reply_revision?: number}): SessionFacts['turns'];
 export function recordReceipt(s: SessionFacts, id: string, status: string, at: number): SessionFacts['turns'];
@@ -203,6 +207,16 @@ export function speakWith(translate: (key: import('../i18n/translator').MessageK
 /** No machine this device can talk to, in one sentence. */
 export function noMachine(): string;
 export const RECONNECT_GRACE_MS: number;
+/** How long a conversation works without a break before it shows as working. */
+export const WORKING_SHOWN_AFTER_MS: number;
+/** Whether the conversation is working on what this browser said, as soon as that is known. */
+export function busy(s: SessionFacts, thread?: string | null): boolean;
+/** Whether the conversation shows as working: busy without a break for WORKING_SHOWN_AFTER_MS, by the clock fact. */
+export function working(s: SessionFacts, thread?: string | null): boolean;
+/** Since when each conversation has been busy without a break, as known at `at`. */
+export function busySince(s: SessionFacts, at: number): Record<string, number>;
+/** When the next conversation busy for a while is due to show as working; null when none is waiting. */
+export function workingDeadline(s: SessionFacts): number | null;
 export function machinesView(s: SessionFacts): MachineView[];
 /** A conversation as the page knows it: the machine (fingerprint) and the room's thread, as one key. */
 export function conversationKey(node: string | null | undefined, thread: string | null | undefined): string | null;

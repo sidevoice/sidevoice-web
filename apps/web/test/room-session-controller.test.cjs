@@ -1,4 +1,4 @@
-const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{mock}=require('node:test'),assert=require('node:assert/strict');
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts'};
+ const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -436,6 +436,40 @@ test('The waveform bubble draws the level the voice reports, and nothing without
  assert.deepEqual(wave.slice(-2).map(Math.abs),[0.5,0.25],'the newest levels last');
  assert.equal(s.run("$('mic-level-meter').getAttribute('aria-valuenow')"),'25');
 });
+test('Optional speaker levels follow the active conversation and clear on silence and disconnect',()=>{
+ const s=setup(),events=[];
+ s.context.window.sidevoiceUI={playbackLevel:{publish:(level,thread)=>events.push([level,thread]),clear:()=>events.push([0,null])}};
+ const host=fakeVoice();
+ let output;
+ host.onPlaybackLevel=listener=>{output=listener;return ()=>{output=null}};
+ s.context.__voice=host;
+ s.run("voice=__voice;state.callNode='fp-mac';state.roomBinding={thread_id:'one'};attachVoice(__voice)");
+ const beforeMic=events.length;
+ host.emit('level',0.9);
+ assert.equal(events.length,beforeMic,'microphone levels never move the agent mouth');
+ host.emit('state',{playback:'synthesizing'});
+ output(0.8);
+ assert.deepEqual(events.at(-1),[0,null],'no mouth while synthesis waits');
+ host.emit('state',{playback:'playing'});
+ s.run("sayReply({utterance_id:'old',thread_id:'one',text:'Old reply',history_id:'old-row'})");
+ host.said[0].step({type:'playing'});
+ output(0.7);
+ assert.deepEqual(events.at(-1),[0.7,'fp-mac|one']);
+ output(0);
+ assert.deepEqual(events.at(-1),[0,'fp-mac|one'],'a pause within playback rests the mouth');
+ s.run("roomStore.patch({roomBinding:{thread_id:'two'}})");
+ assert.deepEqual(events.at(-1),[0,null],'switching conversations closes the old mouth');
+ const beforeOldSample=events.length;
+ output(0.8);
+ assert.equal(events.length,beforeOldSample,'late old-playback samples cannot open the newly selected mouth');
+ host.emit('state',{playback:'idle'});
+ assert.deepEqual(events.at(-1),[0,null]);
+ s.run('disconnect()');
+ assert.equal(output,null,'the output subscription ends with the call');
+ assert.deepEqual(events.at(-1),[0,null]);
+ const old=fakeVoice();s.context.__old=old;
+ assert.doesNotThrow(()=>s.run('voice=__old;attachVoice(__old)'), 'older hosts omit this optional method');
+});
 test('Aggregates summarize with nearest-rank percentiles and never turn a missing value into a zero',()=>{
  const s=setup();
  assert.equal(JSON.stringify(s.run('statsSummary([400,100,300,200])')),JSON.stringify({count:4,mean:250,p50:200,p90:400,max:400}));
@@ -639,6 +673,26 @@ test('A turn the room announces opens a span here and reaches the room as a trac
  s.run("observeLatencyEvent('voice-user-turn',{phase:'cancelled',thread_id:'a',revision:4,merged:true})");
  assert.deepEqual(calls.at(-1),['endTurn','a',4,'merged']);
 });
+test('The harness saying it works shows Working 3 s later, and not at all when it stops sooner',()=>{
+ // The runtime's clock and timers, faked: the wait is WORKING_SHOWN_AFTER_MS of the page's own clock.
+ mock.timers.enable({apis:['setTimeout','Date'],now:1_000_000});
+ try{
+  const s=setup();s.run("ws={readyState:1}");
+  const frame=working=>JSON.stringify(JSON.stringify({type:'voice-conversation',data:{thread_id:'a',working}}));
+  const shown=()=>s.run('roomStore.getState().session.working');
+  s.run(`message(${frame(true)})`);
+  assert.equal(shown(),false,'not at once');
+  mock.timers.tick(2_999);assert.equal(shown(),false);
+  mock.timers.tick(1);assert.equal(shown(),true,'3 s straight');
+  // A plain back-and-forth: busy for 2 s, a reply, busy again: never shown.
+  s.run(`message(${frame(false)})`);assert.equal(shown(),false);
+  s.run(`message(${frame(true)})`);mock.timers.tick(2_000);
+  s.run(`message(${frame(false)})`);mock.timers.tick(5_000);
+  assert.equal(shown(),false);
+  s.run(`message(${frame(true)})`);mock.timers.tick(2_000);assert.equal(shown(),false,'the wait starts again after a break');
+  mock.timers.tick(1_000);assert.equal(shown(),true);
+ }finally{mock.timers.reset()}
+});
 test('A correlated harness end closes telemetry once even while a newer turn keeps the thread working',()=>{
  const {s,calls}=tracing();
  s.run("observeLatencyEvent('voice-user-turn',{phase:'started',thread_id:'a',revision:4})");
@@ -646,7 +700,7 @@ test('A correlated harness end closes telemetry once even while a newer turn kee
  const stopped=JSON.stringify(JSON.stringify({type:'voice-conversation',data:{thread_id:'a',working:true,turn_id:'codex-turn',turn_phase:'end',session_id:'s',revision:4}}));
  s.run(`message(${stopped})`);s.run(`message(${stopped})`);
  assert.deepEqual(calls.filter(call=>call[0]==='endTurn'),[['endTurn','a',4,'harness_finished']]);
- assert.equal(s.run('roomStore.getState().session.working'),true);
+ assert.equal(s.run('SessionState.busy(state)'),true);
 });
 
 // ----- what the room plays back when this browser comes back -----

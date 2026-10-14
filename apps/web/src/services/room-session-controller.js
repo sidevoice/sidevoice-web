@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -19,6 +19,7 @@ import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSetti
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalError} from './refusals.js';
+import {followWorking} from './working-clock.ts';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
 const state=roomStore.facts;
 // What this browser speaks in a call: the language of its system, among those the voice handles.
@@ -44,7 +45,8 @@ function failJoin(message){roomStore.patch({joinStep:null,joinFailure:message?er
 // never sets it.
 function callEndedBy(reason,detail){roomStore.patch({callEnded:{reason,detail:detail||''}})}
 // What this tab already calls the conversation it is going back to; the room is not asked again for a title.
-function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||''}
+// As every surface shows it (displayTitle).
+function conversationTitle(id){const p=state.people.find(p=>personKey(p)===id);return displayTitle(p?.title,p)||displayTitle(state.history.find(r=>r.thread===id)?.name)}
 /* What failed in the voice, its models or the room, as the person reads it (error-message.ts): a known code in the
  * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
  * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
@@ -452,7 +454,7 @@ function nameOfflineRow(turnId,id){
 const replies=new Map(); // utterance_id → {reply, saying, withdrawn}
 function sayReply(reply){
  const saying=voice?.say(reply.text,reply.language?{language:reply.language}:undefined);if(!saying)return;
- const said={reply,saying,withdrawn:null};replies.set(reply.utterance_id,said);
+ const said={reply,saying,withdrawn:null,thread:conversationKey(state.callNode,reply.thread_id)};replies.set(reply.utterance_id,said);
  const report=data=>{keepMessage('playback','voice-playback',{utterance_id:reply.utterance_id,...data});flushOutbox()};
  saying.onEvent(event=>{
   if(replies.get(reply.utterance_id)!==said)return;
@@ -888,7 +890,7 @@ function statsAggregate(replies,stages=LATENCY_STAGES){
 }
 const aggregateColumns=()=>{const t=translator();return [t('stats.column.stage'),'n',t('stats.column.mean'),'p50','p90',t('stats.column.max')]};
 function statsThreads(replies){return [...new Set(replies.map(reply=>reply.thread_id).filter(Boolean))]}
-function statsConversationName(threadId){return state.people.find(person=>person.node===state.callNode&&person.thread_id===threadId)?.title||threadId}
+function statsConversationName(threadId){const p=state.people.find(person=>person.node===state.callNode&&person.thread_id===threadId);return displayTitle(p?.title,p)||threadId}
 function statsAggregateCaption(count){return translator()(count===1?'stats.measured.one':'stats.measured.other',{n:count})}
 function statsAggregateTable(caption,rows){
  const wrap=document.createElement('div');wrap.className='stats-table-wrap';
@@ -959,7 +961,10 @@ function presenceReceipt(id,status){
 }
 // The timer contributes a clock fact; the store derives everything else from it on every transition.
 let receiptDeadline=null;
+let playbackThread=null;
 function reconcileSession(view){
+ const thread=targetId();
+ if(thread!==playbackThread){playbackThread=thread;window.sidevoiceUI?.playbackLevel?.clear?.()}
  const deadlines=Object.values(state.turns).filter(t=>!t.settled&&['delivered','unconfirmed'].includes(t.status)&&t.readyAt>state.now).map(t=>t.readyAt);
  const deadline=deadlines.length?Math.min(...deadlines):null;
  if(deadline!==receiptDeadline){clearTimeout(presenceTimer);receiptDeadline=deadline;
@@ -1222,8 +1227,9 @@ function voiceTurn(turn){
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 // Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
 // be acted on, and in the machine's log.
-function voiceFailed(error){setRoomError(voiceError(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
+function voiceFailed(error){window.sidevoiceUI?.playbackLevel?.clear?.();setRoomError(voiceError(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
 function voiceStateChanged(next){
+ if(next?.playback!=='playing')window.sidevoiceUI?.playbackLevel?.clear?.();
  roomStore.batch(()=>{
   state.voiceState=next;
   state.userLive=next?.listening==='speaking';
@@ -1241,6 +1247,15 @@ function voiceLevel(level){
  $('mic-control')?.style.setProperty('--mic-fill',value+'%');
  $('mic-level-meter')?.setAttribute('aria-valuenow',String(value));
  const channel=window.sidevoiceUI?.micLevel;if(typeof channel?.publish==='function')channel.publish(value);
+}
+// This is the speaker's level, never the microphone's. A host without the optional output channel leaves it at rest.
+function voicePlaybackLevel(level){
+ if(!voice||state.voiceState?.playback!=='playing')return;
+ // The host's level has no reply id. Use the replies whose handles say they are playing, not the binding at callback
+ // time: a prior reply may still sound after a same-machine conversation switch. Mixed threads are ambiguous.
+ const sounding=[...replies.values()].filter(said=>said.playing);
+ if(!sounding.length||sounding.some(said=>said.thread!==sounding[0].thread)||sounding[0].thread!==targetId())return;
+ window.sidevoiceUI?.playbackLevel?.publish?.(level,sounding[0].thread);
 }
 // The bubble of the turn being recorded draws the level the voice reports, as a waveform of the last moments.
 window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
@@ -1320,6 +1335,7 @@ function disconnect() {
     const socket = state.ws, current = voice;
     state.ws = null;
     voice = null;
+    window.sidevoiceUI?.playbackLevel?.clear?.();
     // What is being said ends with the call, and the room ends its replies with the session: nothing is reported.
     replies.clear();
     current?.stop().catch(() => {});
@@ -1348,7 +1364,12 @@ function disconnect() {
 // The voice's reports, for as long as this call has it.
 const voiceListeners=[];
 function attachVoice(next){
+ window.sidevoiceUI?.playbackLevel?.clear?.();
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
+ if(typeof next.onPlaybackLevel==='function'){
+  const stop=next.onPlaybackLevel(level=>{if(voice===next)voicePlaybackLevel(level)});
+  if(typeof stop==='function')voiceListeners.push(stop);
+ }
  void watchAudioDevices();
 }
 /* The microphone and the speaker the voice uses (the same seam on the web and in the desktop app): this device's
@@ -1843,6 +1864,7 @@ window.sidevoiceActions={
  // the call there when it is another's. Out of a call it is the one the next join goes to. Picked while a join is still
  // on its way to another machine, that join is left and the call joined afresh, inside the person's own tap.
  selectParticipant(key){
+  window.sidevoiceUI?.playbackLevel?.clear?.();
   const participant=state.people.find(item=>personKey(item)===key),to=conversationOf(key);
   state.viewedThread=key;markHistorySeen();
   if(!state.sessionId)rememberThread(key);
@@ -2027,3 +2049,5 @@ function publishSessionView(view = roomStore.getState()) {
 }
 roomStore.subscribe(reconcileSession);
 reconcileSession(roomStore.getState());
+// Working shows once a conversation has been busy for a while (WORKING_SHOWN_AFTER_MS): this keeps its start and clock.
+followWorking(roomStore);

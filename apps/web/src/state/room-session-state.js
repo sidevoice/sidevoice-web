@@ -1,5 +1,8 @@
 // The session's facts and pure projections. No DOM, storage, audio engine or clock reads here.
 export const PRESENCE_DELIVERED_DELAY_MS = 1500;
+/* How long a conversation works without a break before it shows as working (the operator, 2026-10-14): its words, its
+ * light and its avatar's work wait for it, so a plain back-and-forth does not flash Working between turns. */
+export const WORKING_SHOWN_AFTER_MS = 3000;
 // A dropped socket is the network's business for this long: the call goes on as if nothing happened (no tone, no
 // line, no control held), and only a drop that outlasts it says the call is reconnecting.
 export const RECONNECT_GRACE_MS = 30000;
@@ -25,6 +28,9 @@ export function initialSessionFacts() {
         joinStep: null, joinFailure: '', joinFailureDetails: '', joinProgress: null, joinDetail: '', joinSubject: '',
         screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0,
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
+        // Since when each conversation has been busy without a break (busySince): the runtime keeps it, and the clock
+        // fact `now` above, so Working shows WORKING_SHOWN_AFTER_MS later (working).
+        workingSince: {},
         // The machines this device is paired with (never their tokens), and when they were read. Every one of them is live
         // at once (`machineLinks`).
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
@@ -71,7 +77,9 @@ export function selectedThread(s) { return conversationKey(s.callNode, s.roomBin
 function inCall(s) { return !!(s.ws || s.reconnecting); }
 export function viewedThread(s) { return s.viewedThread || selectedThread(s); }
 export function speechSegment(speech) { return speech.history_id || speech.session_id + ':voice:' + speech.utterance_id; }
-export function working(s, thread = selectedThread(s)) {
+/** Whether the conversation is working on what this browser said, as soon as that is known: the harness's own report,
+ *  else the turn's receipts. Shown only once it has lasted (working). */
+export function busy(s, thread = selectedThread(s)) {
     if (!inCall(s) || !thread)
         return false;
     // false is an authoritative report too. Receipts and replies can never override it.
@@ -80,6 +88,27 @@ export function working(s, thread = selectedThread(s)) {
     return Object.values(s.turns).some(t => t.thread === thread && t.session === s.sessionId && !t.settled &&
         !['not_sent', 'channel_closed'].includes(t.status) &&
         (t.status === 'read' || (['delivered', 'unconfirmed'].includes(t.status) && s.now >= t.readyAt)));
+}
+/** Whether the conversation shows as working: busy without a break since `workingSince` for WORKING_SHOWN_AFTER_MS, by
+ *  the clock fact. One busy with no start recorded yet is not shown. */
+export function working(s, thread = selectedThread(s)) {
+    const since = thread ? s.workingSince?.[thread] : undefined;
+    return since !== undefined && busy(s, thread) && s.now - since >= WORKING_SHOWN_AFTER_MS;
+}
+/** Since when each conversation has been busy without a break, as known at `at`: a start kept while it stays busy, `at`
+ *  for one that just became busy, none for the rest. */
+export function busySince(s, at) {
+    const since = {};
+    for (const thread of new Set([...Object.keys(s.harness), ...Object.values(s.turns).map(t => t.thread)]))
+        if (thread && busy(s, thread))
+            since[thread] = s.workingSince?.[thread] ?? at;
+    return since;
+}
+/** When the next conversation busy for a while is due to show as working, by the clock fact; null when none is waiting. */
+export function workingDeadline(s) {
+    const due = Object.entries(s.workingSince || {}).map(([thread, since]) => since + WORKING_SHOWN_AFTER_MS)
+        .filter(at => at > s.now);
+    return due.length ? Math.min(...due) : null;
 }
 export function sessionStatus(s) {
     const speaker = s.userLive ? 'user' : s.botLive ? 'room' : 'nobody';
@@ -144,7 +173,7 @@ export function callCardView(s, participants = participantsView(s)) {
     const mic = micView(s);
     const busyReason = s.reconnectShown ? 'reconnecting' : s.switching || s.movingTo ? 'switching' : null;
     const target = busyReason === 'switching' ? s.movingTo || (s.viewedThread && s.viewedThread !== selected ? s.viewedThread : selected) : null;
-    const title = row?.title || (isTarget && s.roomBinding?.title) || '';
+    const title = row?.title || (isTarget && displayTitle(s.roomBinding?.title)) || '';
     return { ready: true, joined: callView(s).joined, busy: !!busyReason, micEnabled: mic.enabled, micDisabled: mic.disabled,
         // Skip stops what is sounding, as the room's own Skip (FC3).
         title, agent, youTalking: !!s.userLive, canSkip: !!s.botLive, conversation: key, participants, devices: cardDevices(s.audioDevices),
@@ -188,14 +217,39 @@ export function callView(s) {
     return { joined, busy: !!s.reconnectShown,
         label: say(joined ? 'session.call.leave' : 'session.call.join') };
 }
+/* A conversation's title as every surface shows it (its row, the header, the stage, the transcript, the desktop card):
+ * the title its agent gave, on one line, without the quotes it may come wrapped in, and without a part that only names
+ * what the conversation's own marks say already — its harness is its icon, never its name, and its model is on the
+ * stage's badge. Each surface then cuts what is left with an ellipsis, the whole of it on hover. */
+const HARNESS_NAMES = { claude: ['claude', 'claude code'], codex: ['codex', 'codex cli', 'openai codex'], cursor: ['cursor', 'cursor agent'] };
+// Wrapped whole in one pair of quotes, with none inside.
+const QUOTED = /^["'`\u201c\u2018\u00ab]([^"'`\u201c\u201d\u2018\u2019\u00ab\u00bb]*)["'`\u201d\u2019\u00bb]$/;
+/** `title` as shown; `person`, the room's row it names (its `harness` and `engine.model`), when known. */
+export function displayTitle(title, person = null) {
+    const line = String(title ?? '').replace(/\s+/g, ' ').trim();
+    const text = (QUOTED.exec(line)?.[1] ?? line).trim();
+    const family = /^(claude|codex|cursor)/.exec(String(person?.harness || '').toLowerCase())?.[1];
+    const named = new Set([...(HARNESS_NAMES[family] || []), String(person?.harness || '').toLowerCase(), String(person?.engine?.model || '').toLowerCase()].filter(Boolean));
+    if (!named.size)
+        return text;
+    // A part in brackets, or one between separators (": ", " — ", " – ", " - ", " | ", " · "), that names the harness or the model.
+    const unbracketed = text.replace(/\s*[([]([^()[\]]*)[)\]]/g, (group, inner) => named.has(inner.trim().toLowerCase()) ? '' : group);
+    const parts = unbracketed.split(/(\s*:\s+|\s+[—–|·-]\s+)/);
+    const kept = [];
+    for (let i = 0; i < parts.length; i += 2)
+        if (!named.has(parts[i].trim().toLowerCase()))
+            kept.push(kept.length ? parts[i - 1] ?? ' ' : '', parts[i]);
+    return kept.join('').trim() || text;
+}
 /** The name over the transcript: the conversation being looked at, whoever it is. */
 export function viewedTitle(s) {
     const id = viewedThread(s);
     if (!id)
         return say('session.liveConversation');
-    return s.people.find(p => personKey(p) === id)?.title
-        || s.history.find(r => r.thread === id && r.role === 'assistant')?.name
-        || s.roomBinding?.title || say('session.liveConversation');
+    const person = s.people.find(p => personKey(p) === id);
+    return displayTitle(person?.title, person)
+        || displayTitle(s.history.find(r => r.thread === id && r.role === 'assistant')?.name)
+        || displayTitle(s.roomBinding?.title) || say('session.liveConversation');
 }
 /** Who is answering: the agent's own model and effort, exactly as its harness reports them. */
 export function enginePanel(s) {
@@ -288,7 +342,7 @@ export function participantsView(s) {
         const reach = REACH_STATES.has(p.reach?.state) ? p.reach.state : (p.available ? 'listening' : 'offline');
         const busy = working(s, key);
         // Grouped by the paired machine it runs on (one room each), named as this device names that machine.
-        return { threadId: key, title: p.title, selected: key === selected, available: !!p.available, switching: s.switching,
+        return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,
             unread, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             model: p.engine?.model || null, effort: p.engine?.effort || null,
