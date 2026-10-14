@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
-import { conversationTranslator } from "./conversation-i18n";
+import { translator } from "../../i18n/translator";
 import { dayLabel, MessageList } from "./MessageList";
 
 const base = 1_700_000_000_000;
@@ -39,7 +39,7 @@ test("a day's first run is headed by its day: today and yesterday by name, older
 });
 
 test("a day further back reads as its date, with its year only when it is not this one", () => {
-  const t = conversationTranslator("en");
+  const t = translator("en");
   const now = new Date(2026, 5, 15, 12).getTime();
   expect(dayLabel(new Date(2026, 5, 15, 8).getTime(), t, now)).toBe("Today");
   expect(dayLabel(new Date(2026, 5, 14, 23).getTime(), t, now)).toBe("Yesterday");
@@ -167,5 +167,5 @@ test("a delivery status this version does not know shows no mark, never the warn
 test("a reply whose audio status this version does not know is drawn as plain text, and listening again stays the room's call (core#112)", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "a:voice:9", text: "Nueva", replayable: true, playback: undefined })])} />);
   expect(container.querySelector(".karaoke-text")?.getAttribute("data-playback")).toBe("complete");
-  expect(screen.getByRole("button", { name: conversationTranslator()("messages.listenAgain") })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: translator()("messages.listenAgain") })).toBeInTheDocument();
 });

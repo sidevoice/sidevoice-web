@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import { clampDeviceName, deviceNameProblem } from "../../services/device-name-rules.js";
 
 /* This device's name as the machines it pairs with list it: prefilled with what it would be called (the computer's
@@ -9,7 +9,7 @@ import { clampDeviceName, deviceNameProblem } from "../../services/device-name-r
  * (setDeviceName). Saved on Enter or on leaving the field; what could not be told is said. In General and in the setup's
  * basics. */
 export function DeviceNameField({ id }: { id: string }) {
-  const t = hostTranslator();
+  const t = translator();
   const derived = () => currentDeviceName((_, params) => t("pair.deviceNameBrowser", params));
   const [value, setValue] = useState(derived);
   const [saved, setSaved] = useState(value);

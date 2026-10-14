@@ -22,6 +22,7 @@ import { OnboardingProvider, useOnboarding } from "../features/onboarding/onboar
 import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
+import { useUiLanguage } from "../i18n/use-ui-language";
 
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
@@ -86,6 +87,8 @@ function RoomContent() {
 
 /** `onboarding`: where the setup keeps its record, and a step to open at — the journeys' storyboard shows each step. */
 export function App({ store, onboarding, runtime }: { store?: RoomStore; onboarding?: { repository?: OnboardingRepository; startAt?: OnboardingStep }; runtime?: boolean } = {}) {
+  // Every word on the page is drawn in the interface's language: a switch draws the page again.
+  useUiLanguage();
   return (
     <RoomProvider store={store} runtime={runtime}>
       <OnboardingProvider repository={onboarding?.repository} startAt={onboarding?.startAt}>

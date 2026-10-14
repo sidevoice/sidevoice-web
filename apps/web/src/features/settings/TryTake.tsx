@@ -4,7 +4,7 @@ import { PauseRecordingIcon, PlayRecordingIcon } from "../../components/ui/Icons
 import { takeMs, type VoiceTake } from "../../services/voice-take";
 import { createTakePlayer, takeColumns } from "./take-audio";
 import { seconds } from "./try-time";
-import type { HostTranslate } from "./host-i18n";
+import type { Translate } from "../../i18n/translator";
 import "./try-take.css";
 
 /* A try's take, once the try is over (transcription's in its try block, the end of turn's in its own card): the whole
@@ -38,7 +38,7 @@ const Bars = memo(function Bars({ columns }: { columns: number[] }) {
 
 type Mark = { kind: "speech" | "pause" | "end"; text: string };
 
-export function TryTake({ take, id, t }: { take: VoiceTake; id: string; t: HostTranslate }) {
+export function TryTake({ take, id, t }: { take: VoiceTake; id: string; t: Translate }) {
   const length = takeMs(take);
   const player = useMemo(() => createTakePlayer(take), [take]);
   // Unmounted, or another take: the player stops and lets go of its copy.

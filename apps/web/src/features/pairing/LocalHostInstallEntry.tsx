@@ -9,13 +9,13 @@ import {
   localHostInstallController,
   type LocalHostInstallController,
 } from "../../services/local-host-install";
-import { hostTranslator } from "../settings/host-i18n";
-import type { HostMessageKey } from "../settings/messages/en";
+import { translator, type MessageKey } from "../../i18n/translator";
 import { localHostBridgeError } from "../settings/local-host-status";
 import { InstallCommandHere } from "./ConnectorSteps";
 import "./pairing.css";
+import { uiLocale } from "../../i18n/locale";
 
-const stepKeys: Record<string, HostMessageKey> = {
+const stepKeys: Record<string, MessageKey> = {
   download: "localInstall.step.download",
   verification: "localInstall.step.verification",
   verify: "localInstall.step.verification",
@@ -27,7 +27,7 @@ const stepKeys: Record<string, HostMessageKey> = {
 };
 
 function formatMegabytes(bytes: number) {
-  return new Intl.NumberFormat(navigator.language, { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
+  return new Intl.NumberFormat(uiLocale(), { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
 }
 
 /** Whether a screen may offer to prepare this computer: `supported` when this app can (the desktop app's install),
@@ -55,7 +55,7 @@ export function LocalHostInstallEntry({
   holdSuccess?: boolean;
   source?: "no-machine" | "machines";
 }) {
-  const t = hostTranslator();
+  const t = translator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const bridge = localHostBridge();
   const supportsInstall = typeof bridge?.install === "function";

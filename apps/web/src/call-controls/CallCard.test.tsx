@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS, duration, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS } from "./CallCard";
 import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
-import { cardLanguage, translator } from "./i18n";
+import { translator } from "../i18n/translator";
+import { cardLanguage } from "./i18n";
 import { cardSnapshot } from "../test/call-card";
 
 const t = translator("en");
@@ -13,11 +14,11 @@ function snapshot(overrides: Partial<CallSnapshot> = {}): CallSnapshot {
     agent: "idle", youTalking: false, canSkip: false, since: SINCE,
     participants: [
       { threadId: "a", title: "Sidevoice: mini call", selected: true, available: true, switching: false, unread: 0, reach: "listening",
-        stateLabel: "Escuchando", subtitle: "", working: false, machine: "daimon", harness: "claude" },
+        working: false, machine: "daimon", harness: "claude" },
       { threadId: "b", title: "brand/web", selected: false, available: true, switching: false, unread: 2, reach: "listening",
-        stateLabel: "2 nuevas", subtitle: "2 nuevas", working: true, machine: "daimon", harness: "claude" },
+        working: true, machine: "daimon", harness: "claude" },
       { threadId: "c", title: "landing", selected: false, available: false, switching: false, unread: 0, reach: "offline",
-        stateLabel: "Desconectada", subtitle: "Desconectada", working: false, machine: "portátil", harness: "cursor" },
+        working: false, machine: "portátil", harness: "cursor" },
     ],
     devices: { inputs: [{ id: "default", label: "Predeterminado del sistema", system: true }, { id: "mbp", label: "MacBook Pro Microphone" },
       { id: "x", label: "Micrófono 2", number: 2 }, { id: "gone", label: "Dispositivo seleccionado · desconectado", missing: true }],
@@ -273,11 +274,19 @@ test("nothing outside a call", () => {
   expect(container).toBeEmptyDOMElement();
 });
 
-test("Spanish when the system speaks it; English for any other language", () => {
+test("the card speaks the language this device's settings chose, else the system's; English for any other", () => {
   expect(cardLanguage(["es-ES"])).toBe("es");
-  expect(cardLanguage(["de-DE"])).toBe("en");
+  expect(cardLanguage(["de-DE"])).toBe("de");
+  expect(cardLanguage(["zh-CN"])).toBe("zh-Hans");
+  expect(cardLanguage(["ko-KR"])).toBe("en");
   expect(translator("es")("card.hangUp")).toBe("Colgar");
-  expect(translator("de")("card.hangUp")).toBe("Hang up");
+  expect(translator("ko")("card.hangUp")).toBe("Hang up");
+  localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "pl" }));
+  try {
+    expect(cardLanguage()).toBe("pl");
+  } finally {
+    localStorage.removeItem("sidevoice.settings");
+  }
 });
 
 test("the call's duration reads like a clock", () => {

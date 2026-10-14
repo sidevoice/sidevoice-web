@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { errorLine, errorMessage, roomFailure, voiceFailure, worded } from "./error-message";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 
 /* A failure as people read it (AGENTS.md): a known code in the bundle's words, in English and in Spanish; any other a
  * generic line about what failed, its code and its own text behind Details; a raw text never the sentence. */
 
-const en = hostTranslator("en"), es = hostTranslator("es");
+const en = translator("en"), es = translator("es");
 const engine = (code: string, detail?: string) => Object.assign(new Error(code), { code, params: {} }, detail ? { detail } : {});
 
 test("a known code is the bundle's sentence, in English and in Spanish", () => {

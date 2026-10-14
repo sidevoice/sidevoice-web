@@ -43,7 +43,7 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
             title={tooltip(row)}
             onClick={() => onSelect(row.threadId)}
           >
-            {lead ? lead(row) : <><span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined} title={row.stateLabel}><span className="dot" /></span></>}
+            {lead ? lead(row) : <><span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined}><span className="dot" /></span></>}
             <span className="participant-copy"><span className="person-name" title={row.title} translate="no">{row.title}</span><span className="person-sub muted">{sub(row)}</span></span>
             {end?.(row)}
           </button>

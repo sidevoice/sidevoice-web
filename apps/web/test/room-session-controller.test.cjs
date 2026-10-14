@@ -15,18 +15,22 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./messages/en':'HostMessagesEn','./messages/es':'HostMessagesEs','../../i18n/translator':'Translator','../features/settings/host-i18n.ts':'HostI18n','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./host-i18n':'HostI18n'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',HostMessagesEn:sourceRoot+'/features/settings/messages/en.ts',HostMessagesEs:sourceRoot+'/features/settings/messages/es.ts',Translator:sourceRoot+'/i18n/translator.ts',HostI18n:sourceRoot+'/features/settings/host-i18n.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts'};
+ const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
  for(const name of new Set(Object.values(modules))){
   let text=fs.readFileSync(files[name],'utf8');
+  // The catalogues the translator finds by file (Vite's import.meta.glob): each one already loaded, by its path.
+  text=text.replace(/import\.meta\.glob<\w+>\("\.\/locales\/\*\.ts", \{ eager: true \}\)/,()=>'({'+fs.readdirSync(sourceRoot+'/i18n/locales').map(file=>JSON.stringify('./locales/'+file)+':Locale'+file.slice(0,-3).split('-').map(part=>part[0].toUpperCase()+part.slice(1)).join('')).join(',')+'})');
   if(files[name].endsWith('.ts'))text=require('typescript').transpileModule(text,{compilerOptions:{target:99,module:99}}).outputText;
   const dependency=imports(text,require('node:path').dirname(files[name]));
   const exports=[...dependency.matchAll(/^export (?:async function|function|const|class) (\w+)/gm)].map(m=>m[1]);
   vm.runInContext('const '+name+'=(()=>{'+dependency.replace(/^export /gm,'')+';return {'+exports.join(',')+'}})();',context);
  }
+ // The projections speak through the translator, as the room's store makes them (state/room-store.ts).
+ vm.runInContext('SessionState.speakWith((key,params)=>Translator.translator()(key,params))',context);
  const source=fs.readFileSync(sourceRoot+'/services/room-session-controller.js','utf8');
  const loaded=imports(source,sourceRoot+'/services');
  vm.runInContext('"use strict";\n'+loaded,context);
@@ -70,17 +74,17 @@ test('The controller publishes serializable snapshots through the React store br
  assert.equal(snapshots.participants[0].threadId,'fp-mac|a');
  assert.equal(snapshots.participants[0].machine,'macbook','grouped under the paired machine, as this device names it');
  assert.equal(snapshots.participants[0].selected,true);
- assert.match(snapshots.participants[0].activityNote,/No sabemos/,'an undeclared capability remains unknown');
+ assert.match(snapshots.participants[0].activityNote,/We do not know/,'an undeclared capability remains unknown');
  s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported'}}];rosterSignature=''");
- assert.match(snapshots.participants[0].activityNote,/no informa/,'unsupported is explained explicitly');
+ assert.match(snapshots.participants[0].activityNote,/does not report/,'unsupported is explained explicitly');
  s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported'}}];rosterSignature=''");
  assert.equal(snapshots.participants[0].activityNote,null,'supported activity needs no warning');
  s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'supported',deliver:'supported',experimental:['deliver']}}];rosterSignature=''");
- assert.match(snapshots.participants[0].activityNote,/Entrega experimental/,'an experimental delivery is said');
+ assert.match(snapshots.participants[0].activityNote,/Experimental delivery/,'an experimental delivery is said');
  s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,capabilities:{working:'unsupported',deliver:'supported',sessionIdentity:'supported',experimental:['deliver','sessionIdentity']}}];rosterSignature=''");
- assert.match(snapshots.participants[0].activityNote,/Identificación experimental/,'an experimental identity is said too');
+ assert.match(snapshots.participants[0].activityNote,/Experimental identification/,'an experimental identity is said too');
  s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,harness:'cursor',route:'cursor-editor-view'}];rosterSignature=''");
- assert.equal(snapshots.participants[0].harness,'cursor'); assert.equal(snapshots.participants[0].route,'tarjeta (experimental)');
+ assert.equal(snapshots.participants[0].harness,'cursor'); assert.equal(snapshots.participants[0].route,'card (experimental)');
  s.run("people=[{node:'fp-mac',thread_id:'a',title:'Agente',available:true,harness:'cursor'}];rosterSignature=''");
  assert.equal(snapshots.participants[0].route,null,'a room that does not say the route leaves the harness name alone');
  assert.equal(s.run("setRoomError('fallo')"),undefined);
@@ -246,7 +250,7 @@ test('Microphone preference can be toggled before joining',()=>{
  const s=setup();
  s.run('window.sidevoiceActions.toggleMic()');
  assert.equal(s.run('micEnabled'),false);
- assert.equal(s.run('SessionState.micView(state).label'),'Activar micrófono');
+ assert.equal(s.run('SessionState.micView(state).label'),'Unmute microphone');
  s.run('window.sidevoiceActions.toggleMic()');
  assert.equal(s.run('micEnabled'),true);
  assert.equal(s.run('SessionState.micView(state).pressed'),false);
@@ -293,7 +297,7 @@ test('A refused lock shows red and says so, instead of failing silently',async()
  s.run('ws={}');
  await s.run('keepScreenAwake()');
  assert.equal(s.run('screenLock.state'),'off');
- assert.match(s.run('screenLock.note'),/No se pudo/);
+ assert.equal(s.run('screenLock.note'),'session.screen.failed','said where it is shown, in the language of the moment');
 });
 test('A lock the system takes back is asked for again while the call is up, and not after it ends',async()=>{
  const s=setup();let requests=0,release=null;const scheduled=[];
@@ -345,7 +349,7 @@ test('Stats omit missing durations and use first reply per turn, only for select
  assert.equal(s.run("$('stats-rows').children.length"),3);
  assert.equal(s.run("$('stats-rows').children[0].children.length"),6,'turn, four stages, status');
  assert.equal(s.run("$('stats-rows').children[0].children[1].textContent"),'—');
- assert.equal(s.run("$('stats-rows').children[1].children[5].textContent"),'Escuchada');
+ assert.equal(s.run("$('stats-rows').children[1].children[5].textContent"),'Heard');
  for(const value of ['null','undefined','NaN','Infinity','-1','true',"'10'"])
   assert.equal(s.run('statsDuration('+value+')'),'—');
  assert.equal(s.run('statsDuration(0)'),'0 ms');
@@ -380,7 +384,7 @@ test('Stats handle old servers, network failures and other call sessions without
   await s.run('openConnectionStats()');
   assert.equal(s.run("$('stats-response').textContent"),'—');
   assert.equal(s.run("$('stats-rows').children.length"),0);
-  assert.match(s.run("$('stats-status').textContent"),mode==='old'?/reiniciarlo/:mode==='offline'?/reintentará/:/Esperando/);
+  assert.match(s.run("$('stats-status').textContent"),mode==='old'?/Restart it/:mode==='offline'?/Retrying/:/Waiting/);
   s.run("$('connection-stats').close()");
  }
 });
@@ -401,10 +405,10 @@ test('A call with no sign of a person asks, then leaves, and only this browser l
  const s=setup();
  s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS+30000;checkIdle()");
  assert.equal(s.run('idleWarned'),true,'a minute before, it asks');
- assert.match(s.run('state.liveNote'),/¿Sigues ahí\?/);
+ assert.equal(s.run('state.callIdleWarning'),true);
  s.run('personSignal()');
  assert.equal(s.run('idleWarned'),false,'any sign of the person answers it');
- assert.equal(s.run('state.liveNote'),'');
+ assert.equal(s.run('state.callIdleWarning'),false);
  s.run("state.ws={close(){},readyState:1,send(){}};lastPersonSignal=Date.now()-IDLE_MS-1;checkIdle()");
  assert.equal(s.run('state.ws'),null,'with no answer the browser leaves the call');
  assert.match(s.run('roomStore.getState().facts?.joinFailure??state.joinFailure'),/^You left the call: 15 minutes without a sign from you/);
@@ -459,7 +463,7 @@ test('Aggregates keep one row per stage, named as the last-turn view names them'
  assert.equal(JSON.stringify(rows[2]),JSON.stringify(['transcript_to_delivery',0,null,null,null,null]),'a stage nobody measured stays empty, not zero');
  assert.equal(JSON.stringify(rows[3]),JSON.stringify(['delivery_to_read',2,500,100,900,900]),'the read stage falls back to queued → read, as the last-turn view does');
  assert.equal(JSON.stringify(rows[5]),JSON.stringify(['input_queued_to_reply',2,6000,3000,9000,9000]));
- assert.deepEqual(plain(s.run('LATENCY_STAGES.map(stage=>stage[2])')),['endpoint_silence','recognition','transcript_to_delivery','delivery_to_read','read_to_reply','input_queued_to_reply','reply_to_dispatch'],'only what the room still measures');
+ assert.deepEqual(plain(s.run('LATENCY_STAGES.map(stage=>stage[1])')),['endpoint_silence','recognition','transcript_to_delivery','delivery_to_read','read_to_reply','input_queued_to_reply','reply_to_dispatch'],'only what the room still measures');
  assert.equal(s.run("statsAggregate([]).every(row=>row.count===0&&row.max===null)"),true);
 });
 test('Copying the aggregates puts a plain-text table on the clipboard and says so',async()=>{
@@ -473,23 +477,23 @@ test('Copying the aggregates puts a plain-text table on the clipboard and says s
  await s.run('copyLatencyAggregates()');
  assert.equal(copied.length,1);
  const lines=copied[0].split('\n');
- assert.match(lines[0],/no se suman/);
- assert.match(lines[3],/^Tramo +n +Media +p50 +p90 +Máx$/);
- assert.match(lines[5],/^Silencio hasta cerrar el turno +1 +600 ms +600 ms +600 ms +600 ms$/);
+ assert.match(lines[0],/do not add them up/);
+ assert.match(lines[3],/^Stage +n +Mean +p50 +p90 +Max$/);
+ assert.match(lines[5],/^Silence until the turn closes +1 +600 ms +600 ms +600 ms +600 ms$/);
  assert.equal(lines[3].length,lines[5].length,'the columns line up so the table reads as a table');
  assert.match(lines[4],/^-+ +-+ +-+ +-+ +-+ +-+$/);
- assert.match(copied[0],/Toda la sesión · 2 respuestas medidas/);
- assert.match(copied[0],/Claude · 1 respuesta medida/);
- assert.match(copied[0],/Astra · 1 respuesta medida/);
- assert.equal(s.run("$('stats-aggregates-copied').textContent"),'Copiado como texto.');
+ assert.match(copied[0],/Whole session · 2 measured replies/);
+ assert.match(copied[0],/Claude · 1 measured reply/);
+ assert.match(copied[0],/Astra · 1 measured reply/);
+ assert.equal(s.run("$('stats-aggregates-copied').textContent"),'Copied as text.');
  // A browser that refuses the clipboard says so instead of pretending it copied.
  s.context.navigator={};
  await s.run('copyLatencyAggregates()');
- assert.match(s.run("$('stats-aggregates-copied').textContent"),/No se pudo copiar/);
+ assert.match(s.run("$('stats-aggregates-copied').textContent"),/Could not copy/);
  s.run('renderLatencyStats(null,null)');
  await s.run('copyLatencyAggregates()');
  assert.equal(copied.length,1,'nothing measured, nothing copied');
- assert.match(s.run("$('stats-aggregates-copied').textContent"),/nada que copiar/);
+ assert.match(s.run("$('stats-aggregates-copied').textContent"),/Nothing to copy/);
 });
 
 test('Selecting a conversation is this tab\'s own choice: it names the session, is remembered per tab and comes back on reconnect',async()=>{
@@ -519,9 +523,9 @@ test('The stats say which build the page runs and which the room serves, and fla
  const s=setup();
  s.context.window.sidevoiceBuildId='page1';
  s.run("roomInfo={version:'0.3.0',web_build:'page1'}");
- assert.equal(JSON.stringify(s.run('versionFacts')()),JSON.stringify([['Versión de la página','page1'],['Versión servida','page1 · al día'],['Servidor','0.3.0']]));
+ assert.equal(JSON.stringify(s.run('versionFacts')()),JSON.stringify([['Page version','page1'],['Version served','page1 · up to date'],['Server','0.3.0']]));
  s.run("roomInfo={version:'0.3.0',web_build:'page2'}");
- assert.equal(s.run('versionFacts')()[1][1],'page2 · hay una versión nueva, recarga');
+ assert.equal(s.run('versionFacts')()[1][1],'page2 · a new version is available, reload');
  s.run("roomInfo=null");
  assert.equal(s.run('versionFacts')()[1][1],'—');
 });
@@ -566,7 +570,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
 
  // A refusal this page has no words for is the room refusing: what the room said is only behind Details, and a device
  // set to Spanish reads it in Spanish.
- const other=setup({strictDOM:true});other.saved['sidevoice.settings']=JSON.stringify({ui_language:'es'});
+ const other=setup({strictDOM:true});other.saved['sidevoice.settings']=JSON.stringify({ui_language:'es'});other.run("Translator.setUiLanguage('es')");
  const odd=joining(other,{admission:{admitted:false,reason:'device_quarantined',message:'This device is quarantined by policy.'}});
  const oddJoined=odd.tap();
  const oddSocket=await firstSocket(odd.sockets);
@@ -827,7 +831,7 @@ test('A device paired with nothing gets explicit pairing on join, not an automat
  const s=setup({paired:false});const sockets=socketsOf(s);const net=network();s.context.fetch=net.get;
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(s.run('roomStore.getState().pairing.open'),false,'the onboarding screen keeps pairing explicit');
- assert.match(s.run('roomStore.getState().join.text'),/no está emparejado con ninguna máquina/);
+ assert.match(s.run('roomStore.getState().join.text'),/is not paired with any machine/);
  await s.run('toggleCall()');
  assert.equal(s.run('roomStore.getState().pairing.open'),true,'joining asks for the code instead');
  assert.equal(s.run('state.connecting'),false);
@@ -909,7 +913,7 @@ test('Olvidar forgets the machine here at once, and asks it to revoke this devic
  assert.equal(net.asked.filter(r=>r.auth==='Bearer tok-pc').length,0);
  assert.deepEqual(stored(s),{pairings:[]});
  assert.equal(s.run('hungUp'),1,'no call was on it: nothing hung up');
- assert.match(s.run('roomStore.getState().join.text'),/no está emparejado con ninguna máquina/);
+ assert.match(s.run('roomStore.getState().join.text'),/is not paired with any machine/);
 });
 
 test('A machine the room cannot reach is not a full room: its own sentence, and not a refusal to stop at',async()=>{
@@ -961,13 +965,12 @@ test('Within the grace a drop is not shown and holds no control; past it, one li
  assert.equal(view().call.busy,false);
  assert.equal(view().call.joined,true,'still a call: the button hangs up');
  assert.equal(view().session.tab,'listening');
- assert.doesNotMatch(view().live,/Reconectando|Entra en la llamada/);
  assert.equal(view().mic.disabled,false);
  s.run('window.sidevoiceActions.toggleMic()');
  assert.equal(s.run('micEnabled'),false,'muting works during the grace');
  assert.deepEqual(voice.calls.at(-1),['mute',true]);
  graces.forEach(fn=>fn());
- assert.match(view().join.text,/Reconectando…/);
+ assert.match(view().join.text,/Reconnecting…/);
  assert.equal(view().call.busy,true);
  assert.equal(view().session.tab,'reconnecting');
  assert.equal(view().mic.disabled,false);
@@ -1681,7 +1684,7 @@ test('A conversation of a machine that does not answer is only looked at: the ca
  s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
  assert.equal(s.run('viewedThread'),'fp-pc|p');
  assert.equal(s.run('state.switching'),false);assert.equal(c.sockets.length,1);assert.equal(s.run('callNode'),'fp-mac');
- assert.match(s.run('SessionState.reachNote(state)'),/«macbook»|^$/,'the note speaks of the call\'s machine');
+ assert.match(s.run('SessionState.reachNote(state)'),/“macbook”|^$/,'the note speaks of the call\'s machine');
  s.run('disconnect()');
 });
 test('A machine that refuses this device while merely watched says so in its row; the call on another goes on',async()=>{
@@ -1696,7 +1699,7 @@ test('A machine that refuses this device while merely watched says so in its row
  s.run("pairings={list:pairings.list.map(p=>p.fp==='fp-pc'?{...p,revoked:false}:p)};hostAgentBases.set('fp-pc','https://pc.example');verified.set('https://pc.example',Date.now())");
  await assert.rejects(s.run("hostApi('fp-pc','/api/host/agents')"));
  assert.equal(s.run('roomStore.getState().pairing.open'),true);
- assert.match(s.run('roomStore.getState().pairing.note'),/«pc» ya no reconoce este dispositivo/);
+ assert.match(s.run('roomStore.getState().pairing.note'),/“pc” no longer recognises this device/);
  assert.ok(s.run('state.ws'),'and the call on the Mac still goes on');
  s.run('disconnect()');
 });

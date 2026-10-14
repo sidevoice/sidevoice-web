@@ -2,8 +2,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { markSetUp } from "./onboarding";
+import { speakWith } from "../state/room-session-state.js";
+import { translator } from "../i18n/translator";
 
 afterEach(cleanup);
+
+// A store made without the room's (a state test's own) speaks as the room's does (state/room-store.ts).
+speakWith((key, params) => translator()(key, params));
 
 // Every test starts on a device whose first setup is finished, so the room renders; the setup's own tests start from
 // an empty record (features/onboarding).

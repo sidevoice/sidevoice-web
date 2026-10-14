@@ -1,9 +1,7 @@
 import type { LocalHostBridge, LocalHostBridgeError, LocalHostStatus, LocalHostStatusName } from "../../services/desktop-host";
 import { localHostBridge } from "../../services/desktop-host";
-import type { HostMessageKey } from "./messages/en";
+import type { MessageKey, Translate } from "../../i18n/translator";
 import { errorMessage, type ErrorMessage } from "./error-message";
-
-export type HostTranslate = (key: HostMessageKey, params?: Record<string, string | number>) => string;
 
 const CAUSES = new Set([
   "import.missing-module", "bind.port-in-use", "identity.unreadable", "identity.unsafe-directory", "start.failed",
@@ -89,7 +87,7 @@ export function safeLocalHostStatusDetails(status: LocalHostStatus): SafeLocalHo
   }
   return details;
 }
-const INSTALL_CAUSES: Record<string, HostMessageKey> = {
+const INSTALL_CAUSES: Record<string, MessageKey> = {
   "install.network": "localInstall.error.network",
   "install.proxy": "localInstall.error.proxy",
   "install.disk": "localInstall.error.disk",
@@ -107,7 +105,7 @@ const INSTALL_CAUSES: Record<string, HostMessageKey> = {
   "service.start.failed": "localInstall.error.service",
   "launch.failed": "localInstall.error.launch",
 };
-const INSTALL_CHECKS: Record<string, HostMessageKey> = {
+const INSTALL_CHECKS: Record<string, MessageKey> = {
   sha256: "localInstall.check.sha256",
   sigstore: "localInstall.check.sigstore",
   "sigstore-bundle": "localInstall.check.sigstoreBundle",
@@ -132,20 +130,20 @@ const INSTALL_CHECKS: Record<string, HostMessageKey> = {
 
 /** A failure of this computer's setup or update, in words (error-message.ts): its cause's sentence, else the setup's own
  *  generic line, the key behind Details. */
-export function localHostBridgeError(error: LocalHostBridgeError, t: HostTranslate): ErrorMessage {
+export function localHostBridgeError(error: LocalHostBridgeError, t: Translate): ErrorMessage {
   const checkKey = typeof error.params?.check === "string" ? INSTALL_CHECKS[error.params.check] : undefined;
   const check = checkKey ? t(checkKey) : t("localInstall.error.verificationCheck");
   return errorMessage({ key: error.key }, { t, generic: t("localInstall.error.unknown"),
     known: (code) => INSTALL_CAUSES[code] ? t(INSTALL_CAUSES[code], { check }) : null });
 }
 
-export function hostCause(status: LocalHostStatus, t: HostTranslate) {
+export function hostCause(status: LocalHostStatus, t: Translate) {
   const key = status.failure?.key || "unknown";
-  const messageKey = `hosts.cause.${key}` as HostMessageKey;
+  const messageKey = `hosts.cause.${key}` as MessageKey;
   return t(CAUSES.has(key) ? messageKey : "hosts.cause.unknown");
 }
 
-export function hostStatusText(status: LocalHostStatus, t: HostTranslate) {
+export function hostStatusText(status: LocalHostStatus, t: Translate) {
   switch (status.state) {
     case "running": return t("hosts.status.running");
     case "not-installed": return t("hosts.status.not-installed");
@@ -154,7 +152,7 @@ export function hostStatusText(status: LocalHostStatus, t: HostTranslate) {
     case "backoff": {
       const attempts = safeLocalHostCount(status.attempts) ?? "?";
       const limit = safeLocalHostCount(status.limit);
-      return t("hosts.status.backoff", { attempts, limit: limit ? ` of ${limit}` : "" });
+      return limit ? t("hosts.status.backoffLimit", { attempts, limit }) : t("hosts.status.backoff", { attempts });
     }
     case "failed": return t("hosts.status.failed", { cause: hostCause(status, t) });
     case "service-failed": return t("hosts.status.service-failed", { cause: hostCause(status, t) });
@@ -181,8 +179,8 @@ export function canRunLocalHostAction(action: LocalHostAction, bridge = localHos
  *  service is not set up (setting it up starts it), Retry (a restart, never the install again) while it retries or
  *  once it failed, Reconnect once it no longer recognizes this app; none while it runs or starts, nor where nothing is
  *  installed. */
-export function localHostRecovery(status: LocalHostStatus, bridge = localHostBridge()): { action: LocalHostAction; label: HostMessageKey } | null {
-  const recovery: { action: LocalHostAction; label: HostMessageKey } | null =
+export function localHostRecovery(status: LocalHostStatus, bridge = localHostBridge()): { action: LocalHostAction; label: MessageKey } | null {
+  const recovery: { action: LocalHostAction; label: MessageKey } | null =
     status.state === "not-installed" ? { action: "serviceInstall", label: "hosts.start" }
       : status.state === "stopped-by-person" ? { action: "start", label: "hosts.start" }
         : status.state === "backoff" || status.state === "failed" || status.state === "service-failed" ? { action: "restart", label: "hosts.retry" }

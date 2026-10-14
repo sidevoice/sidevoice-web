@@ -4,7 +4,7 @@ import { useDialogFocusReturn } from "../../lib/focus-return";
 import { Button } from "./Button";
 import { CloseIcon } from "./Icons";
 import { OverlayPortalProvider } from "./Tooltip";
-import { uiTranslator } from "./ui-i18n";
+import { translator } from "../../i18n/translator";
 
 /* A dialog, and the full-screen page that is the same thing on a bigger stage (Settings, the first-run setup): a head
  * with its title and close, a body that alone scrolls, and a footer that stays in sight. `DialogSurface` is that
@@ -31,7 +31,7 @@ interface SurfaceProps extends PropsWithChildren {
 }
 
 export function DialogSurface({ titleId, title, eyebrow, leading, footer, closeId, onClose, closeable = false, flush = false, closeLabel, titleFocusable = false, children }: SurfaceProps) {
-  const t = uiTranslator();
+  const t = translator();
   return (
     <div className="ui-dialog-surface">
       <header className="ui-dialog-head">

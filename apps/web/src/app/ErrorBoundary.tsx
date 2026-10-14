@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, type PropsWithChildren } from "react";
 import { Button } from "../components/ui/Button";
 import { ErrorDetails } from "../components/ui/ErrorText";
-import { hostTranslator } from "../features/settings/host-i18n";
+import { translator } from "../i18n/translator";
 
 /* React unmounts the whole root when a render throws, and a blank room is the worst thing that can
  * happen to someone who is driving: the call is still up, but nothing on screen says so. The boundary
@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<PropsWithChildren<{ area: string }>
 
   render() {
     if (!this.state.message) return this.props.children;
-    const t = hostTranslator();
+    const t = translator();
     return (
       <div className="panel-error" role="alert">
         <b>{t("app.panelFailed")}</b>

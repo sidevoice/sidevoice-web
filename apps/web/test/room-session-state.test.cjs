@@ -62,8 +62,9 @@ test('A waveform belongs only to the viewed active input, and cancelled input ca
 });
 test('Join progress, returning subject and failure text are derived from the same join facts',async()=>{
  const api=await moduleReady;const s=facts(api);
- for(const [step,text] of Object.entries(api.JOIN_STEPS))assert.equal(api.joinView({...s,joinStep:step,joinSubject:'A'}).text,text+(step==='conversation'?'A':''));
- assert.equal(api.joinView({...s,joinStep:'voice',joinProgress:16.7}).text,'Preparando la voz (17 %)');
+ // The words are keys here: no translator was given (state/room-store.ts gives the interface's).
+ for(const [step,key] of Object.entries(api.JOIN_STEPS))assert.equal(api.joinView({...s,joinStep:step,joinSubject:'A'}).text,key+(step==='conversation'?' {"name":"A"}':''));
+ assert.equal(api.joinView({...s,joinStep:'voice',joinProgress:16.7}).text,'session.join.withDetail {"step":"session.join.voice","detail":"17 %"}');
  assert.deepEqual(api.joinView({...s,joinStep:'room',joinFailure:'No permission'}),{step:'failed',text:'No permission',progress:null,failed:true});
  // What was raw about a failure comes with it, for its Details; never in its text.
  assert.deepEqual(api.joinView({...s,joinFailure:'Something went wrong with the machine.',joinFailureDetails:'TypeError\nFailed to fetch'}),
@@ -113,7 +114,7 @@ test('A participant from a newer machine is listed: extra fields ignored, an unk
  const view=(people)=>api.participantsView(facts(api,{people}));
  // An unknown reach is not "offline": it reads as one the room left unsaid, by whether the conversation is available.
  const [up,down]=view([person({reach:{state:'warming_up',detail:'Loading',eta:3}}),person({thread_id:'b',available:false,reach:{state:'warming_up'}})]);
- assert.equal(up.reach,'listening');assert.equal(up.stateLabel,'Escuchando');assert.equal(up.detail,'Loading');
+ assert.equal(up.reach,'listening');assert.equal(up.detail,'Loading');
  assert.equal(down.reach,'offline');
  for(const state of ['listening','holding','offline'])assert.equal(view([person({reach:{state}})])[0].reach,state);
  // A reach without a state, and no reach at all.
@@ -124,9 +125,9 @@ test('A participant from a newer machine is listed: extra fields ignored, an unk
   const [row]=view([person({capabilities:{working:'supported',experimental}})]);
   assert.equal(row.activityNote,null,JSON.stringify(experimental));
  }
- assert.match(view([person({capabilities:{working:'supported',experimental:['deliver','teleport']}})])[0].activityNote,/Entrega experimental/);
+ assert.match(view([person({capabilities:{working:'supported',experimental:['deliver','teleport']}})])[0].activityNote,/^session.note.experimentalDeliver$/);
  // No capabilities at all: what is not known is said as not known.
- assert.match(view([person({capabilities:undefined})])[0].activityNote,/No sabemos/);
+ assert.match(view([person({capabilities:undefined})])[0].activityNote,/^session.note.workingUnknown$/);
 });
 test('A reply audio status not known yet is left unsaid, never taken for finished; no status is a written reply',async()=>{
  const api=await moduleReady;const row={role:'assistant',segment:'h',thread:'m|a',text:'Texto',time:1};

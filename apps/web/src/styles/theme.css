@@ -8,8 +8,11 @@
 
 :root {
   /* Type: DM Sans, as the landing; a 15px body, a tool's density. 12px is the floor. */
-  --sv-font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --sv-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sv-font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, var(--sv-font-cjk), sans-serif;
+  /* DM Sans has no Chinese or Japanese: the system's own faces, never a webfont, in the page language's order (below)
+   * so Han characters take that language's forms; after the Latin ones, which keep Latin text in them. */
+  --sv-font-cjk: "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Microsoft YaHei", "Yu Gothic", "Meiryo";
+  --sv-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace, var(--sv-font-cjk);
   --sv-font-xs: .75rem;      /* 12/16 — badges, timestamps */
   --sv-font-sm: .8125rem;    /* 13/20 — hints, descriptions, labels */
   --sv-font-md: .9375rem;    /* 15/22 — body, controls, rows */
@@ -58,6 +61,8 @@
   --sv-dur-slow: 260ms;
   --sv-ease: cubic-bezier(.2, 0, 0, 1);
 }
+:root:lang(ja) { --sv-font-cjk: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Yu Gothic", "Meiryo", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei"; }
+:root:lang(zh) { --sv-font-cjk: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", "Meiryo"; }
 @media (pointer: coarse) { :root { --sv-control-sm: 36px; --sv-control-md: 44px; --sv-call-button: 56px; } }
 @media (max-width: 767px) { :root { --sv-header-height: 56px; } }
 @media (prefers-reduced-motion: reduce) { :root { --sv-dur-base: var(--sv-dur-fast); --sv-dur-slow: var(--sv-dur-fast); } }

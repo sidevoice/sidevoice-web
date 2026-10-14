@@ -5,11 +5,10 @@ import { useRoomStore } from "../../state/room-store";
 import { useLayoutEffect, useReducer, useRef, useState, type RefObject } from "react";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
-import { callTranslator, type CallTranslate } from "../call/call-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
 import { stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
-import { hostTranslator } from "../settings/host-i18n";
 import { headerRow, rowCapacity, UNMEASURED_ROW } from "./header-row";
 import { NewConversation } from "./NewConversation";
 import "./room.css";
@@ -19,7 +18,7 @@ import "./room.css";
  * the stage marked in place, then "+" for a new one, then the chevron when some are not in the row. A tap moves the call
  * to one; the whole list comes down from the chevron, and the header stays lit above the dimmed call while it is down. */
 export function RoomHeader() {
-  const t = callTranslator();
+  const t = translator();
   const listDown = useCallLayout((state) => state.conversationsOpen);
   // No updates entry on a phone (decided): the page there picks up a new version the next time it is opened.
   return (
@@ -36,7 +35,7 @@ export function RoomHeader() {
 /** A phone's way to every conversation: the chevron after the header's row, with how many are not in it. A tap drops
  *  the conversations (by machine, a new one, and Settings at their foot) under the header and turns the chevron up;
  *  another tap, a tap outside or Escape puts them away. */
-function ConversationsToggle({ t, hidden }: { t: CallTranslate; hidden: ParticipantView[] }) {
+function ConversationsToggle({ t, hidden }: { t: Translate; hidden: ParticipantView[] }) {
   const count = useRoomStore((state) => state.participants.length);
   const open = useCallLayout((state) => state.conversationsOpen);
   const openConversations = useCallLayout((state) => state.openConversations);
@@ -92,7 +91,7 @@ function useRowWidth(row: RefObject<HTMLElement | null>) {
 
 /* A tap on one moves the call there and the row stays as it is: the one tapped is marked where it is, and keeps the
  * focus. With the list down (the header stays above it) it also puts the list away, as choosing in the list does. */
-function HeaderConversations({ t }: { t: CallTranslate }) {
+function HeaderConversations({ t }: { t: Translate }) {
   const participants = useRoomStore((state) => state.participants);
   const inCall = useRoomStore(selectInCall);
   const stage = useStageConversation();
@@ -142,10 +141,9 @@ function HeaderConversations({ t }: { t: CallTranslate }) {
  * button. The runtime opens Settings from #settings-open's own handler: React must not own that button's click (with an
  * onClick it resets the element's handler on every render), so its wrapper hears it. With agents waiting, Settings
  * then opens at theirs. */
-function SettingsButton({ t }: { t: CallTranslate }) {
-  const hosts = hostTranslator();
+function SettingsButton({ t }: { t: Translate }) {
   const news = useHighlights();
-  const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
+  const label = news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
   return (
     <span className="header-settings">
       {/* Settings' own trigger (aria-controls) on a phone: focus comes back here when what opened Settings has gone. */}

@@ -8,13 +8,12 @@ import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useM
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
-import { callTranslator } from "../call/call-i18n";
+import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
 import { conversationState, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
-import { hostTranslator } from "../settings/host-i18n";
 import { openSettings } from "../settings/open-settings";
 import "./room.css";
 
@@ -35,7 +34,7 @@ export const OPEN_CONVERSATIONS = "sidevoice-conversations-open";
 export function ConversationSidebar() {
   // The conversation on the stage is the one marked in the list, whether or not the call has moved to it yet.
   const onStage = useStageConversation().threadId;
-  const t = callTranslator();
+  const t = translator();
   const participants = useRoomStore((state) => state.participants);
   const inCall = useRoomStore(selectInCall);
   const collapsed = useCallLayout((state) => state.sidebarCollapsed);
@@ -156,11 +155,10 @@ export function ConversationSidebar() {
 /** Settings at the conversations' foot: named beside the list, a gear in the rail, named by its label and its tooltip
  *  there; its mark when something is new. */
 function SidebarSettings({ rail, onOpen }: { rail: boolean; onOpen: () => void }) {
-  const t = callTranslator();
-  const hosts = hostTranslator();
+  const t = translator();
   const store = useContext(RoomStoreContext);
   const news = useHighlights();
-  const label = news.length ? hosts("highlights.gear", { n: news.length }) : t("header.settings");
+  const label = news.length ? t("highlights.gear", { n: news.length }) : t("header.settings");
   return (
     // Settings' own trigger (aria-controls): closed, Settings gives focus back here when what opened it has gone.
     <Button variant="ghost" tone="neutral" size={rail ? "icon" : "md"} block={!rail} className="sidebar-settings" aria-label={label} title={label}

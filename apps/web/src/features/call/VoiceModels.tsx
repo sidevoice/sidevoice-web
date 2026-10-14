@@ -8,8 +8,7 @@ import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
 import { useModelState } from "../settings/ModelSetup";
 import { openSettings } from "../settings/open-settings";
-import { callTranslator, type CallTranslate } from "./call-i18n";
-import type { CallMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 
 /* The models this device's voice runs the call with: what turns the person's speech into text, and what speaks the
  * agent's replies — each its model's id as its catalogue names it, and in a tooltip where it runs (this device, or a
@@ -20,7 +19,7 @@ import type { CallMessageKey } from "./messages/en";
 /** A model's slot as the badge says it; `attention` when something must be done or waited for before it works. */
 type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string };
 
-function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
+function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
@@ -43,19 +42,19 @@ function useSlots(t: CallTranslate): { stt: Slot | null; tts: Slot | null; turn:
       task, status, catalog: chosen.catalog,
       id: chosen.model,
       where: chosen.catalog === "local" ? t("voiceModels.here") : t("voiceModels.provider", { provider }),
-      state: t(("voiceModels.state." + status) as CallMessageKey),
+      state: t(("voiceModels.state." + status) as MessageKey),
       attention: status !== "ready" && status !== "unknown",
     };
   };
   // The smart end of turn has a model of its own; the silence one has none, and no badge.
   const turnId = settings?.end_of_turn === "smart-turn" ? turn.model?.id ?? settings.turn_model ?? null : null;
   const turnStatus = !known ? "unknown" : turn.status ?? "unavailable";
-  const turnSlot: Slot | null = turnId ? { task: "end-of-turn", status: turnStatus, catalog: "local", id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as CallMessageKey),
+  const turnSlot: Slot | null = turnId ? { task: "end-of-turn", status: turnStatus, catalog: "local", id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as MessageKey),
     attention: turnStatus !== "ready" && turnStatus !== "unknown" } : null;
   return { stt: slot("stt", stt), tts: slot("tts", tts), turn: turnSlot };
 }
 
-function Details({ stt, tts, turn, t }: { stt: Slot | null; tts: Slot | null; turn: Slot | null; t: CallTranslate }) {
+function Details({ stt, tts, turn, t }: { stt: Slot | null; tts: Slot | null; turn: Slot | null; t: Translate }) {
   const line = (label: string, slot: Slot | null) =>
     <span className="voice-models-line"><b>{label}</b> {slot ? `${slot.id} · ${slot.where} · ${slot.state}` : t("voiceModels.none")}</span>;
   return <span className="voice-models-details">{line(t("voiceModels.stt"), stt)}{line(t("voiceModels.tts"), tts)}{turn && line(t("voiceModels.turn"), turn)}</span>;
@@ -76,7 +75,7 @@ function Chip({ slot, label, icon, details }: { slot: Slot; label: string; icon:
 
 /** What a model that needs something can have done about it, from the call: download it (again), add the provider's
  *  key, or its settings. None while it downloads. */
-function SlotAction({ slot, t }: { slot: Slot; t: CallTranslate }) {
+function SlotAction({ slot, t }: { slot: Slot; t: Translate }) {
   const section = slot.task === "stt" ? "transcription" : slot.task === "tts" ? "voice" : "call";
   const store = useContext(RoomStoreContext);
   const settings = (where: string) => openSettings({ section: where }, store);
@@ -89,7 +88,7 @@ function SlotAction({ slot, t }: { slot: Slot; t: CallTranslate }) {
 
 /** A phone's corner has no room for the badges: nothing while every model is ready, and a dot when one needs
  *  something; a tap on it says which, and what can be done. */
-function AttentionDot({ slots, t }: { slots: { slot: Slot; label: string }[]; t: CallTranslate }) {
+function AttentionDot({ slots, t }: { slots: { slot: Slot; label: string }[]; t: Translate }) {
   const needs = slots.filter(({ slot }) => slot.attention);
   if (!needs.length) return null;
   return (
@@ -108,7 +107,7 @@ function AttentionDot({ slots, t }: { slots: { slot: Slot; label: string }[]; t:
 /** The models, stacked: speech to text, text to speech, and the end of turn's when it is the smart one; nothing before
  *  any is chosen. A phone shows only a dot, and only when one needs something (AttentionDot). */
 export function VoiceModels() {
-  const t = callTranslator();
+  const t = translator();
   const { stt, tts, turn } = useSlots(t);
   const narrow = useMedia(NARROW_QUERY);
   if (!stt && !tts) return null;

@@ -3,12 +3,12 @@ import { Button } from "../../components/ui/Button";
 import { Group, Row } from "../../components/ui/Card";
 import { Switch } from "../../components/ui/Switch";
 import { callControlsBridge, muteShortcutBridge, type MuteShortcut } from "../../services/desktop-host";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 
 /* The desktop app's own call settings, in Settings › Call, inside the app only and each where the app offers it: the
  * global shortcut that mutes the microphone (recorded by pressing it), and whether the call controls — the floating
  * card — show always, or only while the app is minimised. */
-export function DesktopCallSettings({ t }: { t: HostTranslate }) {
+export function DesktopCallSettings({ t }: { t: Translate }) {
   const shortcut = muteShortcutBridge();
   const controls = callControlsBridge();
   if (!shortcut && !controls) return null;
@@ -28,7 +28,7 @@ export function acceleratorOf(event: Pick<KeyboardEvent, "key" | "metaKey" | "ct
   return [...modifiers, name].join("+");
 }
 
-function MuteShortcutRow({ t }: { t: HostTranslate }) {
+function MuteShortcutRow({ t }: { t: Translate }) {
   const bridge = muteShortcutBridge()!;
   const [now, setNow] = useState<MuteShortcut | null>(null);
   const [recording, setRecording] = useState(false);
@@ -77,7 +77,7 @@ function MuteShortcutRow({ t }: { t: HostTranslate }) {
   </Row>;
 }
 
-function AlwaysShownRow({ t }: { t: HostTranslate }) {
+function AlwaysShownRow({ t }: { t: Translate }) {
   const bridge = callControlsBridge()!;
   const [on, setOn] = useState<boolean | null>(null);
   const [failed, setFailed] = useState(false);

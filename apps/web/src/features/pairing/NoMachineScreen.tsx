@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { AddIcon, MachinesIcon } from "../../components/ui/Icons";
 import { isVisibleLocalHostInstall, localHostInstallController, type LocalHostInstallController, type LocalHostInstallSource } from "../../services/local-host-install";
 import { useRoomStore } from "../../state/room-store";
-import { hostTranslator } from "../settings/host-i18n";
+import { translator } from "../../i18n/translator";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "./LocalHostInstallEntry";
 import "./pairing.css";
 
@@ -14,7 +14,7 @@ export function NoMachineScreen({
   installController = localHostInstallController,
   source = "no-machine",
 }: { installController?: LocalHostInstallController; source?: LocalHostInstallSource } = {}) {
-  const t = hostTranslator();
+  const t = translator();
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
   const install = useSyncExternalStore(installController.subscribe, installController.getSnapshot, installController.getSnapshot);

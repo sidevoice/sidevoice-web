@@ -9,9 +9,8 @@ import { Input } from "../../components/ui/Input";
 import { CloseIcon, LinkIcon, ProviderLogo, SearchIcon, UnlinkIcon, WarningIcon } from "../../components/ui/Icons";
 import { remoteProviders } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { catalogueShown } from "./ModelSetup";
-import type { HostMessageKey } from "./messages/en";
 import { DisconnectDialog, KeyDialog, keyError, listed, PROVIDER_SAYS, readHint, reasonState, useFocusBack, type KeyState } from "./ProviderConnect";
 import { errorLine } from "./error-message";
 
@@ -41,10 +40,10 @@ const REPLACE_FOR: ReadonlySet<KeyState> = new Set(["rejected", "permission", "u
 const OFFERS: Record<string, ("stt" | "tts")[]> = { openai: ["stt", "tts"], elevenlabs: ["tts", "stt"] };
 
 /** What a provider offers, in one short line ("Transcription · Voice"): known, else from the models it lists. */
-function usedFor(provider: string, catalog: CatalogView | undefined, t: HostTranslate) {
+function usedFor(provider: string, catalog: CatalogView | undefined, t: Translate) {
   const caps = new Set((catalog?.models ?? []).flatMap((model) => model.capabilities));
   const offers = OFFERS[provider] ?? (["stt", "tts"] as const).filter((task) => caps.has(task));
-  return offers.length ? offers.map((task) => t(`keys.use.${task}` as HostMessageKey)).join(" · ") : t("keys.purpose.other");
+  return offers.length ? offers.map((task) => t(`keys.use.${task}` as MessageKey)).join(" · ") : t("keys.purpose.other");
 }
 
 /** From how many providers to add a search is offered: below it, they are all in sight. */
@@ -61,7 +60,7 @@ type Moved = { provider: string; to: "row" | "connect"; said: string };
 /** A provider with a key: its row in "Your providers". What it opens (Replace key's dialog, Disconnect's question) is
  *  its own; focus comes back to what opened it, or to the row. */
 function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: ProviderProps & { inUse: string[]; onDisconnected: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const store = useContext(RoomStoreContext);
   const kept = useRoomStore((state) => state.facts.providerKeys[provider]);
   const [open, setOpen] = useState<"replace" | "disconnect" | null>(null);
@@ -88,11 +87,11 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
     setTesting(false);
     const after = reasonState(store?.getState().facts.voiceCatalogue.catalogs.find((entry) => entry.id === provider)?.status.reason?.code);
     if (after === "connected") { setNote(t("keys.tested")); row.current?.focus(); }
-    else setNote(t(("keys.why." + after) as HostMessageKey, { provider: name, last4: last4 ?? "" }));
+    else setNote(t(("keys.why." + after) as MessageKey, { provider: name, last4: last4 ?? "" }));
   }
   const pill = testing ? <Badge tone="neutral">{t("keys.state.checking")}</Badge>
     : state === "connected" ? <Badge tone="positive">{t("keys.state.connected")}</Badge>
-    : <Badge tone={TONE[state]} dot>{t(("keys.state." + state) as HostMessageKey)}</Badge>;
+    : <Badge tone={TONE[state]} dot>{t(("keys.state." + state) as MessageKey)}</Badge>;
   return (
     <div ref={row} className="provider-row" role="group" aria-label={name} data-provider={provider} data-state={state} tabIndex={-1}>
       <span className="provider-mark" aria-hidden="true"><ProviderLogo provider={provider} size={22} /></span>
@@ -103,7 +102,7 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
         {problem && <div className="provider-row-problem">
           <WarningIcon size={14} />
           <div className="provider-row-why">
-            <p>{t(("keys.why." + state) as HostMessageKey, { provider: name, last4: last4 ?? "" })}
+            <p>{t(("keys.why." + state) as MessageKey, { provider: name, last4: last4 ?? "" })}
               {said ? <span className="provider-key-detail" translate="no"> {said}</span> : null}</p>
             <ErrorDetails details={raw} />
           </div>
@@ -124,7 +123,7 @@ function ConnectedRow({ provider, name, catalog, inUse, onDisconnected }: Provid
 
 /** A provider without a key: its card in "Add a provider", Connect opening the key's dialog. */
 function AvailableCard({ provider, name, catalog, onConnected }: ProviderProps & { onConnected: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const [open, setOpen] = useState(false);
   const connect = useRef<HTMLButtonElement>(null);
   const focusBack = useFocusBack(() => connect.current);
@@ -144,7 +143,7 @@ function AvailableCard({ provider, name, catalog, onConnected }: ProviderProps &
 
 /** "Add a provider"'s search: filters the cards as it is typed; × or Escape clears it (Escape then stays here). How
  *  many match is said once typing pauses. */
-function ProviderSearch({ query, onQuery, matches, t }: { query: string; onQuery: (query: string) => void; matches: number; t: HostTranslate }) {
+function ProviderSearch({ query, onQuery, matches, t }: { query: string; onQuery: (query: string) => void; matches: number; t: Translate }) {
   const field = useRef<HTMLInputElement>(null);
   const [said, setSaid] = useState("");
   useEffect(() => {
@@ -168,7 +167,7 @@ function ProviderSearch({ query, onQuery, matches, t }: { query: string; onQuery
 }
 
 export function ProviderKeys() {
-  const t = hostTranslator();
+  const t = translator();
   const inApp = useRoomStore((state) => state.facts.inApp);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   const keys = useRoomStore((state) => state.facts.providerKeys);

@@ -1,13 +1,13 @@
 import { expect, test } from "vitest";
 import type { ParticipantView } from "../../state/room-types";
-import { callTranslator } from "./call-i18n";
+import { translator } from "../../i18n/translator";
 import { conversationState, machineGroups, moodText, personMood, smallAvatarMood, stageMood, stateText } from "./conversation-state";
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
-  stateLabel: "", subtitle: "", working: false, machine: "Laptop", machineId: "m1", ...extra,
+  working: false, machine: "Laptop", machineId: "m1", ...extra,
 });
-const en = callTranslator("en");
+const en = translator("en");
 
 test("a conversation's state: the call's own, working, waiting for you, or out of reach", () => {
   expect(conversationState(row("a", { selected: true }), true)).toBe("in-call");
@@ -80,7 +80,7 @@ test("the state line says the state in words, with what is unread beside a conve
   expect(stateText(row("a", { unread: 2 }), true, en)).toBe("Waiting for you · 2 new");
   expect(stateText(row("a", { reach: "holding" }), true, en)).toBe("Can't receive");
   expect(stateText(row("a", { available: false, reach: "offline" }), true, en)).toBe("Offline");
-  expect(stateText(row("a", { working: true }), true, callTranslator("es"))).toBe("Trabajando");
+  expect(stateText(row("a", { working: true }), true, translator("es"))).toBe("Trabajando");
 });
 
 test("conversations are grouped by the machine they run on — by its id, since two may share a name or have none", () => {

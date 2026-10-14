@@ -1,11 +1,11 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DesktopCallSettings, acceleratorOf } from "./DesktopCallSettings";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import type { CallControlsBridge, MuteShortcut, MuteShortcutBridge } from "../../services/desktop-host";
 
-const en = hostTranslator("en");
-const es = hostTranslator("es");
+const en = translator("en");
+const es = translator("es");
 
 afterEach(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
 

@@ -1,12 +1,12 @@
 import { Snippet } from "../../components/ui/Snippet";
-import { hostTranslator } from "../settings/host-i18n";
+import { translator } from "../../i18n/translator";
 import { CONNECTOR_INSTALL, CONNECTOR_PAIR_DEVICE } from "./connector-commands";
 import "./pairing.css";
 
 /** Preparing another machine: install Sidevoice there, then print a pairing code there to paste in the form beside it;
  *  each step's command a Snippet to copy. */
 export function ConnectorSteps() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <ol className="connector-steps">
       <li><p>{t("pairing.stepInstall")}</p><Snippet text={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} /></li>
@@ -19,7 +19,7 @@ export function ConnectorSteps() {
  *  command's, the operator's call of 2026-10-14): the same install command, to run here in a terminal or to have one of
  *  the person's agents run. */
 export function InstallCommandHere() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <div className="install-here">
       <p>{t("localInstall.runHere")}</p>

@@ -1,5 +1,5 @@
 import type { RoomViewState } from "../../state/room-store";
-import type { HostMessageKey } from "../settings/messages/en";
+import type { MessageKey } from "../../i18n/translator";
 
 /* What a release added that needs the person — not every change, only what they would set up or want to know — each
  * with the release it came in, where it is set up, and whether this device has it already (read live, as the setup
@@ -11,8 +11,8 @@ export const RELEASE = 2;
 export interface Feature {
   id: string;
   introducedIn: number;
-  title: HostMessageKey;
-  line: HostMessageKey;
+  title: MessageKey;
+  line: MessageKey;
   /** The Settings section that sets it up, and the control there (its id) to bring into view and point at. */
   section: string;
   control: string;

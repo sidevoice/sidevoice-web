@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, render } from "@testing-library/react";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { VARIANTS_KEY } from "../../lib/variants";
-import { callTranslator } from "./call-i18n";
+import { translator } from "../../i18n/translator";
 import { PersonTurn } from "./PersonTurn";
 import { PAGE_MS } from "./PagedText";
 import { SENT_LEAVING_MS } from "./speech-reading";
@@ -19,7 +19,7 @@ const settled = (messages: ChatMessage[]): ConversationView => ({ messages, pend
 
 /** The person's turn on the stage, taken from speaking to sent: what PersonTurn shows at each step. */
 function turn(text = LONG) {
-  const t = callTranslator();
+  const t = translator();
   const view = render(<PersonTurn conversation={listening()} t={t} />);
   const to = (conversation: ConversationView) => view.rerender(<PersonTurn conversation={conversation} t={t} />);
   to(settled([said("u-1", text)]));

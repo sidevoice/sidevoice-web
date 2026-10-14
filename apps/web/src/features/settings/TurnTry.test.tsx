@@ -9,7 +9,7 @@ import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { TurnStep } from "../../services/voice-trial.js";
 import type { VoiceTake } from "../../services/voice-take";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 
 /* Trying the end of turn where it is chosen, in its card after the choices: the actions stand in for
  * the voice, and tell the try's steps as the controller would (voice-trial.js TurnStep). The interface speaks English
@@ -216,7 +216,7 @@ test("in Spanish: the listening line, and the line when it decided, with and wit
   expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Escuchando… habla y termina con naturalidad$/);
   await heard("hola", 900);
   expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Detectó que terminaste 0[.,]9 s después de dejar de hablar$/);
-  expect(hostTranslator("es")("turnTry.detectedNow")).toBe("Detectó que terminaste");
+  expect(translator("es")("turnTry.detectedNow")).toBe("Detectó que terminaste");
 });
 
 test.each(variants)("%s: leaving stops a try that runs — its section hidden, its dialog closed, or gone — and touches none that does not", async (variant) => {

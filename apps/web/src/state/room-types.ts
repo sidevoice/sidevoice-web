@@ -53,13 +53,9 @@ export interface ParticipantView {
   switching: boolean;
   unread: number;
   reach: "listening" | "holding" | "offline";
-  stateLabel: string;
   /** Honest activity support: unsupported and unknown are different messages. */
   activityNote?: string | null;
   detail?: string;
-  /** The line under the title: unread, and a reach that is not normal — never "listening" or "thinking",
-   *  the dot says both. */
-  subtitle: string;
   working: boolean;
   /** The paired machine this conversation runs on, as this device names it; `machineId` is its fingerprint. */
   machine?: string | null;
@@ -92,7 +88,6 @@ export interface MachineView {
   /** Whether this row is the app-owned local host, which is projected from the desktop bridge. */
   local?: boolean;
   localStatus?: import("../services/desktop-host").LocalHostStatusName | string;
-  pairedLabel: string;
 }
 
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */

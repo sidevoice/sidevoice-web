@@ -2,25 +2,27 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, TranscriptIcon } from "../../components/ui/Icons";
 import type { ConversationView } from "../../state/room-types";
-import { conversationTranslator, type ConversationTranslate } from "./conversation-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 import { groupMessages } from "./group-messages";
 import { MessageGroup, Speaker } from "./MessageGroup";
+import { speakerName } from "./group-messages";
 import { VoiceWaveform } from "./VoiceWaveform";
+import { uiLocale } from "../../i18n/locale";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Today and yesterday by name, any other day by its date — with its year only when it is not this one. */
-export function dayLabel(time: number, t: ConversationTranslate, now = Date.now()) {
+export function dayLabel(time: number, t: Translate, now = Date.now()) {
   const day = new Date(time).toDateString();
   if (day === new Date(now).toDateString()) return t("messages.today");
   if (day === new Date(now - DAY_MS).toDateString()) return t("messages.yesterday");
   const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear();
-  return new Date(time).toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: sameYear ? undefined : "numeric" });
+  return new Date(time).toLocaleDateString(uiLocale(), { weekday: "long", day: "numeric", month: "long", year: sameYear ? undefined : "numeric" });
 }
 
 /** `visible`: the list is on screen. Hidden, it cannot scroll, so it lands on the latest message when it shows. */
 export function MessageList({ conversation, visible = true }: { conversation: ConversationView; visible?: boolean }) {
-  const t = conversationTranslator();
+  const t = translator();
   const groups = useMemo(() => groupMessages(conversation.messages), [conversation.messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
@@ -93,7 +95,7 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
           </article>
         </div></div>}
         {conversation.working && <div className="message-group live-draft" data-role="assistant"><div className="chat-message-row">
-          <Speaker name={agent?.name ?? ""} thread={agentThread} />
+          <Speaker name={agent ? speakerName(agent, t) : ""} thread={agentThread} />
           <article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label={t("messages.thinking")}><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article>
         </div></div>}
       </div>

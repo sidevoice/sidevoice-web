@@ -1,5 +1,5 @@
 import { cn } from "../../lib/cn";
-import { uiTranslator } from "./ui-i18n";
+import { translator } from "../../i18n/translator";
 
 /* A failure as a person reads it (AGENTS.md): a sentence in their language, never the raw text of what failed. What was
  * raw about it — its code, the engine's or the browser's own words — is kept, closed, behind "Details", for whoever has
@@ -17,7 +17,7 @@ export interface ErrorMessage {
 /** What was raw about a failure, closed behind "Details": never the headline, never translated. */
 export function ErrorDetails({ details, className }: { details?: string; className?: string }) {
   if (!details) return null;
-  const t = uiTranslator();
+  const t = translator();
   return (
     <details className={cn("ui-error-details", className)}>
       <summary>{t("ui.details")}</summary>

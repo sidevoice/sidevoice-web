@@ -4,7 +4,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { DownloadsIcon } from "../../components/ui/Icons";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import { sizeText } from "./ModelSetup";
 import "./model-prepare.css";
 
@@ -54,7 +54,7 @@ export interface ModelPrepareProps {
 
 export function ModelPrepare({ pending, runtime, status, model, pickers, meta, size = null, fraction = null, error, errorDetails, readyAction, readyPanel, onDownload, onCancel, onRetry, onAddKey, id, actionIds }: ModelPrepareProps) {
   const actionId = (name: string) => actionIds ? actionIds + "-" + name : undefined;
-  const t = hostTranslator();
+  const t = translator();
   const hintId = useId();
   const sized = size ? sizeText(size) : "";
   const locked = status === "downloading";

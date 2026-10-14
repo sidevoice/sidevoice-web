@@ -4,7 +4,7 @@ import { createMicLevelChannel } from "../../state/mic-level";
 import { Button } from "../../components/ui/Button";
 import { Popover } from "../../components/ui/Popover";
 import { endOfTurnModel, type DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
-import type { HostTranslate } from "./host-i18n";
+import type { Translate, MessageKey } from "../../i18n/translator";
 import type { PrepareStatus } from "./ModelPrepare";
 import { MAX_TAKE_MS } from "../../services/voice-trial.js";
 import { Textarea } from "../../components/ui/Input";
@@ -14,7 +14,6 @@ import { wordEnd } from "../conversation/KaraokeText";
 import { readingMoves, readingPosition, readOn, type Reading } from "../call/speech-chunks";
 import type { KaraokeRange, TrialTimings } from "../../state/room-types";
 import type { VoiceTake } from "../../services/voice-take";
-import type { HostMessageKey } from "./messages/en";
 import { seconds } from "./try-time";
 import { TryTake } from "./TryTake";
 import { ErrorText } from "../../components/ui/ErrorText";
@@ -172,14 +171,14 @@ const SLOW_MS = { stt: 1500, tts: 1500 } as const;
 
 /** The time that matters after a try, in words: what was said transcribed, or the voice's first sound. */
 const timingMs = (task: Task, timings: TrialTimings) => task === "stt" ? timings.recognition_ms : timings.first_sound_ms;
-const timingText = (task: Task, ms: number, t: HostTranslate) => t(task === "stt" ? "try.timing.stt" : "try.timing.tts", { s: seconds(ms) });
+const timingText = (task: Task, ms: number, t: Translate) => t(task === "stt" ? "try.timing.stt" : "try.timing.tts", { s: seconds(ms) });
 
 /** From this long, getting ready was loading the model (a cold start), worth saying apart; below it, it was there. */
 const COLD_LOAD_MS = 1000;
 
 /** After a try, one plain line with the time that matters ("Transcribed in 0.4 s", "First sound in 0.3 s"), the model's
  *  load after it only when it had to load, and a smaller model suggested when that is slow for this device. */
-export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimings; t: HostTranslate }) {
+export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimings; t: Translate }) {
   const key = timingMs(task, timings);
   if (key == null) return null;
   const slow = key > SLOW_MS[task];
@@ -198,7 +197,7 @@ const AGAIN = { stt: "try.speakAgain", tts: "try.listenAgain" } as const;
 /** The try's button, beside a ready model's state: try it, Stop while it runs, then again. `offered`: shown at all,
  *  running or not (the first-run setup offers the first one in its footer, and stops it there); `again`: tried
  *  already, before this visit. */
-export function TryButton({ task, handle, id, offered = true, again = false, t }: { task: Task; handle: VoiceTry; id: string; offered?: boolean; again?: boolean; t: HostTranslate }) {
+export function TryButton({ task, handle, id, offered = true, again = false, t }: { task: Task; handle: VoiceTry; id: string; offered?: boolean; again?: boolean; t: Translate }) {
   const running = handle.trial.phase === "running";
   if (!offered) return null;
   return <Button size="sm" id={id} onClick={running ? handle.finish : handle.start}>
@@ -232,7 +231,7 @@ function TrySentence({ text, range, sounding, done }: { text: string; range: Kar
 
 /** What was heard, quoted: two lines at most in the block, the rest a "See all" away; in full in the dialog (`roomy`).
  *  `id` is the quote's, and `<id>-all` its See all. */
-export function TryHeard({ text, roomy, t, id = "stt-heard" }: { text: string; roomy: boolean; t: HostTranslate; id?: string }) {
+export function TryHeard({ text, roomy, t, id = "stt-heard" }: { text: string; roomy: boolean; t: Translate; id?: string }) {
   const quote = useRef<HTMLQuoteElement>(null);
   const [cut, setCut] = useState(false);
   useLayoutEffect(() => {
@@ -259,7 +258,7 @@ export function TryHeard({ text, roomy, t, id = "stt-heard" }: { text: string; r
  *  failed — and, for transcription, the take to listen to when the voice handed one (outside the live region: it is
  *  read when reached, not when it appears). `sample`: the sentence to hear, to edit while no try runs (the first-run
  *  setup's). */
-function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { task: Task; handle: VoiceTry; roomy?: boolean; sample?: ReactNode; quote?: boolean; t: HostTranslate }) {
+function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { task: Task; handle: VoiceTry; roomy?: boolean; sample?: ReactNode; quote?: boolean; t: Translate }) {
   const { trial } = handle;
   const running = trial.phase === "running";
   const sentence = quote && task === "tts" && !!trial.said && (running || (trial.phase === "done" && !sample));
@@ -286,7 +285,7 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
  *  level, always there — flat until it listens, moving while it does. Its second, of a fixed height: while it listens,
  *  what to do and the take's length filling to its longest; once done, in its place, what was heard and how quick; or
  *  why it failed. */
-function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: HostTranslate }) {
+function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: Translate }) {
   const { trial } = handle;
   const running = trial.phase === "running";
   const listening = running && trial.live;
@@ -319,7 +318,7 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
  *  not a measure of it). Its second, of a fixed height: the sentence it says, editable (its pencil, or a click on it)
  *  while it does not speak, lit as it is heard; under it, getting ready, then how quick its first sound was, or why it
  *  failed. Play says what is there. */
-function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: HostTranslate }) {
+function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: Translate }) {
   const [editing, setEditing] = useState(false);
   const { trial } = handle;
   const running = trial.phase === "running";
@@ -357,7 +356,7 @@ function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
 
 /** What a try shows in a ready model's block, under its state: all of it. `hint`: a line before any try (the first-run
  *  setup's); `sample`: the sentence to hear, edited in the block. */
-export function TryPanel({ task, handle, model, hint, sample, button, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; button?: ReactNode; t: HostTranslate }) {
+export function TryPanel({ task, handle, model, hint, sample, button, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; button?: ReactNode; t: Translate }) {
   const { trial } = handle;
   const idle = trial.phase === "idle";
   if (task === "stt") return <SttTry handle={handle} hint={hint} button={button} t={t} />;

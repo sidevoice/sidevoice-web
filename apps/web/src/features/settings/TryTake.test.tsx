@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { TryTake } from "./TryTake";
 import { takeColumns, takeWav } from "./take-audio";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import type { VoiceTake } from "../../services/voice-take";
 
 /* A try's take, played from memory: jsdom plays nothing and has no object URLs, so the page's player is watched
@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); });
 
-const t = hostTranslator("en");
+const t = translator("en");
 const slider = () => screen.getByRole("slider", { name: "Where you are in your recording" });
 const play = () => screen.getByRole("button", { name: "Play your recording" });
 

@@ -4,7 +4,7 @@ import { CloseIcon } from "../../components/ui/Icons";
 import { actionableAgent } from "../../services/host-agents";
 import { useRoomStore } from "../../state/room-store";
 import { useOnboardingIfAny } from "../onboarding/onboarding-context";
-import { hostTranslator } from "../settings/host-i18n";
+import { translator } from "../../i18n/translator";
 import { useWhatsNew } from "../whats-new/WhatsNew";
 import { useThisComputerSection } from "../../state/this-computer";
 import "./highlights.css";
@@ -158,14 +158,14 @@ export function GearNewMark({ count }: { count: number }) {
 
 /** The word "New" as the thing itself wears it. */
 export function NewBadge() {
-  const t = hostTranslator();
+  const t = translator();
   return <Badge tone="accent" className="new-badge">{t("highlights.new")}</Badge>;
 }
 
 /** "New" on the thing itself. Seen (half of it in view for a second) it is cleared, but stays on screen until this view
  *  goes; its × clears it at once, while it shows. */
 export function NewMark({ id }: { id: string }) {
-  const t = hostTranslator();
+  const t = translator();
   const items = useHighlights();
   const onboarding = useOnboardingIfAny();
   const isNew = items.some((item) => item.id === id);

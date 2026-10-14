@@ -1,6 +1,6 @@
 import type { LocalHostStatus } from "../../services/desktop-host";
 import type { MachineView } from "../../state/room-types";
-import type { HostTranslate } from "./host-i18n";
+import type { Translate } from "../../i18n/translator";
 
 /* A machine's state, in one set of words wherever it shows: its entry in Settings' nav, a phone's machine list, its
  * page's header, this computer's service card, the design system. Nothing else words a machine's state.
@@ -37,7 +37,7 @@ const FAILED = new Set(["failed", "service-failed", "refused", "incompatible"]);
 const STOPPED = new Set(["not-installed", "stopped-by-person"]);
 
 /** How this device reaches `machine`: the first that holds of not paired, checking, connected, not connected. With no machine (this computer's, not projected yet), it is being checked. */
-function reachStatus(machine: MachineView | null, t: HostTranslate): MachineStatus {
+function reachStatus(machine: MachineView | null, t: Translate): MachineStatus {
   if (machine?.revoked || machine?.state === "revoked") return { key: "unpaired", tone: "warning", short: t("hosts.machineState.unpaired"),
     long: t("hosts.machineState.unpaired.long"), hint: t("hosts.machineState.unpaired.hint") };
   if (!machine || machine.state === "checking") return { key: "checking", tone: "neutral", short: t("hosts.machineState.checking"), long: t("hosts.machineState.checking") };
@@ -48,7 +48,7 @@ function reachStatus(machine: MachineView | null, t: HostTranslate): MachineStat
 
 /** Where this computer's service stands, the first that holds; running, it answers as any machine would. Short and long
  *  are the same. */
-function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: HostTranslate): MachineStatus {
+function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: Translate): MachineStatus {
   const said = (key: MachineStateKey & ("unprepared" | "starting" | "failed" | "stopped" | "running"), tone: MachineTone) =>
     ({ key, tone, short: t(`hosts.machineState.${key}`), long: t(`hosts.machineState.${key}`) });
   if (!machine && status.state === "absent") return said("unprepared", "neutral");
@@ -62,7 +62,7 @@ function serviceStatus(machine: MachineView | null, status: LocalHostStatus, t: 
 
 /** `machine`'s state in words and tone. `readsService`: where the app reads this computer's service (its own section,
  *  useThisComputerSection), this computer says where its service stands; anywhere else it reads as any machine. */
-export function machineStatus(machine: MachineView | null, localStatus: LocalHostStatus, readsService: boolean, t: HostTranslate): MachineStatus {
+export function machineStatus(machine: MachineView | null, localStatus: LocalHostStatus, readsService: boolean, t: Translate): MachineStatus {
   const local = !machine || !!machine.local;
   return local && readsService ? serviceStatus(machine, localStatus, t) : reachStatus(machine, t);
 }

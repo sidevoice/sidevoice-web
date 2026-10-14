@@ -3,8 +3,7 @@ import { Badge } from "../../components/ui/Badge";
 import { ChevronIcon } from "../../components/ui/Icons";
 import { useRoomStore } from "../../state/room-store";
 import type { ModelBuild } from "@sidevoice/engine";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
-import type { HostMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { sizeText, type ModelState } from "./ModelSetup";
 
 /* How a model of this device runs, under its block, folded until asked for: what this device offers (a graphics card
@@ -17,14 +16,14 @@ const ENGINES: Record<string, string> = {
   "transformers-js": "Transformers.js", "sherpa-onnx": "Sherpa-ONNX", "whisper-cpp": "whisper.cpp", onnxruntime: "ONNX Runtime", mlx: "MLX",
 };
 
-function runsOn(build: ModelBuild, t: HostTranslate) {
+function runsOn(build: ModelBuild, t: Translate) {
   if (build.accelerator === "webgpu") return t("runtime.on.gpu");
   if (build.backend === "mlx") return t("runtime.on.apple");
   return t("runtime.on.cpu");
 }
 
 /** This device as the engine sees it in a browser: a graphics card it can use, memory and cores. */
-function DeviceLine({ t }: { t: HostTranslate }) {
+function DeviceLine({ t }: { t: Translate }) {
   const inApp = useRoomStore((state) => state.facts.inApp);
   if (inApp || typeof navigator === "undefined") return null;
   const nav = navigator as Navigator & { deviceMemory?: number; gpu?: unknown };
@@ -35,7 +34,7 @@ function DeviceLine({ t }: { t: HostTranslate }) {
 }
 
 export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; state: ModelState; locked: boolean }) {
-  const t = hostTranslator();
+  const t = translator();
   const [open, setOpen] = useState(false);
   const panel = useId();
   const builds = state.model?.builds ?? [];
@@ -58,7 +57,7 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
   const describe = (build: ModelBuild) => [ENGINES[build.backend] ?? build.backend, build.precision, runsOn(build, t)].join(" · ");
   const sizes = (build: ModelBuild) => t("runtime.sizes", { download: sizeText(build.downloadBytes), memory: sizeText(build.memoryMb * 1e6) });
   const reasons = (build: ModelBuild) => build.available ? "" : t("runtime.notHere", {
-    reasons: build.reasons.map((reason) => t(("voice.unfit." + reason.code) as HostMessageKey)).join("; ") || t("voice.model.unfitUnknown"),
+    reasons: build.reasons.map((reason) => t(("voice.unfit." + reason.code) as MessageKey)).join("; ") || t("voice.model.unfitUnknown"),
   });
   const auto = builds.find((build) => build.id === recommended);
   return (

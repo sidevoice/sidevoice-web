@@ -1,7 +1,7 @@
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
-import { callTranslator } from "./call-i18n";
+import { translator, type MessageKey } from "../../i18n/translator";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
@@ -10,11 +10,12 @@ import { cn } from "../../lib/cn";
  * itself (MicWave). */
 
 export function ScreenLock() {
+  const t = translator();
   const lock = useRoomStore((state) => state.screenLock);
   return (
     <span id="screen-lock" className="screen-lock" role="status" data-state={lock.state || undefined} hidden={!lock.state}>
       <i className="screen-lock-dot" aria-hidden="true" />
-      <span id="screen-lock-text" className="sr-only">{lock.state ? lock.note : ""}</span>
+      <span id="screen-lock-text" className="sr-only">{lock.state && lock.note ? t(lock.note as MessageKey) : ""}</span>
     </span>
   );
 }
@@ -22,7 +23,7 @@ export function ScreenLock() {
 /* Skip what is sounding without saying anything: speaking over a reply to stop it also sends a message. Only this
  * device skips; the reply stays written. */
 export function SkipButton() {
-  const t = callTranslator();
+  const t = translator();
   const playing = useRoomStore((state) => state.facts.botLive);
   return (
     <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} title={t("toolbar.skip")}
@@ -42,7 +43,7 @@ export function MicWave() {
 /** The microphone gives no sound though the person has not muted it: its device is held elsewhere (another app, the
  *  system), as the voice reports it (microphone "muted"). */
 export function useMicSilent() {
-  const t = callTranslator();
+  const t = translator();
   const silent = useRoomStore((state) => !!state.facts.ws && state.mic.enabled && state.facts.voiceState?.microphone === "muted");
   return silent ? t("mic.silent") : null;
 }

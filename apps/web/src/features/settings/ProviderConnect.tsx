@@ -9,8 +9,8 @@ import { Row } from "../../components/ui/Card";
 import { ExternalLinkIcon, EyeIcon, EyeOffIcon, ProviderLogo, WarningIcon } from "../../components/ui/Icons";
 import { ErrorDetails } from "../../components/ui/ErrorText";
 import { errorMessage, type ErrorMessage } from "./error-message";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
-import type { HostMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
+import { uiLocale } from "../../i18n/locale";
 
 /* How a provider's key is given, and taken back: one small dialog everywhere (Settings › Providers, and a voice slot
  * whose provider has no key yet, in Settings and the first-run setup). Paste the key, Connect: the provider is asked
@@ -58,18 +58,18 @@ export const PROVIDER_SAYS = new Set<KeyState>(["rejected", "permission", "quota
 /** What went wrong with a key, in words (error-message.ts): a provider's reason by its code, the provider's own words
  *  after it (`said`, when it gave any); anything else a generic line, what was raw about it behind Details.
  *  `typed`: a key just typed — said as what to check in it, or that it could not be checked. */
-export function keyError(t: HostTranslate, error: unknown, name: string, typed = false): ErrorMessage {
+export function keyError(t: Translate, error: unknown, name: string, typed = false): ErrorMessage {
   return errorMessage(error, { t, what: "key", known: (code) => {
     const state = reasonState(code);
     return typed && state === "rejected" ? t("keys.entry.rejected", { provider: name })
       : typed && state === "unreachable" ? t("keys.entry.unreachable", { provider: name })
-      : state !== "connected" && state !== "problem" ? t(("keys.why." + state) as HostMessageKey, { provider: name, last4: "" })
+      : state !== "connected" && state !== "problem" ? t(("keys.why." + state) as MessageKey, { provider: name, last4: "" })
       : null;
   } });
 }
 
 /** Where the key is really kept, then where to get one: two muted lines. */
-function KeyHelp({ provider, name, t }: { provider: string; name: string; t: HostTranslate }) {
+function KeyHelp({ provider, name, t }: { provider: string; name: string; t: Translate }) {
   const inApp = useRoomStore((state) => state.facts.inApp);
   const page = KEY_PAGES[provider];
   return <span className="provider-key-help">
@@ -81,7 +81,7 @@ function KeyHelp({ provider, name, t }: { provider: string; name: string; t: Hos
 
 /** The key's box with an eye at its end that shows or hides it, as password fields have. Field gives the box its id and
  *  what describes it; they go to the input. */
-const KeyInput = forwardRef<HTMLInputElement, InputProps & { shown: boolean; onReveal: () => void; t: HostTranslate }>(function KeyInput({ shown, onReveal, t, ...input }, ref) {
+const KeyInput = forwardRef<HTMLInputElement, InputProps & { shown: boolean; onReveal: () => void; t: Translate }>(function KeyInput({ shown, onReveal, t, ...input }, ref) {
   return <div className="provider-key-input">
     <Input ref={ref} {...input} type={shown ? "text" : "password"} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
     <Button variant="ghost" tone="neutral" size="icon-sm" className="provider-key-reveal" aria-label={t(shown ? "keys.hideKey" : "keys.showKey")}
@@ -105,7 +105,7 @@ export type KeyDialogProps = {
  *  it — the question can't be called off — and it says what it is doing. A refusal leaves the key there, selected,
  *  with the field marked and focused, to paste another over it; editing clears what was said. */
 export function KeyDialog({ provider, name, replacing, onDone, onCancel }: KeyDialogProps) {
-  const t = hostTranslator();
+  const t = translator();
   const [value, setValue] = useState("");
   const [shown, setShown] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
@@ -161,7 +161,7 @@ export function KeyDialog({ provider, name, replacing, onDone, onCancel }: KeyDi
 export function DisconnectDialog({ provider, name, last4, inUse, onDone, onCancel }: {
   provider: string; name: string; last4: string | null; inUse: string[]; onDone: () => void; onCancel: () => void;
 }) {
-  const t = hostTranslator();
+  const t = translator();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
   const cancel = useRef<HTMLButtonElement>(null);
@@ -200,15 +200,14 @@ export function DisconnectDialog({ provider, name, last4, inUse, onDone, onCance
 
 /** Section names as one phrase ("Transcription and Voice"), in the page's language. */
 export function listed(names: string[]) {
-  const locale = document.documentElement.lang || undefined;
-  try { return new Intl.ListFormat(locale, { type: "conjunction" }).format(names); } catch { return names.join(", "); }
+  try { return new Intl.ListFormat(uiLocale(), { type: "conjunction" }).format(names); } catch { return names.join(", "); }
 }
 
 /** A voice slot's provider while it has no key (`needed`): "OpenAI needs a key" and Connect, which opens the key's
  *  dialog (keeping the key where Providers keeps it). Its dialog stays open while the provider is asked, even if the
  *  slot stops needing it meanwhile. Once kept, the row goes: `onDone` is for the slot to say so and take the focus. */
 export function ProviderKeyNeeded({ provider, name, needed, onDone }: { provider: string; name: string; needed: boolean; onDone: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const [open, setOpen] = useState(false);
   const connect = useRef<HTMLButtonElement>(null);
   const focusBack = useFocusBack(() => connect.current);

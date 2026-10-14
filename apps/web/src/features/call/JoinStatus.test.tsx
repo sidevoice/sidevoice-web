@@ -23,15 +23,15 @@ test("no join, no line", () => {
 });
 
 test("a step is one quiet line, and a failure takes its place as an alert", () => {
-  renderJoin({ step: "voice", text: "Preparando la voz (42 %)", progress: 42, failed: false });
-  expect(screen.getByRole("status")).toHaveTextContent("Preparando la voz (42 %)");
+  renderJoin({ step: "voice", text: "Preparing the voice (42 %)", progress: 42, failed: false });
+  expect(screen.getByRole("status")).toHaveTextContent("Preparing the voice (42 %)");
   expect(document.getElementById("join-status")?.dataset.state).toBe("busy");
 
   act(() => {
-    window.sidevoiceUI?.store?.patch({joinFailure:"El micrófono está bloqueado para esta página."});
+    window.sidevoiceUI?.store?.patch({joinFailure:"The microphone is blocked for this page."});
   });
   expect(screen.queryByRole("status")).toBeNull();
-  expect(screen.getByRole("alert")).toHaveTextContent("El micrófono está bloqueado para esta página.");
+  expect(screen.getByRole("alert")).toHaveTextContent("The microphone is blocked for this page.");
   expect(document.getElementById("join-status")?.dataset.state).toBe("failed");
   expect(screen.getByRole("alert").querySelector("details")).toBeNull();
 
@@ -62,14 +62,14 @@ test("with no machine to talk to the line says why before any tap, as a note, an
   act(() => store.patch(link("offline")));
   const line = document.getElementById("join-status")!;
   expect(line).toBeVisible();
-  expect(screen.getByRole("status")).toHaveTextContent(/«mac» no está conectada ahora mismo\. Comprueba que está encendida\.$/);
+  expect(screen.getByRole("status")).toHaveTextContent(/“mac” is not connected right now\. Check that it is on\.$/);
   expect(line.dataset.state).toBe("note");
   expect(line.querySelector(".join-status-dot")).toBeNull();   // a standing note, not a step in progress
   act(() => store.patch(link("away")));
-  expect(screen.getByRole("status")).toHaveTextContent(/No se llega a «mac» por ningún camino/);
+  expect(screen.getByRole("status")).toHaveTextContent(/“mac” cannot be reached by any route/);
 
   // A join that found no machine says it as an alert; the machine answering takes both away.
-  act(() => store.patch({ joinFailure: "No se llega a «mac»." }));
+  act(() => store.patch({ joinFailure: "“mac” cannot be reached." }));
   expect(screen.getByRole("alert")).toBeInTheDocument();
   act(() => store.patch({ joinFailure: "", ...link("ok", "room") }));
   expect(line).not.toBeVisible();
@@ -78,7 +78,7 @@ test("with no machine to talk to the line says why before any tap, as a note, an
 test("a device paired with nothing, or with a machine that revoked it, says so and what to do", () => {
   const store = renderJoin(null);
   act(() => store.patch({ pairings: [], machinesReady: true }));
-  expect(screen.getByRole("status")).toHaveTextContent(/no está emparejado con ninguna máquina/);
+  expect(screen.getByRole("status")).toHaveTextContent(/is not paired with any machine/);
   act(() => store.patch({ pairings: [{ ...pairing, revoked: true }], machineLinks: { "fp-mac": { reach: "revoked", via: "" } } }));
-  expect(screen.getByRole("status")).toHaveTextContent(/«mac» ya no reconoce este dispositivo.*código nuevo/);
+  expect(screen.getByRole("status")).toHaveTextContent(/“mac” no longer recognises this device.*new code/);
 });
