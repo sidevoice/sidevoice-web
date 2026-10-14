@@ -42,8 +42,8 @@ for (const mode of ["light", "dark"]) {
   });
 }
 
-test("the decided palette: the agent grey, the person the brand's lila with white text", () => {
-  assert.equal(resolve("light")["--sv-chat-agent-bg"], "#f1f1f4");
+test("the decided palette: the agent a white card (soft cards, 2026-10-14), the person the brand's lila with white text", () => {
+  assert.equal(resolve("light")["--sv-chat-agent-bg"], "#ffffff");
   assert.equal(resolve("light")["--sv-chat-person-bg"], "#4a2f6b");
   assert.equal(resolve("dark")["--sv-chat-agent-bg"], "#212125");
   assert.equal(resolve("dark")["--sv-chat-person-bg"], "#46366a");

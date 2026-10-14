@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { VoiceWaveform, waveColumn } from "./VoiceWaveform";
+import { VoiceWaveform, waveColumn, waveformBrush } from "./VoiceWaveform";
 
 const frames = (count = 3) => new Promise((resolve) => setTimeout(resolve, 20 * count));
 
@@ -91,4 +91,15 @@ test("a call with no microphone captured draws without reading anything", async 
   const { container } = render(<VoiceWaveform phase="listening" />);
   await frames();
   expect(container.querySelector("canvas")).toBeInTheDocument();
+});
+
+test("a call bubble draws the soft cards' wider bars; a settings try keeps its fine ones", () => {
+  const room = document.createElement("main");
+  room.className = "call-layout";
+  const wave = document.createElement("span");
+  room.append(wave);
+  document.body.append(room);
+  expect(waveformBrush(wave)).toEqual({ pitch: 8, width: 5 });
+  expect(waveformBrush(document.createElement("span"))).toEqual({ pitch: 5, width: 3 });
+  room.remove();
 });

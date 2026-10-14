@@ -6,7 +6,13 @@ export const PAGE_MS = 3000;
 /* What is said on the stage, three lines at a time: a window three lines tall, and when there is more, the next three
  * scroll up in its place like a page turned (no scroll under reduced motion: call-view.css). The person's sent turn
  * turns a page every PAGE_MS (`onPages` says how many, for how long it stays); the agent's follows its voice: the page
- * holding the last word heard (`follow`, the element whose end marks it). */
+ * holding the last word heard (`follow`, the element whose end marks it). Above the window, a strip of the bubble's own
+ * padding shows the end of the page before, fading out (call-view.css --paged-peek): there is more above, and the
+ * transcript has it; a page is the window without that strip. The whole text stays in the page for assistive tech. */
+function pageHeight(node: HTMLElement) {
+  return (node.clientHeight - (parseFloat(getComputedStyle(node).paddingTop) || 0)) || 1;
+}
+
 export function PagedText({ children, measure, onPages, follow }: { children: ReactNode; measure: unknown; onPages?: (pages: number) => void;
   follow?: string }) {
   const box = useRef<HTMLSpanElement>(null);
@@ -18,11 +24,29 @@ export function PagedText({ children, measure, onPages, follow }: { children: Re
   useLayoutEffect(() => {
     const node = box.current, inner = run.current;
     if (!node || !inner) return;
-    const height = node.clientHeight || 1;
+    const height = pageHeight(node);
     const count = Math.max(1, Math.ceil((inner.scrollHeight - 1) / height));
     setStep(height); setPages(count);
     if (!follow) { setPage(0); onPages?.(count); }
   }, [measure]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A reflow while the turn stays mounted (the face arriving after a fallback, a resize, a turned phone) can change the
+  // bubble's lines: follow it, so a page stays three whole lines.
+  useLayoutEffect(() => {
+    const node = box.current, inner = run.current;
+    if (!node || !inner) return;
+    const observer = new ResizeObserver(() => {
+      const height = pageHeight(node);
+      const count = Math.max(1, Math.ceil((inner.scrollHeight - 1) / height));
+      setStep((before) => before === height ? before : height);
+      setPages((before) => before === count ? before : count);
+      // A cosmetic reflow can remove pages. Keep the visible page inside the new run;
+      // the sent turn's original page count owns its display lifetime.
+      setPage((before) => Math.min(before, count - 1));
+    });
+    observer.observe(node);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [measure, follow]);
   // By time: a page every PAGE_MS.
   useEffect(() => {
     if (follow || page >= pages - 1) return;

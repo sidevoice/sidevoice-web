@@ -15,7 +15,7 @@ test("the messages keep the panel's width: one column that can shrink, no sidewa
   assert.match(rule(".chat-message-row"), /min-width: 0/);
   const bubble = rule(".chat-bubble");
   assert.match(bubble, /min-width: 0/);
-  assert.match(bubble, /max-width: min\(80%, 34rem\)/);
+  assert.match(bubble, /max-width: min\(86%, 34rem\)/);
   assert.match(bubble, /overflow-wrap: anywhere/);
   assert.match(rule(".karaoke-text"), /overflow-wrap: anywhere/);
 });

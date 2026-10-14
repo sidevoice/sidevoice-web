@@ -89,6 +89,83 @@ test("by time: other words start over from their first page, counted again", () 
   expect(page()).toBe(0);
 });
 
+test("a live bubble resize recounts pages without remounting or restarting the current page", () => {
+  let notify: () => void = () => {};
+  class Observer {
+    constructor(callback: () => void) { notify = callback; }
+    observe() {}
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", Observer);
+  let lines = 7;
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text") ? 3 * LINE : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text-run") ? lines * LINE : 0;
+  });
+  const pages = vi.fn();
+  render(<PagedText measure={text(7)} onPages={pages}>{text(7)}</PagedText>);
+  const original = windowOf();
+  tick(PAGE_MS);
+  expect(page()).toBe(1);
+  lines = 10;
+  act(() => notify());
+  expect(windowOf()).toBe(original);
+  expect(page()).toBe(1);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  vi.unstubAllGlobals();
+});
+
+test("a live shrink clamps the visible last page without remounting or restarting its clock", () => {
+  let notify: () => void = () => {};
+  class Observer {
+    constructor(callback: () => void) { notify = callback; }
+    observe() {}
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", Observer);
+  let lines = 9;
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(3 * LINE);
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text-run") ? lines * LINE : 0;
+  });
+  const pages = vi.fn();
+  render(<PagedText measure={text(9)} onPages={pages}>{text(9)}</PagedText>);
+  const original = windowOf();
+  tick(PAGE_MS);
+  tick(PAGE_MS);
+  expect(page()).toBe(2);
+  lines = 6;
+  act(() => notify());
+  expect(windowOf()).toBe(original);
+  expect(page()).toBe(1);
+  expect(run().style.transform).toBe(`translateY(-${3 * LINE}px)`);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  expect(vi.getTimerCount()).toBe(0);
+  vi.unstubAllGlobals();
+});
+
+test("the strip above the window, where the page before fades, is no part of a page: a page is three lines", () => {
+  const PEEK = 12;
+  // The bubble's top padding (call-view.css --paged-peek): the window is that much taller, and a page no taller.
+  const style = document.createElement("style");
+  style.textContent = `.paged-text { padding-top: ${PEEK}px; }`;
+  document.head.append(style);
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text") ? PEEK + 3 * LINE : 0;
+  });
+  const pages = vi.fn();
+  render(<PagedText measure={text(7)} onPages={pages}>{text(7)}</PagedText>);
+  expect(getComputedStyle(windowOf()).paddingTop).toBe(`${PEEK}px`);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  tick(PAGE_MS);
+  expect(run().style.transform).toBe(`translateY(-${3 * LINE}px)`);
+  // The whole text is still there, for assistive tech: only the eye loses the earlier lines.
+  expect(windowOf().textContent).toBe(text(7));
+  style.remove();
+});
+
 /** The agent's words as the stage shows them, `heard` characters of them heard. */
 function voiced(words: string, heard: number) {
   return <PagedText measure={words} follow=".karaoke-played">

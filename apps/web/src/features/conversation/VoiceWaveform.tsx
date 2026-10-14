@@ -12,6 +12,12 @@ const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
 
+/** The call's bubbles draw wider, rounder bars on their pill (the soft cards, 2026-10-14); a settings try keeps the
+ *  fine ones its row is sized for. */
+export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
+  return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
+}
+
 export type WaveformPhase = "listening" | "transcribing";
 
 const LABELS = {
@@ -63,6 +69,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     let width = 1;
     let height = 1;
     let ink = "currentColor";
+    const brush = waveformBrush(node);
 
     const size = () => {
       const ratio = window.devicePixelRatio || 1;
@@ -77,7 +84,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
     // Newest column at the right: the turn scrolls away to the left as a recorder does.
     const paint = () => {
-      const capacity = Math.max(1, Math.floor(width / CELL));
+      const capacity = Math.max(1, Math.floor(width / brush.pitch));
       const values = columns.current;
       while (values.length > capacity) values.shift();
       const middle = height / 2;
@@ -88,21 +95,25 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       for (let slot = 0; slot < capacity; slot += 1) {
         const value = values[values.length - 1 - slot] ?? 0;
         const bar = Math.max(FLOOR, value * span);
-        const x = width - BAR - slot * CELL;
+        const x = width - brush.width - slot * brush.pitch;
         const y = middle - bar / 2;
-        if (context.roundRect) context.roundRect(x, y, BAR, bar, BAR / 2);
-        else context.rect(x, y, BAR, bar);
+        if (context.roundRect) context.roundRect(x, y, brush.width, bar, brush.width / 2);
+        else context.rect(x, y, brush.width, bar);
       }
       context.fill();
     };
 
     const observer = new ResizeObserver(() => { size(); paint(); });
     observer.observe(node);
+    // A theme switch repaints the samples in the new ink, even when transcribing has frozen them.
+    const refresh = () => { ink = window.getComputedStyle?.(node).color || ink; paint(); };
+    const mutation = new MutationObserver(refresh);
+    mutation.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     size();
     paint();
 
     // Transcribing keeps the last frame: nothing is read, nothing is scheduled, the pulse is CSS.
-    if (reduced || phase !== "listening") return () => observer.disconnect();
+    if (reduced || phase !== "listening") return () => { observer.disconnect(); mutation.disconnect(); };
 
     const tick = () => {
       const own = ownLevel.current;
@@ -121,7 +132,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     const visibility = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener("visibilitychange", visibility);
     start();
-    return () => { stop(); observer.disconnect(); document.removeEventListener("visibilitychange", visibility); };
+    return () => { stop(); observer.disconnect(); mutation.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, [phase, reduced]);
 
   const t = translator();
