@@ -10,7 +10,7 @@ import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
 import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
-import { callLanguage, callTranslator, type CallTranslate } from "./call-i18n";
+import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
 import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
 import { PagedText } from "./PagedText";
@@ -66,14 +66,14 @@ function BootError() {
   return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={errorLine(error)} details={error.details} />}</div>;
 }
 
-function posterWords(t: CallTranslate): PosterWords {
+function posterWords(t: Translate): PosterWords {
   return { title: t("stage.poster.title"), status: t("stage.poster.status"), fine: [t("stage.poster.fine1"), t("stage.poster.fine2"), t("stage.poster.fine3")] };
 }
 
 /** The stage; `notice`, what the room says over it (App: where an update waits), at the tile's top, taking no room of
  *  its own. */
 export function CallStage({ notice }: { notice?: ReactNode } = {}) {
-  const t = callTranslator();
+  const t = translator();
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
   const conversation = useRoomStore((state) => state.conversation);
@@ -110,7 +110,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
         <div className="stage-notice">{notice}</div>
         <div className="stage-scene">
           <StageBackdrop seed={stage.threadId} tone={tone} />
-          {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={callLanguage()} />}
+          {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
           <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"}
             mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           <StageDesk seed={stage.threadId} />

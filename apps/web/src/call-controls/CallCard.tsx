@@ -11,7 +11,7 @@
 import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, MicrophoneOffIcon, OpenAppIcon, SkipIcon } from "../components/ui/Icons";
 import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
 import type { CallControlsHost, CallControlsState } from "./host";
-import type { Translate } from "./i18n";
+import type { Translate } from "../i18n/translator";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 

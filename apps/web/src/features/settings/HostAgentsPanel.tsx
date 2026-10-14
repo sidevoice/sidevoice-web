@@ -8,8 +8,7 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import type { AgentManualStep, DetectedAgent, HostAgentsListing, HostAgentsState } from "../../state/room-types";
 import { useRoomStore } from "../../state/room-store";
 import { actionableAgent } from "../../services/host-agents";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
-import type { HostMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { errorMessage, keyFor, type ErrorMessage } from "./error-message";
 import { NewMark } from "../highlights/highlights";
 import { InfoTip } from "../../components/ui/InfoTip";
@@ -18,7 +17,7 @@ import { uiLocale } from "../../i18n/locale";
 
 /** A machine's failure with its agents, in words (error-message.ts): its key's sentence, else this panel's own generic
  *  line, the key behind Details. */
-function translatedError(t: HostTranslate, key: string, params?: Record<string, string | number>): ErrorMessage {
+function translatedError(t: Translate, key: string, params?: Record<string, string | number>): ErrorMessage {
   return errorMessage({ key }, { t, generic: t("agents.error.unknown"), known: (code) => {
     const known = keyFor("agents.error.", code);
     return known ? t(known, params) : null;
@@ -71,7 +70,7 @@ function groupedSteps(steps: AgentManualStep[]): AgentManualStep[] {
 }
 
 function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; fp: string; id: string; kind: ManualKind; onClose: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const status = useRoomStore((state) => state.facts.hostAgents[fp]?.status ?? "idle");
   const steps = manualSteps(agent, kind);
   // On another machine the steps are run there, and said so; on this device, nothing to say.
@@ -102,7 +101,7 @@ function Instructions({ agent, fp, id, kind, onClose }: { agent: DetectedAgent; 
 }
 
 export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }) {
-  const t = hostTranslator();
+  const t = translator();
   const rowState = useRoomStore((state) => state.facts.hostAgents[fp]);
   const busy = rowState?.busy[agent.id];
   const error = rowState?.actionErrors[agent.id];
@@ -146,7 +145,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   // Three states to read at a glance — Connected, Not connected, Needs attention (an entry an older Sidevoice made,
   // another 'sidevoice' entry, settings that can't be read) — the last with its reason after it, the row's action beside.
   const status: { text: string; tone: "ok" | "error" | "muted" | "attention" | ""; info?: string; reason?: string } = errorText ? { text: errorText, tone: "error" }
-    : busy ? { text: t(`agents.busy.${busy}` as HostMessageKey), tone: "muted" }
+    : busy ? { text: t(`agents.busy.${busy}` as MessageKey), tone: "muted" }
     : justConnected && agent.registration === "connected" ? { text: t("agents.justConnected", { agent: agent.label }), tone: "ok" }
     : agent.registration === "connected" ? { text: t("agents.state.connected"), tone: "ok" }
     // Short in the row; what it means and what to do, only in its (i).
@@ -214,7 +213,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
 
 /** For an agent the list does not show: one discreet link at its foot, opening how to connect any MCP agent by hand. */
 function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) {
-  const t = hostTranslator();
+  const t = translator();
   const [open, setOpen] = useState(false);
   if (!custom) return null;
   return (
@@ -231,7 +230,7 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
   );
 }
 
-function scanError(t: HostTranslate, key: string, params?: Record<string, string | number>): ErrorMessage {
+function scanError(t: Translate, key: string, params?: Record<string, string | number>): ErrorMessage {
   if (key === "no-connector") return { text: t("agents.noConnector") };
   if (key === "unreachable" || key === "timeout") return { text: t("agents.unreachable") };
   return translatedError(t, key, params);
@@ -243,7 +242,7 @@ function ScanError({ why }: { why: ErrorMessage }) {
 }
 
 export function HostAgentsPanel({ fp }: { fp: string | null }) {
-  const t = hostTranslator();
+  const t = translator();
   const listing = useRoomStore((state) => fp ? state.facts.hostAgents[fp] : undefined) as HostAgentsState | undefined;
   const value = listing?.value;
   const searchedAgo = useRelativeTime(value?.scanned_at);

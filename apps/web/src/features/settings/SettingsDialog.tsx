@@ -24,11 +24,9 @@ import { Alert } from "../../components/ui/Alert";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { Switch } from "../../components/ui/Switch";
 import { readCallPreferences, subscribeCallPreferences, writeCallPreferences, type CallPreferences, type PresenceSound } from "../../services/call-preferences";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
-import type { HostMessageKey } from "./messages/en";
+import { languageName, translator, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { ErrorBoundary } from "../../app/ErrorBoundary";
 import { remoteProviders } from "../../services/voice-settings.js";
-import { UI_LANGUAGE_NAMES, UI_LANGUAGES } from "../../services/system-language.js";
 import { useDialogFocusReturn } from "../../lib/focus-return";
 import { motionOf, SettingsLevelsProvider, useSectionShown, useSettingsLevelsOf } from "./settings-levels";
 import { MenuRow } from "./SettingsMenu";
@@ -42,7 +40,7 @@ import "./settings.css";
  * (no machine yet, an agent waiting). There is no Save: every setting applies as it changes. */
 
 /** Each section in the nav's order, its icon drawn at the size asked (the nav's, by default; a phone's row, 20px). */
-const SECTIONS: { id: string; label: HostMessageKey; icon: (size?: number) => ReactNode }[] = [
+const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactNode }[] = [
   { id: "general", label: "settings.section.general", icon: (size) => <GeneralIcon size={size} /> },
   { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
   { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
@@ -58,7 +56,7 @@ const SECTIONS: { id: string; label: HostMessageKey; icon: (size?: number) => Re
 /** What a place asked for (`settingsFocus`) can focus: a control that takes it now. */
 const FOCUSABLE = "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
 
-export function Appearance({ t }: { t: HostTranslate }) {
+export function Appearance({ t }: { t: Translate }) {
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
   const choose = (next: ThemePreference) => { setTheme(next); setThemePreference(next); };
   return <Segmented size="sm" label={t("settings.appearance")} value={theme} onChange={choose} items={[
@@ -66,7 +64,7 @@ export function Appearance({ t }: { t: HostTranslate }) {
   ]} />;
 }
 
-function GeneralSettings({ t }: { t: HostTranslate }) {
+function GeneralSettings({ t }: { t: Translate }) {
   // The runtime keeps it (saved as it is chosen, said to the call); this shows it and asks for a change.
   const language = useRoomStore((state) => state.facts.uiLanguage);
   return <Section id="general" title={t("settings.section.general")} description={t("settings.general.description")}>
@@ -75,13 +73,13 @@ function GeneralSettings({ t }: { t: HostTranslate }) {
       <Row label={t("settings.deviceName")} description={t("settings.deviceName.hint")} htmlFor="device-name"><DeviceNameField id="device-name" /></Row>
       <Row label={t("settings.general.languageLabel")} description={t("settings.general.languageHint")} htmlFor="ui-language">
         <Select id="ui-language" value={language} onValueChange={(next) => window.sidevoiceActions?.setInterfaceLanguage?.(next)}
-          options={[{ value: "", label: t("settings.general.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: UI_LANGUAGE_NAMES[value] }))]} />
+          options={[{ value: "", label: t("settings.general.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: languageName(value) }))]} />
       </Row>
     </Group>
   </Section>;
 }
 
-function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslate }) {
+function SlotSection({ id, t }: { id: "transcription" | "voice"; t: Translate }) {
   return <Section id={id} title={t(id === "transcription" ? "settings.section.transcription" : "settings.section.voice")}
     description={t(id === "transcription" ? "settings.transcription.description" : "settings.voice.description")}>
     <SlotPane task={id === "transcription" ? "stt" : "tts"} />
@@ -90,7 +88,7 @@ function SlotSection({ id, t }: { id: "transcription" | "voice"; t: HostTranslat
 
 /** The call's own behaviour: when your turn ends (kept on Save), the sound while the agent works and the screen during
  *  a call (this device's, applied at once). */
-function CallSettings({ t }: { t: HostTranslate }) {
+function CallSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const ready = useRoomStore((state) => catalogueShown(state.facts.voiceCatalogue));
   // Every section is drawn, one shown: another section shown (or, on a phone, the list of them, or Settings closed)
@@ -100,7 +98,7 @@ function CallSettings({ t }: { t: HostTranslate }) {
   useEffect(() => subscribeCallPreferences(() => setPrefs(readCallPreferences())), []);
   const set = (patch: Partial<CallPreferences>) => setPrefs(writeCallPreferences(patch));
   const wakeLock = typeof navigator !== "undefined" && "wakeLock" in navigator;
-  const presence: { value: PresenceSound; label: HostMessageKey }[] = [
+  const presence: { value: PresenceSound; label: MessageKey }[] = [
     { value: "off", label: "settings.call.presence.off" }, { value: "hidden", label: "settings.call.presence.hidden" }, { value: "always", label: "settings.call.presence.always" },
   ];
   return <Section id="call" title={t("settings.section.call")} description={t("settings.call.description")}>
@@ -123,13 +121,13 @@ function CallSettings({ t }: { t: HostTranslate }) {
 
 /** What switching between Smart and Silence does during a call: the voice restarts for a moment (a source or a model
  *  changes without a cut — the new one takes over once it is ready). Said only while a call is on, in Call. */
-function RestartNote({ t }: { t: HostTranslate }) {
+function RestartNote({ t }: { t: Translate }) {
   const inCall = useRoomStore((state) => !!(state.facts.ws || state.facts.reconnecting));
   return inCall ? <Alert tone="warning" title={t("settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;
 }
 
 /** For diagnosis and recovery, and the engine's internals: models' memory, this device's settings, the build. */
-function AdvancedSettings({ t }: { t: HostTranslate }) {
+function AdvancedSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
   return <Section id="advanced" title={t("settings.section.advanced")} description={t("settings.advanced.description")}>
@@ -144,7 +142,7 @@ function AdvancedSettings({ t }: { t: HostTranslate }) {
 }
 
 /** "Saved", for a moment after a setting is kept: settings apply as they change, with no Save to press. */
-function SavedNote({ at, t }: { at: number; t: HostTranslate }) {
+function SavedNote({ at, t }: { at: number; t: Translate }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (!at) return;
@@ -164,7 +162,7 @@ function Pane({ id, current, children }: { id: string; current: string; children
 /** What a section's row in a phone's menu says under its name, where the section has one state that says whether it is
  *  set up and working: the model chosen, This device's service (as its entry words it), the providers connected, the
  *  machines. Blank while it is not known yet (the catalogue loading or failed); none for a section of preferences. */
-function useSummaries(t: HostTranslate, thisDevice: MachineStatus | null): Record<string, ReactNode> {
+function useSummaries(t: Translate, thisDevice: MachineStatus | null): Record<string, ReactNode> {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   const keys = useRoomStore((state) => state.facts.providerKeys);
@@ -187,7 +185,7 @@ function SettingsError() {
 }
 
 export function SettingsDialog() {
-  const t = hostTranslator();
+  const t = translator();
   const store = useContext(RoomStoreContext);
   const current = useRoomStore((state) => state.facts.settingsSection) || "general";
   // This computer as a section of its own, where this device can host.

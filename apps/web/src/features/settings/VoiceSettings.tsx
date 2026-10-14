@@ -8,8 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Segmented } from "../../components/ui/Tabs";
 import { voiceChoices, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
-import type { HostMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { PROVIDER_SAYS, ProviderKeyNeeded, reasonState } from "./ProviderConnect";
 import { NewMark } from "../highlights/highlights";
 import { ModelPrepare, type PrepareStatus } from "./ModelPrepare";
@@ -40,15 +39,15 @@ const familyName = (family: string) => family.charAt(0).toUpperCase() + family.s
 
 /** What the pane says about a choice, in words: its message, why a model does not run here, a catalogue's reason by its
  *  code, and a provider's own words after a reason that is the provider answering. */
-function noteText(t: HostTranslate, note: Note | null | undefined) {
+function noteText(t: Translate, note: Note | null | undefined) {
   if (!note) return "";
-  const reasons = note.reasons?.map((code) => t(("voice.unfit." + code) as HostMessageKey)).join("; ");
+  const reasons = note.reasons?.map((code) => t(("voice.unfit." + code) as MessageKey)).join("; ");
   const code = note.key === "voice.catalog.reason" ? String(note.params?.code ?? "") : "";
   const state = code ? reasonState(code) : null;
   const text = code === "credential-missing" ? t("voice.catalog.noKey")
     : code === "storage-blocked" ? t("storage.blocked")
-    : state && state !== "problem" && state !== "connected" ? t(("voice.catalog.why." + state) as HostMessageKey)
-    : t(note.key as HostMessageKey, { ...note.params, ...(reasons ? { reasons } : {}) });
+    : state && state !== "problem" && state !== "connected" ? t(("voice.catalog.why." + state) as MessageKey)
+    : t(note.key as MessageKey, { ...note.params, ...(reasons ? { reasons } : {}) });
   return note.detail && state && PROVIDER_SAYS.has(state) ? text + " — " + note.detail : text;
 }
 
@@ -67,13 +66,13 @@ function useChoices(draft: Settings) {
 }
 
 /** What the pane says about a choice, in its list: under it, or as why it cannot be chosen when it cannot. */
-function noted(t: HostTranslate, option: { disabled: boolean; note: Note | null }): Pick<SelectOption, "description" | "reason"> {
+function noted(t: Translate, option: { disabled: boolean; note: Note | null }): Pick<SelectOption, "description" | "reason"> {
   const text = noteText(t, option.note);
   if (!text) return {};
   return option.disabled ? { reason: text } : { description: text };
 }
 
-function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: HostTranslate }) {
+function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: string; sources: Source[]; onChange: (catalog: string) => void; t: Translate }) {
   return (
     <Select id={id} value={value} onValueChange={onChange} options={sources.map((source) => ({
       value: source.id, label: source.local ? t("voice.source.local") : source.name ?? source.id, disabled: source.disabled, ...noted(t, source),
@@ -83,7 +82,7 @@ function SourceSelect({ id, value, sources, onChange, t }: { id: string; value: 
 
 /** The family first, then a model of it: a family changed picks its first model that runs here. A provider's models
  *  have no family, and are one list. */
-function ModelPickers({ task, draft, options, locked, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; t: HostTranslate }) {
+function ModelPickers({ task, draft, options, locked, t }: { task: Task; draft: Settings; options: Option[]; locked: boolean; t: Translate }) {
   const families = [...new Set(options.map((option) => option.group).filter((group): group is string => !!group))];
   const current = options.find((option) => option.id === draft[task].model);
   const family = current?.group ?? null;
@@ -129,7 +128,7 @@ function useFirstModel(task: "stt" | "tts") {
  *  try is its own (`trial`), shown in the block all the same. */
 function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; draft: Settings; setup: boolean; trial?: SetupTry }) {
   useFirstModel(task);
-  const t = hostTranslator();
+  const t = translator();
   const choices = useChoices(draft);
   const slot = choices[task];
   const model = useModelState(task, draft);
@@ -229,9 +228,9 @@ export function SpeechChoices({ draft, setup = false, trial }: SlotProps) {
  *  the choices. `setup`: the first-run setup's;
  *  `active`: in sight (Settings' section on show), a try that runs stopping when it is not. */
 export function TurnChoices({ draft, setup = false, active = true, turnTry, turnTried }: { draft: Settings; setup?: boolean; active?: boolean; turnTry?: TurnTryHandle; turnTried?: boolean }) {
-  const t = hostTranslator();
+  const t = translator();
   const choices = useChoices(draft);
-  const patience: { value: Settings["patience"]; label: HostMessageKey; hint: HostMessageKey }[] = [
+  const patience: { value: Settings["patience"]; label: MessageKey; hint: MessageKey }[] = [
     { value: "fast", label: "voice.patience.fastShort", hint: "voice.patience.fast" },
     { value: "normal", label: "voice.patience.normal", hint: "voice.patience.normalHint" },
     { value: "calm", label: "voice.patience.calmShort", hint: "voice.patience.calm" },
@@ -274,7 +273,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry, turn
 
 /** How long this device keeps its models loaded with nothing to do, before freeing their memory. */
 export function IdleUnloadChoice({ draft }: { draft: Settings }) {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <Row label={t("settings.advanced.idleUnload")} description={t("settings.advanced.idleUnloadHint")} htmlFor="voice-idle-unload">
       <Select id="voice-idle-unload" value={String(draft.idle_unload_minutes)} onValueChange={(minutes) => edit({ idle_unload_minutes: Number(minutes) })}
@@ -296,7 +295,7 @@ export function useVoiceReadiness() {
 
 /** A slot's pane in Settings: the catalogue loading or failed, else the slot. */
 export function SlotPane({ task }: { task: Task }) {
-  const t = hostTranslator();
+  const t = translator();
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   return <>

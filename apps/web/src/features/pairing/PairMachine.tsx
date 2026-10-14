@@ -7,9 +7,8 @@ import { CheckIcon, ChevronIcon } from "../../components/ui/Icons";
 import { InfoTip } from "../../components/ui/InfoTip";
 import { Input, Textarea } from "../../components/ui/Input";
 import { currentDeviceName } from "../../state/device-name";
-import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
-import type { HostMessageKey } from "../settings/messages/en";
 import {
   ADDRESS_INSECURE, ADDRESS_INVALID, PAIRING_HTTP_BLOCKED, PAIRING_HTTP_ONLY, PAIRING_HTTP_PRIVATE, machineAddress, previewPairingCode,
   type PairingCodePreview,
@@ -28,7 +27,7 @@ type AlertKind = "expired" | "unreachable" | "httpPrivate" | "httpOnly" | "httpB
 /** Why a code was not redeemed, and where that is said: under the field it is about, or in the form's alert. The
  *  controller rejects with device-pairing.js's code; anything else is said in the generic words of a failure, what it
  *  said behind Details (error-message.ts). */
-type Failure = { field: "code" | "address"; key: HostMessageKey } | { alert: AlertKind; key?: HostMessageKey; why?: ErrorMessage };
+type Failure = { field: "code" | "address"; key: MessageKey } | { alert: AlertKind; key?: MessageKey; why?: ErrorMessage };
 
 const FAILURES: Record<string, Failure> = {
   [ADDRESS_INVALID]: { field: "address", key: "pairing.addressInvalid" },
@@ -50,7 +49,7 @@ const FAILURES: Record<string, Failure> = {
   unreachable: { alert: "unreachable" },
 };
 
-function failure(reason: unknown, t: HostTranslate): Failure {
+function failure(reason: unknown, t: Translate): Failure {
   const known = FAILURES[failureParts(reason).code];
   if (known) return known;
   // The machine answered and said no (its own sentence behind Details), or something this screen has no words for.
@@ -64,14 +63,14 @@ function readCode(code: string, now: number): PairingCodePreview | null {
 
 const minutesLeft = (code: PairingCodePreview, now: number) => Math.max(1, Math.ceil((code.exp * 1000 - now) / 60_000));
 /** The machine as a sentence names it: its name, quoted as the language quotes, or "the machine". */
-const named = (host: string | null | undefined, t: HostTranslate) => host ? t("pairing.named", { host }) : t("pairing.theMachine");
+const named = (host: string | null | undefined, t: Translate) => host ? t("pairing.named", { host }) : t("pairing.theMachine");
 const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 /** A phone or a tablet: the keyboard would cover the screen, so nothing takes the focus by itself. */
 const touchFirst = () => typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
 
 /** The command that prints a new code, copied from the alert that says the old one is spent. */
 function CopyCommand() {
-  const t = hostTranslator();
+  const t = translator();
   const [copied, setCopied] = useState(false);
   async function copy() {
     try { await navigator.clipboard.writeText(CONNECTOR_PAIR_DEVICE); setCopied(true); } catch { setCopied(false); }
@@ -86,7 +85,7 @@ function CopyCommand() {
 export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, rows = 3, submitIn }: {
   idPrefix?: string; autoFocus?: boolean; rows?: number; submitIn?: HTMLElement | null;
 }) {
-  const t = hostTranslator();
+  const t = translator();
   const [code, setCode] = useState("");
   const [address, setAddress] = useState("");
   // The address's disclosure open: by the person (it opens and closes), or by itself where the address is needed.
@@ -95,8 +94,8 @@ export function PairMachine({ idPrefix = "device-pairing", autoFocus = false, ro
   const [unreached, setUnreached] = useState(false);
   // Connecting: over https (Connect), or without encryption once the person agreed (its own button).
   const [busy, setBusy] = useState<"https" | "insecure" | null>(null);
-  const [fieldError, setFieldError] = useState<{ field: "code" | "address"; key: HostMessageKey } | null>(null);
-  const [alert, setAlert] = useState<{ kind: AlertKind; key?: HostMessageKey; why?: ErrorMessage; host: string; address: string } | null>(null);
+  const [fieldError, setFieldError] = useState<{ field: "code" | "address"; key: MessageKey } | null>(null);
+  const [alert, setAlert] = useState<{ kind: AlertKind; key?: MessageKey; why?: ErrorMessage; host: string; address: string } | null>(null);
   const [connected, setConnected] = useState("");
   // What a screen reader hears once when a code is recognised; the line under the field counts the minutes down quietly.
   const [heard, setHeard] = useState("");

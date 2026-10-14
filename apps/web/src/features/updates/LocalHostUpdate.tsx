@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { localHostBridge, type LocalHostBridgeError, type LocalHostStatus, type LocalHostVersion } from "../../services/desktop-host";
 import { normalizeLocalHostBridgeError } from "../../services/local-host-install";
-import { hostTranslator } from "../settings/host-i18n";
+import { translator } from "../../i18n/translator";
 import { localHostBridgeError, safeLocalHostCount } from "../settings/local-host-status";
 import { UPDATE_PLACE } from "./useUpdates";
 
@@ -50,7 +50,7 @@ export function useLocalHostUpdate(status: LocalHostStatus | null) {
  *  once nothing stands in the way, and `onContinued` says it is done or not needed. */
 export function LocalHostUpdateControl({ status, update, continuing = false, onContinued }: { status: LocalHostStatus; update: ReturnType<typeof useLocalHostUpdate>;
   continuing?: boolean; onContinued?: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const { report, setReport } = update;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<LocalHostBridgeError | null>(null);

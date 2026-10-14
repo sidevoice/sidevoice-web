@@ -14,16 +14,14 @@ import { Appearance } from "../settings/SettingsDialog";
 import { Group, Row } from "../../components/ui/Card";
 import { Select } from "../../components/ui/Select";
 import { useModelState, useVoiceTry, type ModelState, type SetupTry, catalogueShown } from "../settings/ModelSetup";
-import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { languageName, translator, UI_LANGUAGES, type MessageKey, type Translate } from "../../i18n/translator";
 import { hostStatusText } from "../settings/local-host-status";
-import type { HostMessageKey } from "../settings/messages/en";
 import { useOnboarding } from "./onboarding-context";
 import { DeviceNameField } from "../settings/DeviceNameField";
 import { ReadyStep } from "./ReadyStep";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
 import type { OnboardingStep } from "../../services/onboarding-state";
-import { UI_LANGUAGE_NAMES, UI_LANGUAGES } from "../../services/system-language.js";
 
 /* The first-run setup, one dialog over the room: of a fixed height, so nothing jumps between steps, and the whole
  * screen on a phone. Its order is the operator's: the basics (appearance, the interface's and the person's
@@ -31,7 +29,7 @@ import { UI_LANGUAGE_NAMES, UI_LANGUAGES } from "../../services/system-language.
  * paired), transcription, voice, and when a turn ends. Transcription and voice are this device's settings (as in
  * Settings); trying them is recommended, not required: Continue waits only for the chosen model to be ready. */
 
-const GROUPS: { key: HostMessageKey; steps: OnboardingStep[] }[] = [
+const GROUPS: { key: MessageKey; steps: OnboardingStep[] }[] = [
   { key: "wizard.group.basics", steps: ["W0"] },
   { key: "wizard.group.where", steps: ["W1"] },
   { key: "wizard.group.agents", steps: ["W2", "W3", "W2r"] },
@@ -42,7 +40,7 @@ const GROUPS: { key: HostMessageKey; steps: OnboardingStep[] }[] = [
 ];
 
 // Preparing this computer and connecting its agents are one step to the person: the same title through both.
-const TITLES: Record<OnboardingStep, HostMessageKey> = {
+const TITLES: Record<OnboardingStep, MessageKey> = {
   W0: "wizard.title.basics", W1: "wizard.title.where", W2: "wizard.title.install", W2r: "wizard.title.pair", W3: "wizard.title.install",
   W4: "wizard.title.stt", W4v: "wizard.title.tts", W5: "wizard.title.turn", W6: "wizard.title.ready",
 };
@@ -63,12 +61,12 @@ function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHos
 
 /** The basics: how it looks, this device's name, the interface's language and the one the person speaks; Automatic and
  *  System by default. */
-function BasicsStep({ t }: { t: HostTranslate }) {
+function BasicsStep({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const [language, setLanguage] = useState(() => window.sidevoiceActions?.interfaceLanguage?.() ?? "");
   // Each language in its own name, as language pickers have them. The speech language is chosen among Spanish and
   // English only here: the other interface languages are not voice languages (yet).
-  const languages = [{ value: "", label: t("wizard.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: UI_LANGUAGE_NAMES[value] }))];
+  const languages = [{ value: "", label: t("wizard.languageAuto") }, ...UI_LANGUAGES.map((value) => ({ value, label: languageName(value) }))];
   const speechLanguages = languages.filter(({ value }) => ["", "es", "en"].includes(value));
   return <section className="wizard-basics">
     <p>{t("wizard.basics.body")}</p>
@@ -87,7 +85,7 @@ function BasicsStep({ t }: { t: HostTranslate }) {
 
 /** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience;
  *  and its try, optional — Continue stays the step's action, and leaving the step (Continue, Back, Later) stops it. */
-function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolean; t: HostTranslate }) {
+function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolean; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -100,7 +98,7 @@ function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolea
 }
 
 /** Where the setup stands: the step and its group in words, then the five groups as a bar, done and current lit. */
-function Stepper({ current, t }: { current: number; t: HostTranslate }) {
+function Stepper({ current, t }: { current: number; t: Translate }) {
   return <div className="wizard-stepper">
     <p className="wizard-stepper-label">{t("wizard.stepOf", { n: current + 1, total: GROUPS.length, group: t(GROUPS[current].key) })}</p>
     <ol className="wizard-steps" aria-label={t("wizard.progress")}>
@@ -115,7 +113,7 @@ type StageTry = SetupTry & { sentence: string; setSentence(value: string): void 
 /** A voice step: its slot as Settings has it, the try in the model's block (what it shows and where, the `try-result`
  *  variant's), its first try offered in the footer. The sentence to hear is edited in the block, where it is then lit
  *  as it is heard (`card`); with the try in its own dialog, beside the block (`dialog`). */
-function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: HostTranslate }) {
+function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   useEffect(() => {
@@ -141,7 +139,7 @@ function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t
  *  `tryReason`: only the try can't run yet (no sentence to say, no transcription to hear a turn). Blocked actions stay focusable, saying why (`blockedBy`). */
 function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onContinue, t }: {
   reason: string; tryReason?: string; running: boolean; tried: boolean;
-  onTry(): void; onStop(): void; onContinue(): void; t: HostTranslate;
+  onTry(): void; onStop(): void; onContinue(): void; t: Translate;
 }) {
   const waiting = !!reason && !running;
   const said = waiting ? reason : !running && tryReason ? tryReason : "";
@@ -159,12 +157,12 @@ function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onC
 
 /** Why a step's model holds its footer, in the step's own words; nothing once it is ready. */
 const WAIT_KEY = { stt: "settings.save.waitTranscription", tts: "settings.save.waitVoice", turn: "settings.save.waitTurn" } as const;
-function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: HostTranslate) {
+function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: Translate) {
   return model.model && model.ready ? "" : t(WAIT_KEY[slot]);
 }
 
 export function Wizard() {
-  const t = hostTranslator();
+  const t = translator();
   const onboarding = useOnboarding();
   const machines = useRoomStore((state) => state.machines);
   const hostAgents = useRoomStore((state) => state.facts.hostAgents);
@@ -281,7 +279,7 @@ export function Wizard() {
 
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
   const back = previous(step, onboarding.path, onboarding.canHostAgents);
-  const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as HostMessageKey) : "";
+  const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as MessageKey) : "";
   const agents = agentsFp ? hostAgents[agentsFp] : undefined;
 
   const remoteName = remoteMachine?.host ?? "";
@@ -373,7 +371,7 @@ export function Wizard() {
 
 /** What a put-off setup leaves on screen: one action, back into it where it stands. */
 export function SetupPending() {
-  const t = hostTranslator();
+  const t = translator();
   const onboarding = useOnboarding();
   return <section className="setup-pending" aria-labelledby="setup-pending-title">
     <span className="setup-pending-mark"><SidevoiceMark size={28} /></span>

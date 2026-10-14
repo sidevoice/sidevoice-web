@@ -7,9 +7,8 @@ import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { useModelState } from "./ModelSetup";
 import { seconds } from "./try-time";
 import { TryTake } from "./TryTake";
-import { hostTranslator } from "./host-i18n";
+import { translator, type MessageKey } from "../../i18n/translator";
 import { voiceFailure, type ErrorMessage } from "./error-message";
-import type { HostMessageKey } from "./messages/en";
 import type { TurnStep } from "../../services/voice-trial.js";
 import type { DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
 import type { VoiceTake } from "../../services/voice-take";
@@ -40,7 +39,7 @@ type Phase = "idle" | "starting" | "restarting" | "listening" | "speaking" | "pa
 const RUNNING: ReadonlySet<Phase> = new Set(["starting", "restarting", "listening", "speaking", "pause", "ended", "notice"]);
 
 /** A message the status region reads out; for a turn that ended, the silence it ended after when the voice said it. */
-type Said = { key: HostMessageKey; ms?: number | null };
+type Said = { key: MessageKey; ms?: number | null };
 
 export type TurnTrial = {
   phase: Phase;
@@ -160,7 +159,7 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   /** The setup's own try (its footer starts it): this shows it, and offers it again here only once tried. */
   handle?: TurnTryHandle; tried?: boolean;
 }) {
-  const t = hostTranslator();
+  const t = translator();
   const stt = useModelState("stt", draft);
   const smartBlocked = smart && !smartReady;
   const own = useTurnTry({ active: active && !handle, smartBlocked });

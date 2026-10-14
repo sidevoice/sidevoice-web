@@ -4,12 +4,12 @@ import { Button } from "../../components/ui/Button";
 import { RefreshIcon } from "../../components/ui/Icons";
 import type { LocalHostAction } from "./local-host-status";
 import { canRunLocalHostAction, hostStatusText, knownLocalHostState, runLocalHostAction } from "./local-host-status";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import { useRoomStore } from "../../state/room-store";
 import "./banners.css";
 
 export function LocalHostBanner() {
-  const t = hostTranslator();
+  const t = translator();
   const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
   const machines = useRoomStore((state) => state.machines);
   const status = useRoomStore((state) => state.facts.localHostStatus);

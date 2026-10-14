@@ -52,7 +52,7 @@ export function StageDesk({ seed }: { seed: string }) {
   return <div className="stage-desk" aria-hidden="true" style={colours} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-/** The poster's words, in the interface's language (the call's message bundle). */
+/** The poster's words, in the interface's language (i18n/locales). */
 export interface PosterWords {
   title: string;
   status: string;

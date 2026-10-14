@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CallCard, CLICK_GUARD_MS, duration, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS } from "./CallCard";
 import type { CallControlsHost, CallControlsState, CallSnapshot } from "./host";
-import { cardLanguage, translator } from "./i18n";
+import { translator } from "../i18n/translator";
+import { cardLanguage } from "./i18n";
 import { cardSnapshot } from "../test/call-card";
 
 const t = translator("en");

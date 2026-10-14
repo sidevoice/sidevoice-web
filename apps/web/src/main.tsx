@@ -12,7 +12,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
 import { Button } from "./components/ui/Button";
 import { ErrorDetails } from "./components/ui/ErrorText";
-import { hostTranslator } from "./features/settings/host-i18n";
+import { translator } from "./i18n/translator";
 
 import "./i18n/room-i18n.js";
 import { startPageTheme } from "./lib/theme";
@@ -45,7 +45,7 @@ try {
 } catch (error) {
   // What it threw is no sentence for people: behind Details.
   const message = error instanceof Error ? error.message : String(error);
-  const t = hostTranslator();
+  const t = translator();
   root.render(
     <main className="startup-error" role="alert">
       <h1>{t("app.startFailed")}</h1>

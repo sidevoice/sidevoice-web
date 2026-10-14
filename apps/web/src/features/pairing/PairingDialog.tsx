@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { useDialogFocusReturn } from "../../lib/focus-return";
 import { useRoomStore } from "../../state/room-store";
-import { hostTranslator } from "../settings/host-i18n";
+import { translator } from "../../i18n/translator";
 import { PairMachine } from "./PairMachine";
 import "./pairing.css";
 
@@ -14,7 +14,7 @@ import "./pairing.css";
  *  The code is checked and redeemed by the controller; this only collects it and says how that went. The dialog stays
  *  in the page while closed, so the form is there (emptied) for the next time. */
 export function PairingDialog() {
-  const t = hostTranslator();
+  const t = translator();
   const prompt = useRoomStore((state) => state.pairing);
   const [opened, setOpened] = useState(0);
   // Where the form's Connect goes: the dialog's footer, beside Cancel.

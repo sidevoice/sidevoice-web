@@ -3,7 +3,7 @@ import { CheckIcon, EndOfTurnIcon, OtherMachineIcon, SidevoiceMark, ThisComputer
 import { useRoomStore } from "../../state/room-store";
 import { ConnectYourAgent } from "../room/ConnectYourAgent";
 import { useModelState } from "../settings/ModelSetup";
-import type { HostTranslate } from "../settings/host-i18n";
+import type { Translate } from "../../i18n/translator";
 
 /* The setup's last step, a small celebration to click through: the mark arriving, "You're all set — talk to your
  * agents", what was set up (read from what the steps wrote: the machine, the device's voice settings), what to tell an
@@ -20,7 +20,7 @@ function RecapRow({ icon, label, value, detail }: { icon: ReactNode; label: stri
 }
 
 export function ReadyStep({ path, machineName, title, t }: {
-  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: HostTranslate;
+  path: "agents" | "remote" | null; machineName: string; title: Ref<HTMLHeadingElement>; t: Translate;
 }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);

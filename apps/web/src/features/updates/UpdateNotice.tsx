@@ -6,7 +6,7 @@ import { returnFocus } from "../../lib/focus-return";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
-import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 import { openSettings } from "../settings/open-settings";
 import { continueAfterRestart, UPDATE_PLACE, useUpdates, type UpdaterStatus } from "./useUpdates";
 import "./updates.css";
@@ -29,7 +29,7 @@ type Notice =
 /** This computer's updates waiting, most pressing first, with what acting on each takes: the app's, then the page's.
  *  A remote machine's is not one of them: Settings › Updates says it, in its row. */
 function useNotices() {
-  const t = hostTranslator();
+  const t = translator();
   const { items, app, appUpdate } = useUpdates();
   const notices: Notice[] = [];
   if (app) notices.push({ key: `app:${app.state}:${app.version ?? ""}`, kind: "app", status: app });
@@ -39,7 +39,7 @@ function useNotices() {
 type Notices = ReturnType<typeof useNotices>;
 
 /** What a notice says: the app's update with its version (available, ready), the page's new version. */
-function noticeText(notice: Notice, t: HostTranslate) {
+function noticeText(notice: Notice, t: Translate) {
   if (notice.kind === "app") {
     const { state, version } = notice.status;
     if (state === "ready") return version ? t("updates.notice.ready", { version }) : t("updates.notice.readyOne");

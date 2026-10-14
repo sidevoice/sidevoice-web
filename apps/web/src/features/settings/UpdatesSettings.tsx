@@ -7,7 +7,7 @@ import { AppUpdateSettings } from "../updates/AppUpdateSettings";
 import { LocalHostUpdateControl } from "../updates/LocalHostUpdate";
 import { useThisComputerUpdate } from "../updates/useThisComputerUpdate";
 import { appUpdater, continueAfterRestart, continued, continuing, UPDATE_PLACE, useOutdatedMachines } from "../updates/useUpdates";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 import "./updates-settings.css";
 
 /* Updates, a Settings section of their own (decided 2026-10-13), holding everything that updates, each in its row with
@@ -30,7 +30,7 @@ export function useUpdatesSection() {
 
 /** A nightly or development app, under its version: what it is, and — a nightly with no updater of its own — that it is
  *  updated by hand, from its page. One with an updater (desktop #56 gives nightlies one, for now) updates as a release. */
-export function DesktopBuildNote({ build, updater, t }: { build: DesktopBuild | null; updater: boolean; t: HostTranslate }) {
+export function DesktopBuildNote({ build, updater, t }: { build: DesktopBuild | null; updater: boolean; t: Translate }) {
   if (build?.channel === "nightly") return <div className="host-status-build">
     {[t("hosts.build.nightly"), build.commit?.slice(0, 7), build.date?.slice(0, 10)].filter(Boolean).join(" · ")}
     {!updater && <>{" — "}<a href={DESKTOP_NIGHTLY_URL} target="_blank" rel="noreferrer">{t("hosts.build.byHand")}<span className="sr-only"> {t("keys.newTab")}</span></a></>}
@@ -41,7 +41,7 @@ export function DesktopBuildNote({ build, updater, t }: { build: DesktopBuild | 
 
 /** This device's Sidevoice in one line on its card: its version — the app's, else its service's — and, where it is
  *  known, Up to date or Update available, the latter a link to its row's button in Updates. */
-export function ThisDeviceVersion({ t }: { t: HostTranslate }) {
+export function ThisDeviceVersion({ t }: { t: Translate }) {
   const store = useContext(RoomStoreContext);
   const { version, state, place } = useThisComputerUpdate();
   const shown = useUpdatesSection();
@@ -56,7 +56,7 @@ export function ThisDeviceVersion({ t }: { t: HostTranslate }) {
 
 /** A part of this computer that updates, at its card's top, under its group's title: what it is, then its version, with
  *  Up to date once its part says so, and a build's note. */
-function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; version: string | null | undefined; upToDate: boolean; note?: ReactNode; t: HostTranslate }) {
+function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; version: string | null | undefined; upToDate: boolean; note?: ReactNode; t: Translate }) {
   return <div className="updates-settings-version">
     {hint && <span className="updates-part-hint">{hint}</span>}
     {version && <span className="host-status-product">{t("settings.updates.version", { version })}
@@ -68,7 +68,7 @@ function PartVersion({ hint, version, upToDate, note, t }: { hint?: string; vers
 /** Updates: this computer as one row, Sidevoice (its service updated with the app), then the machines behind; never
  *  an empty card. */
 export function UpdatesSettings() {
-  const t = hostTranslator();
+  const t = translator();
   const build = desktopBuild();
   const updater = appUpdater() !== null;
   const app = build !== null || updater;

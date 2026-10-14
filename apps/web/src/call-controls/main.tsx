@@ -6,8 +6,8 @@ import "../styles/tokens.css";
 import "./call-card.css";
 import { CallCard } from "./CallCard";
 import { callControlsHost } from "./host";
-import { SETTINGS_STORAGE_KEY } from "../i18n/translator";
-import { cardLanguage, translator } from "./i18n";
+import { SETTINGS_STORAGE_KEY, translator } from "../i18n/translator";
+import { cardLanguage } from "./i18n";
 
 const host = callControlsHost();
 if (host) {

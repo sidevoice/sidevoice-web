@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { SPEECH_LANGUAGES, UI_LANGUAGES, systemLanguage, systemPreferences } from "./system-language.js";
+import { SPEECH_LANGUAGES, systemLanguage } from "./system-language.js";
+import { UI_LANGUAGES } from "../i18n/translator";
 
 test("the system's first supported language wins, by its primary subtag", () => {
   expect(systemLanguage(UI_LANGUAGES, ["es-ES"])).toBe("es");
@@ -15,9 +16,9 @@ test("English when the system speaks nothing a setting supports", () => {
 });
 
 test("the interface's language is the system's, English when it is not one of ours", () => {
-  expect(systemPreferences(["ko-KR", "pt-BR"])).toEqual({ ui_language: "en" });
-  expect(systemPreferences(["de-DE", "fr-FR"])).toEqual({ ui_language: "de" });
-  expect(systemPreferences(["es-419", "en-US"])).toEqual({ ui_language: "es" });
+  expect(systemLanguage(UI_LANGUAGES, ["ko-KR", "pt-BR"])).toBe("en");
+  expect(systemLanguage(UI_LANGUAGES, ["de-DE", "fr-FR"])).toBe("de");
+  expect(systemLanguage(UI_LANGUAGES, ["es-419", "en-US"])).toBe("es");
 });
 
 test("every interface language is found by its primary subtag", () => {

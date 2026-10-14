@@ -9,8 +9,7 @@ import { Row } from "../../components/ui/Card";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { LOCAL_CATALOG } from "../../services/model-catalogs.js";
 import { DELETE_UNUSED_DAYS, modelPurposes, staleModels, type ModelPurpose } from "../../services/model-housekeeping.js";
-import { hostTranslator, type HostTranslate } from "./host-i18n";
-import type { HostMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { sizeText } from "./ModelSetup";
 import { voiceFailure, type ErrorMessage } from "./error-message";
 
@@ -35,12 +34,12 @@ const PURPOSE_ICON: Record<ModelPurpose, ReactNode> = {
   transcription: <TranscriptionIcon size={13} />, voice: <VoicesIcon size={13} />, "end-of-turn": <EndOfTurnIcon size={13} />, "every-call": <CallIcon size={13} />,
 };
 
-function PurposeChip({ purpose, t }: { purpose: ModelPurpose; t: HostTranslate }) {
+function PurposeChip({ purpose, t }: { purpose: ModelPurpose; t: Translate }) {
   const label = PURPOSES.find((item) => item.purpose === purpose)!.chip;
   return <span className="model-purpose" data-purpose={purpose}>{PURPOSE_ICON[purpose]}{t(label)}</span>;
 }
 
-const PURPOSES: { purpose: ModelPurpose; label: HostMessageKey; chip: HostMessageKey }[] = [
+const PURPOSES: { purpose: ModelPurpose; label: MessageKey; chip: MessageKey }[] = [
   { purpose: "transcription", label: "settings.section.transcription", chip: "settings.section.transcription" },
   { purpose: "voice", label: "settings.section.voice", chip: "settings.section.voice" },
   { purpose: "end-of-turn", label: "voice.endOfTurn", chip: "voice.endOfTurn" },
@@ -57,7 +56,7 @@ function useDownloaded(): Downloaded[] {
 }
 
 /** "12 days ago", in the interface's language. */
-function ago(at: number, t: HostTranslate) {
+function ago(at: number, t: Translate) {
   const days = Math.floor((Date.now() - at) / 86_400_000);
   return days < 1 ? t("settings.advanced.usedToday") : days === 1 ? t("settings.advanced.usedYesterday") : t("settings.advanced.usedDaysAgo", { n: days });
 }
@@ -84,7 +83,7 @@ async function deleteAll(ids: string[]) {
   return { done, kept };
 }
 
-function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: Downloaded; inUse: boolean; removable: boolean; chip?: boolean; t: HostTranslate }) {
+function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: Downloaded; inUse: boolean; removable: boolean; chip?: boolean; t: Translate }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
@@ -129,7 +128,7 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
 }
 
 export function DownloadedModels() {
-  const t = hostTranslator();
+  const t = translator();
   const models = useDownloaded();
   const purposes = usePurposes();
   const removable = useRoomStore((state) => state.facts.modelsRemovable);
@@ -180,7 +179,7 @@ export function DownloadedModels() {
 
 /** How long a downloaded model nobody uses is kept before it is deleted: never by default — downloads are costly. */
 export function DeleteUnusedChoice() {
-  const t = hostTranslator();
+  const t = translator();
   const days = useRoomStore((state) => state.facts.deleteUnusedDays);
   const removable = useRoomStore((state) => state.facts.modelsRemovable);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);

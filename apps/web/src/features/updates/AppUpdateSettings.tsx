@@ -6,7 +6,7 @@ import { Segmented } from "../../components/ui/Tabs";
 import { desktopBuild } from "../../services/desktop-host";
 import { RoomStoreContext } from "../../state/room-store";
 import { updaterFailure } from "../settings/error-message";
-import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 import { UPDATE_PLACE, useAppUpdate, type UpdateMode, type UpdaterStatus } from "./useUpdates";
 import "./updates.css";
 import { uiLocale } from "../../i18n/locale";
@@ -35,7 +35,7 @@ function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: R
  *  update restarts with `onRestart` first. A check that finds none says so to a screen reader too. Up to date is never
  *  a colour: those are for what waits. */
 export function AppUpdateSettings({ service, onRestart, current }: { service?: ReactNode; onRestart?: () => void; current?: boolean } = {}) {
-  const t = hostTranslator();
+  const t = translator();
   const store = useContext(RoomStoreContext);
   const update = useAppUpdate();
   const [busy, setBusy] = useState<"check" | "download" | "restart" | null>(null);
@@ -106,7 +106,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
 /** The new version's line: Sidevoice 0.4.0 available; Sidevoice 0.4.0 · Downloading… (manual's after Download, or
  *  automatic's, what the person's check found: it downloads by itself); Sidevoice 0.4.0 ready. Where the app says no
  *  number for it, what it can. */
-function rowWords(status: UpdaterStatus, moving: boolean, t: HostTranslate) {
+function rowWords(status: UpdaterStatus, moving: boolean, t: Translate) {
   const version = status.version ?? "";
   if (status.state === "ready") return version ? t("updates.row.ready", { version }) : t("updates.row.readyOne");
   if (moving) return version ? t("updates.row.downloading", { version }) : t("updates.row.downloadingOne");
@@ -119,7 +119,7 @@ function rowWords(status: UpdaterStatus, moving: boolean, t: HostTranslate) {
  *  landing goes. */
 function AppUpdateRow({ status, mode, can, busy, error, act, t }: { status: UpdaterStatus; mode: UpdateMode | null;
   can: ReturnType<typeof useAppUpdate>["can"]; busy: "check" | "download" | "restart" | null; error: unknown; act: (action: "download" | "restart") => void;
-  t: HostTranslate }) {
+  t: Translate }) {
   const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed" || status.error?.code === "update-download-failed";
   const progress = status.progress == null ? null : Math.max(0, Math.min(1, status.progress));
   const copyId = useId();

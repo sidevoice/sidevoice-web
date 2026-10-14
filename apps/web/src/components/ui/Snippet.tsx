@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon, CopyIcon, WarningIcon } from "./Icons";
-import { uiTranslator } from "./ui-i18n";
+import { translator } from "../../i18n/translator";
 
 /* Something to copy as it is, in one of two kinds and no other: a Snippet is for a terminal or a config file
  * (monospace; it wraps, and scrolls once it is tall), a Quote is a phrase to say to an agent, between the landing's
@@ -75,7 +75,7 @@ function useCopy(text: string, target: React.RefObject<HTMLElement | null>) {
 
 /** The copy button, and what it says (politely) to a screen reader, hidden from sight. */
 function CopyButton({ text, label, feedback: pinned, target }: CopyProps & { target: React.RefObject<HTMLElement | null> }) {
-  const t = uiTranslator();
+  const t = translator();
   const [own, copy] = useCopy(text, target);
   const feedback = pinned ?? own;
   const name = label ?? t("ui.copy");

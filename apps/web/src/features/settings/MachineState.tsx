@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { NewAtEnd } from "../highlights/highlights";
-import type { HostTranslate } from "./host-i18n";
+import type { Translate } from "../../i18n/translator";
 import type { MachineStatus } from "./machine-status";
 import "./machine-state.css";
 
@@ -42,14 +42,14 @@ export function StateOnIcon({ icon, status }: { icon: ReactNode; status: Machine
 
 /** The word an entry's name says for `status`: This device running is connected, as its dot says; its other routine
  *  states are not said; anything else, its short form. */
-function spokenState(status: MachineStatus | null, t: HostTranslate) {
+function spokenState(status: MachineStatus | null, t: Translate) {
   if (!status) return null;
   if (status.key === "running") return t("hosts.machineState.direct");
   return SERVICE.has(status.key) && !needsYou(status) ? null : status.short;
 }
 
 /** An entry's name for a screen reader: its name, its state in words, then new when it holds. */
-export function machineEntryName(name: string, status: MachineStatus | null, isNew: boolean | number, t: HostTranslate) {
+export function machineEntryName(name: string, status: MachineStatus | null, isNew: boolean | number, t: Translate) {
   const state = spokenState(status, t);
   return (state ? t("hosts.machineEntry", { name, state }) : name) + (isNew ? t("highlights.navNew") : "");
 }

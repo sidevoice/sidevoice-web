@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import type { ConversationView } from "../../state/room-types";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
-import type { CallTranslate } from "./call-i18n";
+import type { Translate } from "../../i18n/translator";
 import { PAGE_MS, PagedText } from "./PagedText";
 import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
 
@@ -39,7 +39,7 @@ function SentBubble({ turn, cut, under, onDone }: { turn: SentTurn; cut: boolean
 /** The person's turn at the tile's foot: while they speak and while it is transcribed, the voice's bars; once
  *  transcribed, what is sent, for its moment, then it lifts away toward the agent and fades (a plain fade under reduced
  *  motion). */
-export function PersonTurn({ conversation, t }: { conversation: ConversationView; t: CallTranslate }) {
+export function PersonTurn({ conversation, t }: { conversation: ConversationView; t: Translate }) {
   const pending = !!conversation.pendingText || !!conversation.pendingPhase;
   const { turns, done } = useSentTurns(conversation);
   if (!pending && !turns.length) return null;

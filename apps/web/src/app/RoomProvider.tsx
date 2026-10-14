@@ -2,7 +2,7 @@ import { useEffect, useRef, type PropsWithChildren } from "react";
 import { createRoomStore, installRoomBridge, RoomStoreContext, type RoomStore } from "../state/room-store";
 import { CallLayoutContext, createCallLayoutStore, type CallLayoutStore } from "../state/call-layout";
 import { errorMessage } from "../features/settings/error-message";
-import { hostTranslator } from "../features/settings/host-i18n";
+import { translator } from "../i18n/translator";
 
 let controllerImport: Promise<unknown> | null = null;
 
@@ -44,7 +44,7 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
       .then(() => import("../services/room-session-controller.js"));
     // What could not load is said in words; what it said, behind Details.
     void controllerImport.catch((error: unknown) => {
-      window.sidevoiceUI?.setBootError(errorMessage(error, { generic: hostTranslator()("app.startFailed") }));
+      window.sidevoiceUI?.setBootError(errorMessage(error, { generic: translator()("app.startFailed") }));
     });
   }, [store, runtime]);
 

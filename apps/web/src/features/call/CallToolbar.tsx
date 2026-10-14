@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { MoreVerticalIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { TranscriptEntry } from "./TranscriptEntry";
-import { callTranslator } from "./call-i18n";
+import { translator } from "../../i18n/translator";
 
 /* The call's secondary actions, behind ⋮ beside the call's own, opening upwards. Its id and class are the runtime's:
  * it binds the statistics dialog to #stats-open, closes the menu when the statistics open, and closes it on a click
@@ -19,7 +19,7 @@ function returnFocus(event: SyntheticEvent<HTMLDetailsElement>) {
 }
 
 function CallMenu() {
-  const t = callTranslator();
+  const t = translator();
   const menu = useRef<HTMLDetailsElement>(null);
   return (
     <details id="call-menu" className="call-menu" ref={menu} onToggle={returnFocus}>
@@ -34,7 +34,7 @@ function CallMenu() {
 /* The call's controls in the middle — the microphone with its level, skip, the call, and ⋮ — in one tray under the
  * join's line, and the transcript's button at the right edge. */
 export function CallToolbar() {
-  const t = callTranslator();
+  const t = translator();
   const [devicesOpen, setDevicesOpen] = useState(false);
   const narrow = useMedia(NARROW_QUERY);
   return (

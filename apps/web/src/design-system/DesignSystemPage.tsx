@@ -12,10 +12,9 @@ import { Segmented, Tabs } from "../components/ui/Tabs";
 import { Quote, Snippet, type CopyFeedback } from "../components/ui/Snippet";
 import { Switch } from "../components/ui/Switch";
 import { AddIcon, AdvancedIcon, CloseIcon, CopyIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ProviderLogo, SettingsIcon, SidevoiceMark, TranscriptionIcon, VoicesIcon } from "../components/ui/Icons";
-import { callTranslator } from "../features/call/call-i18n";
+import { translator } from "../i18n/translator";
 import { GearNewMark, NewAtEnd, NewBadge, NewOnIcon } from "../features/highlights/highlights";
 import { CONNECTOR_INSTALL } from "../features/pairing/connector-commands";
-import { hostTranslator } from "../features/settings/host-i18n";
 import { ModelPrepare, type PrepareStatus } from "../features/settings/ModelPrepare";
 import { applyTheme } from "../lib/theme";
 import { AppPatterns } from "./AppPatterns";
@@ -209,12 +208,11 @@ const CONFIG = JSON.stringify({ mcpServers: {
 } }, null, 2);
 
 function Copyables() {
-  const call = callTranslator();
-  const host = hostTranslator();
+  const t = translator();
   return <div className="ds-stack">
     {COPY_STATES.map(({ name, feedback }) => <div className="ds-state" key={name}><code>{name}</code>
-      <Snippet text={CONNECTOR_INSTALL} label={host("noMachine.copyCommand")} feedback={feedback} />
-      <Quote text={call("sidebar.newPhrase")} label={call("sidebar.newCopy")} feedback={feedback} />
+      <Snippet text={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} feedback={feedback} />
+      <Quote text={t("sidebar.newPhrase")} label={t("sidebar.newCopy")} feedback={feedback} />
     </div>)}
     <div className="ds-state"><code>a file's lines</code><Snippet text={CONFIG} /></div>
   </div>;

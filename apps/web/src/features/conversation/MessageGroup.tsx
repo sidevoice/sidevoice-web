@@ -1,7 +1,7 @@
 import { Avatar } from "../../components/ui/Avatar";
 import { avatarFor } from "../avatar/avatar-spec";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
-import { conversationTranslator } from "./conversation-i18n";
+import { translator } from "../../i18n/translator";
 import type { MessageGroupView } from "./group-messages";
 import { MessageBubble } from "./MessageBubble";
 
@@ -15,7 +15,7 @@ export function Speaker({ name, thread }: { name: string; thread?: string | null
 /* A run of one side's messages, as a chat app draws it (2026-10-11): the agent's at the left with its face once, at
  * the run's foot, and a spacer beside the others so the run keeps one edge; the person's at the right, without one. */
 export function MessageGroup({ group }: { group: MessageGroupView }) {
-  const t = conversationTranslator();
+  const t = translator();
   const incoming = group.role === "assistant";
   const thread = group.messages[0]?.thread;
   const last = group.messages.length - 1;

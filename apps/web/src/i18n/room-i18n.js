@@ -1,5 +1,5 @@
 /* Translate UI chrome only. Conversation content and task titles are never translated. */
-import { UI_LANGUAGES, systemLanguage } from '../services/system-language.js';
+import { setUiLanguage } from './translator.ts';
 import { de } from './room-i18n/de.js';
 import { fr } from './room-i18n/fr.js';
 import { it } from './room-i18n/it.js';
@@ -71,4 +71,4 @@ function excluded(element){if(element?.closest('#messages .receipt'))return fals
 function apply(root=document.body){if(!root)return;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while(node=walker.nextNode()){if(excluded(node.parentElement))continue;const current=node.nodeValue;let stored=originals.get(node);if(!stored||current!==stored.output){stored={source:reverse.get(current.trim())||current.trim()}}const output=current.replace(current.trim(),translate(stored.source));if(output!==current)node.nodeValue=output;originals.set(node,{source:stored.source,output})}
 for(const element of root.querySelectorAll('[aria-label],[title],[placeholder]')){if(excluded(element)&&element.tagName!=='TEXTAREA')continue;let stored=originals.get(element)||{};for(const attr of ['aria-label','title','placeholder']){if(!element.hasAttribute(attr))continue;const current=element.getAttribute(attr);let entry=stored[attr];if(!entry||entry.output!==current)entry={source:reverse.get(current)||current};const output=translate(entry.source);if(current!==output)element.setAttribute(attr,output);stored[attr]={source:entry.source,output}}originals.set(element,stored)}}
 let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;observer.disconnect();apply();observe()})});function observe(){observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','title','placeholder']})}
-window.roomI18n={setLanguage(value){language=systemLanguage(UI_LANGUAGES,[value]);document.documentElement.lang=language;observer.disconnect();apply();observe()},translate};observe();
+window.roomI18n={setLanguage(value){setUiLanguage(value);language=document.documentElement.lang;observer.disconnect();apply();observe()},translate};observe();

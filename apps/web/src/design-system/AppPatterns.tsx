@@ -18,9 +18,7 @@ import { avatarFor, PERSON_AVATAR, type AvatarMood } from "../features/avatar/av
 import { avatarColor } from "../features/avatar/bicho-draw";
 import { StageBackdrop, useSceneScale } from "../features/avatar/StageScene";
 import { CharacterAvatar, type AvatarSize } from "../features/avatar/CharacterAvatar";
-import { callTranslator } from "../features/call/call-i18n";
-import { conversationTranslator } from "../features/conversation/conversation-i18n";
-import { hostTranslator } from "../features/settings/host-i18n";
+import { translator } from "../i18n/translator";
 import { ModelPrepare } from "../features/settings/ModelPrepare";
 import { machineStatus } from "../features/settings/machine-status";
 import { MachineState, machineEntryName } from "../features/settings/MachineState";
@@ -74,14 +72,14 @@ const ROWS: { id: string; title: string; harness: string; state: State; mood: Av
   { id: "infra", title: "infra · terraform", harness: "cursor", state: "idle", mood: "idle" },
 ];
 
-function stateLabel(state: State, t: ReturnType<typeof callTranslator>) {
+function stateLabel(state: State, t: ReturnType<typeof translator>) {
   return t(state === "in-call" ? "state.inCall" : state === "working" ? "state.working" : state === "waiting" ? "state.waiting" : "state.offline");
 }
 
 // ---------------------------------------------------------------- the room
 
 function Header({ phone = false }: { phone?: boolean }) {
-  const t = callTranslator();
+  const t = translator();
   return (
     <header className="pt-header" data-phone={phone || undefined}>
       <span className="pt-brand"><SidevoiceMark size={phone ? 20 : 22} />{!phone && <span>Sidevoice</span>}</span>
@@ -97,7 +95,7 @@ function Header({ phone = false }: { phone?: boolean }) {
 }
 
 function ConversationRow({ row, rail = false }: { row: (typeof ROWS)[number]; rail?: boolean }) {
-  const t = callTranslator();
+  const t = translator();
   return (
     <div className="pt-row" data-selected={row.selected || undefined} data-state={row.state}>
       <button type="button" className="pt-row-main" aria-pressed={!!row.selected} title={rail ? `${row.title} · ${stateLabel(row.state, t)}` : undefined}>
@@ -114,7 +112,7 @@ function ConversationRow({ row, rail = false }: { row: (typeof ROWS)[number]; ra
 }
 
 function Sidebar({ rail = false }: { rail?: boolean }) {
-  const t = callTranslator();
+  const t = translator();
   return (
     <aside className="pt-sidebar" data-rail={rail || undefined}>
       <div className="pt-sidebar-head">
@@ -136,7 +134,7 @@ function Sidebar({ rail = false }: { rail?: boolean }) {
 }
 
 function PhonePanel() {
-  const t = callTranslator();
+  const t = translator();
   return (
     <div className="pt-phone-room">
       <Header phone />
@@ -153,7 +151,7 @@ function PhonePanel() {
 // ---------------------------------------------------------------- the call
 
 function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" | "working" | "waiting" | "listening"; compact?: boolean; phone?: boolean }) {
-  const t = callTranslator();
+  const t = translator();
   const spec = avatarFor("sidevoice-web");
   const sceneRef = useSceneScale();
   return (
@@ -182,7 +180,7 @@ function StageTile({ mood, compact = false, phone = false }: { mood: "speaking" 
 
 /** The microphone and the speaker's bar, as the call shows it (features/call/AudioDevices). */
 function DevicesBar({ fixed = false, lost = false }: { fixed?: boolean; lost?: boolean }) {
-  const t = callTranslator();
+  const t = translator();
   return (
     <div className="pt-devices">
       <Field label={t("devices.mic")}><Select defaultValue="headset" options={[{ value: "", label: t("devices.default") }, { value: "headset", label: "AirPods Pro" }, { value: "built-in", label: "MacBook Pro Microphone" }]} /></Field>
@@ -197,12 +195,12 @@ function DevicesBar({ fixed = false, lost = false }: { fixed?: boolean; lost?: b
 }
 
 function StageEmpty() {
-  const t = callTranslator();
+  const t = translator();
   return <div className="pt-stage pt-stage--empty"><p>{t("stage.empty")}</p><Button>{t("stage.chooseConversation")}</Button></div>;
 }
 
 function CallBar({ joined = false, muted = false, menu = false, transcript = false, phone = false }: { joined?: boolean; muted?: boolean; menu?: boolean; transcript?: boolean; phone?: boolean }) {
-  const t = callTranslator();
+  const t = translator();
   return (
     <div className="pt-callbar" data-phone={phone || undefined}>
       <div className="pt-callbar-center">
@@ -243,7 +241,7 @@ function Message({ role, text, time, last = true, interrupted = false, read = fa
 }
 
 function Transcript({ phone = false }: { phone?: boolean }) {
-  const t = conversationTranslator();
+  const t = translator();
   const [text, setText] = useState("");
   return (
     <section className="pt-transcript" data-phone={phone || undefined}>
@@ -273,7 +271,7 @@ function Transcript({ phone = false }: { phone?: boolean }) {
 // ---------------------------------------------------------------- the first-run setup and pairing
 
 function Stepper({ current }: { current: number }) {
-  const t = hostTranslator();
+  const t = translator();
   const groups = ["wizard.group.where", "wizard.group.agents", "wizard.group.transcription", "wizard.group.voice", "wizard.group.ready"] as const;
   return (
     <div className="pt-stepper">
@@ -284,7 +282,7 @@ function Stepper({ current }: { current: number }) {
 }
 
 function WizardFrame({ step, title, children, footer }: { step: number; title: string; children: ReactNode; footer: ReactNode }) {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <div className="pt-wizard">
       <header className="pt-wizard-head">
@@ -300,7 +298,7 @@ function WizardFrame({ step, title, children, footer }: { step: number; title: s
 }
 
 function WizardWhere() {
-  const t = hostTranslator();
+  const t = translator();
   const [choice, setChoice] = useState<"local" | "remote">("local");
   return (
     <WizardFrame step={0} title={t("wizard.title.where")} footer={<Button variant="primary">{t("wizard.continue")}</Button>}>
@@ -314,7 +312,7 @@ function WizardWhere() {
 }
 
 function PairingForm({ error = false }: { error?: boolean }) {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <form className="pt-stack" onSubmit={(event) => event.preventDefault()}>
       <Field label={t("pairing.address")} hint={t("pairing.addressHint")}><Input placeholder={t("pairing.addressPlaceholder")} defaultValue="192.168.1.20:8768" inputMode="url" /></Field>
@@ -324,7 +322,7 @@ function PairingForm({ error = false }: { error?: boolean }) {
 }
 
 function WizardPair() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <WizardFrame step={1} title={t("wizard.title.pair")} footer={<><Button variant="ghost" tone="neutral" className="pt-back">{t("wizard.back")}</Button><Button variant="primary">{t("pairing.connect")}</Button></>}>
       <p>{t("pairing.intro")}</p>
@@ -338,7 +336,7 @@ function WizardPair() {
 }
 
 function WizardTranscription() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <WizardFrame step={2} title={t("wizard.title.stt")} footer={<><Button variant="ghost" tone="neutral" className="pt-back">{t("wizard.back")}</Button><p className="ui-dialog-reason" id="pt-wizard-reason">The transcription model isn't ready yet.</p><Button variant="primary" disabled blockedBy="pt-wizard-reason">{t("wizard.continue")}</Button></>}>
       <ModelPrepare status="downloading" model="whisper-small" size={466e6} fraction={0.58} meta="English, Spanish and 4 more · good accuracy, fast"
@@ -352,7 +350,7 @@ function WizardTranscription() {
 }
 
 function SetupPending() {
-  const t = hostTranslator();
+  const t = translator();
   return <div className="pt-empty pt-card-empty"><SidevoiceMark size={28} /><h3>{t("wizard.pendingTitle")}</h3><p>{t("wizard.pendingBody")}</p><Button variant="primary">{t("wizard.continueSetup")}</Button></div>;
 }
 
@@ -360,7 +358,7 @@ function SetupPending() {
 
 /** A machine gives a device its pairing code: a button makes it, then the code shows, selected whole on a tap. */
 function PairAnotherDevice() {
-  const t = hostTranslator();
+  const t = translator();
   const [code, setCode] = useState(false);
   return (
     <Row label={t("hosts.devices.pairAnother")} description={code ? undefined : "Make a one-time code here, then enter it on the device."} block={code}>
@@ -385,7 +383,7 @@ const PATTERN_MACHINES: { view: MachineView; platform: string; note: string }[] 
 ];
 
 function MachineDetail() {
-  const t = hostTranslator();
+  const t = translator();
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="pt-stack">
@@ -413,7 +411,7 @@ function MachineDetail() {
 }
 
 function MachinesList() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <Section title="Machines" description="The computers where your agents run. Sidevoice talks to them; each can be opened to see its agents and devices."
       actions={<Button variant="primary"><AddIcon />Add a machine</Button>}>
@@ -435,7 +433,7 @@ function MachinesList() {
 
 
 function Providers() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <Section title={t("keys.title")} description={t("keys.intro")}>
       <Alert tone="warning" title="Kept in this browser">{t("keys.browser").split(". ")[0]}.</Alert>
@@ -453,7 +451,7 @@ function Providers() {
 }
 
 function HostAgents() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <Group title="Agents on MacBook Pro">
       <div className="ui-row pt-agent">
@@ -478,7 +476,7 @@ function HostAgents() {
 // ---------------------------------------------------------------- banners, menus, status, empty states, stats
 
 function Banners() {
-  const t = hostTranslator();
+  const t = translator();
   return (
     <div className="pt-stack">
       <div className="pt-banner" data-tone="warning"><Alert tone="warning" title="Site data is blocked">{t("storage.blocked")}</Alert></div>
@@ -513,8 +511,7 @@ function StatusLines() {
 }
 
 function EmptyStates() {
-  const t = hostTranslator();
-  const c = callTranslator();
+  const t = translator();
   return (
     <div className="pt-stack">
       <div className="pt-empty pt-card-empty">
@@ -523,7 +520,7 @@ function EmptyStates() {
         <div className="pt-empty-actions"><Button variant="primary">{t("localInstall.cta")}</Button><Button variant="secondary"><AddIcon />{t("noMachine.connect")}</Button></div>
       </div>
       <div className="pt-two">
-        <div className="pt-empty pt-empty--small"><p>{c("sidebar.empty")}</p></div>
+        <div className="pt-empty pt-empty--small"><p>{t("sidebar.empty")}</p></div>
         <div className="pt-empty pt-empty--small"><p>{t("hosts.devices.empty")}</p></div>
       </div>
     </div>

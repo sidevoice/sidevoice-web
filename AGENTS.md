@@ -5,10 +5,13 @@ Rules for any coding agent (and person) working in this repository.
 ## Language of the code and of the product
 
 - Code, identifiers, comments, commit messages and docs are in **English**.
-- **Every user-facing text goes through i18n**: a key looked up in per-language message bundles (one file per
+- **Every user-facing text goes through i18n**: a key looked up in per-language message catalogues (one file per
   language), with **English as the fallback** when a key is missing. No literal sentence in any language in
   components, server refusals and errors shown to people, native UI (tray, windows, notifications, installer or CLI
-  output meant for people). Adding a text means adding its key to the English bundle; other languages may lag.
+  output meant for people). In the web, the catalogues are `apps/web/src/i18n/locales/<lang>.ts`: one flat key map
+  per language plus its own name; every language is typed against English's keys, so adding a text means adding its
+  key to every catalogue (the typecheck fails otherwise). A language is offered by adding its file: the list, the
+  pickers and the tests find it (`i18n/translator.ts`). The core keeps its own language list for its messages.
 - Language defaults: the device's system language when we support it, otherwise English. Never Spanish, or any
   other language, as a hard-coded default.
 - What reaches the agent (MCP instructions, tool results, the `[Sidevoice]` trailer) is English; it is not UI.

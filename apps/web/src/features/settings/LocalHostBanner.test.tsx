@@ -2,7 +2,7 @@ import { expect, test, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import { LocalHostBanner } from "./LocalHostBanner";
 import { hostStatusText, knownLocalHostState, safeLocalHostStatusDetails } from "./local-host-status";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import type { PairingSummary } from "../../services/device-pairing.js";
@@ -37,7 +37,7 @@ test("this computer's service in a state this app does not know says so, and off
 });
 
 test("a state this app does not know is never worded as one it knows; extra fields are not copied into the details", () => {
-  const t = hostTranslator();
+  const t = translator();
   const status = (state: string) => ({ state, reachable: false, future: "x" }) as unknown as LocalHostStatus;
   expect(hostStatusText(status("migrating"), t)).toBe(t("hosts.status.unknown"));
   expect(hostStatusText(status("absent"), t)).toBe(t("hosts.status.absent"));

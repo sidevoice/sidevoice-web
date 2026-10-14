@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { NewConversation } from "./NewConversation";
-import { en } from "../call/messages/en";
-import { es } from "../call/messages/es";
+import { messages as en } from "../../i18n/locales/en";
+import { messages as es } from "../../i18n/locales/es";
 
 afterEach(cleanup);
 

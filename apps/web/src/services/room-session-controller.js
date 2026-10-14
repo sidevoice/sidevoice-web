@@ -4,12 +4,12 @@ import {readPairingState,projectPairings,writePairings,withPairing,withoutPairin
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
-import {hostTranslator} from '../features/settings/host-i18n.ts';
+import {translator,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
 import {tryTranscription,tryVoice,tryEndOfTurn} from './voice-trial.js';
-import {systemLanguage,systemPreferences,SPEECH_LANGUAGES} from './system-language.js';
+import {systemLanguage,SPEECH_LANGUAGES} from './system-language.js';
 import {createOutbox} from './outbox.js';
 import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
@@ -49,10 +49,10 @@ function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.t
  * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
  * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
  * follow the sentence. `what` names what failed. */
-function voiceError(error,what='voice'){return voiceFailure(error,{what,inApp:!!state.inApp,t:hostTranslator()})}
-function roomError(error,what='room',generic){return roomFailure(error,{what,generic,t:hostTranslator()})}
+function voiceError(error,what='voice'){return voiceFailure(error,{what,inApp:!!state.inApp,t:translator()})}
+function roomError(error,what='room',generic){return roomFailure(error,{what,generic,t:translator()})}
 // A sentence of this page's bundle, as a failure.
-const bundled=(key,params)=>({text:hostTranslator()(key,params)});
+const bundled=(key,params)=>({text:translator()(key,params)});
 function joinError(step,error){return step==='voice'?voiceError(error):roomError(error)}
 // A failure of the voice handed to the interface: its code kept (for what the interface does about it), its words
 // with it (`words`, what error-message.ts says of it).
@@ -659,7 +659,7 @@ function pairingRefused(fp,{call=false,token=null,asked=false}={}){
 // A code, redeemed where the machine proves it is itself: from then on one more machine, live at once, call or not.
 async function pairDevice(code,name,address='',{insecure=false}={}){
  const about=await describeTarget();if(about)targetAbout=about;
- const t=hostTranslator(),defaultName=currentDeviceName((kind,params)=>t('pair.deviceNameBrowser',params));
+ const t=translator(),defaultName=currentDeviceName((kind,params)=>t('pair.deviceNameBrowser',params));
  const {pairing,base}=await redeemPairingCode(code,{name:name||defaultName,address,target,about,origin:location.origin,get:fetch,insecure});
  if(localPairing?.fp===pairing.fp){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
@@ -1800,13 +1800,13 @@ const DEVICE_KEYS=['ui_language'];
 function readStored(key){try{const stored=JSON.parse(localStorage.getItem(key)||'null');return stored&&typeof stored==='object'?stored:{}}catch{return {}}}
 function storedPreferences(){const stored=readStored(SETTINGS_KEY);return Object.fromEntries(DEVICE_KEYS.filter(key=>key in stored).map(key=>[key,stored[key]]))}
 function storePreferences(p){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Object.fromEntries(DEVICE_KEYS.filter(key=>key in p).map(key=>[key,p[key]]))))}catch{}}
-function devicePreferences(){return {...systemPreferences(),...storedPreferences()}}
+function devicePreferences(){return {ui_language:systemLanguage(UI_LANGUAGES),...storedPreferences()}}
 // The interface's language is this device's: saved here as it is chosen ('' is Automatic), said to the call in
 // progress, applied at once; Settings shows it from the store.
 function saveLanguage(chosen){
  // Automatic keeps no language: the system's is read again at each start.
  storePreferences(chosen?{ui_language:chosen}:{});
- const p={...systemPreferences(),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
+ const p={ui_language:systemLanguage(UI_LANGUAGES),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
  roomStore.patch({uiLanguage:chosen,settingsSavedAt:Date.now()});
 }

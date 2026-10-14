@@ -9,13 +9,12 @@ import {
   localHostInstallController,
   type LocalHostInstallController,
 } from "../../services/local-host-install";
-import { hostTranslator } from "../settings/host-i18n";
-import type { HostMessageKey } from "../settings/messages/en";
+import { translator, type MessageKey } from "../../i18n/translator";
 import { localHostBridgeError } from "../settings/local-host-status";
 import "./pairing.css";
 import { uiLocale } from "../../i18n/locale";
 
-const stepKeys: Record<string, HostMessageKey> = {
+const stepKeys: Record<string, MessageKey> = {
   download: "localInstall.step.download",
   verification: "localInstall.step.verification",
   verify: "localInstall.step.verification",
@@ -55,7 +54,7 @@ export function LocalHostInstallEntry({
   holdSuccess?: boolean;
   source?: "no-machine" | "machines";
 }) {
-  const t = hostTranslator();
+  const t = translator();
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const bridge = localHostBridge();
   const supportsInstall = typeof bridge?.install === "function";

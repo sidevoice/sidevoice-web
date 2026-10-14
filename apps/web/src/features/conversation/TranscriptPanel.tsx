@@ -5,7 +5,7 @@ import { useSurface } from "../../lib/use-surface";
 import { Button } from "../../components/ui/Button";
 import { CloseIcon } from "../../components/ui/Icons";
 import { Composer } from "./Composer";
-import { conversationTranslator } from "./conversation-i18n";
+import { translator } from "../../i18n/translator";
 import { MessageList } from "./MessageList";
 import { useMarkTranscriptSeen } from "./transcript-unread";
 import "./transcript.css";
@@ -15,7 +15,7 @@ import "./transcript.css";
  * call that holds focus until it closes. It opens on the latest message, with the text box always under it. It stays
  * mounted while closed — the runtime binds the text box by its ids — and is inert then. */
 export function TranscriptPanel() {
-  const t = conversationTranslator();
+  const t = translator();
   const conversation = useRoomStore((state) => state.conversation);
   const title = useRoomStore((state) => state.title);
   const open = useCallLayout((state) => state.transcriptOpen);

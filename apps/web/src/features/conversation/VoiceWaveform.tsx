@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { conversationTranslator } from "./conversation-i18n";
+import { translator } from "../../i18n/translator";
 import "./transcript.css";
 
 /* The bubble of the turn being recorded is the microphone itself: a canvas that pulls the meter's analyser
@@ -124,7 +124,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     return () => { stop(); observer.disconnect(); document.removeEventListener("visibilitychange", visibility); };
   }, [phase, reduced]);
 
-  const t = conversationTranslator();
+  const t = translator();
   const label = { aria: t(LABELS[phase].aria), title: t(LABELS[phase].title) };
   if (reduced) return <span className="voice-bars" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><i /><i /><i /><i /><i /></span>;
   return <span className="voice-wave" data-phase={phase} role="status" aria-label={label.aria} title={label.title}><canvas ref={canvas} aria-hidden="true" /></span>;

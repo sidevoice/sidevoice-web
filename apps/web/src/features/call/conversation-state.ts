@@ -1,7 +1,7 @@
 import type { ParticipantView } from "../../state/room-types";
 import { canHear } from "../../state/room-session-state.js";
 import type { AvatarMood } from "../avatar/avatar-spec";
-import type { CallTranslate } from "./call-i18n";
+import type { Translate } from "../../i18n/translator";
 
 /* What the call view says about a conversation, derived in one place from the room's own row (participantsView)
  * and whether this page is in the call: the dot beside its avatar, the line under its title, and how its avatar moves.
@@ -42,7 +42,7 @@ export function personMood({ inCall, speaking }: { inCall: boolean; speaking: bo
 }
 
 /** The words for a conversation's state, with what is waiting to be read when it is not the call's. */
-export function stateText(row: ParticipantView, inCall: boolean, t: CallTranslate): string {
+export function stateText(row: ParticipantView, inCall: boolean, t: Translate): string {
   const state = conversationState(row, inCall);
   const words = state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
     : state === "waiting" ? t("state.waiting") : row.reach === "holding" && row.available ? t("state.holding") : t("state.offline");
@@ -50,7 +50,7 @@ export function stateText(row: ParticipantView, inCall: boolean, t: CallTranslat
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */
-export function moodText(mood: AvatarMood, t: CallTranslate): string {
+export function moodText(mood: AvatarMood, t: Translate): string {
   if (mood === "offline") return t("state.offline");
   if (mood === "speaking") return t("state.speaking");
   if (mood === "listening") return t("state.listening");

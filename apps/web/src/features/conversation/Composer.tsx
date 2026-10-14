@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { SendIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Textarea } from "../../components/ui/Input";
-import { conversationTranslator } from "./conversation-i18n";
+import { translator } from "../../i18n/translator";
 
 /* The text box is always there, under the conversation (2026-10-11), as a call app's chat has it: a rounded field
  * pinned at the panel's foot with Send as an icon at its end, one row empty, growing with what is written up to eight
  * (five on a phone), never resized by hand. The runtime owns it by its ids — it sends the form, reads and clears
  * the box's value, and enables both — so React renders it once and never touches its value or its disabled state. */
 export function Composer({ narrow }: { narrow: boolean }) {
-  const t = conversationTranslator();
+  const t = translator();
   const form = useRef<HTMLFormElement>(null);
 
   // The runtime clears the box by setting its value once the text is sent, and no input event follows: the box kept

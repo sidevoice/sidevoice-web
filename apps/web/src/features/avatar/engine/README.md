@@ -9,7 +9,7 @@ The run wipes this folder, writes it again from the lab and regenerates `src/sty
 extraction that no longer finds its anchor stops the run and names it: fix the anchor in the script.
 
 The app talks to the engine only through `features/avatar/` (`bicho-draw.ts`, `CharacterAvatar.tsx`). Left in the lab:
-`main.ts`, `index.html`, `lab.css`, `i18n.ts` (its stage words are keys in `features/call/messages/`),
+`main.ts`, `index.html`, `lab.css`, `i18n.ts` (its stage words are keys in `i18n/locales/`),
 `styles/logos.ts` and every mascot but Sidevoice's, `parts/b16-beyond.ts`, `tools/`, `docs/`.
 
 | lab | here | how | lab sha256 |

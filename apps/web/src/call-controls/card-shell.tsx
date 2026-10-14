@@ -6,7 +6,7 @@ import { ChevronIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, SpeakerIcon } f
 import { ConversationRows } from "../features/room/ConversationRows";
 import type { ParticipantView } from "../state/room-types";
 import type { AudioDeviceOption, CallCommand, CallControlsHost, CallControlsState, CallSnapshot } from "./host";
-import type { Translate } from "./i18n";
+import type { Translate } from "../i18n/translator";
 
 /** Space around the card inside its window, for its shadow. */
 export const CARD_MARGIN = 12;

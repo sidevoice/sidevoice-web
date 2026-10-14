@@ -2,7 +2,7 @@ import { Button } from "../../components/ui/Button";
 import { ListenAgainIcon, PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
 import type { ChatMessage } from "../../state/room-types";
 import { receiptView } from "../../state/room-session-state.js";
-import { conversationTranslator } from "./conversation-i18n";
+import { translator } from "../../i18n/translator";
 import { KaraokeText } from "./KaraokeText";
 import { uiLocale } from "../../i18n/locale";
 
@@ -19,7 +19,7 @@ function DeliveryMark({ state }: { state: string }) {
 /* No sender's name on a bubble (2026-10-11): the side says who — the agent at the left, the person at the right —
  * and the agent's face sits at the foot of its run. The name stays in what a screen reader is told. */
 export function MessageBubble({ message, position }: { message: ChatMessage; position: "only" | "first" | "middle" | "last" }) {
-  const t = conversationTranslator();
+  const t = translator();
   // A delivery status this version does not know (sidevoice-core#112) shows no mark: it has no words to say.
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";

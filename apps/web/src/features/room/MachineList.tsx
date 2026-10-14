@@ -14,7 +14,7 @@ import type { HostDeviceView, MachineView } from "../../state/room-types";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { LocalHostInstallEntry } from "../pairing/LocalHostInstallEntry";
 import { useThisComputerSection } from "../../state/this-computer";
-import { hostTranslator, type HostTranslate } from "../settings/host-i18n";
+import { translator, type Translate } from "../../i18n/translator";
 import { HostAgentsPanel } from "../settings/HostAgentsPanel";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { motionOf, useSettingsLevels } from "../settings/settings-levels";
@@ -32,7 +32,7 @@ function dateText(value: string | number | null | undefined) {
 }
 
 /** A machine's name: the one it has here, else this computer's or an unnamed machine's. */
-export function machineName(machine: MachineView, t: HostTranslate) {
+export function machineName(machine: MachineView, t: Translate) {
   return machine.host || (machine.local ? t("hosts.thisComputer") : t("hosts.unnamed"));
 }
 
@@ -61,7 +61,7 @@ function useListedMachines() {
 /** What Machines' row says under its name in a phone's Settings: none yet; the one machine and its state; how many, and
  *  how many of them connected. */
 export function useMachinesSummary() {
-  const t = hostTranslator();
+  const t = translator();
   const own = useThisComputerSection();
   const machines = useListedMachines();
   const status = useRoomStore((state) => state.facts.localHostStatus);
@@ -77,7 +77,7 @@ function shownMachine(machines: MachineView[], picked: string | null) {
 
 /** The machines under Machines in Settings' navigation, and Add a machine after them. */
 export function MachineNav({ current }: { current: boolean }) {
-  const t = hostTranslator();
+  const t = translator();
   // With this device in a section of its own, these are the remote machines, and said so.
   const own = useThisComputerSection();
   const machines = useListedMachines();
@@ -116,7 +116,7 @@ export function MachineNav({ current }: { current: boolean }) {
 }
 
 export function MachineList() {
-  const t = hostTranslator();
+  const t = translator();
   const machines = useListedMachines();
   const own = useThisComputerSection();
   const agentRequest = useRoomStore((state) => state.facts.settingsAgentRequest);
@@ -212,7 +212,7 @@ export function MachineList() {
  *  block; prepared, its page as Machines shows it — whether it answers, its Sidevoice service, its agents, the devices
  *  paired with it. */
 export function ThisComputerSettings() {
-  const t = hostTranslator();
+  const t = translator();
   const local = useRoomStore((state) => state.machines.find((machine) => machine.local) ?? null);
   const store = useContext(RoomStoreContext);
   // Titled with this device's name; renaming it is General's (its one place), where the pencil takes you.
@@ -234,7 +234,7 @@ export function ThisComputerSettings() {
 /** A machine's page: whether it answers and how, then this computer's service (the local one), its agents, the devices
  *  paired with it, and forgetting it. */
 function HostDetail({ machine, name, untitled = false, onForget }: { machine: MachineView; name: string; untitled?: boolean; onForget?: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const own = useThisComputerSection();
   // Renaming the machine on this device: the name being typed, or null.
   const [naming, setNaming] = useState<string | null>(null);
@@ -295,7 +295,7 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
  *  not answering, done here and told to it when it is back (the controller keeps what it needs to). `onForget`: told as
  *  it is forgotten (a phone's Settings says so once it is gone). */
 function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name: string; onForget?: () => void }) {
-  const t = hostTranslator();
+  const t = translator();
   const [asking, setAsking] = useState(false);
   const open = useRef<HTMLButtonElement>(null);
   return (
@@ -316,7 +316,7 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
 /** Another machine's Sidevoice, to read: where the machine says, its Sidevoice version. How this device reaches it is
  *  its page's header's, two blocks up; no controls: it is run there. */
 function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
-  const t = hostTranslator();
+  const t = translator();
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
   return (
@@ -336,7 +336,7 @@ function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name
  * Start at sign-in as a switch; and the card's actions — Restart and Stop while it runs (Stop asks first when calls are
  * active, as they end), Start when stopped, Retry or Reinstall when it failed. What failed, its log and details below. */
 function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: MachineView; status: LocalHostStatus; titleId: string; name: string | null }) {
-  const t = hostTranslator();
+  const t = translator();
   const [busy, setBusy] = useState<LocalHostAction | null>(null);
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
@@ -447,7 +447,7 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
 }
 
 function MachineDevicesPanel({ machine, name }: { machine: MachineView; name: string }) {
-  const t = hostTranslator();
+  const t = translator();
   const status = useRoomStore((state) => state.facts.localHostStatus);
   const [devices, setDevices] = useState<HostDeviceView[]>([]);
   const [devicesFor, setDevicesFor] = useState<string | null>(null);

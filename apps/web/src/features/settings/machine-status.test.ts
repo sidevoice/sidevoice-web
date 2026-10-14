@@ -1,14 +1,14 @@
 import { expect, test } from "vitest";
 import { machineStatus } from "./machine-status";
-import { hostTranslator } from "./host-i18n";
+import { translator } from "../../i18n/translator";
 import type { LocalHostStatus, LocalHostStatusName } from "../../services/desktop-host";
 import type { MachineView } from "../../state/room-types";
 
 /* One function words a machine's state everywhere (spec R5): a remote machine by how it is reached, this computer by
  * its service where the app reads it. */
 
-const en = hostTranslator("en");
-const es = hostTranslator("es");
+const en = translator("en");
+const es = translator("es");
 
 const machine = (changes: Partial<MachineView> = {}): MachineView => ({
   id: "fp-nuc", pairingId: "fp-nuc", host: "NUC", revoked: false, reach: "direct", state: "connected", pairedLabel: "", ...changes,

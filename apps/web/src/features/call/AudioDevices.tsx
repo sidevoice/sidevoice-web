@@ -6,8 +6,7 @@ import { Select } from "../../components/ui/Select";
 import { ChevronIcon, CloseIcon, RefreshIcon } from "../../components/ui/Icons";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { MicWave } from "./CallIndicators";
-import { callTranslator, type CallTranslate } from "./call-i18n";
-import type { CallMessageKey } from "./messages/en";
+import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { errorMessage, failureParts, type ErrorMessage } from "../settings/error-message";
 
 /* The microphone and the speaker, as the old call bar had them: a chevron joined to the microphone's button opens a
@@ -19,7 +18,7 @@ import { errorMessage, failureParts, type ErrorMessage } from "../settings/error
 /** The devices' button, joined at the left of the microphone's in one pill: it shows the microphone's level while it
  *  listens, and its chevron on hover, on focus, while the bar is open and while muted (as Meet). Opens and closes the bar. */
 export function AudioDevicesToggle({ open, onToggle, controls }: { open: boolean; onToggle(): void; controls: string }) {
-  const t = callTranslator();
+  const t = translator();
   return (
     <button type="button" className="audio-devices-toggle" aria-expanded={open} aria-controls={controls}
       aria-label={t("devices.toggle")} title={t("devices.toggle")} onClick={onToggle}>
@@ -29,15 +28,15 @@ export function AudioDevicesToggle({ open, onToggle, controls }: { open: boolean
   );
 }
 
-function deviceName(label: string, index: number, kind: "mic" | "speaker", t: CallTranslate) {
+function deviceName(label: string, index: number, kind: "mic" | "speaker", t: Translate) {
   // Labels are empty until the page may use the microphone: a number tells them apart meanwhile.
   return label || t(kind === "mic" ? "devices.unnamedMic" : "devices.unnamedSpeaker", { n: index + 1 });
 }
 
 /** Why a device could not be chosen: the microphone's and the speaker's own reasons in this list's words; anything else
  *  as the voice says it (error-message.ts), else this list's generic line, what it said behind Details. */
-function devicesError(error: unknown, t: CallTranslate): ErrorMessage {
-  const known: Record<string, CallMessageKey> = {
+function devicesError(error: unknown, t: Translate): ErrorMessage {
+  const known: Record<string, MessageKey> = {
     "microphone-denied": "devices.error.micDenied", "microphone-unavailable": "devices.error.micUnavailable",
     "audio-output-unselectable": "devices.error.outputUnselectable", "audio-output-failed": "devices.error.outputFailed",
   };
@@ -46,7 +45,7 @@ function devicesError(error: unknown, t: CallTranslate): ErrorMessage {
 }
 
 export function AudioDevicesBar({ id, open, onClose }: { id: string; open: boolean; onClose(): void }) {
-  const t = callTranslator();
+  const t = translator();
   const devices = useRoomStore((state) => state.facts.audioDevices);
   const lost = useRoomStore((state) => state.facts.audioLost);
   const store = useContext(RoomStoreContext);
