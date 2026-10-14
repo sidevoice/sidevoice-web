@@ -25,17 +25,14 @@ export const MAX_TAKE_MS = 10_000;
 const now = () => globalThis.performance?.now?.() ?? Date.now();
 
 /**
- * The take of a try (voice-take.ts, contract gap #40): asked of the voice only where it can hand one (its `onTake`) and
- * someone wants it (`onTake` given). `listening()` starts the voice, with a take when it is asked; each listening
- * stretch's take is kept as it comes — unless `dropping()`, a stretch the try leaves behind — and `hand()` gives the
- * latest to `onTake` once the try has stopped the voice; `stop()` lets the voice go. A voice with no take
- * (@sidevoice/voice 0.3.x, the desktop app's) is asked nothing and hands nothing: the try shows none.
- * @param {import('./voice-take').TakingVoiceHost} voice
- * @param {((take: import('./voice-take').VoiceTake) => void) | undefined} onTake
+ * The take of a try: requested only when the UI wants it. A take from a retuned listening stretch is discarded;
+ * the latest take is handed over after the voice stops.
+ * @param {import('@sidevoice/voice').VoiceHost} voice
+ * @param {((take: import('@sidevoice/voice').VoiceTake) => void) | undefined} onTake
  * @param {() => boolean} [dropping]
  */
 function takeOf(voice, onTake, dropping = () => false) {
-  const asked = !!onTake && typeof voice.onTake === 'function';
+  const asked = !!onTake;
   let latest = null;
   const stop = asked ? voice.onTake((take) => { if (!dropping()) latest = take; }) : () => {};
   return {
@@ -82,9 +79,8 @@ function bounded(promise, { signal, timeoutMs }) {
  * transcribe). A take ended so whose turn comes to no words is `trial-silence` at once: the voice hears no more.
  * `onTranscribing`, each time it changes: whether the take has ended and what was said is being transcribed (Stop, the
  * longest take, or the voice's own end of the turn) — the microphone no longer counts then.
- * `onTake`, once the voice has stopped (heard, failed or cancelled): what the microphone gave it, where the voice hands
- * one (contract gap #40).
- * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('./voice-take').VoiceTake) => void}} [options]
+ * `onTake`, once the voice has stopped (heard, failed or cancelled): what the microphone gave it.
+ * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
  * @returns {Promise<string>}
  */
 export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake } = {}) {
@@ -202,15 +198,14 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
  * of turns in transcription rising (or the turn finishing, where that never shows). It listens until `signal` aborts
  * (`trial-cancelled`), `quietMs` pass with no speech (`trial-silence`) or the voice fails (its error); then the voice
  * stops, whatever happens. `onLevel`: the microphone's level from 0 to 1, as the voice measures it. `onTake`, once the
- * voice has stopped: what the microphone gave it since it last started to listen, where the voice hands one (contract
- * gap #40); what it heard before other settings is theirs, and goes with them.
+ * voice has stopped: what the microphone gave it since it last started to listen; what it heard before other settings is theirs, and goes with them.
  *
  * `retune` puts other settings in place while it runs: the voice takes a patience or an end of turn only as it starts,
  * so the turn in progress is dropped, the voice stops, takes them, and listens again. Asked again while it does, it
  * goes on with the latest; the same settings change nothing.
  * @param {import('@sidevoice/voice').VoiceHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
- * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('./voice-take').VoiceTake) => void}} [options]
+ * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
  * @returns {{done: Promise<void>, retune: (settings: import('@sidevoice/voice').VoiceSettings) => Promise<void>}} `done`
  *   settles once the try is over and the voice stopped, rejecting with why it ended.
  */

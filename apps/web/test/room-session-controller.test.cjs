@@ -436,7 +436,7 @@ test('The waveform bubble draws the level the voice reports, and nothing without
  assert.deepEqual(wave.slice(-2).map(Math.abs),[0.5,0.25],'the newest levels last');
  assert.equal(s.run("$('mic-level-meter').getAttribute('aria-valuenow')"),'25');
 });
-test('Optional speaker levels follow the active conversation and clear on silence and disconnect',()=>{
+test('Speaker levels follow the active conversation and clear on silence and disconnect',()=>{
  const s=setup(),events=[];
  s.context.window.sidevoiceUI={playbackLevel:{publish:(level,thread)=>events.push([level,thread]),clear:()=>events.push([0,null])}};
  const host=fakeVoice();
@@ -1077,9 +1077,9 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
   said.push(handle);return handle;
  };
  return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
-  setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
+  setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onError:sub('error')};
+  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onTake:sub('take'),onError:sub('error')};
 }
 // The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
 function fakeEngine(catalogs){
@@ -1597,7 +1597,7 @@ test('A try tells whoever shows it how it goes: the voice listening and the micr
  assert.deepEqual(plain(told),[{from:0,to:0},{from:10,to:18},{from:18,to:18}]);
 });
 
-test('A try that records the person hands on the take its voice gives once stopped (contract gap #40); a voice without one is asked for none',async()=>{
+test('A try requests a take and hands it over after the voice stops',async()=>{
  const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
  const takes=[];s.context.takes=takes;
  const ask=async task=>{
@@ -1606,10 +1606,7 @@ test('A try that records the person hands on the take its voice gives once stopp
   voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
   await tried;
  };
- await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop']);
- assert.deepEqual(takes,[],'0.3.x hands none');
- // A voice with a take: asked for one as it starts, and it is handed on once the voice has stopped.
+ // Asked for one as it starts; handed on once the voice has stopped.
  const listeners=new Set();voice.calls.length=0;
  voice.start=async options=>{voice.calls.push(['start',options])};
  voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};

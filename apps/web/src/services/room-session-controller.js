@@ -1366,10 +1366,7 @@ const voiceListeners=[];
 function attachVoice(next){
  window.sidevoiceUI?.playbackLevel?.clear?.();
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
- if(typeof next.onPlaybackLevel==='function'){
-  const stop=next.onPlaybackLevel(level=>{if(voice===next)voicePlaybackLevel(level)});
-  if(typeof stop==='function')voiceListeners.push(stop);
- }
+ voiceListeners.push(next.onPlaybackLevel(level=>{if(voice===next)voicePlaybackLevel(level)}));
  void watchAudioDevices();
 }
 /* The microphone and the speaker the voice uses (the same seam on the web and in the desktop app): this device's
@@ -1669,7 +1666,7 @@ async function saveVoiceSettings(){
 // one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
 // whoever shows it (room-types.ts TrialProgress): transcription, that the voice listens and the microphone's level;
 // the voice, the part of `text` sounding, in the page's offsets into it as the room's karaoke has them (`sayingRange`).
-// A try that records the person hands its take (`onTake`, contract gap #40) to whoever shows it, and keeps nothing.
+// A try that records the person hands its take (`onTake`) to whoever shows it, and keeps nothing.
 let voiceTry=null;
 // Never during a call: the try would take its voice.
 function refuseTryInCall(){

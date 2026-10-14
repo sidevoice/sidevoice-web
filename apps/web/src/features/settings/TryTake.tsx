@@ -1,7 +1,8 @@
 import { Fragment, memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { PauseRecordingIcon, PlayRecordingIcon } from "../../components/ui/Icons";
-import { takeMs, type VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
+import { takeMs } from "./take-audio";
 import { createTakePlayer, takeColumns } from "./take-audio";
 import { seconds } from "./try-time";
 import type { Translate } from "../../i18n/translator";

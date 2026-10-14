@@ -13,7 +13,7 @@ import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { wordEnd } from "../conversation/KaraokeText";
 import { readingMoves, readingPosition, readOn, type Reading } from "../call/speech-chunks";
 import type { KaraokeRange, TrialTimings } from "../../state/room-types";
-import type { VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
 import { seconds } from "./try-time";
 import { TryTake } from "./TryTake";
 import { ErrorText } from "../../components/ui/ErrorText";

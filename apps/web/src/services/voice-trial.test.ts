@@ -425,7 +425,7 @@ test("settings asked for while the voice starts are put in place once it has, th
   expect(steps).toEqual([{ step: "listening", again: true }]);
 });
 
-/* A try's take (contract gap #40): asked for only of a voice that hands one, and handed once the voice has stopped. */
+/* A try requests a take only when the UI wants it, and hands it once the voice has stopped. */
 
 /** `fakeVoice`, with a take: `start` says what it was asked, and each stop hands the take of the stretch it ends. */
 function takingVoice() {
@@ -440,17 +440,6 @@ function takingVoice() {
   });
   return taking;
 }
-
-test("a voice with no take is asked for none, and the try hands none (@sidevoice/voice 0.3.x, the desktop app's)", async () => {
-  const voice = fakeVoice();
-  const takes: unknown[] = [];
-  const heard = tryTranscription(voice as unknown as Voice, SETTINGS as never, { onTake: (take) => takes.push(take) });
-  await vi.waitFor(() => expect(voice.calls).toContainEqual(["start"]));
-  voice.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
-  await heard;
-  expect(voice.calls).toEqual([["setSettings", { ...SETTINGS, end_of_turn: "silence", patience: "fast" }], ["start"], ["stop"]]);
-  expect(takes).toEqual([]);
-});
 
 test("a voice that hands a take is asked for one; the try hands it once the voice has stopped, and lets the voice go", async () => {
   const voice = takingVoice();
@@ -468,6 +457,9 @@ test("a voice that hands a take is asked for one; the try hands it once the voic
   await vi.waitFor(() => expect(unwanted.calls).toContainEqual(["start"]));
   unwanted.emit("turn", { phase: "finished", turn_id: "t1", text: "hola" });
   await plain;
+  expect(unwanted.calls).toContainEqual(["start"]);
+  expect(unwanted.calls).not.toContainEqual(["start", { take: true }]);
+  expect(listeners(unwanted)).toBe(0);
   // A try that fails still hands what was heard until then.
   const broken = takingVoice();
   const takes: unknown[] = [];
