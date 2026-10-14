@@ -8,6 +8,7 @@ import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import { chooseOption, listOptions } from "../../test/select";
+import { setUiLanguage } from "../../i18n/translator";
 
 afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.variants"); });
 
@@ -20,13 +21,13 @@ function VoicePanes() {
 /* The voice panes, on the engine's catalogues (Providers' own: ProviderKeys.test); the interface speaks English here
  * (the test's system). */
 
-const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
+const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
 const local = (id: string, family: string, capabilities: string[], extra: Record<string, unknown> = {}) =>
   ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es"], voices: [], installed: true, builds: [build(id + "/int8")], ...extra });
 const catalogs = [
   { id: "local", name: null, status: { stale: false }, models: [
     local("whisper-base", "whisper", ["stt"]),
-    local("whisper-large", "whisper", ["stt"], { builds: [build("whisper-large/int8", { available: false, reasons: [{ code: "memory", params: {} }] })] }),
+    local("whisper-large", "whisper", ["stt"], { builds: [build("whisper-large/int8", { available: false, accelerator: undefined, reasons: [{ code: "memory", params: {} }] })] }),
     local("moonshine-tiny", "moonshine", ["stt"]),
     local("kokoro-82m-v1.0", "kokoro", ["tts"], { voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 } }),
     local("piper-es", "piper", ["tts"], { installed: false, voices: [{ id: "davefx", languages: ["es"] }], recommendedBuild: "piper-es/onnx",
@@ -400,6 +401,53 @@ test("how a model runs folds under it: each build with what it runs on and its s
   expect(options[1]).toHaveTextContent("Sherpa-ONNX · int8 · processor");
   fireEvent.click(options[1].querySelector("input")!);
   expect(actions.editVoice).toHaveBeenCalledWith({ stt: { build: "whisper-base/int8" } });
+});
+
+/** The local catalogue with whisper-base's builds as `builds`, the first of them recommended. */
+const withBuilds = (builds: ReturnType<typeof build>[]) => (catalogs as unknown as { id: string; models: { id: string }[] }[]).map((catalog) =>
+  catalog.id !== "local" ? catalog : { ...catalog, models: catalog.models.map((model) =>
+    model.id === "whisper-base" ? { ...model, builds, recommendedBuild: builds[0].id } : model) }) as unknown as CatalogView[];
+
+/** Settings' transcription panel, with how whisper-base runs open: its summary line, and each option's title. */
+function runtimeLines(builds: ReturnType<typeof build>[]) {
+  renderPane({ voiceCatalogue: { state: "ready", catalogs: withBuilds(builds), error: "" } });
+  const runtime = document.querySelector("#stt-model-card .model-runtime")!;
+  fireEvent.click(runtime.querySelector(".model-runtime-toggle")!);
+  const titles = [...runtime.querySelectorAll(".model-runtime-option .model-runtime-title")].map((title) => title.firstChild!.textContent);
+  return { summary: runtime.querySelector(".model-runtime-summary")!.textContent, auto: runtime.querySelector(".model-runtime-option .model-runtime-detail")!.textContent, titles };
+}
+
+test("what a build runs on is the accelerator the engine resolved for it here: a graphics card, the Neural Engine, the processor, or nothing", () => {
+  const on = (accelerator: string | undefined, backend: string, extra: Record<string, unknown> = {}) =>
+    build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, backend, ...extra });
+  const { summary, auto, titles } = runtimeLines([
+    on("metal", "whisper-cpp"), on("cuda", "whisper-cpp"), on("webgpu", "transformers-js"), on("coreml", "sherpa-onnx"),
+    on("cpu", "sherpa-onnx"), on("wasm", "transformers-js"),
+    // Not run on this device: remote, not runnable here (the engine gives it no accelerator), or unknown to the page.
+    on("remote", "sherpa-onnx"), on(undefined, "mlx", { available: false, reasons: [{ code: "memory", params: {} }] }), on("unknown", "onnxruntime"),
+  ]);
+  // Metal is the Mac's graphics card, never the processor: in the summary, Automatic and its own option.
+  expect(summary).toBe("whisper.cpp · int8 · graphics card (Metal)");
+  expect(auto).toMatch(/^whisper\.cpp · int8 · graphics card \(Metal\) · /);
+  expect(titles.slice(1)).toEqual([
+    "whisper.cpp · int8 · graphics card (Metal)",
+    "whisper.cpp · int8 · graphics card (CUDA)",
+    "Transformers.js · int8 · graphics card (WebGPU)",
+    "Sherpa-ONNX · int8 · Neural Engine",
+    "Sherpa-ONNX · int8 · processor",
+    "Transformers.js · int8 · processor",
+    "Sherpa-ONNX · int8",
+    "MLX · int8",
+    "ONNX Runtime · int8",
+  ]);
+});
+
+test("in Spanish, a whisper.cpp build on Metal runs on the graphics card, and a Sherpa-ONNX one on the processor", () => {
+  act(() => setUiLanguage("es"));
+  try {
+    const { titles } = runtimeLines([build("whisper-base/q5_1", { backend: "whisper-cpp", precision: "q5_1", accelerator: "metal" }), build("whisper-base/int8")]);
+    expect(titles.slice(1)).toEqual(["whisper.cpp · q5_1 · tarjeta gráfica (Metal)", "Sherpa-ONNX · int8 · procesador"]);
+  } finally { act(() => setUiLanguage("en")); }
 });
 
 test("in the model's card, how it runs comes after the model is chosen and before its download", () => {
