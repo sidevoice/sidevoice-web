@@ -254,7 +254,8 @@ test("state dots and small avatars follow each conversation's state, grouped by 
   expect(cardDots.map((d) => d.getAttribute("data-state"))).toEqual(["in-call", "working", "waiting", "idle"]);
   expect(cardDots.every((d) => d.childElementCount === 0)).toBe(true);
   // The call's own conversation at work says Working, on its line and its light (desktop trial, item 11).
-  patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": true } });
+  // At work for a minute: past any wait before Working shows (#112).
+  patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": true }, workingSince: { "fp-1|t-pay": 0, "fp-1|t-login": 0 }, now: 60_000 } as Partial<SessionFacts>);
   expect([dot("Fix the slow login"), mood("Fix the slow login")]).toEqual(["working", "working"]);
   expect(rowOf("Fix the slow login").querySelector(".sidebar-state-text")).toHaveTextContent(/^Working$/);
   patch(store, { harness: { "fp-1|t-pay": true, "fp-1|t-login": false } });
