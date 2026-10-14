@@ -1347,6 +1347,15 @@ test('T13 microphone mute leaves the captured turn to finish through the ordinar
  assert.equal(turnSent(c,c.first,'ordinary','finished')[0].text,'Words already captured');
  c.s.run('disconnect()');
 });
+test('T15 an unknown core Working fact clears the previous activity before the three-second delay can restart',async()=>{
+ const c=await callOnRoom();
+ c.s.run("state.harness={...state.harness,[targetId()]:true}");
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[{thread_id:'a',title:'A',available:true,working:null,epoch:0}]})});
+ await c.s.run('refreshPeople()');
+ assert.equal(c.s.run('state.harness[targetId()]'),undefined);
+ assert.equal(c.s.run('roomStore.getState().session.working'),false);
+ c.s.run('disconnect()');
+});
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
  s.run("ws={readyState:1,send:text=>__send(text)};sessionId='s'");

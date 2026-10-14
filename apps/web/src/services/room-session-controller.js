@@ -678,7 +678,10 @@ async function refreshPeople(fp=state.callNode){
   if(fp===state.callNode)for(const person of data.participants)if(Number.isInteger(person.epoch))threadEpochs.set(person.thread_id,person.epoch);
   mergePeople();
   const activity={...state.harness};
-  for(const person of data.participants)if(typeof person.working==='boolean')activity[conversationKey(fp,person.thread_id)]=person.working;
+  for(const person of data.participants){const key=conversationKey(fp,person.thread_id);
+   if(typeof person.working==='boolean')activity[key]=person.working;
+   else delete activity[key];
+  }
   state.harness=activity;drainReplies();
   if(fp===state.callNode)await reselectRemembered()||await selectOnlyListeningConversation();
  }catch{}
