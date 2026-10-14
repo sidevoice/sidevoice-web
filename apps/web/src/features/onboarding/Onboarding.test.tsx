@@ -283,6 +283,34 @@ test("preparing this computer never offers Prepare again: the install, then wait
   act(() => localHostInstallController.clear());
 });
 
+test("where the app does not install Sidevoice itself, preparing this computer is the install command, then it waits for this computer and moves on", () => {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "absent" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null),
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" }, voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  expect(title()).toHaveTextContent("Prepare this computer");
+  // Never an empty step: no Prepare that could not work, but the command to run here, as another machine's, and that one
+  // of the person's agents can run it.
+  expect(document.getElementById("wizard-prepare")).toBeNull();
+  expect([...document.querySelectorAll("#wizard .ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
+  expect(wizard().getByRole("button", { name: "Copy setup command" })).toHaveClass("ui-copy-button");
+  expect(wizard().getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
+  expect(document.getElementById("wizard")).not.toHaveTextContent("@sidevoice/uplink");
+  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Waiting for Sidevoice on this computer…");
+  // Run: it starts, and the command goes.
+  act(() => store.patch({ localHostStatus: { state: "starting", installed: true, reachable: false } }));
+  expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
+  expect(document.querySelector("#wizard .wizard-prepare-wait")).toHaveTextContent("Starting Sidevoice on this computer…");
+  // Answering: on to its agents by itself, in the same step.
+  act(() => store.patch({ localHostStatus: { state: "running", installed: true, reachable: true },
+    pairings: [{ fp: "fp-local", host: "This computer", local: true, urls: ["http://127.0.0.1:45781"], rv: null, device_id: "d", paired_at: 1, revoked: false }],
+    machineLinks: { "fp-local": { reach: "ok", via: "node" } } }));
+  expect(wizard().getByText("This computer is ready. Connect Sidevoice to the agents you use here.")).toBeInTheDocument();
+});
+
 // Chosen on this device: the default settings' transcription and voice.
 const CHOSEN = { stt: trialKey(defaultVoiceSettings().stt)!, tts: trialKey(defaultVoiceSettings().tts)! };
 

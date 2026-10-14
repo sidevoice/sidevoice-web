@@ -41,6 +41,9 @@
 .wizard-body > section { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .wizard-body > section > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .wizard-loading { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+/* Prepare this computer, installed but not running: what it says of itself, then its one action under it. */
+.wizard-prepare-recover { display: grid; justify-items: start; gap: var(--sv-space-3); min-width: 0; }
+.wizard-prepare-recover > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 
 .wizard-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6); border-top: 1px solid var(--sv-border); }
 .wizard-actions:not(:has(.ui-button)) { display: none; }
