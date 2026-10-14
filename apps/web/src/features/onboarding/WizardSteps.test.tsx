@@ -13,8 +13,8 @@ vi.mock("../../services/room-session-controller.js", () => ({}));
 /** The whole App rendered: past vitest's five seconds on a busy machine (see Onboarding.test.tsx). */
 const WHOLE_APP_MS = 15_000;
 
-/* The setup's basics in their order, This computer's path with no way to another machine but Back, and the first try started and stopped from the
- * footer alone. */
+/* The setup's basics in their order, This computer's path with no way to another machine but Back, and the try started from its
+ * block or the footer, stopped from the footer alone. */
 
 const CATALOGS = [{ id: "local", name: null, status: { stale: false }, models: [
   { id: "whisper-base", family: "whisper", capabilities: ["stt"], languages: ["es", "en"], voices: [], parametersM: 1, license: "MIT", installed: true, builds: [{ id: "whisper-base/int8", available: true, reasons: [] }] },
@@ -55,15 +55,19 @@ test("the basics: appearance, this device's name, then the interface's language 
     .toEqual(["Appearance", "This device’s name", "Interface language", "The language you speak"]);
 });
 
-test("the first try is started and stopped from the footer alone, never a second Stop in the step", async () => {
+test("the first try starts from the block's own button or the footer's, and stops from the footer alone, never a second Stop in the step", async () => {
   transcriptionStep();
-  // Not tried: the step's try is the footer's, not offered in the block.
-  expect(document.getElementById("wizard-try-again")).toBeNull();
-  await act(async () => { fireEvent.click(document.getElementById("wizard-try")!); });
+  // Not tried: the block offers it as well as the footer.
+  const card = () => document.querySelector("#wizard #wizard-card-try")!;
+  expect(card()).toHaveTextContent(/^Try it: speak$/);
+  await act(async () => { fireEvent.click(card()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
   expect(stops()).toHaveLength(1);
   expect(stops()[0]).toHaveAttribute("id", "wizard-try");
-  expect(document.getElementById("wizard-try-again")).toBeNull();
+  // The block's button says the try runs, and is not pressed again.
+  expect(card()).toHaveAttribute("aria-busy", "true");
+  await act(async () => { fireEvent.click(card()); });
+  expect(actions.tryVoiceSettings).toHaveBeenCalledTimes(1);
 }, WHOLE_APP_MS);
 
 test("preparing this computer, the setup offers no other machine in any state of the install: Back is the way there", async () => {

@@ -113,13 +113,14 @@ test("transcription and voice are this device's: trying them is recommended, and
   // Source first, then the model, as in Settings → Voice.
   expect(selectedValue("stt-source")).toBe("local");
   expect(tryButton()).toHaveTextContent("Try it");
-  // The try has its own block, last and outside the model's card: its hint there, and no second Speak beside the footer's.
+  // The try has its own block, last and outside the model's card: its hint there, and its own button first, beside the
+  // level, as well as the footer's.
   expect(document.querySelector("#wizard #stt-model-card")).not.toContainElement(tryBlock("stt") as HTMLElement);
   expect(tryBlock("stt").querySelector(".model-try-hint")).toHaveTextContent("Recommended: try it before you go on.");
   // One steady layout: the microphone's level on the first row from the start, the hint in the area under it.
   expect(tryBlock("stt").querySelector(".stt-try-head .voice-wave")).toBeInTheDocument();
   expect(tryBlock("stt").querySelector(".stt-try-area .model-try-hint")).toBeInTheDocument();
-  expect(document.getElementById("wizard-try-again")).toBeNull();
+  expect(tryBlock("stt").querySelector(".stt-try-head #wizard-card-try")).toHaveTextContent(/^Try it: speak$/);
   await act(async () => { fireEvent.click(tryButton()); });
   expect(actions.tryVoiceSettings).toHaveBeenCalledWith("stt", expect.objectContaining({ keep: true }));
   expect(tryBlock("stt").querySelector("#stt-heard")).toHaveTextContent("hola, ¿me oyes?");
@@ -128,11 +129,11 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(stageAction()).toHaveClass("ui-button--primary");
   expect(tryBlock("stt").querySelector("#stt-timing")).toHaveTextContent("Transcribed in 0.4 s");
   expect(tryBlock("stt").querySelector("#stt-timing")).not.toHaveTextContent("smaller model");
-  // Trying it again is the block's.
-  expect(tryBlock("stt").querySelector("#wizard-try-again")).toHaveTextContent("Speak again");
+  // Trying it again is the block's: its button says so.
+  expect(tryBlock("stt").querySelector("#wizard-card-try")).toHaveTextContent("Speak again");
   expect(tryBlock("stt").querySelector(".model-try-hint")).toBeNull();
   // Again beside the level, and what was heard with its time in the area where the hint was.
-  expect(tryBlock("stt").querySelector(".stt-try-head #wizard-try-again")).toBeInTheDocument();
+  expect(tryBlock("stt").querySelector(".stt-try-head #wizard-card-try")).toBeInTheDocument();
   expect(tryBlock("stt").querySelector(".stt-try-head .voice-wave")).toBeInTheDocument();
   expect(tryBlock("stt").querySelector(".stt-try-area #stt-heard")).toBeInTheDocument();
   expect(tryBlock("stt").querySelector(".stt-try-area #stt-timing")).toBeInTheDocument();
@@ -197,7 +198,7 @@ test("the voice's try is all in its block — its sentence shown and editable be
   paired(store);
   await act(async () => { fireEvent.click(stageAction()); });
   expect(title()).toHaveTextContent("Set up voice");
-  // Before the try: the sentence, editable, and the level's bars; the footer's try starts it.
+  // Before the try: the sentence, editable, and the level's bars; the block's own button and the footer's start it.
   expect(tryBlock("tts").querySelector("button.tts-try-said")).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
   expect(tryBlock("tts").querySelector(".stt-try-head .voice-wave canvas")).toBeInTheDocument();
   expect(tryBlock("tts").querySelector("#wizard-sample")).toBeNull();
@@ -209,18 +210,23 @@ test("the voice's try is all in its block — its sentence shown and editable be
   act(() => { running.told.onProgress!({ from: 0, to: 0 }); running.told.onProgress!({ from: 3, to: 3 }); });
   expect(tryBlock("tts").querySelector(".model-try-said")).toHaveTextContent(/^Hi!$/);
   expect(tryBlock("tts").querySelector("#tts-sentence, button.tts-try-said")).toBeNull();
-  expect(tryBlock("tts").querySelector("#wizard-try-again")).toBeNull();
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveAttribute("aria-busy", "true");
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveTextContent(/^Try it: listen$/);
   await act(async () => { running.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
   expect(tryBlock("tts").querySelector(".tts-try-area #tts-timing")).toHaveTextContent(/^First sound in 0\.3 s$/);
-  expect(tryBlock("tts").querySelector(".stt-try-head #wizard-try-again")).toHaveTextContent(/^Play again$/);
+  expect(tryBlock("tts").querySelector(".stt-try-head #wizard-card-try")).toHaveTextContent(/^Play again$/);
   expect(stageAction()).toHaveTextContent(/^Continue$/);
   // The sentence edited there (its pencil: the one played stays lit) is what Play again says next.
   fireEvent.click(within(tryBlock("tts") as HTMLElement).getByRole("button", { name: "Edit the sentence" }));
   fireEvent.change(tryBlock("tts").querySelector("#tts-sentence")!, { target: { value: "Hola, qué tal." } });
   const again = pendingTry();
-  await act(async () => { fireEvent.click(tryBlock("tts").querySelector("#wizard-try-again")!); });
+  await act(async () => { fireEvent.click(tryBlock("tts").querySelector("#wizard-card-try")!); });
   expect(actions.tryVoiceSettings).toHaveBeenLastCalledWith("tts", expect.objectContaining({ text: "Hola, qué tal.", keep: true }));
   await act(async () => { again.finish({ timings: { ready_ms: 600, first_sound_ms: 320 } }); });
+  // No sentence: the block's button waits for one, in the words the footer uses before a try.
+  fireEvent.change(tryBlock("tts").querySelector("#tts-sentence")!, { target: { value: "  " } });
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveAttribute("aria-disabled", "true");
+  expect(tryBlock("tts").querySelector("#wizard-card-try")).toHaveAccessibleDescription("Write a sentence to try the voice.");
 });
 
 
@@ -457,6 +463,37 @@ const MODEL_STEPS = [
 ] as const;
 const withTurn = (installed: (id: string) => boolean) => CATALOGS.map((catalog) => ({ ...catalog, models: [...catalog.models, TURN_MODEL].map((model) => installed(model.id) ? model
   : { ...model, installed: false, recommendedBuild: model.builds![0].id, builds: [{ ...model.builds![0], installed: false, downloadBytes: 9e6 }] }) })) as unknown as CatalogView[];
+
+/* The try's block is the step's whether or not its model is there: its own button from the start, waiting for the model
+ * with the footer's reason; once it is ready, it starts the try, whose one Stop is the footer's. */
+for (const step of MODEL_STEPS) {
+  test(`${step.title}: the try's own button is there before its model is, waiting with the footer's reason, then starts the try`, async () => {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote", chosen: step.chosen }));
+    const store = createRoomStore();
+    act(() => store.patch({ machinesReady: true, speechLanguage: "es", voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn" },
+      voiceCatalogue: { state: "ready", catalogs: withTurn((id) => id !== step.model), error: "" } }));
+    render(<App store={store} />);
+    paired(store);
+    expect(title()).toHaveTextContent(step.title);
+    const turn = step.task === "end-of-turn";
+    const card = () => document.querySelector<HTMLButtonElement>(turn ? "#wizard #turn-try" : "#wizard #wizard-card-try")!;
+    const footerReason = document.getElementById("wizard-stage-reason")!.textContent!;
+    expect(footerReason).toMatch(/isn't ready yet\.$/);
+    expect(card()).toHaveAttribute("aria-disabled", "true");
+    expect(card()).toHaveAccessibleDescription(footerReason);
+    // Its block laid out as once ready: the button and the level on the first row.
+    expect(card().closest(".stt-try-head")!.querySelector(".voice-wave")).toBeInTheDocument();
+    act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: withTurn(() => true), error: "" } }));
+    expect(card()).not.toHaveAttribute("aria-disabled");
+    actions.tryTurnSettings = vi.fn(() => new Promise(() => {}));
+    if (!turn) pendingTry();
+    await act(async () => { fireEvent.click(card()); });
+    expect(turn ? actions.tryTurnSettings : actions.tryVoiceSettings).toHaveBeenCalled();
+    // Running: the footer's is the one Stop; the block's button says it runs.
+    expect(wizard().queryAllByRole("button", { name: "Stop" }).map((button) => button.id)).toEqual(["wizard-try"]);
+    expect(card()).toHaveAttribute("aria-busy", "true");
+  }, WHOLE_APP_MS);
+}
 
 for (const step of MODEL_STEPS) {
   test(`${step.title} offers Continue without trying only once its model is ready`, () => {

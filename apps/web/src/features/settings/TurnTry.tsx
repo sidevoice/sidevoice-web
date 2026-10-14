@@ -154,10 +154,10 @@ export type TurnTryHandle = ReturnType<typeof useTurnTry>;
 /** The try of the end of turn being edited (`draft`), as the `turn-try` variant has it. `smart`: the smart end of turn
  *  is the one chosen, and `smartReady` its model ready; `setup`: the first-run setup's, where nothing says the try uses
  *  what is selected before it is kept, as Settings do; `active`: in sight (Settings' section on show). */
-export function TurnTry({ draft, smart, smartReady, setup = false, active = true, handle, tried = false }: {
+export function TurnTry({ draft, smart, smartReady, setup = false, active = true, handle }: {
   draft: Settings; smart: boolean; smartReady: boolean; setup?: boolean; active?: boolean;
-  /** The setup's own try (its footer starts it): this shows it, and offers it again here only once tried. */
-  handle?: TurnTryHandle; tried?: boolean;
+  /** The setup's own try: started from here or from its footer, which is its one Stop. */
+  handle?: TurnTryHandle;
 }) {
   const t = translator();
   const stt = useModelState("stt", draft);
@@ -165,8 +165,9 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   const own = useTurnTry({ active: active && !handle, smartBlocked });
   const { trial, running, level, root, start, stop } = handle ?? own;
   const reasonId = useId();
-  // Why it cannot run now: Smart without its model, or no transcription to hear the turn's words.
-  const reason = running ? "" : smartBlocked ? t("turnTry.smartBlocked") : !stt.ready ? t("settings.save.waitTranscription") : "";
+  // Why it cannot run now: Smart without its model (in the setup, in its footer's words), or no transcription to hear
+  // the turn's words.
+  const reason = running ? "" : smartBlocked ? t(setup ? "settings.save.waitTurn" : "turnTry.smartBlocked") : !stt.ready ? t("settings.save.waitTranscription") : "";
   // The microphone's level, always drawn: flat while the try does not listen, live while it does.
   const live = useRef(false);
   live.current = running;
@@ -188,15 +189,17 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   </div>;
   const failure = trial.phase === "failed" && trial.error ? <ErrorText className="stage-try-error" role="alert" message={trial.error} /> : null;
   const take = !running && trial.take ? <TryTake key={trial.attempt} take={trial.take} id="turn-try-take" t={t} /> : null;
-  const button = handle && !tried ? null : <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
-    {running ? t("try.stop") : t(trial.attempt ? "turnTry.again" : "turnTry.try")}
-  </Button>;
-  // The setup's footer says why it waits: here, only when this offers the try.
-  const showWhy = !handle || tried;
+  // While it runs, the label it was pressed with (a first try is still one).
+  const label = t(trial.attempt > (running ? 1 : 0) ? "turnTry.again" : "turnTry.try");
+  // In the setup its footer is the one Stop: here a try running is only said (busy).
+  const button = running && handle ? <Button size="sm" id="turn-try" className="turn-try-button" loading>{label}</Button>
+    : <Button size="sm" id="turn-try" className="turn-try-button" disabled={!!reason} blockedBy={reason ? reasonId : undefined} onClick={running ? stop : start}>
+      {running ? t("try.stop") : label}
+    </Button>;
   const said = trial.said ? t(trial.said.key, trial.said.ms != null ? { s: seconds(trial.said.ms) } : undefined) : "";
   // Read out as a whole, and again when the same message comes again (its content then differs by a trailing space).
   const status = <p className="sr-only turn-try-said" role="status">{said && said + (trial.told % 2 ? "\u00a0" : "")}</p>;
-  const why = reason && showWhy ? <p className="turn-try-reason" id={reasonId}>{reason}</p> : null;
+  const why = reason ? <p className="turn-try-reason" id={reasonId}>{reason}</p> : null;
 
   // Laid out as the other tries: the button and the microphone's level on one row, always; under it an area of a fixed
   // height — where the turn stands while it listens, then when it decided the turn ended and what was heard, in the
