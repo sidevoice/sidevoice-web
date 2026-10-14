@@ -257,8 +257,9 @@ export function voiceChoices(catalogs, settings, languages = []) {
     tts: {
       ...tts,
       voices: voices.map((voice) => ({ id: voice.id, name: voice.name ?? null, languages: voice.languages ?? [], gender: voice.gender ?? null })),
-      // A provider whose voices are the account's own lists none: the voice is the account's first.
-      voiceNote: tts.model && !voices.length ? { key: settings.tts.catalog === LOCAL_CATALOG ? 'voice.voice.model' : 'voice.voice.account' } : null,
+      // The voice when none is chosen, always the list's first choice: the model's own; for a provider whose voices
+      // are the account's own and lists none, the account's first.
+      automaticVoice: settings.tts.catalog !== LOCAL_CATALOG && !voices.length ? 'voice.voice.account' : 'voice.voice.first',
       speed: tts.model?.speed ?? null,
     },
     endOfTurn: { smartTurn, note: smartTurn ? null : { key: 'voice.endOfTurn.none' } },

@@ -31,8 +31,11 @@ const catalogs = [
     local("kokoro-82m-v1.0", "kokoro", ["tts"], { voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 } }),
     local("piper-es", "piper", ["tts"], { installed: false, voices: [{ id: "davefx", languages: ["es"] }], recommendedBuild: "piper-es/onnx",
       builds: [build("piper-es/onnx", { downloadBytes: 63e6, installed: false })] }),
+    // A model whose catalogue declares no voices: it speaks with its own.
+    local("supertonic-3", "supertonic", ["tts"]),
   ] },
-  { id: "elevenlabs", name: "ElevenLabs", status: { stale: false }, models: [{ id: "scribe_v2", capabilities: ["stt"], languages: [], voices: [] }] },
+  { id: "elevenlabs", name: "ElevenLabs", status: { stale: false }, models: [{ id: "scribe_v2", capabilities: ["stt"], languages: [], voices: [] },
+    { id: "eleven_flash_v2_5", capabilities: ["tts"], languages: [], voices: [] }] },
   { id: "openai", name: "OpenAI", status: { stale: false, reason: { code: "credential-missing", params: {} } }, models: [] },
 ] as unknown as CatalogView[];
 
@@ -109,6 +112,14 @@ test("a browser that blocks site data is said once, on top, while it does", () =
 });
 
 const withVoiceModel = (model: string, catalog = "local") => ({ ...defaultVoiceSettings(), tts: { catalog, model, voice: null, speed: 1 } });
+
+test("the voice is always a list, its automatic voice first, even when the model or the account lists no other", () => {
+  renderPane({ voiceSettings: withVoiceModel("supertonic-3") });
+  expect(listOptions("tts-voice").map((option) => [option.value, option.label])).toEqual([["", "Automatic (the model's own)"]]);
+  cleanup();
+  renderPane({ voiceSettings: withVoiceModel("eleven_flash_v2_5", "elevenlabs") });
+  expect(listOptions("tts-voice").map((option) => [option.value, option.label])).toEqual([["", "Automatic (your account's first)"]]);
+});
 
 test("a model not on this device offers its download with its size; its voices wait until it is here", () => {
   const { actions } = renderPane({ voiceSettings: withVoiceModel("piper-es") });
