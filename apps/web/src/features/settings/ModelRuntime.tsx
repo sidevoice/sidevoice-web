@@ -16,17 +16,18 @@ const ENGINES: Record<string, string> = {
   "transformers-js": "Transformers.js", "sherpa-onnx": "Sherpa-ONNX", "whisper-cpp": "whisper.cpp", onnxruntime: "ONNX Runtime", mlx: "MLX",
 };
 
-/** What a build runs on, from the accelerator the engine resolved for it on this device and nothing else: a graphics
- *  card through Metal, CUDA or WebGPU, the Neural Engine through Core ML, the processor natively or as WebAssembly.
- *  Nothing for a remote build, for one that does not run here (the engine gives it no accelerator), or for an
- *  accelerator this page does not know: no label rather than a guess. */
+/** What a build runs on, from the class the engine resolved for this device. The accelerator is only the API name
+ *  shown beside a graphics card; absent or unrecognized classes have no hardware label. */
 function runsOn(build: ModelBuild, t: Translate) {
-  switch (build.accelerator) {
-    case "metal": return t("runtime.on.gpu", { api: "Metal" });
-    case "cuda": return t("runtime.on.gpu", { api: "CUDA" });
-    case "webgpu": return t("runtime.on.gpu", { api: "WebGPU" });
-    case "coreml": return t("runtime.on.neuralEngine");
-    case "cpu": case "wasm": return t("runtime.on.cpu");
+  switch (build.acceleratorClass) {
+    case "gpu": {
+      if (!build.accelerator) return "";
+      const names: Record<string, string> = { metal: "Metal", cuda: "CUDA", webgpu: "WebGPU" };
+      const api = names[build.accelerator] ?? build.accelerator;
+      return t("runtime.on.gpu", { api });
+    }
+    case "neural-engine": return t("runtime.on.neuralEngine");
+    case "cpu": return t("runtime.on.cpu");
     default: return "";
   }
 }

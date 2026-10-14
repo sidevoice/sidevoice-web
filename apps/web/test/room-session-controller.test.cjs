@@ -1241,7 +1241,7 @@ test('Settings send only the interface language to the room',async()=>{
 const build=(id,extra={})=>({id,backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true,...extra});
 const CATALOGS=[
  {id:'local',name:null,status:{stale:false},models:[
-  {id:'whisper-base',family:'whisper',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[build('whisper-base/int8')]},
+  {id:'whisper-base',family:'whisper',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[build('whisper-base/int8',{accelerator:'cpu',acceleratorClass:'cpu'})]},
   {id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],speed:{min:0.5,max:2},installed:true,builds:[build('kokoro/int8')]},
  ]},
  {id:'openai',name:'OpenAI',status:{stale:false},models:[{id:'gpt-4o-transcribe',capabilities:['stt'],languages:[],voices:[]}]},
@@ -1260,6 +1260,8 @@ test('Opening the settings reads the engine\'s catalogues and which providers ha
  const facts=s.run('roomStore.getState().facts');
  assert.equal(facts.voiceCatalogue.state,'ready');
  assert.deepEqual(plain(facts.voiceCatalogue.catalogs.map(c=>[c.id,c.models.map(m=>m.id)])),[['local',['whisper-base','kokoro-82m-v1.0']],['openai',['gpt-4o-transcribe']],['elevenlabs',[]]]);
+ assert.equal(facts.voiceCatalogue.catalogs[0].models[0].builds[0].acceleratorClass,'cpu','the desktop engine class reaches the store');
+ assert.equal(Object.hasOwn(facts.voiceCatalogue.catalogs[0].models[1].builds[0],'acceleratorClass'),false,'a missing class stays missing');
  assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false},'one key per remote catalogue');
  assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
 });

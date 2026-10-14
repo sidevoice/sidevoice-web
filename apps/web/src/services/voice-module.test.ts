@@ -4,12 +4,15 @@ import { pageVoice, swappingVoiceHost } from "./voice-module.js";
 /* Where the page's voice and its models' catalogues come from: the desktop app's, or one engine on this page. */
 
 test("in the desktop app both are the app's: the voice, and the engine's catalogues and keys", async () => {
-  const engine = { catalogs: async () => [], setCredential: async () => {}, hasCredential: async () => false };
+  const builds = [{ accelerator: "metal", acceleratorClass: "gpu" }, { accelerator: "cpu" }];
+  const engine = { catalogs: async () => [{ models: [{ builds }] }], setCredential: async () => {}, hasCredential: async () => false };
   const host = { voice: { say: () => null }, engine };
   const load = vi.fn();
   const page = pageVoice({ host, load });
   expect(await page.voice()).toBe(host.voice);
   expect(await page.catalogs()).toBe(engine);
+  expect((await (await page.catalogs()).catalogs())[0].models[0].builds).toBe(builds);
+  expect(builds[1]).not.toHaveProperty("acceleratorClass");
   expect(load).not.toHaveBeenCalled();
   // An app that does not give the page its catalogues yet says so, by code.
   await expect(pageVoice({ host: { voice: host.voice, engine: {} }, load }).catalogs()).rejects.toMatchObject({ code: "catalogs-unavailable" });
@@ -17,7 +20,8 @@ test("in the desktop app both are the app's: the voice, and the engine's catalog
 
 test("on the web the voice and the catalogues share one engine, made once, whose host reads the keys this page keeps", async () => {
   const hosts: { credential(provider: string): Promise<string | null> }[] = [];
-  const webEngine = { catalogs: () => [{ id: "local", name: undefined, status: async () => ({ stale: false }), models: async () => [] }] };
+  const builds = [{ accelerator: "webgpu", acceleratorClass: "gpu" }, { accelerator: "wasm" }];
+  const webEngine = { catalogs: () => [{ id: "local", name: undefined, status: async () => ({ stale: false }), models: async () => [{ id: "whisper", builds }] }] };
   const create = vi.fn(async (host: (typeof hosts)[number]) => { hosts.push(host); return webEngine; });
   const createVoiceHost = vi.fn((source: object) => ({ source }));
   const load = vi.fn(async () => [{ default: async () => {}, createVoiceHost }, { default: async () => {}, WebEngine: { create } }]);
@@ -26,7 +30,8 @@ test("on the web the voice and the catalogues share one engine, made once, whose
   const catalogs = await page.catalogs();
   expect(create).toHaveBeenCalledTimes(1);
   expect(typeof voice.source.models).toBe("function");
-  expect(await catalogs.catalogs()).toEqual([{ id: "local", name: null, status: { stale: false }, models: [] }]);
+  expect(await catalogs.catalogs()).toEqual([{ id: "local", name: null, status: { stale: false }, models: [{ id: "whisper", builds }] }]);
+  expect(builds[1]).not.toHaveProperty("acceleratorClass");
   await catalogs.setCredential("openai", "sk-1");
   expect(await hosts[0].credential("openai")).toBe("sk-1");
   await catalogs.setCredential("openai", null);

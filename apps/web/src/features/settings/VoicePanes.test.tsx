@@ -7,6 +7,7 @@ import { createRoomStore, installRoomBridge, RoomStoreContext, useRoomStore } fr
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
+import type { ModelBuild } from "@sidevoice/engine";
 import { chooseOption, listOptions } from "../../test/select";
 import { setUiLanguage } from "../../i18n/translator";
 
@@ -21,13 +22,14 @@ function VoicePanes() {
 /* The voice panes, on the engine's catalogues (Providers' own: ProviderKeys.test); the interface speaks English here
  * (the test's system). */
 
-const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
+const build = (id: string, extra: Partial<ModelBuild> = {}): ModelBuild => ({ id, backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", acceleratorClass: "cpu", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
+const withoutClass = (value: ModelBuild): ModelBuild => { delete value.acceleratorClass; return value; };
 const local = (id: string, family: string, capabilities: string[], extra: Record<string, unknown> = {}) =>
   ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es"], voices: [], installed: true, builds: [build(id + "/int8")], ...extra });
 const catalogs = [
   { id: "local", name: null, status: { stale: false }, models: [
     local("whisper-base", "whisper", ["stt"]),
-    local("whisper-large", "whisper", ["stt"], { builds: [build("whisper-large/int8", { available: false, accelerator: undefined, reasons: [{ code: "memory", params: {} }] })] }),
+    local("whisper-large", "whisper", ["stt"], { builds: [withoutClass(build("whisper-large/int8", { available: false, accelerator: undefined, reasons: [{ code: "memory", params: {} }] }))] }),
     local("moonshine-tiny", "moonshine", ["stt"]),
     local("kokoro-82m-v1.0", "kokoro", ["tts"], { voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 } }),
     local("piper-es", "piper", ["tts"], { installed: false, voices: [{ id: "davefx", languages: ["es"] }], recommendedBuild: "piper-es/onnx",
@@ -417,14 +419,20 @@ function runtimeLines(builds: ReturnType<typeof build>[]) {
   return { summary: runtime.querySelector(".model-runtime-summary")!.textContent, auto: runtime.querySelector(".model-runtime-option .model-runtime-detail")!.textContent, titles };
 }
 
-test("what a build runs on is the accelerator the engine resolved for it here: a graphics card, the Neural Engine, the processor, or nothing", () => {
-  const on = (accelerator: string | undefined, backend: string, extra: Record<string, unknown> = {}) =>
-    build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, backend, ...extra });
+test("the engine's accelerator class chooses the hardware label; the API only names a graphics card", () => {
+  const on = (accelerator: string | undefined, acceleratorClass: ModelBuild["acceleratorClass"], backend: string, extra: Partial<ModelBuild> = {}) =>
+    acceleratorClass === undefined
+      ? withoutClass(build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, backend, ...extra }))
+      : build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, acceleratorClass, backend, ...extra });
   const { summary, auto, titles } = runtimeLines([
-    on("metal", "whisper-cpp"), on("cuda", "whisper-cpp"), on("webgpu", "transformers-js"), on("coreml", "sherpa-onnx"),
-    on("cpu", "sherpa-onnx"), on("wasm", "transformers-js"),
-    // Not run on this device: remote, not runnable here (the engine gives it no accelerator), or unknown to the page.
-    on("remote", "sherpa-onnx"), on(undefined, "mlx", { available: false, reasons: [{ code: "memory", params: {} }] }), on("unknown", "onnxruntime"),
+    on("metal", "gpu", "whisper-cpp"), on("cuda", "gpu", "whisper-cpp"), on("webgpu", "gpu", "transformers-js"),
+    on("vulkan", "gpu", "onnxruntime"), on("coreml", "neural-engine", "sherpa-onnx"),
+    on("metal", "cpu", "sherpa-onnx"), on("wasm", "cpu", "transformers-js"),
+    on("cuda", "neural-engine", "mlx"),
+    on("remote", undefined, "sherpa-onnx"),
+    on("cpu", undefined, "mlx", { available: false, reasons: [{ code: "memory", params: {} }] }),
+    on("webgpu", "future-class" as ModelBuild["acceleratorClass"], "onnxruntime"),
+    on(undefined, "gpu", "whisper-cpp"),
   ]);
   // Metal is the Mac's graphics card, never the processor: in the summary, Automatic and its own option.
   expect(summary).toBe("whisper.cpp · int8 · graphics card (Metal)");
@@ -433,19 +441,22 @@ test("what a build runs on is the accelerator the engine resolved for it here: a
     "whisper.cpp · int8 · graphics card (Metal)",
     "whisper.cpp · int8 · graphics card (CUDA)",
     "Transformers.js · int8 · graphics card (WebGPU)",
+    "ONNX Runtime · int8 · graphics card (vulkan)",
     "Sherpa-ONNX · int8 · Neural Engine",
     "Sherpa-ONNX · int8 · processor",
     "Transformers.js · int8 · processor",
+    "MLX · int8 · Neural Engine",
     "Sherpa-ONNX · int8",
     "MLX · int8",
     "ONNX Runtime · int8",
+    "whisper.cpp · int8",
   ]);
 });
 
 test("in Spanish, a whisper.cpp build on Metal runs on the graphics card, and a Sherpa-ONNX one on the processor", () => {
   act(() => setUiLanguage("es"));
   try {
-    const { titles } = runtimeLines([build("whisper-base/q5_1", { backend: "whisper-cpp", precision: "q5_1", accelerator: "metal" }), build("whisper-base/int8")]);
+    const { titles } = runtimeLines([build("whisper-base/q5_1", { backend: "whisper-cpp", precision: "q5_1", accelerator: "metal", acceleratorClass: "gpu" }), build("whisper-base/int8")]);
     expect(titles.slice(1)).toEqual(["whisper.cpp · q5_1 · tarjeta gráfica (Metal)", "Sherpa-ONNX · int8 · procesador"]);
   } finally { act(() => setUiLanguage("en")); }
 });
@@ -526,4 +537,3 @@ test("a provider chosen without its key says so in a row with Connect, which ope
     expect(document.activeElement).toBe(document.getElementById("stt-source"));
   }
 });
-
