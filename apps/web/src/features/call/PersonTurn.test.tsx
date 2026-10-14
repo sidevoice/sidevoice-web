@@ -158,6 +158,34 @@ test("pages: no cap — ten pages stay thirty seconds, turning every PAGE_MS", (
   expect(10 * PAGE_MS).toBe(30_000);
 });
 
+test("a live recount after the first page keeps the original sent-turn deadline", () => {
+  let notify: () => void = () => {};
+  class Observer {
+    constructor(callback: () => void) { notify = callback; }
+    observe() {}
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", Observer);
+  let lines = 6;
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text-run") ? lines * LINE : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text") ? 3 * LINE : 0;
+  });
+  turn();
+  tick(PAGE_MS + 500);
+  expect(pageOf()).toBe(1);
+  lines = 9;
+  act(() => notify());
+  expect(sentBubble()).not.toHaveAttribute("data-leaving");
+  tick(PAGE_MS - 501);
+  expect(sentBubble()).not.toHaveAttribute("data-leaving");
+  tick(1);
+  expect(sentBubble()).toHaveAttribute("data-leaving");
+  vi.unstubAllGlobals();
+});
+
 test("pages: one that fits is a single page, which never turns", () => {
   laidOut({ [SHORT]: 1 });
   turn(SHORT);

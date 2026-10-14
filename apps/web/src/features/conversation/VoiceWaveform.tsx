@@ -72,6 +72,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     let width = 1;
     let height = 1;
     let ink = "currentColor";
+    let brush = waveformBrush(node);
 
     const size = () => {
       const ratio = window.devicePixelRatio || 1;
@@ -86,7 +87,6 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
     // Newest column at the right: the turn scrolls away to the left as a recorder does.
     const paint = () => {
-      const brush = waveformBrush(node);
       const capacity = Math.max(1, Math.floor(width / brush.pitch));
       const values = columns.current;
       while (values.length > Math.max(1, Math.floor(width / CELL))) values.shift();
@@ -111,7 +111,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     const observer = new ResizeObserver(() => { size(); paint(); });
     observer.observe(node);
     // A live variant or theme switch repaints the existing samples, even when transcribing is frozen.
-    const refresh = () => { ink = window.getComputedStyle?.(node).color || ink; paint(); };
+    const refresh = () => { brush = waveformBrush(node); ink = window.getComputedStyle?.(node).color || ink; paint(); };
     const mutation = new MutationObserver(refresh);
     const room = node.closest(".call-layout");
     if (room) mutation.observe(room, { attributes: true, attributeFilter: ["data-bubbles-style"] });

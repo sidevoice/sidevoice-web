@@ -113,7 +113,36 @@ test("a live bubble resize recounts pages without remounting or restarting the c
   act(() => notify());
   expect(windowOf()).toBe(original);
   expect(page()).toBe(1);
-  expect(pages).toHaveBeenLastCalledWith(4);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  vi.unstubAllGlobals();
+});
+
+test("a live shrink clamps the visible last page without remounting or restarting its clock", () => {
+  let notify: () => void = () => {};
+  class Observer {
+    constructor(callback: () => void) { notify = callback; }
+    observe() {}
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", Observer);
+  let lines = 9;
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(3 * LINE);
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text-run") ? lines * LINE : 0;
+  });
+  const pages = vi.fn();
+  render(<PagedText measure={text(9)} onPages={pages}>{text(9)}</PagedText>);
+  const original = windowOf();
+  tick(PAGE_MS);
+  tick(PAGE_MS);
+  expect(page()).toBe(2);
+  lines = 6;
+  act(() => notify());
+  expect(windowOf()).toBe(original);
+  expect(page()).toBe(1);
+  expect(run().style.transform).toBe(`translateY(-${3 * LINE}px)`);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  expect(vi.getTimerCount()).toBe(0);
   vi.unstubAllGlobals();
 });
 

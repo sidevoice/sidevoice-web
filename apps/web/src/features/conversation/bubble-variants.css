@@ -56,17 +56,25 @@
 }
 .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .person-bubble .voice-bars,
 .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble[data-live] .voice-bars { color: var(--sv-voice-text); }
+/* Transcribing stays visibly quieter, including at the pulse minimum and with reduced motion. */
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .voice-wave[data-phase="transcribing"] canvas { animation: bubble-wave-rest 1.9s ease-in-out infinite; }
+@keyframes bubble-wave-rest { 0%, 100% { opacity: 1; } 50% { opacity: .8; } }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .voice-bars[data-phase="transcribing"] i { opacity: .8; }
+@media (prefers-reduced-motion: reduce) {
+  .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .voice-wave[data-phase="transcribing"] canvas { animation: none; opacity: .8; }
+}
 
 /* A: plush, opaque cards with a small restrained corner on the speaker's side. */
 .call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .person-bubble, .chat-bubble) {
   border-radius: 24px;
-  box-shadow: 0 3px 8px rgb(42 26 64 / 10%), 0 16px 36px -18px rgb(74 47 107 / 45%);
+  --bubble-shadow: 0 3px 8px rgb(42 26 64 / 10%), 0 16px 36px -18px rgb(74 47 107 / 45%);
+  box-shadow: var(--bubble-shadow);
 }
 .call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .chat-bubble[data-role="assistant"]):is(.stage-bubble, [data-position="last"], [data-position="only"]) { border-bottom-left-radius: 9px; }
 .call-layout[data-bubbles-style="soft"] :is(.person-bubble, .chat-bubble[data-role="user"]):is(.person-bubble, [data-position="last"], [data-position="only"]) { border-bottom-right-radius: 9px; }
 .call-layout[data-bubbles-style="soft"] .chat-bubble[data-role="assistant"] { background: var(--bubble-agent); border: 1px solid var(--bubble-edge); }
 .call-layout[data-bubbles-style="soft"] :is(.voice-wave, .voice-bars) { border-radius: 12px; }
-[data-theme="dark"] .call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .person-bubble, .chat-bubble) { box-shadow: 0 12px 32px rgb(0 0 0 / 60%); }
+[data-theme="dark"] .call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .person-bubble, .chat-bubble) { --bubble-shadow: 0 12px 32px rgb(0 0 0 / 60%); }
 
 /* B: outlined balloons whose offset shadow and short tails echo the bichos' drawn contours. */
 .call-layout[data-bubbles-style="illustrated"] {
@@ -90,12 +98,13 @@
 .call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .person-bubble, .chat-bubble) {
   border: 2px solid var(--bubble-edge);
   border-radius: 23px;
-  box-shadow: 4px 5px 0 color-mix(in srgb, var(--bubble-edge) 75%, transparent);
+  --bubble-shadow: 4px 5px 0 color-mix(in srgb, var(--bubble-edge) 75%, transparent);
+  box-shadow: var(--bubble-shadow);
 }
 .call-layout[data-bubbles-style="illustrated"] .chat-bubble[data-role="assistant"] { background: var(--bubble-agent); }
 .call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .chat-bubble[data-role="assistant"]):is(.stage-bubble, [data-position="last"], [data-position="only"]) { border-bottom-left-radius: 6px; }
 .call-layout[data-bubbles-style="illustrated"] :is(.person-bubble, .chat-bubble[data-role="user"]):is(.person-bubble, [data-position="last"], [data-position="only"]) { border-bottom-right-radius: 6px; }
-.call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .person-bubble)::after {
+.call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .person-bubble, .chat-bubble:is([data-position="last"], [data-position="only"]))::after {
   content: "";
   position: absolute;
   bottom: -9px;
@@ -106,13 +115,13 @@
   transform: rotate(45deg);
   clip-path: polygon(0 0, 100% 100%, 0 100%);
 }
-.call-layout[data-bubbles-style="illustrated"] .stage-bubble::after { left: 16px; }
-.call-layout[data-bubbles-style="illustrated"] .person-bubble::after { right: 16px; transform: rotate(225deg); }
+.call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .chat-bubble[data-role="assistant"])::after { left: 16px; }
+.call-layout[data-bubbles-style="illustrated"] :is(.person-bubble, .chat-bubble[data-role="user"])::after { right: 16px; transform: rotate(225deg); }
 [data-theme="dark"] .call-layout[data-bubbles-style="illustrated"] :is(.person-bubble, .chat-bubble[data-role="user"]) {
   border-color: #352a42;
-  box-shadow: 4px 5px 0 #352a42;
+  --bubble-shadow: 4px 5px 0 #352a42;
 }
-[data-theme="dark"] .call-layout[data-bubbles-style="illustrated"] .person-bubble::after { border-color: #352a42; }
+[data-theme="dark"] .call-layout[data-bubbles-style="illustrated"] :is(.person-bubble, .chat-bubble[data-role="user"])::after { border-color: #352a42; }
 .call-layout[data-bubbles-style="illustrated"] :is(.voice-wave, .voice-bars) { border: 2px solid var(--bubble-edge); border-radius: 11px; }
 .call-layout[data-bubbles-style="illustrated"] .voice-bars i { width: 5px; border-radius: 3px; }
 
@@ -120,7 +129,8 @@
 .call-layout[data-bubbles-style="panel"] :is(.stage-bubble, .person-bubble, .chat-bubble) {
   border: 1px solid var(--bubble-edge);
   border-radius: 12px;
-  box-shadow: 0 2px 5px rgb(42 26 64 / 10%);
+  --bubble-shadow: 0 2px 5px rgb(42 26 64 / 10%);
+  box-shadow: var(--bubble-shadow);
 }
 .call-layout[data-bubbles-style="panel"] :is(.stage-bubble, .chat-bubble[data-role="assistant"]) { border-left: 4px solid var(--sv-voice-text); }
 .call-layout[data-bubbles-style="panel"] :is(.person-bubble, .chat-bubble[data-role="user"]) { border-right: 4px solid var(--sv-voice); }
@@ -128,6 +138,15 @@
 .call-layout[data-bubbles-style="panel"] :is(.voice-wave, .voice-bars) { border-radius: 5px; }
 .call-layout[data-bubbles-style="panel"] .voice-bars { gap: 5px; }
 .call-layout[data-bubbles-style="panel"] .voice-bars i { width: 2px; border-radius: 1px; }
+
+/* Keep the cut-off reply mark distinct from each proposal's decorative shadow. */
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble[data-interrupted] {
+  box-shadow: inset 3px 0 0 var(--sv-voice), var(--bubble-shadow);
+}
+.call-layout[data-bubbles-style="panel"] .chat-bubble[data-interrupted] {
+  outline: 2px dashed var(--sv-voice);
+  outline-offset: 2px;
+}
 
 @container stage (max-width: 480px) {
   .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) :is(.stage-bubble, .person-bubble) { font-size: 16px; line-height: 24px; }

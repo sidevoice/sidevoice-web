@@ -33,12 +33,14 @@ export function PagedText({ children, measure, onPages, follow }: { children: Re
       const count = Math.max(1, Math.ceil((inner.scrollHeight - 1) / height));
       setStep((before) => before === height ? before : height);
       setPages((before) => before === count ? before : count);
-      if (!follow) onPages?.(count);
+      // A cosmetic reflow can remove pages. Keep the visible page inside the new run;
+      // the sent turn's original page count owns its display lifetime.
+      setPage((before) => Math.min(before, count - 1));
     });
     observer.observe(node);
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [measure, follow, onPages]);
+  }, [measure, follow]);
   // By time: a page every PAGE_MS.
   useEffect(() => {
     if (follow || page >= pages - 1) return;
