@@ -94,3 +94,23 @@ test("a Field labels it, describes it and marks it invalid; size and disabled re
   expect(box).toBeDisabled();
   expect(box).toHaveClass("ui-control--sm");
 });
+
+test("in a form, a value and the options that hold it, changed together, are not taken back as a choice of nothing", () => {
+  // Radix keeps a hidden native select for the form, set to the new value before the new options are drawn in it: it
+  // reports "" (no option has the value yet). Taken as a choice, that clears the value it echoes, and whatever sets it
+  // again loops (the first-run setup choosing a model of another family while Settings, a form, is drawn behind it).
+  const change = vi.fn();
+  const kokoro = [{ value: "kokoro-82m-v0.19", label: "kokoro-82m-v0.19" }, { value: "kokoro-82m-v1.0", label: "kokoro-82m-v1.0" }];
+  const supertonic = [{ value: "supertonic-3", label: "supertonic-3" }, { value: "supertonic-2", label: "supertonic-2" }];
+  const { rerender } = render(<form><Select id="model" aria-label="Model" value="kokoro-82m-v1.0" onValueChange={change} options={kokoro} /></form>);
+  rerender(<form><Select id="model" aria-label="Model" value="supertonic-3" onValueChange={change} options={supertonic} /></form>);
+  expect(change).not.toHaveBeenCalled();
+  expect(selectedValue("model")).toBe("supertonic-3");
+  // With "" a choice of its own (Automatic), it is no more picked by it.
+  const voices = (ids: string[]) => [{ value: "", label: "Automatic" }, ...ids.map((value) => ({ value, label: value }))];
+  rerender(<form><Select id="voice" aria-label="Voice" value="af_heart" onValueChange={change} options={voices(["af_heart"])} /></form>);
+  rerender(<form><Select id="voice" aria-label="Voice" value="ef_dora" onValueChange={change} options={voices(["ef_dora", "em_alex"])} /></form>);
+  expect(change).not.toHaveBeenCalled();
+  chooseOption("voice", "em_alex");
+  expect(change).toHaveBeenLastCalledWith("em_alex");
+});

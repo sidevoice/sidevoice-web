@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { SettingsDialog } from "./SettingsDialog";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import { defaultVoiceSettings } from "../../services/voice-settings.js";
+import { defaultVoiceSettings, editVoiceSettings } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { SidevoiceActions } from "../../state/room-types";
 
@@ -207,4 +207,31 @@ test("where the engine can't delete models, they are listed without Delete, and 
   expect(document.querySelectorAll("#downloaded-models .downloaded-model")).toHaveLength(2);
   expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
   expect(document.getElementById("pane-advanced")).toHaveTextContent("This version of the app can't delete them yet.");
+});
+
+test("a model of another family chosen in the first-run setup, with Settings drawn behind it, leaves Voice drawn and the choice as made", () => {
+  // Settings is drawn from the start, under the setup, in a form: its own Selects follow every choice the setup makes.
+  // A model of another family is a new value and a new list at once; it once looped there (the slot's model taken
+  // back as none, then given its catalogue's first again) until React gave up and Voice showed it had failed.
+  const tts = (id: string, family: string) => ({ ...model(id, family, "tts", false), speed: { min: 0.5, max: 2 } });
+  const local = [{ id: "local", name: null, status: { stale: false }, models: [
+    tts("kokoro-82m-v0.19", "kokoro"), tts("kokoro-82m-v1.0", "kokoro"), tts("supertonic-3", "supertonic"), tts("supertonic-2", "supertonic"), model("whisper-base", "whisper", "stt"),
+  ] }] as unknown as CatalogView[];
+  const store = createRoomStore();
+  act(() => store.patch({ voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: local, error: "" }, settingsSection: "general" }));
+  // The runtime's own edit (room-session-controller.js `editVoice`): the draft, from what is being edited.
+  const editVoice = vi.fn((patch: Parameters<SidevoiceActions["editVoice"]>[0]) => {
+    const facts = store.getState().facts;
+    store.patch({ voiceDraft: editVoiceSettings(facts.voiceDraft ?? facts.voiceSettings!, patch, facts.voiceCatalogue.catalogs) });
+  });
+  window.sidevoiceActions = { editVoice, installVoiceModel: vi.fn(), loadVoiceCatalogue: vi.fn(), cancelVoiceTry: vi.fn() } as unknown as SidevoiceActions;
+  render(<RoomProvider store={store}><SettingsDialog /></RoomProvider>);
+  // The setup's Voice step: Supertonic, its first model.
+  act(() => editVoice({ tts: { model: "supertonic-3" } }));
+  expect(editVoice.mock.calls.map(([patch]) => patch)).toEqual([{ tts: { model: "supertonic-3" } }]);
+  expect(store.getState().facts.voiceDraft?.tts.model).toBe("supertonic-3");
+  expect(document.querySelector("#pane-voice .panel-error")).toBeNull();
+  fireEvent.click(document.getElementById("settings-voice")!);
+  expect(document.getElementById("tts-family")).toHaveAttribute("data-value", "supertonic");
+  expect(document.getElementById("tts-model")).toHaveAttribute("data-value", "supertonic-3");
 });
