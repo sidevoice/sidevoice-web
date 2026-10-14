@@ -50,11 +50,13 @@ function renderShot(shot: Shot) {
     const status = shot.desktop.state as Record<string, unknown>;
     const host = (window as unknown as { __sidevoiceDesktop?: { host: Record<string, unknown> } }).__sidevoiceDesktop?.host ?? {};
     (window as unknown as { __sidevoiceDesktop: unknown }).__sidevoiceDesktop = { host: { ...host, localHost: {
-      state: async () => status, subscribe: () => noop, pairing: async () => null, install: () => Object.assign(new Promise(noop), { job: "j" }),
+      state: async () => status, subscribe: () => noop, pairing: async () => null,
       start: later, stop: later, restart: later, serviceInstall: later, serviceUninstall: later, agents: async () => ({ agents: [
         { id: "claude-code", label: "Claude Code", version: "2.4" }, { id: "codex", label: "Codex", version: "0.157" }] }),
       ...(shot.desktop.pairingCode ? { pairingCode: async () => ({ code: "SV1.7KQ2-M9XA", expires_in: 600, reach: "direct" }) } : {}),
       ...(shot.desktop.version ? { version: async () => shot.desktop!.version, update: later } : {}),
+      // Installing Sidevoice from the app, where a shot asks for it: the desktop app does not (2026-10-14).
+      ...(shot.desktop.install ? { install: () => Object.assign(new Promise(noop), { job: "j" }) } : {}),
     } } };
   }
   // The actions the runtime would bind: here they do nothing, and a pairing code is refused as the shot says.

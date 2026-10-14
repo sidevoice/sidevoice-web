@@ -98,3 +98,41 @@ test("preparing this computer, the setup offers no other machine in any state of
     expect(setup.getByText("Preparing this computer")).toBeInTheDocument();
   } finally { act(() => localHostInstallController.clear()); }
 }, WHOLE_APP_MS);
+
+test("installed here but not running, preparing this computer offers what starts it: never the install, nor its command", async () => {
+  const install = vi.fn(), start = vi.fn(async () => undefined), restart = vi.fn(async () => undefined), serviceInstall = vi.fn(async () => undefined);
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "stopped-by-person" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), install, start, restart, serviceInstall,
+  } } } });
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "agents" }));
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "stopped-by-person", service: "launchd", reachable: false },
+    voiceSettings: defaultVoiceSettings(), voiceCatalogue: { state: "ready", catalogs: CATALOGS, error: "" } }));
+  render(<App store={store} />);
+  const setup = within(document.getElementById("wizard")!);
+  expect(setup.getByRole("heading", { level: 2 })).toHaveTextContent("Prepare this computer");
+  const action = () => document.getElementById("wizard-prepare-recover")!;
+  const nothingElse = () => {
+    expect(document.getElementById("wizard-prepare")).toBeNull();
+    expect(document.querySelector("#wizard .ui-snippet")).toBeNull();
+  };
+  // Stopped: Start.
+  expect(setup.getByText("Stopped until the next sign-in")).toBeInTheDocument();
+  expect(action()).toHaveTextContent("Start");
+  nothingElse();
+  await act(async () => { fireEvent.click(action()); });
+  expect(start).toHaveBeenCalledOnce();
+  // Failed: Retry is a restart (contract gap #12), said as an alert.
+  act(() => store.patch({ localHostStatus: { state: "failed", service: "launchd", reachable: false, failure: { key: "start.failed" } } }));
+  expect(setup.getByRole("alert")).toHaveTextContent(/^Could not start: /);
+  expect(action()).toHaveTextContent("Retry");
+  nothingElse();
+  await act(async () => { fireEvent.click(action()); });
+  expect(restart).toHaveBeenCalledOnce();
+  // Its service not set up: Start sets it up, which starts it.
+  act(() => store.patch({ localHostStatus: { state: "not-installed", service: "none", installed: false, reachable: false } }));
+  expect(action()).toHaveTextContent("Start");
+  await act(async () => { fireEvent.click(action()); });
+  expect(serviceInstall).toHaveBeenCalledOnce();
+  expect(install).not.toHaveBeenCalled();
+}, WHOLE_APP_MS);

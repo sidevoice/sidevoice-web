@@ -15,7 +15,8 @@ export interface Shot {
   facts?: Record<string, unknown>;
   /** The setup open at this step (its record as given, or the base's). */
   setup?: { step: OnboardingStep; record?: Partial<OnboardingRecord> };
-  /** The desktop app's bridge, for this computer's machine (absent: a browser). */
+  /** The desktop app's bridge, for this computer's machine (absent: a browser): its status, and `install: true` where
+   *  the app installs Sidevoice itself (the desktop app does not: the command does). */
   desktop?: Record<string, unknown>;
   /** What is pressed once the page is drawn. */
   after?: (doc: Document) => void | Promise<void>;
@@ -97,6 +98,7 @@ const openSettings = (section: string) => (doc: Document) => {
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
 const running = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.4.0", api: 1 }, calls: 0 };
 const localBridge = (status: Record<string, unknown>) => ({ state: status, pairingCode: true });
+const stopped = { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" };
 /** No machine yet, and the pairing dialog open. */
 const PAIRING = { pairings: [], callNode: null, machineLinks: {}, pairingOpen: true };
 
@@ -104,7 +106,11 @@ export const JOURNEYS: Journey[] = [
   { id: "first-run", title: "First run", note: "The setup, step by step, on a device that has none yet.", shots: [
     { id: "w0", caption: "The basics: appearance (System), the interface's language and the one you speak (Automatic).", setup: { step: "W0", record: {} } },
     { id: "w1", caption: "Where you use your agents: this computer preselected in the desktop app; another machine.", setup: { step: "W1", record: { basics_done: true } }, desktop: localBridge({ state: "absent" }) },
-    { id: "w2", caption: "Prepare this computer: one button, its progress in place.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } }, desktop: localBridge({ state: "absent" }) },
+    { id: "w2", caption: "Prepare this computer: the command to install Sidevoice here (or an agent runs it); on by itself once it answers.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } }, desktop: localBridge({ state: "absent" }) },
+    { id: "w2-stopped", caption: "Prepare this computer, installed but stopped: Start, not the command.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
+      desktop: localBridge(stopped), facts: { localHostStatus: stopped, localHostAvailable: true } },
+    { id: "w2-install", caption: "Prepare this computer where the app installs Sidevoice itself: one button, its progress in place.", setup: { step: "W2", record: { basics_done: true, choice: "agents" } },
+      desktop: { ...localBridge({ state: "absent" }), install: true } },
     { id: "w3", caption: "Ready here: the agents on this computer, Connect or Disconnect each.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], callNode: null, machineLinks: {} } },
@@ -143,8 +149,8 @@ export const JOURNEYS: Journey[] = [
     { id: "s-providers-error", caption: "Providers: a key the provider refused, in its words.", facts: { voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((c) => c.id === "elevenlabs" ? { ...c, status: { stale: false, reason: { code: "credential-rejected" }, detail: "invalid_api_key" } } : c) } }, after: openSettings("providers") },
     { id: "s-machine-local", caption: "Machines: this computer, running — its service, agents, devices.", desktop: localBridge(running),
       facts: { pairings: [THIS, NUC], machineLinks: { [THIS.fp]: { reach: "ok", via: "node" }, [NUC.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true }, after: openSettings("machines") },
-    { id: "s-machine-stopped", caption: "Machines: this computer, stopped — Start brings it back.", desktop: localBridge({ ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" }),
-      facts: { pairings: [THIS, NUC], localHostStatus: { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" }, localHostAvailable: true }, after: openSettings("machines") },
+    { id: "s-machine-stopped", caption: "Machines: this computer, stopped — Start brings it back.", desktop: localBridge(stopped),
+      facts: { pairings: [THIS, NUC], localHostStatus: stopped, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-remote", caption: "Machines: a remote machine, connected.", facts: { pairings: [NUC, WORKSTATION, LAPTOP], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
     { id: "s-machine-offline", caption: "Machines: a remote machine that does not answer.", facts: { pairings: [LAPTOP, NUC], callNode: null, machineLinks: { [LAPTOP.fp]: { reach: "away", via: "" }, [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
     { id: "s-machine-revoked", caption: "Machines: a machine that no longer knows this device.", facts: { pairings: [{ ...NUC, revoked: true }], callNode: null, machineLinks: { [NUC.fp]: { reach: "revoked", via: "" } } }, after: openSettings("machines") },

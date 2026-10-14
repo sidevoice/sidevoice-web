@@ -22,7 +22,7 @@ import { MenuRow } from "../settings/SettingsMenu";
 import { machineStatus } from "../settings/machine-status";
 import { ThisDeviceVersion } from "../settings/UpdatesSettings";
 import { MachineEntryCopy, MachineEntryState, MachineState, StateOnIcon, machineEntryName, machineEntryTitle } from "../settings/MachineState";
-import { canRunLocalHostAction, hostCause, hostStatusText, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
+import { canRunLocalHostAction, hostCause, hostStatusText, localHostRecovery, runLocalHostAction, safeLocalHostStatusDetails, type LocalHostAction } from "../settings/local-host-status";
 
 function dateText(value: string | number | null | undefined) {
   if (value == null) return "";
@@ -350,17 +350,10 @@ function LocalHostStatusPanel({ machine, status, titleId, name }: { machine: Mac
   if (status.state === "running") {
     if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.restart"), variant: "secondary" });
     if (hasMethod("stop")) buttons.push({ action: "stop", label: t("hosts.stop"), variant: "ghost" });
-  } else if (status.state === "not-installed") {
-    if (hasMethod("serviceInstall")) buttons.push({ action: "serviceInstall", label: t("hosts.start"), variant: "primary" });
-  } else if (status.state === "stopped-by-person") {
-    if (hasMethod("start")) buttons.push({ action: "start", label: t("hosts.start"), variant: "primary" });
-  } else if (status.state === "backoff") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
-  } else if (status.state === "failed" || status.state === "service-failed") {
-    if (hasMethod("restart")) buttons.push({ action: "restart", label: t("hosts.retry"), variant: "primary" });
-  } else if (status.state === "refused") {
-    if (hasMethod("reconnect")) buttons.push({ action: "reconnect", label: t("hosts.reconnect"), variant: "primary" });
   }
+  // Stopped, failed or refused: what brings it back.
+  const recovery = localHostRecovery(status);
+  if (recovery) buttons.push({ action: recovery.action, label: t(recovery.label), variant: "primary" });
   // Any failure has the repair path too, whatever the system's service says of itself: reinstalling.
   if (["failed", "service-failed", "refused", "incompatible"].includes(status.state) && hasMethod("serviceInstall"))
     buttons.push({ action: "serviceInstall", label: t("hosts.reinstall"), variant: "secondary" });

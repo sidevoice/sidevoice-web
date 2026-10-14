@@ -14,3 +14,17 @@ export function ConnectorSteps() {
     </ol>
   );
 }
+
+/** Preparing this computer where the app does not install Sidevoice itself (the desktop app: installing stays the
+ *  command's, the operator's call of 2026-10-14): the same install command, to run here in a terminal or to have one of
+ *  the person's agents run. */
+export function InstallCommandHere() {
+  const t = hostTranslator();
+  return (
+    <div className="install-here">
+      <p>{t("localInstall.runHere")}</p>
+      <Snippet text={CONNECTOR_INSTALL} label={t("noMachine.copyCommand")} />
+      <p className="install-here-agent">{t("localInstall.askAgent")}</p>
+    </div>
+  );
+}
