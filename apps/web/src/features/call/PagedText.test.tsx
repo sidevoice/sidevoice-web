@@ -146,6 +146,26 @@ test("a live shrink clamps the visible last page without remounting or restartin
   vi.unstubAllGlobals();
 });
 
+test("the strip above the window, where the page before fades, is no part of a page: a page is three lines", () => {
+  const PEEK = 12;
+  // The bubble's top padding (call-view.css --paged-peek): the window is that much taller, and a page no taller.
+  const style = document.createElement("style");
+  style.textContent = `.paged-text { padding-top: ${PEEK}px; }`;
+  document.head.append(style);
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text") ? PEEK + 3 * LINE : 0;
+  });
+  const pages = vi.fn();
+  render(<PagedText measure={text(7)} onPages={pages}>{text(7)}</PagedText>);
+  expect(getComputedStyle(windowOf()).paddingTop).toBe(`${PEEK}px`);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  tick(PAGE_MS);
+  expect(run().style.transform).toBe(`translateY(-${3 * LINE}px)`);
+  // The whole text is still there, for assistive tech: only the eye loses the earlier lines.
+  expect(windowOf().textContent).toBe(text(7));
+  style.remove();
+});
+
 /** The agent's words as the stage shows them, `heard` characters of them heard. */
 function voiced(words: string, heard: number) {
   return <PagedText measure={words} follow=".karaoke-played">
