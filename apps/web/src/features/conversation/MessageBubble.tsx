@@ -27,7 +27,8 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
   const total = [...message.text].length;
   const audioMark = message.role !== "assistant" ? null : message.audio_reason === "user_skipped" || message.audio === "skipped"
     ? t("messages.audio.skipped")
-    : message.audio === "text_only" || message.audio === "unplayed" ? t("messages.audio.notPlayed")
+    : message.audio === "text_only" || message.audio_reason === "unheard"
+      || message.audio_reason === "newer_turn" && message.heard_chars == null ? t("messages.audio.notPlayed")
       : message.interrupted || message.audio === "failed" || message.audio === "disconnected"
         ? Number.isInteger(message.heard_chars) ? t("messages.audio.partial", { heard: message.heard_chars!, total }) : t("messages.audio.unknown")
         : null;

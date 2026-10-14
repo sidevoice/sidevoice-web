@@ -64,11 +64,12 @@ test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from
     message({segment: "partial", text: "é🐙ab", interrupted: true, heard_chars: 2}),
     message({segment: "unknown", text: "unknown", interrupted: true, heard_chars: null}),
     message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off"}),
+    message({segment: "newer", text: "never started", audio: "interrupted", interrupted: true, audio_reason: "newer_turn", heard_chars: null}),
     message({segment: "skipped", text: "skipped", audio: "skipped", audio_reason: "user_skipped"}),
   ];
   const {container} = render(<MessageList conversation={view(rows)} />);
   expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent))
-    .toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown", "Not played", "Skipped"]);
+    .toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown", "Not played", "Not played", "Skipped"]);
 });
 
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {

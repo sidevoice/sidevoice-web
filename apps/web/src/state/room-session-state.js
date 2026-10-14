@@ -467,6 +467,10 @@ export function audioNote(r, ahead = 0) {
     // Published while this device was away: none of it sounded, which is not the same as being cut off.
     if (r.audio_reason === 'unheard')
         return say('session.audio.unheard');
+    // Core stores a never-started, newer-turn receipt as interrupted with no heard extent.
+    // The mark says "Not played"; an interruption explanation here would contradict it.
+    if (r.audio_reason === 'newer_turn' && r.heard_chars == null)
+        return '';
     if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)
         return reason ? say('session.audio.interruptedWhy', { reason }) : say('session.audio.interrupted');
     if (r.audio === 'failed' && r.audio_reason === 'unconfirmed')
