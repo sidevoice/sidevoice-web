@@ -135,11 +135,11 @@ test("the browser voice wrapper passes take options and output subscriptions thr
     stop: async () => {},
     say: () => ({ id: "", cancel() {}, onEvent() {}, outcome: Promise.resolve({ status: "heard" }) }),
     mute() {}, cancelInput() {},
-    onTurn: () => () => {}, onState: () => () => {}, onLevel: () => () => {}, onError: () => () => {},
+    onTurn: () => () => {}, onState: () => () => {}, onLevel: () => () => {}, onError: () => () => {}, onAgentInterrupted: () => () => {},
     onTake: (listener) => { takes.add(listener); return () => { takes.delete(listener); }; },
     onPlaybackLevel: (listener) => { levels.add(listener); return () => { levels.delete(listener); }; },
     audioDevices: async () => devices, setAudioDevices: async () => devices, onAudioDevices: () => () => {},
-  });
+  } as VoiceHost);
   const host = swappingVoiceHost(create, source);
   const heard: number[] = [], output: number[] = [];
   const stopTake = host.onTake((take) => heard.push(take.ended_at));

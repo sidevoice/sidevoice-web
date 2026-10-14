@@ -7,6 +7,7 @@ const facts={sessionId:'s',threadId:'a',epoch:2,openTurns:new Set<string>(),outp
 test('same epoch plays in FIFO admission; typing has no effect on eligibility',()=>{
  expect(replyEligibility(reply,facts)).toBe('play');
  expect(replyEligibility(reply,{...facts})).toBe('play');
+ expect(replyEligibility({...reply,epoch:1,requested:true},facts)).toBe('play');
 });
 test.each([
  ['session', {...facts,sessionId:'other'},'call_ended'],

@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts'};
+ const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -451,7 +451,7 @@ test('Speaker levels follow the active conversation and clear on silence and dis
  output(0.8);
  assert.deepEqual(events.at(-1),[0,null],'no mouth while synthesis waits');
  host.emit('state',{playback:'playing'});
- s.run("sayReply({utterance_id:'old',thread_id:'one',text:'Old reply',history_id:'old-row'})");
+ s.run("state.sessionId='s';state.ws={close(){}};threadEpochs.set('one',0);receiveReply({session_id:'s',utterance_id:'old',thread_id:'one',epoch:0,text:'Old reply',history_id:'old-row',revision:0})");
  host.said[0].step({type:'playing'});
  output(0.7);
  assert.deepEqual(events.at(-1),[0.7,'fp-mac|one']);
@@ -1070,16 +1070,16 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
  const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
  // What the voice is asked to say: a handle the test steps through (`step`), as the voice's own goes.
  const say=(text,options)=>{
-  calls.push(['say',text,options]);const listeners=new Set();
+  calls.push(['say',text,options]);const listeners=new Set();let settle;
   const handle={id:'say-'+(said.length+1),text,options,cancelled:false,
    cancel(){handle.cancelled=true;calls.push(['cancel',handle.id])},
-   onEvent(listener){listeners.add(listener)},step(event){for(const listener of listeners)listener(event)}};
+   onEvent(listener){listeners.add(listener)},outcome:new Promise(resolve=>{settle=resolve}),step(event){for(const listener of listeners)listener(event);if(event.type==='done')settle(event.outcome)}};
   said.push(handle);return handle;
  };
  return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onTake:sub('take'),onError:sub('error')};
+  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onAgentInterrupted:sub('agent-interrupted'),onTake:sub('take'),onError:sub('error')};
 }
 // The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
 function fakeEngine(catalogs){
@@ -1108,7 +1108,7 @@ async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=un
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  const voice=withVoice(s,fakeVoice());
- s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',title:'A',binding_id:'b',epoch:0},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
  s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);keepScreenAwake=()=>{};roomBinding={thread_id:'a',title:'A',binding_id:'b'}");
  const frames=socket=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m));
  const until=async(check,what)=>{for(let i=0;i<500;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,2))}assert.fail('never: '+what)};
@@ -1120,6 +1120,7 @@ async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=un
  const joined=s.run('toggleCall')();
  await until(()=>sockets.length===1,'the call socket');
  const {socket,hello}=await answer({session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false});await joined;
+ s.run("threadEpochs.set('a',0)");
  return {s,sockets,voice,store,frames,answer,push,drop,until,first:socket,firstHello:hello};
 }
 // What the page sent the room, of one type, without what every frame carries.
@@ -1135,7 +1136,8 @@ test('A call subscribes to its voice, chooses, starts it, and only then joins th
  assert.deepEqual(voice.calls.map(([name])=>name).slice(0,3),['setSettings','start','mute']);
  assert.deepEqual(plain(voice.calls[0][1]),plain(c.s.run('voiceSettings')),'the settings this device keeps');
  assert.equal(firstHello.type,'client-ready');
- assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','ui_language']);
+ assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','speech','ui_language']);
+ assert.deepEqual(plain(firstHello.data.speech),{on:true});
  assert.equal(firstHello.data.conversation,'a');
  assert.equal(c.s.run('sessionId'),'s1');
  c.s.run('window.sidevoiceActions.toggleCall()');
@@ -1182,7 +1184,7 @@ test('Words said while the room was away go as their own offline message; a star
 });
 test('A reply is written at once and said by the voice; its handle lights the row and tells the room how it went',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
- const reply={session_id:'s1',utterance_id:'r-1',revision:3,reply_revision:1,thread_id:'a',history_id:'h-1',text:'Buenos días',language:'es'};
+ const reply={session_id:'s1',utterance_id:'r-1',revision:3,reply_revision:1,epoch:0,thread_id:'a',history_id:'h-1',text:'Buenos días',language:'es'};
  c.push(first,{type:'voice-reply',data:reply});
  assert.equal(s.run('history.at(-1).role'),'assistant');
  assert.equal(s.run('history.at(-1).text'),'Buenos días');
@@ -1207,28 +1209,93 @@ test('A reply is written at once and said by the voice; its handle lights the ro
 
 test('The room\'s withdrawals cancel what it names, and each reply\'s end goes to the room in its words',async()=>{
  const c=await callOnRoom();const {voice,first,s}=c;
- const reply=(id,text)=>c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,revision:3,reply_revision:1,thread_id:'a',history_id:'h-'+id,text}});
+ const reply=(id,text)=>c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,revision:3,reply_revision:1,epoch:0,thread_id:'a',history_id:'h-'+id,text}});
  for(const id of ['r-1','r-2','r-3','r-4','r-5'])reply(id,'Hola mundo');
- const [one,two,three,four,five]=voice.said;
+ assert.equal(voice.said.length,1,'same-epoch replies wait in FIFO order');
+ const one=voice.said[0];
  one.step({type:'playing'});
  c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['r-2','gone'],reason:'newer_turn'}});
- assert.deepEqual([one.cancelled,two.cancelled],[false,true],'only what it names; an id this page no longer holds is ignored');
- two.step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
+ assert.equal(one.cancelled,false,'an unstarted reply is withdrawn without cutting the playing one');
  c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['r-1'],reason:'focus_changed'}});
  one.step({type:'done',outcome:{status:'heard-up-to',heard_chars:4,reason:'cancelled'}});
+ const three=voice.said[1];
  three.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+ const four=voice.said[2];
  four.step({type:'done',outcome:{status:'not-played',reason:'barge-in'}});
+ const five=voice.said[3];
  five.step({type:'done',outcome:{status:'not-played',reason:'failed',code:'credential-missing'}});
  const ends=sentOf(c,first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status,d.reason,d.heard_chars]);
  assert.deepEqual(plain(ends),[
-  ['r-2','unplayed','newer_turn',0],
+  ['r-2','unplayed','newer_turn',null],
   ['r-1','interrupted','focus_changed',4],
   ['r-3','interrupted','user_interrupted',2],
-  ['r-4','unplayed','newer_turn',0],
-  ['r-5','failed',null,0],
+  ['r-4','unplayed','newer_turn',null],
+  ['r-5','failed',null,null],
  ]);
  c.push(first,{type:'voice-reply-withdrawn',data:{session_id:'other',utterance_ids:['r-6'],reason:'newer_turn'}});
  s.run('disconnect()');
+});
+test('T03 stale reply is written but never handed to either voice host',async()=>{
+ const c=await callOnRoom();
+ c.s.run("threadEpochs.set('a',2)");
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'stale',thread_id:'a',revision:2,reply_revision:1,epoch:1,history_id:'stale-row',text:'Old answer'}});
+ assert.equal(c.voice.said.length,0);
+ assert.equal(c.s.run('history.at(-1).text'),'Old answer');
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').map(d=>[d.utterance_id,d.status,d.reason])),[['stale','unplayed','newer_turn']]);
+ c.s.run('disconnect()');
+});
+test('T04 and T12 keep FIFO after skip, with no epoch change',async()=>{
+ const c=await callOnRoom();
+ for(const id of ['first','second'])c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['first']);
+ c.voice.said[0].step({type:'playing'});
+ c.s.run('skipReply()');
+ assert.equal(c.voice.said[0].cancelled,true);
+ c.voice.said[0].step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'cancelled'}});
+ assert.deepEqual(c.voice.said.map(s=>s.text),['first','second']);
+ assert.equal(c.s.run("threadEpochs.get('a')"),0);
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[['user_skipped',1]]);
+ c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+ c.s.run('disconnect()');
+});
+test('T01 and T02 map played-zero barge-in to one core receipt before the terminal turn',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:0,played:true});
+ c.voice.emit('turn',started('spoken'));
+ c.voice.emit('turn',finished('spoken','New words'));
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
+ const frames=c.frames(c.first).filter(f=>['voice-playback','voice-user-turn'].includes(f.type));
+ assert.deepEqual(plain(frames.filter(f=>f.type==='voice-playback'&&f.data.status!=='playing').map(f=>[f.data.utterance_id,f.data.status,f.data.reason,f.data.heard_chars])),[['core-reply','interrupted','user_interrupted',0]]);
+ assert.ok(frames.findIndex(f=>f.data.status==='interrupted')<frames.findIndex(f=>f.data.phase==='finished'));
+ c.s.run('disconnect()');
+});
+test('T06 output settings report local fate and send reliable eligibility without muting the mic',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'Answer'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ const beforeMute=c.voice.calls.filter(([name])=>name==='mute').length;
+ c.s.run("setSpeechOutput('agents_muted')");
+ assert.equal(handle.cancelled,true);
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ assert.equal(c.voice.calls.filter(([name])=>name==='mute').length,beforeMute);
+ assert.equal(sentOf(c,c.first,'voice-speech').at(-1).reason,'agents_muted');
+ assert.equal(sentOf(c,c.first,'voice-playback').at(-1).reason,'agents_muted');
+ c.s.run("setSpeechOutput('voice_off')");
+ assert.equal(sentOf(c,c.first,'voice-speech').at(-1).reason,'voice_off');
+ c.s.run("setSpeechOutput('on')");
+ assert.equal(sentOf(c,c.first,'voice-speech').at(-1).on,true);
+ c.s.run('disconnect()');
+});
+test('T11 a delayed transcript keeps its captured focus through a later selection',async()=>{
+ const c=await callOnRoom();
+ c.voice.emit('turn',started('captured'));
+ c.s.run("state.roomBinding={thread_id:'b',binding_id:'new'}");
+ c.voice.emit('turn',finished('captured','Original conversation'));
+ const end=turnSent(c,c.first,'captured','finished')[0];
+ assert.deepEqual([end.thread_id,end.binding_id],['a','b']);
+ c.s.run('disconnect()');
 });
 test('Settings send only the interface language to the room',async()=>{
  const s=setup();const sent=[];s.context.__send=text=>sent.push(JSON.parse(text));
@@ -1320,7 +1387,7 @@ test('A page with no voice keeps its settings unchecked and says why it cannot k
 // ----- the independent review of #60/#61 (briefs/reviews/2026-10-09-web-60-61.md): each of its probes, the right way round -----
 test('A resumed session sends at once what waited while the room was away',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
- c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r-1',revision:1,reply_revision:1,thread_id:'a',history_id:'h',text:'twelve chars'}});
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r-1',revision:1,epoch:0,reply_revision:1,thread_id:'a',history_id:'h',text:'twelve chars'}});
  c.drop(c.first);
  voice.emit('turn',started('away'));
  voice.emit('turn',finished('away','offline words'));
@@ -1329,7 +1396,7 @@ test('A resumed session sends at once what waited while the room was away',async
  const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
  await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
  const sent=c.frames(socket).filter(f=>['voice-user-turn','voice-playback'].includes(f.type));
- assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status,f.data.offline])),[['voice-user-turn','started',null],['voice-user-turn','finished',null],['voice-playback','heard',null]],'no later voice event needed; the same session takes the turn as it is');
+ assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status,f.data.offline])),[['voice-user-turn','started',null],['voice-playback','heard',null],['voice-user-turn','finished',null]],'terminal playback evidence precedes the final turn frame');
  for(const frame of sent)c.push(socket,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
  assert.equal(s.run('outbox.size'),0);
  s.run('disconnect()');
@@ -1398,12 +1465,12 @@ test('A voice failure is said and logged',async()=>{
 });
 test('A move to another conversation leaves its replies to the room, which withdraws them; the call keeps listening',async()=>{
  const c=await callOnRoom();const {s,voice}=c;
- c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'old-reply',revision:1,reply_revision:1,thread_id:'a',history_id:'row',text:'old conversation'}});
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'old-reply',revision:1,epoch:0,reply_revision:1,thread_id:'a',history_id:'row',text:'old conversation'}});
  const before=voice.calls.length;
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
  await s.run("select('fp-mac|b')");await settleSoon();
  assert.equal(s.run('targetId()'),'fp-mac|b');
- assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),[],'not stopped: what is stale is the room\'s to say');
+ assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['cancel'],'focus change stops local audio before withdrawal arrives');
  c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['old-reply'],reason:'focus_changed'}});
  assert.equal(voice.said[0].cancelled,true);
  voice.said[0].step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
@@ -1680,7 +1747,7 @@ async function callWithTwoMachines(){
 }
 test('Picking another machine\'s conversation moves the call there: the open turn is cancelled, its replies stopped and told, then a new session',async()=>{
  const c=await callWithTwoMachines();const {s,voice,first}=c;
- c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r1',revision:1,reply_revision:1,thread_id:'a',history_id:'row-r1',text:'Sigo en el Mac'}});
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r1',revision:1,epoch:0,reply_revision:1,thread_id:'a',history_id:'row-r1',text:'Sigo en el Mac'}});
  voice.said[0].step({type:'playing'});
  voice.emit('turn',started('u1'));
  const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
@@ -1717,7 +1784,7 @@ test('A reply that arrives while the call leaves its machine is written, never s
  voice.emit('turn',started('u7'));voice.emit('turn',finished('u7','Para el Mac'));
  const reported=[];s.context.window.sidevoiceTelemetry=null;const report=s.run('reportClientError');s.context.__report=e=>{reported.push(e);report(e)};s.run('reportClientError=__report');
  const moved=s.run("window.sidevoiceActions.selectParticipant('fp-pc|p')");
- c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:2,reply_revision:2,thread_id:'a',history_id:'row-late',text:'Tarde'}});
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'late',revision:2,epoch:0,reply_revision:2,thread_id:'a',history_id:'row-late',text:'Tarde'}});
  assert.equal(voice.said.length,0,'not said: the person has moved on');
  assert.ok(s.run("history.some(r=>r.text==='Tarde'&&r.thread==='fp-mac|a')"),'but written in its own conversation');
  await c.until(()=>c.sockets.length===2,'the move does not wait for ever');
@@ -1786,7 +1853,7 @@ test('Words the voice transcribes late, after the call moved, never reach the ot
 test('A row of one machine is never another\'s, even under the same id',async()=>{
  const c=await callWithTwoMachines();const {s,first}=c;
  s.run("history=[{segment:'shared',thread:'fp-pc|p',role:'assistant',text:'Del PC',seq:1}]");
- c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r9',revision:1,reply_revision:1,thread_id:'a',history_id:'shared',text:'Del Mac'}});
+ c.push(first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'r9',revision:1,epoch:0,reply_revision:1,thread_id:'a',history_id:'shared',text:'Del Mac'}});
  assert.deepEqual(plain(s.run('history').map(r=>[r.thread,r.text])),[['fp-pc|p','Del PC'],['fp-mac|a','Del Mac']]);
  s.run("karaokeState={segment:'shared',from:0,to:3}");
  const lit=s.run("SessionState.conversationView({...roomStore.getState().facts,viewedThread:'fp-pc|p'}).messages[0].karaoke");

@@ -51,3 +51,17 @@ test("a microphone the system or another app holds is said where the microphone 
   act(() => store.patch({ micEnabled: true, voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "live" } } as never));
   expect(screen.queryByText(silent)).toBeNull();
 });
+
+test("T06 output controls are distinct from microphone mute", () => {
+  const store=toolbar();
+  const setSpeechOutput=vi.fn();
+  window.sidevoiceActions={setSpeechOutput} as unknown as typeof window.sidevoiceActions;
+  const menu=document.getElementById("call-menu") as HTMLDetailsElement;
+  menu.open=true;
+  screen.getByRole("button",{name:"Mute agents"}).click();
+  expect(setSpeechOutput).toHaveBeenCalledWith("agents_muted");
+  act(()=>store.patch({speechOutput:"agents_muted"}));
+  expect(screen.getByRole("button",{name:"Unmute agents"})).toHaveAttribute("aria-pressed","true");
+  screen.getByRole("button",{name:"Turn spoken replies off"}).click();
+  expect(setSpeechOutput).toHaveBeenCalledWith("voice_off");
+});

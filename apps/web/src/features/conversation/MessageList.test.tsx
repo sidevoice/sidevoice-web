@@ -59,6 +59,18 @@ test("an interrupted reply says so to a screen reader too", () => {
   expect(screen.getByRole("article", { name: "Agente, interrupted: Te decía que" })).toHaveAttribute("data-interrupted", "true");
 });
 
+test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from reading text", () => {
+  const rows = [
+    message({segment: "partial", text: "é🐙ab", interrupted: true, heard_chars: 2}),
+    message({segment: "unknown", text: "unknown", interrupted: true, heard_chars: null}),
+    message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off"}),
+    message({segment: "skipped", text: "skipped", audio: "skipped", audio_reason: "user_skipped"}),
+  ];
+  const {container} = render(<MessageList conversation={view(rows)} />);
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent))
+    .toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown", "Not played", "Skipped"]);
+});
+
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "voice", text: "Respuesta activa ahora", playback: "playing", karaoke: { from: 10, to: 16 } })], "Sigo hablando…")} />);
   expect(screen.getByText("Sigo hablando…")).toBeInTheDocument();

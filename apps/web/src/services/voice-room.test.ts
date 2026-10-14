@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { characters, playbackReport, ROOM_PLAYBACK_REASONS, sayingRange, scalarExtent, turnMessage } from "./voice-room.js";
+import flow from "../../test/fixtures/conversation-flow.json";
 
 /* The voice's events in the room's words. */
 
@@ -40,6 +41,20 @@ test("played zero remains a partial interruption and scalar counts never use UTF
     .toEqual({status: "interrupted", reason: "user_interrupted", heard_chars: 0});
   expect(scalarExtent("é🐙ab", 3, "utf16")).toBe(2);
   expect(scalarExtent("é🐙ab", 200)).toBe(4);
+});
+
+test("core #120 playback fixture stays mapped at the browser boundary", () => {
+  for (const entry of flow.playback) {
+    if ("type" in entry.voice) continue;
+    const voice = entry.voice as {reason?: string | {reason:string}, local_action?: string};
+    const outcome = {...entry.voice, ...(typeof voice.reason === "object" ? {reason:voice.reason.reason} : {})};
+    const action = voice.local_action
+      ? voice.local_action === "skip" ? "user_skipped" : voice.local_action
+      : null;
+    const report = playbackReport(outcome as Parameters<typeof playbackReport>[0], flow.text, null, action);
+    expect(report).toMatchObject(entry.core);
+    if (entry.voice.status === "heard") expect(report.heard_chars).toBe(entry.history.heard_chars);
+  }
 });
 
 test("where the voice is in a reply comes as offsets into its text, counted as JavaScript counts", () => {
