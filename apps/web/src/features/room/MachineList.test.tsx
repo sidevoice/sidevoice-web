@@ -50,7 +50,7 @@ function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   return store;
 }
 
-test("the local host is This device's; every remote row says Connected however it is reached, never a route, and no machine is to be chosen", async () => {
+test("the local host is This device's; every remote row says Online however it is reached, never a route, and no machine is to be chosen", async () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "room" }, "fp-other": { reach: "ok", via: "node" } } });
@@ -58,11 +58,11 @@ test("the local host is This device's; every remote row says Connected however i
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
   expect(rows).toHaveLength(2);
   // Through the room or directly, the same word: how it is reached is not said while the relay is not shipping.
-  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Connected");
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Online");
   expect(rows[0].getAttribute("aria-label")).not.toMatch(/room|nuc-1|fingerprint|relay/i);
-  expect(rows[0]).toHaveAttribute("title", "NUC · Connected");
-  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
-  expect(rows[1]).toHaveAttribute("title", "Other PC · Connected");
+  expect(rows[0]).toHaveAttribute("title", "NUC · Online");
+  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Online");
+  expect(rows[1]).toHaveAttribute("title", "Other PC · Online");
   expect(rows.some((row) => row.hasAttribute("data-in-use"))).toBe(false);
   // Every machine is live at once: no page says In use or offers Use.
   for (const name of ["NUC", "Other PC"]) {
@@ -72,11 +72,11 @@ test("the local host is This device's; every remote row says Connected however i
   }
 });
 
-test("an unreachable remote machine only says Not connected, and can still be forgotten, told when it's back", () => {
+test("an unreachable remote machine only says Offline, and can still be forgotten, told when it's back", () => {
   const done = { ...actions(), machineDevices: vi.fn(), forgetMachine: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
-  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toBe("NUC, Not connected");
+  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toBe("NUC, Offline");
   expect(screen.queryByRole("button", { name: /Retry NUC/ })).toBeNull();
   // Its list can't be read, so no row of this device's: Forget is offered on its own, and never waits on the machine.
   expect(done.machineDevices).not.toHaveBeenCalled();
@@ -163,13 +163,13 @@ test("a failed local R1 host stays on the existing machine path instead of the n
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
 });
 
-test("a remote that does not answer says Not connected while another answers: each row says its own link", () => {
+test("a remote that does not answer says Offline while another answers: each row says its own link", () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "offline", via: "" }, "fp-other": { reach: "ok", via: "node" } } });
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
-  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Not connected");
-  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Offline");
+  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Online");
 });
 
 test("local F6 status shows only supported service actions", async () => {
@@ -498,14 +498,14 @@ test("a lost native pairing keeps This device's page and recovery action, with n
   expect(restart).toHaveBeenCalledOnce();
 });
 
-test("a reachable local core whose service the person stopped says Stopped, as its card, and hides the warning", () => {
+test("a reachable local core whose service the person stopped says Not started, as its card, and hides the warning", () => {
   actions();
   const store = createRoomStore();
   act(() => { store.patch({ pairings: [local], localHostAvailable: true, inApp: true,
     localHostStatus: { state: "stopped-by-person", reachable: true }, machinesReady: true }); });
   render(<RoomProvider store={store}><Panes /><LocalHostBanner /></RoomProvider>);
-  expect(thisDevice().querySelector(".host-detail-state")).toHaveTextContent(/^Stopped$/);
-  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Stopped$/);
+  expect(thisDevice().querySelector(".host-detail-state")).toHaveTextContent(/^Not started$/);
+  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Not started$/);
   expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
 });
 
@@ -590,7 +590,7 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
   expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add"]);
   expect(nav.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a remote machine");
-  expect(entry("NUC")).toHaveAccessibleName("NUC, Connected");
+  expect(entry("NUC")).toHaveAccessibleName("NUC, Online");
   // Each a server, as Remote machines' own icon is: in its entry and in its page's header.
   expect(entry("NUC").querySelector("svg")).toHaveClass("lucide-server");
   expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
@@ -623,7 +623,7 @@ test("asked for a machine's agents, Machines shows that machine once, without fe
   expect(patch.mock.calls.length).toBeLessThanOrEqual(3);
 });
 
-test("this computer is not among the remote machines; stopped, its card says Stopped and offers Start, and nothing of sign-in", async () => {
+test("this computer is not among the remote machines; stopped, its card says Not started and offers Start, and nothing of sign-in", async () => {
   setBridge({ start: vi.fn(async () => running) });
   actions();
   const stopped: LocalHostStatus = { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" };
@@ -632,7 +632,7 @@ test("this computer is not among the remote machines; stopped, its card says Sto
   expect(entry("NUC")).not.toHaveTextContent("This computer");
   expect(within(thisDevice()).getByRole("button", { name: "Start" })).toBeInTheDocument();
   // Its state's word alone says it: no sentence repeats it, and whether it starts at sign-in is its switch's.
-  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Stopped$/);
+  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Not started$/);
   expect(thisDevice().querySelector(".host-status-summary")).toBeNull();
   expect(within(thisDevice()).queryByText(/sign in/)).toBeNull();
 });
@@ -658,7 +658,7 @@ test("a machine paired without encryption shows exactly what the same machine pa
   expect(plain).toBe(await shown(encrypted));
   // And nothing in it speaks of encryption: no words, no open lock, no (i) about the connection.
   expect(plain).not.toMatch(/encrypt|lucide-lock|insecure|About this connection/i);
-  expect(plain).toContain("Lab box, Connected");
+  expect(plain).toContain("Lab box, Online");
 });
 
 /** The devices list on a remote machine's page, and the action at that page's foot. */

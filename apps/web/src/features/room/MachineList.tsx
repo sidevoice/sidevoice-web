@@ -404,7 +404,7 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
             everything that updates is. */}
         <ThisDeviceVersion t={t} />
       </dl>
-      {/* Running or stopped, the state's word says it ("Running", "Stopped") and Start follows: no sentence repeats it.
+      {/* Running or stopped, the state's word says it ("Running", "Not started") and Start follows: no sentence repeats it.
           Whether it starts at sign-in is its switch's alone, below. */}
       {status.state !== "running" && status.state !== "stopped-by-person" && <p className="host-status-summary">{statusMessage}</p>}
       {/* Incompatible ends on "Update it:": the install command, which updates it, follows — as in the setup. */}
