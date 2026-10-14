@@ -22,7 +22,7 @@ test("a failing panel is contained, said in words with what it threw behind Deta
     </div>,
   );
   const alert = screen.getByRole("alert");
-  expect(alert.querySelector("b")).toHaveTextContent("This part of the room failed.");
+  expect(alert.querySelector("b")).toHaveTextContent("This part of the page failed.");
   // What it threw is no sentence for people: closed, behind Details.
   expect(alert.querySelector("b")).not.toHaveTextContent("name.trim");
   expect(alert.querySelector("details:not([open]) > summary")).toHaveTextContent("Details");

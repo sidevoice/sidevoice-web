@@ -355,7 +355,7 @@ async function keepScreenAwake(){
    // change. While the call is up and the room is on screen, ask again.
    lock.addEventListener('release',()=>{
     if(screenWakeLock!==lock)return;
-    screenWakeLock=null;showScreenLock('off','La pantalla puede apagarse; vuelve a la sala para mantenerla activa.');
+    screenWakeLock=null;showScreenLock('off','La pantalla puede apagarse; vuelve a la llamada para mantenerla activa.');
     if(state.ws&&!document.hidden&&wakeRetries<3){++wakeRetries;setTimeout(()=>{if(state.ws&&!document.hidden)keepScreenAwake()},1000)}
    });
   }catch{showScreenLock('off','No se pudo mantener la pantalla activa. El móvil podría suspender la llamada.')}
@@ -533,7 +533,7 @@ function followServedBuild(served){
  const page=window.sidevoiceBuildId||'dev';
  if(!served||page==='dev'||served===page)return;
  // In a call it waits, said in the updates' list too (webUpdate, whose Reload loads it at once), and loads after the hang-up.
- if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la sala: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
+ if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la página: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
  try{if(sessionStorage.getItem('sidevoice.reloadedFor')===served)return;sessionStorage.setItem('sidevoice.reloadedFor',served)}catch{}
  const query=new URLSearchParams(location.search);query.set('v',served);
  location.replace(location.pathname+'?'+query);
@@ -986,7 +986,7 @@ function forgetThread(threadId){state.history=state.history.filter(r=>r.thread!=
 function versionFacts(){
  const page=window.sidevoiceBuildId||'dev',served=state.roomInfo?.web_build||null;
  const stale=served&&page!=='dev'&&served!==page;
- return [['Versión de la página',page],['Versión que sirve la sala',served?served+(stale?' · hay una versión nueva, recarga':' · al día'):'—'],['Servidor',state.roomInfo?.version||'—']];
+ return [['Versión de la página',page],['Versión servida',served?served+(stale?' · hay una versión nueva, recarga':' · al día'):'—'],['Servidor',state.roomInfo?.version||'—']];
 }
 const VOICE_STATES={idle:'Sin iniciar',muted:'Silenciado',listening:'Escuchando',speaking:'Hablando'};
 const PLAYBACK_STATES={idle:'En silencio',synthesizing:'Generando voz',playing:'Reproduciendo'};
@@ -1033,7 +1033,7 @@ async function refreshConnectionStats(){
   renderLatencyStats(matches?snapshot:null,thread);
   if(connection.status==='rejected'||latency.status==='rejected')$('stats-status').textContent='No se pudo actualizar. Se reintentará mientras esta vista esté abierta.';
   else if(snapshot?.unavailable)$('stats-status').textContent='Este servidor aún no ofrece mediciones. Hace falta reiniciarlo con la versión actualizada.';
-  else if(!callId)$('stats-status').textContent='Entra en la sala para medir esta llamada.';
+  else if(!callId)$('stats-status').textContent='Entra en la llamada para medirla.';
   else if(!matches)$('stats-status').textContent='Esperando las mediciones de esta sesión.';
   else $('stats-status').textContent='Mediciones de esta conversación · actualización cada 2 segundos';
   $('stats-updated').textContent=new Date().toLocaleTimeString(document.documentElement?.lang||undefined);

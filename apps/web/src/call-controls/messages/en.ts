@@ -25,7 +25,7 @@ export const en = {
   "card.microphoneNumber": "Microphone {n}",
   "card.speakerNumber": "Speaker {n}",
   "card.deviceMissing": "Selected device · disconnected",
-  "card.deviceFailed": "The room kept the previous device: that one could not be used.",
+  "card.deviceFailed": "The call kept the previous device: that one could not be used.",
   "card.devicesInSystem": "Choose this device in the system's settings.",
   "card.youAreMuted": "You are muted",
 } as const;

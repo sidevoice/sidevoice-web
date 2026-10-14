@@ -28,7 +28,7 @@ test("a provider's words follow the sentence; with nothing raw there is no Detai
 
 test("Details speaks the interface's language, in an Alert too", () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
-  const { container } = render(<Alert tone="danger" title="Algo falló con la sala." details="TypeError\nFailed to fetch" />);
-  expect(container.querySelector(".ui-alert-title")).toHaveTextContent(/^Algo falló con la sala\.$/);
+  const { container } = render(<Alert tone="danger" title="Algo falló con la máquina." details="TypeError\nFailed to fetch" />);
+  expect(container.querySelector(".ui-alert-title")).toHaveTextContent(/^Algo falló con la máquina\.$/);
   expect(container.querySelector("details > summary")).toHaveTextContent("Detalles");
 });

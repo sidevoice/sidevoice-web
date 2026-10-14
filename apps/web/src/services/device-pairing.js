@@ -288,7 +288,7 @@ export async function redeemPairingCode(code, { name = '', address = '', target 
         if (privateAddress && plainHttpBlocked(origin)) throw pairingError(PAIRING_HTTP_BLOCKED);
         if (await answersPlainHttp(written, get)) throw pairingError(privateAddress ? PAIRING_HTTP_PRIVATE : PAIRING_HTTP_ONLY);
     }
-    if (!place) throw pairingError('No se pudo llegar a ' + called + ': ni directamente ni a través de la sala. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');
+    if (!place) throw pairingError('No se pudo llegar a ' + called + ' por ningún camino. Comprueba que está encendida y vuelve a intentarlo.', 'unreachable');
     let response, answer = null;
     try {
         // Never redirected: a 307 would hand the secret, in the body, to wherever it pointed.

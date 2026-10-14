@@ -66,8 +66,8 @@ test('Join progress, returning subject and failure text are derived from the sam
  assert.equal(api.joinView({...s,joinStep:'voice',joinProgress:16.7}).text,'Preparando la voz (17 %)');
  assert.deepEqual(api.joinView({...s,joinStep:'room',joinFailure:'No permission'}),{step:'failed',text:'No permission',progress:null,failed:true});
  // What was raw about a failure comes with it, for its Details; never in its text.
- assert.deepEqual(api.joinView({...s,joinFailure:'Something went wrong with the room.',joinFailureDetails:'TypeError\nFailed to fetch'}),
-  {step:'failed',text:'Something went wrong with the room.',progress:null,failed:true,details:'TypeError\nFailed to fetch'});
+ assert.deepEqual(api.joinView({...s,joinFailure:'Something went wrong with the machine.',joinFailureDetails:'TypeError\nFailed to fetch'}),
+  {step:'failed',text:'Something went wrong with the machine.',progress:null,failed:true,details:'TypeError\nFailed to fetch'});
  assert.equal(api.joinView(s),null);
 });
 test('Two ticks require read; transport delivery and unconfirmed delivery each have one',async()=>{

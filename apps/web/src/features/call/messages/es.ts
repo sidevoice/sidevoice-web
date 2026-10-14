@@ -16,7 +16,7 @@ export const es: Partial<Record<CallMessageKey, string>> = {
   "sidebar.collapse": "Contraer las conversaciones",
   "sidebar.expand": "Expandir las conversaciones",
   "sidebar.close": "Cerrar las conversaciones",
-  "sidebar.empty": "Todavía no hay ninguna conversación en la sala.",
+  "sidebar.empty": "Todavía no hay ninguna conversación.",
   "sidebar.unknownMachine": "Máquina desconocida",
   "sidebar.options": "Opciones de {title}",
   "sidebar.closeConversation": "Cerrar conversación",

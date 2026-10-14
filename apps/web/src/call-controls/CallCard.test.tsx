@@ -225,7 +225,7 @@ test("the devices: the system's choice and unnamed or missing devices in the car
   const devices = snapshot().devices!;
   host.push({ call: snapshot({ devices: { ...devices, busy: true, inputId: "mbp" } }) });
   host.push({ call: snapshot({ devices: { ...devices, busy: false, inputId: "default" } }) });
-  expect(screen.getByRole("status")).toHaveTextContent("The room kept the previous device");
+  expect(screen.getByRole("status")).toHaveTextContent("The call kept the previous device");
 });
 
 test("devices the room cannot choose stay listed, disabled, with where to choose them", () => {

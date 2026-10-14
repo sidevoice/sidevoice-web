@@ -68,7 +68,7 @@ test("out of a call, the reach note speaks of the machine of the conversation be
   const facts: Partial<SessionFacts> = { pairings: [nuc, ws], machinesReady: true, viewedThread: "fp-nuc|t1",
     machineLinks: { "fp-nuc": { reach: "offline", via: "" }, "fp-ws": { reach: "ok", via: "node" } } };
 
-  expect(reachNote(createRoomSessionStore(facts).getState().facts)).toBe("«NUC» no está conectada a la sala ahora mismo. Comprueba que está encendida.");
+  expect(reachNote(createRoomSessionStore(facts).getState().facts)).toBe("«NUC» no está conectada ahora mismo. Comprueba que está encendida.");
   expect(reachNote(createRoomSessionStore({ ...facts, viewedThread: "fp-ws|t1" }).getState().facts)).toBe("");
   // None looked at, one still answering: nothing to say yet; every one away: no machine at all.
   expect(reachNote(createRoomSessionStore({ ...facts, viewedThread: null }).getState().facts)).toBe("");

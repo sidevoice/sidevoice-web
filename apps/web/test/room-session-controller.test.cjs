@@ -519,7 +519,7 @@ test('The stats say which build the page runs and which the room serves, and fla
  const s=setup();
  s.context.window.sidevoiceBuildId='page1';
  s.run("roomInfo={version:'0.3.0',web_build:'page1'}");
- assert.equal(JSON.stringify(s.run('versionFacts')()),JSON.stringify([['Versión de la página','page1'],['Versión que sirve la sala','page1 · al día'],['Servidor','0.3.0']]));
+ assert.equal(JSON.stringify(s.run('versionFacts')()),JSON.stringify([['Versión de la página','page1'],['Versión servida','page1 · al día'],['Servidor','0.3.0']]));
  s.run("roomInfo={version:'0.3.0',web_build:'page2'}");
  assert.equal(s.run('versionFacts')()[1][1],'page2 · hay una versión nueva, recarga');
  s.run("roomInfo=null");
@@ -540,7 +540,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const socket=await firstSocket(room.sockets);
  socket.onerror();socket.onclose({code:1006});   // everything the socket could have said, lost on the way
  await joined;
- assert.equal(full.run('roomStore.getState().join.text'),'The room already has the maximum number of devices connected. Wait for someone to leave and join again.',
+ assert.equal(full.run('roomStore.getState().join.text'),'The machine already has the maximum number of devices connected. Wait for one to leave and join again.',
   'the reason came from the room, asked over a request no proxy rewrites');
  assert.deepEqual(room.voice.calls.at(-1),['stop'],'and the voice the join started is stopped');
 
@@ -553,7 +553,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
   message:'The room already has the maximum number of browsers connected.'}})});
  telling.onclose({code:1006});
  await tellJoined;
- assert.equal(told.run('roomStore.getState().join.text'),'The room already has the maximum number of devices connected. Wait for someone to leave and join again.');
+ assert.equal(told.run('roomStore.getState().join.text'),'The machine already has the maximum number of devices connected. Wait for one to leave and join again.');
 
  // A room that answers nothing at all is not a room that refused: the page says which it was.
  const gone=setup({strictDOM:true});
@@ -562,7 +562,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const lost=await firstSocket(away.sockets);
  lost.onerror();lost.onclose({code:1006});
  await awayJoined;
- assert.equal(gone.run('roomStore.getState().join.text'),'Could not connect to the room.');
+ assert.equal(gone.run('roomStore.getState().join.text'),'Could not connect to the machine.');
 
  // A refusal this page has no words for is the room refusing: what the room said is only behind Details, and a device
  // set to Spanish reads it in Spanish.
@@ -572,7 +572,7 @@ test('Somebody the room refuses reads the room\'s own reason, not the page\'s gu
  const oddSocket=await firstSocket(odd.sockets);
  oddSocket.onerror();oddSocket.onclose({code:1006});
  await oddJoined;
- assert.equal(other.run('roomStore.getState().join.text'),'La sala no deja entrar a este dispositivo.');
+ assert.equal(other.run('roomStore.getState().join.text'),'La máquina no deja entrar a este dispositivo.');
  assert.equal(other.run('roomStore.getState().join.details'),'device_quarantined\nThis device is quarantined by policy.');
 });
 test('A voice that cannot start says why, and opens no socket',async()=>{
@@ -918,7 +918,7 @@ test('A machine the room cannot reach is not a full room: its own sentence, and 
   if(frame)socket.onmessage({data:JSON.stringify({type:'error',data:frame})});
   socket.onclose({code:1013});return pending.then(()=>null,error=>error)};
  const away=await refused({message:'Esa máquina no está conectada a la sala ahora mismo.',reason:'node_offline'});
- assert.equal(away.message,'The machine is not connected to the room right now.');
+ assert.equal(away.message,'The machine is not connected right now.');
  assert.equal(away.words.text,away.message);
  assert.equal(away.refused,false,'a machine restarting may be back at the next attempt');
  const full=await refused(null);
@@ -935,7 +935,7 @@ test('A refusal reason this page does not know is retried unless the close code 
  for(const code of [1000,1006,1011,1012]){
   const error=await refused(newer,code);
   assert.equal(error.refused,false,'close '+code+': a reconnection goes on');
-  assert.equal(error.message,'The room does not let this device in.','a reason with no words here reads as the room refusing');
+  assert.equal(error.message,'The machine does not let this device in.','a reason with no words here reads as the room refusing');
   assert.match(JSON.stringify(error.words),/moving to another server/,'its own sentence behind Details');
  }
  // Refused by policy, or with no room for this call: final, whatever the reason.
@@ -961,13 +961,13 @@ test('Within the grace a drop is not shown and holds no control; past it, one li
  assert.equal(view().call.busy,false);
  assert.equal(view().call.joined,true,'still a call: the button hangs up');
  assert.equal(view().session.tab,'listening');
- assert.doesNotMatch(view().live,/Reconectando|Entra en la sala/);
+ assert.doesNotMatch(view().live,/Reconectando|Entra en la llamada/);
  assert.equal(view().mic.disabled,false);
  s.run('window.sidevoiceActions.toggleMic()');
  assert.equal(s.run('micEnabled'),false,'muting works during the grace');
  assert.deepEqual(voice.calls.at(-1),['mute',true]);
  graces.forEach(fn=>fn());
- assert.match(view().join.text,/Reconectando con la sala/);
+ assert.match(view().join.text,/Reconectando…/);
  assert.equal(view().call.busy,true);
  assert.equal(view().session.tab,'reconnecting');
  assert.equal(view().mic.disabled,false);
