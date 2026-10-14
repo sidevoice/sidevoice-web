@@ -16,10 +16,19 @@ const ENGINES: Record<string, string> = {
   "transformers-js": "Transformers.js", "sherpa-onnx": "Sherpa-ONNX", "whisper-cpp": "whisper.cpp", onnxruntime: "ONNX Runtime", mlx: "MLX",
 };
 
+/** What a build runs on, from the accelerator the engine resolved for it on this device and nothing else: a graphics
+ *  card through Metal, CUDA or WebGPU, the Neural Engine through Core ML, the processor natively or as WebAssembly.
+ *  Nothing for a remote build, for one that does not run here (the engine gives it no accelerator), or for an
+ *  accelerator this page does not know: no label rather than a guess. */
 function runsOn(build: ModelBuild, t: Translate) {
-  if (build.accelerator === "webgpu") return t("runtime.on.gpu");
-  if (build.backend === "mlx") return t("runtime.on.apple");
-  return t("runtime.on.cpu");
+  switch (build.accelerator) {
+    case "metal": return t("runtime.on.gpu", { api: "Metal" });
+    case "cuda": return t("runtime.on.gpu", { api: "CUDA" });
+    case "webgpu": return t("runtime.on.gpu", { api: "WebGPU" });
+    case "coreml": return t("runtime.on.neuralEngine");
+    case "cpu": case "wasm": return t("runtime.on.cpu");
+    default: return "";
+  }
 }
 
 /** This device as the engine sees it in a browser: a graphics card it can use, memory and cores. */
@@ -54,7 +63,7 @@ export function ModelRuntime({ task, state, locked }: { task: "stt" | "tts"; sta
       </label>
     );
   };
-  const describe = (build: ModelBuild) => [ENGINES[build.backend] ?? build.backend, build.precision, runsOn(build, t)].join(" · ");
+  const describe = (build: ModelBuild) => [ENGINES[build.backend] ?? build.backend, build.precision, runsOn(build, t)].filter(Boolean).join(" · ");
   const sizes = (build: ModelBuild) => t("runtime.sizes", { download: sizeText(build.downloadBytes), memory: sizeText(build.memoryMb * 1e6) });
   const reasons = (build: ModelBuild) => build.available ? "" : t("runtime.notHere", {
     reasons: build.reasons.map((reason) => t(("voice.unfit." + reason.code) as MessageKey)).join("; ") || t("voice.model.unfitUnknown"),

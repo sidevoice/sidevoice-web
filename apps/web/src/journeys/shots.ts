@@ -41,7 +41,7 @@ export interface Journey {
   shots: Shot[];
 }
 
-const build = (id: string, installed = true) => ({ id, backend: "sherpa-onnx", precision: "int8", downloadBytes: 148e6, memoryMb: 300, available: true, reasons: [], installed });
+const build = (id: string, installed = true) => ({ id, backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", downloadBytes: 148e6, memoryMb: 300, available: true, reasons: [], installed });
 const local = (id: string, family: string, task: string, installed = true, extra: Record<string, unknown> = {}) =>
   ({ id, family, capabilities: [task], parametersM: 74, license: "MIT", languages: ["es", "en"], voices: [], installed, builds: [build(id + "/int8", installed)], recommendedBuild: id + "/int8", ...extra });
 
