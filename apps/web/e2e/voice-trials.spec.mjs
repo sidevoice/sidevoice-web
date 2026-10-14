@@ -112,14 +112,14 @@ test("a completed transcription take shows its waveform and marks, then releases
   await expect(take.locator('[data-kind="speech"]')).toHaveCount(2);
   await expect(take.locator('[data-kind="pause"]')).toHaveCount(2);
   await expect(take.locator('[data-kind="end"]')).toHaveCount(2);
+  const slider = take.getByRole("slider");
+  await slider.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuenow", "0.5");
   const play = take.locator("#stt-take-play");
   await play.click();
   await expect.poll(() => page.evaluate(() => window.__takeUrls.created.length)).toBe(1);
   if (await play.getAttribute("aria-pressed") === "true") await play.click();
-  const slider = take.getByRole("slider");
-  await slider.focus();
-  await page.keyboard.press("End");
-  await expect(slider).toHaveAttribute("aria-valuenow", "2");
   await page.locator("#stt-try").click();
   await expect(take).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__takeUrls.revoked.length)).toBe(1);
