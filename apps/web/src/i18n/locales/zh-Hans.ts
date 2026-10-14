@@ -490,7 +490,7 @@ export const messages: Messages = {
   "pairing.identityMismatch": "响应的计算机与此代码不匹配，未保存任何内容。",
   "pairing.incompatible": "此代码中的计算机与此版本的 Sidevoice 不兼容。",
   "localInstall.cta": "在本机上使用智能体",
-  "localInstall.description": "在本机上安装 Sidevoice。它还会连接在本机上找到的智能体。",
+  "localInstall.description": "在本机上安装 Sidevoice。",
   "localInstall.runHere": "请在本机的终端中运行：",
   "localInstall.askAgent": "你也可以让你的某个智能体替你运行。",
   "localInstall.panelTitle": "正在准备本机",

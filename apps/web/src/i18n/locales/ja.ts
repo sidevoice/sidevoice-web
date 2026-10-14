@@ -491,7 +491,7 @@ export const messages: Messages = {
   "pairing.identityMismatch": "応答したマシンがこのコードと一致しません。何も保存されていません。",
   "pairing.incompatible": "このコードのマシンは、このバージョンの Sidevoice と互換性がありません。",
   "localInstall.cta": "このコンピュータのエージェントを使う",
-  "localInstall.description": "このコンピュータに Sidevoice をインストールします。ここで見つかったエージェントも接続します。",
+  "localInstall.description": "このコンピュータに Sidevoice をインストールします。",
   "localInstall.runHere": "このコンピュータのターミナルで次を実行してください：",
   "localInstall.askAgent": "エージェントに実行を頼むこともできます。",
   "localInstall.panelTitle": "このコンピュータを準備中",

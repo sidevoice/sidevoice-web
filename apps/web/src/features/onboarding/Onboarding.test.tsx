@@ -333,7 +333,7 @@ test("where the app installs Sidevoice itself, the command is the other way, und
   render(<App store={store} />);
   expect(title()).toHaveTextContent("Prepare this computer");
   // Two ways, one under the other: the app's (the step's main action), then the person's, closed, the description true to both.
-  expect(wizard().getByText("Install Sidevoice on this computer. It also connects the agents it finds here.")).toBeInTheDocument();
+  expect(wizard().getByText("Install Sidevoice on this computer.")).toBeInTheDocument();
   const prepare = document.getElementById("wizard-prepare")!;
   expect(prepare).toHaveTextContent("Prepare this computer");
   expect(prepare).toHaveClass("ui-button--primary");

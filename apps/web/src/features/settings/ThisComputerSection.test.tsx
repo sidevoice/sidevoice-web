@@ -139,7 +139,7 @@ test("on a host not yet prepared: This device offers to prepare it, with no othe
   open([paired()], { localHostAvailable: true, inApp: true, localHostStatus: { state: "absent" }, settingsSection: "this-computer" });
   expect(sections()).toContain("This device");
   const pane = document.getElementById("pane-this-computer")!;
-  expect(pane.querySelector(".this-computer-prepare")).toHaveTextContent("Install Sidevoice on this computer. It also connects the agents it finds here.");
+  expect(pane.querySelector(".this-computer-prepare")).toHaveTextContent("Install Sidevoice on this computer.");
   expect(within(pane).getByRole("button", { name: "Prepare this computer" })).toBeInTheDocument();
   expect(within(pane).getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
   expect(within(pane).queryByRole("button", { name: /another machine/i })).toBeNull();
