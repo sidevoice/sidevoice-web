@@ -4,7 +4,7 @@ import type { AvatarMood } from "../avatar/avatar-spec";
 import type { Translate } from "../../i18n/translator";
 
 /* What the call view says about a conversation, derived in one place from the room's own row (participantsView)
- * and whether this page is in the call: the dot beside its avatar, the line under its title, and how its avatar moves.
+ * and whether this page is in the call: the light beside its avatar, the line under its title, and how its avatar moves.
  * Nothing here reads a clock or the DOM. */
 
 export type { AvatarMood };
@@ -17,13 +17,20 @@ export type { StageFacts } from "../../state/room-session-state.js";
 /** The state a conversation's dot and line show. */
 export type ConversationState = "in-call" | "working" | "waiting" | "idle";
 
-/** In call: the call's own conversation, while this page is in the call — the room keeps its binding before a join
- *  and after a hang-up, and that is not a call. Working: its harness says so (a room only knows this during a call).
- *  Waiting for you: it hears you and has nothing in hand. Idle: it cannot hear you (holding, offline, closed). */
+/** The call's own conversation, while this page is in the call — the room keeps its binding before a join and after a
+ *  hang-up, and that is not a call. */
+export function isCallRow(row: ParticipantView, inCall: boolean): boolean {
+  return inCall && row.selected && canHear(row);
+}
+
+/** The states call model A defines for a row (CALL-MODEL-B-SPEC §6, A): Working, while its harness says so — a room
+ *  only knows this during a call, for the call's own conversation, so it wins over In call (desktop trial, item 11); In
+ *  call, the call's own; Waiting for you, it hears you and has nothing in hand; idle, it cannot hear you (holding,
+ *  offline, closed), its words Can't receive or Offline. */
 export function conversationState(row: ParticipantView, inCall: boolean): ConversationState {
-  if (inCall && row.selected && canHear(row)) return "in-call";
   if (row.working) return "working";
   if (!canHear(row)) return "idle";
+  if (isCallRow(row, inCall)) return "in-call";
   return "waiting";
 }
 
@@ -46,7 +53,7 @@ export function stateText(row: ParticipantView, inCall: boolean, t: Translate): 
   const state = conversationState(row, inCall);
   const words = state === "in-call" ? t("state.inCall") : state === "working" ? t("state.working")
     : state === "waiting" ? t("state.waiting") : row.reach === "holding" && row.available ? t("state.holding") : t("state.offline");
-  return row.unread && state !== "in-call" ? t("state.withUnread", { state: words, unread: t("state.unread", { n: row.unread }) }) : words;
+  return row.unread && !isCallRow(row, inCall) ? t("state.withUnread", { state: words, unread: t("state.unread", { n: row.unread }) }) : words;
 }
 
 /** The words for what an agent's avatar is acting out: the stage says them with its name. */

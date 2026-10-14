@@ -24,9 +24,14 @@
 .pt-avatar .sv-avatar { width: 100%; height: 100%; }
 .pt-avatar[data-size="stage"] { width: 168px; height: 168px; background: none; }
 .pt-state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-text-subtle); }
-.pt-state-dot[data-state="in-call"] { background: var(--sv-positive); }
-.pt-state-dot[data-state="working"] { background: var(--sv-voice); }
-.pt-state-dot[data-state="waiting"] { background: var(--sv-accent); }
+/* The light (the room's .state-dot): green while the agent can hear you, blinking while it works; still, with a halo,
+   where motion is reduced. */
+.pt-state-dot:is([data-state="in-call"], [data-state="waiting"], [data-state="working"]) { background: var(--sv-positive); }
+.pt-state-dot[data-state="working"] { animation: pt-state-dot-blink 1.2s ease-in-out infinite; }
+@keyframes pt-state-dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) {
+  .pt-state-dot[data-state="working"] { animation: none !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sv-positive) 45%, transparent); }
+}
 
 /* ----- header */
 .pt-header { display: flex; align-items: center; gap: var(--sv-space-3); height: var(--sv-header-height); padding: 0 var(--sv-space-4) 0 var(--sv-space-5); background: var(--sv-bg); border-bottom: 1px solid var(--sv-border); }

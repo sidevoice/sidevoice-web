@@ -1,4 +1,4 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
@@ -45,7 +45,8 @@ function failJoin(message){roomStore.patch({joinStep:null,joinFailure:message?er
 // never sets it.
 function callEndedBy(reason,detail){roomStore.patch({callEnded:{reason,detail:detail||''}})}
 // What this tab already calls the conversation it is going back to; the room is not asked again for a title.
-function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||''}
+// As every surface shows it (displayTitle).
+function conversationTitle(id){const p=state.people.find(p=>personKey(p)===id);return displayTitle(p?.title,p)||displayTitle(state.history.find(r=>r.thread===id)?.name)}
 /* What failed in the voice, its models or the room, as the person reads it (error-message.ts): a known code in the
  * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
  * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
@@ -889,7 +890,7 @@ function statsAggregate(replies,stages=LATENCY_STAGES){
 }
 const aggregateColumns=()=>{const t=translator();return [t('stats.column.stage'),'n',t('stats.column.mean'),'p50','p90',t('stats.column.max')]};
 function statsThreads(replies){return [...new Set(replies.map(reply=>reply.thread_id).filter(Boolean))]}
-function statsConversationName(threadId){return state.people.find(person=>person.node===state.callNode&&person.thread_id===threadId)?.title||threadId}
+function statsConversationName(threadId){const p=state.people.find(person=>person.node===state.callNode&&person.thread_id===threadId);return displayTitle(p?.title,p)||threadId}
 function statsAggregateCaption(count){return translator()(count===1?'stats.measured.one':'stats.measured.other',{n:count})}
 function statsAggregateTable(caption,rows){
  const wrap=document.createElement('div');wrap.className='stats-table-wrap';

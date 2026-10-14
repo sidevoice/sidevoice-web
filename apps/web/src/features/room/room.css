@@ -10,12 +10,18 @@
 .conversation-avatar .sv-avatar { width: 100%; height: 100%; border-radius: 50%; background: color-mix(in srgb, var(--av-color) 22%, var(--sv-surface)); }
 [data-theme="dark"] .conversation-avatar .sv-avatar { background: var(--av-bg); }
 .state-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--dot-ring, var(--sv-surface)); border-radius: 50%; background: var(--sv-text-subtle); }
-.state-dot[data-state="in-call"] { background: var(--sv-positive); }
-.state-dot[data-state="working"] { background: var(--sv-voice); }
-.state-dot[data-state="waiting"] { background: var(--sv-accent); }
-/* On the sidebar's cards the plain dot says one thing only: connected (green). Any other state has no dot there (its
-   words are on the card). */
-.sidebar-rows .state-dot:not([data-state="in-call"]):empty { display: none; }
+/* The light says whether its agent is there (desktop trial, item 11): steady green while it can hear you (in the call or
+   waiting for you), blinking green while it works, grey while it cannot hear you. Where motion is reduced it holds
+   still, and working wears a green halo instead, so it still differs from plain green. */
+.state-dot:is([data-state="in-call"], [data-state="waiting"], [data-state="working"]) { background: var(--sv-positive); }
+.state-dot[data-state="working"] { animation: state-dot-blink 1.2s ease-in-out infinite; }
+@keyframes state-dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) {
+  .state-dot[data-state="working"] { animation: none !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sv-positive) 45%, transparent); }
+}
+/* On the sidebar's cards a light says only that the agent is there; one that cannot hear you has none (its words are
+   on the card, its avatar asleep or dimmed). */
+.sidebar-rows .state-dot[data-state="idle"] { display: none; }
 
 /* ----- the header: the mark, and Settings at its end */
 .room-header { --dot-ring: var(--sv-bg); display: flex; align-items: center; gap: var(--sv-space-3); height: var(--sv-header-height); padding: 0 var(--sv-space-4) 0 var(--sv-space-5); border-bottom: 1px solid var(--sv-border); background: var(--sv-bg); }
