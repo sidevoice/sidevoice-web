@@ -1,0 +1,139 @@
+/* The open visual proposal. No stage geometry, turn timing or text paging changes on a switch. */
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) {
+  --bubble-ink: var(--sv-chat-agent-fg);
+  --bubble-agent: var(--sv-surface-raised);
+  --bubble-edge: color-mix(in srgb, var(--sv-accent) 20%, var(--sv-border));
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) :is(.stage-bubble, .person-bubble) {
+  font-size: 18px;
+  line-height: 28px;
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble {
+  font-size: 16px;
+  line-height: 24px;
+}
+/* The text box width and type metrics are identical across A, B and C: PagedText measures on turn text. */
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .stage-bubble {
+  position: relative;
+  padding: 16px 22px;
+  background: var(--bubble-agent);
+  color: var(--sv-chat-agent-subtle);
+  border-color: var(--bubble-edge);
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .stage-bubble .karaoke-played { color: var(--bubble-ink); }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .stage-bubble .karaoke-upcoming { color: var(--sv-chat-agent-subtle); }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .person-bubble {
+  padding: 12px 18px;
+  border-color: var(--bubble-edge);
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble {
+  padding: 12px 16px 8px;
+  max-width: min(86%, 34rem);
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble:not(:has(> .chat-meta)) { padding-bottom: 12px; }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble[data-live] { padding: 10px 14px 8px; }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) :is(.person-bubble, .chat-bubble) .cancel-input::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-meta .listen-again::after { inset: -11px; }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .voice-wave {
+  box-sizing: content-box;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--sv-voice-soft);
+  color: var(--sv-voice-text);
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .person-bubble .voice-wave,
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble[data-live] .voice-wave { color: var(--sv-voice-text); }
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .voice-bars {
+  box-sizing: content-box;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--sv-voice-soft);
+  color: var(--sv-voice-text);
+}
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .person-bubble .voice-bars,
+.call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .chat-bubble[data-live] .voice-bars { color: var(--sv-voice-text); }
+
+/* A: plush, opaque cards with a small restrained corner on the speaker's side. */
+.call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .person-bubble, .chat-bubble) {
+  border-radius: 24px;
+  box-shadow: 0 3px 8px rgb(42 26 64 / 10%), 0 16px 36px -18px rgb(74 47 107 / 45%);
+}
+.call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .chat-bubble[data-role="assistant"]):is(.stage-bubble, [data-position="last"], [data-position="only"]) { border-bottom-left-radius: 9px; }
+.call-layout[data-bubbles-style="soft"] :is(.person-bubble, .chat-bubble[data-role="user"]):is(.person-bubble, [data-position="last"], [data-position="only"]) { border-bottom-right-radius: 9px; }
+.call-layout[data-bubbles-style="soft"] .chat-bubble[data-role="assistant"] { background: var(--bubble-agent); border: 1px solid var(--bubble-edge); }
+.call-layout[data-bubbles-style="soft"] :is(.voice-wave, .voice-bars) { border-radius: 12px; }
+[data-theme="dark"] .call-layout[data-bubbles-style="soft"] :is(.stage-bubble, .person-bubble, .chat-bubble) { box-shadow: 0 12px 32px rgb(0 0 0 / 60%); }
+
+/* B: outlined balloons whose offset shadow and short tails echo the bichos' drawn contours. */
+.call-layout[data-bubbles-style="illustrated"] {
+  --bubble-agent: #fffdf9;
+  --bubble-ink: #211c29;
+  --bubble-edge: #352a42;
+  --sv-chat-person-bg: #e6d4ff;
+  --sv-chat-person-fg: #251b32;
+  --sv-chat-person-subtle: #524260;
+  --sv-chat-person-mark: #4a2f6b;
+  --sv-chat-person-quiet: #695879;
+  --sv-chat-person-danger: #872b26;
+  --sv-chat-person-wash: rgb(74 47 107 / 12%);
+}
+[data-theme="dark"] .call-layout[data-bubbles-style="illustrated"] {
+  --bubble-agent: #29292d;
+  --bubble-ink: #fafafa;
+  --bubble-edge: #a596b5;
+  --sv-chat-person-bg: #d9c4f5;
+}
+.call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .person-bubble, .chat-bubble) {
+  border: 2px solid var(--bubble-edge);
+  border-radius: 23px;
+  box-shadow: 4px 5px 0 color-mix(in srgb, var(--bubble-edge) 75%, transparent);
+}
+.call-layout[data-bubbles-style="illustrated"] .chat-bubble[data-role="assistant"] { background: var(--bubble-agent); }
+.call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .chat-bubble[data-role="assistant"]):is(.stage-bubble, [data-position="last"], [data-position="only"]) { border-bottom-left-radius: 6px; }
+.call-layout[data-bubbles-style="illustrated"] :is(.person-bubble, .chat-bubble[data-role="user"]):is(.person-bubble, [data-position="last"], [data-position="only"]) { border-bottom-right-radius: 6px; }
+.call-layout[data-bubbles-style="illustrated"] :is(.stage-bubble, .person-bubble)::after {
+  content: "";
+  position: absolute;
+  bottom: -9px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border: 2px solid var(--bubble-edge);
+  transform: rotate(45deg);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+.call-layout[data-bubbles-style="illustrated"] .stage-bubble::after { left: 16px; }
+.call-layout[data-bubbles-style="illustrated"] .person-bubble::after { right: 16px; transform: rotate(225deg); }
+[data-theme="dark"] .call-layout[data-bubbles-style="illustrated"] :is(.person-bubble, .chat-bubble[data-role="user"]) {
+  border-color: #352a42;
+  box-shadow: 4px 5px 0 #352a42;
+}
+[data-theme="dark"] .call-layout[data-bubbles-style="illustrated"] .person-bubble::after { border-color: #352a42; }
+.call-layout[data-bubbles-style="illustrated"] :is(.voice-wave, .voice-bars) { border: 2px solid var(--bubble-edge); border-radius: 11px; }
+.call-layout[data-bubbles-style="illustrated"] .voice-bars i { width: 5px; border-radius: 3px; }
+
+/* C: compact speech panels with a rule pointing toward the speaker and almost no elevation. */
+.call-layout[data-bubbles-style="panel"] :is(.stage-bubble, .person-bubble, .chat-bubble) {
+  border: 1px solid var(--bubble-edge);
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgb(42 26 64 / 10%);
+}
+.call-layout[data-bubbles-style="panel"] :is(.stage-bubble, .chat-bubble[data-role="assistant"]) { border-left: 4px solid var(--sv-voice-text); }
+.call-layout[data-bubbles-style="panel"] :is(.person-bubble, .chat-bubble[data-role="user"]) { border-right: 4px solid var(--sv-voice); }
+.call-layout[data-bubbles-style="panel"] .chat-bubble[data-role="assistant"] { background: var(--bubble-agent); }
+.call-layout[data-bubbles-style="panel"] :is(.voice-wave, .voice-bars) { border-radius: 5px; }
+.call-layout[data-bubbles-style="panel"] .voice-bars { gap: 5px; }
+.call-layout[data-bubbles-style="panel"] .voice-bars i { width: 2px; border-radius: 1px; }
+
+@container stage (max-width: 480px) {
+  .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) :is(.stage-bubble, .person-bubble) { font-size: 16px; line-height: 24px; }
+  .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .stage-bubble { padding: 13px 16px; }
+  .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) .person-bubble { padding: 10px 14px; }
+}
+@media (max-width: 899px) {
+  .call-layout[data-bubbles-style]:where(:not([data-bubbles-style="current"])) :is(.stage-bubble, .person-bubble) { font-size: 16px; line-height: 24px; }
+}

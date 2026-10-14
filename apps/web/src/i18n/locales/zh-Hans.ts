@@ -7,6 +7,12 @@ export const name = "简体中文";
 
 export const messages: Messages = {
   // The shared components.
+  "variants.bubbles.title": "语音条和消息气泡",
+  "variants.bubbles.note": "待定：将三种样式与当前外观进行比较。",
+  "variants.bubbles.current": "当前外观",
+  "variants.bubbles.soft": "A · 柔和卡片",
+  "variants.bubbles.illustrated": "B · 插画气泡",
+  "variants.bubbles.panel": "C · 对话面板",
   "ui.close": "关闭",
   "ui.closeNamed": "关闭 {name}",
   "ui.loading": "正在处理…",

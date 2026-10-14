@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { VoiceWaveform, waveColumn } from "./VoiceWaveform";
+import { VoiceWaveform, waveColumn, waveformBrush } from "./VoiceWaveform";
 
 const frames = (count = 3) => new Promise((resolve) => setTimeout(resolve, 20 * count));
 
@@ -91,4 +91,21 @@ test("a call with no microphone captured draws without reading anything", async 
   const { container } = render(<VoiceWaveform phase="listening" />);
   await frames();
   expect(container.querySelector("canvas")).toBeInTheDocument();
+});
+
+test("the call's three drawing brushes are scoped; a settings try retains its bars", () => {
+  const room = document.createElement("main");
+  room.className = "call-layout";
+  const wave = document.createElement("span");
+  room.append(wave);
+  document.body.append(room);
+  expect(waveformBrush(wave)).toEqual({ pitch: 5, width: 3, shape: "round" });
+  room.dataset.bubblesStyle = "soft";
+  expect(waveformBrush(wave)).toEqual({ pitch: 8, width: 5, shape: "round" });
+  room.dataset.bubblesStyle = "illustrated";
+  expect(waveformBrush(wave)).toEqual({ pitch: 9, width: 6, shape: "block" });
+  room.dataset.bubblesStyle = "panel";
+  expect(waveformBrush(wave)).toEqual({ pitch: 8, width: 2, shape: "segments" });
+  expect(waveformBrush(document.createElement("span"))).toEqual({ pitch: 5, width: 3, shape: "round" });
+  room.remove();
 });

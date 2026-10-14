@@ -23,6 +23,22 @@ export function PagedText({ children, measure, onPages, follow }: { children: Re
     setStep(height); setPages(count);
     if (!follow) { setPage(0); onPages?.(count); }
   }, [measure]); // eslint-disable-line react-hooks/exhaustive-deps
+  // An open visual variant can change the bubble's font and width while its turn stays mounted.
+  // Follow that layout change so all three lines remain a whole page after a live switch.
+  useLayoutEffect(() => {
+    const node = box.current, inner = run.current;
+    if (!node || !inner) return;
+    const observer = new ResizeObserver(() => {
+      const height = node.clientHeight || 1;
+      const count = Math.max(1, Math.ceil((inner.scrollHeight - 1) / height));
+      setStep((before) => before === height ? before : height);
+      setPages((before) => before === count ? before : count);
+      if (!follow) onPages?.(count);
+    });
+    observer.observe(node);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [measure, follow, onPages]);
   // By time: a page every PAGE_MS.
   useEffect(() => {
     if (follow || page >= pages - 1) return;

@@ -7,6 +7,12 @@ export const name = "日本語";
 
 export const messages: Messages = {
   // The shared components.
+  "variants.bubbles.title": "音声バーとメッセージ",
+  "variants.bubbles.note": "未決定：3つのスタイルを現在のデザインと比較してください。",
+  "variants.bubbles.current": "現在のデザイン",
+  "variants.bubbles.soft": "A · 柔らかなカード",
+  "variants.bubbles.illustrated": "B · イラスト風の吹き出し",
+  "variants.bubbles.panel": "C · 会話パネル",
   "ui.close": "閉じる",
   "ui.closeNamed": "{name}を閉じる",
   "ui.loading": "処理中…",

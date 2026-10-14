@@ -23,8 +23,12 @@ import { SetupPending, Wizard } from "../features/onboarding/Wizard";
 import { useRoomStore } from "../state/room-store";
 import type { OnboardingRepository, OnboardingStep } from "../services/onboarding-state";
 import { useUiLanguage } from "../i18n/use-ui-language";
+import { useBubbleVariant, bubbleVariantMetadata } from "../lib/bubble-variants";
+import "../features/conversation/bubble-variants.css";
 
 function RoomContent() {
+  const bubblesStyle = useBubbleVariant();
+  const bubblesMetadata = bubbleVariantMetadata();
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
   const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
@@ -55,13 +59,14 @@ function RoomContent() {
   return (
     <>
       <StorageBlockedBanner />
-      <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
+      <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined} data-bubbles-variants={JSON.stringify(bubblesMetadata)}>
         <RoomHeader />
         <LocalHostBanner />
         {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
           <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
-        <main className={noMachine ? undefined : "call-layout"}>
+        <main className={noMachine ? undefined : "call-layout"} data-bubbles-style={noMachine ? undefined : bubblesStyle}
+          data-bubbles-variants={noMachine ? undefined : JSON.stringify(bubblesMetadata)}>
           {noMachine ? <NoMachineScreen source="no-machine" /> : <>
             <ErrorBoundary area="participants"><ConversationSidebar /></ErrorBoundary>
             {/* The stage and its call bar share a column, so the bar centres under the stage and the conversations and

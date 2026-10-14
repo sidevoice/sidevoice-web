@@ -89,6 +89,34 @@ test("by time: other words start over from their first page, counted again", () 
   expect(page()).toBe(0);
 });
 
+test("a live bubble resize recounts pages without remounting or restarting the current page", () => {
+  let notify: () => void = () => {};
+  class Observer {
+    constructor(callback: () => void) { notify = callback; }
+    observe() {}
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", Observer);
+  let lines = 7;
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text") ? 3 * LINE : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("paged-text-run") ? lines * LINE : 0;
+  });
+  const pages = vi.fn();
+  render(<PagedText measure={text(7)} onPages={pages}>{text(7)}</PagedText>);
+  const original = windowOf();
+  tick(PAGE_MS);
+  expect(page()).toBe(1);
+  lines = 10;
+  act(() => notify());
+  expect(windowOf()).toBe(original);
+  expect(page()).toBe(1);
+  expect(pages).toHaveBeenLastCalledWith(4);
+  vi.unstubAllGlobals();
+});
+
 /** The agent's words as the stage shows them, `heard` characters of them heard. */
 function voiced(words: string, heard: number) {
   return <PagedText measure={words} follow=".karaoke-played">

@@ -7,6 +7,12 @@ export const name = "Español";
 
 export const messages: Messages = {
   // The shared components.
+  "variants.bubbles.title": "Barras de voz y bocadillos",
+  "variants.bubbles.note": "Pregunta abierta: compara los tres estilos con el aspecto actual.",
+  "variants.bubbles.current": "Aspecto actual",
+  "variants.bubbles.soft": "A · Tarjetas suaves",
+  "variants.bubbles.illustrated": "B · Bocadillos ilustrados",
+  "variants.bubbles.panel": "C · Paneles de diálogo",
   "ui.close": "Cerrar",
   "ui.closeNamed": "Cerrar {name}",
   "ui.loading": "Procesando…",
