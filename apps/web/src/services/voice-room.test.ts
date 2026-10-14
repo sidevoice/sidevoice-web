@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { characters, playbackReport, ROOM_PLAYBACK_REASONS, sayingRange, turnMessage } from "./voice-room.js";
+import { characters, playbackReport, ROOM_PLAYBACK_REASONS, sayingRange, scalarExtent, turnMessage } from "./voice-room.js";
 
 /* The voice's events in the room's words. */
 
@@ -9,9 +9,10 @@ test("a turn's phases become the room's voice-user-turn data, the timings under 
   expect(turnMessage({
     phase: "finished", turn_id: "t", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
     timings: { audio_ms: 1, endpoint_silence_ms: 2, recognition_ms: 3 },
-  })).toEqual({
+  }, {thread_id: "thread", binding_id: "focus"})).toEqual({
     turn_id: "t", phase: "finished", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
     timings_ms: { audio_ms: 1, endpoint_silence_ms: 2, recognition_ms: 3 },
+    thread_id: "thread", binding_id: "focus",
   });
 });
 
@@ -20,18 +21,25 @@ test("how something said ended becomes the room's playback report, with only the
   expect(characters("héllo 👋")).toBe(7);
   const cases: [Parameters<typeof playbackReport>, ReturnType<typeof playbackReport>][] = [
     [[{ status: "heard-up-to", heard_chars: 3, reason: "barge-in" }, "hola"], { status: "interrupted", heard_chars: 3, reason: "user_interrupted" }],
-    [[{ status: "not-played", reason: "barge-in" }, "hola"], { status: "unplayed", heard_chars: 0, reason: "newer_turn" }],
-    [[{ status: "not-played", reason: "cancelled" }, "hola", "newer_turn"], { status: "unplayed", heard_chars: 0, reason: "newer_turn" }],
+    [[{ status: "not-played", reason: "barge-in" }, "hola"], { status: "unplayed", reason: "newer_turn" }],
+    [[{ status: "not-played", reason: "cancelled" }, "hola", "newer_turn"], { status: "unplayed", reason: "newer_turn" }],
     [[{ status: "heard-up-to", heard_chars: 2, reason: "cancelled" }, "hola", "focus_changed"], { status: "interrupted", heard_chars: 2, reason: "focus_changed" }],
-    [[{ status: "not-played", reason: "cancelled" }, "hola"], { status: "unplayed", heard_chars: 0, reason: "user_skipped" }],
-    [[{ status: "not-played", reason: "stopped" }, "hola"], { status: "unplayed", heard_chars: 0, reason: "call_ended" }],
+    [[{ status: "not-played", reason: "cancelled" }, "hola", null, "user_skipped"], { status: "unplayed", reason: "user_skipped" }],
+    [[{ status: "not-played", reason: "stopped" }, "hola"], { status: "unplayed", reason: "call_ended" }],
     [[{ status: "heard-up-to", heard_chars: 1, reason: "failed", code: "x" }, "hola"], { status: "failed", heard_chars: 1 }],
-    [[{ status: "not-played", reason: "failed", code: "credential-missing" }, "hola"], { status: "failed", heard_chars: 0 }],
+    [[{ status: "not-played", reason: "failed", code: "credential-missing" }, "hola"], { status: "failed" }],
   ];
   for (const [args, report] of cases) {
     expect(playbackReport(...args)).toEqual(report);
     if ("reason" in report) expect(ROOM_PLAYBACK_REASONS).toContain(report.reason);
   }
+});
+
+test("played zero remains a partial interruption and scalar counts never use UTF-16 units", () => {
+  expect(playbackReport({ status: "heard-up-to", heard_chars: 0, reason: "barge-in" }, "é🐙ab"))
+    .toEqual({status: "interrupted", reason: "user_interrupted", heard_chars: 0});
+  expect(scalarExtent("é🐙ab", 3, "utf16")).toBe(2);
+  expect(scalarExtent("é🐙ab", 200)).toBe(4);
 });
 
 test("where the voice is in a reply comes as offsets into its text, counted as JavaScript counts", () => {
