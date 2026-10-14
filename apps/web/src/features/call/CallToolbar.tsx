@@ -7,6 +7,7 @@ import { MoreVerticalIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { translator } from "../../i18n/translator";
+import { useRoomStore } from "../../state/room-store";
 
 /* The call's secondary actions, behind ⋮ beside the call's own, opening upwards. Its id and class are the runtime's:
  * it binds the statistics dialog to #stats-open, closes the menu when the statistics open, and closes it on a click
@@ -21,10 +22,15 @@ function returnFocus(event: SyntheticEvent<HTMLDetailsElement>) {
 function CallMenu() {
   const t = translator();
   const menu = useRef<HTMLDetailsElement>(null);
+  const output = useRoomStore((state) => state.facts.speechOutput);
   return (
     <details id="call-menu" className="call-menu" ref={menu} onToggle={returnFocus}>
       <summary className="call-button" aria-label={t("header.menu")} title={t("header.menu")}><MoreVerticalIcon size={22} /></summary>
       <div className="call-menu-panel" onClick={() => { if (menu.current) menu.current.open = false; }}>
+        <Button variant="ghost" tone="neutral" size="sm" aria-pressed={output === "agents_muted"}
+          onClick={() => window.sidevoiceActions?.setSpeechOutput?.(output === "agents_muted" ? "on" : "agents_muted")}>{t(output === "agents_muted" ? "toolbar.agentsUnmute" : "toolbar.agentsMute")}</Button>
+        <Button variant="ghost" tone="neutral" size="sm" aria-pressed={output === "voice_off"}
+          onClick={() => window.sidevoiceActions?.setSpeechOutput?.(output === "voice_off" ? "on" : "voice_off")}>{t(output === "voice_off" ? "toolbar.voiceOn" : "toolbar.voiceOff")}</Button>
         <Button id="stats-open" variant="ghost" tone="neutral" size="sm">{t("header.stats")}</Button>
       </div>
     </details>

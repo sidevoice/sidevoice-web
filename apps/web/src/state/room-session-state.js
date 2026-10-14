@@ -22,7 +22,7 @@ export function initialSessionFacts() {
         switching: false, roomBinding: null, viewedThread: null,
         people: [], history: [], roomSeen: {}, inputReceipts: {},
         userLive: false, botLive: false,
-        userTurn: null, pendingPhase: '', pendingUserText: '', cancelledInput: false, textSending: false, micEnabled: true,
+        userTurn: null, pendingPhase: '', pendingUserText: '', cancelledInput: false, textSending: false, micEnabled: true, speechOutput: 'on',
         // Where the call's voice is (`{listening, recognising, playback}`, as it reports it), or null outside a call.
         voiceState: null,
         joinStep: null, joinFailure: '', joinFailureDetails: '', joinProgress: null, joinDetail: '', joinSubject: '',
@@ -343,7 +343,7 @@ export function participantsView(s) {
         const busy = working(s, key);
         // Grouped by the paired machine it runs on (one room each), named as this device names that machine.
         return { threadId: key, title: displayTitle(p.title, p), selected: key === selected, available: !!p.available, switching: s.switching,
-            unread, reach, working: busy,
+            unread, unheard: p.unheard?.count ?? 0, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             model: p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
@@ -453,7 +453,7 @@ export function deliveryNote(r) {
 export function audioNote(r, ahead = 0) {
     // Nothing a person did not hear is repeated by itself: a reply nobody was there for says so, and replaying it
     // is the person's choice.
-    const reasons = { newer_turn: 'newer_turn', user_speaking: 'user_speaking', focus_changed: 'focus_changed', call_ended: 'call_ended', session_changed: 'call_ended', expired_audio_turn: 'expired_audio_turn', queue_full: 'queue_full', user_interrupted: 'user_interrupted', user_skipped: 'user_skipped', playback_failed: 'playback_failed', service_restarted: 'service_restarted', channel_closed: 'channel_closed' };
+    const reasons = { newer_turn: 'newer_turn', user_speaking: 'user_speaking', focus_changed: 'focus_changed', call_ended: 'call_ended', session_changed: 'call_ended', expired_audio_turn: 'expired_audio_turn', queue_full: 'queue_full', user_interrupted: 'user_interrupted', user_skipped: 'user_skipped', playback_failed: 'playback_failed', service_restarted: 'service_restarted', channel_closed: 'channel_closed', agents_muted: 'agents_muted', voice_off: 'voice_off', connector_disconnected: 'connector_disconnected', heard_elsewhere: 'heard_elsewhere' };
     const reason = reasons[r.audio_reason] ? say('session.audio.reason.' + reasons[r.audio_reason]) : '';
     if (r.audio === 'waiting_for_pause')
         return say('session.audio.waitingForPause');

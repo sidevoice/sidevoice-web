@@ -41,7 +41,7 @@ function ConversationsToggle({ t, hidden }: { t: Translate; hidden: ParticipantV
   const openConversations = useCallLayout((state) => state.openConversations);
   const closeConversations = useCallLayout((state) => state.closeConversations);
   // The chevron wears a dot when a conversation behind it has something unread, and says how many in words too.
-  const news = hidden.filter((row) => row.unread > 0).length;
+  const news = hidden.filter((row) => row.unread > 0 || (row.unheard ?? 0) > 0).length;
   const label = news ? t(news === 1 ? "header.allConversationsNews.one" : "header.allConversationsNews.other", { n: count, k: news }) : t("header.allConversations", { n: count });
   return (
     <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} title={label}

@@ -1241,6 +1241,21 @@ export const messages = {
   "card.deviceFailed": "The call kept the previous device: that one could not be used.",
   "card.devicesInSystem": "Choose this device in the system's settings.",
   "card.youAreMuted": "You are muted",
+  "toolbar.agentsMute": "Mute agents",
+  "toolbar.agentsUnmute": "Unmute agents",
+  "toolbar.voiceOff": "Turn spoken replies off",
+  "toolbar.voiceOn": "Turn spoken replies on",
+  "state.unheard": "{n} unheard",
+  "messages.audio.notPlayed": "Not played",
+  "messages.audio.partial": "{heard} of {total} characters played",
+  "messages.audio.unknown": "Audio stopped · Played amount unknown",
+  "messages.audio.skipped": "Skipped",
+  "session.audio.reason.agents_muted": "Agents were muted",
+  "session.audio.reason.voice_off": "Spoken replies were off",
+  "session.audio.reason.connector_disconnected": "The connection dropped",
+  "session.audio.reason.heard_elsewhere": "Heard on another device",
+  "room.failure.replayUnavailable": "Playback is unavailable while spoken replies are off or you are speaking.",
+  "room.failure.inputBacklogFull": "Too many messages are waiting. Try again shortly.",
 } as const;
 
 export type MessageKey = keyof typeof messages;

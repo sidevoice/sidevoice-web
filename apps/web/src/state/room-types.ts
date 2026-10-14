@@ -31,6 +31,9 @@ export interface ChatMessage {
   /** The room's own word for this row: `pending`, `sending`, `read`, `not_sent`… */
   status?: string;
   audio_reason?: string | null;
+  epoch?: number;
+  heard_chars?: number | null;
+  globally_heard?: boolean | null;
   karaoke?: KaraokeRange | null;
   playback?: "pending" | "playing" | "complete";
 }
@@ -52,6 +55,8 @@ export interface ParticipantView {
   available: boolean;
   switching: boolean;
   unread: number;
+  /** Core's aggregate across devices, independent of whether text was opened. */
+  unheard?: number;
   reach: "listening" | "holding" | "offline";
   /** Honest activity support: unsupported and unknown are different messages. */
   activityNote?: string | null;
@@ -174,6 +179,7 @@ export interface SidevoiceActions {
   cancelInput(): Promise<void>;
   /** Stops the reply sounding now on this device; the reply stays written and what is queued after it plays on. */
   skipReply(): void;
+  setSpeechOutput?(output: "on" | "agents_muted" | "voice_off"): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
   editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]> & { build?: string | null }; tts?: Partial<DeviceVoiceSettings["tts"]> & { build?: string | null }; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number; turn_model?: string }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */

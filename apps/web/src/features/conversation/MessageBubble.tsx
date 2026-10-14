@@ -24,6 +24,13 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
   // A delivery status this version does not know (sidevoice-core#112) shows no mark: it has no words to say.
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
+  const total = [...message.text].length;
+  const audioMark = message.role !== "assistant" ? null : message.audio_reason === "user_skipped" || message.audio === "skipped"
+    ? t("messages.audio.skipped")
+    : message.audio === "text_only" || message.audio === "unplayed" ? t("messages.audio.notPlayed")
+      : message.interrupted || message.audio === "failed" || message.audio === "disconnected"
+        ? Number.isInteger(message.heard_chars) ? t("messages.audio.partial", { heard: message.heard_chars!, total }) : t("messages.audio.unknown")
+        : null;
   const label = t(message.interrupted ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
@@ -31,6 +38,7 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
       <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />
       {message.cancellable && <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">
+        {audioMark && <span className="audio-fate-mark" title={audioMark}>{audioMark}</span>}
         {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}
         {replay && <Button variant="ghost" tone="neutral" size="icon-sm" className="listen-again" aria-label={t("messages.listenAgain")} title={t("messages.listenAgain")}
           onClick={() => void window.sidevoiceActions?.replayReply(message.segment)}><ListenAgainIcon size={12} /></Button>}

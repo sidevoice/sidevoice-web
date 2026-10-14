@@ -18,7 +18,7 @@ export interface SessionFacts {
  userLive: boolean; botLive: boolean;
  /** The person's turn being said: the voice's id for it, the bubble's segment, and the conversation it goes to. */
  userTurn: {id: string; segment: string; thread: string | null} | null; pendingPhase: '' | 'listening' | 'transcribing'; pendingUserText: string;
- cancelledInput: boolean; textSending: boolean; micEnabled: boolean;
+ cancelledInput: boolean; textSending: boolean; micEnabled: boolean; speechOutput: 'on' | 'agents_muted' | 'voice_off';
  voiceState: VoiceState | null;
  /** A join that failed: its sentence, and what was raw about it, for its Details (error-message.ts). */
  joinStep: string | null; joinFailure: string; joinFailureDetails: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
