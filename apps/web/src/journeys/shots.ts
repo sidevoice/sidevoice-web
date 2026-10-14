@@ -99,6 +99,12 @@ const openSettings = (section: string) => (doc: Document) => {
   if (dialog && !dialog.open) dialog.showModal();
 };
 const press = (id: string) => (doc: Document) => { doc.getElementById(id)?.click(); };
+/** A reply of the agent's arriving once the page is drawn, after the transcript has marked the rest seen. */
+const arrives = (text: string) => (doc: Document) => {
+  const history = BASE_FACTS.history as Record<string, unknown>[];
+  const reply = { ...history[1], segment: "h-3", text, time: Date.now(), seq: 3 };
+  (doc.defaultView as unknown as { __journeyStore: { patch(facts: unknown): void } }).__journeyStore.patch({ history: [...history, reply] });
+};
 /** What `id` opens, opened (a disclosure: DisclosureButton). */
 const disclose = (id: string) => (doc: Document) => { doc.querySelector<HTMLElement>(`[aria-controls="${id}"][aria-expanded="false"]`)?.click(); };
 const running = { state: "running", reachable: true, installed: true, service: "launchd", core: { version: "0.4.0", api: 1 }, calls: 0 };
@@ -185,6 +191,7 @@ export const JOURNEYS: Journey[] = [
     { id: "working", caption: "The agent working.", facts: { harness: { "fp-nuc|t-web": true } } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
     { id: "transcript", caption: "The transcript open.", after: press("transcript-toggle") },
+    { id: "transcript-unread", caption: "A reply arrived while the transcript was closed: a dot on its button.", after: arrives("Both tests pass now. Shall I push the fix?") },
   ] },
   { id: "settings", title: "Settings", note: "Each section, applied as it changes (no Save).", shots: [
     { id: "s-general", caption: "General: language and appearance.", after: openSettings("general") },
