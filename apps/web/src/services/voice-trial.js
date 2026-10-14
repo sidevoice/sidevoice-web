@@ -78,33 +78,45 @@ function bounded(promise, { signal, timeoutMs }) {
  * ended (on a short silence, `TAKE_ENDS`), which is End of turn's. As it goes: `onListening` once the voice hears the
  * microphone (its models loaded, the microphone open), and `onLevel`, the microphone's level from 0 to 1 as the voice
  * measures it. The take ends on its silence, at `maxTakeMs`, or when `finish` aborts (Stop): those last two end it with
- * what was said, by muting (unmuted again after); before anything was said, `finish` is a cancel.
+ * what was said, by muting (unmuted again after); with no turn of the person's open, `finish` is a cancel (nothing to
+ * transcribe). A take ended so whose turn comes to no words is `trial-silence` at once: the voice hears no more.
+ * `onTranscribing`, each time it changes: whether the take has ended and what was said is being transcribed (Stop, the
+ * longest take, or the voice's own end of the turn) — the microphone no longer counts then.
  * `onTake`, once the voice has stopped (heard, failed or cancelled): what the microphone gave it, where the voice hands
  * one (contract gap #40).
- * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTake?: (take: import('./voice-take').VoiceTake) => void}} [options]
+ * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('./voice-take').VoiceTake) => void}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTake } = {}) {
+export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake } = {}) {
   const stops = [];
   let readyMs = null;
   const recorder = takeOf(voice, onTake);
-  // Recognising: the take has ended and is being transcribed; the longest take no longer cuts it.
+  // Recognising: a turn has ended and is being transcribed; the longest take no longer cuts it.
   let recognising = false;
-  // Spoke: the person has started talking; the longest take cuts a take, not a silent microphone (that is the
-  // try's own timeout, `trial-silence`).
-  let spoke = false;
+  // The person's turn open now (the voice's id for it, or its state speaking): what Stop and the longest take end. A
+  // silent microphone is the try's own timeout (`trial-silence`); a turn that came to nothing (a cough) is over.
+  let open = null;
+  let speaking = false;
   let tooLong = null;
   let muted = false;
   let stopped = null;
-  // Ends the take with what was said; nothing said, there is nothing to end (Stop is then a cancel).
-  const endTake = () => { if (!spoke || recognising || muted) return false; muted = true; voice.mute(true); return true; };
+  // Told once per change: the take ended (muted by the try) or a turn of it being transcribed.
+  let transcribing = false;
+  const tell = () => { const now = muted || recognising; if (now !== transcribing) { transcribing = now; onTranscribing?.(now); } };
+  // Ends the take with what was said; no turn open, there is nothing to end (Stop is then a cancel).
+  const endTake = () => { if (!(open || speaking) || recognising || muted) return false; muted = true; voice.mute(true); tell(); return true; };
   try {
     await voice.setSettings({ ...settings, ...TAKE_ENDS });
     const heard = new Promise((resolve, reject) => {
       stops.push(voice.onTurn((turn) => {
-        if (turn.phase === 'started') spoke = true;
+        if (turn.phase === 'started') { open = turn.turn_id ?? true; return; }
+        if (turn.turn_id === open || open === true) open = null;
         const text = turn.phase === 'finished' ? String(turn.text ?? '').trim() : '';
-        if (!text) return;
+        if (!text) {
+          // The take was ended and its turn came to nothing: muted, the voice hears no more, so nothing will come.
+          if (muted && !(turn.phase === 'cancelled' && turn.merged)) reject(trialError('trial-silence'));
+          return;
+        }
         // Its own times only: how the take ended is not this try's.
         onTimings?.({ ready_ms: readyMs, recognition_ms: turn.timings?.recognition_ms ?? null });
         resolve(text);
@@ -113,7 +125,12 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     });
     // Its failure before the voice even listens is the start's to report; this one must not go unheard.
     heard.catch(() => {});
-    stops.push(voice.onState((state) => { recognising = state.recognising > 0; if (state.listening === 'speaking') spoke = true; onState?.(state); }));
+    stops.push(voice.onState((state) => {
+      recognising = state.recognising > 0;
+      if (state.listening !== 'muted') speaking = state.listening === 'speaking';
+      tell();
+      onState?.(state);
+    }));
     if (onLevel) stops.push(voice.onLevel(onLevel));
     const starting = now();
     const listened = recorder.listening().then(() => {

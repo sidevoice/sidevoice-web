@@ -734,6 +734,7 @@ export const messages: Messages = {
   "try.slow": "このデバイスでは動作が遅めです。より小さいモデルのほうが合うかもしれません。",
   "try.starting": "準備中…",
   "try.listening": "聞き取り中… 短い文を話してください",
+  "try.transcribing": "文字起こし中…",
   "try.stop": "停止",
   "try.speakAgain": "もう一度話す",
   "try.listenAgain": "もう一度再生",

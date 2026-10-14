@@ -743,6 +743,7 @@ export const messages: Messages = {
   "try.slow": "Wolno na tym urządzeniu — mniejszy model może lepiej pasować.",
   "try.starting": "Przygotowywanie…",
   "try.listening": "Słucham… powiedz krótkie zdanie",
+  "try.transcribing": "Transkrypcja…",
   "try.stop": "Zatrzymaj",
   "try.speakAgain": "Mów jeszcze raz",
   "try.listenAgain": "Odtwórz ponownie",

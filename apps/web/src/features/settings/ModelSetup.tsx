@@ -94,6 +94,8 @@ export type TryState = {
   attempt: number;
   /** While it runs: the voice listens (transcription) or sounds (voice); before that its models load. */
   live: boolean;
+  /** Transcription's, while it runs: the take has ended (Stop, its longest, or a silence) and is being transcribed. */
+  transcribing: boolean;
   /** The voice's: the sentence it says, and the part of it sounding (none before its first sound). */
   said: string;
   range: KaraokeRange | null;
@@ -105,7 +107,7 @@ export type TryState = {
   take?: VoiceTake | null;
 };
 
-const IDLE: TryState = { phase: "idle", attempt: 0, live: false, said: "", range: null, text: "", error: null, take: null };
+const IDLE: TryState = { phase: "idle", attempt: 0, live: false, transcribing: false, said: "", range: null, text: "", error: null, take: null };
 
 /** A real try of the settings being edited for `task` (the controller's `tryVoiceSettings`): `keep` makes settings that
  *  work this device's (the setup); `onTried` hears each success. A changed setting clears it; leaving stops it. While
@@ -144,13 +146,15 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
         onListening: () => update((trial) => ({ ...trial, live: true })),
         onLevel: (value) => level.publish(value * 100),
         onProgress: (range) => update((trial) => ({ ...trial, live: true, range })),
+        // The take ended: the microphone's level no longer counts, and the try says it transcribes.
+        onTranscribing: (transcribing) => { if (transcribing && attempt.current === mine) level.publish(0); update((trial) => ({ ...trial, transcribing })); },
         onTake: (take) => update((trial) => ({ ...trial, take })) });
-      update((trial) => ({ ...trial, phase: "done", live: false, text: result.text ?? "", timings: result.timings ?? null }));
+      update((trial) => ({ ...trial, phase: "done", live: false, transcribing: false, text: result.text ?? "", timings: result.timings ?? null }));
       if (attempt.current === mine) onTried?.(task);
     } catch (error) {
       const cancelled = (error as { code?: string }).code === "trial-cancelled";
       // Stopped, the try is put away, its take with it; failed, what the microphone gave shows why.
-      update((trial) => ({ ...trial, phase: cancelled ? "idle" : "failed", live: false, error: voiceFailure(error, { what: "try" }), ...(cancelled ? { take: null } : {}) }));
+      update((trial) => ({ ...trial, phase: cancelled ? "idle" : "failed", live: false, transcribing: false, error: voiceFailure(error, { what: "try" }), ...(cancelled ? { take: null } : {}) }));
     } finally {
       level.publish(0);
     }
@@ -283,12 +287,14 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
 
 /** The transcription try, one layout that never jumps. Its first row: the try's button and, beside it, the microphone's
  *  level, always there — flat until it listens, moving while it does. Its second, of a fixed height: while it listens,
- *  what to do and the take's length filling to its longest; once done, in its place, what was heard and how quick; or
- *  why it failed. */
+ *  what to do and the take's length filling to its longest; once the take has ended (Stop, its longest, a silence),
+ *  "Transcribing…", the level flat and the take's length stopped where it ended; once done, in its place, what was
+ *  heard and how quick; or why it failed. */
 function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: Translate }) {
   const { trial } = handle;
   const running = trial.phase === "running";
-  const listening = running && trial.live;
+  const taking = running && trial.live;
+  const listening = taking && !trial.transcribing;
   return <div className="model-try stt-try" id="stt-try-panel" data-phase={trial.phase}>
     <div className="stt-try-head">
       {button}
@@ -297,10 +303,12 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
     <div className="stt-try-area" aria-live="polite">
       {trial.phase === "idle" && hint && <p className="model-try-hint">{hint}</p>}
       {running && !trial.live && <p className="model-try-state"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>}
-      {listening && <>
-        <p className="model-try-state">{t("try.listening")}</p>
-        {/* The take's length, filling to its longest (MAX_TAKE_MS), from when it listens. */}
-        <span className="model-try-take" key={trial.attempt} style={{ animationDuration: MAX_TAKE_MS + "ms" }} role="img" aria-label={t("try.takeMax", { s: MAX_TAKE_MS / 1000 })} />
+      {taking && <>
+        {trial.transcribing
+          ? <p className="model-try-state"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.transcribing")}</p>
+          : <p className="model-try-state">{t("try.listening")}</p>}
+        {/* The take's length, filling to its longest (MAX_TAKE_MS), from when it listens; stopped once it has ended. */}
+        <span className="model-try-take" key={trial.attempt} data-ended={trial.transcribing || undefined} style={{ animationDuration: MAX_TAKE_MS + "ms" }} role="img" aria-label={t("try.takeMax", { s: MAX_TAKE_MS / 1000 })} />
       </>}
       {trial.phase === "done" && <>
         <TryHeard text={trial.text} roomy={false} t={t} />

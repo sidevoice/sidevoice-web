@@ -733,6 +733,7 @@ export const messages: Messages = {
   "try.slow": "在此设备上较慢，换个更小的模型可能更合适。",
   "try.starting": "正在准备…",
   "try.listening": "正在听…请说一句简短的话",
+  "try.transcribing": "正在转写…",
   "try.stop": "停止",
   "try.speakAgain": "再说一次",
   "try.listenAgain": "再播放一次",
