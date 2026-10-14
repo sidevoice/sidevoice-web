@@ -67,7 +67,7 @@ export function turnStepped(trial: TurnTrial, step: TurnStep): TurnTrial {
   switch (step.step) {
     case "listening":
       return step.again ? { ...trial, phase: "notice", notice: "changed", turn: null, ...say(trial, { key: "turnTry.changed" }) }
-        : { ...trial, phase: "listening", turn: null, ...say(trial, { key: "turnTry.listening" }) };
+        : { ...trial, phase: "listening", turn: null, ...say(trial, { key: "turnTry.state.listening" }) };
     case "restarting":
       return { ...trial, phase: "restarting", turn: null, notice: null };
     case "speaking":
@@ -172,11 +172,12 @@ export function TurnTry({ draft, smart, smartReady, setup = false, active = true
   live.current = running;
   const wave = useMemo(() => () => live.current ? level.current() / 100 : 0, [level]);
 
-  // While it listens, one line whatever the turn is doing; once it decided, one line with when, in the same place.
-  const listeningLine = t("turnTry.listeningSimple");
+  // While it listens, where the person is, in words: not started yet (a notice is only read out), speaking, in a pause,
+  // their turn ended; once it decided, one line with when, in the same place.
   const detected = trial.turn ? (trial.turn.silenceMs == null ? t("turnTry.detectedNow") : t("turnTry.detected", { s: seconds(trial.turn.silenceMs) })) : "";
   const words: Partial<Record<Phase, string>> = {
-    listening: listeningLine, speaking: listeningLine, pause: listeningLine, ended: listeningLine, notice: listeningLine,
+    listening: t("turnTry.state.listening"), speaking: t("turnTry.state.speaking"), pause: t("turnTry.state.pause"),
+    ended: t("turnTry.state.ended"), notice: t("turnTry.state.listening"),
     quiet: t("turnTry.quiet"), done: detected,
   };
   const busy = trial.phase === "starting" || trial.phase === "restarting";

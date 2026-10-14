@@ -65,7 +65,7 @@ const button = () => document.getElementById("turn-try") as HTMLButtonElement;
 const status = () => panel().querySelector(".turn-try-said")!;
 const area = () => panel().querySelector(".stt-try-area")!;
 
-test.each(variants)("%s: before a try, what to do and that it uses what is selected; then one line while it listens, and it stops by itself at the first turn, saying when it decided", async (variant) => {
+test.each(variants)("%s: before a try, what to do and that it uses what is selected; then where the person is while it listens, and it stops by itself at the first turn, saying when it decided", async (variant) => {
   const { actions, step, heard, start } = renderTurn({ variant });
   expect(panel()).toHaveTextContent("Talk as you would to the agent, pausing to think. Headphones help.");
   expect(panel()).toHaveTextContent("Uses what's selected, even before saving.");
@@ -77,10 +77,17 @@ test.each(variants)("%s: before a try, what to do and that it uses what is selec
   // Try and Stop are one button: the focus stays on it.
   expect(button()).toBe(tryButton);
   expect(tryButton).toHaveTextContent("Stop");
-  // While it listens, one line whatever the turn does.
-  for (const next of [{ step: "listening", again: false }, { step: "speaking" }, { step: "pause" }, { step: "ended" }] as TurnStep[]) {
+  // While it listens, where the person is, in words: not started yet, speaking, in a pause, their turn ended.
+  const said: [TurnStep, RegExp][] = [
+    [{ step: "listening", again: false }, /^Listening — you haven't started speaking$/],
+    [{ step: "speaking" }, /^You're speaking$/],
+    [{ step: "pause" }, /^Pause — still your turn$/],
+    [{ step: "speaking" }, /^You're speaking$/],
+    [{ step: "ended" }, /^Your turn ended$/],
+  ];
+  for (const [next, line] of said) {
     step(next);
-    expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening… speak and finish naturally$/);
+    expect(area().querySelector(".turn-try-state")).toHaveTextContent(line);
   }
   expect(actions.cancelVoiceTry).not.toHaveBeenCalled();
   // The first turn heard ends the try, in the same place, with when it decided — and nothing of what was heard.
@@ -111,11 +118,11 @@ test.each(variants)("%s: a screen reader hears whole messages: listening, the en
   await start();
   expect(status()).toHaveTextContent(/^$/);
   step({ step: "listening", again: false });
-  expect(status()).toHaveTextContent(/^Listening — start talking$/);
+  expect(status()).toHaveTextContent(/^Listening — you haven't started speaking$/);
   step({ step: "speaking" });
   step({ step: "pause" });
   step({ step: "speaking" });
-  expect(status()).toHaveTextContent(/^Listening — start talking$/);
+  expect(status()).toHaveTextContent(/^Listening — you haven't started speaking$/);
   step({ step: "ended" });
   expect(status()).toHaveTextContent(/^Turn ended — the agent would answer now$/);
   await heard("hola", 2500);
@@ -137,7 +144,7 @@ test.each(variants)("%s: Stop before a turn leaves the try idle, says it stopped
   expect(panel()).not.toHaveTextContent("Detected you finished");
 });
 
-test.each(variants)("%s: a cough (not a turn) does not end the try: it keeps listening, its one line, and the notice is only read out", async (variant) => {
+test.each(variants)("%s: a cough (not a turn) does not end the try: it keeps listening, says so, and the notice is only read out", async (variant) => {
   const { actions, step, heard, start } = renderTurn({ variant });
   await start();
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -146,11 +153,11 @@ test.each(variants)("%s: a cough (not a turn) does not end the try: it keeps lis
   step({ step: "not-a-turn" });
   expect(actions.cancelVoiceTry).not.toHaveBeenCalled();
   expect(button()).toHaveTextContent("Stop");
-  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening… speak and finish naturally$/);
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening — you haven't started speaking$/);
   const first = status().textContent;
   expect(first).toMatch(/^That didn't count as a turn — still listening/);
   act(() => { vi.advanceTimersByTime(2000); });
-  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening… speak and finish naturally$/);
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening — you haven't started speaking$/);
   // The same notice again is read again.
   step({ step: "speaking" });
   step({ step: "not-a-turn" });
@@ -160,7 +167,7 @@ test.each(variants)("%s: a cough (not a turn) does not end the try: it keeps lis
   expect(panel()).toHaveTextContent("Getting ready…");
   expect(panel().querySelector(".turn-try-state")).toBeNull();
   step({ step: "listening", again: true });
-  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening… speak and finish naturally$/);
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Listening — you haven't started speaking$/);
   expect(status()).toHaveTextContent(/^Listening again with the new setting/);
   // Still running: the first turn heard ends it.
   vi.useRealTimers();
@@ -208,12 +215,18 @@ test.each(variants)("%s: transcription not ready on this device: nothing to hear
   expect(document.getElementById(button().getAttribute("aria-describedby")!)).toHaveTextContent("The transcription model isn't ready yet.");
 });
 
-test("in Spanish: the listening line, and the line when it decided, with and without its seconds", async () => {
+test("in Spanish: where the person is while it listens, and the line when it decided, with and without its seconds", async () => {
   localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: "es" }));
   const { step, heard, start } = renderTurn();
   await start();
   step({ step: "listening", again: false });
-  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Escuchando… habla y termina con naturalidad$/);
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Escuchando: aún no has empezado a hablar$/);
+  step({ step: "speaking" });
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Estás hablando$/);
+  step({ step: "pause" });
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Pausa: sigue siendo tu turno$/);
+  step({ step: "ended" });
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Tu turno ha terminado$/);
   await heard("hola", 900);
   expect(area().querySelector(".turn-try-state")).toHaveTextContent(/^Detectó que terminaste 0[.,]9 s después de dejar de hablar$/);
   expect(translator("es")("turnTry.detectedNow")).toBe("Detectó que terminaste");
@@ -302,7 +315,7 @@ test("laid out as the other tries: the button and the level on one row, then one
   expect(head()).toContainElement(button());
   expect(wave()).not.toBeNull();
   step({ step: "listening", again: false });
-  expect(area().querySelector(".turn-try-state")).toHaveTextContent("Listening… speak and finish naturally");
+  expect(area().querySelector(".turn-try-state")).toHaveTextContent("Listening — you haven't started speaking");
   expect(area()).not.toHaveTextContent("Talk as you would to the agent");
   take({ sampleRate: 16000, samples: new Float32Array(16000), started_at: 0, ended_at: 1000, turns: [] });
   await heard("Quiero que revises el PR", 900);
