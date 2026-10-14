@@ -1,7 +1,7 @@
 import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
-import { translator } from "../../i18n/translator";
+import { translator, type MessageKey } from "../../i18n/translator";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
@@ -10,11 +10,12 @@ import { cn } from "../../lib/cn";
  * itself (MicWave). */
 
 export function ScreenLock() {
+  const t = translator();
   const lock = useRoomStore((state) => state.screenLock);
   return (
     <span id="screen-lock" className="screen-lock" role="status" data-state={lock.state || undefined} hidden={!lock.state}>
       <i className="screen-lock-dot" aria-hidden="true" />
-      <span id="screen-lock-text" className="sr-only">{lock.state ? lock.note : ""}</span>
+      <span id="screen-lock-text" className="sr-only">{lock.state && lock.note ? t(lock.note as MessageKey) : ""}</span>
     </span>
   );
 }

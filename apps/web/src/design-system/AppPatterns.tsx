@@ -375,7 +375,7 @@ function PairAnotherDevice() {
  *  as everywhere (machineStatus), in words as a machine's page says it. */
 const RUNNING: LocalHostStatus = { state: "running", reachable: true };
 const machine = (id: string, host: string, changes: Partial<MachineView> = {}): MachineView =>
-  ({ id, host, revoked: false, reach: "direct", state: "connected", pairedLabel: "", ...changes });
+  ({ id, host, revoked: false, reach: "direct", state: "connected", ...changes });
 const PATTERN_MACHINES: { view: MachineView; platform: string; note: string }[] = [
   { view: machine("mbp", "MacBook Pro", { local: true }), platform: "macos", note: "2 agents" },
   { view: machine("nuc", "NUC del salón"), platform: "linux", note: "192.168.1.20 · 1 agent" },

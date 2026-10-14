@@ -1,10 +1,10 @@
-import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,NO_MACHINE,reachNote,conversationKey,conversationOf,personKey} from '../state/room-session-state.js';
+import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
 import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
-import {translator,UI_LANGUAGES} from '../i18n/translator.ts';
+import {translator,setUiLanguage,onUiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
 import {voiceFailure,roomFailure,worded,errorLine} from '../features/settings/error-message.ts';
 import {failureCode} from './failure-code.js';
 import {probeSiteStorage} from './site-storage.js';
@@ -35,7 +35,7 @@ function setRoomError(message){const value=message||null;if(window.sidevoiceUI)w
  * back to — and measures nothing of its own. A step that fails leaves its reason, and what to do about it, in the
  * same place. */
 function joinStatus(step,{detail='',progress=null,subject=''}={}){roomStore.patch({joinStep:step,joinFailure:'',joinFailureDetails:'',joinDetail:detail?String(detail).slice(0,80):'',joinProgress:progress==null?null:Number(progress),joinSubject:subject})}
-function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinFailureDetails:'',joinDetail:'',joinProgress:null,joinSubject:'',liveNote:''})}
+function clearJoinStatus(){roomStore.patch({joinStep:null,joinFailure:'',joinFailureDetails:'',joinDetail:'',joinProgress:null,joinSubject:''})}
 // A join that failed, in words (`ErrorMessage`): its sentence on the join line, what was raw about it behind Details.
 function failJoin(message){roomStore.patch({joinStep:null,joinFailure:message?errorLine(message):'',joinFailureDetails:message?.details||'',joinDetail:'',joinProgress:null,joinSubject:''})}
 // Why a call ended without the person ending it, for the desktop card's exit notice (FLOATING-CARD-SPEC FC7): idle,
@@ -44,7 +44,7 @@ function failJoin(message){roomStore.patch({joinStep:null,joinFailure:message?er
 // never sets it.
 function callEndedBy(reason,detail){roomStore.patch({callEnded:{reason,detail:detail||''}})}
 // What this tab already calls the conversation it is going back to; the room is not asked again for a title.
-function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||'tu conversación'}
+function conversationTitle(id){return state.people.find(p=>personKey(p)===id)?.title||state.history.find(r=>r.thread===id)?.name||''}
 /* What failed in the voice, its models or the room, as the person reads it (error-message.ts): a known code in the
  * words the bundles give it, any other one a generic line about what failed — never the engine's, the browser's or a
  * machine's own text, which goes behind Details with the code. A provider's own words, when it is the one refusing,
@@ -287,14 +287,14 @@ function settleLink(fp,found,reach){
  publishLinks();
  if(moved&&base!=null){if(fp===state.callNode)void refresh();void refreshPeople(fp);void refreshHistory(fp)}
 }
-function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(reachNote(state)||NO_MACHINE);return url}
+function routed(path,fp){const url=routeUrl(path,target,linkBase(fp));if(url==null)throw worded(reachNote(state)||noMachine());return url}
 // A request with the token is never redirected: the node base proved itself, wherever a redirect points did not.
 function withToken(options,token){return {...options,redirect:'error',headers:{...(options?.headers||{}),Authorization:'Bearer '+token}}}
 // Every request to a machine carries the token of that machine's pairing — never another's; one the machine refuses
 // means that pairing is gone. An address that stops answering is looked at again on the next beat.
 const request=async(path,options,fp=state.callNode)=>{
  const url=routed(path,fp);if(!isNodePath(path))return fetch(url,options);
- const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw worded(NO_MACHINE);
+ const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw worded(noMachine());
  let response;
  try{response=await fetch(url,withToken(options,pairing.token))}catch(error){if(link&&link.base===base)link.doubted=base;throw error}
  if(response.status===401)pairingRefused(fp,{token:pairing.token});
@@ -344,21 +344,21 @@ async function keepScreenAwake(){
  if(!(state.ws||state.connecting)||document.hidden||screenWakeLock||wakeRequest)return;
  // Settings → Advanced may leave the screen to the system: a call that goes on with it off.
  if(!readCallPreferences().keepAwake)return;
- if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','Este dispositivo no permite mantener la pantalla encendida.');return}
+ if(!globalThis.navigator?.wakeLock?.request){showScreenLock('off','session.screen.unsupported');return}
  const epoch=wakeEpoch;
  const request=(async()=>{
   try{
    const lock=await navigator.wakeLock.request('screen');
    if(epoch!==wakeEpoch||document.hidden){await lock.release();return}
-   screenWakeLock=lock;wakeRetries=0;showScreenLock('on','Pantalla activa durante la llamada.');
+   screenWakeLock=lock;wakeRetries=0;showScreenLock('on','session.screen.on');
    // The system takes the lock back on its own — a screen that locked once, a route
    // change. While the call is up and the room is on screen, ask again.
    lock.addEventListener('release',()=>{
     if(screenWakeLock!==lock)return;
-    screenWakeLock=null;showScreenLock('off','La pantalla puede apagarse; vuelve a la llamada para mantenerla activa.');
+    screenWakeLock=null;showScreenLock('off','session.screen.released');
     if(state.ws&&!document.hidden&&wakeRetries<3){++wakeRetries;setTimeout(()=>{if(state.ws&&!document.hidden)keepScreenAwake()},1000)}
    });
-  }catch{showScreenLock('off','No se pudo mantener la pantalla activa. El móvil podría suspender la llamada.')}
+  }catch{showScreenLock('off','session.screen.failed')}
  })();
  wakeRequest=request;
  try{await request}finally{if(wakeRequest===request)wakeRequest=null}
@@ -386,7 +386,7 @@ function historyThreadId(){return state.viewedThread||targetId()}
 
 // A refusal is a sentence, or a key with its sentence (sidevoice-core's refusals): rejected with both, for `roomError`
 // to say by its key — the sentence, in whatever language it came, only behind Details.
-async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw worded(reachNote(state)||NO_MACHINE);const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
+async function api(path,options,fp=state.callNode){const r=await request(path,options,fp);if(r.status===401)throw worded(reachNote(state)||noMachine());const d=await r.json();if(!r.ok)throw refusalError(d.detail);return d}
 const post=(path,body,fp=state.callNode)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},fp);
 /* ----- what the call owes its machine: the outbox (`outbox.js`) -----
  * A turn of the person's and what became of a reply are each one message with its own `client_msg_id`, which the machine
@@ -491,7 +491,7 @@ function add(role, text, segment, thread = targetId(), metadata = {}) { // threa
     save();
     markHistorySeen();
     return;
-} state.history = [...state.history, { segment: key, thread, role, text, session: state.sessionId, revision: segment?.toString().startsWith('user-turn:') ? Number(segment.slice(10)) : undefined, ...metadata, name: role === 'user' ? 'Tú' : state.people.find(p => personKey(p) === thread)?.title || state.roomBinding?.title || 'Conversación', time: metadata.time || Date.now() }]; capHistory(); save(); markHistorySeen(); }
+} state.history = [...state.history, { segment: key, thread, role, text, session: state.sessionId, revision: segment?.toString().startsWith('user-turn:') ? Number(segment.slice(10)) : undefined, ...metadata, name: role === 'user' ? '' : state.people.find(p => personKey(p) === thread)?.title || state.roomBinding?.title || '', time: metadata.time || Date.now() }]; capHistory(); save(); markHistorySeen(); }
 // What this page keeps of each machine's conversations: its newest rows, so a busy machine never pushes another's out.
 const HISTORY_PER_MACHINE=1000;
 function capHistory(){const kept=newestPerMachine(state.history,HISTORY_PER_MACHINE);if(kept!==state.history)state.history=kept}
@@ -500,13 +500,15 @@ function cancelCurrentInput(){if(!state.userTurn||state.cancelledInput)return;vo
 function cancelDraft(turn){state.cancelledInput=true;state.history=state.history.filter(r=>!(r.segment===turn.segment&&r.thread===turn.thread));save();partial('');markHistorySeen()}
 function partial(text){state.pendingUserText=text||''}
 // The text box comes and goes with the call view: with none mounted there is nothing to update.
-function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;input.placeholder=ready?'Envía un mensaje':'Únete a la llamada para escribir';}
+function updateComposer(){const input=$('text-message'),send=$('text-send');if(!input||!send)return;const ready=!!(state.ws||state.reconnecting)&&!!state.sessionId&&!!targetId()&&historyThreadId()===targetId()&&!state.switching;input.disabled=!ready;send.disabled=!ready||state.textSending;const t=translator();input.placeholder=t(ready?'transcript.placeholder':'transcript.joinToWrite');}
 async function sendText(){personSignal();const input=$('text-message'),text=input?.value;if(text==null)return;if(state.textSending||!text.trim()||!state.sessionId||!targetId())return;const destination=targetThread(),key=JSON.stringify([state.sessionId,targetId(),text]);if(textAttempt?.key!==key)textAttempt={key,id:crypto.randomUUID()};const attempt=textAttempt;state.textSending=true;updateComposer();setRoomError('');try{await post('/api/presentation/text',{text,thread_id:destination,session_id:state.sessionId,binding_id:state.roomBinding.binding_id,message_id:attempt.id});if(input.value===text)input.value='';if(textAttempt===attempt)textAttempt=null;await refreshHistory(state.callNode)}catch(e){setRoomError(roomError(e,'room',bundled('room.failure.textNotSent').text))}finally{state.textSending=false;updateComposer()}}
 // Taken where they bubble to, not on the box itself, so a box mounted after this runs sends too.
 document.addEventListener('submit',event=>{if(event.target?.id!=='text-composer')return;event.preventDefault();return sendText()});
 document.addEventListener('keydown',event=>{if(event.target?.id==='text-message'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();$('text-composer')?.requestSubmit()}});
 // A box mounted later renders disabled: it is brought up to date as it appears.
 let composerBox=$('text-message');
+// Its placeholder is written here, so it is written again in a language chosen later.
+onUiLanguage(updateComposer);
 new MutationObserver(()=>{const box=$('text-message');if(box===composerBox)return;composerBox=box;updateComposer()}).observe(document.body,{childList:true,subtree:true});
 function updateMic(){updateComposer()}
 function setMic(enabled){personSignal();state.micEnabled=enabled;applyMicState();updateMic();syncNowPlaying()}
@@ -533,7 +535,7 @@ function followServedBuild(served){
  const page=window.sidevoiceBuildId||'dev';
  if(!served||page==='dev'||served===page)return;
  // In a call it waits, said in the updates' list too (webUpdate, whose Reload loads it at once), and loads after the hang-up.
- if(state.ws||state.connecting||state.reconnecting){state.liveNote='Hay una versión nueva de la página: se cargará al colgar.';if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
+ if(state.ws||state.connecting||state.reconnecting){if(state.webUpdate!==served)roomStore.patch({webUpdate:served});return}
  try{if(sessionStorage.getItem('sidevoice.reloadedFor')===served)return;sessionStorage.setItem('sidevoice.reloadedFor',served)}catch{}
  const query=new URLSearchParams(location.search);query.set('v',served);
  location.replace(location.pathname+'?'+query);
@@ -554,7 +556,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  // The conversations (and each one's model and effort) come on a slower beat: the first answer asks for them at once, so
  // the stage is whole from the start rather than six seconds later.
  if(!links.get(fp)?.peopleAnswered)void refreshPeople(fp);
-}catch{state.liveNote='Servidor no disponible'}}
+}catch{}}
 const HISTORY_ROLES=new Set(['user','assistant']);
 function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
 // Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
@@ -578,7 +580,7 @@ async function refreshHistory(fp=state.callNode) { const link = links.get(fp), b
             state.history = state.history.filter(h => !aliases.includes(h));
             changed = true;
         }
-        const patch = { segment: r.id, thread, role: r.role, text: r.text, name: r.role === 'user' ? 'Tú' : state.people.find(p => personKey(p) === thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, audio_reason: r.audio_reason, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
+        const patch = { segment: r.id, thread, role: r.role, text: r.text, name: r.role === 'user' ? '' : state.people.find(p => personKey(p) === thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, audio_reason: r.audio_reason, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
         if (!row) {
             state.history = [...state.history, patch];
             changed = true;
@@ -809,7 +811,7 @@ const renameBody=name=>({method:'PATCH',headers:{'Content-Type':'application/jso
 async function renameMachineDevice(fp,id,name){await hostApi(fp,'/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 async function renameLocalHostDevice(id,name){await localHostApi('/api/device/devices/'+encodeURIComponent(id),renameBody(name))}
 // Browsers cannot set headers on a WebSocket: the token travels as the second subprotocol, the node answers with the first.
-function callProtocols(fp){const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing?.token||pairing.revoked)throw worded(NO_MACHINE);return ['sidevoice','sidevoice.token.'+pairing.token]}
+function callProtocols(fp){const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing?.token||pairing.revoked)throw worded(noMachine());return ['sidevoice','sidevoice.token.'+pairing.token]}
 async function reselectRemembered(){
  // After a reload or a reconnect this tab goes back to the conversation it was on, if it is still in the room.
  const wanted=rememberedThread();
@@ -834,37 +836,39 @@ function renderLatencyStats(snapshot,thread){
   if(statsNumber(value)&&(!firstReplies.has(key)||value<firstReplies.get(key)))firstReplies.set(key,value)}
  $('stats-recognition').textContent=statsDuration(statsMedian(replies.map(r=>r.input_ms?.recognition_ms)));
  $('stats-response').textContent=statsDuration(statsMedian([...firstReplies.values()]));
- const states={queued:'En cola',playing:'Reproduciendo',playback_finished:'Escuchada',interrupted:'Interrumpida',failed:'Falló'};
+ const t=translator(),states=['queued','playing','playback_finished','interrupted','failed'];
  const rows=replies.slice(-12).reverse().map(r=>{
   const row=document.createElement('tr'),input=r.input_ms||{},server=r.server_ms||{};
   row.append(statsCell('td',r.reply_revision),...[
    input.endpoint_silence_ms,input.recognition_ms,
    server.input_queued_to_reply_received_ms,server.reply_received_to_dispatched_ms
-  ].map(value=>statsCell('td',statsDuration(value))),statsCell('td',states[r.status]||r.status||'—'));
+  ].map(value=>statsCell('td',statsDuration(value))),statsCell('td',states.includes(r.status)?t('stats.reply.'+r.status):r.status||'—'));
   return row;
  });
  $('stats-rows').replaceChildren(...rows);
- $('stats-empty').textContent=replies.length?'':'Aún no hay respuestas medidas para esta conversación.';
+ $('stats-empty').textContent=replies.length?'':t('stats.noRepliesConversation');
  renderLatencyStages(replies.at(-1));
  renderLatencyAggregates(measured);
 }
 // The last turn, stage by stage in the order they happen; each measured on its own clock, so bars compare, they do not add up.
-// The third entry is the stage's stable name: it identifies the row in the aggregates and is what a metric will be called.
+// The second entry is the stage's stable name: it identifies the row in the aggregates and is what a metric will be called.
+// Its label is the key `stats.stage.<name>`.
 const LATENCY_STAGES=[
- ['Silencio hasta cerrar el turno',r=>r.input_ms?.endpoint_silence_ms,'endpoint_silence'],
- ['Turno cerrado → texto',r=>r.input_ms?.recognition_ms,'recognition'],
- ['Texto → entregado al agente',r=>r.input_ms?.transcript_to_delivery_ms,'transcript_to_delivery'],
- ['Entregado → leído por la conversación',r=>r.server_ms?.delivery_accepted_to_read_ms??r.server_ms?.input_queued_to_read_ms,'delivery_to_read'],
- ['Leído → primera respuesta',r=>r.server_ms?.read_to_reply_received_ms,'read_to_reply'],
- ['Agente: entrega → primera respuesta',r=>r.server_ms?.input_queued_to_reply_received_ms,'input_queued_to_reply'],
- ['Respuesta → enviada a este dispositivo',r=>r.server_ms?.reply_received_to_dispatched_ms,'reply_to_dispatch'],
+ [r=>r.input_ms?.endpoint_silence_ms,'endpoint_silence'],
+ [r=>r.input_ms?.recognition_ms,'recognition'],
+ [r=>r.input_ms?.transcript_to_delivery_ms,'transcript_to_delivery'],
+ [r=>r.server_ms?.delivery_accepted_to_read_ms??r.server_ms?.input_queued_to_read_ms,'delivery_to_read'],
+ [r=>r.server_ms?.read_to_reply_received_ms,'read_to_reply'],
+ [r=>r.server_ms?.input_queued_to_reply_received_ms,'input_queued_to_reply'],
+ [r=>r.server_ms?.reply_received_to_dispatched_ms,'reply_to_dispatch'],
 ];
 function renderLatencyStages(reply){
  const list=$('stats-stages');if(!list)return;list.replaceChildren();
- if(!reply){$('stats-stages-note').textContent='Aún no hay un turno completo que mostrar.';return}
- const values=LATENCY_STAGES.map(([label,pick])=>[label,pick(reply)]),max=Math.max(1,...values.map(([,v])=>statsNumber(v)?v:0));
+ const t=translator();
+ if(!reply){$('stats-stages-note').textContent=t('stats.noTurn');return}
+ const values=LATENCY_STAGES.map(([pick,key])=>[t('stats.stage.'+key),pick(reply)]),max=Math.max(1,...values.map(([,v])=>statsNumber(v)?v:0));
  for(const [label,value] of values){const item=document.createElement('li');const name=document.createElement('span');name.textContent=label;const bar=document.createElement('i');if(statsNumber(value))bar.style.width=Math.max(1,Math.round(value/max*100))+'%';else bar.hidden=true;const amount=document.createElement('b');amount.textContent=statsDuration(value);item.append(name,bar,amount);list.append(item)}
- $('stats-stages-note').textContent='Turno '+reply.reply_revision+' · el tramo más largo marca la escala.';
+ $('stats-stages-note').textContent=t('stats.stagesScale',{n:reply.reply_revision});
 }
 // Aggregates over the whole call, from the same snapshot the dialog already polls. Percentiles are
 // nearest-rank: every number shown is a measurement that happened, never an interpolation between two.
@@ -879,18 +883,19 @@ function statsSummary(values){
 }
 function statsAggregate(replies,stages=LATENCY_STAGES){
  const measured=(Array.isArray(replies)?replies:[]).filter(Boolean);
- return stages.map(([label,pick,key])=>({key,label,...statsSummary(measured.map(reply=>pick(reply)))}));
+ const t=translator();
+ return stages.map(([pick,key])=>({key,label:t('stats.stage.'+key),...statsSummary(measured.map(reply=>pick(reply)))}));
 }
-const AGGREGATE_COLUMNS=['Tramo','n','Media','p50','p90','Máx'];
+const aggregateColumns=()=>{const t=translator();return [t('stats.column.stage'),'n',t('stats.column.mean'),'p50','p90',t('stats.column.max')]};
 function statsThreads(replies){return [...new Set(replies.map(reply=>reply.thread_id).filter(Boolean))]}
 function statsConversationName(threadId){return state.people.find(person=>person.node===state.callNode&&person.thread_id===threadId)?.title||threadId}
-function statsAggregateCaption(count){return count+(count===1?' respuesta medida':' respuestas medidas')}
+function statsAggregateCaption(count){return translator()(count===1?'stats.measured.one':'stats.measured.other',{n:count})}
 function statsAggregateTable(caption,rows){
  const wrap=document.createElement('div');wrap.className='stats-table-wrap';
  const table=document.createElement('table');table.className='stats-table';
  const title=document.createElement('caption');title.textContent=caption;
  const head=document.createElement('thead'),headRow=document.createElement('tr');
- headRow.append(...AGGREGATE_COLUMNS.map(text=>statsCell('th',text)));head.append(headRow);
+ headRow.append(...aggregateColumns().map(text=>statsCell('th',text)));head.append(headRow);
  const body=document.createElement('tbody');
  for(const row of rows){
   const line=document.createElement('tr');
@@ -906,41 +911,43 @@ function renderLatencyAggregates(replies){
  statsReplies=(Array.isArray(replies)?replies:[]).filter(Boolean);
  $('stats-aggregates-copied').textContent='';
  $('stats-aggregates-copy').disabled=!statsReplies.length;
- if(!statsReplies.length){host.replaceChildren();$('stats-aggregates-note').textContent='Aún no hay respuestas medidas en esta llamada.';return}
+ const t=translator();
+ if(!statsReplies.length){host.replaceChildren();$('stats-aggregates-note').textContent=t('stats.noRepliesCall');return}
  const threads=statsThreads(statsReplies);
- const tables=[statsAggregateTable('Toda la sesión · '+statsAggregateCaption(statsReplies.length),statsAggregate(statsReplies))];
+ const tables=[statsAggregateTable(t('stats.wholeSession',{measured:statsAggregateCaption(statsReplies.length)}),statsAggregate(statsReplies))];
  // The agent side dominates and differs per harness, so a call that talked to two conversations gets one table each.
  if(threads.length>1)for(const thread of threads){
   const own=statsReplies.filter(reply=>reply.thread_id===thread);
   tables.push(statsAggregateTable(statsConversationName(thread)+' · '+statsAggregateCaption(own.length),statsAggregate(own)));
  }
  host.replaceChildren(...tables);
- $('stats-aggregates-note').textContent='Recuento, media, p50, p90 y máximo por tramo sobre '+statsAggregateCaption(statsReplies.length)+'. Los tramos se solapan: no se deben sumar. Percentiles por rango más cercano.';
+ $('stats-aggregates-note').textContent=t('stats.aggregatesOver',{measured:statsAggregateCaption(statsReplies.length)});
 }
 function statsTextTable(caption,rows){
- const cells=[AGGREGATE_COLUMNS,...rows.map(row=>[row.label,row.count?String(row.count):'—',statsDuration(row.mean),statsDuration(row.p50),statsDuration(row.p90),statsDuration(row.max)])];
- const widths=AGGREGATE_COLUMNS.map((_,column)=>Math.max(...cells.map(row=>row[column].length)));
+ const columns=aggregateColumns(),cells=[columns,...rows.map(row=>[row.label,row.count?String(row.count):'—',statsDuration(row.mean),statsDuration(row.p50),statsDuration(row.p90),statsDuration(row.max)])];
+ const widths=columns.map((_,column)=>Math.max(...cells.map(row=>row[column].length)));
  const line=row=>row.map((cell,column)=>column?cell.padStart(widths[column]):cell.padEnd(widths[column])).join('  ').trimEnd();
  return [caption,line(cells[0]),widths.map(width=>'-'.repeat(width)).join('  '),...cells.slice(1).map(line)].join('\n');
 }
 function statsAggregatesText(replies){
  const measured=(Array.isArray(replies)?replies:[]).filter(Boolean),threads=statsThreads(measured);
- const blocks=[statsTextTable('Toda la sesión · '+statsAggregateCaption(measured.length),statsAggregate(measured))];
+ const t=translator(),blocks=[statsTextTable(t('stats.wholeSession',{measured:statsAggregateCaption(measured.length)}),statsAggregate(measured))];
  if(threads.length>1)for(const thread of threads){
   const own=measured.filter(reply=>reply.thread_id===thread);
   blocks.push(statsTextTable(statsConversationName(thread)+' · '+statsAggregateCaption(own.length),statsAggregate(own)));
  }
- return ['Sidevoice · agregados de latencia · los tramos se solapan, no se suman',...blocks].join('\n\n');
+ return [t('stats.copyHeading'),...blocks].join('\n\n');
 }
 async function copyLatencyAggregates(){
  const status=$('stats-aggregates-copied');
- if(!statsReplies.length){status.textContent='Aún no hay nada que copiar.';return}
+ const t=translator();
+ if(!statsReplies.length){status.textContent=t('stats.nothingToCopy');return}
  try{
   const clipboard=globalThis.navigator?.clipboard;
-  if(!clipboard?.writeText)throw Error('sin portapapeles');
+  if(!clipboard?.writeText)throw Error('no clipboard');
   await clipboard.writeText(statsAggregatesText(statsReplies));
-  status.textContent='Copiado como texto.';
- }catch{status.textContent='No se pudo copiar; selecciona la tabla a mano.'}
+  status.textContent=t('stats.copiedAsText');
+ }catch{status.textContent=t('stats.copyFailedTable')}
 }
 
 /* ----- the turn in the conversation's hands -----
@@ -986,25 +993,25 @@ function forgetThread(threadId){state.history=state.history.filter(r=>r.thread!=
 function versionFacts(){
  const page=window.sidevoiceBuildId||'dev',served=state.roomInfo?.web_build||null;
  const stale=served&&page!=='dev'&&served!==page;
- return [['Versión de la página',page],['Versión servida',served?served+(stale?' · hay una versión nueva, recarga':' · al día'):'—'],['Servidor',state.roomInfo?.version||'—']];
+ const t=translator();
+ return [[t('stats.fact.pageVersion'),page],[t('stats.fact.servedVersion'),served?t(stale?'stats.served.stale':'stats.served.current',{build:served}):'—'],[t('stats.fact.server'),state.roomInfo?.version||'—']];
 }
-const VOICE_STATES={idle:'Sin iniciar',muted:'Silenciado',listening:'Escuchando',speaking:'Hablando'};
-const PLAYBACK_STATES={idle:'En silencio',synthesizing:'Generando voz',playing:'Reproduciendo'};
+const MIC_STATES=['idle','muted','listening','speaking'],SPEAKER_STATES=['idle','synthesizing','playing'],SOCKET_STATES=['connecting','open','closing','closed'];
 function renderConnectionStats(data,roundTrip){
  const call=state.sessionId&&data?.call?.id===state.sessionId?data.call:null,voiceState=state.voiceState;
- const socket=['Conectando','Conectado','Cerrando','Desconectado'][state.ws?.readyState]||'Desconectado';
+ const t=translator(),socket=t('stats.socket.'+(SOCKET_STATES[state.ws?.readyState]||'closed'));
  const facts=[
   ...versionFacts(),
   ['WebSocket',socket],
-  ['Consulta al servidor (HTTP)',statsDuration(roundTrip)],
-  ['Sesión',state.sessionId||'Sin llamada'],
-  ['Servidor y este dispositivo',call?'Misma sesión':state.sessionId?'Sesión no confirmada':'Sin llamada'],
-  ['Voz',state.inApp?'La de la aplicación':'La de esta página'],
-  ['Micrófono',VOICE_STATES[voiceState?.listening]||'Sin iniciar'],
-  ['Intervenciones transcribiéndose',voiceState?String(voiceState.recognising):'—'],
-  ['Altavoz',PLAYBACK_STATES[voiceState?.playback]||'—'],
-  ['Mensajes sin confirmar',String(outbox.size)],
-  ['Pantalla activa',screenWakeLock&&!screenWakeLock.released?'Activado':'No confirmado']
+  [t('stats.fact.http'),statsDuration(roundTrip)],
+  [t('stats.fact.session'),state.sessionId||t('stats.noCall')],
+  [t('stats.fact.serverAndDevice'),call?t('stats.sameSession'):state.sessionId?t('stats.sessionUnconfirmed'):t('stats.noCall')],
+  [t('stats.fact.voice'),t(state.inApp?'stats.voice.app':'stats.voice.page')],
+  [t('stats.fact.microphone'),t('stats.mic.'+(MIC_STATES.includes(voiceState?.listening)?voiceState.listening:'idle'))],
+  [t('stats.fact.transcribing'),voiceState?String(voiceState.recognising):'—'],
+  [t('stats.fact.speaker'),SPEAKER_STATES.includes(voiceState?.playback)?t('stats.speaker.'+voiceState.playback):'—'],
+  [t('stats.fact.unacknowledged'),String(outbox.size)],
+  [t('stats.fact.screen'),t(screenWakeLock&&!screenWakeLock.released?'stats.enabled':'stats.unconfirmed')]
  ];
  $('stats-connection').replaceChildren(...facts.flatMap(([label,value])=>[statsCell('dt',label),statsCell('dd',value)]));
 }
@@ -1020,22 +1027,20 @@ async function refreshConnectionStats(){
    api(roomQuery('/api/presentation'),{signal:controller.signal}).then(data=>({data,elapsed:latencyNow()-started})),
    request(roomQuery('/api/presentation/latency'),{signal:controller.signal}).then(async response=>{
     if(response.status===404)return {unavailable:true};
-    if(!response.ok)throw Error('No se pudieron consultar las mediciones.');
+    if(!response.ok)throw Error('latency request failed: '+response.status);
     return response.json();
    })
   ]);
   if(epoch!==statsEpoch||!$('connection-stats').open)return;
-  if(callId!==state.sessionId||thread!==targetThread()){resetStats();$('stats-status').textContent='La conversación ha cambiado. Actualizando…';return}
+  const t=translator();
+  if(callId!==state.sessionId||thread!==targetThread()){resetStats();$('stats-status').textContent=t('stats.status.changed');return}
   if(connection.status==='fulfilled')renderConnectionStats(connection.value.data,connection.value.elapsed);
   else renderConnectionStats(null,null);
   const snapshot=latency.status==='fulfilled'?latency.value:null;
   const matches=!!callId&&snapshot?.session_id===callId;
   renderLatencyStats(matches?snapshot:null,thread);
-  if(connection.status==='rejected'||latency.status==='rejected')$('stats-status').textContent='No se pudo actualizar. Se reintentará mientras esta vista esté abierta.';
-  else if(snapshot?.unavailable)$('stats-status').textContent='Este servidor aún no ofrece mediciones. Hace falta reiniciarlo con la versión actualizada.';
-  else if(!callId)$('stats-status').textContent='Entra en la llamada para medirla.';
-  else if(!matches)$('stats-status').textContent='Esperando las mediciones de esta sesión.';
-  else $('stats-status').textContent='Mediciones de esta conversación · actualización cada 2 segundos';
+  $('stats-status').textContent=t(connection.status==='rejected'||latency.status==='rejected'?'stats.status.retrying'
+   :snapshot?.unavailable?'stats.status.unavailable':!callId?'stats.status.join':!matches?'stats.status.waiting':'stats.status.live');
   $('stats-updated').textContent=new Date().toLocaleTimeString(document.documentElement?.lang||undefined);
  }finally{
   clearTimeout(timeout);
@@ -1224,7 +1229,7 @@ function voiceStateChanged(next){
   state.userLive=next?.listening==='speaking';
   state.botLive=next?.playback==='playing';
   if(state.userTurn&&next?.listening!=='speaking'&&next?.recognising>0)state.pendingPhase='transcribing';
-  if(next?.listening==='speaking'){state.userQuietAt=0;state.liveNote=''}
+  if(next?.listening==='speaking')state.userQuietAt=0;
  });
 }
 // The microphone's level for whoever shows it: the meter, the bubble's waveform, and outside this page the desktop
@@ -1249,7 +1254,7 @@ function receiveReply(d){
  // A reply that arrives while the call leaves its machine is written, never said: the person has moved on.
  if(!replies.has(d.utterance_id)&&!moving)sayReply(d);
 }
-function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(reachNote(state)||NO_MACHINE);return callSocketUrl(base,location)}
+function roomSocketUrl(fp){const base=linkBase(fp);if(base==null)throw worded(reachNote(state)||noMachine());return callSocketUrl(base,location)}
 /* Why the room refused, asked of the room itself over an ordinary request.
  * The room says it twice on the socket — an error frame, then the close code 1013 — and a tunnel
  * can lose both: a phone read only «La sala rechazó la conexión» while the room had written that it
@@ -1329,7 +1334,6 @@ function disconnect() {
     state.karaokeState = null;
     partial('');
     state.holding = false;
-    state.liveNote = '';
     // The call's machine is no longer the call's: the conversation it was on stays on screen, as one looked at.
     if (!state.viewedThread)
         state.viewedThread = targetId();
@@ -1781,7 +1785,7 @@ $('settings-open').onclick=()=>{try{
  if(!$('language-settings').open&&![...links.values()].some(link=>link.base!=null))settingsSection(ownComputerSection()&&!localPairing?'this-computer':'machines');
  // What was chosen and is still on its way stays chosen across openings.
  roomStore.patch({voiceDraft:state.voiceDraft||state.voiceSettings});void loadVoiceCatalogue();
- const p=devicePreferences();window.roomI18n?.setLanguage(p.ui_language);
+ const p=devicePreferences();setUiLanguage(p.ui_language);
  // Empty is Automatic: the system's language, followed as it is rather than kept.
  roomStore.patch({uiLanguage:storedPreferences().ui_language||''});
  roomStore.patch({settingsError:null});
@@ -1791,7 +1795,7 @@ $('settings-open').onclick=()=>{try{
 // (no machine yet) or on an agent waiting to be connected — that section's own page on a phone, not the list of them.
 function settingsSection(name){roomStore.patch({settingsSection:name,settingsLevel:'page'})}
 $('reset-settings').onclick=()=>{try{localStorage.removeItem(SETTINGS_KEY)}catch{}$('settings-open').onclick();saveLanguage('');
- roomStore.patch({voiceDraft:defaultVoiceSettings()});void applyVoiceSettings();$('reset-settings-note').textContent='Restablecido a los valores por defecto.'};
+ roomStore.patch({voiceDraft:defaultVoiceSettings()});void applyVoiceSettings();$('reset-settings-note').textContent=translator()('session.settingsReset')};
 $('settings-close').onclick=()=>$('language-settings').close();
 // Every setting belongs to this device, and the room keeps no copy: what this browser saved wins over what its system
 // says. Only the settings of today's shape are read back.
@@ -1806,7 +1810,7 @@ function devicePreferences(){return {ui_language:systemLanguage(UI_LANGUAGES),..
 function saveLanguage(chosen){
  // Automatic keeps no language: the system's is read again at each start.
  storePreferences(chosen?{ui_language:chosen}:{});
- const p={ui_language:systemLanguage(UI_LANGUAGES),...(chosen?{ui_language:chosen}:{})};window.roomI18n?.setLanguage(p.ui_language);
+ const p={ui_language:systemLanguage(UI_LANGUAGES),...(chosen?{ui_language:chosen}:{})};setUiLanguage(p.ui_language);
  if(state.ws&&state.ws.readyState===WebSocket.OPEN&&state.sessionId)state.ws.send(JSON.stringify({type:'voice-settings',data:{session_id:state.sessionId,ui_language:p.ui_language}}));
  roomStore.patch({uiLanguage:chosen,settingsSavedAt:Date.now()});
 }
@@ -1956,13 +1960,13 @@ window.addEventListener('pagehide',()=>keepTicket(true));
 window.addEventListener('beforeunload',()=>{keepTicket(true);state.ws?.close();void voice?.stop().catch(()=>{})});updateMic();
 // Discover the desktop-owned host first: it is one more machine, listed first. Pairing remains an explicit action:
 // an unpaired browser shows setup guidance, and an unpaired desktop does not open a modal by itself.
-window.roomI18n?.setLanguage(devicePreferences().ui_language);
+setUiLanguage(devicePreferences().ui_language);
 // The conversation this tab was looking at is looked at again: the next join goes to its machine.
 if(rememberedThread())state.viewedThread=rememberedThread();
 function startInitialLocate(){
  publishPairings();
  scanPairedAgents();
- void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>window.roomI18n?.setLanguage(devicePreferences().ui_language));
+ void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>setUiLanguage(devicePreferences().ui_language));
 }
 if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
 else{void refreshLocalHost();startInitialLocate()}
@@ -1978,7 +1982,7 @@ setupIdleWatch();
 // a sign of anybody: an agent can talk to an empty car for ever.
 function personSignal(){
  lastPersonSignal=Date.now();
- if(idleWarned){idleWarned=false;state.liveNote='';roomStore.patch({callIdleWarning:false})}
+ if(idleWarned){idleWarned=false;roomStore.patch({callIdleWarning:false})}
 }
 function checkIdle(){
  if(!state.ws){idleWarned=false;return}
@@ -1991,7 +1995,7 @@ function checkIdle(){
  if(!idleWarned&&quiet>=IDLE_MS-IDLE_WARN_MS){
   idleWarned=true;
   // Said in the room's line, and shown on the desktop card with its Keep (FLOATING-CARD-SPEC FC6).
-  roomStore.batch(()=>{state.liveNote='¿Sigues ahí? Sin señales tuyas, saldrás de la llamada en '+Math.round(IDLE_WARN_MS/1000)+' segundos. Habla o toca la pantalla para seguir.';state.callIdleWarning=true});
+  state.callIdleWarning=true;
  }
 }
 function setupIdleWatch(){

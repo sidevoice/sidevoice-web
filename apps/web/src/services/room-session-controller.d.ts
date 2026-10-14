@@ -15,7 +15,6 @@ declare global {
       setOutputDevice(id: string): Promise<void>;
     };
     roomTranscription?: Record<string, unknown>;
-    roomI18n?: { setLanguage(language: string): void };
     sidevoiceSessionId?: () => string | null;
     sidevoiceUI?: {
       store?: import("../state/room-store").RoomStore;

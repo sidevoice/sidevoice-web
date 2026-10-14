@@ -4,6 +4,7 @@ import type { ChatMessage } from "../../state/room-types";
 import { receiptView } from "../../state/room-session-state.js";
 import { translator } from "../../i18n/translator";
 import { KaraokeText } from "./KaraokeText";
+import { speakerName } from "./group-messages";
 import { uiLocale } from "../../i18n/locale";
 
 /** The delivery mark as a drawing, not a glyph: a text check sat below the time's line and at its own size. The
@@ -23,7 +24,7 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
   // A delivery status this version does not know (sidevoice-core#112) shows no mark: it has no words to say.
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
-  const label = t(message.interrupted ? "messages.interrupted" : "messages.message", { name: message.name, text: message.text });
+  const label = t(message.interrupted ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
       data-interrupted={message.interrupted || undefined} aria-label={label}>

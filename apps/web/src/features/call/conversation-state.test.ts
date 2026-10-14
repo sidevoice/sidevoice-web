@@ -5,7 +5,7 @@ import { conversationState, machineGroups, moodText, personMood, smallAvatarMood
 
 const row = (threadId: string, extra: Partial<ParticipantView> = {}): ParticipantView => ({
   threadId, title: threadId, selected: false, available: true, switching: false, unread: 0, reach: "listening",
-  stateLabel: "", subtitle: "", working: false, machine: "Laptop", machineId: "m1", ...extra,
+  working: false, machine: "Laptop", machineId: "m1", ...extra,
 });
 const en = translator("en");
 

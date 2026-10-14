@@ -14,7 +14,6 @@ import { Button } from "./components/ui/Button";
 import { ErrorDetails } from "./components/ui/ErrorText";
 import { translator } from "./i18n/translator";
 
-import "./i18n/room-i18n.js";
 import { startPageTheme } from "./lib/theme";
 
 // Uncaught errors are reported to the room before anything else is loaded: the controller owns the

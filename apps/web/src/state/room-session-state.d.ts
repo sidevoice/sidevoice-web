@@ -22,7 +22,7 @@ export interface SessionFacts {
  voiceState: VoiceState | null;
  /** A join that failed: its sentence, and what was raw about it, for its Details (error-message.ts). */
  joinStep: string | null; joinFailure: string; joinFailureDetails: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
- screenLock: {state: string; note: string}; holding: boolean; userQuietAt: number; liveNote: string;
+ screenLock: {state: string; note: string}; holding: boolean; userQuietAt: number;
  harness: Record<string, boolean>; turns: Record<string, {session: string; thread: string; status?: string; settled?: boolean; harnessEnded?: boolean; readyAt?: number}>;
  /** The reply being said, and where the voice is in it: the part of `segment`'s text sounding now (`from`, `to`;
   *  both the end of what was heard between its chunks). */
@@ -109,12 +109,11 @@ export interface SessionStatus {
 }
 export interface SessionSnapshot {
  facts: SessionFacts; session: SessionStatus; conversation: ConversationView; participants: ParticipantView[];
- join: JoinStatusView | null; live: string;
+ join: JoinStatusView | null;
  mic: {enabled: boolean; label: string; title: string; pressed: boolean; disabled: boolean; holding: boolean};
  call: {joined: boolean; busy: boolean; label: string}; title: string;
  callCard: CallCardView;
  enginePanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
- capabilityPanel: {id: string; label: string; value: string; state: 'ok' | 'warn' | 'fail'; note: string}[];
  screenLock: {state: string; note: string};
  bootError: import('../components/ui/ErrorText').ErrorMessage | null; machines: MachineView[]; pairing: PairingPromptView;
 }
@@ -199,9 +198,11 @@ export function receiptView(status: string): {symbol: string; label: string};
 export function speechSegment(reply: {history_id?: string; session_id?: string; utterance_id?: string}): string;
 export function recordReply(s: SessionFacts, reply: {session_id?: string; thread_id?: string; revision?: number; reply_revision?: number}): SessionFacts['turns'];
 export function recordReceipt(s: SessionFacts, id: string, status: string, at: number): SessionFacts['turns'];
-export const NO_MACHINE: string;
+/** The translator every projection speaks through (state/room-store.ts gives it). */
+export function speakWith(translate: (key: import('../i18n/translator').MessageKey, params?: Record<string, string | number>) => string): void;
+/** No machine this device can talk to, in one sentence. */
+export function noMachine(): string;
 export const RECONNECT_GRACE_MS: number;
-export const UNPAIRED: string;
 export function machinesView(s: SessionFacts): MachineView[];
 /** A conversation as the page knows it: the machine (fingerprint) and the room's thread, as one key. */
 export function conversationKey(node: string | null | undefined, thread: string | null | undefined): string | null;
@@ -210,4 +211,3 @@ export function personKey(person: { node?: string | null; thread_id?: string | n
 export function selectedThread(s: SessionFacts): string | null;
 export function reachNote(s: SessionFacts): string;
 export function joinView(s: SessionFacts): JoinStatusView | null;
-export function sinceText(seconds: number | null | undefined, now: number): string;

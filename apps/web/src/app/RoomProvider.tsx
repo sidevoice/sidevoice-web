@@ -2,6 +2,7 @@ import { useEffect, useRef, type PropsWithChildren } from "react";
 import { createRoomStore, installRoomBridge, RoomStoreContext, type RoomStore } from "../state/room-store";
 import { CallLayoutContext, createCallLayoutStore, type CallLayoutStore } from "../state/call-layout";
 import { errorMessage } from "../features/settings/error-message";
+import { onUiLanguage, uiLanguage } from "../i18n/translator";
 import { translator } from "../i18n/translator";
 
 let controllerImport: Promise<unknown> | null = null;
@@ -21,15 +22,16 @@ export function RoomProvider({ children, store: suppliedStore, runtime = true }:
   // How the call view is laid out on this device (state/call-layout.ts).
   if (!layoutRef.current) layoutRef.current = createCallLayoutStore();
 
-  // The theme and the language the page wears (its root's data-theme and lang), in the facts: the desktop card wears
-  // the room's (FLOATING-CARD-SPEC FC12).
+  // The theme and the language the page wears (its root's data-theme, and the interface's language), in the facts: the
+  // desktop card wears the room's (FLOATING-CARD-SPEC FC12), and a new language projects every word again, at once.
   useEffect(() => {
     const root = document.documentElement;
-    const read = () => store.patch({ pageTheme: root.getAttribute("data-theme") === "dark" ? "dark" : "light", pageLanguage: root.lang || "en" });
+    const read = () => store.patch({ pageTheme: root.getAttribute("data-theme") === "dark" ? "dark" : "light", pageLanguage: uiLanguage() });
     read();
     const observer = new MutationObserver(read);
-    observer.observe(root, { attributes: true, attributeFilter: ["data-theme", "lang"] });
-    return () => observer.disconnect();
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    const unsubscribe = onUiLanguage(read);
+    return () => { observer.disconnect(); unsubscribe(); };
   }, [store]);
 
   useEffect(() => {

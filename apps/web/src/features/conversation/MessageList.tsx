@@ -5,6 +5,7 @@ import type { ConversationView } from "../../state/room-types";
 import { translator, type Translate } from "../../i18n/translator";
 import { groupMessages } from "./group-messages";
 import { MessageGroup, Speaker } from "./MessageGroup";
+import { speakerName } from "./group-messages";
 import { VoiceWaveform } from "./VoiceWaveform";
 import { uiLocale } from "../../i18n/locale";
 
@@ -94,7 +95,7 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
           </article>
         </div></div>}
         {conversation.working && <div className="message-group live-draft" data-role="assistant"><div className="chat-message-row">
-          <Speaker name={agent?.name ?? ""} thread={agentThread} />
+          <Speaker name={agent ? speakerName(agent, t) : ""} thread={agentThread} />
           <article className="chat-bubble thinking" data-role="assistant" data-position="only" aria-label={t("messages.thinking")}><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></article>
         </div></div>}
       </div>

@@ -1,4 +1,10 @@
 import type { ChatMessage } from "../../state/room-types";
+import type { Translate } from "../../i18n/translator";
+
+/** Who said a message, in the interface's language: the person is "you"; a reply, its conversation's name. */
+export function speakerName({ role, name }: { role: string; name: string }, t: Translate) {
+  return role === "user" ? t("stage.you") : name || t("session.conversation");
+}
 
 export interface MessageGroupView {
   id: string;

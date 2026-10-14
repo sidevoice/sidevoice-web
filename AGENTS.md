@@ -16,11 +16,6 @@ Rules for any coding agent (and person) working in this repository.
   other language, as a hard-coded default.
 - What reaches the agent (MCP instructions, tool results, the `[Sidevoice]` trailer) is English; it is not UI.
 
-## Before changing things
-
-Today the web's source strings are Spanish, translated by pairs in `apps/web/src/i18n/room-i18n.js`; moving
-to English-keyed bundles is #17 — new text follows the rule above, not the old pattern.
-
 ## Public product information
 
 For changes to user-visible behavior, supported platforms/models, setup, security/privacy practices, availability, limitations, or release/download details, follow the shared [public-information process](https://github.com/sidevoice/landing/blob/main/AGENTS.md#keep-public-product-information-current). Record the landing change/PR or a linked `sidevoice/landing` issue in the PR checklist. Landing issues are the follow-up triage queue.

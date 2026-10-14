@@ -10,7 +10,6 @@ import { App } from "../app/App";
 import { createRoomStore } from "../state/room-store";
 import { createOnboardingRepository, emptyOnboardingRecord } from "../services/onboarding-state";
 import { BASE_FACTS, JOURNEYS, type Shot } from "./shots";
-import "../i18n/room-i18n.js";
 
 /* The journeys' storyboard (journeys.html, served by the dev server only): every screen and state of the app laid out
  * as the person meets them, on a phone and a desktop, light and dark, each captioned. Not interactive: each frame is

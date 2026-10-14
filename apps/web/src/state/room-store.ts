@@ -1,10 +1,14 @@
 import { createContext, useContext } from "react";
-import { createRoomSessionStore } from "./room-session-state.js";
+import { createRoomSessionStore, speakWith } from "./room-session-state.js";
+import { translator } from "../i18n/translator";
 import { useStore } from "zustand";
 import { createMicLevelChannel } from "./mic-level";
 
 export type RoomViewState = import('./room-session-state.js').SessionSnapshot;
 export type RoomStore = import('./room-session-state.js').SessionStore;
+
+// The projections speak the interface's language, whichever it is when they are made.
+speakWith((key, params) => translator()(key, params));
 
 export function createRoomStore(): RoomStore {
   return createRoomSessionStore();

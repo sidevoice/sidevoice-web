@@ -11,7 +11,7 @@ const en = translator("en");
 const es = translator("es");
 
 const machine = (changes: Partial<MachineView> = {}): MachineView => ({
-  id: "fp-nuc", pairingId: "fp-nuc", host: "NUC", revoked: false, reach: "direct", state: "connected", pairedLabel: "", ...changes,
+  id: "fp-nuc", pairingId: "fp-nuc", host: "NUC", revoked: false, reach: "direct", state: "connected", ...changes,
 });
 const local = (changes: Partial<MachineView> = {}) => machine({ id: "local-host", pairingId: "fp-local", host: "MacBook", local: true, ...changes });
 const status = (state: LocalHostStatusName): LocalHostStatus => ({ state, reachable: state === "running" });

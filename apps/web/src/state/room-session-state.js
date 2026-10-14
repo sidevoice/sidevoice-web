@@ -3,9 +3,14 @@ export const PRESENCE_DELIVERED_DELAY_MS = 1500;
 // A dropped socket is the network's business for this long: the call goes on as if nothing happened (no tone, no
 // line, no control held), and only a drop that outlasts it says the call is reconnecting.
 export const RECONNECT_GRACE_MS = 30000;
-export const JOIN_STEPS = { voice: 'Preparando la voz', room: 'Entrando en la llamada', conversation: 'Volviendo a ', reconnect: 'Reconectando…' };
-export const NO_MACHINE = 'Ninguna máquina disponible. Enciende alguna de las tuyas, o empareja una en Configuración › Máquinas.';
-export const UNPAIRED = 'Este dispositivo no está emparejado con ninguna máquina. Emparéjalo para poder entrar.';
+/* The words every projection says, in the interface's language: whoever makes the store gives them (state/room-store.ts),
+ * and the facts carry the language (`pageLanguage`), so a switch projects everything again. Until then, the keys. */
+let say = (key, params) => key + (params ? ' ' + JSON.stringify(params) : '');
+export function speakWith(translate) { say = translate; }
+/** What a join line says at each step; the conversation's names the one it goes back to. */
+export const JOIN_STEPS = { voice: 'session.join.voice', room: 'session.join.room', conversation: 'session.join.conversation', reconnect: 'session.join.reconnect' };
+/** No machine this device can talk to, in one sentence. */
+export function noMachine() { return say('session.reach.noMachine'); }
 export function initialSessionFacts() {
     return {
         ws: null, sessionId: null, roomRevision: 0, roomInfo: null, connecting: false, reconnecting: false,
@@ -18,10 +23,10 @@ export function initialSessionFacts() {
         // Where the call's voice is (`{listening, recognising, playback}`, as it reports it), or null outside a call.
         voiceState: null,
         joinStep: null, joinFailure: '', joinFailureDetails: '', joinProgress: null, joinDetail: '', joinSubject: '',
-        screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0, liveNote: '',
+        screenLock: { state: '', note: '' }, holding: false, userQuietAt: 0,
         harness: {}, turns: {}, now: 0, karaokeState: null, bootError: null,
-        // The machines this device is paired with (never their tokens) and the clock of the moment they were read so a
-        // row can say "hace 3 días" without reading one. Every one of them is live at once (`machineLinks`).
+        // The machines this device is paired with (never their tokens), and when they were read. Every one of them is live
+        // at once (`machineLinks`).
         pairings: [], machinesAt: 0, machinesReady: false, remoteHostStatus: {},
         // Host-owned agent state is keyed by fingerprint.
         hostAgents: {}, settingsAgentRequest: null,
@@ -159,38 +164,38 @@ export function joinView(s) {
         const note = !s.ws && !s.connecting ? reachNote(s) : '';
         return note ? { step: 'no-machine', text: note, progress: null, failed: false, note: true } : null;
     }
-    const base = JOIN_STEPS[s.joinStep] + (s.joinStep === 'conversation' ? s.joinSubject : '');
+    const base = say(JOIN_STEPS[s.joinStep], s.joinStep === 'conversation' ? { name: s.joinSubject || say('session.yourConversation') } : undefined);
     const note = s.joinProgress != null ? Math.round(s.joinProgress) + ' %' : s.joinDetail;
-    return { step: s.joinStep, text: note ? base + ' (' + note + ')' : base, progress: s.joinProgress, failed: false };
+    return { step: s.joinStep, text: note ? say('session.join.withDetail', { step: base, detail: note }) : base, progress: s.joinProgress, failed: false };
 }
 /** The microphone button: what it says and whether it can be pressed. The level itself is not here —
  *  it changes per animation frame and belongs to whoever owns the meter. */
 export function micView(s) {
     const enabled = s.micEnabled !== false;
-    const label = enabled ? 'Silenciar micrófono' : 'Activar micrófono';
+    const label = say(enabled ? 'session.mic.mute' : 'session.mic.unmute');
     // Not disabled before joining: the preference is set then as often as during a call, and a button that
     // looks dead right after a reload reads as "the microphone is broken" (2026-09-20). In a call with no
     // conversation selected there is nobody to speak to, so it is off and says why (2026-09-26).
     if (s.ws && !selectedThread(s))
-        return { enabled, label: 'Elige una conversación para hablar', pressed: !enabled, disabled: true, holding: false,
-            title: 'Elige una conversación para hablar: sin ninguna seleccionada, el micrófono no envía nada.' };
+        return { enabled, label: say('session.mic.choose'), pressed: !enabled, disabled: true, holding: false,
+            title: say('session.mic.chooseTitle') };
     return { enabled, label, pressed: !enabled, disabled: false, holding: !!s.holding,
-        title: label + ' (⌘D / Ctrl+D). Mantén Espacio para hablar si está silenciado.' };
+        title: say('session.mic.title', { label }) };
 }
 /** The call button: joining and leaving are the same button, and it says which one it is now. */
 export function callView(s) {
     const joined = !!(inCall(s) || s.connecting);
     return { joined, busy: !!s.reconnectShown,
-        label: joined ? 'Salir de la llamada' : 'Entrar en la llamada' };
+        label: say(joined ? 'session.call.leave' : 'session.call.join') };
 }
 /** The name over the transcript: the conversation being looked at, whoever it is. */
 export function viewedTitle(s) {
     const id = viewedThread(s);
     if (!id)
-        return 'Conversación en directo';
+        return say('session.liveConversation');
     return s.people.find(p => personKey(p) === id)?.title
         || s.history.find(r => r.thread === id && r.role === 'assistant')?.name
-        || s.roomBinding?.title || 'Conversación en directo';
+        || s.roomBinding?.title || say('session.liveConversation');
 }
 /** Who is answering: the agent's own model and effort, exactly as its harness reports them. */
 export function enginePanel(s) {
@@ -200,19 +205,6 @@ export function enginePanel(s) {
         rows.push({ id: 'agent', label: 'LLM',
             value: [engine.model, engine.effort].filter(Boolean).join(' · '),
             state: 'ok', note: '' });
-    return rows;
-}
-const LISTENING_WORDS = { muted: 'Silenciado', listening: 'Escuchando', speaking: 'Te escucha', idle: 'Sin iniciar' };
-/** What this call has switched on right now, as lights: the voice, and the screen. */
-export function capabilityPanel(s) {
-    const rows = [], voice = s.voiceState;
-    if (voice)
-        rows.push({ id: 'voice', label: 'Voz', value: LISTENING_WORDS[voice.listening] || voice.listening,
-            state: s.reconnecting ? 'warn' : 'ok', note: s.reconnecting ? 'Sin conexión: lo que digas se envía al volver.' : '' });
-    if (s.screenLock?.state)
-        rows.push({ id: 'screen', label: 'Pantalla',
-            value: s.screenLock.state === 'on' ? 'Se mantiene encendida' : 'No se pudo mantener',
-            state: s.screenLock.state === 'on' ? 'ok' : 'warn', note: s.screenLock.note });
     return rows;
 }
 /** Whether the voice is saying reply `r` now. */
@@ -240,8 +232,8 @@ export function playbackState(r, s) {
  *  mark is drawn for it — never the warning of one that failed. */
 export function receiptView(status) {
     const symbols = { pending: '◷', sending: '◷', delivered: '✓', unconfirmed: '✓', read: '✓✓', uncertain: '!', not_sent: '!' };
-    const labels = { pending: 'Enviando', sending: 'Enviando', delivered: 'Entregado a la conversación; lectura sin confirmar', unconfirmed: 'Escrito en la conversación, sin acuse', read: 'Leído por la conversación', uncertain: 'Entrega sin confirmar', not_sent: 'No enviado' };
-    return { symbol: symbols[status] || '', label: labels[status] || '' };
+    const labels = { pending: 'sending', sending: 'sending', delivered: 'delivered', unconfirmed: 'unconfirmed', read: 'read', uncertain: 'uncertain', not_sent: 'notSent' };
+    return { symbol: symbols[status] || '', label: labels[status] ? say('session.receipt.' + labels[status]) : '' };
 }
 export function orderedHistory(s, id) { return s.history.filter(r => r.thread === id).slice().sort((a, b) => Number(!!a.draft) - Number(!!b.draft) || a.time - b.time || (a.seq || 0) - (b.seq || 0)); }
 export function unreadCount(s, id) { return s.history.filter(r => r.thread === id && r.role === 'assistant' && r.seq > (s.roomSeen[id] || 0)).length; }
@@ -267,16 +259,17 @@ export function conversationView(s) {
 /** How a conversation's harness is reached, in the words under its title. Only routes that differ in what the
  *  person can do are named; a room that does not say leaves it to the harness name. */
 export function routeLabel(p) {
-    return { 'cursor-editor-bridge': 'Desktop Bridge (experimental)', 'cursor-editor-view': 'tarjeta (experimental)', 'cursor-cli-persist': 'CLI persist (experimental)', 'cursor-cli': 'CLI, solo escucha' }[p.route] || null;
+    const route = { 'cursor-editor-bridge': 'bridge', 'cursor-editor-view': 'card', 'cursor-cli-persist': 'cliPersist', 'cursor-cli': 'cliListen' }[p.route];
+    return route ? say('session.route.' + route) : null;
 }
 /** A capability the harness reaches by a route it does not offer: said, because it can misbehave. */
 export function experimentalNote(p) {
     // A list of the capabilities marked experimental; anything else in its place marks none (sidevoice-core#112).
     const marked = Array.isArray(p.capabilities?.experimental) ? p.capabilities.experimental : [];
-    return [marked.includes('deliver') ? 'Entrega experimental: lo que dices se escribe en la conversación por un camino que su harness no ofrece; si escribes a la vez, se mezcla.' : null,
-        marked.includes('sessionIdentity') ? 'Identificación experimental: la conversación es la que muestra la tarjeta de Sidevoice.' : null].filter(Boolean).join(' ') || null;
+    return [marked.includes('deliver') ? say('session.note.experimentalDeliver') : null,
+        marked.includes('sessionIdentity') ? say('session.note.experimentalIdentity') : null].filter(Boolean).join(' ') || null;
 }
-export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? 'Este harness no informa cuándo está trabajando; los puntos siguen lo que dice la conversación.' : 'No sabemos si este harness informa cuándo está trabajando.'; }
+export function workingCapabilityNote(p) { const v = p.capabilities?.working; return v === 'supported' ? null : v === 'unsupported' ? say('session.note.workingUnsupported') : say('session.note.workingUnknown'); }
 /** Whether a machine this device is paired with cannot be reached now: its conversations cannot hear anybody. */
 function machineDown(s, fp) { const reach = s.machineLinks?.[fp]?.reach; return !!reach && reach !== 'ok'; }
 const REACH_STATES = new Set(['listening', 'holding', 'offline']);
@@ -293,37 +286,14 @@ export function participantsView(s) {
         // A reach this version does not know reads as one the room did not say (sidevoice-core#112): by whether the
         // conversation is available, which the room always says, rather than as offline.
         const reach = REACH_STATES.has(p.reach?.state) ? p.reach.state : (p.available ? 'listening' : 'offline');
-        const base = reach === 'listening' ? (unread ? unread + ' nuevas' : 'Escuchando') : reach === 'holding' ? 'No puede recibir' : p.available ? 'Sin poder recibir' : 'Desconectada';
         const busy = working(s, key);
-        // The dot already says "listening"; the line under the title says only what the dot cannot: where the
-        // conversation runs, that it is thinking, what is waiting to be read, and a reach that is not normal.
-        const subtitle = [unread ? unread + ' nuevas' : null,
-            reach === 'holding' ? 'No puede recibir' : reach === 'offline' && !p.available ? 'Desconectada' : reach === 'offline' ? 'Sin poder recibir' : null]
-            .filter(Boolean).join(' · ');
         // Grouped by the paired machine it runs on (one room each), named as this device names that machine.
         return { threadId: key, title: p.title, selected: key === selected, available: !!p.available, switching: s.switching,
-            unread, reach, stateLabel: unread && reach !== 'listening' ? base + ' · ' + unread + ' nuevas' : base, subtitle, working: busy,
+            unread, reach, working: busy,
             machine: machineName(s, p.node) || p.machine?.host || null, machineId: p.node || p.machine?.id || null, harness: p.harness || null, route: routeLabel(p),
             model: p.engine?.model || null, effort: p.engine?.effort || null,
             activityNote: [experimentalNote(p), workingCapabilityNote(p)].filter(Boolean).join(' ') || null, detail: p.reach?.detail ? (p.reach.detail + (p.reach.remedy ? '\n\n' + p.reach.remedy : '')) : undefined };
     });
-}
-/** How long ago, said the way a person says it. The clock comes in with the facts — nothing here
- *  reads one — so the same facts always render the same line. */
-export function sinceText(seconds, now) {
-    if (!seconds || !now)
-        return '';
-    const elapsed = Math.max(0, Math.round(now / 1000 - seconds));
-    if (elapsed < 90)
-        return 'hace un momento';
-    const minutes = Math.round(elapsed / 60);
-    if (minutes < 60)
-        return 'hace ' + minutes + ' min';
-    const hours = Math.round(minutes / 60);
-    if (hours < 24)
-        return 'hace ' + hours + ' h';
-    const days = Math.round(hours / 24);
-    return days === 1 ? 'hace 1 día' : 'hace ' + days + ' días';
 }
 /** The machines this device is paired with, each as one row: its name, how this device reaches it, and since when.
  *  Every one of them is live at once: none is "the one in use". A pairing the machine revoked stays listed, saying so,
@@ -353,8 +323,7 @@ export function machinesView(s) {
         const state = p.local ? reachableLocal ? 'connected' : ['failed', 'service-failed', 'refused', 'incompatible'].includes(localStatus) ? 'failed' : 'offline'
             : p.revoked ? 'revoked' : remoteReach;
         return { id: p.local ? 'local-host' : p.fp, pairingId: p.local ? local?.fp : p.fp, host: p.host || '', revoked: !!p.revoked, reach,
-            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null,
-            pairedLabel: sinceText(p.paired_at, s.machinesAt) && 'Emparejada ' + sinceText(p.paired_at, s.machinesAt) };
+            state, local: !!p.local, localStatus, alias: !!p.alias, machineHost: p.machine_host ?? null };
     });
 }
 /** Why there is no machine to talk to, in one sentence, or '' when there is one (or it is still being found). The
@@ -362,43 +331,15 @@ export function machinesView(s) {
 export function reachNote(s) {
     const pairings = s.pairings || [];
     if (!pairings.length)
-        return s.machinesReady ? UNPAIRED : '';
+        return s.machinesReady ? say('session.reach.unpaired') : '';
     const fp = s.callNode || conversationOf(viewedThread(s))?.node || (pairings.length === 1 ? pairings[0].fp : null);
     if (!fp) {
         // Several machines and none chosen: only when every one of them has answered that it is not there.
         const links = pairings.map(p => s.machineLinks?.[p.fp]?.reach);
-        return links.every(reach => ['away', 'offline', 'revoked'].includes(reach)) ? NO_MACHINE : '';
+        return links.every(reach => ['away', 'offline', 'revoked'].includes(reach)) ? noMachine() : '';
     }
-    const p = pairings.find(x => x.fp === fp), called = p?.host ? '«' + p.host + '»' : 'la máquina';
-    const Called = called[0].toUpperCase() + called.slice(1), reach = p?.revoked ? 'revoked' : s.machineLinks?.[fp]?.reach;
-    if (reach === 'revoked')
-        return Called + ' ya no reconoce este dispositivo: se revocó el emparejamiento. Vuelve a emparejarlo con un código nuevo.';
-    if (reach === 'offline')
-        return Called + ' no está conectada ahora mismo. Comprueba que está encendida.';
-    if (reach === 'away')
-        return 'No se llega a ' + called + ' por ningún camino. Comprueba que está encendida.';
-    return '';
-}
-export function liveText(s) {
-    // A notice the runtime put there (the voice model loading, a saved preference, a server that did not
-    // answer) speaks for the moment it belongs to; it is cleared when the call moves on, not overwritten
-    // by the next unrelated store change, which is what writing the node used to mean.
-    if (s.liveNote)
-        return s.liveNote;
-    const v = sessionStatus(s);
-    if (v.tab === 'reconnecting')
-        return 'Reconectando…';
-    if (v.tab === 'switching')
-        return 'Cambiando de conversación…';
-    if (inCall(s) && s.voiceState && s.micEnabled === false)
-        return 'Micrófono silenciado';
-    if (v.speaker === 'user')
-        return 'Te estamos escuchando…';
-    if (v.speaker === 'room')
-        return 'La conversación está hablando · Puedes interrumpir';
-    if (v.tab === 'transcribing')
-        return 'Procesando tu intervención…';
-    return inCall(s) ? (v.selected ? 'Puedes hablar. La transcripción aparece al completar tu intervención.' : 'Estás en la llamada · Esperando a una conversación') : 'Entra en la llamada para hablar.';
+    const p = pairings.find(x => x.fp === fp), reach = p?.revoked ? 'revoked' : s.machineLinks?.[fp]?.reach;
+    return ['revoked', 'offline', 'away'].includes(reach) ? say('session.reach.' + reach + (p?.host ? 'Named' : ''), { host: p?.host }) : '';
 }
 // A receipt/reply records evidence about its own turn, never an instruction to extinguish a light.
 export function recordReceipt(s, id, status, at) {
@@ -423,9 +364,9 @@ export function createRoomSessionStore(seed = {}) {
         // The desktop card's whole snapshot, from the same rows.
         const callCard = callCardView(facts, participants);
         return { facts, session: sessionStatus(facts), conversation: conversationView(facts), participants,
-            join: joinView(facts), live: liveText(facts),
+            join: joinView(facts),
             mic: micView(facts), call: callView(facts), callCard, title: viewedTitle(facts), screenLock: facts.screenLock,
-            enginePanel: enginePanel(facts), capabilityPanel: capabilityPanel(facts),
+            enginePanel: enginePanel(facts),
             machines: machinesView(facts), pairing: { open: facts.pairingOpen, note: facts.pairingNote },
             bootError: facts.bootError };
     }
@@ -453,32 +394,30 @@ export function createRoomSessionStore(seed = {}) {
 export function deliveryNote(r) {
     if (r.role !== 'user' || r.status !== 'not_sent')
         return '';
-    return r.audio_reason === 'expired'
-        ? 'No llegó a la conversación: la máquina no volvió a tiempo'
-        : 'No llegó a la conversación';
+    return say(r.audio_reason === 'expired' ? 'session.delivery.notReachedExpired' : 'session.delivery.notReached');
 }
 export function audioNote(r, ahead = 0) {
     // Nothing a person did not hear is repeated by itself: a reply nobody was there for says so, and replaying it
     // is the person's choice.
-    const reasons = { newer_turn: 'Empezaste otra intervención', user_speaking: 'Estabas hablando', focus_changed: 'No estabas en esta conversación', call_ended: 'No estabas en la llamada', session_changed: 'No estabas en la llamada', expired_audio_turn: 'El turno de audio había caducado', queue_full: 'Cola de audio llena', user_interrupted: 'Interrumpiste el audio', user_skipped: 'Lo saltaste', playback_failed: 'Falló la reproducción', service_restarted: 'Se reinició el servicio', channel_closed: 'Canal de voz cerrado' };
-    const reason = reasons[r.audio_reason];
+    const reasons = { newer_turn: 'newer_turn', user_speaking: 'user_speaking', focus_changed: 'focus_changed', call_ended: 'call_ended', session_changed: 'call_ended', expired_audio_turn: 'expired_audio_turn', queue_full: 'queue_full', user_interrupted: 'user_interrupted', user_skipped: 'user_skipped', playback_failed: 'playback_failed', service_restarted: 'service_restarted', channel_closed: 'channel_closed' };
+    const reason = reasons[r.audio_reason] ? say('session.audio.reason.' + reasons[r.audio_reason]) : '';
     if (r.audio === 'waiting_for_pause')
-        return 'Audio pendiente · Breve pausa antes de hablar';
+        return say('session.audio.waitingForPause');
     if (r.audio === 'waiting_for_turn')
-        return 'Audio pendiente · Esperando a que termines de hablar';
+        return say('session.audio.waitingForTurn');
     // Held behind another reply, not behind anybody's voice: say which wait it is, and how long the line is.
     if (r.audio === 'queued' && r.audio_reason === 'previous_reply')
-        return 'Audio pendiente · ' + (ahead > 1 ? 'Hay ' + ahead + ' respuestas antes' : 'Esperando a que termine la respuesta anterior');
+        return say(ahead > 1 ? 'session.audio.queued.other' : 'session.audio.queued.one', { n: ahead });
     if (r.audio === 'text_only')
-        return 'Sin audio' + (reason ? ' · ' + reason : ' · Motivo no registrado');
+        return say('session.audio.textOnly', { reason: reason || say('session.audio.reasonUnknown') });
     // Published while this device was away: none of it sounded, which is not the same as being cut off.
     if (r.audio_reason === 'unheard')
-        return 'Audio no reproducido';
+        return say('session.audio.unheard');
     if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)
-        return 'Audio interrumpido' + (reason ? ' · ' + reason : '') + ' · El texto puede incluir partes que no sonaron';
+        return reason ? say('session.audio.interruptedWhy', { reason }) : say('session.audio.interrupted');
     if (r.audio === 'failed' && r.audio_reason === 'unconfirmed')
-        return 'Audio sin confirmar · Este dispositivo no dijo si llegó a sonar';
+        return say('session.audio.unconfirmed');
     if (r.audio === 'failed')
-        return 'Audio no reproducido · Falló la reproducción';
+        return say('session.audio.failed');
     return '';
 }

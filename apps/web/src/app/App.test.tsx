@@ -11,7 +11,7 @@ test("renders the room as accessible React components", () => {
   render(<App />);
   expect(screen.getByRole("heading", { name: "Sidevoice" })).toBeInTheDocument();
   expect(screen.getByRole("log")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Entrar en la llamada" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Join the call" })).toBeInTheDocument();
   expect(document.getElementById("language-settings")).toBeInTheDocument();
 });
 
@@ -93,7 +93,7 @@ test("remote room controls stay available when remote pairing succeeds during lo
   }));
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
   expect(screen.getByRole("log")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Entrar en la llamada" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Join the call" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
 
   await act(async () => { resolveInstall({ state: "running", reachable: true, installed: true }); await Promise.resolve(); });
