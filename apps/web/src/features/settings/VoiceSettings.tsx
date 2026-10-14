@@ -187,12 +187,13 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
         <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
           options={[{ value: "", label: t("voice.language.detect") }, ...choices.stt.languages.map((tag: string) => ({ value: tag, label: languageName(tag) }))]} />
       </Row>}
-      {model.ready && task === "tts" && (voices.length ? <Row label={t("voice.voice")} htmlFor="tts-voice">
+      {/* Always a list, even with the automatic voice alone in it: what the voice is, and that it is a choice. */}
+      {model.ready && task === "tts" && <Row label={t("voice.voice")} htmlFor="tts-voice">
         <Select id="tts-voice" value={draft.tts.voice ?? ""} onValueChange={(voice) => edit({ tts: { voice: voice || null } })}
-          options={[{ value: "", label: t("voice.voice.first") }, ...voices.map((voice: { id: string; name: string | null; languages: string[] }) => ({
+          options={[{ value: "", label: t(choices.tts.automaticVoice as MessageKey) }, ...voices.map((voice: { id: string; name: string | null; languages: string[] }) => ({
             value: voice.id, label: voice.name ?? voice.id, description: voice.languages.length ? voice.languages.map(languageName).join(", ") : undefined,
           }))]} />
-      </Row> : <Row label={t("voice.voice")} description={noteText(t, choices.tts.voiceNote)} />)}
+      </Row>}
       {model.ready && speed && <Row label={t("voice.speed")} htmlFor="tts-speed">
         <span className="voice-speed">
           <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
