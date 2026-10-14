@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
+import { DisclosureButton } from "../../components/ui/DisclosureButton";
 import { cn } from "../../lib/cn";
 import { ChevronIcon, ConnectorIcon, HarnessIcon, RefreshIcon } from "../../components/ui/Icons";
 import { Snippet } from "../../components/ui/Snippet";
@@ -182,9 +183,9 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             Connect or Disconnect, which Sidevoice does itself. */}
         <span className="host-agent-actions">
           {hasManualInstructions && <Tooltip content={handHint}>
-            <Button variant="ghost" size="sm" disabled={!!busy} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
-              {t(agent.registration === "foreign" ? "agents.foreign.manual.toggle" : "agents.manual.toggle")}<ChevronIcon size={14} className={open ? "host-agent-chevron-up" : undefined} />
-            </Button>
+            <DisclosureButton disabled={!!busy} open={open} controls={panelId} onClick={() => setOpen((value) => !value)}>
+              {t(agent.registration === "foreign" ? "agents.foreign.manual.toggle" : "agents.manual.toggle")}
+            </DisclosureButton>
           </Tooltip>}
           {connected ? can.disconnect !== false && <Tooltip content={t("agents.hint.disconnect", { agent: agent.label })}>
               <Button ref={action} variant="ghost" size="sm" loading={busy === "disconnect"} disabled={busy === "connect" || confirming} aria-label={t("agents.disconnectNamed", { agent: agent.label })}

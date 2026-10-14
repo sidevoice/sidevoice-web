@@ -41,7 +41,7 @@ test("keeps local setup visible through native projection, and puts it away once
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
-  expect(await screen.findByText("Sidevoice is preparing this computer…")).toBeInTheDocument();
+  expect(await screen.findByText("Installing the Sidevoice service…")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect to another machine" })).toBeInTheDocument();
   expect(agents).not.toHaveBeenCalled();
 
@@ -53,7 +53,7 @@ test("keeps local setup visible through native projection, and puts it away once
   expect(await screen.findByText("The download could not reach the release. Check your connection and retry.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect to another machine" })).toBeInTheDocument();
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry setup" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   await act(async () => { resolveRetry({ state: "running", reachable: true, installed: true });await Promise.resolve(); });
   expect(await screen.findByText("Connecting to this computer…")).toBeInTheDocument();
@@ -84,7 +84,7 @@ test("remote room controls stay available when remote pairing succeeds during lo
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
-  expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
 
   act(() => store.patch({
     pairings: [{ fp: "fp-remote", device_id: "device-remote", urls: ["https://remote.example"], rv: null,
@@ -94,7 +94,7 @@ test("remote room controls stay available when remote pairing succeeds during lo
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
   expect(screen.getByRole("log")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Join the call" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Cancel setup" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
 
   await act(async () => { resolveInstall({ state: "running", reachable: true, installed: true }); await Promise.resolve(); });
   act(() => localHostInstallController.clear());

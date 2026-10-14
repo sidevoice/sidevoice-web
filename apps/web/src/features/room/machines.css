@@ -70,6 +70,10 @@
 .local-pairing-code { display: grid; justify-items: start; gap: var(--sv-space-2); }
 .issued-pairing-code { display: block; padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-md); background: var(--sv-bg-sunken); font: 600 1.375rem / 1.75rem var(--sv-font-mono); letter-spacing: .08em; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
 .local-install-entry--machines { margin-top: var(--sv-space-2); }
+/* This device not prepared yet: what preparing it does, then the install's panel (while it shows one) and the two ways. */
+.this-computer-prepare { display: grid; gap: var(--sv-space-4); min-width: 0; }
+.this-computer-prepare > p { max-width: 60ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.this-computer-prepare > .local-install-entry--machines { margin-top: 0; }
 
 @media (max-width: 640px) {
   .machine-picker { flex-direction: column; align-items: stretch; }

@@ -23,12 +23,12 @@ test("a phone's Settings: the system's back and Escape go up a level, and from t
   await expect(dialog).toBeVisible();
   await expect(title).toHaveText("Settings");
   await expect(title).toBeFocused();
-  await expect(page.locator("#settings-machines .settings-menu-summary")).toHaveText(/^E2E Host · Connected$/);
+  await expect(page.locator("#settings-machines .settings-menu-summary")).toHaveText(/^E2E Host · Online$/);
   await page.locator("#settings-machines").click();
   await expect(title).toHaveText("Machines");
   const machine = page.locator(".machines-menu .machine-entry[data-name='E2E Host']");
-  // Connected: a dot on its icon, said in its name.
-  await expect(machine).toHaveAccessibleName(/Connected/);
+  // Online: a dot on its icon, said in its name.
+  await expect(machine).toHaveAccessibleName(/Online/);
   await machine.click();
   await expect(title).toHaveText("E2E Host");
   await expect(page.getByRole("button", { name: "Back to Machines" })).toBeVisible();

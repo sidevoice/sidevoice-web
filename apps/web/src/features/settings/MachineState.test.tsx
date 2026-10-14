@@ -74,25 +74,25 @@ test("a green dot on a connected machine's icon and nothing else; not connected,
   expect(navEntry("NUC").querySelector(".machine-nav-icon .state-on-icon .state-on-icon-dot")).toHaveAttribute("aria-hidden", "true");
   expect(navEntry("NUC").querySelector(".machine-entry-copy .state-on-icon-dot")).toBeNull();
   // Its whole state is in its name and in its native tooltip.
-  expect(navEntry("NUC")).toHaveAccessibleName("NUC, Connected");
-  expect(navEntry("Old laptop")).toHaveAccessibleName("Old laptop, Not connected");
-  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
-  expect(navEntry("NUC")).toHaveAttribute("title", "NUC · Connected");
-  expect(navEntry("Old laptop")).toHaveAttribute("title", "Old laptop · Not connected");
-  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected");
+  expect(navEntry("NUC")).toHaveAccessibleName("NUC, Online");
+  expect(navEntry("Old laptop")).toHaveAccessibleName("Old laptop, Offline");
+  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Online");
+  expect(navEntry("NUC")).toHaveAttribute("title", "NUC · Online");
+  expect(navEntry("Old laptop")).toHaveAttribute("title", "Old laptop · Offline");
+  expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Online");
   // One line where nothing is said.
   expect(lines(navEntry("NUC"))).toBe(1);
   // This device: the dot while its service runs and answers, no word, and connected in its name.
   expect(dot(thisDevice())).toHaveAttribute("data-state", "running");
   expect(word(thisDevice())).toBeNull();
-  expect(thisDevice()).toHaveAccessibleName("This device, Connected");
+  expect(thisDevice()).toHaveAccessibleName("This device, Online");
 });
 
 test("a remote entry's tooltip is the native one: no app tooltip on keyboard focus, and its click opens the machine", () => {
   open();
   act(() => { navEntry("Lab box").focus(); });
   expect(screen.queryByRole("tooltip")).toBeNull();
-  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
+  expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Online");
   act(() => { navEntry("Lab box").click(); });
   expect(header("machines")).toHaveTextContent("Lab box");
 });
@@ -115,7 +115,7 @@ test("a choice the preview's panel stored for the old variants changes nothing",
   expect(dot(navEntry("NUC"))).not.toBeNull();
   expect(word(navEntry("Old laptop"))).toBeNull();
   expect(dot(thisDevice())).not.toBeNull();
-  expect(thisDevice()).toHaveAccessibleName("This device, Connected");
+  expect(thisDevice()).toHaveAccessibleName("This device, Online");
 });
 
 test("what needs the person is said in words, in its tone, and never wears the dot", () => {
@@ -127,19 +127,19 @@ test("what needs the person is said in words, in its tone, and never wears the d
     expect(lines(entry("NUC"))).toBe(2);
   }
   expect(navEntry("NUC")).toHaveAccessibleName("NUC, Not paired");
-  expect(navEntry("NUC")).toHaveAttribute("title", "NUC · No longer paired");
+  expect(navEntry("NUC")).toHaveAttribute("title", "NUC · Pairing removed");
   expect(word(thisDevice())).toBe("Not working");
   expect(thisDevice().querySelector(".machine-state")).toHaveAttribute("data-tone", "danger");
   expect(dot(thisDevice())).toBeNull();
   expect(thisDevice()).toHaveAccessibleName("This device, Not working");
 });
 
-test("This device is never \"Running\", \"Starting…\" or \"Not running\" in the nav or a phone's row; its dot only while it runs", () => {
+test("This device is never \"Running\", \"Starting…\" or \"Not started\" in the nav or a phone's row; its dot only while it runs", () => {
   const states: LocalHostStatus[] = [running, { state: "starting" }, { state: "stopped-by-person", installed: true }, { state: "absent" }];
   for (const status of states) {
     open({ localHostStatus: status });
     expect(thisDevice().textContent).toBe("This device");
-    expect(thisDevice().getAttribute("aria-label")).not.toMatch(/Running|Starting|Not running|Not prepared/);
+    expect(thisDevice().getAttribute("aria-label")).not.toMatch(/Running|Starting|Not started|Not prepared/);
     expect(!!dot(thisDevice())).toBe(status === running);
     cleanup();
   }
@@ -148,17 +148,17 @@ test("This device is never \"Running\", \"Starting…\" or \"Not running\" in th
 test("a page's header: the long state, nothing after it, and what to do under it", () => {
   open({ machinesView: { machine: "fp-lab" } });
   // Paired without encryption: its state alone, as any machine's.
-  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected$/);
+  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Online$/);
   expect(header("machines").querySelector(".host-detail-state")!.children.length).toBe(1);
   expect(header("machines").querySelector("svg.lucide-lock-open, .ui-infotip")).toBeNull();
   act(() => { navEntry("Old laptop").click(); });
-  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Not connected$/);
+  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Offline$/);
   expect(header("machines").querySelector(".host-detail-hint")).toHaveTextContent(/^Not reachable from here now$/);
   cleanup();
   open({}, [local, paired({ revoked: true })]);
   expect(navEntry("NUC")).toHaveAccessibleName("NUC, Not paired");
   expect(navEntry("NUC").querySelector(".machine-state")).toHaveAttribute("data-tone", "warning");
-  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^No longer paired$/);
+  expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Pairing removed$/);
   expect(header("machines").querySelector(".host-detail-hint")).toHaveTextContent(
     /^This machine removed this device\. To use it here again, pair it with a new code from it, or forget it below\.$/);
 });
@@ -179,9 +179,9 @@ test("machine-unencrypted is decided (none): whatever the preview's panel stored
     if (stored) localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "machine-unencrypted": stored }));
     open({ machinesView: { machine: "fp-lab" } });
     for (const entry of [navEntry, row]) expect(entry("Lab box").querySelector("svg.lucide-lock-open")).toBeNull();
-    expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Connected");
-    expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Connected");
-    expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Connected$/);
+    expect(navEntry("Lab box")).toHaveAccessibleName("Lab box, Online");
+    expect(navEntry("Lab box")).toHaveAttribute("title", "Lab box · Online");
+    expect(header("machines").querySelector(".host-detail-state")).toHaveTextContent(/^Online$/);
     expect(screen.queryByRole("button", { name: "About this connection" })).toBeNull();
     expect(document.getElementById("pane-machines")).not.toHaveTextContent(/encrypt/i);
     cleanup();
@@ -193,7 +193,7 @@ test("Connected on a page wears the models' Ready badge, green with its dot; not
   const ready = render(<Badge tone="positive" dot>Ready</Badge>).container.firstElementChild!;
   open({ machinesView: { machine: "fp-nuc" } });
   const state = header("machines").querySelector(".host-detail-state > :first-child")!;
-  expect(state).toHaveTextContent(/^Connected$/);
+  expect(state).toHaveTextContent(/^Online$/);
   expect(state).toHaveClass("ui-badge", "machine-state");
   expect(state).toHaveAttribute("data-tone", "positive");
   expect(state).toHaveAttribute("role", "status");
@@ -203,7 +203,7 @@ test("Connected on a page wears the models' Ready badge, green with its dot; not
   expect(state.querySelector(".ui-badge-dot")).toHaveAttribute("aria-hidden");
   act(() => { navEntry("Old laptop").click(); });
   const off = header("machines").querySelector(".host-detail-state > :first-child")!;
-  expect(off).toHaveTextContent(/^Not connected$/);
+  expect(off).toHaveTextContent(/^Offline$/);
   expect(off).not.toHaveClass("ui-badge");
   expect(off).toHaveAttribute("data-tone", "neutral");
   expect(off.querySelector(".ui-badge-dot")).toBeNull();
@@ -218,7 +218,7 @@ test("a dot is only ever green and only means connected; one live state per page
   const states = (page: HTMLElement) => [...page.querySelectorAll(".host-detail-header [role=status], .host-status-card [role=status]")];
   const remote = document.querySelector<HTMLElement>("#pane-machines .host-detail")!;
   expect(states(remote)).toEqual([remote.querySelector(".host-detail-state > :first-child")]);
-  expect(states(remote)[0]).toHaveTextContent(/^Connected$/);
+  expect(states(remote)[0]).toHaveTextContent(/^Online$/);
   // This device: its card's state is the live one, its header's is not.
   const own = document.querySelector<HTMLElement>("#pane-this-computer .host-detail")!;
   expect(states(own)).toEqual([own.querySelector(".host-status-card .host-status-state")]);
@@ -232,7 +232,7 @@ test("\"New\" is off for this release: an agent new on a machine marks neither i
     expect(entry.querySelector(".machine-state")).toBeNull();
     expect(dot(entry)).toBeNull();
     expect(entry.querySelector(".new-on-icon-dot, .new-end-dot, .new-nav-pill, .new-nav-count, .sr-only")).toBeNull();
-    expect(entry).toHaveAccessibleName("Old laptop, Not connected");
+    expect(entry).toHaveAccessibleName("Old laptop, Offline");
     cleanup();
     localStorage.removeItem(VARIANTS_KEY);
     localStorage.removeItem("sidevoice.highlights");
@@ -244,5 +244,5 @@ test("in Spanish: what needs the person, and the name, in Spanish", () => {
   open({ localHostStatus: { state: "failed", installed: true } });
   expect(thisDevice()).toHaveAccessibleName("Este dispositivo, No funciona");
   expect(word(thisDevice())).toBe("No funciona");
-  expect(navEntry("NUC")).toHaveAccessibleName("NUC, Conectada");
+  expect(navEntry("NUC")).toHaveAccessibleName("NUC, En línea");
 });

@@ -48,7 +48,7 @@ function nothingNew(language: "en" | "es" = "en") {
   expect(document.querySelector(".new-on-icon[data-dot]")).toBeNull();
   expect(gear()).toHaveAccessibleName(language === "en" ? "Settings" : "Configuración");
   expect(section()).toHaveAccessibleName(language === "en" ? "Machines" : "Máquinas");
-  expect(machine()).toHaveAccessibleName(language === "en" ? "NUC, Connected" : "NUC, Conectada");
+  expect(machine()).toHaveAccessibleName(language === "en" ? "NUC, Online" : "NUC, En línea");
   expect(document.body.textContent).not.toMatch(language === "en" ? /\bNew\b/ : /\bNuevo\b/);
 }
 

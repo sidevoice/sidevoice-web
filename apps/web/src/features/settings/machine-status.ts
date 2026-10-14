@@ -10,7 +10,7 @@ import type { Translate } from "../../i18n/translator";
  * not connected, or no longer paired. Not connected is grey, not red: a laptop asleep is not something to fix, and the
  * conversations say the same fact in grey; red is for what is (This device not working), amber for what needs the
  * person (pairing it again). This device, where the app reads its service (its own section), says where the service
- * stands instead — not prepared, starting, not working, not running, running — and, running, how it answers as any
+ * stands instead — not prepared, starting, not working, stopped, running — and, running, how it answers as any
  * machine would. Whether it was paired with encryption is never said: a machine is connected or not. */
 
 export type MachineTone = "positive" | "neutral" | "warning" | "danger";

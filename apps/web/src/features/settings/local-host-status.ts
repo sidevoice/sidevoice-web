@@ -101,6 +101,8 @@ const INSTALL_CAUSES: Record<string, MessageKey> = {
   "install.executable-missing": "localInstall.error.executableMissing",
   "unsupported": "localInstall.error.unsupported",
   "install.unsafe": "localInstall.error.unsafe",
+  "install.busy": "localInstall.error.busy",
+  "install.failed": "localInstall.error.failed",
   "service.failed": "localInstall.error.service",
   "service.start.failed": "localInstall.error.service",
   "launch.failed": "localInstall.error.launch",
@@ -143,7 +145,9 @@ export function hostCause(status: LocalHostStatus, t: Translate) {
   return t(CAUSES.has(key) ? messageKey : "hosts.cause.unknown");
 }
 
-export function hostStatusText(status: LocalHostStatus, t: Translate) {
+/** This computer's service, where it stands, in words. `command`: the install command follows the words (the setup's
+ *  step, this computer's card), so incompatible ends on "Update it:"; where nothing follows (the banner), it does not. */
+export function hostStatusText(status: LocalHostStatus, t: Translate, { command = true }: { command?: boolean } = {}) {
   switch (status.state) {
     case "running": return t("hosts.status.running");
     case "not-installed": return t("hosts.status.not-installed");
@@ -157,7 +161,7 @@ export function hostStatusText(status: LocalHostStatus, t: Translate) {
     case "failed": return t("hosts.status.failed", { cause: hostCause(status, t) });
     case "service-failed": return t("hosts.status.service-failed", { cause: hostCause(status, t) });
     case "refused": return t("hosts.status.refused");
-    case "incompatible": return t("hosts.status.incompatible");
+    case "incompatible": return t(command ? "hosts.status.incompatible" : "hosts.status.incompatible.banner");
     case "installing": return t("hosts.status.starting");
     case "absent": return t("hosts.status.absent");
     // A state this app does not know is said as such, not as one it knows (sidevoice-core#112).

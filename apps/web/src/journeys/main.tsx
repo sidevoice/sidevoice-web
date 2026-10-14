@@ -54,8 +54,9 @@ function renderShot(shot: Shot) {
         { id: "claude-code", label: "Claude Code", version: "2.4" }, { id: "codex", label: "Codex", version: "0.157" }] }),
       ...(shot.desktop.pairingCode ? { pairingCode: async () => ({ code: "SV1.7KQ2-M9XA", expires_in: 600, reach: "direct" }) } : {}),
       ...(shot.desktop.version ? { version: async () => shot.desktop!.version, update: later } : {}),
-      // Installing Sidevoice from the app, where a shot asks for it: the desktop app does not (2026-10-14).
-      ...(shot.desktop.install ? { install: () => Object.assign(new Promise(noop), { job: "j" }) } : {}),
+      // Installing Sidevoice from the app, where a shot asks for it: running on, or failing at its download.
+      ...(shot.desktop.install ? { install: () => Object.assign(shot.desktop!.install === "fails"
+        ? new Promise((_, reject) => setTimeout(() => reject({ key: "install.network", step: "download" }), 0)) : new Promise(noop), { job: "j" }) } : {}),
     } } };
   }
   // The actions the runtime would bind: here they do nothing, and a pairing code is refused as the shot says.

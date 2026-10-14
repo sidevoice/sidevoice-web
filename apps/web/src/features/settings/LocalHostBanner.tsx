@@ -25,7 +25,10 @@ export function LocalHostBanner() {
       : status.state === "not-installed" ? "serviceInstall"
         : status.state === "refused" ? "reconnect" : "restart";
   const available = action ? canRunLocalHostAction(action) : false;
-  const cause = hostStatusText(status, t);
+  // Stopped (or its service not set up, which setting up starts), what brings it back is Start, as on its card; else Retry.
+  const starts = action === "start" || action === "serviceInstall";
+  // No install command follows a banner's line: incompatible is said without "Update it:".
+  const cause = hostStatusText(status, t, { command: false });
   async function retry() {
     if (busy || !action) return;
     setBusy(true);setError(false);
@@ -35,7 +38,7 @@ export function LocalHostBanner() {
   return (
     <aside className="room-banner local-host-banner" role="status">
       <Alert tone="danger" title={t("noMachine.retryBanner", { cause })}
-        action={available ? <Button size="sm" loading={busy} onClick={() => void retry()}><RefreshIcon />{t("hosts.retry")}</Button> : undefined}>
+        action={available ? <Button size="sm" loading={busy} onClick={() => void retry()}>{starts ? t("hosts.start") : <><RefreshIcon />{t("hosts.retry")}</>}</Button> : undefined}>
         {error ? t("hosts.actionFailed") : undefined}
       </Alert>
     </aside>

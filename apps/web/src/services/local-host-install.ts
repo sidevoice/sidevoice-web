@@ -5,6 +5,7 @@ import {
   type LocalHostInstallProgress,
   type LocalHostStatus,
 } from "./desktop-host";
+import { redactFreeText } from "../lib/redact";
 
 export type LocalHostInstallSnapshot =
   | { phase: "idle" }
@@ -35,8 +36,8 @@ const SAFE_NUMERIC_PARAMS = new Set(["attempt", "attempts", "limit", "bytes", "d
 const SAFE_ERROR_KEYS = new Set([
   "install.network", "install.proxy", "install.disk", "install.checksum", "install.no-bundle",
   "install.authenticity", "install.self-test", "install.rollback", "install.rollback-failed",
-  "install.executable-missing", "install.unsafe", "install.cancelled", "install.unknown",
-  "cli.timeout", "unsupported", "service.failed", "service.start.failed", "launch.failed",
+  "install.executable-missing", "install.unsafe", "install.cancelled", "install.unknown", "install.busy",
+  "install.failed", "cli.timeout", "unsupported", "service.failed", "service.start.failed", "launch.failed",
   "bridge.invalid-response", "import.missing-module", "bind.port-in-use", "identity.unreadable",
   "identity.unsafe-directory", "start.failed", "launch.missing-executable", "launch.permission",
   "launch.exited", "hang", "ready.timeout", "executable-missing", "permission-denied", "start-limit",
@@ -65,15 +66,26 @@ function safeParams(value: unknown) {
   return Object.keys(result).length ? result : undefined;
 }
 
+/** The installer's last lines of error output, redacted (home path as ~, secrets masked): never shown, only copied with
+ *  the details (Copy details — preparing this computer, and updating it), which the person pastes where they choose
+ *  (operator, 2026-10-14). Lines of text only. */
+function logTail(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  const lines = value.filter((line): line is string => typeof line === "string").map(redactFreeText);
+  return lines.length ? lines : undefined;
+}
+
 export function normalizeLocalHostBridgeError(value: unknown, fallbackStep: string | null = null): LocalHostBridgeError {
   const outer = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const source = outer.failure && typeof outer.failure === "object" ? outer.failure as Record<string, unknown> : outer;
   const key = typeof source.key === "string" && SAFE_ERROR_KEYS.has(source.key) ? source.key : "install.unknown";
   const params = safeParams(source.params);
+  const log = logTail(source.log_tail);
   return {
     key,
     ...(safeStep(source.step) || fallbackStep ? { step: safeStep(source.step) || fallbackStep || undefined } : {}),
     ...(params ? { params } : {}),
+    ...(log ? { log_tail: log } : {}),
   };
 }
 

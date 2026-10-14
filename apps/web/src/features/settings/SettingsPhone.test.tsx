@@ -117,7 +117,7 @@ test("opened from the gear it is the list of sections, under Settings: each a ro
   expect(summary("transcription")).toBe("whisper-base");
   expect(summary("voice")).toBe("kokoro-82m-v1.0");
   expect(summary("providers")).toBe("OpenAI");
-  expect(summary("machines")).toBe("NUC · Connected");
+  expect(summary("machines")).toBe("NUC · Online");
   expect([summary("general"), summary("call"), summary("advanced")]).toEqual([null, null, null]);
   expect(nav().querySelector("[aria-current]")).toBeNull();
   expect(screen.getByRole("navigation", { name: "Settings sections" }).querySelector("ul > li > button")).toBe(row("general"));
@@ -231,7 +231,7 @@ test("Machines is a list, each machine's state on its row; a machine is a page o
   // Paired without encryption: nothing after its name, and its name as any machine's.
   expect(list.querySelector('[data-machine="fp-lab"] .settings-menu-label')!.children.length).toBe(1);
   expect(list.querySelector('[data-machine="fp-lab"] svg.lucide-lock-open')).toBeNull();
-  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Not connected");
+  expect(list.querySelector('[data-machine="fp-lab"]')).toHaveAccessibleName("Lab box, Offline");
   // Add a machine opens a dialog, not a page: no chevron; and no chips at the page's head.
   expect(list.querySelector(".settings-menu-row--add .settings-menu-chevron")).toBeNull();
   expect(document.querySelector(".machines-inline")).toBeNull();

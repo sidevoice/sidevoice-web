@@ -9,6 +9,8 @@ import type { HostDeviceView } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 import type { LocalHostBridge, LocalHostStatus, LocalHostVersion, LocalPairingCode } from "../../services/desktop-host";
 import { fakeUpdater } from "../../test/updater";
+import { localHostInstallController } from "../../services/local-host-install";
+import { CONNECTOR_INSTALL } from "../pairing/connector-commands";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
 
@@ -48,7 +50,7 @@ function room(pairings: PairingSummary[], facts: Record<string, unknown> = {}) {
   return store;
 }
 
-test("the local host is This device's; every remote row says Connected however it is reached, never a route, and no machine is to be chosen", async () => {
+test("the local host is This device's; every remote row says Online however it is reached, never a route, and no machine is to be chosen", async () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "ok", via: "room" }, "fp-other": { reach: "ok", via: "node" } } });
@@ -56,11 +58,11 @@ test("the local host is This device's; every remote row says Connected however i
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
   expect(rows).toHaveLength(2);
   // Through the room or directly, the same word: how it is reached is not said while the relay is not shipping.
-  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Connected");
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Online");
   expect(rows[0].getAttribute("aria-label")).not.toMatch(/room|nuc-1|fingerprint|relay/i);
-  expect(rows[0]).toHaveAttribute("title", "NUC · Connected");
-  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
-  expect(rows[1]).toHaveAttribute("title", "Other PC · Connected");
+  expect(rows[0]).toHaveAttribute("title", "NUC · Online");
+  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Online");
+  expect(rows[1]).toHaveAttribute("title", "Other PC · Online");
   expect(rows.some((row) => row.hasAttribute("data-in-use"))).toBe(false);
   // Every machine is live at once: no page says In use or offers Use.
   for (const name of ["NUC", "Other PC"]) {
@@ -70,11 +72,11 @@ test("the local host is This device's; every remote row says Connected however i
   }
 });
 
-test("an unreachable remote machine only says Not connected, and can still be forgotten, told when it's back", () => {
+test("an unreachable remote machine only says Offline, and can still be forgotten, told when it's back", () => {
   const done = { ...actions(), machineDevices: vi.fn(), forgetMachine: vi.fn() };
   window.sidevoiceActions = done as unknown as typeof window.sidevoiceActions;
   room([paired()], { machineLinks: { "fp-nuc": { reach: "away", via: "" } } });
-  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toBe("NUC, Not connected");
+  expect(document.querySelector(".machines-inline .machine-entry")?.getAttribute("aria-label")).toBe("NUC, Offline");
   expect(screen.queryByRole("button", { name: /Retry NUC/ })).toBeNull();
   // Its list can't be read, so no row of this device's: Forget is offered on its own, and never waits on the machine.
   expect(done.machineDevices).not.toHaveBeenCalled();
@@ -88,13 +90,33 @@ test("This device offers local setup when no local host is projected; Remote mac
   const install = vi.fn();
   const done = actions();
   setBridge({ install });
+  onTestFinished(() => localHostInstallController.clear());
   room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true, inApp: true });
 
-  expect(within(thisDevice()).getByRole("button", { name: "Use agents on this computer" })).toBeInTheDocument();
+  // The setup's two ways: the app's Prepare, then I'll do it myself, closed.
+  const device = within(thisDevice());
+  expect(thisDevice().querySelector(".this-computer-prepare > p")).toHaveTextContent("To use the agents on this computer, Sidevoice needs a background service.");
+  expect(device.getByRole("button", { name: "Prepare this computer" })).toHaveClass("ui-button--primary");
+  expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "false");
+  expect(thisDevice().querySelector(".ui-snippet")).toBeNull();
   expect(document.getElementById("machines")!.querySelector(".local-install-entry")).toBeNull();
   await act(async () => { screen.getAllByRole("button", { name: "Add a remote machine" })[0].click(); });
   expect(done.openPairing).toHaveBeenCalledOnce();
   expect(install).not.toHaveBeenCalled();
+  // Opened: the command, and the wait for this computer.
+  await act(async () => { device.getByRole("button", { name: "I’ll do it myself" }).click(); });
+  expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
+  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
+  await act(async () => { device.getByRole("button", { name: "I’ll do it myself" }).click(); });
+  expect(thisDevice().querySelector(".ui-snippet")).toBeNull();
+  // The app's install failing (this one answers nothing usable): what failed, Retry, and the command open by itself.
+  await act(async () => { device.getByRole("button", { name: "Prepare this computer" }).click(); });
+  expect(install).toHaveBeenCalledOnce();
+  expect(thisDevice().querySelector(".local-install-panel")).toHaveAttribute("data-phase", "failed");
+  expect(device.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  expect(device.queryByRole("button", { name: "Prepare this computer" })).toBeNull();
+  expect(device.getByRole("button", { name: "I’ll do it myself" })).toHaveAttribute("aria-expanded", "true");
+  expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
 });
 
 test("This device, where the app does not install Sidevoice itself, offers the install command to run here instead", () => {
@@ -102,9 +124,12 @@ test("This device, where the app does not install Sidevoice itself, offers the i
   setBridge({});
   room([paired()], { localHostStatus: { state: "absent" }, localHostAvailable: true, inApp: true });
 
-  expect(within(thisDevice()).queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(within(thisDevice()).queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
+  // The only way: shown as it is, nothing to open.
+  expect(within(thisDevice()).queryByRole("button", { name: "I’ll do it myself" })).toBeNull();
   expect([...thisDevice().querySelectorAll(".ui-snippet code")].map((code) => code.textContent)).toEqual(["npx sidevoice@latest install"]);
   expect(within(thisDevice()).getByText("You can also ask one of your agents to run it for you.")).toBeInTheDocument();
+  expect(thisDevice().querySelector(".prepare-here-wait")).toHaveTextContent("Waiting for the Sidevoice service…");
   expect(document.getElementById("machines")!.querySelector(".local-install-entry")).toBeNull();
 });
 
@@ -114,7 +139,7 @@ test("an existing stopped local R1 host keeps its page and does not show the ins
   room([local], { localHostStatus: { state: "stopped-by-person", installed: true, reachable: false } });
 
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
-  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
 });
 
 test("an already-running local R1 host is shown without starting another install", () => {
@@ -124,7 +149,7 @@ test("an already-running local R1 host is shown without starting another install
   room([local], { localHostStatus: running });
 
   expect(thisDevice().querySelector('.host-detail[aria-label="MacBook"]')).not.toBeNull();
-  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   expect(install).not.toHaveBeenCalled();
 });
 
@@ -138,13 +163,13 @@ test("a failed local R1 host stays on the existing machine path instead of the n
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
 });
 
-test("a remote that does not answer says Not connected while another answers: each row says its own link", () => {
+test("a remote that does not answer says Offline while another answers: each row says its own link", () => {
   actions();
   const other = paired({ fp: "fp-other", host: "Other PC" });
   room([local, paired(), other], { machineLinks: { "fp-nuc": { reach: "offline", via: "" }, "fp-other": { reach: "ok", via: "node" } } });
   const rows = [...document.querySelectorAll(".machines-inline .machine-entry")];
-  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Not connected");
-  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Connected");
+  expect(rows[0].getAttribute("aria-label")).toBe("NUC, Offline");
+  expect(rows[1].getAttribute("aria-label")).toBe("Other PC, Online");
 });
 
 test("local F6 status shows only supported service actions", async () => {
@@ -152,17 +177,33 @@ test("local F6 status shows only supported service actions", async () => {
   setBridge({ serviceInstall, start: undefined, restart: undefined, stop: undefined });
   actions();
   room([local], { localHostStatus: { state: "not-installed", installed: false, service: "none" } });
-  expect(screen.getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
-  expect(document.querySelector(".host-status-summary")).toHaveTextContent("Does not start when you sign in");
+  expect(document.querySelector(".host-status-summary")).toHaveTextContent("The service is installed, but doesn't start by itself.");
   // Not installed: its one action is Start, which installs the service; Start at sign-in comes once there is one.
   expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
   expect(screen.queryByRole("switch", { name: "Start at sign-in" })).toBeNull();
   expect(screen.queryByRole("button", { name: /agent/i })).toBeNull();
   expect(screen.queryByRole("button", { name: /copy from another machine/i })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Use agents on this computer" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^(Use agents on|Prepare) this computer$/ })).toBeNull();
   await act(async () => { screen.getByRole("button", { name: "Start" }).click(); });
   expect(serviceInstall).toHaveBeenCalledOnce();
+});
+
+test("incompatible, this computer's card ends on Update it: and the install command follows; the banner, with no command, says it without", () => {
+  setBridge({ serviceInstall: vi.fn() });
+  actions();
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], machinesAt: 1_700_086_400_000, machinesReady: true, localHostAvailable: true, inApp: true,
+    localHostStatus: { ...running, state: "incompatible", reachable: false } }); });
+  render(<RoomProvider store={store}><Panes /><LocalHostBanner /></RoomProvider>);
+  const card = thisDevice().querySelector<HTMLElement>(".host-status-card")!;
+  expect(within(card).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
+  const summary = card.querySelector(".host-status-summary")!;
+  expect(summary).toHaveTextContent("The service on this computer isn't compatible with this version of the app. Update it:");
+  expect(summary.nextElementSibling).toHaveClass("install-here");
+  expect(summary.nextElementSibling).toHaveTextContent(CONNECTOR_INSTALL);
+  expect(screen.getByText("This computer is unavailable: The service on this computer isn't compatible with this version of the app.")).toBeInTheDocument();
 });
 
 test("service failure display and copied diagnostics omit secret-bearing native fields", async () => {
@@ -213,7 +254,7 @@ test("stopping the local host while calls are active asks first, and Cancel leav
   room([local], { localHostStatus: { ...running, calls: 1 } });
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
-  expect(screen.getByText("Stop Sidevoice on this computer? Active calls will end.")).toBeInTheDocument();
+  expect(screen.getByText("Stop the service on this computer? Active calls will end.")).toBeInTheDocument();
   expect(stop).not.toHaveBeenCalled();
   await act(async () => { screen.getByRole("button", { name: "Cancel" }).click(); });
   expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent("Running");
@@ -232,7 +273,7 @@ test("with no active calls, Stop stops the local host without asking", async () 
   await act(async () => {});
 
   await act(async () => { screen.getByRole("button", { name: "Stop" }).click(); });
-  expect(screen.queryByText("Stop Sidevoice on this computer? Active calls will end.")).toBeNull();
+  expect(screen.queryByText("Stop the service on this computer? Active calls will end.")).toBeNull();
   expect(stop).toHaveBeenCalledOnce();
 });
 
@@ -451,20 +492,20 @@ test("a lost native pairing keeps This device's page and recovery action, with n
   expect(document.querySelector(".machines-inline .machine-entry")).toBeNull();
   expect(screen.queryByRole("button", { name: "Use This computer" })).toBeNull();
   expect(screen.getByText(/This computer is unavailable/)).toBeInTheDocument();
-  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice on this computer" })).toBeInTheDocument();
+  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice service" })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
   await act(async () => { screen.getAllByRole("button", { name: "Retry" })[0].click(); });
   expect(restart).toHaveBeenCalledOnce();
 });
 
-test("a reachable local core whose service the person stopped says Not running, as its card, and hides the warning", () => {
+test("a reachable local core whose service the person stopped says Not started, as its card, and hides the warning", () => {
   actions();
   const store = createRoomStore();
   act(() => { store.patch({ pairings: [local], localHostAvailable: true, inApp: true,
     localHostStatus: { state: "stopped-by-person", reachable: true }, machinesReady: true }); });
   render(<RoomProvider store={store}><Panes /><LocalHostBanner /></RoomProvider>);
-  expect(thisDevice().querySelector(".host-detail-state")).toHaveTextContent(/^Not running$/);
-  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Not running$/);
+  expect(thisDevice().querySelector(".host-detail-state")).toHaveTextContent(/^Not started$/);
+  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Not started$/);
   expect(screen.queryByText(/This computer is unavailable/)).toBeNull();
 });
 
@@ -502,8 +543,8 @@ test("a remote machine's page has it all: how it is reached, its agents, its dev
   expect(done.revokeMachineDevice).toHaveBeenCalledWith("fp-nuc", "d-phone");
   // Pairing goes from a device to the machine, never from here.
   expect(screen.queryByRole("button", { name: "Pair another device" })).toBeNull();
-  // Its Sidevoice card is to read: it is run there.
-  expect(screen.getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
+  // Its Sidevoice service's card is to read: it is run there.
+  expect(screen.getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
   expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Forget NUC" }));
   fireEvent.click(screen.getByRole("button", { name: "Yes, forget" }));
@@ -549,21 +590,23 @@ test("the remote machines are entries under Remote machines, Add a remote machin
   expect(within(machines).getByRole("heading", { level: 2 })).toHaveTextContent("Remote machines");
   expect([...nav.querySelectorAll("button")].map((button) => button.textContent)).toEqual([expect.stringMatching(/^NUC/), expect.stringMatching(/^Other PC/), "Add"]);
   expect(nav.querySelector(".machine-nav-add")).toHaveAccessibleName("Add a remote machine");
-  expect(entry("NUC")).toHaveAccessibleName("NUC, Connected");
+  expect(entry("NUC")).toHaveAccessibleName("NUC, Online");
   // Each a server, as Remote machines' own icon is: in its entry and in its page's header.
   expect(entry("NUC").querySelector("svg")).toHaveClass("lucide-server");
   expect(machines.querySelector('.host-detail[aria-label="NUC"] .machine-icon svg')).toHaveClass("lucide-server");
   // Remote machines alone is the first remote machine; this computer's page is This device's.
-  expect(within(machines).getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
-  expect(within(machines).queryByRole("heading", { name: "Sidevoice on MacBook" })).toBeNull();
-  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice on MacBook" })).toBeInTheDocument();
+  // Each card is the Sidevoice service: the remote machine's, to read, there; this computer's, with its controls, here.
+  expect(within(machines).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
+  expect(machines.querySelector(".host-status-card:not([data-remote])")).toBeNull();
+  expect(within(thisDevice()).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).not.toHaveAttribute("data-remote");
   await act(async () => { entry("Other PC").click(); });
   expect(store.getState().facts.machinesView.machine).not.toBeNull();
-  // Every machine's page has its Sidevoice card: another machine's, to read.
-  expect(within(machines).queryByRole("heading", { name: "Sidevoice on NUC" })).toBeNull();
-  expect(within(machines).getByRole("heading", { name: "Sidevoice on Other PC" })).toBeInTheDocument();
+  // Every machine's page has its Sidevoice service's card: another machine's, to read.
+  const page = (name: string) => within(machines).queryByRole("region", { name });
+  expect(page("NUC")).toBeNull();
+  expect(within(page("Other PC")!).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
   await act(async () => { entry("NUC").click(); });
-  expect(within(machines).getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
+  expect(within(page("NUC")!).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
   expect(within(machines).getByRole("heading", { name: "Paired devices" })).toBeInTheDocument();
   expect(entry("NUC")).toHaveAttribute("aria-current", "page");
 });
@@ -580,7 +623,7 @@ test("asked for a machine's agents, Machines shows that machine once, without fe
   expect(patch.mock.calls.length).toBeLessThanOrEqual(3);
 });
 
-test("this computer is not among the remote machines; stopped, its page says Start brings it back, and whether sign-in would", async () => {
+test("this computer is not among the remote machines; stopped, its card says Not started and offers Start, and nothing of sign-in", async () => {
   setBridge({ start: vi.fn(async () => running) });
   actions();
   const stopped: LocalHostStatus = { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" };
@@ -588,7 +631,10 @@ test("this computer is not among the remote machines; stopped, its page says Sta
   expect(entry("MacBook")).toBeNull();
   expect(entry("NUC")).not.toHaveTextContent("This computer");
   expect(within(thisDevice()).getByRole("button", { name: "Start" })).toBeInTheDocument();
-  expect(screen.getByText(/does not start when you sign in\. Start it here/)).toBeInTheDocument();
+  // Its state's word alone says it: no sentence repeats it, and whether it starts at sign-in is its switch's.
+  expect(thisDevice().querySelector(".host-status-state")).toHaveTextContent(/^Not started$/);
+  expect(thisDevice().querySelector(".host-status-summary")).toBeNull();
+  expect(within(thisDevice()).queryByText(/sign in/)).toBeNull();
 });
 
 
@@ -612,7 +658,7 @@ test("a machine paired without encryption shows exactly what the same machine pa
   expect(plain).toBe(await shown(encrypted));
   // And nothing in it speaks of encryption: no words, no open lock, no (i) about the connection.
   expect(plain).not.toMatch(/encrypt|lucide-lock|insecure|About this connection/i);
-  expect(plain).toContain("Lab box, Connected");
+  expect(plain).toContain("Lab box, Online");
 });
 
 /** The devices list on a remote machine's page, and the action at that page's foot. */
