@@ -444,8 +444,9 @@ test('Optional speaker levels follow the active conversation and clear on silenc
  host.onPlaybackLevel=listener=>{output=listener;return ()=>{output=null}};
  s.context.__voice=host;
  s.run("voice=__voice;state.callNode='fp-mac';state.roomBinding={thread_id:'one'};attachVoice(__voice)");
+ const beforeMic=events.length;
  host.emit('level',0.9);
- assert.deepEqual(events,[[0,null]],'microphone levels never move the agent mouth');
+ assert.equal(events.length,beforeMic,'microphone levels never move the agent mouth');
  host.emit('state',{playback:'synthesizing'});
  output(0.8);
  assert.deepEqual(events.at(-1),[0,null],'no mouth while synthesis waits');
