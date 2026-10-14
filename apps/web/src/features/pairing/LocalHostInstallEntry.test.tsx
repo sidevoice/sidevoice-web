@@ -92,7 +92,7 @@ test("a non-cancellable commit progress frame hides Cancel", async () => {
   act(() => controller.clear());
 });
 
-test("failure shows translated key copy, safe details and a retry action", async () => {
+test("failure shows translated key copy, safe details with the installer's log (copied, never shown) and a retry action", async () => {
   const failed = deferred<LocalHostStatus>();
   const install = vi.fn()
     .mockImplementationOnce(() => operation("failed-job", failed.promise))
@@ -110,23 +110,40 @@ test("failure shows translated key copy, safe details and a retry action", async
     await Promise.resolve(); });
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("The download could not reach the release"));
   expect(screen.queryByText("never show native prose")).toBeNull();
+  expect(screen.queryByText(/HOME=|private-pairing-code/)).toBeNull();
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
   expect(writeText).toHaveBeenCalledOnce();
   const copied = writeText.mock.calls[0][0];
-  expect(copied).toContain('"key": "install.network"');
+  // Its key, step and allowlisted params; the installer's log as it came, for whoever the person sends it to (operator,
+  // 2026-10-14). Never the native sentence nor a param outside the allowlist.
+  expect(JSON.parse(copied)).toEqual({ key: "install.network", step: "download", params: { attempt: 2 },
+    log_tail: ["HOME=/private/account", "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}", "SV1.private-pairing-code"] });
   expect(copied).not.toContain("raw-token");
-  expect(copied).not.toContain("private-pairing-code");
-  expect(copied).not.toContain("HOME=");
   expect(copied).not.toContain("never show native prose");
   expect(copied).not.toContain("demo-user");
   expect(copied).not.toContain("demo-password");
-  expect(copied).not.toContain("demo-secret");
-  expect(copied).not.toContain("demo-credential");
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
   expect(install).toHaveBeenCalledTimes(2);
   await waitFor(() => expect(screen.queryByRole("heading", { name: "Preparing this computer" })).toBeNull());
+});
+
+test.each([
+  ["install.busy", "An install is already running. Wait for it to finish."],
+  ["install.failed", "The service couldn't be installed. Copy the details and try again."],
+])("the desktop app's %s is said in its own words, its key kept in the details", async (key, said) => {
+  const failed = deferred<LocalHostStatus>();
+  const controller = fakeController({ install: vi.fn(() => operation("keyed-job", failed.promise)) });
+  const writeText = vi.fn(async (_value: string) => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  render(<LocalHostInstallEntry showCta controller={controller} />);
+
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  await act(async () => { failed.reject({ key, message: "native prose" }); await Promise.resolve(); });
+  expect(await screen.findByRole("alert")).toHaveTextContent(said);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
+  expect(JSON.parse(writeText.mock.calls[0][0])).toEqual({ key });
 });
 
 test("authenticity failures translate allowlisted connector check IDs", async () => {

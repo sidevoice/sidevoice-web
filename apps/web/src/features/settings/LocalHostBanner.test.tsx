@@ -36,6 +36,21 @@ test("this computer's service in a state this app does not know says so, and off
   expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
 });
 
+test("stopped, the banner says only that, and offers Start", async () => {
+  const restart = vi.fn().mockResolvedValue(undefined), start = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { localHost: {
+    state: vi.fn(async () => ({ state: "stopped-by-person" })), subscribe: vi.fn(() => () => {}), pairing: vi.fn(async () => null), restart, start,
+  } } } });
+  const store = createRoomStore();
+  act(() => { store.patch({ pairings: [local], localHostStatus: { state: "stopped-by-person", reachable: false } }); });
+  render(<RoomProvider store={store}><LocalHostBanner /></RoomProvider>);
+  expect(screen.getByText("This computer is unavailable: The service is stopped.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  await act(async () => { screen.getByRole("button", { name: "Start" }).click(); });
+  expect(start).toHaveBeenCalledOnce();
+  expect(restart).not.toHaveBeenCalled();
+});
+
 test("a state this app does not know is never worded as one it knows; extra fields are not copied into the details", () => {
   const t = translator();
   const status = (state: string) => ({ state, reachable: false, future: "x" }) as unknown as LocalHostStatus;

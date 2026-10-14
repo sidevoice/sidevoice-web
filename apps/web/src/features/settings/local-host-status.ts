@@ -101,6 +101,8 @@ const INSTALL_CAUSES: Record<string, MessageKey> = {
   "install.executable-missing": "localInstall.error.executableMissing",
   "unsupported": "localInstall.error.unsupported",
   "install.unsafe": "localInstall.error.unsafe",
+  "install.busy": "localInstall.error.busy",
+  "install.failed": "localInstall.error.failed",
   "service.failed": "localInstall.error.service",
   "service.start.failed": "localInstall.error.service",
   "launch.failed": "localInstall.error.launch",

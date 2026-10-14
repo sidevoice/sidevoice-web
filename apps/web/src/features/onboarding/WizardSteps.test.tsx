@@ -158,7 +158,7 @@ test("installed here but not running, preparing this computer offers what starts
     expect(setup.queryByRole("button", { name: "I’ll do it myself" })).toBeNull();
   };
   // Stopped: Start.
-  expect(setup.getByText("The service is stopped until you sign in again.")).toBeInTheDocument();
+  expect(setup.getByText("The service is stopped.")).toBeInTheDocument();
   expect(action()).toHaveTextContent("Start");
   nothingElse();
   await act(async () => { fireEvent.click(action()); });

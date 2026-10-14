@@ -134,12 +134,12 @@ test("what needs the person is said in words, in its tone, and never wears the d
   expect(thisDevice()).toHaveAccessibleName("This device, Not working");
 });
 
-test("This device is never \"Running\", \"Starting…\" or \"Not running\" in the nav or a phone's row; its dot only while it runs", () => {
+test("This device is never \"Running\", \"Starting…\" or \"Stopped\" in the nav or a phone's row; its dot only while it runs", () => {
   const states: LocalHostStatus[] = [running, { state: "starting" }, { state: "stopped-by-person", installed: true }, { state: "absent" }];
   for (const status of states) {
     open({ localHostStatus: status });
     expect(thisDevice().textContent).toBe("This device");
-    expect(thisDevice().getAttribute("aria-label")).not.toMatch(/Running|Starting|Not running|Not prepared/);
+    expect(thisDevice().getAttribute("aria-label")).not.toMatch(/Running|Starting|Stopped|Not prepared/);
     expect(!!dot(thisDevice())).toBe(status === running);
     cleanup();
   }

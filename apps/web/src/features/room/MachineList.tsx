@@ -281,7 +281,7 @@ function HostDetail({ machine, name, untitled = false, onForget }: { machine: Ma
       {/* Sidevoice on the machine, as a card on every machine's page: this computer's with its controls; another's to read. */}
       <section className="host-section" aria-labelledby={"host-status-" + machine.id}>
         {machine.local ? <LocalHostStatusPanel machine={machine} status={status} titleId={"host-status-" + machine.id} />
-          : <RemoteHostCard machine={machine} name={name} titleId={"host-status-" + machine.id} />}
+          : <RemoteHostCard machine={machine} titleId={"host-status-" + machine.id} />}
       </section>
       <section className="host-section" ref={agents}>
         <HostAgentsPanel fp={machine.pairingId ?? null} />
@@ -316,16 +316,17 @@ function ForgetMachine({ machine, name, onForget }: { machine: MachineView; name
   );
 }
 
-/** Another machine's Sidevoice, to read: where the machine says, its Sidevoice version. How this device reaches it is
- *  its page's header's, two blocks up; no controls: it is run there. */
-function RemoteHostCard({ machine, name, titleId }: { machine: MachineView; name: string; titleId: string }) {
+/** Another machine's Sidevoice service, to read: where the machine says, its Sidevoice version. Titled as this
+ *  computer's card ("Sidevoice service"): its page names the machine already. How this device reaches it is its
+ *  page's header's, two blocks up; no controls: it is run there. */
+function RemoteHostCard({ machine, titleId }: { machine: MachineView; titleId: string }) {
   const t = translator();
   const info = useRoomStore((state) => machine.pairingId ? state.facts.remoteHostStatus?.[machine.pairingId] : undefined);
   useEffect(() => { if (machine.pairingId && machine.state === "connected") void window.sidevoiceActions?.loadMachineInfo?.(machine.pairingId); }, [machine.pairingId, machine.state]);
   return (
     <div className="host-status-card" data-remote>
       <div className="host-status-head">
-        <h4 id={titleId}>{t("hosts.serviceOn", { machine: name })}</h4>
+        <h4 id={titleId}>{t("hosts.section.service")}</h4>
       </div>
       {info?.version && <dl className="host-status-facts">
         {info?.version && <div className="host-status-product">{t("hosts.productVersion", { version: info.version })}</div>}
@@ -403,12 +404,11 @@ function LocalHostStatusPanel({ machine, status, titleId }: { machine: MachineVi
             everything that updates is. */}
         <ThisDeviceVersion t={t} />
       </dl>
-      {status.state !== "running" && <p className="host-status-summary">{statusMessage}</p>}
+      {/* Running or stopped, the state's word says it ("Running", "Stopped") and Start follows: no sentence repeats it.
+          Whether it starts at sign-in is its switch's alone, below. */}
+      {status.state !== "running" && status.state !== "stopped-by-person" && <p className="host-status-summary">{statusMessage}</p>}
       {/* Incompatible ends on "Update it:": the install command, which updates it, follows — as in the setup. */}
       {status.state === "incompatible" && <InstallCommandHere />}
-      {/* Stopped by the person: Start brings it back (the app runs the service), and without start at sign-in it would not
-          come back by itself either. Only this computer's machine has this card: a remote one is never stopped from here. */}
-      {status.state === "stopped-by-person" && <p className="muted">{t(installed ? "hosts.stoppedNote" : "hosts.stoppedNoLoginNote")}</p>}
       {cause && status.state === "backoff" && <p className="muted">{cause}</p>}
       {status.failure && failed && (details.attempts !== undefined || !!failureAt) && (
         <div className="host-failure-details">

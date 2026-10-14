@@ -131,8 +131,9 @@ test("with this computer prepared: This device shows its page; Remote machines l
   addSays("Add a remote machine");
   expect(machinesPane().querySelector('.machine-entry[data-name="MacBook"]')).toBeNull();
   expect(machinesPane().querySelector('.machine-entry[data-name="NUC"]')).not.toBeNull();
-  expect(within(machinesPane()).queryByRole("heading", { name: "Sidevoice service" })).toBeNull();
-  expect(within(machinesPane()).getByRole("heading", { name: "Sidevoice on NUC" })).toBeInTheDocument();
+  // NUC's Sidevoice service, to read; this computer's card is This device's alone.
+  expect(within(machinesPane()).getByRole("heading", { name: "Sidevoice service" }).closest(".host-status-card")).toHaveAttribute("data-remote");
+  expect(machinesPane().querySelector(".host-status-card:not([data-remote])")).toBeNull();
 });
 
 test("on a host not yet prepared: This device offers to prepare it, with no other machine; Remote machines has no install entry", () => {

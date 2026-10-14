@@ -36,12 +36,12 @@ test("a remote machine: the first that holds of not paired, checking, connected,
   }
 });
 
-test("This device, where the app reads its service: not prepared, starting, not working, not running, running", () => {
+test("This device, where the app reads its service: not prepared, starting, not working, stopped, running", () => {
   const device = (state: LocalHostStatusName, row: MachineView | null = local()) => said(machineStatus(row, status(state), true, en));
   expect(device("absent", null)).toEqual(["unprepared", "neutral", "Not prepared", "Not prepared", undefined]);
   for (const state of ["installing", "starting", "backoff"] as const) expect(device(state)).toEqual(["starting", "neutral", "Starting…", "Starting…", undefined]);
   for (const state of ["failed", "service-failed", "refused", "incompatible"] as const) expect(device(state, local({ state: "failed" }))).toEqual(["failed", "danger", "Not working", "Not working", undefined]);
-  for (const state of ["not-installed", "stopped-by-person"] as const) expect(device(state)).toEqual(["stopped", "neutral", "Not running", "Not running", undefined]);
+  for (const state of ["not-installed", "stopped-by-person"] as const) expect(device(state)).toEqual(["stopped", "neutral", "Stopped", "Stopped", undefined]);
   expect(device("running")).toEqual(["running", "positive", "Running", "Running", undefined]);
   // Preparing it, before its row exists: where the service stands, all the same.
   expect(device("installing", null)[0]).toBe("starting");
@@ -97,6 +97,6 @@ test("in Spanish, the words the spec gives", () => {
   expect(said(machineStatus(machine({ state: "offline" }), running, false, es)).slice(2, 5)).toEqual(["No conectada", "No conectada", "Ahora no se llega desde aquí"]);
   expect(said(machineStatus(machine({ revoked: true }), running, false, es)).slice(2, 5))
     .toEqual(["Sin emparejar", "Ya no está emparejada", "Esta máquina quitó este dispositivo. Para volver a usarla aquí, emparéjala con un código nuevo de ella, u olvídala abajo."]);
-  expect(machineStatus(local(), status("stopped-by-person"), true, es).short).toBe("No está en marcha");
+  expect(machineStatus(local(), status("stopped-by-person"), true, es).short).toBe("Parado");
   expect(machineStatus(null, status("absent"), true, es).short).toBe("Sin preparar");
 });
