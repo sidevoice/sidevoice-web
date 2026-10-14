@@ -120,8 +120,8 @@
    holds), from the scene, and from the dot and the words beside it. Speaking shows a still, open mouth. */
 @media (prefers-reduced-motion:reduce) {
   .sv-avatar,.sv-avatar *,.stage-spinner { animation:none !important;transition:none !important }
-  .sv-avatar[data-style=bichos][data-mood=speaking]:not([data-mouth=level]) .m-open { opacity:1 }
-  .sv-avatar[data-style=bichos][data-mood=speaking]:not([data-mouth=level]) .m-rest { opacity:0 }
+  .sv-avatar[data-style=bichos][data-mood=speaking]:not([data-mouth=level]):not([data-mouth=playback]) .m-open { opacity:1 }
+  .sv-avatar[data-style=bichos][data-mood=speaking]:not([data-mouth=level]):not([data-mouth=playback]) .m-rest { opacity:0 }
   .sv-avatar[data-style=bichos][data-mouth=playback] .m-open { opacity:0;transform:none !important }
   .sv-avatar[data-style=bichos][data-mouth=playback] .m-rest { opacity:1 }
   .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(.55) !important }
