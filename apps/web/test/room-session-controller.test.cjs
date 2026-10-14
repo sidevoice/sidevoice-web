@@ -436,6 +436,32 @@ test('The waveform bubble draws the level the voice reports, and nothing without
  assert.deepEqual(wave.slice(-2).map(Math.abs),[0.5,0.25],'the newest levels last');
  assert.equal(s.run("$('mic-level-meter').getAttribute('aria-valuenow')"),'25');
 });
+test('Optional speaker levels follow the active conversation and clear on silence and disconnect',()=>{
+ const s=setup(),events=[];
+ s.context.window.sidevoiceUI={playbackLevel:{publish:(level,thread)=>events.push([level,thread]),clear:()=>events.push([0,null])}};
+ const host=fakeVoice();
+ let output;
+ host.onPlaybackLevel=listener=>{output=listener;return ()=>{output=null}};
+ s.context.__voice=host;
+ s.run("voice=__voice;state.callNode='fp-mac';state.roomBinding={thread_id:'one'};attachVoice(__voice)");
+ host.emit('level',0.9);
+ assert.deepEqual(events,[[0,null]],'microphone levels never move the agent mouth');
+ host.emit('state',{playback:'synthesizing'});
+ output(0.8);
+ assert.deepEqual(events.at(-1),[0,null],'no mouth while synthesis waits');
+ host.emit('state',{playback:'playing'});
+ output(0.7);
+ assert.deepEqual(events.at(-1),[0.7,'fp-mac|one']);
+ output(0);
+ assert.deepEqual(events.at(-1),[0,'fp-mac|one'],'a pause within playback rests the mouth');
+ host.emit('state',{playback:'idle'});
+ assert.deepEqual(events.at(-1),[0,null]);
+ s.run('disconnect()');
+ assert.equal(output,null,'the output subscription ends with the call');
+ assert.deepEqual(events.at(-1),[0,null]);
+ const old=fakeVoice();s.context.__old=old;
+ assert.doesNotThrow(()=>s.run('voice=__old;attachVoice(__old)'), 'older hosts omit this optional method');
+});
 test('Aggregates summarize with nearest-rank percentiles and never turn a missing value into a zero',()=>{
  const s=setup();
  assert.equal(JSON.stringify(s.run('statsSummary([400,100,300,200])')),JSON.stringify({count:4,mean:250,p50:200,p90:400,max:400}));

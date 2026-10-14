@@ -9,7 +9,7 @@ import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
 import { CharacterAvatar } from "../avatar/CharacterAvatar";
 import { StageBackdrop, StageDesk, useSceneScale, WantedPoster, type PosterWords } from "../avatar/StageScene";
-import { KaraokeText, wordEnd } from "../conversation/KaraokeText";
+import { KaraokeText } from "../conversation/KaraokeText";
 import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
 import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
@@ -112,7 +112,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
           <StageBackdrop seed={stage.threadId} tone={tone} />
           {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
           <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"}
-            mouthKey={reply && spokenTo !== null ? wordEnd(reply.text, spokenTo) : undefined} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
+            mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
           <StageDesk seed={stage.threadId} />
         </div>
         <div className="stage-name" translate="no">

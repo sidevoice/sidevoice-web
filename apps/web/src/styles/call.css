@@ -34,6 +34,11 @@
 /* The person's mouth follows the microphone's level, written as --mouth (0–1) on the root. */
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=level] .m-open { animation:none;opacity:1;transform:scaleY(calc(.2 + var(--mouth, .3) * .8));transition:transform 80ms linear }
 .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=level] .m-rest { animation:none;opacity:0 }
+/* The stage agent rests in every output gap, including gaps inside an otherwise playing reply. */
+.sv-avatar[data-style=bichos][data-mouth=playback] .m-open { animation:none;opacity:0;transform:scaleY(1);transition:none }
+.sv-avatar[data-style=bichos][data-mouth=playback] .m-rest { animation:none;opacity:1 }
+.sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(calc(.2 + var(--mouth, 0) * .8));transition:transform 80ms linear }
+.sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-rest { opacity:0 }
 @keyframes av-talk { from { opacity:0;transform:scaleY(.3) } to { opacity:1;transform:scaleY(1) } }
 @keyframes av-talk-rest { from { opacity:1 } to { opacity:0 } }
 @keyframes av-word-a { 0% { opacity:1;transform:scaleY(1) } 55% { opacity:1;transform:scaleY(.75) } 100% { opacity:0;transform:scaleY(.3) } }
@@ -117,6 +122,10 @@
   .sv-avatar,.sv-avatar *,.stage-spinner { animation:none !important;transition:none !important }
   .sv-avatar[data-style=bichos][data-mood=speaking]:not([data-mouth=level]) .m-open { opacity:1 }
   .sv-avatar[data-style=bichos][data-mood=speaking]:not([data-mouth=level]) .m-rest { opacity:0 }
+  .sv-avatar[data-style=bichos][data-mouth=playback] .m-open { opacity:0;transform:none !important }
+  .sv-avatar[data-style=bichos][data-mouth=playback] .m-rest { opacity:1 }
+  .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-open { opacity:1;transform:scaleY(.55) !important }
+  .sv-avatar[data-style=bichos][data-mood=speaking][data-mouth=playback][data-mouth-active] .m-rest { opacity:0 }
   .stage-scene *,.stage-desk,.wanted { animation:none !important;transition:none !important }
   .stage-spinner { border-right-color:currentColor;opacity:.7 }
 }

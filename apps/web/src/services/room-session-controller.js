@@ -959,7 +959,10 @@ function presenceReceipt(id,status){
 }
 // The timer contributes a clock fact; the store derives everything else from it on every transition.
 let receiptDeadline=null;
+let playbackThread=null;
 function reconcileSession(view){
+ const thread=targetId();
+ if(thread!==playbackThread){playbackThread=thread;window.sidevoiceUI?.playbackLevel?.clear?.()}
  const deadlines=Object.values(state.turns).filter(t=>!t.settled&&['delivered','unconfirmed'].includes(t.status)&&t.readyAt>state.now).map(t=>t.readyAt);
  const deadline=deadlines.length?Math.min(...deadlines):null;
  if(deadline!==receiptDeadline){clearTimeout(presenceTimer);receiptDeadline=deadline;
@@ -1222,8 +1225,9 @@ function voiceTurn(turn){
 function takeReceipt(segment){const status=state.inputReceipts[segment];if(status==null)return null;const {[segment]:_,...rest}=state.inputReceipts;state.inputReceipts=rest;return status}
 // Why the voice could not do something (a reply it could not say, a transcription that failed) stays here, where it can
 // be acted on, and in the machine's log.
-function voiceFailed(error){setRoomError(voiceError(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
+function voiceFailed(error){window.sidevoiceUI?.playbackLevel?.clear?.();setRoomError(voiceError(error));reportClientError({kind:'voice',message:failureCode(error,'')})}
 function voiceStateChanged(next){
+ if(next?.playback!=='playing')window.sidevoiceUI?.playbackLevel?.clear?.();
  roomStore.batch(()=>{
   state.voiceState=next;
   state.userLive=next?.listening==='speaking';
@@ -1241,6 +1245,11 @@ function voiceLevel(level){
  $('mic-control')?.style.setProperty('--mic-fill',value+'%');
  $('mic-level-meter')?.setAttribute('aria-valuenow',String(value));
  const channel=window.sidevoiceUI?.micLevel;if(typeof channel?.publish==='function')channel.publish(value);
+}
+// This is the speaker's level, never the microphone's. A host without the optional output channel leaves it at rest.
+function voicePlaybackLevel(level){
+ if(!voice||state.voiceState?.playback!=='playing')return;
+ window.sidevoiceUI?.playbackLevel?.publish?.(level,targetId());
 }
 // The bubble of the turn being recorded draws the level the voice reports, as a waveform of the last moments.
 window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
@@ -1320,6 +1329,7 @@ function disconnect() {
     const socket = state.ws, current = voice;
     state.ws = null;
     voice = null;
+    window.sidevoiceUI?.playbackLevel?.clear?.();
     // What is being said ends with the call, and the room ends its replies with the session: nothing is reported.
     replies.clear();
     current?.stop().catch(() => {});
@@ -1348,7 +1358,12 @@ function disconnect() {
 // The voice's reports, for as long as this call has it.
 const voiceListeners=[];
 function attachVoice(next){
+ window.sidevoiceUI?.playbackLevel?.clear?.();
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
+ if(typeof next.onPlaybackLevel==='function'){
+  const stop=next.onPlaybackLevel(level=>{if(voice===next)voicePlaybackLevel(level)});
+  if(typeof stop==='function')voiceListeners.push(stop);
+ }
  void watchAudioDevices();
 }
 /* The microphone and the speaker the voice uses (the same seam on the web and in the desktop app): this device's
@@ -1843,6 +1858,7 @@ window.sidevoiceActions={
  // the call there when it is another's. Out of a call it is the one the next join goes to. Picked while a join is still
  // on its way to another machine, that join is left and the call joined afresh, inside the person's own tap.
  selectParticipant(key){
+  window.sidevoiceUI?.playbackLevel?.clear?.();
   const participant=state.people.find(item=>personKey(item)===key),to=conversationOf(key);
   state.viewedThread=key;markHistorySeen();
   if(!state.sessionId)rememberThread(key);
