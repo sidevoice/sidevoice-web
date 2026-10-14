@@ -71,6 +71,9 @@ const agentsListing = () => ({ status: "ready", error: null, busy: {}, actionErr
   { id: "codex", label: "Codex", present: true, version: "0.157.0", registration: "not-connected", connect: "auto", actionable: false, instructions: { command: "codex mcp add sidevoice -- sidevoice mcp", file: null, snippet: null } },
 ] } });
 const REPLY = "I ran the tests: two fail in the settings pane, both about the Save button that no longer exists. Shall I update them?";
+/** A reply longer than a page of the stage's bubble, to see its pages follow the voice. */
+const LONG_REPLY = "I went through the settings pane: every toggle saves again, and the one for automatic updates had lost its listener " +
+  "in yesterday's refactor, so I put it back and added a test that flips it and reloads. The whole suite passes. Shall I open the pull request?";
 
 /** A device set up, paired with the NUC, in a call on "sidevoice-web" with two other conversations. */
 export const BASE_FACTS: Record<string, unknown> = {
@@ -182,6 +185,9 @@ export const JOURNEYS: Journey[] = [
     { id: "conversations", caption: "A conversation on the stage; the others beside it (a phone: from the header).", facts: {} },
     { id: "speaking", caption: "The agent speaking: its words as they are said.", facts: { botLive: true, karaokeState: { segment: "h-2", from: 0, to: 58 }, history: [
       ...(BASE_FACTS.history as unknown[]).slice(0, 1), { ...(BASE_FACTS.history as Record<string, unknown>[])[1], audio: "playing" }] } },
+    { id: "speaking-long", caption: "A long reply: three lines at a time, its pages following the voice, the end of the page before fading above.",
+      facts: { botLive: true, karaokeState: { segment: "h-3", from: 160, to: 200 }, history: [...(BASE_FACTS.history as unknown[]),
+        { segment: "h-3", thread: "fp-nuc|t-web", role: "assistant", text: LONG_REPLY, name: "sidevoice-web", time: Date.now() - 5_000, session: "s1", seq: 3, audio: "playing" }] } },
     { id: "working", caption: "The agent working.", facts: { harness: { "fp-nuc|t-web": true } } },
     { id: "listening", caption: "You speaking: your turn, as it is heard.", facts: { userLive: true, userTurn: { id: "u", segment: "u", thread: "fp-nuc|t-web" }, pendingPhase: "listening" } },
     { id: "transcript", caption: "The transcript open.", after: press("transcript-toggle") },
