@@ -62,7 +62,7 @@ test("a bridge commit frame revokes cancellation for that job", async () => {
   await vi.waitFor(() => expect(controller.getSnapshot()).toMatchObject({ phase: "succeeded" }));
 });
 
-test("failed bridge details retain allowlisted diagnostics and the installer's log lines, and omit untrusted params and prose", async () => {
+test("failed bridge details retain allowlisted diagnostics and the installer's log lines redacted, and omit untrusted params and prose", async () => {
   const result = deferred<LocalHostStatus>();
   const bridge = { install: vi.fn(() => operation("job-2", result.promise)) } as unknown as LocalHostBridge;
   const controller = createLocalHostInstallController(() => bridge);
@@ -70,14 +70,15 @@ test("failed bridge details retain allowlisted diagnostics and the installer's l
   result.reject({ key: "install.authenticity", step: "verification", message: "do not render raw prose",
     params: { check: "sigstore-bundle", token: "secret-token", attempts: 2,
       url: "http://demo-user:demo-password@proxy.example:8080", arbitrary: "{\"token\":\"demo-secret\"}" },
-    log_tail: ["environment: token=secret-token", 42, { line: "not text" }, "SV1.private-pairing-code"] });
+    log_tail: ["environment: token=secret-token", 42, { line: "not text" }, "SV1.private-pairing-code", "log at /home/demo-person/.sidevoice"] });
 
   await vi.waitFor(() => expect(controller.getSnapshot().phase).toBe("failed"));
-  // The log's lines of text, as they came, for Copy details (never shown); nothing else of what the bridge said.
+  // The log's lines of text, redacted, for Copy details (never shown); nothing else of what the bridge said.
   expect(controller.getSnapshot()).toEqual({ phase: "failed", source: "machines", step: "verification", error: {
     key: "install.authenticity", step: "verification", params: { check: "sigstore-bundle", attempts: 2 },
-    log_tail: ["environment: token=secret-token", "SV1.private-pairing-code"],
+    log_tail: ["environment: token=•••", "SV1.•••", "log at ~/.sidevoice"],
   } });
+  expect(JSON.stringify(controller.getSnapshot())).not.toMatch(/secret-token|private-pairing-code|demo-person/);
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("do not render raw prose");
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-user");
   expect(JSON.stringify(controller.getSnapshot())).not.toContain("demo-password");

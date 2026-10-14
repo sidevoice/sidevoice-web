@@ -5,6 +5,7 @@ import {
   type LocalHostInstallProgress,
   type LocalHostStatus,
 } from "./desktop-host";
+import { redactFreeText } from "../lib/redact";
 
 export type LocalHostInstallSnapshot =
   | { phase: "idle" }
@@ -65,11 +66,12 @@ function safeParams(value: unknown) {
   return Object.keys(result).length ? result : undefined;
 }
 
-/** The installer's last lines of error output, as they came: never shown, only copied with the details (Copy details),
- *  which the person pastes where they choose (operator, 2026-10-14). Lines of text only. */
+/** The installer's last lines of error output, redacted (home path as ~, secrets masked): never shown, only copied with
+ *  the details (Copy details — preparing this computer, and updating it), which the person pastes where they choose
+ *  (operator, 2026-10-14). Lines of text only. */
 function logTail(value: unknown) {
   if (!Array.isArray(value)) return undefined;
-  const lines = value.filter((line): line is string => typeof line === "string");
+  const lines = value.filter((line): line is string => typeof line === "string").map(redactFreeText);
   return lines.length ? lines : undefined;
 }
 

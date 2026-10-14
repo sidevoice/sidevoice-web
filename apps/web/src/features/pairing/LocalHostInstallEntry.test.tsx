@@ -92,7 +92,7 @@ test("a non-cancellable commit progress frame hides Cancel", async () => {
   act(() => controller.clear());
 });
 
-test("failure shows translated key copy, safe details with the installer's log (copied, never shown) and a retry action", async () => {
+test("failure shows translated key copy, safe details with the installer's log redacted (copied, never shown) and a retry action", async () => {
   const failed = deferred<LocalHostStatus>();
   const install = vi.fn()
     .mockImplementationOnce(() => operation("failed-job", failed.promise))
@@ -106,19 +106,22 @@ test("failure shows translated key copy, safe details with the installer's log (
   await act(async () => { failed.reject({ key: "install.network", step: "download", message: "never show native prose",
     params: { token: "raw-token", attempt: 2, url: "http://demo-user:demo-password@proxy.example:8080",
       detail: "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}" },
-    log_tail: ["HOME=/private/account", "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}", "SV1.private-pairing-code"] });
+    log_tail: ["HOME=/Users/demo-person", "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}", "SV1.private-pairing-code",
+      "Authorization: Bearer demo-bearer", "fetching sidevoice-core 0.4.2 for aarch64-apple-darwin"] });
     await Promise.resolve(); });
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("The download could not reach the release"));
   expect(screen.queryByText("never show native prose")).toBeNull();
-  expect(screen.queryByText(/HOME=|private-pairing-code/)).toBeNull();
+  expect(screen.queryByText(/HOME=|private-pairing-code|aarch64-apple-darwin|•••/)).toBeNull();
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy details" })); });
   expect(writeText).toHaveBeenCalledOnce();
   const copied = writeText.mock.calls[0][0];
-  // Its key, step and allowlisted params; the installer's log as it came, for whoever the person sends it to (operator,
-  // 2026-10-14). Never the native sentence nor a param outside the allowlist.
+  // Its key, step and allowlisted params; the installer's log with the home path as ~ and secrets masked, for whoever the
+  // person sends it to (operator, 2026-10-14). Never the native sentence nor a param outside the allowlist.
   expect(JSON.parse(copied)).toEqual({ key: "install.network", step: "download", params: { attempt: 2 },
-    log_tail: ["HOME=/private/account", "{\"token\":\"demo-secret\",\"env\":{\"CUSTOM_CREDENTIAL\":\"demo-credential\"}}", "SV1.private-pairing-code"] });
+    log_tail: ["HOME=~", "{\"token\":\"•••\",\"env\":{\"CUSTOM_CREDENTIAL\":\"•••\"}}", "SV1.•••", "Authorization: •••",
+      "fetching sidevoice-core 0.4.2 for aarch64-apple-darwin"] });
+  expect(copied).not.toMatch(/demo-person|demo-secret|demo-credential|private-pairing-code|demo-bearer/);
   expect(copied).not.toContain("raw-token");
   expect(copied).not.toContain("never show native prose");
   expect(copied).not.toContain("demo-user");

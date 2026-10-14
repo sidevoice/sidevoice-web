@@ -513,8 +513,9 @@ test("this computer's Update, done: asked again, and gone once current", async (
   expect(version).toHaveBeenCalledTimes(3);
 });
 
-test("this computer's Update failing: said, with details to copy that leave out what the bridge must not repeat", async () => {
-  const update = vi.fn().mockRejectedValue({ key: "SV1.private-pairing-code", step: "token-secret", params: { check: "archive-link", token: "raw-token" } });
+test("this computer's Update failing: said, with details to copy that leave out what the bridge must not repeat and the installer's log redacted", async () => {
+  const update = vi.fn().mockRejectedValue({ key: "SV1.private-pairing-code", step: "token-secret", params: { check: "archive-link", token: "raw-token" },
+    log_tail: ["staging C:\\Users\\Demo Person\\AppData\\Local\\Sidevoice", "secret=demo-secret", "service exited with code 1"] });
   open({ section: "updates", service: BUNDLED, update });
   const writeText = vi.fn(async (_value: string) => {});
   const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
@@ -526,8 +527,11 @@ test("this computer's Update failing: said, with details to copy that leave out 
     expect(updates().getByRole("button", { name: "Retry updating Sidevoice" })).toBeInTheDocument();
     await act(async () => { fireEvent.click(updates().getByRole("button", { name: "Copy details" })); });
     const copied = writeText.mock.calls[0][0];
-    expect(JSON.parse(copied)).toEqual({ key: "install.unknown", params: { check: "archive-link" } });
-    expect(copied).not.toMatch(/SV1\.private-pairing-code|token-secret|raw-token/);
+    expect(JSON.parse(copied)).toEqual({ key: "install.unknown", params: { check: "archive-link" },
+      log_tail: ["staging ~\\AppData\\Local\\Sidevoice", "secret=•••", "service exited with code 1"] });
+    expect(copied).not.toMatch(/SV1\.private-pairing-code|token-secret|raw-token|Demo Person|demo-secret/);
+    // Copied only: no log line on screen.
+    expect(updates().queryByText(/staging|secret=|exited with code/)).toBeNull();
   } finally {
     if (previous) Object.defineProperty(navigator, "clipboard", previous);
     else Reflect.deleteProperty(navigator, "clipboard");
