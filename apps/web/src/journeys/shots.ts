@@ -3,6 +3,7 @@ import { defaultVoiceSettings } from "../services/voice-settings.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
 import type { UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
+import type { TrialProgress } from "../state/room-types";
 
 /* Every screen the storyboard shows (journeys.html): each a state of the real app, seeded — the room's facts, the
  * setup's record and step, and what to press once it is drawn (Settings open at a section, the transcript, a pairing
@@ -20,6 +21,8 @@ export interface Shot {
   desktop?: Record<string, unknown>;
   /** What is pressed once the page is drawn. */
   after?: (doc: Document) => void | Promise<void>;
+  /** Actions the runtime would bind that do something in this shot (the rest do nothing): a try that listens, say. */
+  actions?: Record<string, (...args: never[]) => unknown>;
   /** The setup's record over the base's (a device set up on this release). */
   record?: Partial<OnboardingRecord>;
   /** The variants this shot shows (VARIANTS). */
@@ -103,6 +106,27 @@ const localBridge = (status: Record<string, unknown>) => ({ state: status, pairi
 const stopped = { ...running, state: "stopped-by-person", reachable: false, installed: false, service: "none" };
 /** No machine yet, and the pairing dialog open. */
 const PAIRING = { pairings: [], callNode: null, machineLinks: {}, pairingOpen: true };
+/** The catalogues with the model `id` not on this device yet. */
+const absent = (id: string) => ({ voiceCatalogue: { state: "ready", error: "", catalogs: CATALOGS.map((catalog) => ({ ...catalog, models: catalog.models.map((model) => model.id !== id ? model
+  : { ...model, installed: false, builds: model.builds?.map((entry) => ({ ...entry, installed: false })) }) })) } });
+const never = () => new Promise(() => {});
+/** The voice steps' tries, as the runtime's actions would run them: listening (the level up) or playing (half the
+ *  sentence heard) until the shot ends, or done — what was heard, how quick. */
+const TRIES = {
+  listening: { tryVoiceSettings: (_task: string, progress: TrialProgress) => { progress.onListening?.(); progress.onLevel?.(0.5); return never(); } },
+  playing: { tryVoiceSettings: (_task: string, progress: TrialProgress) => { progress.onListening?.(); progress.onProgress?.({ from: 0, to: 24 }); return never(); } },
+  heard: { tryVoiceSettings: async (task: string) => task === "stt"
+    ? { text: "Hello, can you hear me?", timings: { ready_ms: 300, recognition_ms: 420 } } : { timings: { ready_ms: 300, first_sound_ms: 320 } } },
+};
+/** The end of turn's try: listening until the shot ends, or a turn whose end it decided 0.9 s into the silence. */
+const TURN_TRIES = {
+  listening: { tryTurnSettings: (progress: TrialProgress) => { progress.onTurnStep?.({ step: "listening", again: false }); progress.onLevel?.(0.5); return never(); } },
+  heard: { tryTurnSettings: (progress: TrialProgress) => {
+    progress.onTurnStep?.({ step: "heard", text: "Can you look at the failing test? I think it's the reconnect one.", endpoint_silence_ms: 900 });
+    // Decided, the try is stopped (cancelVoiceTry): it ends cancelled, with the turn it heard.
+    return new Promise((_, reject) => setTimeout(() => reject({ code: "trial-cancelled" }), 0));
+  } },
+};
 
 export const JOURNEYS: Journey[] = [
   { id: "first-run", title: "First run", note: "The setup, step by step, on a device that has none yet.", shots: [
@@ -120,10 +144,27 @@ export const JOURNEYS: Journey[] = [
     { id: "w3", caption: "Ready here: the agents on this computer, Connect or Disconnect each.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], callNode: null, machineLinks: {} } },
-    { id: "w4", caption: "Transcription: a model not downloaded yet — Continue waits for it; trying is recommended.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
+    { id: "w4", caption: "Transcription, its model not downloaded yet: the try's block already there, its button and the footer's waiting for the model, saying why.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       facts: { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } } } },
-    { id: "w4v", caption: "Voice: a sentence to hear, editable; Listen is optional.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } } },
-    { id: "w5", caption: "When your turn ends: Smart (recommended) or Silence, patience with its timings.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } } },
+    { id: "w4-ready", caption: "Transcription, its model ready: Try it in the try's block and in the footer — recommended, not required.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } } },
+    { id: "w4-listening", caption: "Transcription, listening: the level moving, the take's bar filling; the footer's Stop is the one.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
+      actions: TRIES.listening, after: press("wizard-try") },
+    { id: "w4-heard", caption: "Transcription, tried: what was heard and how quick, Speak again in the block; Continue.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
+      actions: TRIES.heard, after: press("wizard-try") },
+    { id: "w4v-absent", caption: "Voice, its model not downloaded yet: the try's block already there, waiting for the model, saying why.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
+      facts: absent("kokoro-82m-v1.0") },
+    { id: "w4v", caption: "Voice: a sentence to hear, editable; Try it in the try's block and in the footer.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } } },
+    { id: "w4v-playing", caption: "Voice, playing: the sentence lit as it is heard; the footer's Stop is the one.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
+      actions: TRIES.playing, after: press("wizard-try") },
+    { id: "w4v-heard", caption: "Voice, tried: how quick its first sound was, Play again in the block; Continue.", setup: { step: "W4v", record: { basics_done: true, choice: "remote" } },
+      actions: TRIES.heard, after: press("wizard-try") },
+    { id: "w5-absent", caption: "When your turn ends, Smart's model not downloaded yet: the try's block already there, waiting for it, saying why.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } },
+      facts: absent("smart-turn-v3") },
+    { id: "w5", caption: "When your turn ends: Smart (recommended) or Silence, patience with its timings; Try it in the try's block and in the footer.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } } },
+    { id: "w5-listening", caption: "When your turn ends, listening: talk as you would to the agent; the footer's Stop is the one.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } },
+      actions: TURN_TRIES.listening, after: press("wizard-try") },
+    { id: "w5-heard", caption: "When your turn ends, tried: when it decided you had finished; Continue.", setup: { step: "W5", record: { basics_done: true, choice: "remote" } },
+      actions: TURN_TRIES.heard, after: press("wizard-try") },
     { id: "w6", caption: "Ready: into the room.", setup: { step: "W6", record: { basics_done: true, choice: "remote", turn_done: true } } },
   ] },
   { id: "pairing", title: "Pairing a machine", note: "The code pasted in this device; what it says when the code cannot be used.", shots: [

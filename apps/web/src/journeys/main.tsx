@@ -59,8 +59,9 @@ function renderShot(shot: Shot) {
         ? new Promise((_, reject) => setTimeout(() => reject({ key: "install.network", step: "download" }), 0)) : new Promise(noop), { job: "j" }) } : {}),
     } } };
   }
-  // The actions the runtime would bind: here they do nothing, and a pairing code is refused as the shot says.
-  window.sidevoiceActions = new Proxy({}, { get: (_target, name) => name === "pairDevice"
+  // The actions the runtime would bind: here they do nothing — but those the shot gives (a try that listens) — and a
+  // pairing code is refused as the shot says.
+  window.sidevoiceActions = new Proxy({}, { get: (_target, name) => typeof name === "string" && shot.actions?.[name] ? shot.actions[name] : name === "pairDevice"
     ? async () => { throw new Error(shot.pairRefusal ?? "unreachable"); }
     : name === "interfaceLanguage" ? () => "" : () => Promise.resolve(undefined) }) as typeof window.sidevoiceActions;
   const store = createRoomStore();

@@ -86,7 +86,7 @@ function BasicsStep({ t }: { t: Translate }) {
 
 /** When a turn ends, as Settings → Call has it: Smart preselected (where it runs here), Silence the other; patience;
  *  and its try, optional — Continue stays the step's action, and leaving the step (Continue, Back, Later) stops it. */
-function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolean; t: Translate }) {
+function TurnStep({ turnTry, t }: { turnTry: TurnTryHandle; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const catalogue = useRoomStore((state) => state.facts.voiceCatalogue);
   useEffect(() => { if (catalogue.state === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -94,7 +94,7 @@ function TurnStep({ turnTry, tried, t }: { turnTry: TurnTryHandle; tried: boolea
     <p>{t("wizard.turnIntro")}</p>
     {catalogue.state === "failed" ? <Alert tone="danger" live className="voice-catalogue-error" title={catalogue.error} details={catalogue.details} />
       : !catalogueShown(catalogue) || !draft ? <p className="wizard-loading" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("voice.loading")}</p>
-        : <TurnChoices draft={draft} setup turnTry={turnTry} turnTried={tried} />}
+        : <TurnChoices draft={draft} setup turnTry={turnTry} />}
   </section>;
 }
 
@@ -158,8 +158,8 @@ function PrepareStep({ ready, t }: { ready: boolean; t: Translate }) {
 
 type StageTry = SetupTry & { sentence: string; setSentence(value: string): void };
 
-/** A voice step: its slot as Settings has it, the try in the model's block (what it shows and where, the `try-result`
- *  variant's), its first try offered in the footer. The sentence to hear is edited in the block, where it is then lit
+/** A voice step: its slot as Settings has it, the try in its block (what it shows and where, the `try-result`
+ *  variant's) with its own button, there before the model is; the footer offers it too, and is its one Stop. The sentence to hear is edited in the block, where it is then lit
  *  as it is heard (`card`); with the try in its own dialog, beside the block (`dialog`). */
 function StageStep({ task, stage, t }: { task: "stt" | "tts"; stage: StageTry; t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
@@ -365,7 +365,7 @@ export function Wizard() {
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
-      {step === "W5" && <TurnStep turnTry={turnTry} tried={turnTried} t={t} />}
+      {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
       {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
       {ready && error && <Alert tone="danger" live className="wizard-ready-error" title={error} />}
     </div>

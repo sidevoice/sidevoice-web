@@ -166,8 +166,9 @@ export function useVoiceTry(task: Task | null, { keep = true, onTried }: { keep?
 /** A try as it is offered: `start` runs it; for the voice, `sentence` is what it says, edited in the try itself. */
 export type VoiceTry = ReturnType<typeof useVoiceTry> & { start(): void; sentence?: string; setSentence?(sentence: string): void };
 
-/** The first-run setup's try, shown in the slot's block: its first one started from the setup's footer, `tried`
- *  already (then the block offers it again), a line before it (`hint`), and the sentence to hear, to edit (`sample`). */
+/** The first-run setup's try, shown in the slot's block: started from the block's button or the setup's footer, which
+ *  stops it (the one Stop); `tried` already (then the block's button says again), a line before it (`hint`), and the
+ *  sentence to hear, to edit (`sample`). */
 export type SetupTry = VoiceTry & { tried: boolean; hint?: string; sample?: ReactNode };
 
 /** Past these, a try is slow for this device: transcribing what was said, or the first sound of a sentence. */
@@ -198,14 +199,20 @@ export function TryTiming({ task, timings, t }: { task: Task; timings: TrialTimi
 const FIRST = { stt: "voice.try.speak", tts: "voice.try.listen" } as const;
 const AGAIN = { stt: "try.speakAgain", tts: "try.listenAgain" } as const;
 
-/** The try's button, beside a ready model's state: try it, Stop while it runs, then again. `offered`: shown at all,
- *  running or not (the first-run setup offers the first one in its footer, and stops it there); `again`: tried
- *  already, before this visit. */
-export function TryButton({ task, handle, id, offered = true, again = false, t }: { task: Task; handle: VoiceTry; id: string; offered?: boolean; again?: boolean; t: Translate }) {
+/** The try's button, first in its block whether or not the try can run: try it, Stop while it runs, then again.
+ *  `reason`: why it cannot run now (its model not ready), said by the text `reasonId` names — the button stays reachable
+ *  and reads it. `stopsElsewhere`: the first-run setup's, whose footer is the one Stop; here a try running is only
+ *  said (busy). `again`: tried already, before this visit. */
+export function TryButton({ task, handle, id, again = false, reason = "", reasonId, stopsElsewhere = false, t }: {
+  task: Task; handle: VoiceTry; id: string; again?: boolean; reason?: string; reasonId?: string; stopsElsewhere?: boolean; t: Translate;
+}) {
   const running = handle.trial.phase === "running";
-  if (!offered) return null;
-  return <Button size="sm" id={id} onClick={running ? handle.finish : handle.start}>
-    {running ? t("try.stop") : t(again || handle.trial.phase !== "idle" ? AGAIN[task] : FIRST[task])}
+  // While it runs, the label it was pressed with (a first try is still one).
+  const label = t(again || (!running && handle.trial.phase !== "idle") ? AGAIN[task] : FIRST[task]);
+  if (running && stopsElsewhere) return <Button size="sm" id={id} loading>{label}</Button>;
+  const blocked = !running && !!reason;
+  return <Button size="sm" id={id} disabled={blocked} blockedBy={blocked ? reasonId : undefined} onClick={running ? handle.finish : handle.start}>
+    {running ? t("try.stop") : label}
   </Button>;
 }
 
@@ -362,7 +369,7 @@ function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
   </div>;
 }
 
-/** What a try shows in a ready model's block, under its state: all of it. `hint`: a line before any try (the first-run
+/** What a try shows in its block, after the slot's settings: all of it, the same whether or not the model is ready. `hint`: a line before any try (the first-run
  *  setup's); `sample`: the sentence to hear, edited in the block. */
 export function TryPanel({ task, handle, model, hint, sample, button, t }: { task: Task; handle: VoiceTry; model: string; hint?: string; sample?: ReactNode; button?: ReactNode; t: Translate }) {
   const { trial } = handle;

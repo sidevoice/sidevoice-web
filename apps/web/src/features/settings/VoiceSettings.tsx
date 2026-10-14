@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRoomStore } from "../../state/room-store";
 import { Select, type SelectOption } from "../../components/ui/Select";
 import { Button } from "../../components/ui/Button";
@@ -159,7 +159,13 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
   const [sentence, setSentence] = useState(() => t("wizard.sampleText"));
   const handle: VoiceTry | null = setupTry ?? (setup ? null : { ...own, start: () => void own.run(task === "stt" ? {} : { text: sentence.trim(), language: tryLanguage }),
     ...(task === "tts" ? { sentence, setSentence } : {}) });
-  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-try-again" : task + "-try"} offered={!setupTry || setupTry.tried} again={setupTry?.tried} t={t} />;
+  // Why the try cannot run now, in the words the setup's footer uses: its model not ready, no sentence to say. Said in
+  // the try's block, which the setup shows whether or not the model is ready (Settings, once it is).
+  const reasonId = useId();
+  const tryReason = !model.model || !model.ready ? t(task === "stt" ? "settings.save.waitTranscription" : "settings.save.waitVoice")
+    : setupTry && task === "tts" && !setupTry.sentence?.trim() ? t("wizard.wait.sentence") : "";
+  const tryButton = handle && <TryButton task={task} handle={handle} id={setupTry ? "wizard-card-try" : task + "-try"} again={setupTry?.tried}
+    reason={tryReason} reasonId={reasonId} stopsElsewhere={!!setupTry} t={t} />;
   const tryPanel = handle && <TryPanel task={task} handle={handle} model={draft[task].model} hint={setupTry?.hint} sample={setupTry?.sample} button={tryButton} t={t} />;
   const voices = task === "tts" ? choices.tts.voices : [];
   const speed = task === "tts" ? choices.tts.speed : null;
@@ -200,11 +206,13 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
           <output id="tts-speed-value" htmlFor="tts-speed">{draft.tts.speed.toFixed(2)}×</output>
         </span>
       </Row>}
-      {/* The try, last, after all of the slot's settings: the same place and the same block as End of turn's. */}
-      {model.ready && handle && <Row label={t(task === "stt" ? "try.title.stt" : "try.title.tts")} block>
+      {/* The try, last, after all of the slot's settings: the same place and the same block as End of turn's. In the
+          setup there before its model is, its button waiting for it and saying why, so the step looks the same. */}
+      {handle && (model.ready || setup) && <Row label={t(task === "stt" ? "try.title.stt" : "try.title.tts")} block>
         <div className="turn-try turn-try-card" id={task + "-try-block"}>
           {/* Each try lays out its own button, beside its level (SttTry, TtsTry). */}
           {tryPanel}
+          {tryReason && handle.trial.phase !== "running" && <p className="turn-try-reason" id={reasonId}>{tryReason}</p>}
         </div>
       </Row>}
       <p ref={announce} className="sr-only" role="status">{keyNote}</p>
@@ -228,7 +236,7 @@ export function SpeechChoices({ draft, setup = false, trial }: SlotProps) {
  *  smart model when it runs here (else why not); and a try of both together (TurnTry), in a card of its own after
  *  the choices. `setup`: the first-run setup's;
  *  `active`: in sight (Settings' section on show), a try that runs stopping when it is not. */
-export function TurnChoices({ draft, setup = false, active = true, turnTry, turnTried }: { draft: Settings; setup?: boolean; active?: boolean; turnTry?: TurnTryHandle; turnTried?: boolean }) {
+export function TurnChoices({ draft, setup = false, active = true, turnTry }: { draft: Settings; setup?: boolean; active?: boolean; turnTry?: TurnTryHandle }) {
   const t = translator();
   const choices = useChoices(draft);
   const patience: { value: Settings["patience"]; label: MessageKey; hint: MessageKey }[] = [
@@ -246,7 +254,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry, turn
   const turnPending = saved && (saved.end_of_turn !== "smart-turn" || saved.turn_model !== draft.turn_model)
     ? t(saved.end_of_turn === "smart-turn" ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: saved.turn_model ?? "" }) : undefined;
   // In the same place whichever end of turn is chosen, so switching keeps a try that runs, and the focus.
-  const tryIt = <TurnTry draft={draft} smart={smart} smartReady={turn.ready} setup={setup} active={active} handle={turnTry} tried={turnTried} />;
+  const tryIt = <TurnTry draft={draft} smart={smart} smartReady={turn.ready} setup={setup} active={active} handle={turnTry} />;
   return (
     <Group title={t("settings.call.turn")}>
       <Row label={<>{t("voice.patience")}<InfoTip label={t("voice.patience.infoLabel")}>{t("voice.patience.info")}</InfoTip></>} description={t(current.hint)}>
