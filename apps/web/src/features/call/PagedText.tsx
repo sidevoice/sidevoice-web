@@ -23,8 +23,8 @@ export function PagedText({ children, measure, onPages, follow }: { children: Re
     setStep(height); setPages(count);
     if (!follow) { setPage(0); onPages?.(count); }
   }, [measure]); // eslint-disable-line react-hooks/exhaustive-deps
-  // An open visual variant can change the bubble's font and width while its turn stays mounted.
-  // Follow that layout change so all three lines remain a whole page after a live switch.
+  // A reflow while the turn stays mounted (the face arriving after a fallback, a resize, a turned phone) can change the
+  // bubble's lines: follow it, so a page stays three whole lines.
   useLayoutEffect(() => {
     const node = box.current, inner = run.current;
     if (!node || !inner) return;

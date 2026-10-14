@@ -69,26 +69,6 @@ function viewport({ narrow = false, crowded = false }) {
 }
 const escape = () => act(() => { fireEvent.keyDown(document, { key: "Escape" }); });
 
-test("bubble choices switch live without remounting the current turn and expose translated metadata", () => {
-  const store = room({ userLive: true, userTurn: { id: "u-variant", segment: "turn:u-variant", thread: "fp-1|t-login" }, pendingPhase: "listening" });
-  const layout = document.querySelector<HTMLElement>(".call-layout")!;
-  const turn = layout.querySelector(".person-bubble")!;
-  expect(layout.dataset.bubblesStyle).toBe("current");
-  const metadata = JSON.parse(layout.dataset.bubblesVariants!);
-  expect(metadata.values.map((option: { value: string }) => option.value)).toEqual(["current", "soft", "illustrated", "panel"]);
-  expect(metadata.label).toBe("Voice and message bubbles");
-  for (const style of ["soft", "illustrated", "panel", "current"]) {
-    localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "bubbles-style": style }));
-    act(() => window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })));
-    expect(layout.dataset.bubblesStyle).toBe(style);
-    expect(layout.querySelector(".person-bubble")).toBe(turn);
-  }
-  localStorage.setItem(VARIANTS_KEY, JSON.stringify({ "bubbles-style": "unknown" }));
-  act(() => window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })));
-  expect(layout.dataset.bubblesStyle).toBe("current");
-  patch(store, { pendingPhase: "" });
-});
-
 test("the stage plays what the agent says as a karaoke bubble, the whole reply in pages that follow the voice", () => {
   const store = room({ botLive: true, karaokeState: { segment: "h-2", from: 57, to: 57 } });
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");

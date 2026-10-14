@@ -12,13 +12,10 @@ const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
 
-/** Only call bubbles change their brush; settings tries retain the shipped waveform. */
-export function waveformBrush(node: HTMLElement): { pitch: number; width: number; shape: "round" | "block" | "segments" } {
-  const style = node.closest<HTMLElement>(".call-layout")?.dataset.bubblesStyle;
-  if (style === "soft") return { pitch: 8, width: 5, shape: "round" };
-  if (style === "illustrated") return { pitch: 9, width: 6, shape: "block" };
-  if (style === "panel") return { pitch: 8, width: 2, shape: "segments" };
-  return { pitch: CELL, width: BAR, shape: "round" };
+/** The call's bubbles draw wider, rounder bars on their pill (the soft cards, 2026-10-14); a settings try keeps the
+ *  fine ones its row is sized for. */
+export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
+  return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
 }
 
 export type WaveformPhase = "listening" | "transcribing";
@@ -72,7 +69,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     let width = 1;
     let height = 1;
     let ink = "currentColor";
-    let brush = waveformBrush(node);
+    const brush = waveformBrush(node);
 
     const size = () => {
       const ratio = window.devicePixelRatio || 1;
@@ -89,7 +86,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     const paint = () => {
       const capacity = Math.max(1, Math.floor(width / brush.pitch));
       const values = columns.current;
-      while (values.length > Math.max(1, Math.floor(width / CELL))) values.shift();
+      while (values.length > capacity) values.shift();
       const middle = height / 2;
       const span = Math.max(FLOOR, height - 2);
       context.clearRect(0, 0, width, height);
@@ -100,9 +97,7 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
         const bar = Math.max(FLOOR, value * span);
         const x = width - brush.width - slot * brush.pitch;
         const y = middle - bar / 2;
-        if (brush.shape === "segments") {
-          for (let segment = y; segment < y + bar; segment += 5) context.rect(x, segment, brush.width, Math.min(3, y + bar - segment));
-        } else if (context.roundRect) context.roundRect(x, y, brush.width, bar, brush.shape === "block" ? 1.5 : brush.width / 2);
+        if (context.roundRect) context.roundRect(x, y, brush.width, bar, brush.width / 2);
         else context.rect(x, y, brush.width, bar);
       }
       context.fill();
@@ -110,11 +105,9 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
     const observer = new ResizeObserver(() => { size(); paint(); });
     observer.observe(node);
-    // A live variant or theme switch repaints the existing samples, even when transcribing is frozen.
-    const refresh = () => { brush = waveformBrush(node); ink = window.getComputedStyle?.(node).color || ink; paint(); };
+    // A theme switch repaints the samples in the new ink, even when transcribing has frozen them.
+    const refresh = () => { ink = window.getComputedStyle?.(node).color || ink; paint(); };
     const mutation = new MutationObserver(refresh);
-    const room = node.closest(".call-layout");
-    if (room) mutation.observe(room, { attributes: true, attributeFilter: ["data-bubbles-style"] });
     mutation.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     size();
     paint();

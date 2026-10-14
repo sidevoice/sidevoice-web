@@ -7,12 +7,6 @@ export const name = "Polski";
 
 export const messages: Messages = {
   // The shared components.
-  "variants.bubbles.title": "Paski głosu i dymki wiadomości",
-  "variants.bubbles.note": "Otwarta kwestia: porównaj trzy style z obecnym wyglądem.",
-  "variants.bubbles.current": "Obecny wygląd",
-  "variants.bubbles.soft": "A · Miękkie karty",
-  "variants.bubbles.illustrated": "B · Ilustrowane dymki",
-  "variants.bubbles.panel": "C · Panele rozmowy",
   "ui.close": "Zamknij",
   "ui.closeNamed": "Zamknij: {name}",
   "ui.loading": "Przetwarzanie…",

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("proposed bubbles keep interrupted replies distinct in both themes", async ({ page }) => {
+test("a reply cut off keeps its mark over the soft card's shadow, in both themes", async ({ page }) => {
   await page.goto("/voice/");
   await page.evaluate(() => {
     const host = document.createElement("div");
@@ -10,27 +10,15 @@ test("proposed bubbles keep interrupted replies distinct in both themes", async 
       <div class="chat-bubble" data-role="user" data-position="only">Person</div>`;
     document.body.append(host);
   });
-  for (const theme of ["light", "dark"]) for (const proposal of ["soft", "illustrated", "panel"]) {
-    const paints = await page.evaluate(({ theme, proposal }) => {
+  for (const theme of ["light", "dark"]) {
+    const paints = await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
-      const host = document.querySelector(".call-layout");
-      host.dataset.bubblesStyle = proposal;
-      const [complete, interrupted, person] = host.querySelectorAll(".chat-bubble");
-      return {
-        complete: getComputedStyle(complete).boxShadow,
-        interrupted: getComputedStyle(interrupted).boxShadow,
-        outline: getComputedStyle(interrupted).outlineStyle,
-        agentTail: getComputedStyle(complete, "::after").content,
-        personTail: getComputedStyle(person, "::after").content,
-      };
-    }, { theme, proposal });
-    expect(paints.interrupted, `${theme}/${proposal}`).not.toBe(paints.complete);
-    expect(paints.interrupted, `${theme}/${proposal}`).toContain("inset");
-    if (proposal === "panel") expect(paints.outline).toBe("dashed");
-    if (proposal === "illustrated") {
-      expect(paints.agentTail).toBe('""');
-      expect(paints.personTail).toBe('""');
-    }
+      const [complete, interrupted] = document.querySelectorAll(".call-layout .chat-bubble");
+      return { complete: getComputedStyle(complete).boxShadow, interrupted: getComputedStyle(interrupted).boxShadow };
+    }, theme);
+    expect(paints.complete, theme).not.toBe("none");
+    expect(paints.interrupted, theme).not.toBe(paints.complete);
+    expect(paints.interrupted, theme).toContain("inset");
   }
 });
 
@@ -73,14 +61,11 @@ test("transcribing bars keep 3:1 contrast at the pulse minimum and with reduced 
     const [high, low] = [luminance(mixed), luminance(b)].sort((x, y) => y - x);
     return (high + .05) / (low + .05);
   };
-  for (const theme of ["light", "dark"]) for (const proposal of ["soft", "illustrated", "panel"]) {
-    await page.evaluate(({ theme, proposal }) => {
-      document.documentElement.dataset.theme = theme;
-      document.querySelector(".call-layout").dataset.bubblesStyle = proposal;
-    }, { theme, proposal });
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
     for (const reduced of [false, true]) {
       const colors = await paint(reduced);
-      expect(ratio(colors), `${theme}/${proposal}/${reduced ? "reduced" : "pulse"}: ${JSON.stringify(colors)}`).toBeGreaterThanOrEqual(3);
+      expect(ratio(colors), `${theme}/${reduced ? "reduced" : "pulse"}: ${JSON.stringify(colors)}`).toBeGreaterThanOrEqual(3);
     }
   }
 });

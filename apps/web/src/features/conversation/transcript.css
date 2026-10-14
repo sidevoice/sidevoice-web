@@ -48,15 +48,17 @@
 
 /* ----- a bubble: the agent's at the left, the person's at the right, each in the chat's colours (theme.css --sv-chat-*:
  * a fill, its text, its quieter text, which what the bubble holds reads as the theme's); the corner at a run's foot,
- * beside the face, is the tight one */
+ * beside the face, is the tight one. Soft cards (decided 2026-10-14), as on the stage: round, lifted by a low shadow,
+ * the agent's parted from the panel by an edge. */
 .chat-bubble {
   --sv-text: var(--sv-chat-agent-fg); --sv-text-subtle: var(--sv-chat-agent-subtle);
-  position: relative; min-width: 0; max-width: min(80%, 34rem); padding: 10px 14px 6px;
-  border-radius: var(--sv-radius-xl); background: var(--sv-chat-agent-bg); color: var(--sv-text);
+  position: relative; min-width: 0; max-width: min(86%, 34rem); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-2);
+  border-radius: var(--sv-radius-2xl); background: var(--sv-chat-agent-bg); color: var(--sv-text); box-shadow: var(--sv-bubble-shadow);
   font-size: 1rem; line-height: 1.5rem; white-space: pre-wrap; overflow-wrap: anywhere;
 }
+.chat-bubble[data-role="assistant"] { border: 1px solid var(--sv-bubble-edge); }
 /* Without a meta line (a draft has no time yet) the text sits in the middle. */
-.chat-bubble:not(:has(> .chat-meta)) { padding-bottom: 10px; }
+.chat-bubble:not(:has(> .chat-meta)) { padding-bottom: var(--sv-space-3); }
 /* The person's, here and on the call's stage (call-view.css .person-bubble): one rule, so the two never differ. */
 .chat-bubble[data-role="user"], .person-bubble {
   --sv-text: var(--sv-chat-person-fg); --sv-text-subtle: var(--sv-chat-person-subtle); background: var(--sv-chat-person-bg); color: var(--sv-text);
@@ -69,10 +71,10 @@
   --sv-danger: var(--sv-chat-person-danger); --sv-disabled-text: var(--sv-chat-person-quiet);
   --sv-hover: var(--sv-chat-person-wash); --sv-pressed: var(--sv-chat-person-wash); --sv-accent-soft: var(--sv-chat-person-wash); --sv-danger-soft: var(--sv-chat-person-wash);
 }
-.chat-bubble[data-role="assistant"]:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: var(--sv-radius-xs); }
-.chat-bubble[data-role="user"]:is([data-position="last"], [data-position="only"]) { border-bottom-right-radius: var(--sv-radius-xs); }
-/* Cut off while it played: a bar in the voice's colour down its edge. */
-.chat-bubble[data-interrupted] { box-shadow: inset 3px 0 0 var(--sv-voice); }
+.chat-bubble[data-role="assistant"]:is([data-position="last"], [data-position="only"]) { border-bottom-left-radius: var(--sv-radius-sm); }
+.chat-bubble[data-role="user"]:is([data-position="last"], [data-position="only"]) { border-bottom-right-radius: var(--sv-radius-sm); }
+/* Cut off while it played: a bar in the voice's colour down its edge, over the card's own shadow. */
+.chat-bubble[data-interrupted] { box-shadow: inset 3px 0 0 var(--sv-voice), var(--sv-bubble-shadow); }
 /* Not sent yet: what is being said, still open, has a dashed edge and quieter text. */
 .chat-bubble[data-draft]:not([data-live]) { color: var(--sv-text-muted); outline: 1px dashed var(--sv-border-strong); outline-offset: -1px; }
 
@@ -85,7 +87,7 @@
 .chat-meta .ui-button.listen-again { width: 22px; height: 22px; border-radius: 50%; color: var(--sv-text-subtle); }
 .chat-meta .ui-button.listen-again svg { width: 12px; height: 12px; }
 /* Small to the eye, not to a finger: its tap area reaches past what it draws. */
-.chat-meta .ui-button.listen-again::after { content: ""; position: absolute; inset: -6px; }
+.chat-meta .ui-button.listen-again::after { content: ""; position: absolute; inset: -11px; }
 .chat-meta .receipt { display: inline-flex; color: var(--sv-text-subtle); }
 .chat-meta .receipt[data-state="read"] { color: var(--sv-accent-text); }
 /* Written but never acknowledged: a quieter grey than delivered, still 3:1 on the bubble (an opacity fell under it). */
@@ -95,10 +97,15 @@
 
 /* Cancelling belongs to the bubble, not beside it: its own line, at the end, in the danger colour and without a frame. */
 .chat-bubble .ui-button.cancel-input { display: flex; width: max-content; height: 28px; margin: var(--sv-space-1) calc(-1 * var(--sv-space-2)) 0 auto; padding: 0 var(--sv-space-2); }
+/* Small to the eye, not to a finger, here and on the stage. */
+:is(.person-bubble, .chat-bubble) .cancel-input::after { content: ""; position: absolute; inset: -6px; }
 
 /* The open turn is the microphone's own waveform, on the person's bubble. */
-.chat-bubble[data-live] { padding: var(--sv-space-2) var(--sv-space-3) 6px; }
-.chat-bubble[data-live] :is(.voice-wave, .voice-bars) { color: var(--sv-accent); }
+.chat-bubble[data-live] { padding: var(--sv-space-2) var(--sv-space-3); }
+/* The open turn's waveform, here and on the stage, on a pill in the voice's own colours: the person speaking. */
+:is(.person-bubble, .chat-bubble[data-live]) .voice-wave { box-sizing: content-box; padding: var(--sv-space-1) var(--sv-space-2); }
+:is(.person-bubble, .chat-bubble[data-live]) .voice-bars { box-sizing: content-box; padding: var(--sv-space-1-5) 10px; }
+:is(.person-bubble, .chat-bubble[data-live]) :is(.voice-wave, .voice-bars) { border-radius: var(--sv-radius-lg); background: var(--sv-voice-soft); color: var(--sv-voice-text); }
 
 /* The conversation is working on your turn: three dots in the agent's bubble. */
 .chat-bubble.thinking { display: inline-flex; align-items: center; height: 36px; padding: 0 var(--sv-space-4); color: var(--sv-text-muted); }
@@ -157,13 +164,13 @@
  * colour): the open turn's waveform, the karaoke of a reply, the thinking dots */
 .voice-wave { display: block; width: min(13rem, 44vw); height: 2.15rem; }
 .voice-wave canvas { display: block; width: 100%; height: 100%; }
-/* Transcribing keeps the turn's last frame, breathing. */
+/* Transcribing keeps the turn's last frame, breathing: quieter, and 3:1 still at its faintest. */
 .voice-wave[data-phase="transcribing"] canvas { animation: voice-wave-rest 1.9s ease-in-out infinite; }
-@keyframes voice-wave-rest { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes voice-wave-rest { 0%, 100% { opacity: 1; } 50% { opacity: .8; } }
 /* What a device that asks for less motion sees instead: still bars, dimmer while transcribing. */
 .voice-bars { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 2px; }
 .voice-bars i { display: block; width: 3px; height: 12px; border-radius: 2px; background: currentColor; }
-.voice-bars[data-phase="transcribing"] i { opacity: .55; }
+.voice-bars[data-phase="transcribing"] i { opacity: .8; }
 
 /* The part already spoken in the text's colour, the rest quieter; all of it quiet before the voice says where it is. */
 .karaoke-text { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -179,7 +186,7 @@
 @keyframes thinking-dot { 0%, 60%, 100% { opacity: .7; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-wave[data-phase="transcribing"] canvas { animation: none; opacity: .6; }
+  .voice-wave[data-phase="transcribing"] canvas { animation: none; opacity: .8; }
   .thinking-dots i { animation: none; opacity: .7; }
 }
 

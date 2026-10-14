@@ -7,12 +7,6 @@ export const name = "English";
 
 export const messages = {
   // The shared components.
-  "variants.bubbles.title": "Voice and message bubbles",
-  "variants.bubbles.note": "Open question: compare the three styles with the current look.",
-  "variants.bubbles.current": "Current look",
-  "variants.bubbles.soft": "A · Soft cards",
-  "variants.bubbles.illustrated": "B · Illustrated balloons",
-  "variants.bubbles.panel": "C · Speech panels",
   "ui.close": "Close",
   "ui.closeNamed": "Close {name}",
   "ui.loading": "Working…",

@@ -7,12 +7,6 @@ export const name = "Italiano";
 
 export const messages: Messages = {
   // The shared components.
-  "variants.bubbles.title": "Barre vocali e fumetti",
-  "variants.bubbles.note": "Scelta aperta: confronta i tre stili con l’aspetto attuale.",
-  "variants.bubbles.current": "Aspetto attuale",
-  "variants.bubbles.soft": "A · Schede morbide",
-  "variants.bubbles.illustrated": "B · Fumetti illustrati",
-  "variants.bubbles.panel": "C · Pannelli di dialogo",
   "ui.close": "Chiudi",
   "ui.closeNamed": "Chiudi {name}",
   "ui.loading": "Elaborazione…",
