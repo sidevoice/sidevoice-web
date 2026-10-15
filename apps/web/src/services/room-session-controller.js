@@ -1622,7 +1622,8 @@ function attachVoice(next){
  window.sidevoiceUI?.playbackLevel?.clear?.();
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
  voiceListeners.push(next.onPlaybackLevel(level=>{if(voice===next)voicePlaybackLevel(level)}));
- voiceListeners.push(next.onAgentInterrupted(cut=>{
+ // Preview only, until web#140 (voice 0.5.0) replaces this: voice 0.4.0 has no onAgentInterrupted.
+ if(next.onAgentInterrupted)voiceListeners.push(next.onAgentInterrupted(cut=>{
   const coreId=handleIds.get(cut.utterance_id),said=coreId&&replies.get(coreId);
   if(!said)return;
   const heard=scalarExtent(said.reply.text,cut.heard_until);
