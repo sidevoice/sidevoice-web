@@ -1214,6 +1214,8 @@ export const messages: Messages = {
   "messages.audio.skipped": "Ignoré",
   "session.audio.reason.agents_muted": "Agents en sourdine",
   "session.audio.reason.voice_off": "Réponses vocales désactivées",
+  "session.audio.reason.inactive_conversation": "Vous étiez dans une autre conversation",
+  "session.audio.reason.disconnected": "L’appel était déconnecté",
   "session.audio.reason.connector_disconnected": "Connexion interrompue",
   "session.audio.reason.heard_elsewhere": "Écouté sur un autre appareil",
   "room.failure.replayUnavailable": "La lecture est indisponible quand les réponses vocales sont désactivées ou que vous parlez.",

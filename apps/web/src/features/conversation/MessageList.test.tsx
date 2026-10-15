@@ -81,6 +81,24 @@ test("T14 partial and unknown playback failures explain failure without claiming
   expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown"]);
   expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual(["Playback failed", "Playback failed"]);
 });
+test("F8 core admission reasons for inactive and disconnected audiences are explained", () => {
+  const rows = ["inactive_conversation", "disconnected"].map((audio_reason) => {
+    const core = { audio: "text_only", audio_reason, globally_heard: false };
+    return message({ ...core, text: audio_reason, audioNote: audioNote(core) });
+  });
+  const { container } = render(<MessageList conversation={view(rows)} />);
+  expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual([
+    "No audio · You were in another conversation", "No audio · The call was disconnected",
+  ]);
+});
+
+test("F9 a manually heard text-only reply no longer claims it was not played", () => {
+  const core = { audio: "text_only", audio_reason: "voice_off", heard_chars: 6, globally_heard: true, replayable: false };
+  const { container } = render(<MessageList conversation={view([message({ segment: "manual-heard", text: "Answer", ...core, audioNote: audioNote(core) })])} />);
+  expect(container.querySelector(".audio-fate-mark")).toBeNull();
+  expect(container.querySelector(".chat-audio-note")).toBeNull();
+  expect(screen.getByRole("article", { name: "Agente: Answer" })).toBeInTheDocument();
+});
 
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {
   const { container } = render(<MessageList conversation={view([message({ segment: "voice", text: "Respuesta activa ahora", playback: "playing", karaoke: { from: 10, to: 16 } })], "Sigo hablando…")} />);

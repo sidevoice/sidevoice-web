@@ -1217,6 +1217,8 @@ export const messages: Messages = {
   "messages.audio.skipped": "Übersprungen",
   "session.audio.reason.agents_muted": "Agenten waren stummgeschaltet",
   "session.audio.reason.voice_off": "Gesprochene Antworten waren aus",
+  "session.audio.reason.inactive_conversation": "Du warst in einem anderen Gespräch",
+  "session.audio.reason.disconnected": "Der Anruf war getrennt",
   "session.audio.reason.connector_disconnected": "Verbindung unterbrochen",
   "session.audio.reason.heard_elsewhere": "Auf einem anderen Gerät gehört",
   "room.failure.replayUnavailable": "Während gesprochene Antworten aus sind oder du sprichst, ist die Wiedergabe nicht verfügbar.",

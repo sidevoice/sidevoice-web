@@ -1252,6 +1252,8 @@ export const messages = {
   "messages.audio.skipped": "Skipped",
   "session.audio.reason.agents_muted": "Agents were muted",
   "session.audio.reason.voice_off": "Spoken replies were off",
+  "session.audio.reason.inactive_conversation": "You were in another conversation",
+  "session.audio.reason.disconnected": "The call was disconnected",
   "session.audio.reason.connector_disconnected": "The connection dropped",
   "session.audio.reason.heard_elsewhere": "Heard on another device",
   "room.failure.replayUnavailable": "Playback is unavailable while spoken replies are off or you are speaking.",

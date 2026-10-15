@@ -379,7 +379,7 @@ const SAVED_PER_MACHINE=300;
 function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringify(newestPerMachine(state.history,SAVED_PER_MACHINE)))}catch{}}
 function newestPerMachine(rows,limit){
  const counts=new Map(),kept=[];
- for(let i=rows.length-1;i>=0;i--){const node=conversationOf(rows[i].thread)?.node||'',n=(counts.get(node)||0)+1;counts.set(node,n);if(n<=limit)kept.push(rows[i])}
+ for(let i=rows.length-1;i>=0;i--){const row=rows[i],node=conversationOf(row.thread)?.node||'',n=(counts.get(node)||0)+1;counts.set(node,n);if(n<=limit||row.role==='assistant'&&row.globally_heard===false)kept.push(row)}
  return kept.length===rows.length?rows:kept.reverse();
 }
 // The conversation the call talks to, by its key (machine and thread); the room's own name for it is `targetThread`.

@@ -1214,6 +1214,8 @@ export const messages: Messages = {
   "messages.audio.skipped": "已跳过",
   "session.audio.reason.agents_muted": "智能体已静音",
   "session.audio.reason.voice_off": "语音回复已关闭",
+  "session.audio.reason.inactive_conversation": "你当时在另一个对话中",
+  "session.audio.reason.disconnected": "通话已断开连接",
   "session.audio.reason.connector_disconnected": "连接已断开",
   "session.audio.reason.heard_elsewhere": "已在另一台设备上收听",
   "room.failure.replayUnavailable": "语音回复关闭或你正在说话时，无法播放。",

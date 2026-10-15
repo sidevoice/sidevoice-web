@@ -1215,6 +1215,8 @@ export const messages: Messages = {
   "messages.audio.skipped": "スキップしました",
   "session.audio.reason.agents_muted": "エージェントはミュート中でした",
   "session.audio.reason.voice_off": "音声返信はオフでした",
+  "session.audio.reason.inactive_conversation": "別の会話を選択していました",
+  "session.audio.reason.disconnected": "通話が切断されていました",
   "session.audio.reason.connector_disconnected": "接続が切れました",
   "session.audio.reason.heard_elsewhere": "別の端末で再生済み",
   "room.failure.replayUnavailable": "音声返信がオフの間、またはあなたが話している間は再生できません。",

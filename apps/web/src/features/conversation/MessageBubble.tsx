@@ -25,17 +25,17 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
   const total = [...message.text].length;
-  const audioMark = message.role !== "assistant" ? null : message.audio_reason === "user_skipped" || message.audio === "skipped"
+  const audioMark = message.role !== "assistant" || message.globally_heard ? null : message.audio_reason === "user_skipped" || message.audio === "skipped"
     ? t("messages.audio.skipped")
     : message.audio === "text_only" || message.audio_reason === "unheard"
       || message.audio_reason === "newer_turn" && message.heard_chars == null ? t("messages.audio.notPlayed")
       : message.interrupted || message.audio === "failed" || message.audio === "disconnected"
         ? Number.isInteger(message.heard_chars) ? t("messages.audio.partial", { heard: message.heard_chars!, total }) : t("messages.audio.unknown")
         : null;
-  const label = t(message.interrupted ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
+  const label = t(message.interrupted && !message.globally_heard ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
-      data-interrupted={message.interrupted || undefined} aria-label={label}>
+      data-interrupted={message.interrupted && !message.globally_heard || undefined} aria-label={label}>
       <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />
       {message.cancellable && <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">

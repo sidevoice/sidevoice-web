@@ -1235,6 +1235,8 @@ export const messages: Messages = {
   "messages.audio.skipped": "Saltato",
   "session.audio.reason.agents_muted": "Agenti silenziati",
   "session.audio.reason.voice_off": "Risposte vocali disattivate",
+  "session.audio.reason.inactive_conversation": "Eri in un’altra conversazione",
+  "session.audio.reason.disconnected": "La chiamata era disconnessa",
   "session.audio.reason.connector_disconnected": "Connessione interrotta",
   "session.audio.reason.heard_elsewhere": "Ascoltato su un altro dispositivo",
   "room.failure.replayUnavailable": "La riproduzione non è disponibile mentre le risposte vocali sono disattivate o stai parlando.",

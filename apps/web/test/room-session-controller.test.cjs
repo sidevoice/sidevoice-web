@@ -1470,6 +1470,19 @@ test('T06d/e return reconciliation shows only globally unheard rows and no notic
  assert.equal(c.s.run("state.people.find(p=>p.thread_id==='a').unheard"),null);
  c.s.run('disconnect()');
 });
+test('F6 core-retained old unheard reply survives the live and session history caps',async()=>{
+ const c=await callOnRoom();
+ const messages=[{id:'old-miss',thread:'a',role:'assistant',text:'Manual replay remains available',status:'text_only',audio_reason:'voice_off',heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1}];
+ for(let i=2;i<=1001;i++)messages.push({id:'recent-'+i,thread:'a',role:'user',text:'Recent '+i,status:'delivered',time:i,seq:i});
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages})});
+ await c.s.run('refreshHistory()');
+ const old=c.s.run("history.find(row=>row.segment==='old-miss')");
+ assert.equal(old.text,'Manual replay remains available');
+ assert.equal(old.replayable,true);
+ assert.equal(c.s.run('history.length'),1001);
+ assert.ok(JSON.parse(c.store['voice-room-transcript']).some(row=>row.segment==='old-miss'),'session cache retains the miss too');
+ c.s.run('disconnect()');
+});
 test('T11 a delayed transcript keeps its captured focus through a later selection',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('captured'));

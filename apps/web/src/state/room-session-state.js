@@ -453,7 +453,9 @@ export function deliveryNote(r) {
 export function audioNote(r, ahead = 0) {
     // Nothing a person did not hear is repeated by itself: a reply nobody was there for says so, and replaying it
     // is the person's choice.
-    const reasons = { newer_turn: 'newer_turn', user_speaking: 'user_speaking', focus_changed: 'focus_changed', call_ended: 'call_ended', session_changed: 'call_ended', expired_audio_turn: 'expired_audio_turn', queue_full: 'queue_full', user_interrupted: 'user_interrupted', user_skipped: 'user_skipped', playback_failed: 'playback_failed', service_restarted: 'service_restarted', channel_closed: 'channel_closed', agents_muted: 'agents_muted', voice_off: 'voice_off', connector_disconnected: 'connector_disconnected', heard_elsewhere: 'heard_elsewhere' };
+    if (r.globally_heard === true)
+        return '';
+    const reasons = { newer_turn: 'newer_turn', user_speaking: 'user_speaking', focus_changed: 'focus_changed', call_ended: 'call_ended', session_changed: 'call_ended', expired_audio_turn: 'expired_audio_turn', queue_full: 'queue_full', user_interrupted: 'user_interrupted', user_skipped: 'user_skipped', playback_failed: 'playback_failed', service_restarted: 'service_restarted', channel_closed: 'channel_closed', agents_muted: 'agents_muted', voice_off: 'voice_off', connector_disconnected: 'connector_disconnected', inactive_conversation: 'inactive_conversation', disconnected: 'disconnected', heard_elsewhere: 'heard_elsewhere' };
     const reason = reasons[r.audio_reason] ? say('session.audio.reason.' + reasons[r.audio_reason]) : '';
     if (r.audio === 'waiting_for_pause')
         return say('session.audio.waitingForPause');
