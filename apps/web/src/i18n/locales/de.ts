@@ -846,7 +846,7 @@ export const messages: Messages = {
   "data.restarting": "Sidevoice wird beendet, um die Datenlöschung abzuschließen.",
   "data.partial": "Einige Sidevoice-Daten konnten nicht gelöscht werden. Prüfe die folgenden Einträge und versuche es erneut.",
   "data.complete": "Sidevoice-Daten wurden gelöscht. Die Einrichtung beginnt erneut.",
-  "data.stepFailed": "{step} konnte nicht gelöscht werden.",
+  "data.stepFailed": "Löschen fehlgeschlagen: {step}.",
   "data.busy": "Sidevoice ist beschäftigt. Beende den Anruf oder warte auf den laufenden Download oder die Installation.",
   "data.serviceFailed": "Der Sidevoice-Dienst konnte nicht deinstalliert werden. Deine App-Daten bleiben für einen erneuten Versuch erhalten.",
   "data.failed": "Sidevoice konnte das Zurücksetzen nicht starten. Deine App-Daten bleiben erhalten.",

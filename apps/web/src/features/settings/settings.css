@@ -246,6 +246,11 @@
   padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg);
   background: var(--sv-surface); box-shadow: var(--sv-shadow-lg); color: var(--sv-text); }
 .data-reset-result[role="alert"] { border-color: var(--sv-danger); }
+.wizard-dialog > .data-reset-result {
+  position: static; order: -1; flex: none; box-sizing: border-box; width: auto;
+  margin: var(--sv-space-3) var(--sv-space-6) 0; max-height: min(28dvh, 14rem);
+  box-shadow: none;
+}
 .data-reset-result p { margin: 0 0 var(--sv-space-2); }
 .data-reset-result ul { margin: 0 0 var(--sv-space-2); padding-inline-start: 1.25em; }
 .data-reset-dismiss { float: right; margin-inline-start: var(--sv-space-2); }
