@@ -1522,6 +1522,9 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
  socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='voice-session'){if(m.type==='error'){refusal=m.data?refusalError(m.data):refusal;refused=m.data?.reason||refused}message(e.data,socket);return}state.roomInfo=m.data?.room||state.roomInfo;clearTimeout(timer);resolve(m.data)}})}
 function disconnect() {
     window.sidevoiceTelemetry?.endCall?.('left');
+    // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
+    // semantic frames on the live socket before closing it; a lost frame remains unconfirmed.
+    for(const said of replies.values())if(!said.terminal){said.action='call_ended';reportHearing(said,{status:'unplayed'})}
     // A hang-up ends what the call still owed its session.
     outbox.clear();
     writtenHearing.clear();

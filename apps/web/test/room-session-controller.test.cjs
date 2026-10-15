@@ -1466,6 +1466,15 @@ test('T06b–c/T07 output, focus and disconnect choices report not_heard indepen
   c.s.run('disconnect()');
  }
 });
+test('T07 deliberate hang-up offers a not_heard decision for a pending reply before closing',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'hangup',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:hangup',text:'Answer'}});
+ const handle=c.voice.said[0];
+ c.s.run('disconnect()');
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome,d.heard_chars??null])),[['s1:voice:hangup','not_heard',null]]);
+ assert.equal(handle.cancelled,false,'the voice host is stopped with the call, not replayed');
+ assert.equal(c.s.run('outbox.size'),0,'the ended session does not retry a receipt under a new one');
+});
 test('T16 a written muted reply gets one reliable semantic receipt without an audio handle',async()=>{
  const c=await callOnRoom();
  const row={id:'s1:voice:written',thread:'a',role:'assistant',text:'Written only',status:'text_only',audio_reason:'agents_muted',hearing:null,hearing_unconfirmed:true,heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
