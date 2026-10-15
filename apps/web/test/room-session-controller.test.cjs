@@ -15,8 +15,8 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
  // Each module the controller imports becomes one object in the context, and its import line a destructuring of it;
  // a JSON import is its content. A TypeScript module is transpiled here.
- const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock'};
- const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts'};
+ const modules={'./device-name-rules.js':'DeviceNameRules','../services/device-name-rules.js':'DeviceNameRules','./refusals.js':'Refusals','../state/room-session-state.js':'SessionState','./rendezvous.js':'Rendezvous','./device-pairing.js':'DevicePairing','../services/device-pairing.js':'DevicePairing','./desktop-host.ts':'DesktopHost','../services/desktop-host':'DesktopHost','./system-language.js':'SystemLanguage','../services/system-language.js':'SystemLanguage','../../services/system-language.js':'SystemLanguage','../state/device-name.ts':'DeviceName','./locales/en':'LocaleEn','../../i18n/locales/en':'LocaleEn','./locales/es':'LocaleEs','../../i18n/locales/es':'LocaleEs','./locales/fr':'LocaleFr','../../i18n/locales/fr':'LocaleFr','./locales/it':'LocaleIt','../../i18n/locales/it':'LocaleIt','./locales/de':'LocaleDe','../../i18n/locales/de':'LocaleDe','./locales/ja':'LocaleJa','../../i18n/locales/ja':'LocaleJa','./locales/zh-Hans':'LocaleZhHans','../../i18n/locales/zh-Hans':'LocaleZhHans','./locales/pl':'LocalePl','../../i18n/locales/pl':'LocalePl','../../i18n/translator':'Translator','../i18n/translator.ts':'Translator','./outbox.js':'Outbox','./host-agents.ts':'HostAgents','./failure-code.js':'FailureCode','./site-storage.js':'SiteStorage','./voice-trial.js':'VoiceTrial','./model-catalogs.js':'ModelCatalogs','./voice-source.ts':'VoiceSource','./voice-module.js':'VoiceModule','./turn-relay.js':'TurnRelay','./voice-room.js':'VoiceRoom','./reply-eligibility.js':'ReplyEligibility','./reply-hearing-policy.js':'HearingPolicy','./voice-settings.js':'VoiceSettings','./call-preferences.ts':'CallPreferences','./model-housekeeping.js':'ModelHousekeeping','../features/settings/error-message.ts':'ErrorMessage','../../services/failure-code.js':'FailureCode','./working-clock.ts':'WorkingClock'};
+ const files={Refusals:sourceRoot+'/services/refusals.js',SessionState:sourceRoot+'/state/room-session-state.js',Rendezvous:sourceRoot+'/services/rendezvous.js',DevicePairing:sourceRoot+'/services/device-pairing.js',DesktopHost:sourceRoot+'/services/desktop-host.ts',SystemLanguage:sourceRoot+'/services/system-language.js',Outbox:sourceRoot+'/services/outbox.js',HostAgents:sourceRoot+'/services/host-agents.ts',DeviceName:sourceRoot+'/state/device-name.ts',LocaleEn:sourceRoot+'/i18n/locales/en.ts',LocaleEs:sourceRoot+'/i18n/locales/es.ts',LocaleFr:sourceRoot+'/i18n/locales/fr.ts',LocaleIt:sourceRoot+'/i18n/locales/it.ts',LocaleDe:sourceRoot+'/i18n/locales/de.ts',LocaleJa:sourceRoot+'/i18n/locales/ja.ts',LocaleZhHans:sourceRoot+'/i18n/locales/zh-Hans.ts',LocalePl:sourceRoot+'/i18n/locales/pl.ts',Translator:sourceRoot+'/i18n/translator.ts',FailureCode:sourceRoot+'/services/failure-code.js',SiteStorage:sourceRoot+'/services/site-storage.js',VoiceTrial:sourceRoot+'/services/voice-trial.js',ModelCatalogs:sourceRoot+'/services/model-catalogs.js',VoiceSource:sourceRoot+'/services/voice-source.ts',VoiceModule:sourceRoot+'/services/voice-module.js',TurnRelay:sourceRoot+'/services/turn-relay.js',VoiceRoom:sourceRoot+'/services/voice-room.js',ReplyEligibility:sourceRoot+'/services/reply-eligibility.js',HearingPolicy:sourceRoot+'/services/reply-hearing-policy.js',VoiceSettings:sourceRoot+'/services/voice-settings.js',CallPreferences:sourceRoot+'/services/call-preferences.ts',ModelHousekeeping:sourceRoot+'/services/model-housekeeping.js',DeviceNameRules:sourceRoot+'/services/device-name-rules.js',ErrorMessage:sourceRoot+'/features/settings/error-message.ts',WorkingClock:sourceRoot+'/services/working-clock.ts'};
  const imports=(source,dir)=>source.replace(/^import (\w+) from ['"](.*\.json)['"][^;]*;\n/gm,(_,name,from)=>'const '+name+'='+fs.readFileSync(require('node:path').resolve(dir,from),'utf8')+';\n')
   .replace(/^import \{(.*)\} from ['"](.*)['"];\n/gm,(_,names,from)=>'const {'+names.replace(/ as /g,':')+'}='+modules[from]+';\n');
  // In dependency order: a module may import one listed before it.
@@ -1270,7 +1270,8 @@ test('T04 and T12 keep FIFO after skip, with no epoch change',async()=>{
  c.voice.said[0].step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'cancelled'}});
  assert.deepEqual(c.voice.said.map(s=>s.text),['first','second']);
  assert.equal(c.s.run("threadEpochs.get('a')"),0);
- assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[['user_skipped',1]]);
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[[null,1]]);
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.utterance_id,d.outcome,d.heard_chars??null])),[['first','heard',null]]);
  c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
  c.s.run('disconnect()');
 });
@@ -1281,7 +1282,8 @@ test('T14 explicit skip wins a competing withdrawal while retaining the confirme
  c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['skip-race'],reason:'newer_turn'}});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
- assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[['user_skipped',2]]);
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[[null,2]]);
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.utterance_id,d.outcome])),[['skip-race','heard']]);
  c.s.run('disconnect()');
 });
 test('T14 Skip stays heard by choice through output, focus and barge-in callbacks',async()=>{
@@ -1293,11 +1295,12 @@ test('T14 Skip stays heard by choice through output, focus and barge-in callback
   if(race==='focus')c.s.run("stopReplies('focus_changed')");
   if(race==='barge-in')c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
   handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
-  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_skipped',2]],race);
+  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[[null,2]],race);
+  assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>d.outcome)),['heard'],race);
   c.s.run('disconnect()');
  }
 });
-test('T01 and T02 map played-zero barge-in to one core receipt before the terminal turn',async()=>{
+test('T01 and T02 map played-zero barge-in to physical and semantic receipts before the terminal turn',async()=>{
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
  const handle=c.voice.said[0];handle.step({type:'playing'});
@@ -1305,9 +1308,11 @@ test('T01 and T02 map played-zero barge-in to one core receipt before the termin
  c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:0,played:true});
  c.voice.emit('turn',finished('spoken','New words'));
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
- const frames=c.frames(c.first).filter(f=>['voice-playback','voice-user-turn'].includes(f.type));
+ const frames=c.frames(c.first).filter(f=>['voice-playback','reply-hearing','voice-user-turn'].includes(f.type));
  assert.deepEqual(plain(frames.filter(f=>f.type==='voice-playback'&&f.data.status!=='playing').map(f=>[f.data.utterance_id,f.data.status,f.data.reason,f.data.heard_chars])),[['core-reply','interrupted','user_interrupted',0]]);
- assert.ok(frames.findIndex(f=>f.data.status==='interrupted')<frames.findIndex(f=>f.data.phase==='finished'));
+ assert.deepEqual(plain(frames.filter(f=>f.type==='reply-hearing').map(f=>[f.data.history_id,f.data.utterance_id,f.data.outcome,f.data.heard_chars??null])),[['row','core-reply','not_heard',null]]);
+ assert.ok(frames.findIndex(f=>f.data.status==='interrupted')<frames.findIndex(f=>f.type==='reply-hearing'));
+ assert.ok(frames.findIndex(f=>f.type==='reply-hearing')<frames.findIndex(f=>f.data.phase==='finished'));
  c.s.run('disconnect()');
 });
 test('T02b an acknowledged but refused start releases its gate and says why',async()=>{
@@ -1444,9 +1449,45 @@ test('T06a agents mute wins either terminal callback order and retains the scala
   const outcome=()=>handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason}});
   if(first==='interruption'){cut();outcome()}else{outcome();cut()}
   assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status,d.reason,d.heard_chars])),[['muted','interrupted','agents_muted',2]],`${reason}, ${first}`);
+  assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.outcome,d.heard_chars??null,d.reason??null])),[['not_heard',null,null]],`${reason}, ${first}`);
   assert.deepEqual(plain(sentOf(c,c.first,'voice-speech').at(-1)),{session_id:'s1',client_msg_id:sentOf(c,c.first,'voice-speech').at(-1).client_msg_id,on:false,reason:'agents_muted'});
   c.s.run('disconnect()');
  }
+});
+test('T06b–c/T07 output, focus and disconnect choices report not_heard independently of a physical prefix',async()=>{
+ for(const action of ['voice_off','focus_changed','connector_disconnected']){
+  const c=await callOnRoom();
+  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:action,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:'+action,text:'é🐙ab'}});
+  const handle=c.voice.said[0];handle.step({type:'playing'});
+  c.s.run(`stopReplies(${JSON.stringify(action)})`);
+  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[[action,2]],action);
+  assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome,d.heard_chars??null])),[['s1:voice:'+action,'not_heard',null]],action);
+  c.s.run('disconnect()');
+ }
+});
+test('T16 a written muted reply gets one reliable semantic receipt without an audio handle',async()=>{
+ const c=await callOnRoom();
+ const row={id:'s1:voice:written',thread:'a',role:'assistant',text:'Written only',status:'text_only',audio_reason:'agents_muted',hearing:null,hearing_unconfirmed:true,heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages:[row]})});
+ await c.s.run('refreshHistory()');await c.s.run('refreshHistory()');
+ const receipts=sentOf(c,c.first,'reply-hearing');
+ assert.equal(receipts.length,1,'polling does not duplicate a written acknowledgement');
+ assert.deepEqual(plain([receipts[0].history_id,receipts[0].utterance_id,receipts[0].outcome,receipts[0].heard_chars??null]),['s1:voice:written','written','not_heard',null]);
+ assert.equal(sentOf(c,c.first,'voice-playback').length,0,'written replies have no physical playback target');
+ assert.deepEqual(plain([c.s.run("history[0].hearing"),c.s.run("history[0].hearing_unconfirmed")]),[null,true],'the mark waits for core confirmation');
+ c.s.run('disconnect()');
+});
+test('T06c a written reply in an unfocused conversation waits for a valid hearing target',async()=>{
+ const c=await callOnRoom();
+ const row={id:'s1:voice:elsewhere',thread:'b',role:'assistant',text:'Other conversation',status:'text_only',audio_reason:'inactive_conversation',hearing:null,hearing_unconfirmed:true,heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages:[row]})});
+ await c.s.run('refreshHistory()');
+ assert.equal(sentOf(c,c.first,'reply-hearing').length,0,'core has not granted this session access to b');
+ c.s.run("state.roomBinding={thread_id:'b',binding_id:'binding-b'}");
+ await c.s.run('refreshHistory()');
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:elsewhere','not_heard']]);
+ c.s.run('disconnect()');
 });
 test('T06a a receipt before mute remains a genuine spoken interruption',async()=>{
  const c=await callOnRoom();
@@ -1461,7 +1502,7 @@ test('T06a a receipt before mute remains a genuine spoken interruption',async()=
 test('T11 reversed history and participant responses cannot undo globally confirmed hearing',async()=>{
  const c=await callOnRoom(),requests=[];
  c.s.context.fetch=async path=>new Promise(resolve=>requests.push({path,resolve}));
- const row=(heard,full=false)=>({id:'history-reply',thread:'a',role:'assistant',text:'Hello',status:full?'heard':'interrupted',heard_chars:heard,globally_heard:full,replayable:!full,time:1,seq:1});
+ const row=(heard,full=false)=>({id:'history-reply',thread:'a',role:'assistant',text:'Hello',status:full?'playback_finished':'interrupted',heard_chars:heard,hearing:full?'heard':'partial',hearing_unconfirmed:false,globally_heard:full,replayable:!full,time:1,seq:1});
  const older=c.s.run('refreshHistory()'),newer=c.s.run('refreshHistory()');
  requests[1].resolve({ok:true,status:200,json:async()=>({messages:[row(5,true)]})});await newer;
  requests[0].resolve({ok:true,status:200,json:async()=>({messages:[row(2)]})});await older;
@@ -1473,7 +1514,7 @@ test('T11 reversed history and participant responses cannot undo globally confir
  assert.equal(c.s.run("threadEpochs.get('a')"),1);
  // A local confirmed receipt can land while a single older history request is in flight.
  const pending=c.s.run('refreshHistory()');
- c.s.run("state.history=state.history.map(r=>r.segment==='history-reply'?{...r,globally_heard:true,heard_chars:5,audio:'heard',replayable:false}:r)");
+ c.s.run("state.history=state.history.map(r=>r.segment==='history-reply'?{...r,hearing:'heard',hearing_unconfirmed:false,globally_heard:true,heard_chars:5,audio:'playback_finished',replayable:false}:r)");
  requests[4].resolve({ok:true,status:200,json:async()=>({messages:[row(2)]})});await pending;
  assert.equal(c.s.run("history.find(r=>r.segment==='history-reply').heard_chars"),5);
  assert.equal(c.s.run("history.find(r=>r.segment==='history-reply').globally_heard"),true);
@@ -1483,7 +1524,7 @@ test('T06d/e return reconciliation shows only globally unheard rows and no notic
  const c=await callOnRoom();let heard=false;
  c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
   ?{participants:[{thread_id:'a',available:true,epoch:0,unheard:heard?null:{count:1,since:1}}]}
-  :{messages:[{id:'reply',thread:'a',role:'assistant',text:'Answer',status:heard?'playback_finished':'interrupted',audio_reason:heard?null:'user_interrupted',heard_chars:heard?6:2,globally_heard:heard,replayable:!heard,time:1,seq:1},
+  :{messages:[{id:'reply',thread:'a',role:'assistant',text:'Answer',status:heard?'playback_finished':'interrupted',audio_reason:heard?null:'user_interrupted',heard_chars:heard?6:2,hearing:heard?'heard':'partial',hearing_unconfirmed:false,globally_heard:heard,replayable:!heard,time:1,seq:1},
    {id:'notice',thread:'a',role:'note',text:'',notice:{kind:heard?'reply_heard':'user_returned',corrects_message_id:'old',heard:[]},time:2,seq:2}]}});
  await c.s.run('refreshHistory()');await c.s.run('refreshPeople()');
  assert.equal(c.s.run("state.people.find(p=>p.thread_id==='a').unheard.count"),1);
@@ -1497,7 +1538,7 @@ test('T06d/e return reconciliation shows only globally unheard rows and no notic
 });
 test('F6 core-retained old unheard reply survives the live and session history caps',async()=>{
  const c=await callOnRoom();
- const messages=[{id:'old-miss',thread:'a',role:'assistant',text:'Manual replay remains available',status:'text_only',audio_reason:'voice_off',heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1}];
+ const messages=[{id:'old-miss',thread:'a',role:'assistant',text:'Manual replay remains available',status:'text_only',audio_reason:'voice_off',heard_chars:0,hearing:'not_heard',hearing_unconfirmed:false,globally_heard:false,replayable:true,time:1,seq:1}];
  for(let i=2;i<=1001;i++)messages.push({id:'recent-'+i,thread:'a',role:'user',text:'Recent '+i,status:'delivered',time:i,seq:i});
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages})});
  await c.s.run('refreshHistory()');
@@ -1510,13 +1551,13 @@ test('F6 core-retained old unheard reply survives the live and session history c
 });
 test('R6 another device hearing an old miss retires its protected browser row',async()=>{
  const c=await callOnRoom(),requests=[];
- const miss={id:'old-miss',thread:'a',role:'assistant',text:'Manual replay remains available',status:'text_only',audio_reason:'voice_off',heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
+ const miss={id:'old-miss',thread:'a',role:'assistant',text:'Manual replay remains available',status:'text_only',audio_reason:'voice_off',heard_chars:0,hearing:'not_heard',hearing_unconfirmed:false,globally_heard:false,replayable:true,time:1,seq:1};
  const recent=Array.from({length:1000},(_,i)=>({id:'recent-'+i,thread:'a',role:'user',text:'Recent '+i,status:'delivered',time:i+2,seq:i+2}));
  let heardElsewhere=false;
  c.s.context.fetch=async path=>{
   requests.push(String(path));
   const data=String(path).includes('resolve_id=old-miss')
-   ?{messages:recent,resolved:[{...miss,status:'playback_finished',audio_reason:null,heard_chars:miss.text.length,globally_heard:true,replayable:false}],missing_ids:[]}
+   ?{messages:recent,resolved:[{...miss,status:'playback_finished',audio_reason:null,heard_chars:miss.text.length,hearing:'heard',hearing_unconfirmed:false,globally_heard:true,replayable:false}],missing_ids:[]}
    :{messages:heardElsewhere?recent:[miss,...recent]};
   return {ok:true,status:200,json:async()=>data};
  };
@@ -1531,7 +1572,7 @@ test('R6 another device hearing an old miss retires its protected browser row',a
 });
 test('R6 an explicitly missing old ID is removed, while ordinary absent rows remain',async()=>{
  const c=await callOnRoom();
- c.s.run("state.history=[{segment:'evicted',thread:'fp-mac|a',role:'assistant',text:'Old miss',globally_heard:false,replayable:true},{segment:'pending-local',thread:'fp-mac|a',role:'user',text:'Pending',draft:true}]");
+ c.s.run("state.history=[{segment:'evicted',thread:'fp-mac|a',role:'assistant',text:'Old miss',hearing:'not_heard',hearing_unconfirmed:false,globally_heard:false,replayable:true},{segment:'pending-local',thread:'fp-mac|a',role:'user',text:'Pending',draft:true}]");
  c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>String(path).includes('resolve_id=evicted')
   ?{messages:[],resolved:[],missing_ids:['evicted']}:{messages:[]}});
  await c.s.run('refreshHistory()');
@@ -1541,7 +1582,7 @@ test('R6 an explicitly missing old ID is removed, while ordinary absent rows rem
 });
 test('N4 slow batched resolution cannot starve fresh history across polling intervals',async()=>{
  const c=await callOnRoom(),gates=[];let recentReads=0,resolutionReads=0;
- c.s.run("state.history=Array.from({length:65},(_,i)=>({segment:'old-'+i,thread:'fp-mac|a',role:'assistant',text:'Old miss '+i,globally_heard:false,replayable:true,time:i}))");
+ c.s.run("state.history=Array.from({length:65},(_,i)=>({segment:'old-'+i,thread:'fp-mac|a',role:'assistant',text:'Old miss '+i,hearing:'not_heard',hearing_unconfirmed:false,globally_heard:false,replayable:true,time:i}))");
  c.s.context.fetch=async path=>{
   if(String(path).includes('resolve_id=')){
    ++resolutionReads;
@@ -1557,7 +1598,7 @@ test('N4 slow batched resolution cannot starve fresh history across polling inte
  await c.until(()=>c.s.run("history.some(row=>row.segment==='fresh-2')"),'next polling interval renders');
  assert.equal(resolutionReads,1,'the machine has one resolution pipeline');
  const firstBatch=gates[0];
- firstBatch.resolve({messages:[],resolved:[{id:firstBatch.ids[0],thread:'a',role:'assistant',text:'Old miss 0',status:'playback_finished',heard_chars:10,globally_heard:true,replayable:false,time:0}],missing_ids:firstBatch.ids.slice(1)});
+ firstBatch.resolve({messages:[],resolved:[{id:firstBatch.ids[0],thread:'a',role:'assistant',text:'Old miss 0',status:'playback_finished',heard_chars:10,hearing:'heard',hearing_unconfirmed:false,globally_heard:true,replayable:false,time:0}],missing_ids:firstBatch.ids.slice(1)});
  await c.until(()=>gates.length===2,'second ID resolution batch');
  assert.equal(c.s.run("history.find(row=>row.segment==='old-0').globally_heard"),true,'a completed batch reconciles immediately');
  const third=c.s.run('refreshHistory()');
@@ -1861,8 +1902,8 @@ test('A resumed session sends at once what waited while the room was away',async
  await c.until(()=>c.sockets.length===2,'reconnect socket');
  const {socket}=await c.answer({session_id:'s1',resume:{token:'new'},resumed:true});
  await c.until(()=>!s.run('state.reconnecting'),'resumed');await settleSoon();
- const sent=c.frames(socket).filter(f=>['voice-user-turn','voice-playback'].includes(f.type));
- assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status,f.data.offline])),[['voice-user-turn','started',null],['voice-playback','heard',null],['voice-user-turn','finished',null]],'terminal playback evidence precedes the final turn frame');
+ const sent=c.frames(socket).filter(f=>['voice-user-turn','voice-playback','reply-hearing'].includes(f.type));
+ assert.deepEqual(plain(sent.map(f=>[f.type,f.data.phase??f.data.status??f.data.outcome,f.data.offline])),[['voice-user-turn','started',null],['voice-playback','heard',null],['reply-hearing','heard',null],['voice-user-turn','finished',null]],'physical and semantic evidence precede the final turn frame');
  for(const frame of sent)c.push(socket,{type:'voice-ack',data:{client_msg_id:frame.data.client_msg_id}});
  assert.equal(s.run('outbox.size'),0);
  s.run('disconnect()');

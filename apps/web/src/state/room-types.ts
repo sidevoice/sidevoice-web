@@ -33,6 +33,8 @@ export interface ChatMessage {
   audio_reason?: string | null;
   epoch?: number;
   heard_chars?: number | null;
+  hearing?: "heard" | "partial" | "not_heard" | null;
+  hearing_unconfirmed?: boolean;
   globally_heard?: boolean | null;
   karaoke?: KaraokeRange | null;
   playback?: "pending" | "playing" | "complete";

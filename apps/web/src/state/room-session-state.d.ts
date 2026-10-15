@@ -197,7 +197,7 @@ export interface SessionStore {
 }
 export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionStore;
 export function receiptView(status: string): {symbol: string; label: string};
-export function audioNote(row: {audio?: string; audio_reason?: string; heard_chars?: number | null; interrupted?: boolean}, ahead?: number): string;
+export function audioNote(row: {audio?: string; audio_reason?: string; heard_chars?: number | null; hearing?: "heard" | "partial" | "not_heard" | null; interrupted?: boolean}, ahead?: number): string;
 /** A conversation's title as every surface shows it: one line, unquoted, without a part naming its harness or model. */
 export function displayTitle(title: string | null | undefined, person?: { harness?: string | null; engine?: { model?: string | null } | null } | null): string;
 export function speechSegment(reply: {history_id?: string; session_id?: string; utterance_id?: string}): string;

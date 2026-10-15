@@ -25,13 +25,12 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
   const delivery = message.role === "user" && message.delivery && receiptView(message.delivery).label ? message.delivery : null;
   const replay = message.replayable && message.role === "assistant" && message.playback !== "playing" && message.playback !== "pending";
   const total = [...message.text].length;
-  const audioMark = message.role !== "assistant" || message.globally_heard ? null : message.audio_reason === "user_skipped" || message.audio === "skipped"
-    ? t("messages.audio.skipped")
-    : message.audio === "text_only" || message.audio_reason === "unheard"
-      || message.audio_reason === "newer_turn" && message.heard_chars == null ? t("messages.audio.notPlayed")
-      : message.interrupted || message.audio === "failed" || message.audio === "disconnected"
-        ? Number.isInteger(message.heard_chars) ? t("messages.audio.partial", { heard: message.heard_chars!, total }) : t("messages.audio.unknown")
-        : null;
+  const audioMark = message.role !== "assistant" ? null
+    : message.hearing === "heard" ? null
+      : message.hearing === "partial" && Number.isInteger(message.heard_chars)
+        ? t("messages.audio.partial", { heard: message.heard_chars!, total })
+        : message.hearing === "not_heard" ? t("messages.audio.notHeard")
+          : message.hearing_unconfirmed ? t("messages.audio.unconfirmed") : null;
   const label = t(message.interrupted && !message.globally_heard ? "messages.interrupted" : "messages.message", { name: speakerName(message, t), text: message.text });
   return (
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}

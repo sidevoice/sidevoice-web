@@ -62,23 +62,24 @@ test("an interrupted reply says so to a screen reader too", () => {
 
 test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from reading text", () => {
   const rows = [
-    message({segment: "partial", text: "é🐙ab", interrupted: true, heard_chars: 2}),
-    message({segment: "unknown", text: "unknown", interrupted: true, heard_chars: null}),
-    message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off"}),
-    message({segment: "newer", text: "never started", audio: "interrupted", interrupted: true, audio_reason: "newer_turn", heard_chars: null}),
-    message({segment: "skipped", text: "skipped", audio: "skipped", audio_reason: "user_skipped"}),
+    message({segment: "partial", text: "é🐙ab", interrupted: true, hearing: "partial", heard_chars: 2}),
+    message({segment: "unknown", text: "unknown", interrupted: true, hearing: null, hearing_unconfirmed: true, heard_chars: null}),
+    message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off", hearing: "not_heard"}),
+    message({segment: "newer", text: "never started", audio: "interrupted", interrupted: true, audio_reason: "newer_turn", hearing: "not_heard", heard_chars: 0}),
+    message({segment: "skipped", text: "skipped", audio: "interrupted", hearing: "heard"}),
   ];
   const {container} = render(<MessageList conversation={view(rows)} />);
   expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent))
-    .toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown", "Not played", "Not played", "Skipped"]);
+    .toEqual(["2 of 4 characters heard", "Hearing not confirmed", "Not heard", "Not heard"]);
 });
 test("T14 partial and unknown playback failures explain failure without claiming silence", () => {
-  const failed = (heard_chars: number | null) => ({audio: "failed", audio_reason: "playback_failed", heard_chars});
+  const failed = (heard_chars: number | null) => ({audio: "failed", audio_reason: "playback_failed", heard_chars,
+    hearing: heard_chars == null ? null : "partial" as const, hearing_unconfirmed: heard_chars == null});
   const {container} = render(<MessageList conversation={view([
     message({segment: "partial-failure", text: "é🐙ab", ...failed(2), audioNote: audioNote(failed(2))}),
     message({segment: "unknown-failure", text: "Unknown", ...failed(null), audioNote: audioNote(failed(null))}),
   ])} />);
-  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown"]);
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["2 of 4 characters heard", "Hearing not confirmed"]);
   expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual(["Playback failed", "Playback failed"]);
 });
 test("F8 core admission reasons for inactive and disconnected audiences are explained", () => {
@@ -93,7 +94,7 @@ test("F8 core admission reasons for inactive and disconnected audiences are expl
 });
 
 test("F9 a manually heard text-only reply no longer claims it was not played", () => {
-  const core = { audio: "text_only", audio_reason: "voice_off", heard_chars: 6, globally_heard: true, replayable: false };
+  const core = { audio: "text_only", audio_reason: "voice_off", heard_chars: 6, hearing: "heard" as const, globally_heard: true, replayable: false };
   const { container } = render(<MessageList conversation={view([message({ segment: "manual-heard", text: "Answer", ...core, audioNote: audioNote(core) })])} />);
   expect(container.querySelector(".audio-fate-mark")).toBeNull();
   expect(container.querySelector(".chat-audio-note")).toBeNull();

@@ -19,6 +19,7 @@ import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSetti
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange,scalarExtent} from './voice-room.js';
 import {replyEligibility} from './reply-eligibility.js';
+import {playbackHearing,writtenReplyHearing} from './reply-hearing-policy.js';
 import {refusalError} from './refusals.js';
 import {followWorking} from './working-clock.ts';
 const roomStore=window.sidevoiceUI?.store||createRoomSessionStore();
@@ -380,7 +381,7 @@ const SAVED_PER_MACHINE=300;
 function save(){try{sessionStorage.setItem('voice-room-transcript',JSON.stringify(newestPerMachine(state.history,SAVED_PER_MACHINE)))}catch{}}
 function newestPerMachine(rows,limit){
  const counts=new Map(),kept=[];
- for(let i=rows.length-1;i>=0;i--){const row=rows[i],node=conversationOf(row.thread)?.node||'',n=(counts.get(node)||0)+1;counts.set(node,n);if(n<=limit||row.role==='assistant'&&row.globally_heard===false)kept.push(row)}
+ for(let i=rows.length-1;i>=0;i--){const row=rows[i],node=conversationOf(row.thread)?.node||'',n=(counts.get(node)||0)+1;counts.set(node,n);if(n<=limit||row.role==='assistant'&&['partial','not_heard'].includes(row.hearing))kept.push(row)}
  return kept.length===rows.length?rows:kept.reverse();
 }
 // The conversation the call talks to, by its key (machine and thread); the room's own name for it is `targetThread`.
@@ -420,7 +421,7 @@ function flushOutbox(socket=state.ws){
    if(entry.sentOn===socket)continue;
    if(entry.node!==state.callNode){outbox.remove(entry.id);continue}
    // What a reply of a replaced session became is that session's; the room ended its replies with it.
-   if((entry.kind==='playback'||entry.kind==='speech')&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
+   if((entry.kind==='playback'||entry.kind==='hearing'||entry.kind==='speech')&&entry.session_id!==state.sessionId){outbox.remove(entry.id);continue}
    let data=entry.payload.data;
    if(entry.kind==='user-turn'){
     // A start made for a session the room has replaced is never answered there: the room takes each message once
@@ -473,9 +474,16 @@ function reportPlayback(said,data){
  if(data.status!=='playing')said.terminal=true;
  keepMessage('playback','voice-playback',{utterance_id:said.reply.utterance_id,...data});flushOutbox();
 }
+function reportHearing(said,data){
+ const reply=said.reply;
+ keepMessage('hearing','reply-hearing',{history_id:reply.history_id,utterance_id:reply.utterance_id,
+  ...playbackHearing(data,reply.text,said.action??said.withdrawn??data.reason)});
+ flushOutbox();
+}
 function finishReply(said,data){
  if(replies.get(said.reply.utterance_id)!==said)return;
  reportPlayback(said,data);
+ reportHearing(said,data);
  replies.delete(said.reply.utterance_id);
  if(said.saying)handleIds.delete(said.saying.id);
  if(state.karaokeState?.segment===speechSegment(said.reply))state.karaokeState=null;
@@ -487,7 +495,7 @@ function stopReplies(reason,onlyPlaying=false){
   if(onlyPlaying&&!said.playing)continue;
   if(said.action!=='user_skipped')said.action=reason;
   if(said.saying)said.saying.cancel();
-  else finishReply(said,{status:'unplayed',reason});
+  else finishReply(said,{status:'unplayed',...(reason==='user_skipped'?{}:{reason})});
  }
  stoppingReplies=false;
  drainReplies();
@@ -633,7 +641,7 @@ async function resolveProtectedHistory(fp,messages,link,base){
  const byThread=new Map();
  for(const row of state.history){
   const source=conversationOf(row.thread);
-  if(source?.node!==fp||row.role!=='assistant'||row.globally_heard!==false||!row.segment||seen.has(source.thread+'\0'+row.segment))continue;
+  if(source?.node!==fp||row.role!=='assistant'||!['partial','not_heard'].includes(row.hearing)||!row.segment||seen.has(source.thread+'\0'+row.segment))continue;
   if(!byThread.has(source.thread))byThread.set(source.thread,[]);
   byThread.get(source.thread).push(row.segment);
  }
@@ -654,6 +662,22 @@ async function resolveProtectedHistory(fp,messages,link,base){
 }
 // Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
 // conversations. The call's machine is asked on the call's beat, every other one on the machines' beat.
+const writtenHearing=new Set();
+function acknowledgeWrittenReply(fp,r){
+ if(fp!==state.callNode||!state.sessionId||r.role!=='assistant'||r.status!=='text_only'||typeof r.id!=='string')return;
+ // Core accepts a written acknowledgement only from a session that focused this conversation.
+ // Keep an unfocused row unconfirmed until this call has access, rather than sending a refused receipt once.
+ if(state.roomBinding?.thread_id!==r.thread&&![...captureTargets.values()].some(target=>target.node===fp&&target.thread_id===r.thread&&target.generation===callGeneration))return;
+ const marker=':voice:',at=r.id.lastIndexOf(marker);
+ if(at<0||r.hearing==='heard')return;
+ const key=state.sessionId+'\0'+r.id;
+ if(writtenHearing.has(key))return;
+ const decision=writtenReplyHearing(r);
+ if(!decision)return;
+ writtenHearing.add(key);
+ keepMessage('hearing','reply-hearing',{history_id:r.id,utterance_id:r.id.slice(at+marker.length),...decision});
+ flushOutbox();
+}
 function mergeHistoryRows(fp,rows,missing=new Set()){
     let changed = false;
     for (const r of rows) {
@@ -671,12 +695,16 @@ function mergeHistoryRows(fp,rows,missing=new Set()){
             state.history = state.history.filter(h => !aliases.includes(h));
             changed = true;
         }
-        const patch = { segment: r.id, thread, role: r.role, text: r.text, name: r.role === 'user' ? '' : state.people.find(p => personKey(p) === thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, epoch: r.epoch, audio_reason: r.audio_reason, heard_chars: r.heard_chars, globally_heard: r.globally_heard, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
-        if(row?.globally_heard&&!patch.globally_heard){
+        const patch = { segment: r.id, thread, role: r.role, text: r.text, name: r.role === 'user' ? '' : state.people.find(p => personKey(p) === thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, epoch: r.epoch, audio_reason: r.audio_reason, heard_chars: r.heard_chars, hearing:r.hearing, hearing_unconfirmed:!!r.hearing_unconfirmed, globally_heard: r.globally_heard, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
+        if(row?.hearing==='heard'&&patch.hearing!=='heard'){
             // A receipt confirmed after this snapshot was taken cannot be undone by it.
-            Object.assign(patch,{globally_heard:true,audio:row.audio,audio_reason:row.audio_reason,replayable:false,interrupted:row.interrupted});
+            Object.assign(patch,{hearing:'heard',hearing_unconfirmed:false,globally_heard:true,audio:row.audio,audio_reason:row.audio_reason,replayable:false,interrupted:row.interrupted});
         }
-        if(Number.isInteger(row?.heard_chars))patch.heard_chars=Math.max(row.heard_chars,Number.isInteger(patch.heard_chars)?patch.heard_chars:0);
+        if(Number.isInteger(row?.heard_chars)&&row.hearing!=null){
+            const newer=Math.max(row.heard_chars,Number.isInteger(patch.heard_chars)?patch.heard_chars:0);
+            if(newer>0&&patch.hearing!=='heard')patch.hearing='partial';
+            patch.heard_chars=newer;
+        }
         if (!row) {
             state.history = [...state.history, patch];
             changed = true;
@@ -685,6 +713,7 @@ function mergeHistoryRows(fp,rows,missing=new Set()){
             state.history = state.history.map(r => r === row ? { ...r, ...patch } : r);
             changed = true;
         }
+        acknowledgeWrittenReply(fp,r);
     }
     if(missing.size){
         const kept=state.history.filter(row=>!missing.has(conversationOf(row.thread)?.thread+'\0'+row.segment)||conversationOf(row.thread)?.node!==fp);
@@ -1495,6 +1524,7 @@ function disconnect() {
     window.sidevoiceTelemetry?.endCall?.('left');
     // A hang-up ends what the call still owed its session.
     outbox.clear();
+    writtenHearing.clear();
     clearTurnLifecycle();
     resumeToken = null;
     lastSeq = 0;
@@ -1546,7 +1576,8 @@ function attachVoice(next){
   const coreId=handleIds.get(cut.utterance_id),said=coreId&&replies.get(coreId);
   if(!said)return;
   const heard=scalarExtent(said.reply.text,cut.heard_until);
-  finishReply(said,{status:cut.played?'interrupted':'unplayed',reason:said.action??(cut.played?'user_interrupted':'newer_turn'),...(cut.played?{heard_chars:heard??0}:{})});
+  const reason=said.action==='user_skipped'?null:said.action??(cut.played?'user_interrupted':'newer_turn');
+  finishReply(said,{status:cut.played?'interrupted':'unplayed',...(reason?{reason}:{}),...(cut.played?{heard_chars:heard??0}:{})});
  }));
  void watchAudioDevices();
 }
@@ -1790,6 +1821,7 @@ async function drainOutbox(node,ms,mine){
 // The call's session ends, its voice does not: the socket is closed as a hang-up, and nothing of that session stays.
 function leaveSession(){
  clearTurnLifecycle();
+ writtenHearing.clear();
  const socket=state.ws;
  if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
  window.sidevoiceTelemetry?.endCall?.('moved');

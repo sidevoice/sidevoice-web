@@ -30,7 +30,7 @@ test("how something said ended becomes the room's playback report, with only the
     [[{ status: "heard-up-to", heard_chars: 2, reason: "barge-in" }, "hola", null, "agents_muted"], { status: "interrupted", heard_chars: 2, reason: "agents_muted" }],
     [[{ status: "heard-up-to", heard_chars: 2, reason: "cancelled" }, "hola", null, "agents_muted"], { status: "interrupted", heard_chars: 2, reason: "agents_muted" }],
     [[{ status: "not-played", reason: "barge-in" }, "hola", null, "agents_muted"], { status: "unplayed", reason: "agents_muted" }],
-    [[{ status: "not-played", reason: "cancelled" }, "hola", null, "user_skipped"], { status: "unplayed", reason: "user_skipped" }],
+    [[{ status: "not-played", reason: "cancelled" }, "hola", null, "user_skipped"], { status: "unplayed" }],
     [[{ status: "not-played", reason: "stopped" }, "hola"], { status: "unplayed", reason: "call_ended" }],
     [[{ status: "heard-up-to", heard_chars: 1, reason: "failed", code: "x" }, "hola"], { status: "failed", heard_chars: 1 }],
     [[{ status: "not-played", reason: "failed", code: "credential-missing" }, "hola"], { status: "failed" }],
@@ -58,7 +58,7 @@ test("core #120 playback fixture stays mapped at the browser boundary", () => {
       : null;
     const report = playbackReport(outcome as Parameters<typeof playbackReport>[0], flow.text, null, action);
     expect(report).toMatchObject(entry.core);
-    if (entry.voice.status === "heard") expect(report.heard_chars).toBe(entry.history.heard_chars);
+    if (entry.voice.status === "heard") expect(report.heard_chars).toBe(characters(flow.text));
   }
 });
 

@@ -453,7 +453,7 @@ export function deliveryNote(r) {
 export function audioNote(r, ahead = 0) {
     // Nothing a person did not hear is repeated by itself: a reply nobody was there for says so, and replaying it
     // is the person's choice.
-    if (r.globally_heard === true)
+    if (r.hearing === 'heard')
         return '';
     const reasons = { newer_turn: 'newer_turn', user_speaking: 'user_speaking', focus_changed: 'focus_changed', call_ended: 'call_ended', session_changed: 'call_ended', expired_audio_turn: 'expired_audio_turn', queue_full: 'queue_full', user_interrupted: 'user_interrupted', user_skipped: 'user_skipped', playback_failed: 'playback_failed', service_restarted: 'service_restarted', channel_closed: 'channel_closed', agents_muted: 'agents_muted', voice_off: 'voice_off', connector_disconnected: 'connector_disconnected', inactive_conversation: 'inactive_conversation', disconnected: 'disconnected', heard_elsewhere: 'heard_elsewhere' };
     const reason = reasons[r.audio_reason] ? say('session.audio.reason.' + reasons[r.audio_reason]) : '';
@@ -469,8 +469,7 @@ export function audioNote(r, ahead = 0) {
     // Published while this device was away: none of it sounded, which is not the same as being cut off.
     if (r.audio_reason === 'unheard')
         return say('session.audio.unheard');
-    // Core stores a never-started, newer-turn receipt as interrupted with no heard extent.
-    // The mark says "Not played"; an interruption explanation here would contradict it.
+    // A never-started, newer-turn diagnostic has no audio explanation to add to the semantic mark.
     if (r.audio_reason === 'newer_turn' && r.heard_chars == null)
         return '';
     if (r.audio === 'interrupted' || r.audio === 'disconnected' || r.interrupted)

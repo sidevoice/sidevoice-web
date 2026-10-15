@@ -9,7 +9,13 @@ const scalarLength = text => [...(text ?? '')].length;
 const extentOf = (report, length) => Number.isInteger(report?.heard_chars) && report.heard_chars >= 0
   ? Math.min(report.heard_chars, length) : 0;
 
-/** @returns {{outcome:'heard'|'partial'|'not_heard',heard_chars?:number}} */
+/**
+ * @param {{status:string,heard_chars?:number,reason?:string}} report
+ * @param {string} text
+ * @param {string|null} action
+ * @param {{skipCountsAsHeard:boolean,readMutedReplies:boolean}} policy
+ * @returns {{outcome:'heard'|'partial'|'not_heard',heard_chars?:number}}
+ */
 export function playbackHearing(report, text, action = null, policy = HEARING_POLICY) {
   const length = scalarLength(text);
   if (report?.status === 'heard' || action === 'user_skipped' && policy.skipCountsAsHeard)
@@ -23,7 +29,12 @@ export function playbackHearing(report, text, action = null, policy = HEARING_PO
   return { outcome: 'not_heard' };
 }
 
-/** A written reply has no audio handle. In reading mode a muted page accepts its text as read. */
+/**
+ * A written reply has no audio handle. In reading mode a muted page accepts its text as read.
+ * @param {{status:string,audio_reason?:string|null}} row
+ * @param {{skipCountsAsHeard:boolean,readMutedReplies:boolean}} policy
+ * @returns {{outcome:'heard'|'not_heard'}|null}
+ */
 export function writtenReplyHearing(row, policy = HEARING_POLICY) {
   if (row?.status !== 'text_only') return null;
   const muted = row.audio_reason === 'agents_muted' || row.audio_reason === 'voice_off';
