@@ -1998,17 +1998,17 @@ function startInitialLocate(){
  void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>setUiLanguage(devicePreferences().ui_language));
 }
 async function loadPairingsBeforeDiscovery(){
- if(nativeData){
-  try{
-   const saved=await nativeData.pairings.read();
-   storedPairingState.list=Array.isArray(saved.pairings)?saved.pairings:[];
-   pairings=projectPairings(storedPairingState,null);
-  }catch{setRoomError(translator()('data.pairingsReadFailed'))}
- }
- await refreshLocalHost();
- startInitialLocate();
+ try{
+  const saved=await nativeData.pairings.read();
+  storedPairingState.list=Array.isArray(saved.pairings)?saved.pairings:[];
+  pairings=projectPairings(storedPairingState,null);
+ }catch{setRoomError(translator()('data.pairingsReadFailed'))}
+ if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
+ else{void refreshLocalHost();startInitialLocate()}
 }
-void loadPairingsBeforeDiscovery();
+if(nativeData)void loadPairingsBeforeDiscovery();
+else if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
+else{void refreshLocalHost();startInitialLocate()}
 setInterval(callBeat,1500);setInterval(machinesBeat,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupIdleWatch();

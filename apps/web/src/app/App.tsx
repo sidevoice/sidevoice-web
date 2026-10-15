@@ -11,6 +11,7 @@ import { CallToolbar } from "../features/call/CallToolbar";
 import { PresenceSound } from "../features/call/PresenceSound";
 import { ConnectionStatsDialog } from "../features/diagnostics/ConnectionStatsDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
+import { ResetReportNotice } from "../features/settings/DeleteAllData";
 import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
@@ -55,6 +56,7 @@ function RoomContent() {
   return (
     <>
       <StorageBlockedBanner />
+      <ResetReportNotice />
       <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
         <RoomHeader />
         <LocalHostBanner />

@@ -862,6 +862,8 @@ export const messages: Messages = {
   "data.step.other": "別の項目",
   "data.step.agents": "エージェント登録",
   "data.agentRemains": "{agent} の登録が残っている可能性があります。",
+  "data.dismiss": "閉じる",
+  "data.retryAfterSetup": "初期設定後、設定 › 詳細設定から再試行してください。",
   "settings.advanced.description": "モデルのメモリ、このデバイスの設定、ビルド情報です。問題を調べるときにお使いください。",
   "settings.save": "変更を保存",
   "settings.general.resetShort": "リセット",

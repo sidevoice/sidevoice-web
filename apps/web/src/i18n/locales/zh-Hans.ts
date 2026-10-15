@@ -861,6 +861,8 @@ export const messages: Messages = {
   "data.step.other": "其他项目",
   "data.step.agents": "智能体注册",
   "data.agentRemains": "{agent} 中的注册可能仍然存在。",
+  "data.dismiss": "关闭",
+  "data.retryAfterSetup": "完成初始设置后，打开“设置”›“高级”以重试。",
   "settings.advanced.description": "模型内存、此设备的设置和构建版本：用于排查问题。",
   "settings.save": "保存更改",
   "settings.general.resetShort": "重置",

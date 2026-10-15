@@ -864,6 +864,8 @@ export const messages: Messages = {
   "data.step.other": "ein weiterer Eintrag",
   "data.step.agents": "Agentenregistrierungen",
   "data.agentRemains": "Die Registrierung in {agent} kann bestehen bleiben.",
+  "data.dismiss": "Schließen",
+  "data.retryAfterSetup": "Öffne nach der Einrichtung Einstellungen › Erweitert, um es erneut zu versuchen.",
   "settings.advanced.description": "Modellspeicher, Einstellungen dieses Geräts und die Version: für den Fall, dass etwas geprüft werden muss.",
   "settings.save": "Änderungen speichern",
   "settings.general.resetShort": "Zurücksetzen",

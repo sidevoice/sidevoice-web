@@ -16,6 +16,34 @@ const steps: Record<string, MessageKey> = {
 
 type Report = Awaited<ReturnType<DesktopDataBridge["resetReport"]>>;
 
+function FailedItems({ failed }: { failed: { step: string; key: string; agent?: string }[] }) {
+  const t = translator();
+  return failed.length > 0 && <ul>{failed.map((entry, index) =>
+    <li key={index}>{entry.agent ? t("data.agentRemains", { agent: entry.agent }) :
+      t("data.stepFailed", { step: t(steps[entry.step] ?? "data.step.other") })}</li>)}</ul>;
+}
+
+/** Shown on first-run too: Settings is hidden behind onboarding after the helper relaunches. */
+export function ResetReportNotice() {
+  const data = desktopDataBridge();
+  const t = translator();
+  const [report, setReport] = useState<Report>(null);
+  const [error, setError] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void data?.resetReport().then((value) => { if (live) setReport(value); }).catch(() => { if (live) setError(true); });
+    return () => { live = false; };
+  }, [data]);
+  if (!data || dismissed || (!report && !error)) return null;
+  return <div className="data-reset-result" role={report?.state === "partial" || error ? "alert" : "status"}>
+    <Button variant="ghost" size="sm" className="data-reset-dismiss" onClick={() => setDismissed(true)}>{t("data.dismiss")}</Button>
+    <p>{error ? t("data.reportFailed") : t(report?.state === "partial" ? "data.partial" : "data.complete")}</p>
+    {report && <FailedItems failed={report.failed} />}
+    {report?.state === "partial" && <p>{t("data.retryAfterSetup")}</p>}
+  </div>;
+}
+
 /** Desktop-only destructive action; the browser has no machine-wide deletion capability. */
 export function DeleteAllData() {
   const data = desktopDataBridge();
@@ -28,13 +56,6 @@ export function DeleteAllData() {
   const [restarting, setRestarting] = useState(false);
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
-  useEffect(() => {
-    let live = true;
-    void data?.resetReport().then((value) => { if (live) setReport(value); }).catch(() => {
-      if (live) setError("data.reportFailed");
-    });
-    return () => { live = false; };
-  }, [data]);
   if (!data) return null;
 
   async function erase() {
@@ -60,9 +81,7 @@ export function DeleteAllData() {
     {restarting && <p className="data-reset-note" role="status">{t("data.restarting")}</p>}
     {report && <div className="data-reset-note" role={report.state === "partial" ? "alert" : "status"}>
       <p>{t(report.state === "partial" ? "data.partial" : "data.complete")}</p>
-      {report.failed.length > 0 && <ul>{report.failed.map((entry, index) =>
-        <li key={index}>{entry.agent ? t("data.agentRemains", { agent: entry.agent }) :
-          t("data.stepFailed", { step: t(steps[entry.step] ?? "data.step.other") })}</li>)}</ul>}
+      <FailedItems failed={report.failed} />
     </div>}
     {error && !open && <p className="data-reset-note" role="alert">{t(error)}</p>}
     {open && createPortal(<Dialog open size="sm" titleId={titleId} title={t("data.confirmTitle")}

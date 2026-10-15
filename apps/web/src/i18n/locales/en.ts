@@ -880,6 +880,8 @@ export const messages = {
   "data.step.other": "another item",
   "data.step.agents": "agent registrations",
   "data.agentRemains": "Registration in {agent} may remain.",
+  "data.dismiss": "Dismiss",
+  "data.retryAfterSetup": "After setup, open Settings › Advanced to retry.",
   "settings.advanced.description": "Models' memory, this device's settings and the build: for when something needs looking into.",
   "settings.save": "Save changes",
   "settings.general.resetShort": "Reset",

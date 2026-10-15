@@ -872,6 +872,8 @@ export const messages: Messages = {
   "data.step.other": "otro elemento",
   "data.step.agents": "los registros de agentes",
   "data.agentRemains": "Puede quedar el registro en {agent}.",
+  "data.dismiss": "Cerrar",
+  "data.retryAfterSetup": "Después de la configuración, abre Ajustes › Avanzado para volver a intentarlo.",
   "settings.advanced.description": "La memoria de los modelos, los ajustes de este dispositivo y la versión: para cuando algo necesita revisarse.",
   "settings.save": "Guardar cambios",
   "settings.general.resetShort": "Restablecer",

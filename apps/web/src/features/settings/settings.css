@@ -241,3 +241,11 @@
 .data-reset-note { margin: var(--sv-space-2) 0 0; color: var(--sv-text-muted); font-size: var(--sv-font-sm); }
 .data-reset-note[role="alert"] { color: var(--sv-danger); }
 .data-reset-note ul { margin: var(--sv-space-2) 0 0; padding-inline-start: 1.25em; }
+.data-reset-result { position: fixed; z-index: 100; inset-block-start: var(--sv-space-4); inset-inline: var(--sv-space-4) auto;
+  width: min(34rem, calc(100vw - 2 * var(--sv-space-4))); max-height: min(70vh, 32rem); overflow: auto;
+  padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg);
+  background: var(--sv-surface); box-shadow: var(--sv-shadow-lg); color: var(--sv-text); }
+.data-reset-result[role="alert"] { border-color: var(--sv-danger); }
+.data-reset-result p { margin: 0 0 var(--sv-space-2); }
+.data-reset-result ul { margin: 0 0 var(--sv-space-2); padding-inline-start: 1.25em; }
+.data-reset-dismiss { float: right; margin-inline-start: var(--sv-space-2); }

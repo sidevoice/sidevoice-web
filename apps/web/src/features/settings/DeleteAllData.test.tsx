@@ -1,7 +1,8 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { DeleteAllData } from "./DeleteAllData";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { DeleteAllData, ResetReportNotice } from "./DeleteAllData";
 import { RoomProvider } from "../../app/RoomProvider";
+import { createRoomStore } from "../../state/room-store";
 
 afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
 
@@ -32,6 +33,25 @@ test("Cancel is focused in the confirmation and does not call native reset", () 
   expect(data.deleteAll).not.toHaveBeenCalled();
 });
 
+test("Escape closes the confirmation without calling native reset", () => {
+  const data = bridge();
+  show();
+  fireEvent.click(screen.getByRole("button", { name: "Delete all Sidevoice data" }));
+  fireEvent(screen.getByRole("dialog"), new Event("cancel", { bubbles: true, cancelable: true }));
+  expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  expect(data.deleteAll).not.toHaveBeenCalled();
+});
+
+test("an active call disables the action", () => {
+  const data = bridge();
+  const store = createRoomStore();
+  act(() => store.patch({ reconnecting: true }));
+  render(<RoomProvider store={store} runtime={false}><DeleteAllData /></RoomProvider>);
+  expect(screen.getByRole("button", { name: "Delete all Sidevoice data" })).toBeDisabled();
+  expect(screen.getByText(/End the current call/)).toBeInTheDocument();
+  expect(data.deleteAll).not.toHaveBeenCalled();
+});
+
 test("confirmed reset calls native once and says the app is closing", async () => {
   const data = bridge();
   show();
@@ -42,8 +62,9 @@ test("confirmed reset calls native once and says the app is closing", async () =
 });
 
 test("a partial helper report names the failed step without claiming success", async () => {
-  bridge({ state: "partial", completed: ["app-data"], failed: [{ step: "models", key: "remove" }] });
-  show();
+  bridge({ state: "partial", completed: ["app-data"], failed: [{ step: "models", key: "remove" }], agents: {} });
+  render(<RoomProvider runtime={false}><ResetReportNotice /></RoomProvider>);
   expect(await screen.findByText(/Some Sidevoice data could not be deleted/)).toBeInTheDocument();
   expect(screen.getByText(/Could not delete models/)).toBeInTheDocument();
+  expect(screen.getByText(/After setup, open Settings/)).toBeInTheDocument();
 });
