@@ -181,7 +181,9 @@
  * out of (PersonTurn), and keeps its size: a longer turn pages inside it. */
 .person-said { flex: 1 1 calc(128 * var(--u)); min-width: 0; margin-block: calc(8 * var(--u)); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 /* Whether it got there: the transcript's checks, at the balloon's end, in the person's light ink. */
-.person-receipt { position: absolute; right: calc(12 * var(--u)); bottom: calc(8 * var(--u)); display: inline-flex; color: var(--sv-chat-person-fg); opacity: .85; }
+.person-receipt { position: absolute; right: calc(var(--person-pad-i) * var(--u) + 6 * var(--u)); bottom: calc(var(--person-pad-b) * var(--u)); display: inline-flex; color: var(--sv-chat-person-fg); opacity: .85; }
+/* Its words keep clear of the checks. */
+.person-bubble[data-sent]:has(.person-receipt) .person-said { padding-inline-end: 1.25em; }
 .person-receipt[data-state="read"] { opacity: 1; }
 .person-receipt:is([data-state="uncertain"], [data-state="not_sent"]) { color: var(--sv-danger); opacity: 1; }
 .person-turns .person-bubble[data-sent] { width: var(--live-w); height: var(--live-h); align-content: center; transform-origin: 100% 100%; }
