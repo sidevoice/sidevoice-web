@@ -341,8 +341,7 @@
  * name holds the top-left and the agent's badge the foot. Their column is no wider than the corner allows, so a chip
  * keeps the tile's inset from its edge as the rest of its chrome does, and a long model's name ends in an ellipsis
  * instead of running past the edge. */
-.voice-models { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; grid-template-columns: minmax(0, auto); justify-items: end; gap: .3333em; max-width: var(--models-w);
-  font-size: var(--chip-fs); }
+.voice-models { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sv-space-1-5); min-width: 0; }
 /* The models' column: as wide as 16rem was at the chips' 12px, never over 40% of the tile. */
 .stage-tile { --models-w: min(40%, calc(21.3333 * var(--chip-fs))); }
 /* Quiet while ready: no fill, a faint edge, the muted text colour (AA on the tile) and a softer icon; full contrast on
@@ -392,10 +391,8 @@
 .stage-name { padding: .3em .6em; border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
 /* The conversation's name and its machine, over the stage (CallStage StageName; 2026-10-15): the name in a display
- * weight, one line cut with an ellipsis; the machine a small chip with its icon. Its look is the `stageTitle` variant —
- * a: the name, the machine's chip beside it on the name's baseline; b: the agent's small avatar with its state dot, the name over the chip; c: the name on a
- * paper sticker inked as the balloon, the agent's colour along its edge. The same on a desktop, above the tile, and
- * on a phone, on the tile's corner (the sticker its own plate there). */
+ * weight, one line cut with an ellipsis; the machine a small chip with its icon, under it. The same on a desktop, above
+ * the tile, and on a phone, on the tile's corner. */
 :is(.stage-title, .stage-name) h2 { display: flex; align-items: center; gap: .4em; min-width: 0; margin: 0; font-size: 1em; line-height: 1.2em;
   font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; color: var(--sv-text); }
 :is(.stage-title, .stage-name) h2 > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -404,20 +401,13 @@
   font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); white-space: nowrap; color: var(--sv-text-muted); }
 .stage-machine > svg { flex: none; width: 1em; height: 1em; }
 .stage-machine > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-:where(.stage-name):is([data-look="a"], [data-look="c"]) { display: flex; align-items: center; gap: .4em; }
-:where(.stage-name)[data-look="a"] { align-items: baseline; }
-:where(.stage-name)[data-look="b"] { grid-template-columns: auto minmax(0, 1fr); column-gap: .4em; align-items: center; }
-:is(.stage-title, .stage-name)[data-look="b"] .conversation-avatar { grid-row: 1 / span 2; width: 1.8em; height: 1.8em; }
-:is(.stage-title, .stage-name)[data-look="b"] h2 { font-size: .85em; line-height: 1.2941em; }
-:is(.stage-title, .stage-name)[data-look="b"] .stage-machine { justify-self: start; height: 1.6667em; }
-:is(.stage-title, .stage-name)[data-look="c"] h2 { padding: .1176em .7059em .1765em .9412em; border: 2.5px solid #1b1428;
-  border-radius: 10px 13px 11px 9px / 11px 9px 13px 10px; background: #fffdf9; box-shadow: inset 5px 0 0 var(--av-color, var(--sv-accent)), 0 6px 12px -6px rgb(27 20 40 / 50%);
-  font-size: .85em; line-height: 1.4118em; color: #1b1428; transform: rotate(-1deg); }
-.stage-name[data-look="c"] { padding: .2em 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* Two rows, the name over its machine; across from them, on a desktop, the models and the agent's badge, at the
+ * interface's own size (they are not part of the slide). On a phone the agent's badge sits under the machine. */
+.stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; }
+.stage-name { display: grid; gap: .3em; justify-items: start; }
+.stage-title-tags { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1-5); min-width: 0; font-size: var(--sv-font-xs); }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
-  .room-shell .stage-title:is([data-look="a"], [data-look="c"]) { display: flex; align-items: center; gap: var(--sv-space-2); }
-  .room-shell .stage-title[data-look="a"] { align-items: baseline; }
-  .room-shell .stage-title[data-look="b"] { grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sv-space-2); align-items: center; }
+  .room-shell .stage-title { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-4); }
 }
 .voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }

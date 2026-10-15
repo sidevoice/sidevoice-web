@@ -16,7 +16,6 @@ import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-r
 import { PagedText } from "./PagedText";
 import { useStageConversation, type StageConversation } from "./stage-view";
 import { BalloonTail } from "./BalloonTail";
-import { ConversationAvatar } from "./ConversationAvatar";
 import { useVariant } from "../../lib/variants";
 import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
@@ -68,21 +67,31 @@ function AgentBubble({ turn }: { turn: AgentTurn }) {
   );
 }
 
-/* Where the call is, over the stage (2026-10-15): the conversation's name with more presence and its machine as a chip,
- * in one of three looks compared on the live page (`stageTitle`): a (the name in a display weight after a swatch of the
- * agent's colour, inked as the bichos are, the machine's chip beside it), b (the agent's small avatar with its state
- * dot, the name over the machine's chip) or c (the name on an inked paper sticker, as the balloon, its edge in the
- * agent's colour). The same on a desktop, above the tile, and on a phone, on the tile's corner. */
-const STAGE_TITLES = ["a", "b", "c"] as const;
+/* Where the call is (decided 2026-10-15): the conversation's name in a display weight, and under it the machine it runs on
+ * as a chip; across from them, on a desktop, what it is talked to with
+ * — the voice's models; the agent's harness, model and effort stay a chip at the tile's foot. On a phone the name sits on
+ * the tile's corner and the models are a dot only when one needs something. */
+function AgentBadge({ stage }: { stage: StageConversation }) {
+  if (!stage.row?.harness && !stage.row?.model) return null;
+  const words = [stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ");
+  return <Tooltip content={harnessName(stage.row?.harness) || words}>
+    <span className="stage-tag stage-badge" tabIndex={0}>
+      {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
+      <span>{words || harnessName(stage.row?.harness)}</span>
+    </span>
+  </Tooltip>;
+}
 
-function StageName({ stage, className, look, tone }: { stage: StageConversation; className: string; look: (typeof STAGE_TITLES)[number]; tone: string }) {
+function StageName({ stage, className, tone, children }: { stage: StageConversation; className: string; tone: string; children?: ReactNode }) {
   const Tag = className === "stage-title" ? "header" : "div";
   return (
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
-    <Tag className={className} data-look={look} translate="no" style={avatarTone(tone) as CSSProperties}>
-      {look === "b" && stage.row && <ConversationAvatar row={stage.row} />}
-      <h2 title={stage.title}><span>{stage.title}</span></h2>
-      {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
+    <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
+      <span className="stage-heading">
+        <h2 title={stage.title}><span>{stage.title}</span></h2>
+        {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
+      </span>
+      {children}
     </Tag>
   );
 }
@@ -136,7 +145,6 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
-  const titleLook = useVariant("stageTitle", STAGE_TITLES);
 
   if (!stage.threadId) {
     return (
@@ -156,7 +164,9 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
-      <StageName stage={stage} className="stage-title" look={titleLook} tone={tone} />
+      <StageName stage={stage} className="stage-title" tone={tone}>
+        {!narrow && <span className="stage-title-tags"><VoiceModels /></span>}
+      </StageName>
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
@@ -173,22 +183,16 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
-        <StageName stage={stage} className="stage-name" look={titleLook} tone={tone} />
-        <VoiceModels />
+        <StageName stage={stage} className="stage-name" tone={tone} />
+        {narrow && <VoiceModels />}
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
           <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={setBalloonUp} />
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>
-        <div className="stage-tags">
-          {(stage.row?.harness || stage.row?.model) && <Tooltip content={[harnessName(stage.row?.harness), stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}>
-            <span className="stage-tag stage-badge" tabIndex={0}>
-              {stage.row?.harness && <HarnessIcon harness={stage.row.harness} size={12} />}
-              <span>{[stage.row?.model, stage.row?.effort].filter(Boolean).join(" · ")}</span>
-            </span>
-          </Tooltip>}
-        </div>
+        {/* The agent's harness, model and effort, at the tile's foot (it gives the stage its touch: operator, 2026-10-15). */}
+        <div className="stage-tags"><AgentBadge stage={stage} /></div>
         <PersonTurn conversation={conversation} t={t} />
         {narrow && <TranscriptEntry />}
       </div>

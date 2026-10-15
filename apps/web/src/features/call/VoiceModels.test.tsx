@@ -74,7 +74,7 @@ test("the stage reads the catalogue itself: the Smart Turn badge shows, and the 
   expect(loadVoiceCatalogue).toHaveBeenCalledTimes(1);
   expect(document.querySelectorAll(".voice-chip")).toHaveLength(2);
   const details = () => { fireEvent.click(document.querySelector(".voice-chip")!); return screen.getByRole("tooltip").textContent; };
-  expect(details()).toContain("whisper-base · on this device · not checked yet");
+  expect(details()).toBe("Speech to text · on this device");
 
   const turnModel = { id: "smart-turn-v3", family: "smart-turn", capabilities: ["end-of-turn"], installed: false, builds: [{ ...build, installed: false }], languages: [], voices: [] };
   const withTurn = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, turnModel] } : catalog) as CatalogView[];
@@ -83,10 +83,9 @@ test("the stage reads the catalogue itself: the Smart Turn badge shows, and the 
   expect(chips).toHaveLength(3);
   expect(chips[2]).toHaveAccessibleName("End of turn: smart-turn-v3, not downloaded");
   expect(chips[2].querySelector(".voice-chip-state")).toHaveTextContent("not downloaded");
-  const said = details();
-  expect(said).not.toContain("not checked yet");
-  expect(said).toContain("whisper-base · on this device · ready");
-  expect(said).toContain("eleven_flash_v2_5 · through ElevenLabs · ready");
+  expect(details()).toBe("Speech to text · on this device");
+  fireEvent.click(chips[1]);
+  expect(screen.getAllByRole("tooltip").at(-1)!.textContent).toBe("Text to speech · through ElevenLabs");
   expect(loadVoiceCatalogue).toHaveBeenCalledTimes(1);
 });
 

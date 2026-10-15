@@ -54,17 +54,11 @@ function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slo
   return { stt: slot("stt", stt), tts: slot("tts", tts), turn: turnSlot };
 }
 
-function Details({ stt, tts, turn, t }: { stt: Slot | null; tts: Slot | null; turn: Slot | null; t: Translate }) {
-  const line = (label: string, slot: Slot | null) =>
-    <span className="voice-models-line"><b>{label}</b> {slot ? `${slot.id} · ${slot.where} · ${slot.state}` : t("voiceModels.none")}</span>;
-  return <span className="voice-models-details">{line(t("voiceModels.stt"), stt)}{line(t("voiceModels.tts"), tts)}{turn && line(t("voiceModels.turn"), turn)}</span>;
-}
-
 /** One model: quiet while it is ready (full contrast on hover or focus), and saying its state in words, in the
- *  attention style, while it is not. */
-function Chip({ slot, label, icon, details }: { slot: Slot; label: string; icon: ReactNode; details: ReactNode }) {
+ *  attention style, while it is not. Its tooltip says only what it is for and where it runs (operator, 2026-10-15). */
+function Chip({ slot, label, icon }: { slot: Slot; label: string; icon: ReactNode }) {
   return (
-    <Tooltip content={details}>
+    <Tooltip content={`${label} · ${slot.where}`}>
       <span className="voice-chip" data-attention={slot.attention || undefined} tabIndex={0}
         aria-label={label + ": " + slot.id + (slot.attention ? ", " + slot.state : "")}>
         {icon}<span>{slot.id}</span>{slot.attention && <span className="voice-chip-state">{slot.state}</span>}
@@ -115,12 +109,11 @@ export function VoiceModels() {
     ...(stt ? [{ slot: stt, label: t("voiceModels.stt") }] : []), ...(tts ? [{ slot: tts, label: t("voiceModels.tts") }] : []),
     ...(turn ? [{ slot: turn, label: t("voiceModels.turn") }] : [])]} />;
   const label = t("voiceModels.label", { stt: stt?.id ?? t("voiceModels.none"), tts: tts?.id ?? t("voiceModels.none") });
-  const details = <Details stt={stt} tts={tts} turn={turn} t={t} />;
   return (
     <div className="voice-models" role="group" aria-label={label} translate="no">
-      {stt && <Chip slot={stt} label={t("voiceModels.stt")} icon={<TranscriptionIcon size={12} />} details={details} />}
-      {tts && <Chip slot={tts} label={t("voiceModels.tts")} icon={<VoicesIcon size={12} />} details={details} />}
-      {turn && <Chip slot={turn} label={t("voiceModels.turn")} icon={<EndOfTurnIcon size={12} />} details={details} />}
+      {stt && <Chip slot={stt} label={t("voiceModels.stt")} icon={<TranscriptionIcon size={12} />} />}
+      {tts && <Chip slot={tts} label={t("voiceModels.tts")} icon={<VoicesIcon size={12} />} />}
+      {turn && <Chip slot={turn} label={t("voiceModels.turn")} icon={<EndOfTurnIcon size={12} />} />}
     </div>
   );
 }
