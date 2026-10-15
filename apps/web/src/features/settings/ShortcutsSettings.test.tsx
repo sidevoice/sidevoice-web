@@ -46,9 +46,9 @@ function muteBridge(initial = shortcut(), failure?: unknown) {
 
 const change = () => screen.getByRole("button", { name: "Change" });
 const groups = () => [...document.querySelectorAll(".ui-group-title")].map((title) => title.textContent);
-/** The room's keys as listed: each row's label and its key cap. */
-const pageKeys = () => [...document.querySelectorAll(".ui-row")].filter((row) => row.querySelector(".shortcut-keys"))
-  .map((row) => [row.querySelector(".ui-row-label")!.textContent, row.querySelector(".shortcut-keys")!.textContent]);
+/** The room's keys as listed (the last group): each row's label and its key caps, read as the combination by their label. */
+const pageKeys = () => [...[...document.querySelectorAll(".ui-group")].at(-1)!.querySelectorAll(".ui-row")].filter((row) => row.querySelector(".shortcut-keys"))
+  .map((row) => [row.querySelector(".ui-row-label")!.textContent, row.querySelector(".shortcut-keys")!.getAttribute("aria-label")]);
 
 test("Shortcuts shows in the desktop app where it offers the mute shortcut, or wherever a keyboard is likely; never on a phone", () => {
   keyboard(false);
@@ -86,7 +86,7 @@ test("in the app: its global mute shortcut first, anywhere on this computer; the
   render(<ShortcutsSettings t={en} />);
   expect(groups()).toEqual(["Anywhere on this computer", "While Sidevoice is in front"]);
   const global = document.querySelectorAll(".ui-group")[0] as HTMLElement;
-  expect(await within(global).findByText("⇧⌘M")).toBeInTheDocument();
+  expect(await within(global).findByLabelText("⇧⌘M")).toBeInTheDocument();
   expect(within(global).getByText("Mute shortcut")).toBeInTheDocument();
   expect(within(global).getByText("Mutes or unmutes the microphone from anywhere, even with Sidevoice in the background.")).toBeInTheDocument();
   expect(pageKeys()).toEqual([["Mute or unmute the microphone", "Ctrl+D"], ["Talk while muted", "Space"]]);
@@ -125,18 +125,18 @@ test("Change records the next combination: Cmd+Shift+M sets it, a key alone is i
   await act(async () => { fireEvent.keyDown(recording, { key: "m", metaKey: true, shiftKey: true }); });
   expect(bridge.set).toHaveBeenCalledExactlyOnceWith("Cmd+Shift+M");
   expect(screen.getByRole("button", { name: "Change" })).toHaveAttribute("aria-pressed", "false");
-  expect(screen.getByText("Cmd+Shift+M")).toBeInTheDocument();
+  expect(screen.getByLabelText("Cmd+Shift+M")).toBeInTheDocument();
 });
 
 test("Escape stops recording without changing the shortcut", async () => {
   const { bridge } = muteBridge();
   inApp({ muteShortcut: bridge });
   render(<ShortcutsSettings t={en} />);
-  await screen.findByText("⇧⌘M");
+  await screen.findByLabelText("⇧⌘M");
   fireEvent.click(change());
   fireEvent.keyDown(screen.getByRole("button", { name: "Recording — Esc to stop" }), { key: "Escape" });
   expect(change()).toHaveAttribute("aria-pressed", "false");
-  expect(screen.getByText("⇧⌘M")).toBeInTheDocument();
+  expect(screen.getByLabelText("⇧⌘M")).toBeInTheDocument();
   expect(bridge.set).not.toHaveBeenCalled();
 });
 
@@ -144,7 +144,7 @@ test("keys pressed while not recording change nothing", async () => {
   const { bridge } = muteBridge();
   inApp({ muteShortcut: bridge });
   render(<ShortcutsSettings t={en} />);
-  await screen.findByText("⇧⌘M");
+  await screen.findByLabelText("⇧⌘M");
   fireEvent.keyDown(change(), { key: "k", metaKey: true });
   expect(bridge.set).not.toHaveBeenCalled();
 });
@@ -153,7 +153,7 @@ test("Clear sets no shortcut", async () => {
   const { bridge } = muteBridge();
   inApp({ muteShortcut: bridge });
   render(<ShortcutsSettings t={en} />);
-  await screen.findByText("⇧⌘M");
+  await screen.findByLabelText("⇧⌘M");
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Clear" })); });
   expect(bridge.set).toHaveBeenCalledExactlyOnceWith(null);
   expect(screen.getByText("Not set")).toBeInTheDocument();
@@ -183,12 +183,12 @@ test("a combination the app can't register says so; any other failure says it co
     const { bridge } = muteBridge(shortcut(), failure);
     inApp({ muteShortcut: bridge });
     const view = render(<ShortcutsSettings t={en} />);
-    await screen.findByText("⇧⌘M");
+    await screen.findByLabelText("⇧⌘M");
     fireEvent.click(change());
     await act(async () => { fireEvent.keyDown(screen.getByRole("button", { name: "Recording — Esc to stop" }), { key: "F13", ctrlKey: true }); });
     expect(bridge.set).toHaveBeenCalledWith("Ctrl+F13");
     expect(screen.getByRole("alert")).toHaveTextContent(copy);
-    expect(screen.getByText("⇧⌘M")).toBeInTheDocument();
+    expect(screen.getByLabelText("⇧⌘M")).toBeInTheDocument();
     view.unmount();
   }
 });
@@ -197,9 +197,9 @@ test("a change the app reports shows at once, and unmounting stops listening", a
   const { bridge, emit } = muteBridge();
   inApp({ muteShortcut: bridge });
   const view = render(<ShortcutsSettings t={en} />);
-  await screen.findByText("⇧⌘M");
+  await screen.findByLabelText("⇧⌘M");
   act(() => emit(shortcut({ accelerator: "Ctrl+Alt+K", label: "⌃⌥K", state: "refused", alternatives: [] })));
-  expect(screen.getByText("⌃⌥K")).toBeInTheDocument();
+  expect(screen.getByLabelText("⌃⌥K")).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("Another app already uses this shortcut.");
   expect(screen.queryByRole("group", { name: "Shortcuts you can use" })).toBeNull();
   view.unmount();

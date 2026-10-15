@@ -74,7 +74,7 @@ test("with a keyboard, Shortcuts follows Call: the keys the room answers, read o
   const pane = document.getElementById("pane-shortcuts")!;
   expect(pane).not.toHaveAttribute("hidden");
   expect(document.getElementById("settings-shortcuts")).toHaveAttribute("aria-current", "page");
-  expect([...pane.querySelectorAll(".shortcut-keys")].map((keys) => keys.textContent)).toEqual(["Ctrl+D", "Space"]);
+  expect([...pane.querySelectorAll(".shortcut-keys")].map((keys) => keys.getAttribute("aria-label"))).toEqual(["Ctrl+D", "Space"]);
   expect(pane.querySelector("button")).toBeNull();
   expect(document.getElementById("pane-call")).not.toHaveTextContent("Mute shortcut");
 });
@@ -99,7 +99,7 @@ test("in the desktop app, Shortcuts holds its global mute shortcut, and Call kee
   expect(call).not.toHaveTextContent("Mute shortcut");
   fireEvent.click(document.getElementById("settings-shortcuts")!);
   const pane = document.getElementById("pane-shortcuts")!;
-  expect(await within(pane).findByText("⇧⌘M")).toBeInTheDocument();
+  expect(await within(pane).findByLabelText("⇧⌘M")).toBeInTheDocument();
   expect([...pane.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Anywhere on this computer", "While Sidevoice is in front"]);
   expect(within(pane).getByRole("button", { name: "Change" })).toBeInTheDocument();
 });
@@ -230,7 +230,7 @@ test("a delete that fails says why in words: a model still downloading, or one t
   expect(error.textContent!.replace(error.querySelector("details")!.textContent!, "")).not.toContain("EBUSY");
 });
 
-test("the voice detector comes first, is never deletable, and says why after its tags; a row's tags are its purpose then In use", () => {
+test("the voice detector comes first, is never deletable, and says why right by its name; a row's tags are its purpose then In use", () => {
   const vad = { ...model("silero-vad", "silero-vad", "vad") };
   const withVad = [{ ...withUnused[0], models: [...(withUnused[0] as { models: unknown[] }).models, vad] }] as unknown as CatalogView[];
   const store = open("whisper-base");
@@ -241,7 +241,7 @@ test("the voice detector comes first, is never deletable, and says why after its
   expect(screen.queryByRole("button", { name: "Delete silero-vad from this device" })).toBeNull();
   expect(list?.querySelector('[data-model="silero-vad"] .ui-infotip')).not.toBeNull();
   const tags = (id: string) => [...list!.querySelector(`[data-model="${id}"] .downloaded-model-title`)!.children].map((tag) => tag.matches(".ui-infotip") ? "ui-infotip" : tag.className.split(" ")[0]);
-  expect(tags("silero-vad")).toEqual(["downloaded-model-name", "model-purpose", "ui-badge", "ui-infotip"]);
+  expect(tags("silero-vad")).toEqual(["downloaded-model-name", "ui-infotip", "model-purpose", "ui-badge"]);
   expect(tags("whisper-base")).toEqual(["downloaded-model-name", "model-purpose", "ui-badge"]);
 });
 
