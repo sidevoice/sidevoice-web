@@ -29,4 +29,12 @@
    and the clock, filling the room the button leaves. */
 .try-take[data-inline] { flex: 1; min-width: 0; }
 .try-take[data-inline] .try-take-player { gap: var(--sv-space-2); }
-.try-take[data-inline] .try-take-wave { height: 28px; }
+/* Inline, as a voice note: one capsule (its own surface, a hairline, round ends) holding a round Play, the waveform and
+   the clock — one object, not three loose parts. */
+.try-take[data-inline] .try-take-player { padding: 4px var(--sv-space-3) 4px 4px; border: 1px solid var(--sv-border); border-radius: 999px; background: var(--sv-surface); }
+/* Play inside the capsule: the icon alone, in the accent, no ring or fill of its own (a button shape inside the capsule
+   reads as a second, clashing outline). */
+.try-take[data-inline] .try-take-play { border: 0; border-radius: 50%; background: transparent; color: var(--sv-accent-text); box-shadow: none; }
+.try-take[data-inline] .try-take-play:hover { background: color-mix(in srgb, var(--sv-accent) 12%, transparent); }
+.try-take[data-inline] .try-take-wave { height: 24px; }
+.try-take[data-inline] .try-take-clock { min-width: 8ch; font-size: var(--sv-font-xs); }
