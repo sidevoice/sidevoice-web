@@ -26,14 +26,14 @@ test("the published browser host records opt-in takes and reports rendered speak
       speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.6), sampleRate: 16000 }) },
     }) }) };
     const audio = {
-      attach() { return { io: { start(next) { sink = next; queueMicrotask(() => sink.ready()); },
-        stop() {}, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1 } }; },
-      routeInput: async () => {},
+      attach() { const lane = { active: false }; return { io: { start(next) { lane.active = true; sink = next; queueMicrotask(() => sink.ready()); },
+        stop() { lane.active = false; }, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1, lane } }; },
+      // As the shared audio does: only a started lane can be given the microphone.
+      routeInput: async (target) => { if (target && !target.lane.active) throw new TypeError("an inactive lane"); },
       setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
     const owner = createVoiceHost(source, { io: audio });
     const host = owner.createCall();
-    await owner.routeInput(host);
     const stops = [
       host.onState((state) => seen.states.push(state.listening)),
       host.onTurn((turn) => seen.turns.push(turn.phase)),
@@ -42,6 +42,7 @@ test("the published browser host records opt-in takes and reports rendered speak
     ];
     await host.setSettings({ stt: { model: "fake" }, tts: { model: "fake" }, end_of_turn: "silence", patience: "fast" });
     await host.start({ take: true });
+    await owner.routeInput(host);
     // The fake output reports what a rendered browser audio window would give the host.
     sink.rendered(new Float32Array(16000).fill(0.6));
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -87,13 +88,14 @@ test("the candidate browser host reports a heard reply with scalar progress and 
       speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.2), sampleRate: 16000 }) },
     }) }) };
     const audio = {
-      attach() { return { io: { start(next) { sink = next; queueMicrotask(() => sink.ready()); },
-        stop() {}, stopPlayback() {},
+      attach() { const lane = { active: false }; return { io: { start(next) { lane.active = true; sink = next; queueMicrotask(() => sink.ready()); },
+        stop() { lane.active = false; }, stopPlayback() {},
         play(utterance, chunk) {
           played.push([utterance, chunk]);
           queueMicrotask(() => { sink.chunkStarted(utterance, chunk); sink.chunkPlayed(utterance, chunk); sink.playbackEnded(); });
-        }, dispose() {} }, input: { id: 1 } }; },
-      routeInput: async () => {},
+        }, dispose() {} }, input: { id: 1, lane } }; },
+      // As the shared audio does: only a started lane can be given the microphone.
+      routeInput: async (target) => { if (target && !target.lane.active) throw new TypeError("an inactive lane"); },
       setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
     const host = createVoiceHost(source, { io: audio }).createCall();
@@ -138,9 +140,10 @@ test("a recorded settings try delivers the package take through the real trial a
       speaker: { speak: async () => ({ samples: new Float32Array(16000), sampleRate: 16000 }) },
     }) }) };
     const audio = {
-      attach() { return { io: { start(sink) { window.__trialSink = sink; queueMicrotask(() => sink.ready()); },
-        stop() {}, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1 } }; },
-      routeInput: async () => {},
+      attach() { const lane = { active: false }; return { io: { start(sink) { lane.active = true; window.__trialSink = sink; queueMicrotask(() => sink.ready()); },
+        stop() { lane.active = false; }, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1, lane } }; },
+      // As the shared audio does: only a started lane can be given the microphone.
+      routeInput: async (target) => { if (target && !target.lane.active) throw new TypeError("an inactive lane"); },
       setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
     const owner = createVoiceHost(source, { io: audio });
