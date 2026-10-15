@@ -34,7 +34,7 @@ export const UPDATE_PLACE = {
 };
 
 export type UpdateMode = "automatic" | "manual";
-export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed";
+export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed" | "update-cancel-failed";
 export interface UpdaterStatus {
   state: "idle" | "available" | "downloading" | "ready";
   version?: string;
@@ -45,7 +45,8 @@ export interface UpdaterStatus {
 /** The desktop app's updater (sidevoice-desktop #56: a release's, and for now a nightly's; a development build or an
  *  older app has none, and then nothing of it shows: whatever its channel, it is the updater that says). Each method
  *  is looked for before it is used. Automatic downloads an update by itself; manual says one exists and `download`
- *  fetches it. `restart` installs a ready one at once. */
+ *  fetches it. `cancel` stops a download in progress (sidevoice-desktop #91): the partial is removed and the status is
+ *  `available` again, the update still known. `restart` installs a ready one at once. */
 export interface AppUpdater {
   settings?(): Promise<{ mode: UpdateMode }>;
   setMode?(mode: UpdateMode): Promise<{ mode: UpdateMode }>;
@@ -53,6 +54,7 @@ export interface AppUpdater {
   subscribe?(listener: (status: UpdaterStatus) => void): () => void;
   check?(): Promise<UpdaterStatus>;
   download?(): Promise<UpdaterStatus>;
+  cancel(): Promise<void>;
   restart?(): Promise<void>;
 }
 export function appUpdater(): AppUpdater | null {
@@ -83,6 +85,9 @@ function flag(set: WeakSet<AppUpdater>, updater: AppUpdater, on: boolean) {
   if (on) set.add(updater); else set.delete(updater);
   window.dispatchEvent(new Event(CHANGED));
 }
+/** The version whose download the person cancelled, per app updater ("" where the app names none): the app does not
+ *  download it again by itself, so it reads as available with its Download, in either mode, until it moves on. */
+const cancelledVersions = new WeakMap<AppUpdater, string>();
 /** The mode as each app's updater last answered it, for every place that shows its update. */
 const knownModes = new WeakMap<AppUpdater, UpdateMode>();
 function modeKnown(updater: AppUpdater, mode: UpdateMode) {
@@ -97,6 +102,7 @@ export function useAppUpdate() {
   const [updater] = useState(appUpdater);
   const [status, setStatus] = useState<UpdaterStatus | null>(null);
   const [mode, setModeShown] = useState<UpdateMode | null>(() => updater ? knownModes.get(updater) ?? null : null);
+  const [cancelledVersion, setCancelledVersion] = useState(() => updater ? cancelledVersions.get(updater) ?? null : null);
   const [checkedAt, setCheckedAt] = useState(readCheckedAt);
   const [person, setPerson] = useState(() => ({ checking: !!updater && checking.has(updater), asked: !!updater && asked.has(updater) }));
 
@@ -104,6 +110,7 @@ export function useAppUpdate() {
     const changed = () => {
       setCheckedAt(readCheckedAt());
       if (updater && knownModes.has(updater)) setModeShown(knownModes.get(updater)!);
+      if (updater) setCancelledVersion(cancelledVersions.get(updater) ?? null);
       if (updater) setPerson((was) => was.checking === checking.has(updater) && was.asked === asked.has(updater) ? was
         : { checking: checking.has(updater), asked: asked.has(updater) });
     };
@@ -152,6 +159,8 @@ export function useAppUpdate() {
   }
   async function download() {
     if (typeof updater?.download !== "function") return null;
+    cancelledVersions.delete(updater);
+    window.dispatchEvent(new Event(CHANGED));
     try {
       const next = await updater.download();
       if (next && typeof next.state === "string") setStatus(next);
@@ -159,6 +168,22 @@ export function useAppUpdate() {
     } catch (error) {
       throw failedAs("update-download-failed", error);
     }
+  }
+  /** Stops the download in progress; the app's answer is the status, `available` again. The cancellation is kept
+   *  before the call: the app pushes `available` before it answers, and that status is already a cancelled one. */
+  async function cancel() {
+    if (!updater) return;
+    cancelledVersions.set(updater, status?.version ?? "");
+    window.dispatchEvent(new Event(CHANGED));
+    try {
+      await updater.cancel();
+    } catch (error) {
+      cancelledVersions.delete(updater);
+      window.dispatchEvent(new Event(CHANGED));
+      throw failedAs("update-cancel-failed", error);
+    }
+    // The status is pushed too; asked for here for an app that does not push it.
+    try { const next = await updater.status(); if (next && typeof next.state === "string") setStatus(next); } catch { /* The pushed status stands. */ }
   }
   /** Restarts into the ready update, now, whether a call is on or not. */
   async function restart() {
@@ -173,15 +198,18 @@ export function useAppUpdate() {
     try { modeKnown(updater, (await updater.setMode(next)).mode === "manual" ? "manual" : "automatic"); } catch (error) { modeKnown(updater, before); throw error; }
   }
   const shownMode = updater ? mode : null;
+  const cancelled = status?.state === "available" && cancelledVersion === (status.version ?? "");
   return {
-    updater, status, mode: shownMode, checkedAt, check, download, restart, setMode,
+    updater, status, mode: shownMode, cancelled, checkedAt, check, download, cancel, restart, setMode,
     /** Whether the person's own check is under way; whether it found what the app has now. */
     checking: !!updater && person.checking,
     asked: !!updater && person.asked,
     /** The app's update as Settings › Updates shows it (appUpdateInView), and as the room's notice says it
      *  (appUpdateShown). */
-    inView: appUpdateInView(status, shownMode, !!updater && person.asked, !!updater && person.checking),
-    noticed: appUpdateShown(status, shownMode, !!updater && person.checking),
+    /** Whether This device says the app's update is pending (appUpdatePending): not Settings' visibility. */
+    pending: appUpdatePending(status, shownMode, !!updater && person.asked, !!updater && person.checking),
+    inView: appUpdateInView(status, shownMode, !!updater && person.asked, !!updater && person.checking, cancelled),
+    noticed: appUpdateShown(status, shownMode, !!updater && person.checking, cancelled),
     can: {
       mode: typeof updater?.settings === "function" && typeof updater.setMode === "function",
       check: typeof updater?.check === "function",
@@ -199,23 +227,33 @@ function failedAs(code: UpdaterFailure, error: unknown) {
 }
 
 /** What the room's notice says of the app's update: manual, that one is available (with Download) once a check found
- *  one; in either mode, once downloaded, that it is ready to restart into — never a download, whose progress is
- *  Updates' to show, and nothing while the person's own check runs. Automatic says nothing until then: it downloads by
- *  itself. A download that failed is said with its Retry (manual), an install that failed with ready; a failed check is
- *  Updates' to say. */
-export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null, checking = false): UpdaterStatus | null {
+ *  one; in either mode, a download in progress (with Cancel; its progress is Updates' to show) and, once downloaded,
+ *  that it is ready to restart into — and nothing while the person's own check runs. Automatic says nothing of an
+ *  update available: it downloads by itself — unless the person cancelled that download (`cancelled`): it is not
+ *  fetched again by itself, so it is said available, as manual's. A download that failed is said with its Retry
+ *  (manual), an install that failed with ready; a failed check is Updates' to say. */
+export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null, checking = false, cancelled = false): UpdaterStatus | null {
   if (!status || checking) return null;
-  if (status.state === "ready") return status;
-  return mode === "manual" && status.state === "available" ? status : null;
+  if (status.state === "ready" || status.state === "downloading") return status;
+  return (mode === "manual" || cancelled) && status.state === "available" ? status : null;
 }
 
-/** What Settings › Updates shows of the app's update: every step of what the person's own check found (`asked`),
- *  automatic's download too; else what the app found by itself as its mode has it — manual, at once and its download
- *  after Download; automatic, once ready (never a download it runs by itself) — and nothing while the person's check
- *  runs (Updates says Checking…). */
-export function appUpdateInView(status: UpdaterStatus | null, mode: UpdateMode | null, asked: boolean, checking = false): UpdaterStatus | null {
+/** What Settings › Updates shows of the app's update: every step of what the person's own check found (`asked`); else
+ *  what the app found by itself as its mode has it — manual, at once and its download after Download; automatic, a
+ *  download in progress (to cancel) and once ready, and a download the person cancelled (`cancelled`), available again
+ *  — and nothing while the person's check runs (Updates says Checking…). */
+export function appUpdateInView(status: UpdaterStatus | null, mode: UpdateMode | null, asked: boolean, checking = false, cancelled = false): UpdaterStatus | null {
   if (!status || status.state === "idle" || checking) return null;
-  return asked || status.state === "ready" || mode === "manual" ? status : null;
+  return asked || status.state !== "available" || cancelled || mode === "manual" ? status : null;
+}
+
+/** Whether the app's update is pending as This device says it: what the person's own check found (`asked`); else
+ *  manual's as soon as found, automatic's once ready — a download the app runs by itself, or an update it is about to
+ *  download, is neither pending nor current; nothing while the person's check runs. Settings › Updates shows more
+ *  (`appUpdateInView`: a download to cancel) without This device saying more. */
+export function appUpdatePending(status: UpdaterStatus | null, mode: UpdateMode | null, asked: boolean, checking = false): boolean {
+  if (!status || status.state === "idle" || checking) return false;
+  return asked || status.state === "ready" || mode === "manual";
 }
 
 /** What updates Sidevoice on a machine, as the connector's README documents it (sidevoice/sidevoice-connector,
