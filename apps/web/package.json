@@ -22,7 +22,7 @@
     "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-tooltip": "^1.2.16",
-    "@sidevoice/engine": "0.3.1",
+    "@sidevoice/engine": "0.5.0",
     "@sidevoice/protocol": "0.2.1",
     "@sidevoice/voice": "0.3.1",
     "class-variance-authority": "^0.7.1",
