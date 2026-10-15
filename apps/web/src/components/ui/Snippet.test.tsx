@@ -22,8 +22,9 @@ test("a Snippet is a command or a file's lines in monospace, and a Quote a phras
     <Snippet text={'{\n  "mcpServers": {}\n}'} label="Copy the configuration" />
     <Quote text="Connect to Sidevoice (use its voice_connect tool)" label="Copy the message" />
   </>);
-  // As it is, line breaks and all: the text alone is what a tap selects whole.
+  // As it is, line breaks and all. Several lines may be selected in part (ui.css); one line, a tap selects whole.
   expect(document.querySelector(".ui-snippet pre code")?.textContent).toBe('{\n  "mcpServers": {}\n}');
+  expect(document.querySelector(".ui-snippet pre")).toHaveAttribute("data-lines", "many");
   expect(document.querySelector(".ui-quote blockquote")).toHaveTextContent("Connect to Sidevoice (use its voice_connect tool)");
   expect(screen.getByRole("button", { name: "Copy the configuration" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Copy the message" })).toBeInTheDocument();

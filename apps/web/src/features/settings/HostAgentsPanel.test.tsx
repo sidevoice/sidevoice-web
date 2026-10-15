@@ -1,6 +1,6 @@
 import { expect, test, vi, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { HostAgentsPanel } from "./HostAgentsPanel";
+import { HostAgentsPanel, sidevoiceEntry } from "./HostAgentsPanel";
 import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
@@ -91,7 +91,7 @@ test("manual instructions come from the selected host and trigger four-second wa
     expect(steps(row)).toEqual(["/opt/sidevoice/bin/connector mcp --stdio", '[mcp_servers.sidevoice]\ncommand = "/opt/sidevoice/bin/connector"']);
     expect(row).toHaveTextContent("File: ~/.codex/config.toml");
     fireEvent.click(screen.getByText("Don’t see yours? Connect it by hand"));
-    expect(screen.getByText("sidevoice connector mcp")).toBeInTheDocument();
+    expect(document.querySelector("#host-agent-other-howto code")?.textContent).toBe('"sidevoice": {\n  "command": "sidevoice"\n}');
     act(() => { vi.advanceTimersByTime(4000); });
     expect(loadHostAgents).toHaveBeenCalledWith("fp-a", { rescan: true, watch: "codex" });
   } finally {
@@ -481,5 +481,23 @@ test("a machine with only Cursor installed lists Cursor, and Other to connect an
   expect([...document.querySelectorAll(".host-agent-row .host-agent-name strong")].map((name) => name.textContent)).toEqual(["Cursor"]);
   const other = screen.getByRole("button", { name: "Don’t see yours? Connect it by hand" });
   fireEvent.click(other);
-  expect(document.querySelector("#host-agent-other-howto")).toHaveTextContent("sidevoice connector mcp");
+  // What to do — add Sidevoice to the agent's MCP servers — and only Sidevoice's entry to paste there: not the whole
+  // configuration, and not the bare command (the entry holds it, with its environment).
+  const howto = document.querySelector("#host-agent-other-howto")!;
+  expect(howto).toHaveTextContent("Add Sidevoice to your agent’s list of MCP servers");
+  expect(howto.querySelectorAll(".ui-snippet")).toHaveLength(1);
+  expect(howto.querySelector(".ui-snippet code")?.textContent).toBe('"sidevoice": {\n  "command": "sidevoice"\n}');
+  expect(howto).not.toHaveTextContent("sidevoice connector mcp");
+  expect(screen.getByRole("button", { name: "Copy the Sidevoice entry" })).toBeInTheDocument();
+});
+
+test("the entry to paste is Sidevoice's own under mcpServers, as the connector registers it, whole", () => {
+  const entry = { command: "/opt/sidevoice/bin/sidevoice-connector", args: ["mcp"], env: { SIDEVOICE_DATA_DIR: "/home/ana/.local/share/sidevoice" } };
+  const pasted = sidevoiceEntry(JSON.stringify({ mcpServers: { sidevoice: entry } }, null, 2));
+  expect(pasted.startsWith('"sidevoice": {')).toBe(true);
+  // Pasted into a list of servers, it is that member, exactly.
+  expect(JSON.parse(`{${pasted}}`)).toEqual({ sidevoice: entry });
+  // Anything of another shape is shown as it came.
+  expect(sidevoiceEntry("not json")).toBe("not json");
+  expect(sidevoiceEntry('{"servers":{}}')).toBe('{"servers":{}}');
 });

@@ -212,11 +212,24 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   );
 }
 
-/** For an agent the list does not show: one discreet link at its foot, opening how to connect any MCP agent by hand. */
+/** Sidevoice's own entry in the connector's `mcpServers` configuration, as it goes into an agent's list of MCP servers:
+ *  `"sidevoice": { "command", "args", "env" }` — the same command, arguments and environment the connector registers
+ *  with Claude Code, Codex and Cursor. Else (a configuration of another shape) the configuration as it came. */
+export function sidevoiceEntry(snippet: string): string {
+  try {
+    const entry = (JSON.parse(snippet) as { mcpServers?: { sidevoice?: unknown } }).mcpServers?.sidevoice;
+    if (entry && typeof entry === "object") return `"sidevoice": ${JSON.stringify(entry, null, 2)}`;
+  } catch { /* not JSON: shown as it came */ }
+  return snippet;
+}
+
+/** For an agent the list does not show: one discreet link at its foot, opening how to connect any MCP agent by hand —
+ *  add Sidevoice to the agent's list of MCP servers, with its entry to paste there. The command alone is not offered:
+ *  the entry holds it with its arguments and the environment it needs, which the command line leaves out. */
 function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) {
   const t = translator();
   const [open, setOpen] = useState(false);
-  if (!custom) return null;
+  if (!custom?.snippet) return null;
   return (
     <section className="host-agent-other">
       <button type="button" className="host-agent-other-link" aria-expanded={open} aria-controls="host-agent-other-howto" onClick={() => setOpen((value) => !value)}>
@@ -224,8 +237,7 @@ function OtherAgentSection({ custom }: { custom: HostAgentsListing["custom"] }) 
       </button>
       {open && <div className="host-agent-howto" id="host-agent-other-howto">
         <p className="muted">{t("agents.other.detail")}</p>
-        {custom.command && <><p className="host-agent-howto-label">{t("agents.other.command")}</p><Snippet text={custom.command} /></>}
-        {custom.snippet && <><p className="host-agent-howto-label">{t("agents.other.json")}</p><Snippet text={custom.snippet} /></>}
+        <Snippet text={sidevoiceEntry(custom.snippet)} label={t("agents.other.copy")} />
       </div>}
     </section>
   );
