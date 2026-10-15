@@ -111,6 +111,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
           bands around it as a letterboxed video's (useSceneScale fits it; call-view.css names the shapes). What the
           tile says — the name, the voice models, the replies, the badge — is laid on the tile, over canvas and bands. */}
       <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
+        <div className="stage-notice">{notice}</div>
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
@@ -120,7 +121,6 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
-        <div className="stage-notice">{notice}</div>
         <div className="stage-name" translate="no">
           <h2 title={stage.title}>{stage.title}</h2>
           {stage.row?.machine && <span>{stage.row.machine}</span>}
