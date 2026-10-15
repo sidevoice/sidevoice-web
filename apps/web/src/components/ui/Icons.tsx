@@ -6,7 +6,7 @@
  * The exceptions are below: a product's own mark and the logos of other people's products are not
  * generic icons and are drawn here. */
 import {
-  Download, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
+  Download, Trash2, Activity, Check, CheckCheck, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, ExternalLink, Keyboard, KeyRound,
   MessagesSquare, Mic, MicOff, Monitor, MoreHorizontal, MoreVertical, Plus, Info, PanelLeftClose,
   PanelLeftOpen, Pause, Phone, PhoneOff, Play, Plug, RefreshCw, Settings, SkipForward, SlidersHorizontal, Volume2, Wrench, X,
   Box, AudioWaveform, ArrowUp, ArrowLeft, ArrowRight, RefreshCcwDot, Pencil, Laptop, Server,
@@ -44,6 +44,9 @@ export function OtherMachineIcon({ className, size = 18 }: IconProps) {
 }
 /** Renames what it sits beside. */
 export const EditIcon = mark(Pencil, 14);
+export const DeleteIcon = mark(Trash2, 16);
+/** The voice detector (Silero VAD): it hears when someone speaks. */
+export const VoiceDetectionIcon = mark(Activity, 16);
 export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
 /** Puts away what dropped from above: a phone's conversations panel. */

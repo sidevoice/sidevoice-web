@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { InfoTip } from "../../components/ui/InfoTip";
-import { CallIcon, EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
+import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon, DeleteIcon, CloseIcon, VoiceDetectionIcon } from "../../components/ui/Icons";
 import { Row } from "../../components/ui/Card";
 import { ErrorText } from "../../components/ui/ErrorText";
 import { LOCAL_CATALOG } from "../../services/model-catalogs.js";
@@ -31,7 +31,7 @@ function purposeOf(capabilities: readonly string[] | undefined): ModelPurpose {
 }
 
 const PURPOSE_ICON: Record<ModelPurpose, ReactNode> = {
-  transcription: <TranscriptionIcon size={13} />, voice: <VoicesIcon size={13} />, "end-of-turn": <EndOfTurnIcon size={13} />, "every-call": <CallIcon size={13} />,
+  transcription: <TranscriptionIcon size={13} />, voice: <VoicesIcon size={13} />, "end-of-turn": <EndOfTurnIcon size={13} />, "every-call": <VoiceDetectionIcon size={13} />,
 };
 
 function PurposeChip({ purpose, t }: { purpose: ModelPurpose; t: Translate }) {
@@ -107,13 +107,16 @@ function DownloadedModel({ model, inUse, removable, chip = true, t }: { model: D
       <div className="downloaded-model-main">
         <span className="downloaded-model-copy">
           <span className="downloaded-model-title"><code className="downloaded-model-name">{model.id}</code>
+            {/* The voice detector: every call needs it, so it is never offered for deletion — said why, right by its name. */}
+            {inUse && model.purpose === "every-call" && <InfoTip label={t("settings.advanced.vadInfoLabel")}>{t("settings.advanced.vadInfo")}</InfoTip>}
             {chip && <PurposeChip purpose={model.purpose} t={t} />}
             {inUse && <Badge tone="accent">{t("settings.advanced.inUse")}</Badge>}
-            {/* The voice detector: every call needs it, so it is never offered for deletion — said why, after the tags. */}
-            {inUse && model.purpose === "every-call" && <InfoTip label={t("settings.advanced.vadInfoLabel")}>{t("settings.advanced.vadInfo")}</InfoTip>}</span>
-          <span className="downloaded-model-size">{size}{!inUse && model.lastUsedAt ? " · " + ago(model.lastUsedAt, t) : ""}</span>
+            {!inUse && model.lastUsedAt ? <span className="downloaded-model-used">{ago(model.lastUsedAt, t)}</span> : null}</span>
+          {/* Its size, then Delete as a quiet × at the far end, in a column kept for every row (empty where it cannot go):
+              both always in the same place, whatever the row carries. */}
+          <span className="downloaded-model-size">{size}</span>
+          <span className="downloaded-model-action">{removable && !inUse && !asking && <Button ref={deleteButton} variant="ghost" tone="neutral" size="icon-sm" aria-label={t("settings.advanced.deleteNamed", { model: model.id })} title={t("settings.advanced.deleteNamed", { model: model.id })} onClick={() => setAsking(true)}><CloseIcon /></Button>}</span>
         </span>
-        {removable && !inUse && !asking && <Button ref={deleteButton} variant="ghost" tone="danger" size="sm" aria-label={t("settings.advanced.deleteNamed", { model: model.id })} onClick={() => setAsking(true)}>{t("settings.advanced.delete")}</Button>}
       </div>
       {asking && <div className="provider-remove" role="group" aria-label={t("settings.advanced.deleteNamed", { model: model.id })}>
         <p>{t("settings.advanced.deleteConfirm", { model: model.id, size })}</p>
@@ -156,7 +159,7 @@ export function DownloadedModels() {
   const row = (model: Downloaded, chip = true) => <DownloadedModel key={model.id} model={model} inUse={inUse(model)} removable={removable} chip={chip} t={t} />;
   // Remove all, and its question: with the models not in use, wherever the design puts them.
   const removeAllControl = removable && unused.length > 1 && <div className="downloaded-remove-all">
-    {!askingAll ? <Button variant="ghost" tone="danger" size="sm" id="downloaded-remove-all" onClick={() => setAskingAll(true)}>{t("settings.advanced.deleteAllUnusedSized", { size: freed })}</Button>
+    {!askingAll ? <Button variant="ghost" tone="neutral" size="sm" id="downloaded-remove-all" onClick={() => setAskingAll(true)}><DeleteIcon />{t("settings.advanced.deleteAllUnusedSized", { size: freed })}</Button>
       : <div className="provider-remove" role="group" aria-label={t("settings.advanced.deleteAllUnused")}>
         <p>{t("settings.advanced.deleteAllConfirm", { count: unused.length, size: freed })}</p>
         <div className="provider-key-actions">

@@ -258,3 +258,20 @@
 .data-reset-result p { margin: 0 0 var(--sv-space-2); }
 .data-reset-result ul { margin: 0 0 var(--sv-space-2); padding-inline-start: 1.25em; }
 .data-reset-dismiss { float: right; margin-inline-start: var(--sv-space-2); }
+/* Downloaded models (DownloadedModels.tsx), three fixed columns so nothing shifts from row to row: the name with its
+   tags and, when unused, how long ago it was used; its size, right-aligned; Delete as an icon (an empty slot where the
+   model is in use). Remove all unused: a quiet action under the list, at its end. */
+.downloaded-model-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.downloaded-model-size { margin-inline-start: 0; text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.downloaded-model-used { font-size: var(--sv-font-xs); color: var(--sv-text-muted); }
+.downloaded-model-action { flex: none; display: inline-grid; place-items: center; width: 32px; min-height: 32px; }
+.downloaded-remove-all { justify-items: end; }
+/* The size, then Delete at the far end; every row one line and the same height (the name ends in an ellipsis rather than wrapping). */
+.downloaded-model-copy { grid-template-columns: minmax(0, 1fr) 7ch 32px; }
+.downloaded-model-main { min-height: 40px; }
+.downloaded-model-title { flex-wrap: nowrap; overflow: hidden; }
+.downloaded-model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.downloaded-model-title > .downloaded-model-name { flex: 0 1 auto; min-width: 0; }
+.downloaded-model-title > :not(.downloaded-model-name) { flex: none; }
+/* The (i) right by the model's name: no room of its own either side, it reads as part of the name. */
+.downloaded-model-title > .ui-infotip { width: 18px; margin-inline: -6px -4px; }
