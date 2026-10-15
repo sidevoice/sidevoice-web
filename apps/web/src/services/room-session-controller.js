@@ -116,10 +116,10 @@ async function persistPairingProjection(){
  publishPairings();
 }
 async function keepPairings(next){
- const previous=pairings,projected=projectPairings(next,localPairing);
+ const previous=pairings,previousStored=storedPairingState.list,projected=projectPairings(next,localPairing);
  pairings=projected;storedPairingState.list=projected.list.filter(p=>!p.local);
+ try{await persistPairingProjection()}catch(error){pairings=previous;storedPairingState.list=previousStored;throw error}
  discardChangedHostAgents(previous,projected);
- await persistPairingProjection();
  syncLinks();
 }
 // The local host's fingerprint, kept while the app says it has one even when it does not answer for a while (its core
@@ -2003,7 +2003,7 @@ async function loadPairingsBeforeDiscovery(){
    const saved=await nativeData.pairings.read();
    storedPairingState.list=Array.isArray(saved.pairings)?saved.pairings:[];
    pairings=projectPairings(storedPairingState,null);
-  }catch{setRoomError(translator()('data.pairingsReadFailed'));return}
+  }catch{setRoomError(translator()('data.pairingsReadFailed'))}
  }
  await refreshLocalHost();
  startInitialLocate();

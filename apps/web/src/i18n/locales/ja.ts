@@ -860,6 +860,8 @@ export const messages: Messages = {
   "data.step.preferences": "システム設定",
   "data.step.keychain": "プロバイダーキー",
   "data.step.other": "別の項目",
+  "data.step.agents": "エージェント登録",
+  "data.agentRemains": "{agent} の登録が残っている可能性があります。",
   "settings.advanced.description": "モデルのメモリ、このデバイスの設定、ビルド情報です。問題を調べるときにお使いください。",
   "settings.save": "変更を保存",
   "settings.general.resetShort": "リセット",

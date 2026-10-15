@@ -118,10 +118,10 @@ export interface DesktopDataBridge {
     state: "needs-restart" | "partial";
     service: "removed" | "absent";
     agents: Record<string, { outcome?: "removed" | "foreign" | "unknown" | "failed" }>;
-    failed: { step: string; key: string }[];
+    failed: { step: string; key: string; agent?: string }[];
     pending: string[];
   }>;
-  resetReport(): Promise<null | { state: "complete" | "partial"; completed: string[]; failed: { step: string; key: string }[] }>;
+  resetReport(): Promise<null | { state: "complete" | "partial"; completed: string[]; failed: { step: string; key: string; agent?: string }[]; agents: Record<string, unknown> }>;
 }
 
 export function desktopDataBridge(): DesktopDataBridge | null {

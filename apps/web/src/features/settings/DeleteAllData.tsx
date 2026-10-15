@@ -11,6 +11,7 @@ const steps: Record<string, MessageKey> = {
   "app-data": "data.step.app", models: "data.step.models", webview: "data.step.webview",
   cache: "data.step.cache", "saved-state": "data.step.saved", logs: "data.step.logs",
   preferences: "data.step.preferences", keychain: "data.step.keychain",
+  agents: "data.step.agents",
 };
 
 type Report = Awaited<ReturnType<DesktopDataBridge["resetReport"]>>;
@@ -43,7 +44,7 @@ export function DeleteAllData() {
       const result = await data.deleteAll();
       setRestarting(true);
       setOpen(false);
-      if (result.failed.length) setReport({ state: "partial", completed: ["service"], failed: result.failed });
+      if (result.failed.length) setReport({ state: "partial", completed: ["service"], failed: result.failed, agents: result.agents });
     } catch (failure) {
       const key = (failure as { key?: string })?.key;
       setError(key === "reset.busy" ? "data.busy" : key === "reset.service-failed" ? "data.serviceFailed" : "data.failed");
@@ -60,7 +61,8 @@ export function DeleteAllData() {
     {report && <div className="data-reset-note" role={report.state === "partial" ? "alert" : "status"}>
       <p>{t(report.state === "partial" ? "data.partial" : "data.complete")}</p>
       {report.failed.length > 0 && <ul>{report.failed.map((entry, index) =>
-        <li key={index}>{t("data.stepFailed", { step: t(steps[entry.step] ?? "data.step.other") })}</li>)}</ul>}
+        <li key={index}>{entry.agent ? t("data.agentRemains", { agent: entry.agent }) :
+          t("data.stepFailed", { step: t(steps[entry.step] ?? "data.step.other") })}</li>)}</ul>}
     </div>}
     {error && !open && <p className="data-reset-note" role="alert">{t(error)}</p>}
     {open && createPortal(<Dialog open size="sm" titleId={titleId} title={t("data.confirmTitle")}

@@ -870,6 +870,8 @@ export const messages: Messages = {
   "data.step.preferences": "las preferencias del sistema",
   "data.step.keychain": "las claves de proveedores",
   "data.step.other": "otro elemento",
+  "data.step.agents": "los registros de agentes",
+  "data.agentRemains": "Puede quedar el registro en {agent}.",
   "settings.advanced.description": "La memoria de los modelos, los ajustes de este dispositivo y la versión: para cuando algo necesita revisarse.",
   "settings.save": "Guardar cambios",
   "settings.general.resetShort": "Restablecer",

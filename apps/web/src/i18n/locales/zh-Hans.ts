@@ -859,6 +859,8 @@ export const messages: Messages = {
   "data.step.preferences": "系统偏好设置",
   "data.step.keychain": "提供商密钥",
   "data.step.other": "其他项目",
+  "data.step.agents": "智能体注册",
+  "data.agentRemains": "{agent} 中的注册可能仍然存在。",
   "settings.advanced.description": "模型内存、此设备的设置和构建版本：用于排查问题。",
   "settings.save": "保存更改",
   "settings.general.resetShort": "重置",
