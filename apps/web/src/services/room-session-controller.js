@@ -1,7 +1,7 @@
 import {createRoomSessionStore,speechSegment,recordReceipt,recordReply,RECONNECT_GRACE_MS,noMachine,reachNote,conversationKey,conversationOf,personKey,displayTitle} from '../state/room-session-state.js';
 import {pageTarget,targetAnswers,routeUrl,callSocketUrl,isNodePath,askTarget,askRoomNode} from './rendezvous.js';
 import {readPairingState,projectPairings,writePairings,withPairing,withoutPairing,revokedPairing,pairingSummary,candidateBases,firstProven,redeemPairingCode,VERIFIED_FOR_MS} from './device-pairing.js';
-import {localHostBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
+import {localHostBridge,desktopDataBridge,normalizeLocalHostPairing,localHostLocator} from './desktop-host.ts';
 import {createHostAgentsController} from './host-agents.ts';
 import {currentDeviceName} from '../state/device-name.ts';
 import {translator,setUiLanguage,onUiLanguage,UI_LANGUAGES} from '../i18n/translator.ts';
@@ -75,7 +75,8 @@ const describeTarget=()=>targetAnswers(target)?askTarget(target,fetch):Promise.r
 // This device's pairings, every one of them live, kept across tabs and reloads. The tokens stay in here and in
 // storage; the store the interface reads gets everything else.
 function pageStorage(){try{return localStorage}catch{return null}}
-const pairingStorage=pageStorage(),storedPairingState=readPairingState(pairingStorage);
+const nativeData=desktopDataBridge();
+const pairingStorage=nativeData?null:pageStorage(),storedPairingState=readPairingState(pairingStorage);
 let localPairing=null;
 let pairings={list:storedPairingState.list};
 const desktopLocalHost=localHostBridge();
@@ -107,12 +108,18 @@ async function setDeviceName(name){
  const results=await Promise.allSettled(asked);
  return results.filter(r=>r.status==='rejected').length;
 }
-function persistPairingProjection(){if(pairingStorage)writePairings(pairingStorage,pairings);publishPairings()}
-function keepPairings(next){
+async function persistPairingProjection(){
+ if(nativeData){
+  try{await nativeData.pairings.write({pairings:pairings.list.filter(p=>!p.local)})}
+  catch{setRoomError(translator()('data.pairingsWriteFailed'));throw Object.assign(Error('data.pairings-write'),{key:'data.pairings-write'})}
+ }else if(pairingStorage&&!writePairings(pairingStorage,pairings)){setRoomError(translator()('data.pairingsWriteFailed'))}
+ publishPairings();
+}
+async function keepPairings(next){
  const previous=pairings,projected=projectPairings(next,localPairing);
  pairings=projected;storedPairingState.list=projected.list.filter(p=>!p.local);
  discardChangedHostAgents(previous,projected);
- persistPairingProjection();
+ await persistPairingProjection();
  syncLinks();
 }
 // The local host's fingerprint, kept while the app says it has one even when it does not answer for a while (its core
@@ -127,7 +134,7 @@ function setLocalPairing(value){
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
  discardChangedHostAgents(previous,projected);
- persistPairingProjection();
+ void persistPairingProjection().catch(()=>{});
  // An unreachable report invalidates the app-owned per-launch proxy immediately. Never keep its URL or
  // session secret around to be reused after native starts a new core.
  if(previousLocal&&previousLocal.fp!==next?.fp)settleLink(previousLocal.fp,null,'away');
@@ -651,7 +658,7 @@ function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
 function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
- keepPairings(revokedPairing(pairings,fp));
+ void keepPairings(revokedPairing(pairings,fp));
  settleLink(fp,null,'revoked');
  const onCall=fp===state.callNode&&(call||inCallNow());
  if(!onCall&&!asked)return;
@@ -669,7 +676,7 @@ async function pairDevice(code,name,address='',{insecure=false}={}){
   try{await fetch(base.base+'/api/device/devices/'+encodeURIComponent(pairing.device_id),withToken({method:'DELETE'},pairing.token))}catch{}
   closePairing();return {host:localPairing.host};
  }
- keepPairings(withPairing(pairings,pairing));
+ await keepPairings(withPairing(pairings,pairing));
  void hostAgentsController.load(pairing.fp);
  verified.set(base.base,Date.now());hostAgentBases.set(pairing.fp,base.base);
  if(!(pairing.fp===state.callNode&&state.ws))settleLink(pairing.fp,base,'ok');
@@ -684,7 +691,7 @@ async function forgetMachine(fp){
  const known=linkBase(fp);
  // The call ends only when it is with the machine forgotten.
  if(fp===state.callNode&&inCallNow())disconnect();
- keepPairings(withoutPairing(pairings,fp));
+ await keepPairings(withoutPairing(pairings,fp));
  if(pairing.revoked)return;
  // Gone from here at once; the machine is told now if it answers, else whenever it does (pendingRevokes).
  const told=await revokeOn(pairing,known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?known:null);
@@ -1990,8 +1997,18 @@ function startInitialLocate(){
  scanPairedAgents();
  void Promise.allSettled(liveMachines().map(fp=>locate(fp))).finally(()=>setUiLanguage(devicePreferences().ui_language));
 }
-if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
-else{void refreshLocalHost();startInitialLocate()}
+async function loadPairingsBeforeDiscovery(){
+ if(nativeData){
+  try{
+   const saved=await nativeData.pairings.read();
+   storedPairingState.list=Array.isArray(saved.pairings)?saved.pairings:[];
+   pairings=projectPairings(storedPairingState,null);
+  }catch{setRoomError(translator()('data.pairingsReadFailed'));return}
+ }
+ await refreshLocalHost();
+ startInitialLocate();
+}
+void loadPairingsBeforeDiscovery();
 setInterval(callBeat,1500);setInterval(machinesBeat,6000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.ws)keepScreenAwake()});
 setupIdleWatch();
