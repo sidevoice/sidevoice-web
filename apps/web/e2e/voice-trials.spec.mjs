@@ -171,7 +171,7 @@ test("a recorded settings try delivers the package take through the real trial a
   expect(takes[0].turns).toBe(1);
 });
 
-test("a completed transcription take shows its waveform and marks, then releases replay audio", async ({ page }) => {
+test("a completed transcription take shows its waveform with only its start and stop, no turn marks, then releases replay audio", async ({ page }) => {
   await installHarness(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/voice/");
@@ -205,9 +205,11 @@ test("a completed transcription take shows its waveform and marks, then releases
   const take = page.locator("#stt-take");
   await expect(take).toBeVisible();
   await expect(take).toContainText("2.0 s recorded");
-  await expect(take.locator('[data-kind="speech"]')).toHaveCount(2);
-  await expect(take.locator('[data-kind="pause"]')).toHaveCount(2);
-  await expect(take.locator('[data-kind="end"]')).toHaveCount(2);
+  // The transcription take marks only its start and stop (decided 2026-10-15): none of its turns, over it or in words.
+  await expect(take.locator('[data-kind="speech"]')).toHaveCount(0);
+  await expect(take.locator('[data-kind="pause"]')).toHaveCount(0);
+  await expect(take.locator('[data-kind="end"]')).toHaveCount(0);
+  await expect(take).not.toContainText("speech starts");
   const slider = take.getByRole("slider");
   await slider.focus();
   await page.keyboard.press("ArrowRight");

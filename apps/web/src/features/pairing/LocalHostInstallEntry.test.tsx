@@ -56,7 +56,9 @@ test("NoMachine keeps remote pairing available while local preparation reports b
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<RoomProvider store={store}><NoMachineScreen installController={controller} /></RoomProvider>);
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  expect(screen.getByText("This computer isn't prepared yet.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "I’ll do it myself" })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   expect(install).toHaveBeenCalledOnce();
   await act(async () => { report({ step: "download", done: 1_572_864, total: 3_145_728 }); });
   expect(screen.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("aria-valuenow", "50");

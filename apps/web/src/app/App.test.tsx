@@ -36,13 +36,18 @@ test("keeps local setup visible through native projection, and puts it away once
   const openPairing = vi.fn();
   window.sidevoiceActions = { chooseMachine, openPairing } as unknown as typeof window.sidevoiceActions;
   const store = createRoomStore();
-  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
+  act(() => store.patch({ machinesReady: true, inApp: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  expect(screen.getAllByText("This computer isn't prepared yet.")[0]).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "I’ll do it myself" })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
-  expect(await screen.findByText("Installing the Sidevoice service…")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Connect to another machine" })).toBeInTheDocument();
+  const settings = document.getElementById("pane-this-computer")!;
+  expect(settings.querySelector(".local-install-panel")).toHaveAttribute("data-phase", "installing");
+  expect(settings.textContent).toContain("Installing the Sidevoice service…");
+  expect(screen.getByRole("region", { name: "No machine connected" })).toHaveTextContent("Installing the Sidevoice service…");
+  expect(document.querySelector(".room-shell > .local-install-entry")).toBeNull();
   expect(agents).not.toHaveBeenCalled();
 
   await act(async () => {
@@ -50,13 +55,13 @@ test("keeps local setup visible through native projection, and puts it away once
     await Promise.resolve();
   });
   act(() => store.patch({ localHostStatus: { state: "failed", installed: false } }));
-  expect(await screen.findByText("The download could not reach the release. Check your connection and retry.")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Connect to another machine" })).toBeInTheDocument();
+  expect(settings.textContent).toContain("The download could not reach the release. Check your connection and retry.");
+  expect(screen.getByRole("region", { name: "No machine connected" })).toHaveTextContent("The download could not reach the release. Check your connection and retry.");
 
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   await act(async () => { resolveRetry({ state: "running", reachable: true, installed: true });await Promise.resolve(); });
-  expect(await screen.findByText("Connecting to this computer…")).toBeInTheDocument();
+  expect(settings.textContent).toContain("Connecting to this computer…");
   expect(chooseMachine).not.toHaveBeenCalled();
 
   act(() => store.patch({
@@ -79,12 +84,12 @@ test("remote room controls stay available when remote pairing succeeds during lo
     cancel: vi.fn(async () => true),
   } } } });
   const store = createRoomStore();
-  act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
+  act(() => store.patch({ machinesReady: true, inApp: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
-  expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  expect(document.querySelector("#pane-this-computer .local-install-panel")).toHaveAttribute("data-phase", "installing");
 
   act(() => store.patch({
     pairings: [{ fp: "fp-remote", device_id: "device-remote", urls: ["https://remote.example"], rv: null,
@@ -94,7 +99,8 @@ test("remote room controls stay available when remote pairing succeeds during lo
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
   expect(screen.getByRole("log")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Join the call" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  expect(document.querySelector(".room-shell > .local-install-entry")).toBeNull();
+  expect(document.querySelector("#pane-this-computer .local-install-panel")).toHaveAttribute("data-phase", "installing");
 
   await act(async () => { resolveInstall({ state: "running", reachable: true, installed: true }); await Promise.resolve(); });
   act(() => localHostInstallController.clear());
@@ -113,7 +119,7 @@ test("a failed local host projected during setup returns to the normal room and 
   act(() => store.patch({ machinesReady: true, localHostAvailable: true, localHostStatus: { state: "absent" } }));
   render(<App store={store} />);
 
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Use agents on this computer" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Prepare this computer" })); });
   act(() => store.patch({ localHostStatus: { state: "installing", installed: false } }));
   act(() => store.patch({
     pairings: [{ fp: "fp-local", device_id: "device-local", urls: ["http://127.0.0.1:45781"], rv: null,
@@ -124,15 +130,15 @@ test("a failed local host projected during setup returns to the normal room and 
 
   expect(screen.queryByRole("heading", { name: "No machine connected" })).toBeNull();
   expect(screen.getByRole("log")).toBeInTheDocument();
-  expect(document.querySelector(".local-host-banner")).toBeInTheDocument();
+  expect(document.querySelector(".local-host-banner")).toBeNull();
   const pane = document.getElementById("pane-machines");
   const dialog = document.getElementById("language-settings");
   pane?.removeAttribute("hidden");
   dialog?.setAttribute("open", "");
   expect(document.querySelector(".machine-entry[data-local='true']")).toHaveAttribute("data-name", "This computer");
-  // Machines shows the first machine's page: its Retry, beside the banner's.
-  expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
-
   await act(async () => { rejectInstall({ key: "install.service", step: "service" }); await Promise.resolve(); });
+  expect(document.querySelector(".local-host-banner")).toBeInTheDocument();
+  // Once preparation has stopped, the installed service's Retry restarts it from the banner or its card.
+  expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
   act(() => localHostInstallController.clear());
 });
