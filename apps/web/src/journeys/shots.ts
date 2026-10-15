@@ -76,7 +76,7 @@ const cursorReadiness = (state: "ready" | "needs_attention" | "unsupported" | "u
   state: state === "unknown_code" ? "needs_attention" : state,
   reasons: state === "needs_attention" ? [{ code: "cursor.bridge_not_running", message: "Voice in the Cursor editor needs Cursor's Desktop Bridge: in Cursor, open Settings › Beta, enable “Allow CLI to access desktop agents”, then restart Cursor." }] :
     state === "unknown_code" ? [{ code: "cursor.future_code", message: "Check the new Cursor setup." }] :
-      state === "unsupported" ? [{ code: "cursor.unsupported", message: "Cursor voice requires a Mac with the Cursor editor installed." }] : [],
+      state === "unsupported" ? [{ code: "cursor.unsupported", message: "Cursor editor voice is not supported on this computer." }] : [],
 });
 const cursorAgentsListing = (state: "ready" | "needs_attention" | "unsupported" | "unknown_code") => {
   const listing = agentsListing();
