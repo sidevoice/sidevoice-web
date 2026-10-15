@@ -28,6 +28,7 @@ test("how something said ended becomes the room's playback report, with only the
     [[{ status: "not-played", reason: "cancelled" }, "hola", "newer_turn"], { status: "unplayed", reason: "newer_turn" }],
     [[{ status: "heard-up-to", heard_chars: 2, reason: "cancelled" }, "hola", "focus_changed"], { status: "interrupted", heard_chars: 2, reason: "focus_changed" }],
     [[{ status: "heard-up-to", heard_chars: 2, reason: "barge-in" }, "hola", null, "agents_muted"], { status: "interrupted", heard_chars: 2, reason: "agents_muted" }],
+    [[{ status: "heard-up-to", heard_chars: 2, reason: "cancelled" }, "hola", null, "agents_muted"], { status: "interrupted", heard_chars: 2, reason: "agents_muted" }],
     [[{ status: "not-played", reason: "barge-in" }, "hola", null, "agents_muted"], { status: "unplayed", reason: "agents_muted" }],
     [[{ status: "not-played", reason: "cancelled" }, "hola", null, "user_skipped"], { status: "unplayed", reason: "user_skipped" }],
     [[{ status: "not-played", reason: "stopped" }, "hola"], { status: "unplayed", reason: "call_ended" }],
