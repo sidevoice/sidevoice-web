@@ -1,17 +1,29 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { NARROW_QUERY } from "../../state/call-layout";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { SidevoiceActions } from "../../state/room-types";
 import { TooltipProvider } from "../../components/ui/Tooltip";
-import { VoiceModels } from "./VoiceModels";
+import { useVoiceModels, VoiceModels } from "./VoiceModels";
 
 afterEach(() => { cleanup(); delete window.sidevoiceActions; });
 
-/* The call's voice models, stacked in the tile's corner: each model's id, and in words what it does. */
+/* The call's voice models, as the call's details list them (CallDetails): what each is for, its model's id, where it
+ * runs and its state; and whether any needs something (the stage title's dot). */
+
+/** The models as the details show them, and what the title's dot reads. */
+let attention = false;
+function Shown() {
+  const voice = useVoiceModels();
+  attention = voice.attention;
+  return <VoiceModels rows={voice.rows} />;
+}
+const rowOf = (row: Element) => ({ task: row.querySelector(".voice-model-task")?.textContent, id: row.querySelector(".voice-model-id")?.textContent,
+  where: row.querySelector(".voice-model-where")?.firstChild?.textContent, state: row.querySelector(".voice-model-state")?.textContent ?? null,
+  attention: row.hasAttribute("data-attention") });
+const rows = () => [...document.querySelectorAll(".voice-model")].map(rowOf);
 
 const build = { id: "b", backend: "sherpa-onnx", precision: "int8", downloadBytes: 1, memoryMb: 1, available: true, reasons: [], installed: true };
 const catalogs = [
@@ -22,70 +34,63 @@ const catalogs = [
 function shown(settings: ReturnType<typeof defaultVoiceSettings> = { ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } }) {
   const store = createRoomStore();
   act(() => store.patch({ voiceSettings: settings, voiceCatalogue: { state: "ready", catalogs, error: "" } }));
-  render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
+  render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
 }
 
-test("speech to text over text to speech, each its model's id, said in full for a screen reader", () => {
+test("speech to text over text to speech, each its model's id and where it runs, the list named in full for a screen reader", () => {
   shown();
-  const group = screen.getByRole("group", { name: "Your voice: whisper-base turns speech to text, eleven_flash_v2_5 speaks" });
-  expect([...group.querySelectorAll(".voice-chip")].map((chip) => chip.getAttribute("aria-label"))).toEqual(["Speech to text: whisper-base", "Text to speech: eleven_flash_v2_5"]);
+  expect(screen.getByRole("list", { name: "Your voice: whisper-base turns speech to text, eleven_flash_v2_5 speaks" })).toBeInTheDocument();
+  expect(rows()).toEqual([
+    { task: "Speech to text", id: "whisper-base", where: "on this device", state: "ready", attention: false },
+    { task: "Text to speech", id: "eleven_flash_v2_5", where: "through ElevenLabs", state: "ready", attention: false },
+  ]);
+  expect(attention).toBe(false);
 });
 
-test("quiet while ready; a model that needs something says so in words, in the attention style", () => {
+test("a model that needs something says so in words, in the attention style, with what can be done; the title's dot follows", () => {
   shown({ ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } });
-  const [stt, tts] = [...document.querySelectorAll(".voice-chip")];
-  expect(stt).toHaveAttribute("data-attention");
-  expect(stt).toHaveAccessibleName("Speech to text: whisper-small, not available now");
-  expect(tts).toHaveAttribute("data-attention");
-  cleanup();
-  shown();
-  expect(document.querySelector(".voice-chip")).not.toHaveAttribute("data-attention");
+  const [stt] = rows();
+  expect(stt).toMatchObject({ id: "whisper-small", state: "not available now", attention: true });
+  expect(document.querySelector(".voice-model[data-attention] .voice-model-action button")).toHaveTextContent("Open its settings");
+  expect(attention).toBe(true);
 });
 
-test("before the catalogue is read, a badge claims nothing about its model: quiet, no state", () => {
+test("before the catalogue is read, a row claims nothing about its model: no state, no attention", () => {
   const store = createRoomStore();
   act(() => store.patch({ voiceSettings: defaultVoiceSettings() }));
-  render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
-  expect([...document.querySelectorAll(".voice-chip")].map((chip) => chip.hasAttribute("data-attention"))).toEqual([false, false]);
-  expect(document.querySelector(".voice-chip-state")).toBeNull();
+  render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
+  expect(rows().map((row) => [row.state, row.attention])).toEqual([[null, false], [null, false]]);
+  expect(attention).toBe(false);
 });
 
-test("the smart end of turn adds its model's badge under the other two; the silence one adds none", () => {
+test("the smart end of turn adds its model's row under the other two; the silence one adds none", () => {
   const turnModel = { id: "smart-turn-v3", family: "smart-turn", capabilities: ["end-of-turn"], installed: false, builds: [{ ...build, installed: false }], languages: [], voices: [] };
   const withTurn = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, turnModel] } : catalog) as CatalogView[];
   const store = createRoomStore();
   act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn" }, voiceCatalogue: { state: "ready", catalogs: withTurn, error: "" } }));
-  render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
-  const chips = [...document.querySelectorAll(".voice-chip")];
-  expect(chips).toHaveLength(3);
-  expect(chips[2]).toHaveAccessibleName("End of turn: smart-turn-v3, not downloaded");
+  render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
+  expect(rows()).toHaveLength(3);
+  expect(rows()[2]).toMatchObject({ task: "End of turn", id: "smart-turn-v3", state: "not downloaded", attention: true });
+  expect(document.querySelectorAll(".voice-model")[2].querySelector(".voice-model-action button")).toHaveTextContent("Download");
   act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "silence" } }));
-  expect(document.querySelectorAll(".voice-chip")).toHaveLength(2);
+  expect(rows()).toHaveLength(2);
 });
 
-test("the stage reads the catalogue itself: the Smart Turn badge shows, and the others say their state, without Settings opened", () => {
+test("the stage reads the catalogue itself, once: the Smart Turn row shows when it is read", () => {
   const loadVoiceCatalogue = vi.fn().mockResolvedValue(undefined);
   window.sidevoiceActions = { loadVoiceCatalogue } as unknown as SidevoiceActions;
   const store = createRoomStore();
-  // The smart end of turn names no model in the settings: its badge waits for the catalogue's.
+  // The smart end of turn names no model in the settings: its row waits for the catalogue's.
   act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn", tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } } }));
   expect(store.getState().facts.voiceCatalogue.state).toBe("idle");
-  render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
+  render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
   expect(loadVoiceCatalogue).toHaveBeenCalledTimes(1);
-  expect(document.querySelectorAll(".voice-chip")).toHaveLength(2);
-  const details = () => { fireEvent.click(document.querySelector(".voice-chip")!); return screen.getByRole("tooltip").textContent; };
-  expect(details()).toBe("Speech to text · on this device");
-
+  expect(rows()).toHaveLength(2);
   const turnModel = { id: "smart-turn-v3", family: "smart-turn", capabilities: ["end-of-turn"], installed: false, builds: [{ ...build, installed: false }], languages: [], voices: [] };
   const withTurn = catalogs.map((catalog) => catalog.id === "local" ? { ...catalog, models: [...catalog.models, turnModel] } : catalog) as CatalogView[];
   act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: withTurn, error: "" } }));
-  const chips = [...document.querySelectorAll(".voice-chip")];
-  expect(chips).toHaveLength(3);
-  expect(chips[2]).toHaveAccessibleName("End of turn: smart-turn-v3, not downloaded");
-  expect(chips[2].querySelector(".voice-chip-state")).toHaveTextContent("not downloaded");
-  expect(details()).toBe("Speech to text · on this device");
-  fireEvent.click(chips[1]);
-  expect(screen.getAllByRole("tooltip").at(-1)!.textContent).toBe("Text to speech · through ElevenLabs");
+  expect(rows()).toHaveLength(3);
+  expect(rows()[1]).toMatchObject({ where: "through ElevenLabs" });
   expect(loadVoiceCatalogue).toHaveBeenCalledTimes(1);
 });
 
@@ -95,22 +100,8 @@ test("a catalogue read or being read is not read again by the stage", () => {
   for (const voiceCatalogue of [{ state: "loading" as const, catalogs: [], error: "" }, { state: "ready" as const, catalogs, error: "" }, { state: "failed" as const, catalogs: [], error: "x" }]) {
     const store = createRoomStore();
     act(() => store.patch({ voiceSettings: defaultVoiceSettings(), voiceCatalogue }));
-    render(<RoomProvider store={store}><TooltipProvider><VoiceModels /></TooltipProvider></RoomProvider>);
+    render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
     cleanup();
   }
   expect(loadVoiceCatalogue).not.toHaveBeenCalled();
-});
-
-test("on a phone: nothing while every model is ready, and only a dot when one needs something", () => {
-  const narrow = vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
-    media, matches: media === NARROW_QUERY, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
-  shown({ ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } });
-  expect(document.querySelector(".voice-chip")).toBeNull();
-  expect(screen.queryByRole("button", { name: "Your voice needs attention" })).toBeNull();
-  cleanup();
-  shown({ ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } });
-  expect(document.querySelector(".voice-chip")).toBeNull();
-  expect(screen.getByRole("button", { name: "Your voice needs attention" })).toBeInTheDocument();
-  narrow.mockRestore();
 });

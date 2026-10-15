@@ -314,48 +314,15 @@
 }
 
 /* What the room says over the stage (CallStage's `notice`: where an update waits, the pill):
- * a pill floating at the tile's top centre, in the band kept clear above the agent's replies and clear of the voice
- * models' corner; it takes no room of its own. */
+ * a pill floating at the tile's top centre, in the band kept clear above the agent's replies; it takes no room of its
+ * own. */
 .stage-notice { position: absolute; z-index: 4; top: var(--stage-inset); left: 50%; display: flex; justify-content: center; width: max-content;
   max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); pointer-events: none; }
 .stage-notice:empty { display: none; }
-.stage-tile:has(> .voice-models, > .voice-attention) > .stage-notice { max-width: calc(100% - 2 * (var(--stage-inset) + var(--models-w) + calc(8 * var(--u)))); }
-/* The app's slide, narrower for its height than a web page's (3:2), leaves the pill no room centred between the models'
- * corner and its mirror: it starts at the tile's top-left corner instead (free on a desktop, whose stage is named above
- * the tile) and reaches up to the models' corner. By the form factor, as the slide's shape is: never by the window. */
-@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
-  .stage-tile[data-app]:has(> .voice-models) > .stage-notice { left: var(--stage-inset); justify-content: flex-start; transform: none;
-    max-width: calc(100% - 2 * var(--stage-inset) - var(--models-w) - calc(8 * var(--u))); }
-}
 /* Its words and buttons keep the interface's size (they are acted on); its place follows the tile. */
 .stage-notice > * { pointer-events: auto; padding: calc(4 * var(--u)) calc(4 * var(--u)) calc(4 * var(--u)) calc(12 * var(--u)); border: 1px solid var(--sv-border);
   border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); box-shadow: var(--sv-shadow-md); }
 
-/* The call's voice models (VoiceModels): the tile's top-right corner, one under the other, small; the conversation's
- * name holds the top-left and the agent's badge the foot. Their column is no wider than the corner allows, so a chip
- * keeps the tile's inset from its edge as the rest of its chrome does, and a long model's name ends in an ellipsis
- * instead of running past the edge. */
-.voice-models { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sv-space-1-5); min-width: 0; }
-/* The models' column: as wide as 16rem was at the chips' 12px, never over 40% of the tile. */
-.stage-tile { --models-w: min(40%, calc(21.3333 * var(--chip-fs))); }
-/* Quiet while ready: no fill, a faint edge, the muted text colour (AA on the tile) and a softer icon; full contrast on
- * hover or focus. Not ready, the attention style, its state in words. */
-.voice-chip { display: inline-flex; align-items: center; gap: .3333em; max-width: 100%; height: max(24px, 2em); padding: 0 .6667em;
-  border: 1px solid color-mix(in srgb, var(--sv-border) 60%, transparent); border-radius: var(--sv-radius-pill); background: transparent;
-  color: var(--sv-text-muted); font-size: 1em; font-weight: var(--sv-weight-medium); white-space: nowrap;
-  transition: color var(--sv-dur-fast) var(--sv-ease), background-color var(--sv-dur-fast) var(--sv-ease), border-color var(--sv-dur-fast) var(--sv-ease); }
-.voice-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.voice-chip svg { flex: none; width: 1em; height: 1em; opacity: .7; }
-.voice-chip:is(:hover, :focus-visible) { border-color: var(--sv-border); background: var(--sv-surface); color: var(--sv-text); }
-.voice-chip:is(:hover, :focus-visible) svg { opacity: 1; }
-.voice-chip[data-attention] { border-color: color-mix(in srgb, var(--sv-warning) 45%, transparent); background: var(--sv-warning-soft); color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
-.voice-chip[data-attention] svg { opacity: 1; color: var(--sv-warning); }
-.voice-chip-state { flex: none; color: var(--sv-text); }
-.voice-chip-state::before { content: "·"; margin-inline-end: .3333em; color: var(--sv-text-muted); }
-@media (prefers-reduced-motion: reduce) { .voice-chip { transition: none; } }
-.voice-chip:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.voice-models-details { display: grid; gap: 2px; }
-.voice-models-line b { font-weight: var(--sv-weight-semibold); }
 
 /* The way into the transcript, in the tile's corner (TranscriptEntry): round, opaque for contrast over the tile's glow,
  * 44px to touch on the phone's slide (--entry: with the tile, never under 36px), a dot when something arrived unread;
@@ -370,18 +337,9 @@
 
 .stage-badge:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
 
-/* A phone's voice models: a dot in the corner while one needs something, opening what and what to do. */
-.voice-attention { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; place-items: center; width: max(24px, calc(32 * var(--u))); height: max(24px, calc(32 * var(--u))); padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.voice-attention span { width: calc(10 * var(--u)); height: calc(10 * var(--u)); border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-warning); }
-.voice-attention:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.voice-attention-list { display: grid; gap: var(--sv-space-3); width: min(280px, calc(100vw - 48px)); margin: 0; padding: 0; list-style: none; }
-.voice-attention-list li { display: grid; gap: var(--sv-space-2); }
-.voice-attention-list li > span { display: grid; gap: 2px; font-size: var(--sv-font-sm); }
-.voice-attention-list li > span > span { color: var(--sv-text-muted); }
-.voice-attention-list .ui-button { justify-self: start; }
 
 /* Over the bicho's backdrop (dark or light, whatever its seed rolled) the tile's words sit on a frosted surface of the
- * theme, so they read on any of them: the conversation's name on a phone, the voice models, the agent's badge. */
+ * theme, so they read on any of them: the conversation's name on a phone and the agent's badge. */
 .stage-name { padding: .3em .6em; border-radius: var(--sv-radius-lg); background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
 /* The conversation's name and its machine, over the stage (CallStage StageName; 2026-10-15): the name in a display
@@ -389,21 +347,72 @@
  * the tile, and on a phone, on the tile's corner. */
 :is(.stage-title, .stage-name) h2 { display: flex; align-items: center; gap: .4em; min-width: 0; margin: 0; font-size: 1em; line-height: 1.2em;
   font-weight: var(--sv-weight-heavy); letter-spacing: -.02em; color: var(--sv-text); }
-:is(.stage-title, .stage-name) h2 > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .stage-machine { display: inline-flex; align-items: center; gap: .3333em; flex: 0 1 auto; min-width: 0; max-width: 16em; height: 1.8333em; padding: 0 .6667em;
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-pill); background: color-mix(in srgb, var(--sv-surface) 84%, transparent);
   font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); white-space: nowrap; color: var(--sv-text-muted); }
 .stage-machine > svg { flex: none; width: 1em; height: 1em; }
 .stage-machine > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Two rows, the name over its machine; across from them, on a desktop, the models and the agent's badge, at the
- * interface's own size (they are not part of the slide). On a phone the agent's badge sits under the machine. */
-.stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; }
+/* Two rows, the name over its machine, as one quiet button that opens what the call runs on (CallDetails): a soft wash
+ * round both rows on hover, the accent's while its details are open, a chevron after the name, and the warning dot
+ * while a voice model needs something (said in words to assistive tech). The stage carries nothing else of the models
+ * (operator, 2026-10-15); the agent's badge keeps the tile's foot. */
 .stage-name { display: grid; gap: .3em; justify-items: start; }
-.stage-title-tags { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1-5); min-width: 0; font-size: var(--sv-font-xs); }
+.stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; max-width: 100%; margin: -.2em -.35em; padding: .2em .35em; border: 0;
+  border-radius: var(--sv-radius-md); background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: start; cursor: pointer;
+  transition: background-color var(--sv-dur-fast) var(--sv-ease); }
+@media (hover: hover) { .stage-heading:hover { background: color-mix(in srgb, var(--sv-text) 7%, transparent); } }
+.stage-heading:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
+.stage-heading[aria-expanded="true"] { background: var(--sv-accent-soft); }
+.stage-heading-name { display: flex; align-items: center; gap: .3em; min-width: 0; max-width: 100%; }
+.stage-heading-name > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.stage-heading-chevron { flex: none; width: .7em; height: .7em; color: var(--sv-text-muted); transition: transform var(--sv-dur-fast) var(--sv-ease); }
+.stage-heading[aria-expanded="true"] .stage-heading-chevron { transform: rotate(180deg); }
+.stage-attention { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--sv-warning); box-shadow: 0 0 0 2px var(--sv-surface); }
+@media (prefers-reduced-motion: reduce) { .stage-heading, .stage-heading-chevron { transition: none; } }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .stage-title { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-4); }
 }
-.voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+/* What the call runs on (CallDetails): the machine, the agent (harness, model, effort) and the voice's models — each
+ * group a small heading over its lines, at the interface's size. A model is one row: its task's icon, what it is for,
+ * its model's id, where it runs and its state; one that needs something wears the warning's soft fill and offers its
+ * action under its words. In a popover under the title (titleDetail "popover"), or a sheet from the window's right edge,
+ * from its foot on a phone ("sheet"), the agent's avatar at its head. */
+.call-details { display: grid; gap: var(--sv-space-4); min-width: 0; }
+.call-details-group { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
+.call-details-group h3 { margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; font-weight: var(--sv-weight-semibold); color: var(--sv-text-muted); }
+.call-details-machine { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; margin: 0; font-size: var(--sv-font-md); line-height: 1.375rem;
+  font-weight: var(--sv-weight-semibold); color: var(--sv-text); overflow-wrap: anywhere; }
+.call-details-agent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; }
+.call-details-agent > div { display: contents; }
+.call-details-agent dt { color: var(--sv-text-muted); }
+.call-details-agent dd { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0; font-weight: var(--sv-weight-semibold); color: var(--sv-text); overflow-wrap: anywhere; }
+:is(.call-details-machine, .call-details-agent) svg { flex: none; color: var(--sv-text-muted); }
+.call-details-none { margin: 0; font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
+.voice-models { display: grid; gap: var(--sv-space-1-5); margin: 0; padding: 0; list-style: none; }
+.voice-model { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--sv-space-2) var(--sv-space-3); padding: var(--sv-space-2) var(--sv-space-3);
+  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+.voice-model[data-attention] { border-color: color-mix(in srgb, var(--sv-warning) 45%, transparent); background: var(--sv-warning-soft); }
+.voice-model-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--sv-surface); color: var(--sv-text-muted); }
+.voice-model[data-attention] .voice-model-icon { color: var(--sv-warning); }
+.voice-model-copy { display: grid; min-width: 0; }
+.voice-model-task, .voice-model-where { font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
+.voice-model-id { overflow: hidden; font-size: var(--sv-font-sm); line-height: 1.25rem; font-weight: var(--sv-weight-semibold); white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
+.voice-model-state::before { content: "·"; margin-inline: .35em; }
+.voice-model[data-attention] .voice-model-state { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
+.voice-model-action { grid-column: 2; justify-self: start; }
+.ui-popover.call-details-popover { width: min(22rem, calc(100vw - 24px)); max-height: min(70dvh, 34rem); overflow: auto; padding: var(--sv-space-4); }
+/* The sheet: the window's height at its right edge, sliding in; a phone's from its foot, as tall as it needs. */
+.ui-dialog.call-details-sheet[data-layout="dialog"] { --ui-dialog-width: 380px; margin: 0 0 0 auto; height: 100dvh; }
+.ui-dialog.call-details-sheet .ui-dialog-surface { height: 100%; max-height: none; border-radius: var(--sv-radius-2xl) 0 0 var(--sv-radius-2xl); animation: call-details-in 220ms var(--sv-ease); }
+.ui-dialog.call-details-sheet .conversation-avatar { width: 36px; height: 36px; }
+@keyframes call-details-in { from { transform: translateX(24px); opacity: 0; } }
+@media (max-width: 899px) {
+  .ui-dialog.call-details-sheet[data-layout="dialog"] { width: 100vw; height: auto; margin: auto 0 0; }
+  .ui-dialog.call-details-sheet .ui-dialog-surface { height: auto; max-height: 85dvh; border-radius: var(--sv-radius-2xl) var(--sv-radius-2xl) 0 0; animation-name: call-details-up; }
+  @keyframes call-details-up { from { transform: translateY(24px); opacity: 0; } }
+}
+@media (prefers-reduced-motion: reduce) { .ui-dialog.call-details-sheet .ui-dialog-surface { animation: none; } }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
 /* The microphone and the speaker (AudioDevices): the devices' button at the microphone's left, in its pill, and the

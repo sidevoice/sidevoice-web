@@ -1,30 +1,27 @@
 import { useContext, type ReactNode, useEffect } from "react";
 import { EndOfTurnIcon, TranscriptionIcon, VoicesIcon } from "../../components/ui/Icons";
-import { Tooltip } from "../../components/ui/Tooltip";
-import { Popover } from "../../components/ui/Popover";
 import { Button } from "../../components/ui/Button";
-import { NARROW_QUERY, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { voiceSettingsHere } from "../../services/voice-settings.js";
 import { useModelState } from "../settings/ModelSetup";
 import { openSettings } from "../settings/open-settings";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 
-/* The models this device's voice runs the call with: what turns the person's speech into text, and what speaks the
- * agent's replies — each its model's id as its catalogue names it, and in a tooltip where it runs (this device, or a
- * provider) and whether it is ready. They sit in the stage tile's top-right corner, one under the other, across from
- * the conversation's name; the agent's badge keeps the tile's foot. They are the settings the voice is given
- * (voiceSettingsHere); the voice reports no model of its own. */
+/* The models this device's voice runs the call with: what turns the person's speech into text, what speaks the agent's
+ * replies, and the smart end of turn's — each its model's id as its catalogue names it, where it runs (this device, or a
+ * provider) and whether it is ready. They are shown in the call's details, opened from the stage's title (CallDetails;
+ * 2026-10-15: no chips on the stage), and the title wears a dot while one needs something. They are the settings the
+ * voice is given (voiceSettingsHere); the voice reports no model of its own. */
 
-/** A model's slot as the badge says it; `attention` when something must be done or waited for before it works. */
-type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string };
+/** A model's slot as the details say it; `attention` when something must be done or waited for before it works. */
+export type Slot = { id: string; where: string; state: string; attention: boolean; task: "stt" | "tts" | "end-of-turn"; status: string; catalog: string };
 
 function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slot | null } {
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
-  // The catalogue is read as the stage first shows these badges (as Settings, the setup and an install read it too):
-  // until it is, nothing is known of a model's state, and the badge claims nothing.
+  // The catalogue is read as the stage first shows (as Settings, the setup and an install read it too):
+  // until it is, nothing is known of a model's state, and nothing is claimed of it.
   const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
   useEffect(() => { if (catalogueState === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const known = catalogueState === "ready";
@@ -46,25 +43,12 @@ function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slo
       attention: status !== "ready" && status !== "unknown",
     };
   };
-  // The smart end of turn has a model of its own; the silence one has none, and no badge.
+  // The smart end of turn has a model of its own; the silence one has none, and no row.
   const turnId = settings?.end_of_turn === "smart-turn" ? turn.model?.id ?? settings.turn_model ?? null : null;
   const turnStatus = !known ? "unknown" : turn.status ?? "unavailable";
   const turnSlot: Slot | null = turnId ? { task: "end-of-turn", status: turnStatus, catalog: "local", id: turnId, where: t("voiceModels.here"), state: t(("voiceModels.state." + turnStatus) as MessageKey),
     attention: turnStatus !== "ready" && turnStatus !== "unknown" } : null;
   return { stt: slot("stt", stt), tts: slot("tts", tts), turn: turnSlot };
-}
-
-/** One model: quiet while it is ready (full contrast on hover or focus), and saying its state in words, in the
- *  attention style, while it is not. Its tooltip says only what it is for and where it runs (operator, 2026-10-15). */
-function Chip({ slot, label, icon }: { slot: Slot; label: string; icon: ReactNode }) {
-  return (
-    <Tooltip content={`${label} · ${slot.where}`}>
-      <span className="voice-chip" data-attention={slot.attention || undefined} tabIndex={0}
-        aria-label={label + ": " + slot.id + (slot.attention ? ", " + slot.state : "")}>
-        {icon}<span>{slot.id}</span>{slot.attention && <span className="voice-chip-state">{slot.state}</span>}
-      </span>
-    </Tooltip>
-  );
 }
 
 /** What a model that needs something can have done about it, from the call: download it (again), add the provider's
@@ -80,40 +64,39 @@ function SlotAction({ slot, t }: { slot: Slot; t: Translate }) {
   return <Button size="sm" variant="secondary" onClick={() => settings(section)}>{t("voiceModels.openSettings")}</Button>;
 }
 
-/** A phone's corner has no room for the badges: nothing while every model is ready, and a dot when one needs
- *  something; a tap on it says which, and what can be done. */
-function AttentionDot({ slots, t }: { slots: { slot: Slot; label: string }[]; t: Translate }) {
-  const needs = slots.filter(({ slot }) => slot.attention);
-  if (!needs.length) return null;
-  return (
-    <Popover label={t("voiceModels.attention")} side="bottom" align="end"
-      trigger={<button type="button" className="voice-attention" aria-label={t("voiceModels.attention")}><span aria-hidden="true" /></button>}>
-      <ul className="voice-attention-list">
-        {needs.map(({ slot, label }) => <li key={slot.task}>
-          <span><strong>{label}</strong><span translate="no">{slot.id} · {slot.state}</span></span>
-          <SlotAction slot={slot} t={t} />
-        </li>)}
-      </ul>
-    </Popover>
-  );
-}
+export interface VoiceModelRow { slot: Slot; label: string; icon: ReactNode }
 
-/** The models, stacked: speech to text, text to speech, and the end of turn's when it is the smart one; nothing before
- *  any is chosen. A phone shows only a dot, and only when one needs something (AttentionDot). */
-export function VoiceModels() {
+/** The call's voice models, in order — speech to text, text to speech, and the end of turn's when it is the smart one —
+ *  and whether any needs something done or waited for: the stage's title shows a dot for that (CallStage StageName). */
+export function useVoiceModels(): { rows: VoiceModelRow[]; attention: boolean } {
   const t = translator();
   const { stt, tts, turn } = useSlots(t);
-  const narrow = useMedia(NARROW_QUERY);
-  if (!stt && !tts) return null;
-  if (narrow) return <AttentionDot t={t} slots={[
-    ...(stt ? [{ slot: stt, label: t("voiceModels.stt") }] : []), ...(tts ? [{ slot: tts, label: t("voiceModels.tts") }] : []),
-    ...(turn ? [{ slot: turn, label: t("voiceModels.turn") }] : [])]} />;
-  const label = t("voiceModels.label", { stt: stt?.id ?? t("voiceModels.none"), tts: tts?.id ?? t("voiceModels.none") });
+  const rows: VoiceModelRow[] = [];
+  if (stt) rows.push({ slot: stt, label: t("voiceModels.stt"), icon: <TranscriptionIcon size={14} /> });
+  if (tts) rows.push({ slot: tts, label: t("voiceModels.tts"), icon: <VoicesIcon size={14} /> });
+  if (turn) rows.push({ slot: turn, label: t("voiceModels.turn"), icon: <EndOfTurnIcon size={14} /> });
+  return { rows, attention: rows.some((row) => row.slot.attention) };
+}
+
+/** The models in the call's details (CallDetails): one row each — what it is for, its model's id, where it runs, its
+ *  state in words, and, when it needs something, what can be done about it. Before the catalogue is read a row claims
+ *  nothing of its state. */
+export function VoiceModels({ rows }: { rows: VoiceModelRow[] }) {
+  const t = translator();
+  const stt = rows.find((row) => row.slot.task === "stt")?.slot.id, tts = rows.find((row) => row.slot.task === "tts")?.slot.id;
   return (
-    <div className="voice-models" role="group" aria-label={label} translate="no">
-      {stt && <Chip slot={stt} label={t("voiceModels.stt")} icon={<TranscriptionIcon size={12} />} />}
-      {tts && <Chip slot={tts} label={t("voiceModels.tts")} icon={<VoicesIcon size={12} />} />}
-      {turn && <Chip slot={turn} label={t("voiceModels.turn")} icon={<EndOfTurnIcon size={12} />} />}
-    </div>
+    <ul className="voice-models" aria-label={t("voiceModels.label", { stt: stt ?? t("voiceModels.none"), tts: tts ?? t("voiceModels.none") })}>
+      {rows.map(({ slot, label, icon }) => (
+        <li key={slot.task} className="voice-model" data-attention={slot.attention || undefined}>
+          <span className="voice-model-icon" aria-hidden="true">{icon}</span>
+          <span className="voice-model-copy">
+            <span className="voice-model-task">{label}</span>
+            <span className="voice-model-id" translate="no">{slot.id}</span>
+            <span className="voice-model-where">{slot.where}{slot.status !== "unknown" && <span className="voice-model-state">{slot.state}</span>}</span>
+          </span>
+          {slot.attention && <span className="voice-model-action"><SlotAction slot={slot} t={t} /></span>}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -31,14 +31,13 @@ for (const [label, viewport, ratio] of [["a web page, 16:9", { width: 1280, heig
   });
 }
 
-test("the voice models' chips keep the tile's inset from its right edge, as the rest of its chrome", async ({ page }) => {
+
+test("the stage carries no voice-model chips: the title opens what the call runs on, the models among it", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  const { tile } = await canvasOnStage(page, false);
-  const chips = page.locator(".voice-models .voice-chip");
-  await expect(chips.first()).toBeVisible();
-  for (const chip of await chips.all()) {
-    const box = await chip.boundingBox();
-    // 16px (the tile's inset) inside its 1px border.
-    expect(tile.x + tile.width - (box.x + box.width)).toBeGreaterThanOrEqual(16);
-  }
+  await canvasOnStage(page, false);
+  await expect(page.locator(".stage-tile .voice-chip, .stage-title .voice-chip")).toHaveCount(0);
+  await page.locator(".stage-title .stage-heading").click();
+  const details = page.locator(".call-details");
+  await expect(details).toBeVisible();
+  await expect(details.locator(".voice-model").first()).toBeVisible();
 });

@@ -19,19 +19,12 @@ import { BalloonTail } from "./BalloonTail";
 import { useVariant } from "../../lib/variants";
 import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
-import { VoiceModels } from "./VoiceModels";
+import { useVoiceModels } from "./VoiceModels";
+import { harnessName, StageHeading, TITLE_DETAILS, type TitleDetail } from "./CallDetails";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
 import { desktopHost } from "../../services/desktop-host";
 
-/** A harness by its product name, for the badge's tooltip; one not known, as it is reported. */
-function harnessName(id: string | null | undefined) {
-  if (!id) return "";
-  if (/^claude/.test(id)) return "Claude Code";
-  if (/^codex/.test(id)) return "Codex";
-  if (/^cursor/.test(id)) return "Cursor";
-  return id;
-}
 import "./call-view.css";
 
 /* The call as a stage (2026-10-10): the conversation's agent fills it, and what it says plays in a bubble, a chunk at
@@ -82,16 +75,15 @@ function AgentBadge({ stage }: { stage: StageConversation }) {
   </Tooltip>;
 }
 
-function StageName({ stage, className, tone, children }: { stage: StageConversation; className: string; tone: string; children?: ReactNode }) {
+/** The conversation's name over its machine, opening what the call runs on (CallDetails); above the tile on a desktop,
+ *  on its corner on a phone. */
+function StageName({ stage, className, tone, detail, voice }: { stage: StageConversation; className: string; tone: string; detail: TitleDetail;
+  voice: ReturnType<typeof useVoiceModels> }) {
   const Tag = className === "stage-title" ? "header" : "div";
   return (
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
-      <span className="stage-heading">
-        <h2 title={stage.title}><span>{stage.title}</span></h2>
-        {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
-      </span>
-      {children}
+      <StageHeading stage={stage} detail={detail} voice={voice} />
     </Tag>
   );
 }
@@ -139,6 +131,10 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
+  // What the call runs on, behind the title (CallDetails), in the form compared on the live page; and whether a voice
+  // model needs something, for the title's dot.
+  const detail = useVariant("titleDetail", TITLE_DETAILS);
+  const voice = useVoiceModels();
 
   if (!stage.threadId) {
     return (
@@ -159,9 +155,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
     <section className="call-stage" aria-label={t("stage.label")}>
         <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
-      <StageName stage={stage} className="stage-title" tone={tone}>
-        {!narrow && <span className="stage-title-tags"><VoiceModels /></span>}
-      </StageName>
+      <StageName stage={stage} className="stage-title" tone={tone} detail={detail} voice={voice} />
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
@@ -177,8 +171,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
-        <StageName stage={stage} className="stage-name" tone={tone} />
-        {narrow && <VoiceModels />}
+        <StageName stage={stage} className="stage-name" tone={tone} detail={detail} voice={voice} />
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
           <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={setBalloonUp} />

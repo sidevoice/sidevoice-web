@@ -90,8 +90,8 @@ test("the pill, over the stage's tile at its top, whatever update-notice value i
     expect(tile.firstElementChild).toBe(notice()!.parentElement);
     expect(document.querySelectorAll(".update-notice")).toHaveLength(1);
     expect(document.querySelector(".stage-title .update-notice, .stage-title-end, .sidebar-foot .update-notice")).toBeNull();
-    // The title row as it was: the conversation's name and its machine.
-    expect([...document.querySelector(".stage-title")!.children].map((child) => child.tagName)).toEqual(["H2", "SPAN"]);
+    // The title row as it is: the conversation's heading alone (its name over its machine, opening the call's details).
+    expect([...document.querySelector(".stage-title")!.children].map((child) => child.tagName)).toEqual(["H2"]);
     expect(notice()).toHaveAccessibleName("Updates");
     cleanup();
   }
