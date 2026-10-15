@@ -56,7 +56,7 @@ export async function respond(route, value, status = 200) {
 }
 
 /** The paired machine, answering at the page's own origin; what it was asked, and how it answers next. */
-export async function installHarness(page, { onboarding = { version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {}, baseline_release: 2 }, secondMachine = false, participants = {}, agents = null } = {}) {
+export async function installHarness(page, { onboarding = { version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {}, baseline_release: 2 }, secondMachine = false, participants = {}, agents = null, microphone = "granted" } = {}) {
   // `presentation`: every presentation request, with the machine it went to and the token it carried.
   const fake = { scans: 0, hostMode: "normal", connectMode: "success", authorization: [], presentation: [] };
   await page.route("**/api/**", async (route) => {
@@ -94,6 +94,15 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
   });
   // This device paired with that machine, its first setup finished (so the room shows, not the setup), and the page
   // pointed at the machine: the static site's own origin.
+  // The microphone's permission as the browser reads it (the setup's microphone step, web#129): allowed unless a test
+  // says otherwise, so a setup walked to a later step is not stopped at it. Only the read: nothing here opens a microphone.
+  await page.addInitScript((state) => {
+    const permissions = navigator.permissions;
+    if (!permissions) return;
+    const query = permissions.query.bind(permissions);
+    const status = Object.assign(new EventTarget(), { name: "microphone", state, onchange: null });
+    permissions.query = (descriptor) => descriptor?.name === "microphone" ? Promise.resolve(status) : query(descriptor);
+  }, microphone);
   await page.addInitScript(({ hostPairing, otherPairing, onboarding }) => {
     localStorage.setItem("sidevoice.pairings", JSON.stringify({ pairings: [hostPairing, ...(otherPairing ? [otherPairing] : [])] }));
     localStorage.setItem("sidevoice.onboarding", JSON.stringify(onboarding));
