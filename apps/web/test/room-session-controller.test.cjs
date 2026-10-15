@@ -1967,12 +1967,12 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
  assert.equal(plain(await stt).text,'hola');
- assert.deepEqual([...voice.routes],['call-1',null,null],'routed as it starts, fenced off when the take ends, released after');
+ assert.deepEqual([...voice.routes],['call-1',null],'routed as it starts, fenced off when the take ends (and so no longer its to release)');
  const tts=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'hola',keep:false})");
  await settleSoon();
  voice.said.at(-1).step({type:'done',outcome:{status:'heard'}});
  await tts;
- assert.deepEqual([...voice.routes].slice(3),['call-2',null]);
+ assert.deepEqual([...voice.routes].slice(2),['call-2',null]);
  s.run("roomStore.patch({voiceDraft:{...voiceSettings,end_of_turn:'silence'}})");
  const turn=s.run('window.sidevoiceActions.tryTurnSettings()');
  await settleSoon();
@@ -1980,7 +1980,7 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  s.run('window.sidevoiceActions.cancelVoiceTry()');
  await assert.rejects(turn,{code:'trial-cancelled'});
- assert.deepEqual([...voice.routes].slice(5),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
+ assert.deepEqual([...voice.routes].slice(4),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
 });
 test('F3 a delayed start heard before a rebind keeps the binding it was heard under; speech after it, the new one',async()=>{
  const c=await callOnRoom(),a=c.voice.created[0];
@@ -2817,4 +2817,20 @@ test('A paired machine that says it is behind says how to update it there; anyth
  // Once answered, the next question goes out again.
  await Promise.all([s.run("loadMachineInfo('fp-mac')"),new Promise(resolve=>setTimeout(()=>{answer();resolve()},0))]);
  assert.equal(asked.length,2);
+});
+
+test('replacement retains its own microphone after the previous trial\'s close completes',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ // The first trial's close is held: the replacement starts and takes the microphone while the first still closes.
+ let release;const held=new Promise(resolve=>{release=resolve});const create=voice.createCall.bind(voice);
+ voice.createCall=()=>{const call=create();call.endInput=()=>call.id==='call-1'?held:Promise.resolve();return call};
+ const first=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");first.catch(()=>{});
+ await settleSoon();voice.created[0].emit('turn',{phase:'started',turn_id:'first'});
+ const second=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");second.catch(()=>{});
+ await settleSoon();
+ assert.equal(voice.routed?.id,'call-2');
+ release();await first.catch(()=>{});await settleSoon();
+ assert.equal(voice.routed?.id,'call-2','the first trial finishing its close does not take the microphone from the second');
+ voice.created[1].emit('turn',{phase:'finished',turn_id:'second',text:'second'});
+ assert.equal(plain(await second).text,'second');
 });
