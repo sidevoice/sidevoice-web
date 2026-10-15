@@ -83,7 +83,7 @@ function StageName({ stage, className, look, tone }: { stage: StageConversation;
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} data-look={look} translate="no" style={avatarTone(tone) as CSSProperties}>
       {look === "b" && stage.row && <ConversationAvatar row={stage.row} />}
-      <h2 title={stage.title}>{look === "a" && <i className="stage-name-mark" aria-hidden="true" />}<span>{stage.title}</span></h2>
+      <h2 title={stage.title}><span>{stage.title}</span></h2>
       {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
     </Tag>
   );

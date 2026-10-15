@@ -2,7 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
-import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
+import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MachinesIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
 import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
@@ -134,7 +134,7 @@ export function ConversationSidebar() {
             const machine = group.machine || t("sidebar.unknownMachine");
             return (
               <section className="sidebar-group" key={group.key} aria-label={machine}>
-                <h3 className="sidebar-group-label" aria-hidden={rail || undefined}><span translate="no">{machine}</span></h3>
+                <h3 className="sidebar-group-label" aria-hidden={rail || undefined}><MachinesIcon size={12} /><span translate="no">{machine}</span></h3>
                 <ConversationRows
                   className="sidebar-rows"
                   rows={group.rows.map((row) => row.threadId === onStage && !row.selected ? { ...row, selected: true } : row)}
