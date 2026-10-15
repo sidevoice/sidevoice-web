@@ -14,7 +14,7 @@ import { SENT_LEAVING_MS, useSentTurns, type SentTurn } from "./speech-reading";
 
 /* The person's balloon at the tile's foot, drawn as the agent's is (call-view.css), its tail out of the tile's corner
  * toward whoever is speaking. While they speak, and while it is transcribed, it keeps one size: the voice's bars, long
- * and fine as a voice note, over the way to take the turn back; transcribing, the bars shimmer. Once transcribed, what
+ * and fine as a voice note, over the way to take the turn back; transcribing, the bars hold their shape and blink. Once transcribed, what
  * is sent takes their place with a little pop, the same size: its first three lines, cut with an ellipsis, for PAGE_MS,
  * then it leaves. It says the words were heard right, in time to take them back; the transcript has them all (operator,
  * 2026-10-15: no scrolling through what you said yourself). */
