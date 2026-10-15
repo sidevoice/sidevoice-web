@@ -73,6 +73,20 @@ test("native cancellation closes the web confirmation without a reset result", a
   expect(screen.queryByText(/closing to finish deleting/)).not.toBeInTheDocument();
 });
 
+test.each([
+  ["reset.unsafe", /standard Sidevoice installation/],
+  ["reset.unavailable", /standard Sidevoice installation/],
+  ["reset.unsupported-connector", /version that supports safe removal/],
+])("%s explains the unsupported reset scope without implying a partial deletion", async (key, expected) => {
+  const data = bridge();
+  data.deleteAll.mockRejectedValueOnce({ key });
+  show();
+  fireEvent.click(screen.getByRole("button", { name: "Delete all Sidevoice data" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "Delete all Sidevoice data" }).at(-1)!);
+  expect(await screen.findByRole("alert")).toHaveTextContent(expected);
+  expect(screen.queryByText(/Some data may already be removed/)).not.toBeInTheDocument();
+});
+
 test("a partial helper report names the failed step without claiming success", async () => {
   bridge({ state: "partial", completed: ["app-data"], failed: [{ step: "models", key: "remove" }], agents: {} });
   render(<RoomProvider runtime={false}><dialog id="wizard" open /><ResetReportNotice /></RoomProvider>);

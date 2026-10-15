@@ -79,7 +79,10 @@ export function DeleteAllData() {
     } catch (failure) {
       const key = (failure as { key?: string })?.key;
       if (key === "reset.cancelled") { setOpen(false); return; }
-      setError(key === "reset.busy" ? "data.busy" : key === "reset.service-failed" ? "data.serviceFailed" : "data.failed");
+      setError(key === "reset.busy" ? "data.busy"
+        : key === "reset.service-failed" ? "data.serviceFailed"
+        : key === "reset.unsafe" || key === "reset.unavailable" ? "data.unsafeScope"
+        : key === "reset.unsupported-connector" ? "data.connectorUpdateRequired" : "data.failed");
     } finally { setBusy(false); }
   }
 
