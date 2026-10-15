@@ -1539,6 +1539,38 @@ test('R6 an explicitly missing old ID is removed, while ordinary absent rows rem
  assert.equal(c.s.run("history.some(row=>row.segment==='pending-local')"),true,'absence alone does not delete a local row');
  c.s.run('disconnect()');
 });
+test('N4 slow batched resolution cannot starve fresh history across polling intervals',async()=>{
+ const c=await callOnRoom(),gates=[];let recentReads=0,resolutionReads=0;
+ c.s.run("state.history=Array.from({length:65},(_,i)=>({segment:'old-'+i,thread:'fp-mac|a',role:'assistant',text:'Old miss '+i,globally_heard:false,replayable:true,time:i}))");
+ c.s.context.fetch=async path=>{
+  if(String(path).includes('resolve_id=')){
+   ++resolutionReads;
+   const ids=new URL(String(path),'https://room.example').searchParams.getAll('resolve_id');
+   return {ok:true,status:200,json:async()=>new Promise(resolve=>gates.push({ids,resolve}))};
+  }
+  const number=++recentReads;
+  return {ok:true,status:200,json:async()=>({messages:[{id:'fresh-'+number,thread:'a',role:'user',text:'Fresh '+number,status:'delivered',time:100+number,seq:100+number}]})};
+ };
+ const first=c.s.run('refreshHistory()');await c.until(()=>gates.length===1,'first 64-ID resolution batch');
+ assert.equal(c.s.run("history.some(row=>row.segment==='fresh-1')"),true,'recent history renders before old IDs resolve');
+ const second=c.s.run('refreshHistory()');
+ await c.until(()=>c.s.run("history.some(row=>row.segment==='fresh-2')"),'next polling interval renders');
+ assert.equal(resolutionReads,1,'the machine has one resolution pipeline');
+ const firstBatch=gates[0];
+ firstBatch.resolve({messages:[],resolved:[{id:firstBatch.ids[0],thread:'a',role:'assistant',text:'Old miss 0',status:'playback_finished',heard_chars:10,globally_heard:true,replayable:false,time:0}],missing_ids:firstBatch.ids.slice(1)});
+ await c.until(()=>gates.length===2,'second ID resolution batch');
+ assert.equal(c.s.run("history.find(row=>row.segment==='old-0').globally_heard"),true,'a completed batch reconciles immediately');
+ const third=c.s.run('refreshHistory()');
+ await c.until(()=>c.s.run("history.some(row=>row.segment==='fresh-3')"),'third polling interval renders');
+ assert.equal(resolutionReads,2,'polls do not duplicate slow ID batches');
+ gates[1].resolve({messages:[],resolved:[],missing_ids:gates[1].ids});
+ await Promise.all([first,second,third]);
+ assert.deepEqual(plain(c.s.run("history.filter(row=>row.segment?.startsWith('fresh-')).map(row=>row.segment)")),['fresh-1','fresh-2','fresh-3']);
+ assert.equal(c.s.run("history.some(row=>row.segment==='old-64')"),false);
+ assert.equal(c.s.run("history.some(row=>row.role==='assistant'&&row.globally_heard===false)"),false);
+ assert.equal(JSON.parse(c.store['voice-room-transcript']).some(row=>row.globally_heard===false),false);
+ c.s.run('disconnect()');
+});
 test('T11 a delayed transcript keeps its captured focus through a later selection',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('captured'));
