@@ -1731,6 +1731,7 @@ function retuneTurnTry(){
 // A model of this device's catalogue the slot names but that is not on disk: installed on this device (the build the
 // slot names, else its recommended one), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
 let voiceInstall=null;
+let voiceInstallDone=Promise.resolve();
 let setupCleanupStarted=false;
 async function installVoiceModel(task,{setup=false}={}){
  // The end of turn has no slot: its model is this device's end-of-turn model.
@@ -1739,6 +1740,7 @@ async function installVoiceModel(task,{setup=false}={}){
  const model=state.voiceCatalogue.catalogs.find(c=>c.id===slot.catalog)?.models.find(m=>m.id===slot.model);
  const build=(slot.build&&model?.builds?.find(b=>b.id===slot.build))??model?.builds?.find(b=>b.id===model.recommendedBuild)??model?.builds?.find(b=>b.available);
  voiceInstall?.abort();const abort=voiceInstall=new AbortController();
+ let finishInstall;voiceInstallDone=new Promise(resolve=>{finishInstall=resolve});
  const at=fraction=>roomStore.patch({voiceInstall:{task,model:slot.model,state:'running',fraction,error:''}});
  at(null);
  try{
@@ -1752,7 +1754,7 @@ async function installVoiceModel(task,{setup=false}={}){
   }
   roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
  }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,...installFailure(error)}})}
- finally{if(voiceInstall===abort)voiceInstall=null}
+ finally{if(voiceInstall===abort)voiceInstall=null;finishInstall()}
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
 // Once Ready is saved, the wizard closes independently of this best-effort cleanup. The record is consumed before
@@ -1760,6 +1762,8 @@ function cancelVoiceInstall(){voiceInstall?.abort()}
 async function cleanupSetupTrials(){
  setupCleanupStarted=true;
  voiceInstall?.abort();
+ // Finish cancellation before consuming the one-shot provenance, so an unrelated pending download cannot skip older trials.
+ await voiceInstallDone;
  await cleanSetupDownloads({storage:pageStorage(),models:modelCatalogs,
   selected:()=>[state.voiceDraft||state.voiceSettings,state.voiceSettings,handed],
   busy:()=>!!(state.ws||state.connecting||state.reconnecting||voiceInstall),

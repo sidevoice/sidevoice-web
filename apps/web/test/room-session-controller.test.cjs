@@ -1696,6 +1696,29 @@ test('Only a setup-origin download earns cleanup provenance; finishing removes i
  assert.equal(engine.calls.filter(([name])=>name==='uninstall').length,1);
 });
 
+test('Finishing during a second download still cleans an earlier completed setup trial',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');s.context.__original=s.run('voiceSettings');
+ const chosen={id:'whisper-base',capabilities:['stt'],installed:true,builds:[{id:'chosen/int8',available:true,installed:true}]};
+ const first={id:'first-trial',capabilities:['stt'],installed:false,builds:[{id:'first/int8',available:true,installed:false}]};
+ const second={id:'second-trial',capabilities:['stt'],installed:false,builds:[{id:'second/int8',available:true,installed:false}]};
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[chosen,first,second]}];s.context.__catalogs=catalogs;
+ const engine=fakeEngine(catalogs);
+ engine.install=async(id,{signal})=>{
+  if(id==='first-trial'){first.installed=true;first.builds[0].installed=true;return}
+  await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Object.assign(Error('cancelled'),{code:'install-cancelled'})),{once:true}));
+ };
+ engine.uninstall=async id=>{engine.calls.push(['uninstall',id])};
+ withVoice(s,fakeVoice(),engine);
+ const pick=id=>{s.context.__picked=id;s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:__picked,language:null}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})")};
+ pick('first-trial');await s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ s.run('roomStore.patch({voiceDraft:__original})');await s.run('applyVoiceSettings()');
+ pick('second-trial');const pending=s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ await settleSoon();
+ await s.run('window.sidevoiceActions.cleanupSetupTrials()');await pending;
+ assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[['uninstall','first-trial']]);
+ assert.equal(s.context.localStorage.getItem('sidevoice.setup-model-downloads'),null);
+});
+
 test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{
  const notHere=CATALOGS.map(c=>c.id==='local'?{...c,models:[...c.models,{id:'whisper-small',family:'whisper',capabilities:['stt'],languages:['es'],voices:[],installed:false,builds:[build('whisper-small/int8',{installed:false})]}]}:c);
  const s=setup({strictDOM:true});
