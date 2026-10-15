@@ -1283,6 +1283,19 @@ test('T14 explicit skip wins a competing withdrawal while retaining the confirme
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[['user_skipped',2]]);
  c.s.run('disconnect()');
 });
+test('T14 Skip stays heard by choice through output, focus and barge-in callbacks',async()=>{
+ for(const race of ['output','focus','barge-in']){
+  const c=await callOnRoom();
+  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'choice',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'choice',text:'Hello'}});
+  const handle=c.voice.said[0];handle.step({type:'playing'});c.s.run('skipReply()');
+  if(race==='output')c.s.run("setSpeechOutput('agents_muted')");
+  if(race==='focus')c.s.run("stopReplies('focus_changed')");
+  if(race==='barge-in')c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_skipped',2]],race);
+  c.s.run('disconnect()');
+ }
+});
 test('T01 and T02 map played-zero barge-in to one core receipt before the terminal turn',async()=>{
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
