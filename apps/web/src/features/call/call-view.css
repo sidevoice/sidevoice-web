@@ -402,7 +402,7 @@
 .stage-heading { display: flex; align-items: center; gap: .5em; min-width: 0; }
 /* The machine centred on the name's capitals, not on its line box (the heavy face sits low in it): the name's box
  * trimmed to its cap height and baseline where the browser can. */
-.stage-heading h2 > span { text-box: trim-both cap alphabetic; }
+.stage-heading h2 > span { text-box: trim-both cap alphabetic; overflow: clip; overflow-clip-margin: .3em; } /* trimmed, its descenders still show */
 .stage-name { display: grid; gap: .3em; justify-items: start; }
 /* The subtitle: the voice's models as quiet words with their icons, no chips (a model needing attention keeps its
  * attention style, its state in words). */
