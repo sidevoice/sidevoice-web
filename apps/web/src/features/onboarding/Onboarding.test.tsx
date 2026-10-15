@@ -198,9 +198,10 @@ test("the voice's try is all in its block — its sentence shown and editable be
   paired(store);
   await act(async () => { fireEvent.click(stageAction()); });
   expect(title()).toHaveTextContent("Set up voice");
-  // Before the try: the sentence, editable, and the level's bars; the block's own button and the footer's start it.
+  // Before the try: the sentence, editable, in the level's place; the block's own button and the footer's start it.
   expect(tryBlock("tts").querySelector("button.tts-try-said")).toHaveTextContent("Hi! This is how Sidevoice will read your agent's replies.");
-  expect(tryBlock("tts").querySelector(".stt-try-head .voice-wave canvas")).toBeInTheDocument();
+  expect(tryBlock("tts").querySelector(".stt-try-head button.tts-try-said")).toBeInTheDocument();
+  expect(tryBlock("tts").querySelector(".voice-wave")).toBeNull();
   expect(tryBlock("tts").querySelector("#wizard-sample")).toBeNull();
   const running = pendingTry();
   await act(async () => { fireEvent.click(tryButton()); });
@@ -481,8 +482,8 @@ for (const step of MODEL_STEPS) {
     expect(footerReason).toMatch(/isn't ready yet\.$/);
     expect(card()).toHaveAttribute("aria-disabled", "true");
     expect(card()).toHaveAccessibleDescription(footerReason);
-    // Its block laid out as once ready: the button and the level on the first row.
-    expect(card().closest(".stt-try-head")!.querySelector(".voice-wave")).toBeInTheDocument();
+    // Its block laid out as once ready: the button and the level (the voice's sentence) on the first row.
+    expect(card().closest(".stt-try-head")!.querySelector(step.task === "tts" ? ".tts-try-sentence" : ".voice-wave")).toBeInTheDocument();
     act(() => store.patch({ voiceCatalogue: { state: "ready", catalogs: withTurn(() => true), error: "" } }));
     expect(card()).not.toHaveAttribute("aria-disabled");
     actions.tryTurnSettings = vi.fn(() => new Promise(() => {}));

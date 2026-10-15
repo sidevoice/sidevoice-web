@@ -293,7 +293,7 @@ test("once it has decided, the try's take shows in its card to be played, with i
   expect(document.getElementById("turn-try-take")).toHaveTextContent("no speech detected");
 });
 
-test("laid out as the other tries: the button and the level on one row, then one area for the hint and the state, then the take", async () => {
+test("laid out as the other tries: the button and the level on one row (the take in the level's place), then one area for the hint and the state", async () => {
   const { step, heard, start, take } = renderTurn();
   const head = () => panel().querySelector(".stt-try-head")!;
   const wave = () => head().querySelector(".model-try-wave .voice-wave, .model-try-wave .voice-bars");
@@ -310,15 +310,15 @@ test("laid out as the other tries: the button and the level on one row, then one
   expect(area()).not.toHaveTextContent("Talk as you would to the agent");
   take({ sampleRate: 16000, samples: new Float32Array(16000), started_at: 0, ended_at: 1000, turns: [] });
   await heard("Quiero que revises el PR", 900);
-  // Decided: its one line in the same area, the button and the level still on their row, the take after the area.
+  // Decided: its one line in the same area; the recorded take is drawn inline on the button's row, where the level was.
   expect(area().querySelectorAll("p")).toHaveLength(1);
   expect(area().querySelector(".turn-try-state")).toHaveTextContent("Detected you finished 0.9 s after you stopped speaking");
   expect(area().querySelector(".turn-try-result")).toBeNull();
   expect(head()).toContainElement(button());
   expect(button()).toHaveTextContent("Try again");
-  expect(wave()).not.toBeNull();
   const recorded = document.getElementById("turn-try-take")!;
   expect(recorded).not.toBeNull();
+  expect(head()).toContainElement(recorded);
+  expect(wave()).toBeNull();
   expect(area()).not.toContainElement(recorded);
-  expect(area().compareDocumentPosition(recorded) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
