@@ -50,9 +50,10 @@ test("played zero remains a partial interruption and scalar counts never use UTF
 
 test("core #120 playback fixture stays mapped at the browser boundary", () => {
   for (const entry of flow.playback) {
-    if ("type" in entry.voice) continue;
     const voice = entry.voice as {reason?: string | {reason:string}, local_action?: string};
-    const outcome = {...entry.voice, ...(typeof voice.reason === "object" ? {reason:voice.reason.reason} : {})};
+    // A qualified turn in the reply's conversation is what the call's say handle ends as `barge-in`.
+    const reason = typeof voice.reason === "object" ? voice.reason.reason : "app_action" in entry ? "barge-in" : undefined;
+    const outcome = {...entry.voice, ...(reason ? {reason} : {})};
     const action = voice.local_action
       ? voice.local_action === "skip" ? "user_skipped" : voice.local_action
       : null;

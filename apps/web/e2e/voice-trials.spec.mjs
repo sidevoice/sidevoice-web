@@ -10,7 +10,7 @@ test("the published browser host records opt-in takes and reports rendered speak
     let sink;
     const seen = { states: [], turns: [], takes: [], output: [] };
     const source = { models: () => ({ load: async () => ({
-      vad: {
+      createVad: () => ({
         position: 0,
         accept(samples) {
           const frames = [];
@@ -21,17 +21,19 @@ test("the published browser host records opt-in takes and reports rendered speak
           return frames;
         },
         reset() { this.position = 0; },
-      },
+      }),
       transcriber: { transcribe: async () => "hello" },
       speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.6), sampleRate: 16000 }) },
     }) }) };
-    const io = {
-      start(next) { sink = next; queueMicrotask(() => sink.ready()); },
-      stop() {},
-      stopPlayback() {},
-      play() {},
+    const audio = {
+      attach() { return { io: { start(next) { sink = next; queueMicrotask(() => sink.ready()); },
+        stop() {}, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1 } }; },
+      routeInput: async () => {},
+      setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
-    const host = createVoiceHost(source, { io });
+    const owner = createVoiceHost(source, { io: audio });
+    const host = owner.createCall();
+    await owner.routeInput(host);
     const stops = [
       host.onState((state) => seen.states.push(state.listening)),
       host.onTurn((turn) => seen.turns.push(turn.phase)),
@@ -56,6 +58,7 @@ test("the published browser host records opt-in takes and reports rendered speak
     sink.captured(new Float32Array(512).fill(0.5));
     await host.stop();
     stops.forEach((stop) => stop());
+    await host.dispose();
     return seen;
   });
   expect(result.states).toContain("speaking");
@@ -79,25 +82,27 @@ test("the candidate browser host reports a heard reply with scalar progress and 
     let sink;
     const played = [], events = [];
     const source = { models: () => ({ load: async () => ({
-      vad: { position: 0, accept() { return []; }, reset() { this.position = 0; } },
+      createVad: () => ({ position: 0, accept() { return []; }, reset() { this.position = 0; } }),
       transcriber: { transcribe: async () => "" },
       speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.2), sampleRate: 16000 }) },
     }) }) };
-    const io = {
-      start(next) { sink = next; queueMicrotask(() => sink.ready()); },
-      stop() {}, stopPlayback() {},
-      play(utterance, chunk) {
-        played.push([utterance, chunk]);
-        queueMicrotask(() => { sink.chunkStarted(utterance, chunk); sink.chunkPlayed(utterance, chunk); sink.playbackEnded(); });
-      },
+    const audio = {
+      attach() { return { io: { start(next) { sink = next; queueMicrotask(() => sink.ready()); },
+        stop() {}, stopPlayback() {},
+        play(utterance, chunk) {
+          played.push([utterance, chunk]);
+          queueMicrotask(() => { sink.chunkStarted(utterance, chunk); sink.chunkPlayed(utterance, chunk); sink.playbackEnded(); });
+        }, dispose() {} }, input: { id: 1 } }; },
+      routeInput: async () => {},
+      setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
-    const host = createVoiceHost(source, { io });
+    const host = createVoiceHost(source, { io: audio }).createCall();
     await host.setSettings({ stt: { model: "fake" }, tts: { model: "fake" }, end_of_turn: "silence", patience: "fast" });
     await host.start();
     const saying = host.say("é🐙ab");
     saying.onEvent((event) => events.push(event));
     const outcome = await Promise.race([saying.outcome, new Promise((_, reject) => setTimeout(() => reject(Error("reply did not settle")), 5000))]);
-    await host.stop();
+    await host.dispose();
     return { played, events, outcome };
   });
   expect(result.played.length).toBeGreaterThan(0);
@@ -117,7 +122,7 @@ test("a recorded settings try delivers the package take through the real trial a
     const { default: init, createVoiceHost } = await import("/voice-contract/js/index.js");
     await init();
     const source = { models: () => ({ load: async () => ({
-      vad: {
+      createVad: () => ({
         position: 0,
         accept(samples) {
           const frames = [];
@@ -128,19 +133,26 @@ test("a recorded settings try delivers the package take through the real trial a
           return frames;
         },
         reset() { this.position = 0; },
-      },
+      }),
       transcriber: { transcribe: async () => "hello" },
       speaker: { speak: async () => ({ samples: new Float32Array(16000), sampleRate: 16000 }) },
     }) }) };
-    const io = {
-      start(sink) { window.__trialSink = sink; queueMicrotask(() => sink.ready()); },
-      stop() {}, stopPlayback() {}, play() {},
+    const audio = {
+      attach() { return { io: { start(sink) { window.__trialSink = sink; queueMicrotask(() => sink.ready()); },
+        stop() {}, stopPlayback() {}, play() {}, dispose() {} }, input: { id: 1 } }; },
+      routeInput: async () => {},
+      setInputDevice: async () => {}, setOutputDevice: async () => {}, outputSelectable: false,
     };
-    const host = createVoiceHost(source, { io });
+    const owner = createVoiceHost(source, { io: audio });
     window.__trialTakes = [];
     window.__turnStarted = false;
-    host.onTake((take) => window.__trialTakes.push(take));
-    host.onTurn((turn) => { if (turn.phase === "started") window.__turnStarted = true; });
+    // The trial makes its own call on the page's voice: each call it makes is watched.
+    const host = { ...owner, createCall() {
+      const call = owner.createCall();
+      call.onTake((take) => window.__trialTakes.push(take));
+      call.onTurn((turn) => { if (turn.phase === "started") window.__turnStarted = true; });
+      return call;
+    } };
     window.__sidevoiceDesktop = { host: { voice: host } };
     const model = (id, capability) => ({ id, family: "fake", capabilities: [capability], languages: ["en"], voices: [], installed: true,
       builds: [{ id: id + "/test", backend: "test", precision: "test", accelerator: "cpu", available: true, installed: true, reasons: [] }] });
