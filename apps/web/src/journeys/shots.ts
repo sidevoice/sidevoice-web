@@ -95,8 +95,13 @@ const cursorAgentsListing = (state: CursorBridgeState) => {
     { id: "cursor", label: "Cursor", present: true, version: state === "unsupported" ? null : "3.22.12", registration: "connected", connect: "auto", cursor_bridge: cursorBridge(state) }] } };
 };
 const showCursorBridgeInSettings = async (doc: Document) => {
-  openSettings("this-computer")(doc);
+  openSettings("machines")(doc);
   await new Promise((resolve) => setTimeout(resolve, 100));
+  // The phone shows its machine list first; desktop already has the selected machine's page beside it.
+  if (!doc.querySelector<HTMLElement>(".host-agent-bridge")?.getClientRects().length) {
+    doc.querySelector<HTMLElement>('.machine-entry[data-machine="local-host"]')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
   doc.querySelector<HTMLElement>(".host-agent-bridge-toggle")?.click();
 };
 const REPLY = "I ran the tests: two fail in the settings pane, both about the Save button that no longer exists. Shall I update them?";
@@ -183,7 +188,10 @@ export const JOURNEYS: Journey[] = [
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true } },
     { id: "w3-cursor-bridge", caption: "Cursor's Desktop Bridge steps on the shared onboarding agent card.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true,
-        hostAgents: { [THIS.fp]: cursorAgentsListing("needs_attention") } }, after: (doc) => { doc.querySelector<HTMLElement>(".host-agent-bridge-toggle")?.click(); } },
+        hostAgents: { [THIS.fp]: cursorAgentsListing("needs_attention") } }, after: async (doc) => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          doc.querySelector<HTMLElement>("#wizard .host-agent-bridge-toggle")?.click();
+        } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], callNode: null, machineLinks: {} } },
     { id: "w4", caption: "Transcription, its model not downloaded yet: the try's block already there, its button and the footer's waiting for the model, saying why.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       facts: { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } } } },

@@ -79,6 +79,6 @@
 @media (max-width: 550px) {
   .host-agent-bridge { margin-inline: var(--sv-space-4); }
   .host-agent-bridge-toggle { min-height: 44px; }
-  .host-agent-bridge-requirements span { display: none; }
+  .host-agent-bridge-separator { display: none; }
   .host-agent-bridge-requirements { display: grid; gap: 2px; }
 }

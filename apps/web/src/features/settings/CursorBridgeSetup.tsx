@@ -48,8 +48,9 @@ export function CursorBridgeSetup({ bridge, id }: { bridge: CursorBridgeStatus; 
     {open && <div className="host-agent-bridge-body" id={id} role="group" aria-label={t("agents.cursorBridge.title")}>
       {reason && <p className="host-agent-bridge-reason">{t(reason, { minimum: bridge.minimum_cursor_version })}</p>}
       <p className="host-agent-bridge-requirements">
-        {bridge.cursor_version ? t("agents.cursorBridge.version.observed", { version: bridge.cursor_version }) : t("agents.cursorBridge.version.unknown")}
-        <span aria-hidden="true"> · </span>{t("agents.cursorBridge.connectorMinimum", { minimum: bridge.minimum_connector_version })}
+        <span>{bridge.cursor_version ? t("agents.cursorBridge.version.observed", { version: bridge.cursor_version }) : t("agents.cursorBridge.version.unknown")}</span>
+        <span className="host-agent-bridge-separator" aria-hidden="true"> · </span>
+        <span>{t("agents.cursorBridge.connectorMinimum", { minimum: bridge.minimum_connector_version })}</span>
       </p>
       <ol className="host-agent-bridge-steps">{bridge.steps.map((step) => {
         const status = stepStates[step.state] ?? stepStates.unknown;
