@@ -1,8 +1,9 @@
 /* The call (CallStage, CallToolbar): the stage the conversation's agent fills, and the call bar under it, as the design
  * system's "Call · stage" and "Call · bar" patterns draw them (design-system/app-patterns.css), on its tokens alone.
  * The shared components' CSS (components/ui/ui.css) is loaded after this file, so whatever restyles a component here
- * goes through an id of the call's rather than through the order of the files. Below 900px is a phone
- * (state/call-layout.ts NARROW_QUERY). */
+ * goes through an id of the call's rather than through the order of the files. A phone is a touch screen under 900px or
+ * any window under 560px (state/call-layout.ts NARROW_QUERY); a desktop window between is a compact desktop
+ * (COMPACT_QUERY), laid out as a desktop. */
 
 /* ---------- the stage ---------- */
 .call-stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--sv-space-2); padding: var(--sv-space-4) var(--sv-space-4) var(--sv-space-1); }
@@ -201,6 +202,11 @@
   .call-bar .controls { grid-column: 1; }
   .call-bar .call-actions { gap: var(--sv-space-2); }
 }
+/* ---------- a compact desktop window (COMPACT_QUERY): a desktop's bar, the transcript's button at its right end; the
+ * join's line wraps at the tray's width rather than widening the middle column over that button ---------- */
+@media (min-width: 560px) and (max-width: 899px) and (pointer: fine) {
+  .call-bar .join-status { justify-self: stretch; contain: inline-size; }
+}
 
 /* Nothing here moves for a device that asks for less motion: the dot, the call and the waveform hold still. */
 @media (prefers-reduced-motion: reduce) {
@@ -228,6 +234,13 @@
   max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); pointer-events: none; }
 .stage-notice:empty { display: none; }
 .stage-tile:has(> .voice-models, > .voice-attention) > .stage-notice { max-width: calc(100% - 2 * (var(--stage-inset) + min(40%, 16rem) + var(--sv-space-2))); }
+/* A narrower tile (a compact desktop window, or the docked transcript beside the call) leaves the pill no room centred
+ * between the models' corner and its mirror: it starts at the tile's top-left corner instead (free on a desktop, whose
+ * stage is named above the tile) and reaches up to the models' corner. */
+@container stage (max-width: 860px) {
+  .stage-tile:has(> .voice-models) > .stage-notice { left: var(--stage-inset); justify-content: flex-start; transform: none;
+    max-width: calc(100% - 2 * var(--stage-inset) - min(40%, 16rem) - var(--sv-space-2)); }
+}
 .stage-notice > * { pointer-events: auto; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border);
   border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); box-shadow: var(--sv-shadow-md); }
 

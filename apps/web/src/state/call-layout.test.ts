@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { createCallLayoutStore, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "./call-layout";
+import { COMPACT_QUERY, createCallLayoutStore, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "./call-layout";
 
 function memoryStorage(seed: Record<string, string> = {}) {
   const values = { ...seed };
@@ -39,9 +39,9 @@ test("the transcript and the phone's panel start closed and are not remembered",
   expect(Object.keys(storage.values)).toEqual([SIDEBAR_COLLAPSED_KEY]);
 });
 
-function windowIs({ narrow = false, crowded = false }) {
+function windowIs({ narrow = false, compact = false, crowded = false }) {
   vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
-    media, matches: (media === NARROW_QUERY && narrow) || (media === RAIL_WITH_TRANSCRIPT_QUERY && (narrow || crowded)),
+    media, matches: (media === NARROW_QUERY && narrow) || (media === COMPACT_QUERY && compact) || (media === RAIL_WITH_TRANSCRIPT_QUERY && (narrow || compact || crowded)),
   }) as MediaQueryList);
 }
 
@@ -79,4 +79,19 @@ test("on a phone the panel and the transcript are never both open: one opening p
   windowIs({});
   layout.getState().openConversations();
   expect(layout.getState()).toMatchObject({ conversationsOpen: true, transcriptOpen: true });
+});
+
+test("on a compact desktop window the list over the stage and the transcript are never both open either, and the saved sidebar stays", () => {
+  windowIs({ compact: true });
+  const storage = memoryStorage();
+  const layout = createCallLayoutStore(storage);
+  layout.getState().toggleTranscript();
+  layout.getState().openConversations();
+  expect(layout.getState()).toMatchObject({ conversationsOpen: true, transcriptOpen: false });
+  layout.getState().toggleTranscript();
+  expect(layout.getState()).toMatchObject({ conversationsOpen: false, transcriptOpen: true });
+  // Showing the conversations there puts the transcript away: the rail is behind it, already the conversations.
+  layout.getState().showConversations();
+  expect(layout.getState()).toMatchObject({ conversationsOpen: false, transcriptOpen: false, sidebarCollapsed: false });
+  expect(storage.values).toEqual({});
 });

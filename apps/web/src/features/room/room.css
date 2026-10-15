@@ -1,7 +1,8 @@
 /* The room's header and its conversations (RoomHeader, ConversationSidebar, ConversationRows, ConversationAvatar), as
  * the app patterns "Room · header" and "Room · conversations" draw them (design-system/app-patterns.css), on the tokens
- * alone. Below 900px (state/call-layout.ts NARROW_QUERY) the conversations have no column: a few sit in the header and
- * the whole list drops from it as a panel over the dimmed call. This file loads before the shared components' CSS, so
+ * alone. On a phone (state/call-layout.ts NARROW_QUERY) the conversations have no column: a few sit in the header and
+ * the whole list drops from it as a panel over the dimmed call; a compact desktop window (COMPACT_QUERY) keeps their
+ * rail, and opens the whole list over the stage. This file loads before the shared components' CSS, so
  * what it changes on a Button is said under a parent of its own. */
 
 /* ----- a conversation's agent, small, and the dot of its state. The dot is ringed in what is behind it (--dot-ring),
@@ -135,6 +136,16 @@
   /* The header's chevron (always there, turned up while the list is down) closes it, as do a tap outside and Escape: the
      sheet's own arrow stays for assistive tech only, inside the dialog. */
   .conversation-sidebar .sidebar-close { display: inline-flex; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .conversations-scrim { position: fixed; inset: 0; z-index: 30; display: block; background: var(--sv-scrim); opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease); }
+  .conversations-scrim[data-open] { opacity: 1; pointer-events: auto; }
+}
+
+/* ----- a compact desktop window (560–899px, a fine pointer: COMPACT_QUERY): the rail, whose toggle opens the whole list
+ * over the dimmed stage from the rail's own place. Its width grows as its margin gives the same back, so the call never
+ * moves under it (and the stage's tile is not refitted). */
+@media (min-width: 560px) and (max-width: 899px) and (pointer: fine) {
+  .conversation-sidebar { transition: width var(--sv-dur-slow) var(--sv-ease), margin var(--sv-dur-slow) var(--sv-ease); }
+  .conversation-sidebar[data-open] { position: relative; z-index: 31; margin-inline-end: calc(68px - 288px); box-shadow: var(--sv-shadow-lg); }
   .conversations-scrim { position: fixed; inset: 0; z-index: 30; display: block; background: var(--sv-scrim); opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease); }
   .conversations-scrim[data-open] { opacity: 1; pointer-events: auto; }
 }

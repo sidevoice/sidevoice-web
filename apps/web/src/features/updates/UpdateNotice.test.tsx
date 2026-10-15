@@ -1,4 +1,5 @@
 import { afterEach, expect, onTestFinished, test, vi } from "vitest";
+import { NARROW_QUERY } from "../../state/call-layout";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -292,7 +293,7 @@ test("it goes softly: a moment leaving, out of reach, then gone; at once under r
 
 test("no notice on a phone", async () => {
   const matchMedia = window.matchMedia;
-  window.matchMedia = ((media: string) => ({ ...matchMedia(media), matches: media.includes("max-width: 899px") })) as typeof window.matchMedia;
+  window.matchMedia = ((media: string) => ({ ...matchMedia(media), matches: media === NARROW_QUERY })) as typeof window.matchMedia;
   onTestFinished(() => { window.matchMedia = matchMedia; });
   for (const picked of STALE) {
     room({ updater: { status: READY }, notice: picked });

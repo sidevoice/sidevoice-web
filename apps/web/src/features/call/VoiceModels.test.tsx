@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { NARROW_QUERY } from "../../state/call-layout";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
@@ -103,7 +104,7 @@ test("a catalogue read or being read is not read again by the stage", () => {
 
 test("on a phone: nothing while every model is ready, and only a dot when one needs something", () => {
   const narrow = vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
-    media, matches: media === "(max-width: 899px)", onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
+    media, matches: media === NARROW_QUERY, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
   }) as unknown as MediaQueryList);
   shown({ ...defaultVoiceSettings(), tts: { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: null, speed: 1 } });
   expect(document.querySelector(".voice-chip")).toBeNull();

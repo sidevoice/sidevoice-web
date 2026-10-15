@@ -30,7 +30,10 @@ export const OPEN_CONVERSATIONS = "sidevoice-conversations-open";
  * was left; with the transcript docked and no room for both, it is the rail, and opening it puts the transcript away.
  * On a phone (2026-10-10) there is no room for it beside the call: the header carries a few avatars, and this same
  * list drops from it as a dialog over the dimmed call — choosing a conversation, the chevron, a tap outside or Escape
- * puts it away, and focus goes back to what opened it, or, a conversation chosen, to its avatar in the header. */
+ * puts it away, and focus goes back to what opened it, or, a conversation chosen, to its avatar in the header.
+ * A compact desktop window (560–899px, a fine pointer: COMPACT_QUERY, 2026-10-15) has room for the rail alone: its
+ * toggle opens the whole list over the dimmed stage, from the rail's own place, without moving the call or touching the
+ * saved choice — a dialog as the phone's is, put away the same ways, focus back to the toggle or to the one chosen. */
 export function ConversationSidebar() {
   // The conversation on the stage is the one marked in the list, whether or not the call has moved to it yet.
   const onStage = useStageConversation().threadId;
@@ -45,13 +48,21 @@ export function ConversationSidebar() {
   const openConversations = useCallLayout((state) => state.openConversations);
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
-  const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
-  // A compact desktop window (under 900px, not a phone) keeps its conversations as the rail.
-  const compact = useMedia(COMPACT_QUERY) && !narrow;
-  const rail = collapsed || crowded || compact;
-  const modal = narrow && open;
+  const compact = useMedia(COMPACT_QUERY);
+  // A compact window's transcript opens over the call, never beside it: it squeezes nothing.
+  const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow && !compact;
+  const rail = compact ? !open : collapsed || crowded;
+  const modal = (narrow || compact) && open;
   const panel = useRef<HTMLElement>(null);
 
+  // The list over the call belongs to the layout it opened in: the window turned into another one, it is put away.
+  const layout = narrow ? "phone" : compact ? "compact" : "desktop";
+  const laidOut = useRef(layout);
+  useEffect(() => {
+    if (laidOut.current === layout) return;
+    laidOut.current = layout;
+    close();
+  }, [layout, close]);
   useEffect(() => {
     // On a desktop the list is always on screen; only a phone has to bring it down.
     const show = () => { if (isNarrow()) openConversations(); };
@@ -61,22 +72,26 @@ export function ConversationSidebar() {
   // The panel hangs from the header's lower edge, wherever a banner above the room has put it: measured once per
   // opening, before it paints.
   useLayoutEffect(() => {
-    if (!modal) return;
+    if (!modal || !narrow) return;
     const header = document.querySelector(".room-header");
     if (header) panel.current?.style.setProperty("--conversations-top", header.getBoundingClientRect().bottom + "px");
-  }, [modal]);
+  }, [modal, narrow]);
   // Chosen on a phone, a conversation is in the header's row (its last slot if need be): focus goes to its avatar there,
-  // not back to the chevron.
+  // not back to the chevron; on a compact desktop, to its avatar in the rail.
   const chosen = useRef<string | null>(null);
   useSurface({
     open: modal, close, container: panel, modal,
     initialFocus: () => panel.current?.querySelector<HTMLElement>(".participant-row[data-selected] .person:not(:disabled)")
       ?? panel.current?.querySelector<HTMLElement>(".person:not(:disabled)") ?? panel.current?.querySelector<HTMLElement>(".sidebar-close"),
-    fallbackFocus: () => document.querySelector<HTMLElement>("button.conversations-toggle") ?? document.querySelector<HTMLElement>(".room-header .header-new"),
+    fallbackFocus: () => narrow
+      ? document.querySelector<HTMLElement>("button.conversations-toggle") ?? document.querySelector<HTMLElement>(".room-header .header-new")
+      : panel.current?.querySelector<HTMLElement>(".sidebar-collapse"),
     returnFocus: () => {
       const threadId = chosen.current;
       chosen.current = null;
-      return threadId ? [...document.querySelectorAll<HTMLElement>(".room-header .header-avatar")].find((avatar) => avatar.dataset.thread === threadId) : null;
+      if (!threadId) return null;
+      if (!narrow) return [...panel.current?.querySelectorAll<HTMLElement>(".participant-row") ?? []].find((row) => row.dataset.thread === threadId)?.querySelector<HTMLElement>(".person");
+      return [...document.querySelectorAll<HTMLElement>(".room-header .header-avatar")].find((avatar) => avatar.dataset.thread === threadId);
     },
   });
 
@@ -85,8 +100,10 @@ export function ConversationSidebar() {
     if (modal) chosen.current = threadId;
     close();
   };
-  // One toggle. Opening the rail opens the sidebar; with the docked transcript in the way, the transcript makes room.
+  // One toggle. Opening the rail opens the sidebar; with the docked transcript in the way, the transcript makes room. A
+  // compact window opens and closes its list over the stage instead.
   const toggle = () => {
+    if (compact) { if (open) close(); else openConversations(); return; }
     if (!rail) { toggleSidebar(); return; }
     if (collapsed) toggleSidebar();
     if (crowded) closeTranscript();
