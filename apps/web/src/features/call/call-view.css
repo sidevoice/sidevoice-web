@@ -169,21 +169,16 @@
 /* While they speak and while it is transcribed, one size whatever happens in it (2026-10-15): the voice's bars on one
  * row, long and fine as a voice note, on the balloon itself (no pill of their own), in the person's light ink; under
  * them, at the end, the way to take the turn back, its row kept even while it is not offered. Transcribing, the bars
- * hold their last frame and shimmer, a light passing along them while they quiver (still, reduced). */
+ * hold their last frame and blink (still, reduced). */
 .person-turns .person-bubble[data-live] { transform-origin: 100% calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: calc(4 * var(--u));
   width: var(--live-w); height: var(--live-h); padding: calc(12 * var(--u)) calc(16 * var(--u)) calc(8 * var(--u)); }
 .person-turns .person-bubble[data-live] :is(.voice-wave, .voice-bars) { width: 100%; height: calc(44 * var(--u)); padding: 0; border-radius: 0; background: none; color: var(--sv-chat-person-fg); }
 .person-turns .person-bubble[data-live] .voice-bars { display: flex; justify-content: flex-end; }
 .person-turns .person-bubble[data-live] .voice-bars i { height: calc(20 * var(--u)); }
 .person-turns .person-bubble[data-live] .voice-bars i:nth-child(even) { height: calc(10 * var(--u)); }
-.person-turns .person-bubble[data-live] .voice-wave[data-phase="transcribing"] canvas { opacity: 1;
-  -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / 55%) 40%, #000 50%, rgb(0 0 0 / 55%) 60%); mask-image: linear-gradient(90deg, rgb(0 0 0 / 55%) 40%, #000 50%, rgb(0 0 0 / 55%) 60%);
-  -webkit-mask-size: 300% 100%; mask-size: 300% 100%; animation: person-wave-think 1.6s ease-in-out infinite; }
-@keyframes person-wave-think {
-  0% { -webkit-mask-position: 100% 0; mask-position: 100% 0; transform: scaleY(1); }
-  30% { transform: scaleY(.9); }
-  60% { transform: scaleY(1.05); }
-  100% { -webkit-mask-position: 0 0; mask-position: 0 0; transform: scaleY(1); } }
+/* Transcribing, the bars stay exactly as the turn closed on them, and only blink there (operator, 2026-10-15). */
+.person-turns .person-bubble[data-live] .voice-wave[data-phase="transcribing"] canvas { animation: person-wave-blink 1s ease-in-out infinite; }
+@keyframes person-wave-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .person-live-actions { display: flex; justify-content: flex-end; min-height: max(28px, calc(32 * var(--u))); }
 .person-live-actions .ui-button.cancel-input { margin-inline-end: calc(-8 * var(--u)); }
 
