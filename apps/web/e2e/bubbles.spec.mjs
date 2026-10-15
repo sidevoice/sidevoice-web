@@ -70,6 +70,34 @@ test("transcribing bars keep 3:1 contrast at the pulse minimum and with reduced 
   }
 });
 
+
+test("the stage's own voice-note bars keep 3:1 on the person's balloon, at the transcribing shimmer's dimmest and still", async ({ page }) => {
+  await page.goto("/voice/");
+  await page.evaluate(() => {
+    const host = document.createElement("div");
+    host.className = "call-layout";
+    host.innerHTML = `<div class="stage-tile" style="width: 100%; height: 640px"><div class="person-turns"><div class="speech-bubble person-bubble" data-live="">
+      <span class="voice-wave" data-phase="transcribing"><canvas></canvas></span>
+      <span class="voice-bars" data-phase="transcribing"><i></i></span><div class="person-live-actions"></div></div></div></div>`;
+    document.body.replaceChildren(host);
+  });
+  for (const theme of ["light", "dark"]) {
+    const paint = await page.evaluate((theme) => {
+      document.documentElement.dataset.theme = theme;
+      const bubble = document.querySelector(".person-bubble");
+      return { canvas: getComputedStyle(document.querySelector(".voice-wave canvas")).color, bar: getComputedStyle(document.querySelector(".voice-bars i")).backgroundColor,
+        wave: getComputedStyle(document.querySelector(".voice-wave")).backgroundColor, fill: getComputedStyle(bubble, "::before").backgroundColor,
+        size: [bubble.offsetWidth, bubble.offsetHeight] };
+    }, theme);
+    // No pill of their own: the bars lie on the balloon's fill.
+    expect(paint.wave, theme).toBe("rgba(0, 0, 0, 0)");
+    // The shimmer dims the bars to 55% at its darkest (call-view.css person-wave-think's mask).
+    const channels = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => value.startsWith("color(srgb ") ? v * 255 : v);
+    const dimmed = channels(paint.canvas).map((v, i) => v * .55 + channels(paint.fill)[i] * .45);
+    expect(contrast(`rgb(${dimmed.join(", ")})`, paint.fill), `${theme} shimmer`).toBeGreaterThanOrEqual(3);
+    expect(contrast(paint.bar, paint.fill), `${theme} still`).toBeGreaterThanOrEqual(3);
+  }
+});
 /** WCAG contrast between two computed colours (rgb() or color(srgb …)). */
 function contrast(ink, surface) {
   const channels = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => value.startsWith("color(srgb ") ? v * 255 : v);
@@ -82,8 +110,9 @@ function contrast(ink, surface) {
 const SAID = "Okay, so here's what I'd like you to do next. First, go through the settings pane and check that every toggle " +
   "still saves when you change it, because I think the one for automatic updates stopped doing that after yesterday's refactor.";
 
-test("what is said on the stage is big and clear, three lines a page with the page before fading above, and whole for assistive tech", async ({ page }) => {
-  for (const [width, size, line] of [[1280, 21, 30], [320, 18, 27]]) {
+test("what is said on the stage is big and clear, the agent's bigger, three lines a page with the page before fading above, and whole for assistive tech", async ({ page }) => {
+  // The agent's balloon a size up from the person's (2026-10-15): [size, line] of each.
+  for (const [width, agent, person] of [[1280, [24, 33], [21, 30]], [320, [21, 30], [18, 27]]]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/voice/");
     await page.evaluate((said) => {
@@ -111,11 +140,23 @@ test("what is said on the stage is big and clear, three lines a page with the pa
           type: [".stage-bubble", ".person-bubble"].map((selector) => ({ size: style(selector).fontSize, line: style(selector).lineHeight,
             weight: style(selector).fontWeight, family: style(selector).fontFamily })),
           loaded: document.fonts.check('450 18px "DM Sans"'),
-          inks: {
-            played: [style(".karaoke-played").color, style(".stage-bubble").backgroundColor],
-            upcoming: [style(".karaoke-upcoming").color, style(".stage-bubble").backgroundColor],
-            person: [style(".person-said").color, style(".person-bubble").backgroundColor],
-          },
+          // The agent's balloon in each of its looks (CallStage `balloon`), on the palest, deepest and greyest coats a
+          // bicho rolls and with none: its words said and still to say, on its fill (its skin, ::before). The person's
+          // on theirs.
+          inks: (() => {
+            const bubble = document.querySelector(".stage-bubble"), tile = document.querySelector(".stage-tile"), found = {};
+            for (const balloon of ["a", "b", "c"]) for (const tone of ["", "hsl(240 78% 46%)", "hsl(60 86% 56%)", "hsl(0 0% 92%)", "hsl(150 50% 66%)"]) {
+              bubble.dataset.balloon = balloon;
+              tile.style.setProperty("--av-color", tone);
+              const fill = getComputedStyle(bubble, "::before").backgroundColor, as = `${balloon} ${tone || "no tone"}`;
+              found[`${as} played`] = [style(".karaoke-played").color, fill];
+              found[`${as} upcoming`] = [style(".karaoke-upcoming").color, fill];
+            }
+            delete bubble.dataset.balloon;
+            tile.style.removeProperty("--av-color");
+            found.person = [style(".person-said").color, getComputedStyle(document.querySelector(".person-bubble"), "::before").backgroundColor];
+            return found;
+          })(),
           windows, right: Math.max(...bubbles.map((box) => box.right)), left: Math.min(...bubbles.map((box) => box.left)),
           page: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth,
           said: document.querySelector(".person-said").textContent.trim(), hidden: document.querySelector(".person-bubble").closest("[aria-hidden=true]") !== null,
@@ -123,16 +164,18 @@ test("what is said on the stage is big and clear, three lines a page with the pa
       }, theme);
       const at = `${width}px ${theme}`;
       expect(paint.loaded, at).toBe(true);
-      for (const type of paint.type) {
+      paint.type.forEach((type, index) => {
+        const [size, line] = index ? person : agent;
         expect(type, at).toMatchObject({ size: `${size}px`, line: `${line}px`, weight: "450" });
         expect(type.family, at).toMatch(/^"?DM Sans/);
-      }
+      });
       for (const [name, [ink, surface]] of Object.entries(paint.inks)) expect(contrast(ink, surface), `${at} ${name}`).toBeGreaterThanOrEqual(4.5);
-      for (const window of paint.windows) {
-        expect(window.page, at).toBe(3 * line);
+      // The stage's window, then the person's: three of its own lines each (before PagedText sets a height, CSS caps it).
+      paint.windows.forEach((window, index) => {
+        expect(window.page, at).toBe(3 * (index ? person : agent)[1]);
         expect(window.strip, at).toBeGreaterThan(0);
         expect(window.mask, at).toContain("linear-gradient");
-      }
+      });
       expect(paint.left, at).toBeGreaterThanOrEqual(0);
       expect(paint.right, at).toBeLessThanOrEqual(paint.page);
       expect(paint.scroll, at).toBeLessThanOrEqual(paint.page);
@@ -143,4 +186,6 @@ test("what is said on the stage is big and clear, three lines a page with the pa
   await page.emulateMedia({ reducedMotion: "reduce" });
   // A page turns at once: no scroll (app.css leaves every transition a hair long, never a visible one).
   expect(parseFloat(await page.evaluate(() => getComputedStyle(document.querySelector(".paged-text-run")).transitionDuration))).toBeLessThan(.01);
+  // Nor does a shorter last page ease to its height.
+  expect(parseFloat(await page.evaluate(() => getComputedStyle(document.querySelector(".paged-text")).transitionDuration))).toBeLessThan(.01);
 });
