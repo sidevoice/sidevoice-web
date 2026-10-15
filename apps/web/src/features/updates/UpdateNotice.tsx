@@ -65,7 +65,7 @@ function noticeAction(notice: Notice, data: Notices, store: Parameters<typeof op
     if (state === "ready" && appUpdate.can.restart) return { label: t("updates.notice.restart"),
       // Sidevoice as one: its service follows the app's restart (continueAfterRestart).
       run: async () => { continueAfterRestart(); await appUpdate.restart(); } };
-    if (state === "available" && appUpdate.can.download && (appUpdate.mode === "manual" || downloadFailed)) return {
+    if (state === "available" && appUpdate.can.download && (appUpdate.mode === "manual" || downloadFailed || appUpdate.cancelled)) return {
       label: t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download"), run: () => appUpdate.download() };
   } else if (notice.kind === "web") return { label: t("updates.reload"), aria: t("updates.reloadNamed"), run: () => window.sidevoiceActions?.reloadToUpdate?.() };
   const place = UPDATE_PLACE.app;

@@ -280,12 +280,13 @@ test("manual: an update found has its own line under the installed version, Side
   await act(async () => { fireEvent.click(download); });
   expect(fake.updater.download).toHaveBeenCalledTimes(1);
   act(() => fake.push({ state: "downloading", version: "0.10.0", progress: 0.4 }));
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…\s?40\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…\s?40\s?%Cancel download$/);
   const progress = within(appRow()!).getByRole("progressbar");
   expect(progress).toHaveAttribute("aria-valuenow", "40");
   // Its progress and its percent in the same line as its words.
-  expect(progress.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…\s?40\s?%$/);
-  expect(within(appRow()!).queryByRole("button")).toBeNull();
+  expect(progress.closest(".update-action")).toHaveTextContent(/^Sidevoice 0\.10\.0 · Downloading…\s?40\s?%Cancel download$/);
+  // Only Cancel while it downloads.
+  expect(within(appRow()!).getAllByRole("button").map((button) => button.textContent)).toEqual(["Cancel download"]);
   act(() => fake.push({ state: "ready", version: "0.10.0" }));
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 readyRestart to update$/);
   expect(updates().queryByRole("button", { name: "Restart to update Sidevoice" })).toBeNull();
@@ -316,9 +317,55 @@ test("with no version known: Update available · Download, then Downloading the 
   await settle();
   expect(appRow()).toHaveTextContent(/^Update availableDownload$/);
   act(() => fake.push({ state: "downloading", progress: 0.5 }));
-  expect(appRow()).toHaveTextContent(/^Downloading the update…\s?50\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Downloading the update…\s?50\s?%Cancel download$/);
   act(() => fake.push({ state: "ready" }));
   expect(appRow()).toHaveTextContent(/^Update readyRestart to update$/);
+});
+
+test("a download in progress has a Cancel: it calls cancel once and the line is available again, with its Download", async () => {
+  const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "available", version: "0.10.0" } } });
+  await settle();
+  expect(within(appRow()!).queryByRole("button", { name: "Cancel the update download" })).toBeNull();
+  act(() => fake.push({ state: "downloading", version: "0.10.0", progress: 0.4 }));
+  const cancel = within(appRow()!).getByRole("button", { name: "Cancel the update download" });
+  expect(cancel).toHaveTextContent("Cancel download");
+  fake.updater.cancel.mockImplementationOnce(async () => { fake.push({ state: "available", version: "0.10.0" }); });
+  await act(async () => { fireEvent.click(cancel); });
+  expect(fake.updater.cancel).toHaveBeenCalledTimes(1);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 availableDownload$/);
+  expect(within(appRow()!).queryByRole("progressbar")).toBeNull();
+  expect(within(appRow()!).queryByRole("button", { name: "Cancel the update download" })).toBeNull();
+});
+
+test("automatic: a download the person cancelled is not fetched again by itself — available with its Download, here and in the room's notice — until they ask", async () => {
+  const { fake } = open({ section: "updates", notice: true, updater: { mode: "automatic", status: { state: "available", version: "0.10.0" } } });
+  await settle();
+  // Automatic's download is Updates' to show once the person's own check found it.
+  await act(async () => { fireEvent.click(updates().getByRole("button", { name: "Check for updates" })); });
+  act(() => fake.push({ state: "downloading", version: "0.10.0", progress: 0.4 }));
+  fake.updater.cancel.mockImplementationOnce(async () => { fake.push({ state: "available", version: "0.10.0" }); });
+  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Cancel the update download" })); });
+  expect(fake.updater.cancel).toHaveBeenCalledTimes(1);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.10\.0 availableDownload$/);
+  expect(document.body).toHaveTextContent(/Download/);
+  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Download" })); });
+  expect(fake.updater.download).toHaveBeenCalledTimes(1);
+});
+
+test("a download that cannot be cancelled says so in its line, and goes on downloading", async () => {
+  const { fake } = open({ section: "updates", updater: { mode: "manual", status: { state: "downloading", version: "0.10.0", progress: 0.4 } } });
+  await settle();
+  fake.updater.cancel.mockRejectedValueOnce(new Error("boom"));
+  await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Cancel the update download" })); });
+  expect(within(appRow()!).getByRole("alert")).toHaveTextContent("The download couldn't be cancelled.");
+  expect(within(appRow()!).getByRole("progressbar")).toBeInTheDocument();
+  expect(within(appRow()!).getByRole("button", { name: "Cancel the update download" })).toBeInTheDocument();
+});
+
+test("without cancel in the app's updater (an older app), a download shows no Cancel", async () => {
+  open({ section: "updates", updater: { mode: "manual", status: { state: "downloading", version: "0.10.0", progress: 0.4 }, without: ["cancel"] } });
+  await settle();
+  expect(within(appRow()!).queryByRole("button")).toBeNull();
 });
 
 const FAILURES = [

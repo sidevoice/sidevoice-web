@@ -14,10 +14,11 @@ import { uiLocale } from "../../i18n/locale";
 const percent = (progress: number) => new Intl.NumberFormat(uiLocale(), { style: "percent" }).format(progress);
 
 /** Whether the app's update, as `status` says it, has a button in its row: Download (manual, or a download that
- *  failed, as Retry) or Restart to update (ready, either mode). */
-function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: ReturnType<typeof useAppUpdate>["can"]) {
+ *  failed, as Retry; or one the person cancelled, which the app does not fetch again by itself) or Restart to update
+ *  (ready, either mode). */
+function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: ReturnType<typeof useAppUpdate>["can"], cancelled = false) {
   if (status?.state === "ready") return can.restart;
-  return status?.state === "available" && can.download && (mode === "manual" || status.error?.code === "update-download-failed");
+  return status?.state === "available" && can.download && (mode === "manual" || cancelled || status.error?.code === "update-download-failed");
 }
 
 /** Sidevoice on this computer, in Settings › Updates (a release's updater; none, `service` alone), top to bottom:
@@ -38,12 +39,12 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   const t = translator();
   const store = useContext(RoomStoreContext);
   const update = useAppUpdate();
-  const [busy, setBusy] = useState<"check" | "download" | "restart" | null>(null);
+  const [busy, setBusy] = useState<"check" | "download" | "cancel" | "restart" | null>(null);
   const [modeFailed, setModeFailed] = useState(false);
   // A call of this page's that failed; and whether the person's own check found nothing.
   const [failure, setFailure] = useState<unknown>(null);
   const [upToDate, setUpToDate] = useState(false);
-  const { status, mode, can, checkedAt, inView } = update;
+  const { status, mode, can, checkedAt, inView, cancelled } = update;
   // What the app says next replaces what a call of this page's said.
   useEffect(() => { setFailure(null); }, [status?.state]);
   if (!update.updater) return <>{service}</>;
@@ -52,12 +53,13 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
     setModeFailed(false);
     void update.setMode(next).catch(() => setModeFailed(true));
   }
-  async function act(action: "check" | "download" | "restart") {
+  async function act(action: "check" | "download" | "cancel" | "restart") {
     if (busy) return;
     setFailure(null); setUpToDate(false);
     setBusy(action);
     try {
       if (action === "restart") { onRestart?.(); await update.restart(); return; }
+      if (action === "cancel") { await update.cancel(); return; }
       const next = action === "check" ? await update.check() : await update.download();
       if (action !== "check" || !next || next.error) return;
       if (next.state === "idle") setUpToDate(true);
@@ -73,7 +75,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   const code = (error as { code?: unknown } | null)?.code;
   const found = inView;
   // A download or an install that failed is its line's to say; a check that failed, the check's.
-  const rowError = found && (code === "update-download-failed" || code === "update-install-failed") ? error : null;
+  const rowError = found && (code === "update-download-failed" || code === "update-install-failed" || code === "update-cancel-failed") ? error : null;
   const checkError = rowError ? null : error;
   const checking = busy === "check" || update.checking;
   // Up to date once a check went through, while nothing waits and nothing failed: the app idle, its service current.
@@ -98,7 +100,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
       </div>
       {!!checkError && <div className="app-update-failure" role="alert"><ErrorText message={updaterFailure(checkError, { t })} /></div>}
       {/* A newer version: the app's, its service following its restart; else what its service waits for. */}
-      {found ? <AppUpdateRow status={found} mode={mode} can={can} busy={busy} error={rowError} act={(action) => void act(action)} t={t} /> : service}
+      {found ? <AppUpdateRow status={found} mode={mode} can={can} cancelled={cancelled} busy={busy} error={rowError} act={(action) => void act(action)} t={t} /> : service}
     </div>
   </>;
 }
@@ -114,21 +116,25 @@ function rowWords(status: UpdaterStatus, moving: boolean, t: Translate) {
 }
 
 /** The app's update once found, on one line with its one action: Sidevoice 0.4.0 available · Download (or Retry
- *  download), its words its description; Sidevoice 0.4.0 · Downloading… with its progress in the line (automatic: from
- *  the start, with no Download); Sidevoice 0.4.0 ready · Restart to update; what failed under it. The line is where a
+ *  download), its words its description; Sidevoice 0.4.0 · Downloading… with its progress in the line and a Cancel
+ *  (automatic: from the start, with no Download; a download the person cancelled is available again, with its
+ *  Download, in either mode); Sidevoice 0.4.0 ready · Restart to update; what failed under it. The line is where a
  *  landing goes. */
-function AppUpdateRow({ status, mode, can, busy, error, act, t }: { status: UpdaterStatus; mode: UpdateMode | null;
-  can: ReturnType<typeof useAppUpdate>["can"]; busy: "check" | "download" | "restart" | null; error: unknown; act: (action: "download" | "restart") => void;
+function AppUpdateRow({ status, mode, can, cancelled, busy, error, act, t }: { status: UpdaterStatus; mode: UpdateMode | null;
+  can: ReturnType<typeof useAppUpdate>["can"]; cancelled: boolean; busy: "check" | "download" | "cancel" | "restart" | null; error: unknown;
+  act: (action: "download" | "cancel" | "restart") => void;
   t: Translate }) {
   const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed" || status.error?.code === "update-download-failed";
   const progress = status.progress == null ? null : Math.max(0, Math.min(1, status.progress));
   const copyId = useId();
   // Downloading; or automatic's, found and downloading by itself from then on.
-  const moving = status.state === "downloading" || (status.state === "available" && mode !== "manual" && !downloadFailed);
+  const moving = status.state === "downloading" || (status.state === "available" && mode !== "manual" && !downloadFailed && !cancelled);
   const button = status.state === "ready" ? can.restart && <Button size="sm" variant="primary" loading={busy === "restart"} aria-describedby={copyId}
       onClick={() => act("restart")}>{t("updates.action.restartAll")}</Button>
-    : status.state === "available" && hasAction(status, mode, can) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"}
+    : status.state === "available" && hasAction(status, mode, can, cancelled) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"}
         aria-describedby={copyId} onClick={() => act("download")}>{t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download")}</Button>
+      : status.state === "downloading" && can.cancel ? <Button size="sm" variant="secondary" loading={busy === "cancel"} aria-label={t("updates.action.cancelDownloadNamed")}
+        onClick={() => act("cancel")}>{t("updates.action.cancelDownload")}</Button>
       : null;
   const copy = rowWords(status, moving, t);
   const shownProgress = status.state === "downloading" ? progress : null;

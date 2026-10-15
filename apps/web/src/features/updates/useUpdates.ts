@@ -34,7 +34,7 @@ export const UPDATE_PLACE = {
 };
 
 export type UpdateMode = "automatic" | "manual";
-export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed";
+export type UpdaterFailure = "update-check-failed" | "update-download-failed" | "update-install-failed" | "update-cancel-failed";
 export interface UpdaterStatus {
   state: "idle" | "available" | "downloading" | "ready";
   version?: string;
@@ -45,7 +45,8 @@ export interface UpdaterStatus {
 /** The desktop app's updater (sidevoice-desktop #56: a release's, and for now a nightly's; a development build or an
  *  older app has none, and then nothing of it shows: whatever its channel, it is the updater that says). Each method
  *  is looked for before it is used. Automatic downloads an update by itself; manual says one exists and `download`
- *  fetches it. `restart` installs a ready one at once. */
+ *  fetches it. `cancel` stops a download in progress (sidevoice-desktop #91): the partial is removed and the status is
+ *  `available` again, the update still known. `restart` installs a ready one at once. */
 export interface AppUpdater {
   settings?(): Promise<{ mode: UpdateMode }>;
   setMode?(mode: UpdateMode): Promise<{ mode: UpdateMode }>;
@@ -53,6 +54,7 @@ export interface AppUpdater {
   subscribe?(listener: (status: UpdaterStatus) => void): () => void;
   check?(): Promise<UpdaterStatus>;
   download?(): Promise<UpdaterStatus>;
+  cancel?(): Promise<void>;
   restart?(): Promise<void>;
 }
 export function appUpdater(): AppUpdater | null {
@@ -83,6 +85,9 @@ function flag(set: WeakSet<AppUpdater>, updater: AppUpdater, on: boolean) {
   if (on) set.add(updater); else set.delete(updater);
   window.dispatchEvent(new Event(CHANGED));
 }
+/** The version whose download the person cancelled, per app updater ("" where the app names none): the app does not
+ *  download it again by itself, so it reads as available with its Download, in either mode, until it moves on. */
+const cancelledVersions = new WeakMap<AppUpdater, string>();
 /** The mode as each app's updater last answered it, for every place that shows its update. */
 const knownModes = new WeakMap<AppUpdater, UpdateMode>();
 function modeKnown(updater: AppUpdater, mode: UpdateMode) {
@@ -97,6 +102,7 @@ export function useAppUpdate() {
   const [updater] = useState(appUpdater);
   const [status, setStatus] = useState<UpdaterStatus | null>(null);
   const [mode, setModeShown] = useState<UpdateMode | null>(() => updater ? knownModes.get(updater) ?? null : null);
+  const [cancelledVersion, setCancelledVersion] = useState(() => updater ? cancelledVersions.get(updater) ?? null : null);
   const [checkedAt, setCheckedAt] = useState(readCheckedAt);
   const [person, setPerson] = useState(() => ({ checking: !!updater && checking.has(updater), asked: !!updater && asked.has(updater) }));
 
@@ -104,6 +110,7 @@ export function useAppUpdate() {
     const changed = () => {
       setCheckedAt(readCheckedAt());
       if (updater && knownModes.has(updater)) setModeShown(knownModes.get(updater)!);
+      if (updater) setCancelledVersion(cancelledVersions.get(updater) ?? null);
       if (updater) setPerson((was) => was.checking === checking.has(updater) && was.asked === asked.has(updater) ? was
         : { checking: checking.has(updater), asked: asked.has(updater) });
     };
@@ -152,6 +159,8 @@ export function useAppUpdate() {
   }
   async function download() {
     if (typeof updater?.download !== "function") return null;
+    cancelledVersions.delete(updater);
+    window.dispatchEvent(new Event(CHANGED));
     try {
       const next = await updater.download();
       if (next && typeof next.state === "string") setStatus(next);
@@ -159,6 +168,20 @@ export function useAppUpdate() {
     } catch (error) {
       throw failedAs("update-download-failed", error);
     }
+  }
+  /** Stops the download in progress; the app's answer is the status, `available` again. */
+  async function cancel() {
+    if (typeof updater?.cancel !== "function") return;
+    const version = status?.version ?? "";
+    try {
+      await updater.cancel();
+    } catch (error) {
+      throw failedAs("update-cancel-failed", error);
+    }
+    cancelledVersions.set(updater, version);
+    window.dispatchEvent(new Event(CHANGED));
+    // The status is pushed too; asked for here for an app that does not push it.
+    try { const next = await updater.status(); if (next && typeof next.state === "string") setStatus(next); } catch { /* The pushed status stands. */ }
   }
   /** Restarts into the ready update, now, whether a call is on or not. */
   async function restart() {
@@ -173,19 +196,21 @@ export function useAppUpdate() {
     try { modeKnown(updater, (await updater.setMode(next)).mode === "manual" ? "manual" : "automatic"); } catch (error) { modeKnown(updater, before); throw error; }
   }
   const shownMode = updater ? mode : null;
+  const cancelled = status?.state === "available" && cancelledVersion === (status.version ?? "");
   return {
-    updater, status, mode: shownMode, checkedAt, check, download, restart, setMode,
+    updater, status, mode: shownMode, cancelled, checkedAt, check, download, cancel, restart, setMode,
     /** Whether the person's own check is under way; whether it found what the app has now. */
     checking: !!updater && person.checking,
     asked: !!updater && person.asked,
     /** The app's update as Settings › Updates shows it (appUpdateInView), and as the room's notice says it
      *  (appUpdateShown). */
     inView: appUpdateInView(status, shownMode, !!updater && person.asked, !!updater && person.checking),
-    noticed: appUpdateShown(status, shownMode, !!updater && person.checking),
+    noticed: appUpdateShown(status, shownMode, !!updater && person.checking, cancelled),
     can: {
       mode: typeof updater?.settings === "function" && typeof updater.setMode === "function",
       check: typeof updater?.check === "function",
       download: typeof updater?.download === "function",
+      cancel: typeof updater?.cancel === "function",
       restart: typeof updater?.restart === "function",
     },
   };
@@ -201,12 +226,13 @@ function failedAs(code: UpdaterFailure, error: unknown) {
 /** What the room's notice says of the app's update: manual, that one is available (with Download) once a check found
  *  one; in either mode, once downloaded, that it is ready to restart into — never a download, whose progress is
  *  Updates' to show, and nothing while the person's own check runs. Automatic says nothing until then: it downloads by
- *  itself. A download that failed is said with its Retry (manual), an install that failed with ready; a failed check is
+ *  itself — unless the person cancelled that download (`cancelled`): it is not fetched again by itself, so it is said
+ *  available, as manual's. A download that failed is said with its Retry (manual), an install that failed with ready; a failed check is
  *  Updates' to say. */
-export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null, checking = false): UpdaterStatus | null {
+export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | null, checking = false, cancelled = false): UpdaterStatus | null {
   if (!status || checking) return null;
   if (status.state === "ready") return status;
-  return mode === "manual" && status.state === "available" ? status : null;
+  return (mode === "manual" || cancelled) && status.state === "available" ? status : null;
 }
 
 /** What Settings › Updates shows of the app's update: every step of what the person's own check found (`asked`),

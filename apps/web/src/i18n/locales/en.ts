@@ -382,6 +382,7 @@ export const messages = {
   "updates.failure.update-check-failed": "Couldn't check for updates.",
   "updates.failure.update-download-failed": "The update couldn't be downloaded.",
   "updates.failure.update-install-failed": "The update couldn't be installed.",
+  "updates.failure.update-cancel-failed": "The download couldn't be cancelled.",
   "hosts.startAtSignIn": "Start at sign-in",
   "hosts.startAtSignInHint": "The service starts when you sign in to this computer.",
   "hosts.startAtSignInUnavailable": "This version of the app can’t change this without stopping the service.",
@@ -1121,6 +1122,8 @@ export const messages = {
   // app and its service, as one) updated.
   "updates.action.download": "Download",
   "updates.action.retryDownload": "Retry download",
+  "updates.action.cancelDownload": "Cancel download",
+  "updates.action.cancelDownloadNamed": "Cancel the update download",
   "updates.action.updateAll": "Update Sidevoice",
   "updates.action.updatingAll": "Updating Sidevoice…",
   "updates.action.retryAll": "Retry updating Sidevoice",

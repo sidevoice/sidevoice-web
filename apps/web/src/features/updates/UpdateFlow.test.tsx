@@ -124,7 +124,7 @@ test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevo
   await wait(CHECK_MS);
   // Found: it downloads by itself, its progress in its own line with just the new version; no Download anywhere; the
   // room silent. The installed version stays on its own line, saying neither Checking… nor Up to date.
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
   expect(appRow()).toHaveAttribute("data-state", "downloading");
   expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
   expect(installedLine()).not.toHaveAttribute("id");
@@ -134,7 +134,7 @@ test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevo
   for (const percent of ["30", "60", "90"]) {
     await wait(STEP_MS);
     expect(percentOf()).toBe(percent);
-    expect(appRow()).toHaveTextContent(new RegExp(`^Sidevoice 0\\.4\\.0 · Downloading…\\s?${percent}\\s?%$`));
+    expect(appRow()).toHaveTextContent(new RegExp(`^Sidevoice 0\\.4\\.0 · Downloading…\\s?${percent}\\s?%(Cancel download|Cancelar la descarga)$`));
     expect(notice()).toBeNull();
     noRestart();
   }
@@ -171,11 +171,11 @@ test("manual, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevoice
   expect(fake.updater.download).not.toHaveBeenCalled();
   expect(appRow()).toHaveAttribute("data-state", "available");
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Download", hidden: true })); });
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
   // Its progress is the line's: the room says nothing while it downloads.
   await wait(STEP_MS);
   expect(percentOf()).toBe("30");
-  expect(within(appRow()!).queryByRole("button", { hidden: true })).toBeNull();
+  expect(within(appRow()!).getAllByRole("button", { hidden: true }).map((button) => button.textContent)).toEqual(["Cancel download"]);
   expect(notice()).toBeNull();
   await wait(3 * STEP_MS);
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
@@ -251,7 +251,7 @@ test("the app's own check, manual: no Checking…; Sidevoice 0.4.0 available · 
   // The person's own press, in the room: its progress in the line, as when pressed there; the room silent.
   await act(async () => { fireEvent.click(within(document.querySelector<HTMLElement>(".update-notice")!).getByRole("button", { name: "Download", hidden: true })); });
   expect(fake.updater.download).toHaveBeenCalledOnce();
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
   await wait(STEP_MS);
   expect(percentOf()).toBe("30");
   expect(notice()).toBeNull();
@@ -265,7 +265,7 @@ test("in Spanish: Sidevoice 0.3.0 · Buscando…, Sidevoice 0.4.0 · Descargando
   await press();
   expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Buscando…$/);
   await wait(CHECK_MS + STEP_MS);
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?30\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?30\s?%(Cancel download|Cancelar la descarga)$/);
   expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
   expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Última comprobación|Aún sin comprobar/);
   await wait(3 * STEP_MS);
@@ -279,5 +279,5 @@ test("in Spanish: Sidevoice 0.3.0 · Buscando…, Sidevoice 0.4.0 · Descargando
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 disponibleDescargar$/);
   expect(notice()).toBe("Versión 0.4.0 disponible · Descargar");
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Descargar", hidden: true })); });
-  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?0\s?%$/);
+  expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Descargando…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
 });
