@@ -176,12 +176,16 @@ test("a recorded settings try delivers the package take through the real trial a
     for (let n = 0; n < 64; n++) window.__trialSink.captured(new Float32Array(512).fill(0.5));
   });
   await page.waitForFunction(() => window.__turnStarted);
+  // Stop ends the open turn at once (`endInput`), with no more audio and no wait for the pause: its words come as soon
+  // as the voice has transcribed and merged them, well inside the 2.5 s of ordinary patience.
+  const stopped = Date.now();
   await page.locator("#stt-try").click();
   // Stop mutes the call, and a muted call ends its turn as silence does: the microphone goes on giving frames.
   await page.evaluate(() => {
     for (let n = 0; n < 160; n++) window.__trialSink.captured(new Float32Array(512));
   });
   await expect(page.locator("#stt-try-panel")).toHaveAttribute("data-phase", "done");
+  expect(Date.now() - stopped).toBeLessThan(3000);
   await expect(page.locator("#stt-take")).toBeVisible();
   await expect(page.locator("#stt-take")).toContainText("recorded");
   const takes = await page.evaluate(() => window.__trialTakes.map((take) => ({ samples: take.samples.length, turns: take.turns.length })));

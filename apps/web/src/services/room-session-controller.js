@@ -2038,19 +2038,27 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   try{
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake})}
+  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>unroute(host,trial)})}
    :(await tryVoice(routedTrial(host,trial),settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
-  }finally{await host.routeInput(null).catch(()=>{});await trial.dispose()}
+  }finally{await unroute(host,trial).catch(()=>{});await trial.dispose()}
  }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
 }
 /* A try's call takes the microphone once it has started (its settings, models and take in place), and each time it
  * starts again (a retune stops it, which lets the microphone go): only a started call can be given it. */
 function routedTrial(host,trial){
- return Object.create(trial,{start:{value:async options=>{await trial.start(options);await host.routeInput(trial)}}});
+ return Object.create(trial,{start:{value:async options=>{await trial.start(options);routeOwner=trial;await host.routeInput(trial)}}});
+}
+/* Whose the microphone is among the tries: a try that is replaced while it closes its take (its fence, its last release)
+ * must not take the microphone from the one that replaced it, which routed itself while the first was still closing. */
+let routeOwner=null;
+async function unroute(host,trial){
+ if(routeOwner!==trial)return;
+ routeOwner=null;
+ await host.routeInput(null);
 }
 let voiceTryFinish=null;
 function cancelVoiceTry(){voiceTry?.abort()}
@@ -2075,7 +2083,7 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
   const settings=turnTrySettings();if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs))abort.abort();
   const run=tryEndOfTurn(routedTrial(host,trial),settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};
-  try{await run.done}finally{await host.routeInput(null).catch(()=>{});await trial.dispose()}
+  try{await run.done}finally{await unroute(host,trial).catch(()=>{});await trial.dispose()}
  }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(turnTry?.abort===abort)turnTry=null}
 }

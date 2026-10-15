@@ -1967,7 +1967,7 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
  assert.equal(plain(await stt).text,'hola');
- assert.deepEqual([...voice.routes],['call-1',null]);
+ assert.deepEqual([...voice.routes],['call-1',null],'routed as it starts, fenced off when the take ends (and so no longer its to release)');
  const tts=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'hola',keep:false})");
  await settleSoon();
  voice.said.at(-1).step({type:'done',outcome:{status:'heard'}});
@@ -2419,7 +2419,7 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const result=plain(await tried);assert.equal(result.text,'hola');
  // With how long its phases took (the fake voice says nothing of its recognition).
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop','dispose','stop'],'the temporary call is stopped and disposed after the try');
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop','dispose','stop'],'the temporary call is stopped and disposed after the try');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
@@ -2462,7 +2462,7 @@ test('A try requests a take and hands it over after the voice stops',async()=>{
  voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
  voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
  await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['mute',true],['mute',false],['stop'],['dispose','call-1'],['stop']]);
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop'],['dispose','call-1'],['stop']]);
  assert.deepEqual([...takes],[1]);
  assert.equal(listeners.size,0,'and the voice is let go');
  // The end of turn's too, once stopped.
@@ -2817,4 +2817,20 @@ test('A paired machine that says it is behind says how to update it there; anyth
  // Once answered, the next question goes out again.
  await Promise.all([s.run("loadMachineInfo('fp-mac')"),new Promise(resolve=>setTimeout(()=>{answer();resolve()},0))]);
  assert.equal(asked.length,2);
+});
+
+test('replacement retains its own microphone after the previous trial\'s close completes',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ // The first trial's close is held: the replacement starts and takes the microphone while the first still closes.
+ let release;const held=new Promise(resolve=>{release=resolve});const create=voice.createCall.bind(voice);
+ voice.createCall=()=>{const call=create();call.endInput=()=>call.id==='call-1'?held:Promise.resolve();return call};
+ const first=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");first.catch(()=>{});
+ await settleSoon();voice.created[0].emit('turn',{phase:'started',turn_id:'first'});
+ const second=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");second.catch(()=>{});
+ await settleSoon();
+ assert.equal(voice.routed?.id,'call-2');
+ release();await first.catch(()=>{});await settleSoon();
+ assert.equal(voice.routed?.id,'call-2','the first trial finishing its close does not take the microphone from the second');
+ voice.created[1].emit('turn',{phase:'finished',turn_id:'second',text:'second'});
+ assert.equal(plain(await second).text,'second');
 });
