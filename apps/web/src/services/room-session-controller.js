@@ -77,6 +77,8 @@ const describeTarget=()=>targetAnswers(target)?askTarget(target,fetch):Promise.r
 function pageStorage(){try{return localStorage}catch{return null}}
 const nativeData=desktopDataBridge();
 const pairingStorage=nativeData?null:pageStorage(),storedPairingState=readPairingState(pairingStorage);
+let nativePairingsReady=!nativeData,nativePendingRevokes=[];
+let nativeWriteQueue=Promise.resolve();
 let localPairing=null;
 let pairings={list:storedPairingState.list};
 const desktopLocalHost=localHostBridge();
@@ -110,12 +112,15 @@ async function setDeviceName(name){
 }
 async function persistPairingProjection(){
  if(nativeData){
-  try{await nativeData.pairings.write({pairings:pairings.list.filter(p=>!p.local)})}
+  if(!nativePairingsReady)throw Object.assign(Error('data.pairings-read'),{key:'data.pairings-read'});
+  const value={pairings:pairings.list.filter(p=>!p.local),pendingRevokes:nativePendingRevokes};
+  try{nativeWriteQueue=nativeWriteQueue.catch(()=>{}).then(()=>nativeData.pairings.write(value));await nativeWriteQueue}
   catch{setRoomError(translator()('data.pairingsWriteFailed'));throw Object.assign(Error('data.pairings-write'),{key:'data.pairings-write'})}
  }else if(pairingStorage&&!writePairings(pairingStorage,pairings)){setRoomError(translator()('data.pairingsWriteFailed'))}
  publishPairings();
 }
 async function keepPairings(next){
+ if(nativeData&&!nativePairingsReady)throw Object.assign(Error('data.pairings-read'),{key:'data.pairings-read'});
  const previous=pairings,previousStored=storedPairingState.list,projected=projectPairings(next,localPairing);
  pairings=projected;storedPairingState.list=projected.list.filter(p=>!p.local);
  try{await persistPairingProjection()}catch(error){pairings=previous;storedPairingState.list=previousStored;throw error}
@@ -134,7 +139,8 @@ function setLocalPairing(value){
  storedPairingState.list=projected.list.filter(p=>!p.local);
  pairings=projected;
  discardChangedHostAgents(previous,projected);
- void persistPairingProjection().catch(()=>{});
+ // Status changes do not rewrite the remote credential store. Only removing a duplicate needs a write.
+ if(duplicates.length)void persistPairingProjection().catch(()=>{});else publishPairings();
  // An unreachable report invalidates the app-owned per-launch proxy immediately. Never keep its URL or
  // session secret around to be reused after native starts a new core.
  if(previousLocal&&previousLocal.fp!==next?.fp)settleLink(previousLocal.fp,null,'away');
@@ -189,7 +195,7 @@ async function refreshLocalHost(){
  if(epoch!==localHostEpoch)return;
  setLocalPairing(pairing);roomStore.patch({machinesReady:true});
 }
-if(desktopLocalHost){
+function subscribeLocalHost(){if(desktopLocalHost){
  try{desktopLocalHost.subscribe(status=>{
   const epoch=++localHostEpoch;
   setLocalHostStatus(status);
@@ -199,7 +205,8 @@ if(desktopLocalHost){
    if(epoch===localHostEpoch){setLocalPairing(pairing);roomStore.patch({machinesReady:true})}
   }).catch(()=>{if(epoch===localHostEpoch){setLocalPairing(null);roomStore.patch({machinesReady:true})}});
  })}catch{}
-}
+}}
+if(!nativeData)subscribeLocalHost();
 /* ----- every paired machine at once: one link each -----
  * A link is how this page reaches one machine: the node base that proved itself, how (directly or through the room
  * it links with), and the conversations it last listed. Every pairing has one, up to MAX_LINKS — the local host
@@ -695,16 +702,19 @@ async function forgetMachine(fp){
  if(pairing.revoked)return;
  // Gone from here at once; the machine is told now if it answers, else whenever it does (pendingRevokes).
  const told=await revokeOn(pairing,known!=null&&Date.now()-(verified.get(known)||0)<VERIFIED_FOR_MS?known:null);
- if(!told)keepPendingRevoke(pairing);
+ if(!told)await keepPendingRevoke(pairing);
 }
 // A forgotten machine that could not be told: its token is still good there until it is. What is needed to tell it is
 // kept (this device's storage, as the pairing was) and tried again — on start, and every few minutes — until it hears.
 const PENDING_REVOKES_KEY='sidevoice.pending-revokes';
-function pendingRevokes(){try{const kept=JSON.parse(pageStorage()?.getItem(PENDING_REVOKES_KEY)||'[]');return Array.isArray(kept)?kept.filter(p=>p&&typeof p.fp==='string'&&typeof p.token==='string'&&typeof p.device_id==='string'):[]}catch{return []}}
-function writePendingRevokes(list){try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}}
-function keepPendingRevoke(pairing){
+function pendingRevokes(){if(nativeData)return nativePendingRevokes;try{const kept=JSON.parse(pageStorage()?.getItem(PENDING_REVOKES_KEY)||'[]');return Array.isArray(kept)?kept.filter(p=>p&&typeof p.fp==='string'&&typeof p.token==='string'&&typeof p.device_id==='string'):[]}catch{return []}}
+async function writePendingRevokes(list){
+ if(nativeData){const previous=nativePendingRevokes;nativePendingRevokes=list;try{await persistPairingProjection()}catch(error){nativePendingRevokes=previous;throw error}return}
+ try{if(list.length)pageStorage()?.setItem(PENDING_REVOKES_KEY,JSON.stringify(list));else pageStorage()?.removeItem(PENDING_REVOKES_KEY)}catch{}
+}
+async function keepPendingRevoke(pairing){
  const {fp,device_id,token,urls,rv,public_key,host,insecure}=pairing;
- writePendingRevokes([...pendingRevokes().filter(p=>p.fp!==fp),{fp,device_id,token,urls,rv,public_key,host,...(insecure?{insecure}:{})}]);
+ await writePendingRevokes([...pendingRevokes().filter(p=>p.fp!==fp),{fp,device_id,token,urls,rv,public_key,host,...(insecure?{insecure}:{})}]);
 }
 /** Tells a machine this device is gone (its token revoked there), at an address that proves it is that machine. */
 async function revokeOn(pairing,knownBase=null){
@@ -719,7 +729,7 @@ async function revokeOn(pairing,knownBase=null){
 }
 let revokingPending=false;
 async function retryPendingRevokes(){
- if(revokingPending)return;revokingPending=true;
+ if(revokingPending||nativeData&&!nativePairingsReady)return;revokingPending=true;
  try{
   const left=[];
   for(const pending of pendingRevokes()){
@@ -727,7 +737,7 @@ async function retryPendingRevokes(){
    if(pairings.list.some(p=>p.fp===pending.fp))continue;
    if(!await revokeOn(pending))left.push(pending);
   }
-  writePendingRevokes(left);
+  await writePendingRevokes(left);
  }finally{revokingPending=false}
 }
 // (Never holding a process open where timers can: the runtime's tests.)
@@ -2000,9 +2010,17 @@ function startInitialLocate(){
 async function loadPairingsBeforeDiscovery(){
  try{
   const saved=await nativeData.pairings.read();
-  storedPairingState.list=Array.isArray(saved.pairings)?saved.pairings:[];
+  if(!Array.isArray(saved.pairings)||saved.pendingRevokes!=null&&!Array.isArray(saved.pendingRevokes))throw Error('invalid pairings');
+  storedPairingState.list=saved.pairings;
+  nativePendingRevokes=saved.pendingRevokes||[];
   pairings=projectPairings(storedPairingState,null);
- }catch{setRoomError(translator()('data.pairingsReadFailed'))}
+  nativePairingsReady=true;
+ }catch{
+  setRoomError(translator()('data.pairingsReadFailed'));
+  setTimeout(()=>void loadPairingsBeforeDiscovery(),2000)?.unref?.();
+  return;
+ }
+ subscribeLocalHost();
  if(desktopLocalHost)void refreshLocalHost().finally(startInitialLocate);
  else{void refreshLocalHost();startInitialLocate()}
 }

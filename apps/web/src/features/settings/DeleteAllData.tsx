@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { Group, Row } from "../../components/ui/Card";
 import { useRoomStore } from "../../state/room-store";
-import { desktopDataBridge, type DesktopDataBridge } from "../../services/desktop-host";
+import { desktopResetBridge, type DesktopResetBridge } from "../../services/desktop-host";
 import { translator, type MessageKey } from "../../i18n/translator";
 
 const steps: Record<string, MessageKey> = {
@@ -14,7 +14,7 @@ const steps: Record<string, MessageKey> = {
   agents: "data.step.agents",
 };
 
-type Report = Awaited<ReturnType<DesktopDataBridge["resetReport"]>>;
+type Report = Awaited<ReturnType<DesktopResetBridge["resetReport"]>>;
 
 function FailedItems({ failed }: { failed: { step: string; key: string; agent?: string }[] }) {
   const t = translator();
@@ -25,7 +25,7 @@ function FailedItems({ failed }: { failed: { step: string; key: string; agent?: 
 
 /** Shown on first-run too: Settings is hidden behind onboarding after the helper relaunches. */
 export function ResetReportNotice() {
-  const data = desktopDataBridge();
+  const data = desktopResetBridge();
   const t = translator();
   const [report, setReport] = useState<Report>(null);
   const [error, setError] = useState(false);
@@ -56,7 +56,7 @@ export function ResetReportNotice() {
 
 /** Desktop-only destructive action; the browser has no machine-wide deletion capability. */
 export function DeleteAllData() {
-  const data = desktopDataBridge();
+  const data = desktopResetBridge();
   const t = translator();
   const inCall = useRoomStore((state) => Boolean(state.facts.ws || state.facts.reconnecting));
   const [open, setOpen] = useState(false);
@@ -69,7 +69,7 @@ export function DeleteAllData() {
   if (!data) return null;
 
   async function erase() {
-    if (!data || busy || inCall) return;
+    if (!data || !open || busy || inCall) return;
     setBusy(true); setError(null);
     try {
       const result = await data.deleteAll();
@@ -78,6 +78,7 @@ export function DeleteAllData() {
       if (result.failed.length) setReport({ state: "partial", completed: ["service"], failed: result.failed, agents: result.agents });
     } catch (failure) {
       const key = (failure as { key?: string })?.key;
+      if (key === "reset.cancelled") { setOpen(false); return; }
       setError(key === "reset.busy" ? "data.busy" : key === "reset.service-failed" ? "data.serviceFailed" : "data.failed");
     } finally { setBusy(false); }
   }
