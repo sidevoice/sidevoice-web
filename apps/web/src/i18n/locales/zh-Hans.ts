@@ -707,7 +707,6 @@ export const messages: Messages = {
   "wizard.title.ready": "一切就绪，和你的智能体对话吧",
   "wizard.recap.title": "你的设置",
   "wizard.recap.here": "本机",
-  "wizard.recap.smart": "智能",
   "wizard.recap.note": "你可以随时在“设置”中更改这些内容。",
   "wizard.progress": "设置进度",
   "wizard.group.where": "工作位置",

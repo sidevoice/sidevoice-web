@@ -717,7 +717,6 @@ export const messages: Messages = {
   "wizard.title.ready": "Tutto pronto — parla con i tuoi agenti",
   "wizard.recap.title": "La tua configurazione",
   "wizard.recap.here": "Questo computer",
-  "wizard.recap.smart": "Intelligente",
   "wizard.recap.note": "Puoi cambiare tutto questo in Impostazioni.",
   "wizard.progress": "Avanzamento della configurazione",
   "wizard.group.where": "Dove lavori",

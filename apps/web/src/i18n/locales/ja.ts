@@ -708,7 +708,6 @@ export const messages: Messages = {
   "wizard.title.ready": "準備完了。エージェントと話しましょう",
   "wizard.recap.title": "あなたの設定",
   "wizard.recap.here": "このコンピュータ",
-  "wizard.recap.smart": "スマート",
   "wizard.recap.note": "これらはすべて「設定」で変更できます。",
   "wizard.progress": "設定の進行状況",
   "wizard.group.where": "作業場所",

@@ -101,7 +101,8 @@
 .wizard-recap-row:nth-child(4) { animation-delay: 430ms; }
 .wizard-recap-icon { grid-area: icon; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--sv-radius-md); background: var(--sv-accent-soft); color: var(--sv-accent-text); }
 .wizard-recap-row dt { grid-area: label; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
-.wizard-recap-row dd { grid-area: value; margin: 0; font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); overflow-wrap: anywhere; }
+/* One line, whatever the model's name: what does not fit ends in an ellipsis (the whole name on hover). */
+.wizard-recap-row dd { grid-area: value; margin: 0; font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wizard-recap-detail { font-weight: var(--sv-weight-regular, 400); color: var(--sv-text-muted); }
 .wizard-recap-check { grid-area: check; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--sv-positive-soft); color: var(--sv-positive); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
 .wizard-recap-row:nth-child(1) .wizard-recap-check { animation-delay: 420ms; }

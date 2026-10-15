@@ -723,7 +723,6 @@ export const messages = {
   "wizard.title.ready": "You’re all set — talk to your agents",
   "wizard.recap.title": "Your setup",
   "wizard.recap.here": "This computer",
-  "wizard.recap.smart": "Smart",
   "wizard.recap.note": "You can change any of this in Settings.",
   "wizard.progress": "Setup progress",
   "wizard.group.where": "Where you work",

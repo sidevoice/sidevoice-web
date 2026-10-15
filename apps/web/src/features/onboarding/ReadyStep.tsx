@@ -14,7 +14,8 @@ function RecapRow({ icon, label, value, detail }: { icon: ReactNode; label: stri
   return <div className="wizard-recap-row">
     <span className="wizard-recap-icon" aria-hidden>{icon}</span>
     <dt>{label}</dt>
-    <dd>{value}{detail && <span className="wizard-recap-detail"> · {detail}</span>}</dd>
+    {/* One line always: a long model name ends in an ellipsis, said whole on hover. */}
+    <dd title={detail ? `${value} · ${detail}` : value}>{value}{detail && <span className="wizard-recap-detail"> · {detail}</span>}</dd>
     <span className="wizard-recap-check" aria-hidden><CheckIcon size={12} /></span>
   </div>;
 }
@@ -45,8 +46,8 @@ export function ReadyStep({ path, machineName, title, t }: {
         <RecapRow icon={<TranscriptionIcon size={16} />} label={t("wizard.group.transcription")} value={draft?.stt.model ?? ""} detail={stt.local ? undefined : catalogName("stt")} />
         <RecapRow icon={<VoicesIcon size={16} />} label={t("wizard.group.voice")} value={draft?.tts.model ?? ""} detail={tts.local ? undefined : catalogName("tts")} />
         <RecapRow icon={<EndOfTurnIcon size={16} />} label={t("voice.endOfTurn")}
-          value={draft?.end_of_turn === "smart-turn" && turn.model ? t("wizard.recap.smart") : t("voice.endOfTurn.silence")}
-          detail={draft?.end_of_turn === "smart-turn" && turn.model ? turn.model.id : undefined} />
+          // The model by its name when one ends turns, Silence otherwise: one word or one name, as the other rows.
+          value={draft?.end_of_turn === "smart-turn" && turn.model ? turn.model.id : t("voice.endOfTurn.silence")} />
       </dl>
       <p className="wizard-recap-note">{t("wizard.recap.note")}</p>
     </div>
