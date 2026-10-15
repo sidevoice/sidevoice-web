@@ -121,6 +121,10 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   // Under its balloon the agent holds still (operator, 2026-10-15): work that starts meanwhile waits for it to go.
   const mood = balloonUp && stage.mood === "working" ? "speaking" : stage.mood;
   const conversation = useRoomStore((state) => state.conversation);
+  // Anything that happens with the agent restarts its rest before a pastime: the call starting, the conversation on
+  // the stage, the person speaking, a balloon, its mood (operator, 2026-10-15).
+  const joined = useRoomStore((state) => state.call.joined);
+  const interaction = [joined, stage.threadId, conversation.pendingPhase, balloonUp, mood].join("|");
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
@@ -161,7 +165,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
             {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} mood={mood} size="stage" unread={stage.unread > 0} desk={mood === "working"} still={balloonUp}
+            <CharacterAvatar className="stage-agent" spec={spec} mood={mood} size="stage" unread={stage.unread > 0} desk={mood === "working"} still={balloonUp} interaction={interaction}
               mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
             <StageDesk seed={stage.threadId} />
           </div>

@@ -50,6 +50,8 @@ export interface CharacterAvatarProps {
   ref?: Ref<HTMLSpanElement>;
   /** Held still while set (on the stage: while its balloon is up): no idle pastime and no work in hand; quiet instead. */
   still?: boolean;
+  /** What last happened with it (any value; a change restarts its rest before a pastime): see BORED_AFTER_MS. */
+  interaction?: unknown;
 }
 
 /** "a" and "b" in turn, a new one each time `key` changes: each restarts the engine's per-word keyframes. */
@@ -65,6 +67,23 @@ function useBeat(key: string | number | undefined): "a" | "b" | undefined {
 
 /** The entrance into a new mood (enterFrom: the startle into listening), for ENTER_MS: the mood it left, or nothing.
  *  A first mood makes no entrance. */
+/** How long it rests, quiet, after anything happened (it spoke, listened, held still under its balloon) before a pastime
+ *  starts (operator, 2026-10-15): it never seems to busy itself the moment you are done with it. */
+export const BORED_AFTER_MS = 10_000;
+
+/** Whether it has rested BORED_AFTER_MS: from `resting` turning on, or from the last interaction (`interaction`
+ *  changing: a call starting, someone speaking, a balloon), whichever came last. */
+function useBored(resting: boolean, interaction: unknown) {
+  const [bored, setBored] = useState(false);
+  useEffect(() => {
+    setBored(false);
+    if (!resting) return;
+    const next = window.setTimeout(() => setBored(true), BORED_AFTER_MS);
+    return () => window.clearTimeout(next);
+  }, [resting, interaction]);
+  return resting && bored;
+}
+
 function useEnter(acts: EngineMood): "idle" | "working" | null {
   const [seen, setSeen] = useState(acts);
   const [enter, setEnter] = useState<"idle" | "working" | null>(null);
@@ -87,7 +106,7 @@ function useLast(value: string | undefined): string | undefined {
   return value ?? last.current;
 }
 
-export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, playbackThreadId, unread, desk, still, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, playbackThreadId, unread, desk, still, interaction, label, className, ref }: CharacterAvatarProps) {
   const avatar = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
     if (mouth !== "playback") return;
@@ -119,11 +138,13 @@ export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, p
   const working = useRotation("work", key, drawing.works, acts === "working" && !still);
   // Idle steps (idle.ts) while idle: offline sleeps instead, and so does the person out of a call (no steps).
   // Held still (its words still on screen): no pastime starts, it stays quiet until they go.
-  const resting = useRotation("idle", key, drawing.idles, mood === "idle" && !still);
+  const bored = useBored(mood === "idle" && !still, interaction);
+  const resting = useRotation("idle", key, drawing.idles, bored);
   // During the entrance, what it had in hand stays on so it can drop away.
   const lastWork = useLast(working), lastIdle = useLast(resting);
   const work = working ?? (enter === "working" ? lastWork : undefined);
-  const idle = mood === "present" || (still && mood === "idle") ? "quiet" : resting ?? (enter === "idle" ? lastIdle : undefined);
+  // Resting before it is bored (or held still) is quiet: awake, nothing in hand.
+  const idle = mood === "present" || (mood === "idle" && !bored) ? "quiet" : resting ?? (enter === "idle" ? lastIdle : undefined);
   return (
     <span ref={(element) => { avatar.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={mood} data-mood={acts}
       data-size={engineSize(size)} data-mouth={mouth} data-beat={beat} data-work={work} data-idle={idle} data-enter={enter ?? undefined}
