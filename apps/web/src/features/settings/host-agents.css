@@ -62,7 +62,8 @@
 .host-agent-bridge { margin: 0 var(--sv-space-5) var(--sv-space-3); border-top: 1px solid var(--sv-border); }
 .host-agent-bridge-toggle { width: 100%; height: auto; min-height: var(--sv-control-sm); justify-content: flex-start; padding-inline: 0; text-align: start; white-space: normal; }
 .host-agent-bridge-labels { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); min-width: 0; overflow-wrap: anywhere; }
-.host-agent-bridge-toggle > svg { flex: none; }
+.host-agent-bridge-toggle .ui-button-content { width: 100%; }
+.host-agent-bridge-toggle .ui-button-content > svg { flex: none; }
 .host-agent-bridge-state { margin-inline-start: auto; font-size: var(--sv-font-xs); font-weight: 600; color: var(--sv-text-muted); }
 .host-agent-bridge[data-state="ready"] .host-agent-bridge-state { color: var(--sv-positive); }
 .host-agent-bridge[data-state="needs_attention"] .host-agent-bridge-state { color: var(--sv-warning); }

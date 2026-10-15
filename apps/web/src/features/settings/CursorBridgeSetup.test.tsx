@@ -88,7 +88,7 @@ test("the Cursor editor prompt uses the shared Quote and copies only the phrase"
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   try {
     const { panel } = show(base);
-    const join = panel.querySelectorAll(".host-agent-bridge-steps li")[5];
+    const join = panel.querySelectorAll<HTMLLIElement>(".host-agent-bridge-steps li")[5];
     expect(join).toHaveTextContent("In a new Cursor editor chat (not cursor-agent), ask:");
     expect(join.querySelector(".ui-quote blockquote")).toHaveTextContent("Join the Sidevoice voice room");
     await act(async () => fireEvent.click(within(join).getByRole("button", { name: "Copy the message for your agent" })));
