@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DisclosureButton } from "../../components/ui/DisclosureButton";
+import { Quote } from "../../components/ui/Snippet";
 import { translator, type MessageKey } from "../../i18n/translator";
 import type { CursorBridgeReason, CursorBridgeState, CursorBridgeStatus, CursorBridgeStepId, CursorBridgeStepState } from "../../state/room-types";
 
@@ -42,8 +43,10 @@ export function CursorBridgeSetup({ bridge, id }: { bridge: CursorBridgeStatus; 
   const reason = bridge.reason && reasons[bridge.reason];
   return <div className="host-agent-bridge" data-state={bridge.state}>
     <DisclosureButton className="host-agent-bridge-toggle" open={open} controls={id} onClick={() => setOpen((value) => !value)}>
-      <span>{t("agents.cursorBridge.title")}</span>
-      <span className="host-agent-bridge-state">{t(state)}</span>
+      <span className="host-agent-bridge-labels">
+        <span>{t("agents.cursorBridge.title")}</span>
+        <span className="host-agent-bridge-state">{t(state)}</span>
+      </span>
     </DisclosureButton>
     {open && <div className="host-agent-bridge-body" id={id} role="group" aria-label={t("agents.cursorBridge.title")}>
       {reason && <p className="host-agent-bridge-reason">{t(reason, { minimum: bridge.minimum_cursor_version })}</p>}
@@ -61,6 +64,7 @@ export function CursorBridgeSetup({ bridge, id }: { bridge: CursorBridgeStatus; 
             {step.id === "enable_desktop_bridge" && step.state === "unknown" &&
               <span className="host-agent-bridge-setting-note">{t("agents.cursorBridge.settingUnknown")}</span>}
           </span>
+          {step.id === "join_editor_chat" && <Quote text={t("agents.cursorBridge.joinPrompt")} label={t("sidebar.newCopy")} />}
           <span className="host-agent-bridge-step-state">{t(status)}</span>
         </li>;
       })}</ol>

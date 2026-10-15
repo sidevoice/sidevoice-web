@@ -1,5 +1,5 @@
-import { afterEach, expect, test } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, expect, test, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { CursorBridgeSetup } from "./CursorBridgeSetup";
 import { setUiLanguage, translator, UI_LANGUAGES } from "../../i18n/translator";
 import type { CursorBridgeReason, CursorBridgeStatus } from "../../state/room-types";
@@ -67,7 +67,7 @@ test("every connector reason is localized and the unknown version is not present
   const cases: [CursorBridgeReason, string][] = [
     ["cursor_version_too_old", "Update Cursor to 3.22.12"],
     ["bridge_missing", "No running Desktop Bridge"],
-    ["bridge_stale", "file was found"],
+    ["bridge_stale", "Sidevoice could not verify a usable bridge"],
     ["sqlite3_missing", "cannot find sqlite3"],
     ["sidevoice_not_registered", "not connected to Sidevoice"],
     ["cursor_version_unknown", "version could not be verified"],
@@ -82,12 +82,29 @@ test("every connector reason is localized and the unknown version is not present
   }
 });
 
+test("the Cursor editor prompt uses the shared Quote and copies only the phrase", async () => {
+  const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  const writeText = vi.fn(async (_text: string) => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    const { panel } = show(base);
+    const join = panel.querySelectorAll(".host-agent-bridge-steps li")[5];
+    expect(join).toHaveTextContent("In a new Cursor editor chat (not cursor-agent), ask:");
+    expect(join.querySelector(".ui-quote blockquote")).toHaveTextContent("Join the Sidevoice voice room");
+    await act(async () => fireEvent.click(within(join).getByRole("button", { name: "Copy the message for your agent" })));
+    expect(writeText).toHaveBeenCalledExactlyOnceWith("Join the Sidevoice voice room");
+  } finally {
+    if (previous) Object.defineProperty(navigator, "clipboard", previous);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
 test("the new copy exists in all eight catalogues, including the unreadable-setting explanation", () => {
   expect(UI_LANGUAGES).toHaveLength(8);
   for (const language of UI_LANGUAGES) {
     const t = translator(language);
     for (const key of ["agents.cursorBridge.title", "agents.cursorBridge.state.unsupported", "agents.cursorBridge.reason.editor_unavailable",
-      "agents.cursorBridge.step.enable_desktop_bridge", "agents.cursorBridge.step.wait_for_chat_registration", "agents.cursorBridge.settingUnknown"] as const)
+      "agents.cursorBridge.step.enable_desktop_bridge", "agents.cursorBridge.step.wait_for_chat_registration", "agents.cursorBridge.joinPrompt", "agents.cursorBridge.settingUnknown"] as const)
       expect(t(key), `${language}: ${key}`).not.toBe(key);
     expect(t("agents.cursorBridge.step.cursor_version", { minimum: "3.22.12" })).toContain("3.22.12");
   }
