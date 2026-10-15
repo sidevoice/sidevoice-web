@@ -503,6 +503,8 @@ test("the smart end of turn has its model chosen like the others — just the mo
   expect(listOptions("voice-end-of-turn")[0].label).toMatch(/^Smart/);
   expect(listOptions("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
   expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
+  // Kept as Smart, without its model: calls end turns with silence until it is downloaded, never downloading it.
+  expect(document.getElementById("turn-model-card")).toHaveTextContent("Will switch when ready: the turn ends with silence until then.");
   fireEvent.click(document.getElementById("turn-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");
 });
