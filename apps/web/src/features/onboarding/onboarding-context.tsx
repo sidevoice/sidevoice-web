@@ -175,7 +175,11 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
       if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
       // Set up on this release: what it already has is not news to the person.
       const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });
-      if (saved) setOpen(false);
+      if (saved) {
+        setOpen(false);
+        // A failed cleanup has no bearing on completion and must never surface a setup message.
+        void window.sidevoiceActions?.cleanupSetupTrials?.().catch(() => undefined);
+      }
       return saved;
     },
   };

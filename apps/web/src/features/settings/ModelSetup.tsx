@@ -85,7 +85,9 @@ export function sizeText(bytes: number | null, language = document.documentEleme
 }
 
 /** The download of the slot's model: started, cancelled. */
-export const downloadModel = (task: Task | "end-of-turn") => void window.sidevoiceActions?.installVoiceModel?.(task);
+export const downloadModel = (task: Task | "end-of-turn", setup = false) => void (setup
+  ? window.sidevoiceActions?.installVoiceModel?.(task, { setup: true })
+  : window.sidevoiceActions?.installVoiceModel?.(task));
 export const cancelDownload = () => window.sidevoiceActions?.cancelVoiceInstall?.();
 
 export type TryState = {

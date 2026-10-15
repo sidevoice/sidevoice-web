@@ -15,6 +15,7 @@ import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
+import {setupModelAbsent,recordSetupInstall,cleanSetupDownloads} from './setup-model-cleanup.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
@@ -1730,7 +1731,8 @@ function retuneTurnTry(){
 // A model of this device's catalogue the slot names but that is not on disk: installed on this device (the build the
 // slot names, else its recommended one), its progress in `voiceInstall` for whatever shows it, and the catalogues read again once it is there.
 let voiceInstall=null;
-async function installVoiceModel(task){
+let setupCleanupStarted=false;
+async function installVoiceModel(task,{setup=false}={}){
  // The end of turn has no slot: its model is this device's end-of-turn model.
  const turn=task==='end-of-turn'?endOfTurnModel(state.voiceCatalogue.catalogs,(state.voiceDraft||state.voiceSettings)?.turn_model):null;
  const slot=turn?{catalog:'local',model:turn.id}:(state.voiceDraft||state.voiceSettings)?.[task];if(!slot)return;
@@ -1741,12 +1743,28 @@ async function installVoiceModel(task){
  at(null);
  try{
   const models=await modelCatalogs();
+  // A setup download earns provenance only from a fresh local listing with no installed build beforehand.
+  const before=setup&&!setupCleanupStarted?setupModelAbsent(await models.catalogs().catch(()=>null),slot.model):false;
   await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
+  if(setup&&before&&!setupCleanupStarted){
+   const after=await models.catalogs().catch(()=>null);
+   if(after)recordSetupInstall(pageStorage(),slot.model,before,after);
+  }
   roomStore.patch({voiceInstall:null});await loadVoiceCatalogue();
  }catch(error){roomStore.patch({voiceInstall:failureCode(error,'')==='install-cancelled'?null:{task,model:slot.model,state:'failed',fraction:null,...installFailure(error)}})}
  finally{if(voiceInstall===abort)voiceInstall=null}
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
+// Once Ready is saved, the wizard closes independently of this best-effort cleanup. The record is consumed before
+// any host request, and a late setup install cannot claim ownership after cleanup begins.
+async function cleanupSetupTrials(){
+ setupCleanupStarted=true;
+ voiceInstall?.abort();
+ await cleanSetupDownloads({storage:pageStorage(),models:modelCatalogs,
+  selected:()=>[state.voiceDraft||state.voiceSettings,state.voiceSettings,handed],
+  busy:()=>!!(state.ws||state.connecting||state.reconnecting||voiceInstall),
+  changed:loadVoiceCatalogue});
+}
 // Models not used for as long as the person chose (model-housekeeping.js), deleted where the engine can: none in use,
 // none the engine says nothing about; the catalogues read again once one went.
 async function deleteUnusedModels(models,catalogs){
@@ -1893,6 +1911,7 @@ window.sidevoiceActions={
  tryTurnSettings,
  cancelVoiceTry,finishVoiceTry,
  installVoiceModel,
+ cleanupSetupTrials,
  cancelVoiceInstall,
  uninstallVoiceModel,
  setDeleteUnusedModels,

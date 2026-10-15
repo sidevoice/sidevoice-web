@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { defaultVoiceSettings } from "./voice-settings.js";
-import { cleanSetupDownloads, recordSetupInstall, SETUP_DOWNLOADS_KEY } from "./setup-model-cleanup.js";
+import { cleanSetupDownloads, recordSetupInstall, setupModelAbsent, SETUP_DOWNLOADS_KEY } from "./setup-model-cleanup.js";
 import type { CatalogView, ModelCatalogs } from "./model-catalogs.js";
 
 const memory = () => {
@@ -28,9 +28,9 @@ function fixture() {
   const busy = vi.fn(() => false);
   const changed = vi.fn(async () => {});
   const log = vi.fn();
-  const clean = () => cleanSetupDownloads({ storage, models, selected, busy, changed, log });
+  const clean = () => cleanSetupDownloads({ storage, models: async () => models, selected, busy, changed, log });
   const downloaded = (id: string) => {
-    const before = catalogue({ [id]: [false] });
+    const before = setupModelAbsent(catalogue({ [id]: [false] }), id);
     installed.add(id);
     expect(recordSetupInstall(storage, id, before, catalogue({ [id]: [true] }))).toBe(true);
   };
@@ -59,10 +59,10 @@ test("selected transcription, voice and smart-turn models are never uninstalled"
 
 test("pre-existing builds and partially downloaded or failed installs never acquire setup ownership", async () => {
   const { storage, entries } = memory();
-  expect(recordSetupInstall(storage, "old", catalogue({ old: [true, false] }), catalogue({ old: [true, true] }))).toBe(false);
-  expect(recordSetupInstall(storage, "partial", catalogue({ partial: [false] }), catalogue({ partial: [false] }))).toBe(false);
-  expect(recordSetupInstall(storage, "failed", catalogue({ failed: [false] }), catalogue({ failed: [false] }))).toBe(false);
-  expect(recordSetupInstall(storage, "uncertain", catalogue({ uncertain: [false] }, true), catalogue({ uncertain: [true] }))).toBe(false);
+  expect(recordSetupInstall(storage, "old", setupModelAbsent(catalogue({ old: [true, false] }), "old"), catalogue({ old: [true, true] }))).toBe(false);
+  expect(recordSetupInstall(storage, "partial", setupModelAbsent(catalogue({ partial: [false] }), "partial"), catalogue({ partial: [false] }))).toBe(false);
+  expect(recordSetupInstall(storage, "failed", setupModelAbsent(catalogue({ failed: [false] }), "failed"), catalogue({ failed: [false] }))).toBe(false);
+  expect(recordSetupInstall(storage, "uncertain", setupModelAbsent(catalogue({ uncertain: [false] }, true), "uncertain"), catalogue({ uncertain: [true] }))).toBe(false);
   expect(entries.has(SETUP_DOWNLOADS_KEY)).toBe(false);
 });
 
@@ -96,7 +96,7 @@ test("storage and catalogue uncertainty authorize no destructive cleanup", async
   await run.clean();
   expect(run.uninstall).not.toHaveBeenCalled();
   const blocked = { getItem: () => { throw new Error("blocked"); }, setItem: () => {}, removeItem: () => {} } as unknown as Storage;
-  expect(recordSetupInstall(blocked, "spare", catalogue({ spare: [false] }), catalogue({ spare: [true] }))).toBe(false);
-  await cleanSetupDownloads({ storage: blocked, models: run.models, selected: run.selected, busy: run.busy, log: run.log });
+  expect(recordSetupInstall(blocked, "spare", setupModelAbsent(catalogue({ spare: [false] }), "spare"), catalogue({ spare: [true] }))).toBe(false);
+  await cleanSetupDownloads({ storage: blocked, models: async () => run.models, selected: run.selected, busy: run.busy, log: run.log });
   expect(run.uninstall).not.toHaveBeenCalled();
 });

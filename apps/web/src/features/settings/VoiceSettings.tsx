@@ -187,7 +187,7 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
         <ModelPrepare id={task + "-model-card"} actionIds={task + "-model"} pending={pending} status={status} model={draft[task].model} size={model.local ? model.size : null} fraction={model.fraction} error={model.failure} errorDetails={model.failureDetails}
           meta={meta || undefined} pickers={(locked) => <ModelPickers task={task} draft={draft} options={slot.options} locked={locked} t={t} />}
           runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
-          onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />
+          onDownload={() => downloadModel(task, setup)} onCancel={cancelDownload} onRetry={() => downloadModel(task, setup)} />
       </Row>
       {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
         <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
@@ -277,7 +277,7 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
             <Select id="turn-model" value={turn.model!.id} disabled={locked} onValueChange={(model) => edit({ turn_model: model })}
               options={turnModels.map((model: { id: string; builds?: { available: boolean }[] }) => ({ value: model.id, label: model.id, disabled: !model.builds?.some((build) => build.available) }))} />
           </Field>}
-          onDownload={() => downloadModel("end-of-turn")} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn")} />
+          onDownload={() => downloadModel("end-of-turn", setup)} onCancel={cancelDownload} onRetry={() => downloadModel("end-of-turn", setup)} />
       </Row>}
       {tryIt}
     </Group>

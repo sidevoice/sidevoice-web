@@ -34,7 +34,7 @@ beforeEach(() => {
   actions = {
     openPairing: vi.fn(), loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(),
     tryVoiceSettings: vi.fn().mockResolvedValue({ text: "hola, ¿me oyes?", timings: { ready_ms: 900, recognition_ms: 420 } }), cancelVoiceTry: vi.fn(), loadHostAgents: vi.fn().mockResolvedValue(undefined),
-    installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(),
+    installVoiceModel: vi.fn().mockResolvedValue(undefined), cancelVoiceInstall: vi.fn(), cleanupSetupTrials: vi.fn().mockResolvedValue(undefined),
   };
   window.sidevoiceActions = actions as unknown as SidevoiceActions;
 });
@@ -154,9 +154,11 @@ test("transcription and voice are this device's: trying them is recommended, and
   expect(document.querySelector(".wizard-recap-list")).toHaveTextContent("Transcription");
   expect(document.querySelector(".wizard-ready .ui-quote blockquote")).toHaveTextContent("voice_connect");
   expect(wizard().getByRole("button", { name: "Copy the message for your agent" })).toHaveClass("ui-copy-button");
+  actions.cleanupSetupTrials.mockReturnValueOnce(new Promise(() => {}));
   await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Enter Sidevoice" })); });
   const kept = JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!);
   expect(kept.completed_at).toBeGreaterThan(0);
+  expect(actions.cleanupSetupTrials).toHaveBeenCalledOnce();
   expect(kept.trials.tts).toBeUndefined();
   expect(document.querySelector(".room-shell")).not.toHaveAttribute("hidden");
 }, WHOLE_APP_MS);
@@ -255,8 +257,8 @@ test("a model not on this device is downloaded first, in its block as in Setting
   expect(tryButton()).toHaveAccessibleDescription("The transcription model isn't ready yet.");
   expect(document.getElementById("wizard-stage-reason")).toHaveTextContent("The transcription model isn't ready yet.");
   expect(document.getElementById("stt-language")).toBeNull();
-  fireEvent.click(document.getElementById("stt-model-download")!);
-  expect(actions.installVoiceModel).toHaveBeenCalledWith("stt");
+  fireEvent.click(document.querySelector("#wizard #stt-model-download")!);
+  expect(actions.installVoiceModel).toHaveBeenCalledWith("stt", { setup: true });
   act(() => store.patch({ voiceInstall: { task: "stt", model: "whisper-base", state: "running", fraction: 0.5, error: "" } }));
   expect(document.getElementById("stt-model-card")).toHaveTextContent("Downloading… 50%");
   fireEvent.click(document.getElementById("stt-model-cancel")!);

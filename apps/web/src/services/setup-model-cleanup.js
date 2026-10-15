@@ -21,6 +21,12 @@ function localModel(catalogs, id) {
 
 const installed = (model) => model.installed === true || model.builds.some((build) => build.installed === true);
 
+/** Snapshot absence before the engine can mutate catalogue objects during the install. */
+export function setupModelAbsent(catalogs, id) {
+  const model = localModel(catalogs, id);
+  return !!model && !installed(model);
+}
+
 /** The set kept on this device; invalid or inaccessible storage authorizes no deletion. */
 function read(storage) {
   try {
@@ -32,9 +38,9 @@ function read(storage) {
 }
 
 /** A successful setup install with no pre-existing build is the only source of an owned model ID. */
-export function recordSetupInstall(storage, id, before, after) {
-  const oldModel = localModel(before, id), newModel = localModel(after, id);
-  if (!oldModel || !newModel || installed(oldModel) || !installed(newModel)) return false;
+export function recordSetupInstall(storage, id, absentBeforeInstall, after) {
+  const newModel = localModel(after, id);
+  if (!absentBeforeInstall || !newModel || !installed(newModel)) return false;
   const ids = read(storage);
   if (!ids) return false;
   try {
@@ -56,23 +62,26 @@ function take(storage) {
 
 /**
  * Quietly remove only confirmed setup downloads that are neither selected nor in use at the moment of deletion.
- * @param {{storage: Storage | null, models: ModelCatalogs | null, selected: () => (DeviceVoiceSettings | null | undefined)[],
+ * @param {{storage: Storage | null, models: () => Promise<ModelCatalogs>, selected: () => (DeviceVoiceSettings | null | undefined)[],
  *   busy: () => boolean, changed?: () => Promise<unknown>, log?: (error: unknown) => void}} options
  */
 export async function cleanSetupDownloads({ storage, models, selected, busy, changed, log = console.warn }) {
   const ids = take(storage);
-  if (!ids.length || !models?.uninstall || busy()) return;
+  if (!ids.length || busy()) return;
+  let host;
+  try { host = await models(); } catch (error) { log(error); return; }
+  if (typeof host.uninstall !== 'function') return;
   let removed = false;
   for (const id of ids) {
     if (busy()) break;
     try {
-      const catalogs = await models.catalogs();
+      const catalogs = await host.catalogs();
       const model = localModel(catalogs, id);
       if (!model || !installed(model)) continue;
       const settings = selected();
       if (!settings.length || !settings[0] || settings.some((value) => value && modelPurposes(catalogs, value)(id).length)) continue;
       if (busy()) break;
-      await models.uninstall(id);
+      await host.uninstall(id);
       removed = true;
     } catch (error) { log(error); }
   }

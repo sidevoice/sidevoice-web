@@ -218,7 +218,8 @@ export interface SidevoiceActions {
    *  the change; Smart without its model ready stops it. */
   tryTurnSettings?(progress?: Pick<TrialProgress, "onLevel" | "onTurnStep" | "onTake">): Promise<void>;
   /** Installs on this device the model the slot names, its progress in `voiceInstall`. */
-  installVoiceModel?(task: "stt" | "tts" | "end-of-turn"): Promise<void>;
+  installVoiceModel?(task: "stt" | "tts" | "end-of-turn", options?: { setup?: boolean }): Promise<void>;
+  cleanupSetupTrials?(): Promise<void>;
   /** Cancels that install: nothing of it is kept. */
   cancelVoiceInstall?(): void;
   uninstallVoiceModel?(model: string): Promise<void>;
