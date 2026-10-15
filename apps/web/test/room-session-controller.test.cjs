@@ -1179,10 +1179,14 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
    const call=Object.create(owner);call.id='call-'+(created.length+1);
    call.emit=(name,value)=>{for(const listener of on[name]||[])listener(value)};
    call.onTurn=sub('turn');call.onState=sub('state');call.onLevel=sub('level');call.onPlaybackLevel=sub('output');call.onTake=listener=>typeof owner.onTake==='function'?owner.onTake(listener):sub('take')(listener);call.onError=sub('error');
-   call.dispose=async()=>{calls.push(['dispose',call.id]);await owner.stop()};
+   // As the shared audio does: only a started call's lane can be given the microphone, and stopping it lets it go.
+   call.active=false;
+   call.start=async options=>{await owner.start(options);call.active=true};
+   call.stop=async()=>{call.active=false;if(owner.routed===call)owner.routed=null;await owner.stop()};
+   call.dispose=async()=>{calls.push(['dispose',call.id]);call.active=false;if(owner.routed===call)owner.routed=null;await owner.stop()};
    created.push(call);return call;
   },
-  async routeInput(call){routes.push(call?.id??null);this.routed=call},
+  async routeInput(call){if(call&&!call.active)throw new TypeError('a started call');routes.push(call?.id??null);this.routed=call},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
  };
@@ -1837,7 +1841,7 @@ test('A words that end after B took the microphone are written in A, and B shows
  s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
   :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
  const create=voice.createCall.bind(voice);
- voice.createCall=()=>{const call=create();call.start=async()=>{call.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'})};return call};
+ voice.createCall=()=>{const call=create();call.start=async()=>{call.active=true;call.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'})};return call};
  await s.run("select('fp-mac|b')");
  assert.equal(s.run('state.voiceState.listening'),'listening','the focused call is B, whose last state was listening');
  assert.equal(s.run('state.userLive'),false);
@@ -1852,7 +1856,7 @@ test('stopping routed A while B starts does not cancel B or route its words to A
  s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
  let release;const starting=new Promise(resolve=>{release=resolve});
  const create=voice.createCall.bind(voice);
- voice.createCall=()=>{const call=create();if(voice.created.length===2)call.start=async options=>{await starting;await voice.start(options)};return call};
+ voice.createCall=()=>{const call=create();if(voice.created.length===2)call.start=async options=>{await starting;await voice.start(options);call.active=true};return call};
  s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
   :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
  const selected=s.run("select('fp-mac|b')");
@@ -1924,10 +1928,96 @@ test('a binding replacement preserves an already started turn target',async()=>{
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',binding_id:'next-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
  await c.s.run('refresh()');
  a.emit('turn',finished('before-rebind','Before'));
- a.emit('turn',started('after-rebind'));a.emit('turn',finished('after-rebind','After'));
+ // Heard after the rebind: the voice stamps it then.
+ a.emit('turn',started('after-rebind',Date.now()));a.emit('turn',finished('after-rebind','After'));
  assert.equal(turnSent(c,c.first,'before-rebind','finished')[0].binding_id,'b');
  assert.equal(turnSent(c,c.first,'after-rebind','finished')[0].binding_id,'next-binding');
  c.s.run('disconnect()');
+});
+// ----- web #140 review: F1 a failed switch, F2 trial routing, F3 activation bindings, F4 disposal with open turns -----
+const toB=(c,binding_id='b-binding')=>{
+ c.s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ c.s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',title:'B',binding_id},room:{revision:1},clients:[],call:null,participants:[]}});
+};
+for(const failing of ['start','routeInput'])test(`F1 B's ${failing} rejected: B is selected and nobody has the microphone, never A; a later refresh gives it to B`,async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ assert.equal(voice.routed,a);
+ toB(c);
+ const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,key)=>key==='setBootError'?value=>said.push(value):()=>{}});
+ let fail=true;
+ const create=voice.createCall.bind(voice),route=voice.routeInput.bind(voice);
+ if(failing==='start')voice.createCall=()=>{const call=create();const start=call.start;call.start=async options=>{if(fail)throw Object.assign(Error('models-load-failed'),{code:'models-load-failed'});await start(options)};return call};
+ else voice.routeInput=async call=>{if(fail&&call&&call!==a)throw Object.assign(Error('audio-output-failed'),{code:'audio-output-failed'});await route(call)};
+ await s.run("select('fp-mac|b')");
+ assert.equal(s.run('targetId()'),'fp-mac|b','the room selected B');
+ assert.equal(voice.routed,null,'A no longer hears the microphone');
+ assert.equal(voice.routes.at(-1),null);
+ assert.equal(s.run('voice'),null,'no call is shown as listening');
+ assert.ok(said.some(Boolean),'the failure is said');
+ fail=false;
+ await s.run('refresh()');
+ assert.equal(voice.routed?.id,voice.created.at(-1).id,'the next refresh gives B the microphone');
+ assert.notEqual(voice.routed,a);
+ s.run('disconnect()');
+});
+test('F2 each settings try gives its call the microphone only once started, and again after a retune',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const stt=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");
+ await settleSoon();
+ voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+ assert.equal(plain(await stt).text,'hola');
+ assert.deepEqual([...voice.routes],['call-1',null]);
+ const tts=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'hola',keep:false})");
+ await settleSoon();
+ voice.said.at(-1).step({type:'done',outcome:{status:'heard'}});
+ await tts;
+ assert.deepEqual([...voice.routes].slice(2),['call-2',null]);
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,end_of_turn:'silence'}})");
+ const turn=s.run('window.sidevoiceActions.tryTurnSettings()');
+ await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({patience:'calm'})");
+ await settleSoon();
+ s.run('window.sidevoiceActions.cancelVoiceTry()');
+ await assert.rejects(turn,{code:'trial-cancelled'});
+ assert.deepEqual([...voice.routes].slice(4),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
+});
+test('F3 a delayed start heard before a rebind keeps the binding it was heard under; speech after it, the new one',async()=>{
+ const c=await callOnRoom(),a=c.voice.created[0];
+ const heard=Date.now();await new Promise(resolve=>setTimeout(resolve,5));
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',binding_id:'replacement'},room:{revision:1},clients:[],call:null,participants:[]})});
+ await c.s.run('refresh()');
+ a.emit('turn',started('heard-before',heard));a.emit('turn',finished('heard-before','Before'));
+ a.emit('turn',started('heard-after',Date.now()));
+ assert.deepEqual([turnSent(c,c.first,'heard-before','started')[0].binding_id,turnSent(c,c.first,'heard-before','finished')[0].binding_id],['b','b']);
+ assert.equal(turnSent(c,c.first,'heard-after','started')[0].binding_id,'replacement');
+ c.s.run('disconnect()');
+});
+test('F3 A to B to A: the old A start keeps its first binding, new A speech the returned one',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ const heard=Date.now();await new Promise(resolve=>setTimeout(resolve,5));
+ toB(c);await s.run("select('fp-mac|b')");
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'a',title:'A',binding_id:'a-return'},room:{revision:2},clients:[],call:null,participants:[]}});
+ await s.run("select('fp-mac|a')");
+ assert.equal(voice.routed,a);
+ a.emit('turn',started('old-a',heard));a.emit('turn',finished('old-a','Old'));
+ a.emit('turn',started('new-a',Date.now()));
+ assert.deepEqual([turnSent(c,c.first,'old-a','started')[0].thread_id,turnSent(c,c.first,'old-a','started')[0].binding_id],['a','b']);
+ assert.deepEqual([turnSent(c,c.first,'new-a','started')[0].thread_id,turnSent(c,c.first,'new-a','started')[0].binding_id],['a','a-return']);
+ s.run('disconnect()');
+});
+for(const ending of ['the voice cancels it as it stops','the voice says nothing of it','its disposal fails'])test(`F4 closing a conversation with an open turn ends that turn once (${ending}), and releases the reply hold`,async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ a.emit('turn',started('closing-turn'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'closing-turn',revision:1,thread_id:'a',epoch:1}});
+ if(ending==='the voice cancels it as it stops')a.dispose=async()=>{voice.calls.push(['dispose',a.id]);a.emit('turn',{turn_id:'closing-turn',phase:'cancelled',merged:false})};
+ if(ending==='its disposal fails')a.dispose=async()=>{throw Error('dispose-failed')};
+ await s.run("disposeConversation('fp-mac|a')").catch(()=>{});
+ assert.deepEqual(plain(turnSent(c,c.first,'closing-turn','cancelled').map(d=>d.merged)),[false],'one cancellation reaches the room');
+ assert.equal(s.run("openVoiceTurns.has('closing-turn')"),false);
+ assert.equal(s.run("[...turnWireIds.keys()].length"),0);
+ s.run('disconnect()');
 });
 test('T02 an accepted reply cannot start while a voice turn or its start acknowledgement is open',async()=>{
  const c=await callOnRoom();

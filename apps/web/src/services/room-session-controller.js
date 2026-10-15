@@ -1413,7 +1413,7 @@ async function prepareConversationCall(node,thread_id,binding_id){
  if(!entry){
   const owner=voiceOwner??await voiceHost();
   const call=owner.createCall();
-  entry={call,key,node,thread_id,binding_id,generation:callGeneration,listeners:[]};
+  entry={call,key,node,thread_id,activations:[],generation:callGeneration,listeners:[]};
   conversationCalls.set(key,entry);
   entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{entry.state=next;if(voice===call)voiceStateChanged(next)}),
    call.onLevel(level=>{if(voice===call)voiceLevel(level)}),call.onError(voiceFailed),
@@ -1426,8 +1426,18 @@ async function prepareConversationCall(node,thread_id,binding_id){
   }
   catch(error){conversationCalls.delete(key);for(const stop of entry.listeners)stop();await call.dispose().catch(()=>{});throw error}
  }
- if(binding_id)entry.binding_id=binding_id;
  return entry;
+}
+/* Each time a conversation's call is given the microphone, the binding it is given it under: speech the call hears
+ * from then on is that binding's. The voice stamps a turn's start (`started_at`) as it hears it, before any delayed
+ * forwarding, so a late `started` still finds the activation it was heard in, not a later rebind. */
+function activate(entry,binding_id){
+ entry.activations.push({binding_id,from:Date.now()});
+ if(entry.activations.length>16)entry.activations.shift();
+}
+function bindingHeard(entry,at){
+ const heard=entry.activations.findLast(activation=>activation.from<=at)??entry.activations[0];
+ return heard?.binding_id??null;
 }
 function routeConversation(node,thread_id,binding_id){
  const version=++routeVersion;
@@ -1435,18 +1445,29 @@ function routeConversation(node,thread_id,binding_id){
  const operation=routing.then(async()=>{
   if(version!==routeVersion)return;
   const owner=voiceOwner??await voiceHost();
-  const entry=binding_id?await prepareConversationCall(node,thread_id,binding_id):null;
-  if(version!==routeVersion)return;
-  entry?.call.mute(!state.micEnabled);
-  await owner.routeInput(entry?.call??null);
-  if(version!==routeVersion)return;
-  voice=entry?.call??null;
-  // The focused call's state is the one shown: the last one it told, not the previous call's.
-  if(entry)voiceStateChanged(entry.state??null);
-  else{voiceLevel(0);window.sidevoiceUI?.playbackLevel?.clear?.()}
+  try{
+   const entry=binding_id?await prepareConversationCall(node,thread_id,binding_id):null;
+   if(version!==routeVersion)return;
+   entry?.call.mute(!state.micEnabled);
+   if(entry)activate(entry,binding_id);
+   await owner.routeInput(entry?.call??null);
+   if(version!==routeVersion)return;
+   applyRoute(entry);
+  }catch(error){
+   // The new conversation could not take the microphone: nobody has it (never the previous one, which the focus left),
+   // and a later refresh tries again.
+   if(version===routeVersion){await owner.routeInput(null).catch(()=>{});applyRoute(null)}
+   throw error;
+  }
  });
  routing=operation.catch(()=>{});
  return operation;
+}
+function applyRoute(entry){
+ voice=entry?.call??null;
+ // The focused call's state is the one shown: the last one it told, not the previous call's.
+ if(entry)voiceStateChanged(entry.state??null);
+ else{voiceLevel(0);window.sidevoiceUI?.playbackLevel?.clear?.()}
 }
 async function disposeConversation(key){
  const entry=conversationCalls.get(key);if(!entry)return;
@@ -1455,8 +1476,14 @@ async function disposeConversation(key){
   else voice=null;
  }
  conversationCalls.delete(key);
- for(const stop of entry.listeners)stop();
- await entry.call.dispose();
+ // Its listeners stay until the call is gone: stopping it ends its open turns, and those ends go to the room.
+ try{await entry.call.dispose()}
+ finally{
+  for(const stop of entry.listeners)stop();
+  // A turn the call never ended (its disposal failed, or said nothing) is cancelled here, once.
+  const prefix=entry.call.id+'\0';
+  for(const open of [...turnWireIds.keys()])if(open.startsWith(prefix))voiceTurn({phase:'cancelled',turn_id:open.slice(prefix.length),merged:false},entry);
+ }
 }
 let turnSend=Promise.resolve();
 let turnSendPending=0;
@@ -1474,7 +1501,7 @@ function voiceTurn(event,entry=null){
  const turn={...event,turn_id:turnWireIds.get(key)??event.turn_id};
  if(event.phase!=='started')turnWireIds.delete(key);
  if(turn.phase==='started'){
-  turnNodes.set(turn.turn_id,{node:source.node,thread_id:source.thread_id,binding_id:source.binding_id,generation:source.generation});
+  turnNodes.set(turn.turn_id,{node:source.node,thread_id:source.thread_id,binding_id:source.activations?bindingHeard(source,event.started_at):source.binding_id,generation:source.generation});
  }
  const target=turnNodes.get(turn.turn_id);
  if(turn.phase!=='started')turnNodes.delete(turn.turn_id);
@@ -2009,17 +2036,21 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   const host=await voiceHost();
   const trial=host.createCall();
   try{
-   await host.routeInput(trial);
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(trial,settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake})}
-   :(await tryVoice(trial,settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
+  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake})}
+   :(await tryVoice(routedTrial(host,trial),settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}
   return result;
-  }finally{await host.routeInput(null);await trial.dispose()}
+  }finally{await host.routeInput(null).catch(()=>{});await trial.dispose()}
  }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(voiceTryFinish===finish)voiceTryFinish=null}
+}
+/* A try's call takes the microphone once it has started (its settings, models and take in place), and each time it
+ * starts again (a retune stops it, which lets the microphone go): only a started call can be given it. */
+function routedTrial(host,trial){
+ return Object.create(trial,{start:{value:async options=>{await trial.start(options);await host.routeInput(trial)}}});
 }
 let voiceTryFinish=null;
 function cancelVoiceTry(){voiceTry?.abort()}
@@ -2041,11 +2072,10 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
  try{
   const host=await voiceHost();
   const trial=host.createCall();
-  try{await host.routeInput(trial)}catch(error){await trial.dispose();throw error}
   const settings=turnTrySettings();if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs))abort.abort();
-  const run=tryEndOfTurn(trial,settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
+  const run=tryEndOfTurn(routedTrial(host,trial),settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};
-  try{await run.done}finally{await host.routeInput(null);await trial.dispose()}
+  try{await run.done}finally{await host.routeInput(null).catch(()=>{});await trial.dispose()}
  }catch(error){throw voiceRefused(error,'try')}
  finally{if(voiceTry===abort)voiceTry=null;if(turnTry?.abort===abort)turnTry=null}
 }
