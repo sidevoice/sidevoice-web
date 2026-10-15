@@ -1534,6 +1534,34 @@ test('F7 the new focus stays muted until voice acknowledges its capture boundary
  assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
  s.run('disconnect()');
 });
+test('R1 overlapping refresh fences release only their own mute ownership',async()=>{
+ const c=await callOnRoom(),{s,voice}=c;
+ const releases=[];const original=voice.setCaptureBoundary;
+ voice.setCaptureBoundary=async id=>{await original(id);await new Promise(resolve=>releases.push(resolve))};
+ let response=0;
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:++response===1?'b':'c',binding_id:'binding-'+response},room:{revision:response},clients:[],call:null,participants:[]})});
+ const first=s.run('refresh()');
+ await c.until(()=>releases.length===1,'first capture fence');
+ const second=s.run('refresh()');
+ await c.until(()=>s.run('captureFencePending')===2,'overlapping capture fences');
+ assert.equal(s.run('captureFencePending'),2);
+ releases.shift()();
+ await c.until(()=>releases.length===1,'second capture fence');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],true,'the second fence still owns mute');
+ releases.shift()();await Promise.all([first,second]);
+ assert.equal(s.run('captureFencePending'),0);
+ assert.equal(s.run('state.switching'),false);
+ assert.equal(s.run('targetThread()'),'c');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'capture resumes after both fences');
+ s.run('disconnect()');
+});
+test('R2 successful join unmutes the enabled microphone before speech',async()=>{
+ const c=await callOnRoom();
+ assert.equal(c.s.run('state.connecting'),false);
+ assert.equal(c.s.run('state.micEnabled'),true);
+ assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ c.s.run('disconnect()');
+});
 test('F7 a late terminal retains its captured target after many later starts',async()=>{
  const c=await callOnRoom(),boundary=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
  c.voice.emit('turn',{...started('old'),capture_boundary_id:boundary});

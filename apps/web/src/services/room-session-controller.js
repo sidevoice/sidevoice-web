@@ -601,14 +601,12 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const d=await api(roomQuery('/api/presentation',fp),undefined,fp);
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  const nextThread=d.binding?.thread_id||null;
- const wasSwitching=state.switching;
- let fenced=false;
  if((nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id)&&voice){
   // The old boundary may still have words in STT or a merge hold. Keep the microphone closed until voice
   // has fenced those words, then make the new binding visible to new speech.
-  fenced=true;++captureFencePending;state.switching=true;applyMicState();
-  try{await setCaptureFocus(fp,nextThread,d.binding?.binding_id)}catch(error){--captureFencePending;state.switching=wasSwitching;applyMicState();throw error}
-  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode){--captureFencePending;state.switching=wasSwitching;applyMicState();return}
+  ++captureFencePending;applyMicState();
+  try{await setCaptureFocus(fp,nextThread,d.binding?.binding_id)}finally{--captureFencePending;applyMicState()}
+  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  }
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
@@ -618,8 +616,6 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
- if(fenced)--captureFencePending;
- if(state.switching!==wasSwitching){state.switching=wasSwitching;applyMicState()}
  applyMicState();
  if(previousThread!==targetId())stopReplies('focus_changed');else drainReplies();
  // The page follows the build of whoever serves it: this answer's only when the machine itself served the page.
@@ -1588,7 +1584,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   await refresh();await refreshPeople(fp);
   if(epoch===connectEpoch){clearJoinStatus();flushOutbox()}
  }catch(e){if(epoch===connectEpoch){const failed=state.joinStep;disconnect();failJoin(joinError(failed,e))}}
- finally{if(epoch===connectEpoch)state.connecting=false}
+ finally{if(epoch===connectEpoch){state.connecting=false;applyMicState()}}
 }
 // ----- the socket: opened on join, reopened by itself when the room goes away -----
 // A room restart or a network blip must not end the call: the microphone permission, the media stream
