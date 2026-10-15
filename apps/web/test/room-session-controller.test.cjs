@@ -2,14 +2,14 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,nativeData=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
  if(strictDOM){for(const match of uiSource.matchAll(/id="([^"]+)"/g))elements.set(match[1],new Element(match[1]));for(const id of ['pair-close','pair-title','connection-stats','stats-title','stats-close','language-settings','settings-title','stats-recognition','stats-response'])elements.set(id,new Element(id))}
  const saved=stored?{'sidevoice.pairings':JSON.stringify(stored)}:{};
  const context=vm.createContext({Element,console,Date,JSON,Math,Map,Set,Promise,Uint8Array,TextEncoder,TextDecoder,URL,AbortController,URLSearchParams,crypto:globalThis.crypto,localStorage:{getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value},removeItem(key){delete saved[key]}},btoa:value=>Buffer.from(value,'binary').toString('base64'),sessionStorage:{getItem:()=>null,setItem(){}},document:{getElementById:id=>{if(!elements.has(id)){if(strictDOM)return null;elements.set(id,new Element(id))}return elements.get(id)},body:new Element('body'),createElement:()=>new Element(),addEventListener:(name,fn)=>(documentHandlers[name]??=[]).push(fn)},window:{addEventListener:(name,fn)=>handlers[name]=fn},MutationObserver:class{constructor(fn){observers.push(fn)}observe(){}},fetch:()=>new Promise(()=>{}),setInterval(){},setTimeout,clearTimeout,cancelAnimationFrame(){},requestAnimationFrame(){},WebSocket:{OPEN:1},location:{protocol:'https:',host:'room.example'}});
- if(localHost)context.window.__sidevoiceDesktop={host:{localHost}};
+ if(localHost||nativeData)context.window.__sidevoiceDesktop={host:{...(localHost?{localHost}:{}),...(nativeData?{data:nativeData}:{})}};
  // The outbox's storage across reloads, and this tab's scope in it.
  if(indexedDB)context.indexedDB=indexedDB;
  if(outboxScope)context.sessionStorage={getItem:key=>key==='sidevoice.outbox-scope'?outboxScope:null,setItem(){}};
@@ -53,6 +53,104 @@ test('The runtime never writes into a node React fills itself',()=>{
  s.run("joinStep='room';publishSessionView()");
  assert.equal(join.textContent,'pintado por React','the join line belongs to JoinStatus alone');
  assert.equal(s.run("roomStore.getState().join?.step"),'room','and the same store still says what the step is');
+});
+
+test('native pairing read failure never writes an empty projection or subscribes to early status',async()=>{
+ const writes=[];let subscribed=0;
+ const data={pairings:{read:()=>Promise.reject(Error('read failed')),write:value=>{writes.push(value);return Promise.resolve()}}};
+ const localHost={subscribe:()=>{subscribed++},state:async()=>({state:'absent'}),pairing:async()=>null};
+ const s=setup({paired:false,nativeData:data,localHost});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(subscribed,0);
+ assert.equal(writes.length,0);
+ assert.equal(s.run('nativePairingsReady'),false);
+});
+
+test('native hydration precedes local status and unchanged status never rewrites credentials',async()=>{
+ let resolveRead,notify;const writes=[];
+ const data={pairings:{read:()=>new Promise(resolve=>{resolveRead=resolve}),write:value=>{writes.push(value);return Promise.resolve()}}};
+ const localHost={subscribe:fn=>{notify=fn},state:async()=>({state:'absent'}),pairing:async()=>null};
+ const s=setup({paired:false,nativeData:data,localHost});
+ assert.equal(notify,undefined);
+ resolveRead({pairings:[PAIRED],pendingRevokes:[]});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(typeof notify,'function');
+ notify({state:'absent',reachable:false});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(writes.length,0);
+ assert.equal(s.run('pairings.list[0].fp'),'fp-mac');
+});
+test('overlapping native pairing transactions derive from the last committed write',async()=>{
+ let rejectFirst,stored={pairings:[],pendingRevokes:[]},attempts=0;
+ const data={pairings:{read:async()=>stored,write:value=>{
+  attempts++;
+  if(attempts===1)return new Promise((_,reject)=>{rejectFirst=reject});
+  stored=JSON.parse(JSON.stringify(value));return Promise.resolve();
+ }}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__first={...PAIRED,fp:'first',device_id:'first'};
+ s.context.__second={...PAIRED,fp:'second',device_id:'second'};
+ const first=s.run('keepPairings(current=>withPairing(current,__first))');
+ const second=s.run('keepPairings(current=>withPairing(current,__second))');
+ await new Promise(resolve=>setTimeout(resolve,0));
+ rejectFirst(Error('write failed'));
+ await assert.rejects(first);
+ await second;
+ assert.deepEqual(stored.pairings.map(pairing=>pairing.fp),['second']);
+ assert.deepEqual(Array.from(s.run('pairings.list.map(pairing=>pairing.fp)')),['second']);
+ assert.deepEqual(Array.from(s.run('storedPairingState.list.map(pairing=>pairing.fp)')),['second']);
+});
+test('overlapping successful native transactions commit in order',async()=>{
+ let releaseFirst,stored={pairings:[],pendingRevokes:[]},attempts=0;
+ const data={pairings:{read:async()=>stored,write:value=>{
+  attempts++;
+  if(attempts===1)return new Promise(resolve=>{releaseFirst=()=>{stored=JSON.parse(JSON.stringify(value));resolve()}});
+  stored=JSON.parse(JSON.stringify(value));return Promise.resolve();
+ }}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__first={...PAIRED,fp:'first',device_id:'first'};
+ s.context.__second={...PAIRED,fp:'second',device_id:'second'};
+ const first=s.run('keepPairings(current=>withPairing(current,__first))');
+ const second=s.run('keepPairings(current=>withPairing(current,__second))');
+ await new Promise(resolve=>setTimeout(resolve,0));
+ releaseFirst();await Promise.all([first,second]);
+ assert.deepEqual(stored.pairings.map(pairing=>pairing.fp),['second','first']);
+ assert.deepEqual(Array.from(s.run('pairings.list.map(pairing=>pairing.fp)')),['second','first']);
+});
+test('a queued old-token refusal cannot revoke a newly committed pairing',async()=>{
+ let releaseFirst,stored={pairings:[PAIRED],pendingRevokes:[]},attempts=0;
+ const data={pairings:{read:async()=>stored,write:value=>{
+  attempts++;
+  if(attempts===1)return new Promise(resolve=>{releaseFirst=()=>{stored=JSON.parse(JSON.stringify(value));resolve()}});
+  stored=JSON.parse(JSON.stringify(value));return Promise.resolve();
+ }}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__replacement={...PAIRED,token:'tok-new'};
+ const replacement=s.run('keepPairings(current=>withPairing(current,__replacement))');
+ const refusal=s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ releaseFirst();await Promise.all([replacement,refusal]);
+ assert.equal(stored.pairings[0].token,'tok-new');
+ assert.equal(stored.pairings[0].revoked,undefined);
+ assert.equal(s.run('pairings.list[0].revoked'),undefined);
+});
+test('offline revocation stays in native storage across relaunch without WebView credentials',async()=>{
+ let savedNative={pairings:[PAIRED],pendingRevokes:[]};
+ const data={pairings:{read:async()=>savedNative,write:async value=>{savedNative=JSON.parse(JSON.stringify(value))}}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.fetch=async()=>{throw Error('offline')};
+ await s.run("forgetMachine('fp-mac')");
+ assert.equal(savedNative.pairings.length,0);
+ assert.equal(savedNative.pendingRevokes[0].token,'tok-1');
+ assert.equal(s.saved['sidevoice.pending-revokes'],undefined);
+ const restarted=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(restarted.run('pendingRevokes()[0].token'),'tok-1');
+ assert.equal(restarted.saved['sidevoice.pending-revokes'],undefined);
 });
 test('A page whose interface is gone still runs the call',()=>{
  // React unmounts its whole root when a render throws. The runtime writes into nodes React owns, so
@@ -2529,20 +2627,20 @@ test('A move given up leaves the next call\'s debts alone, and takes over a join
  assert.ok(s.run("outbox.list().some(entry=>entry.payload.data.utterance_id==='nueva')"),'the abandoned drain deleted nothing of it');
  s.run('disconnect()');
 });
-test('A refusal of a credential a new pairing has replaced does not revoke the new one',()=>{
+test('A refusal of a credential a new pairing has replaced does not revoke the new one',async()=>{
  const s=setup();
- s.run("pairingRefused('fp-mac',{token:'tok-old'})");
+ await s.run("pairingRefused('fp-mac',{token:'tok-old'})");
  assert.equal(s.run("pairings.list[0].revoked"),undefined);
- s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ await s.run("pairingRefused('fp-mac',{token:'tok-1'})");
  assert.equal(s.run("pairings.list[0].revoked"),true);
 });
-test('No more machines are watched than the bound, and the call\'s always is',()=>{
+test('No more machines are watched than the bound, and the call\'s always is',async()=>{
  const many=Array.from({length:9},(_,i)=>({...PAIRED,fp:'fp-'+i,device_id:'d'+i}));
  const s=setup({stored:{pairings:many}});
  assert.equal(s.run('liveMachines().length'),s.run('MAX_LINKS'));
  s.run("callNode='fp-8'");
  assert.ok(s.run("liveMachines().includes('fp-8')"));
- s.run("pairingRefused('fp-1')");
+ await s.run("pairingRefused('fp-1')");
  assert.equal(s.run("liveMachines().includes('fp-1')"),false,'a revoked one is not watched');
 });
 

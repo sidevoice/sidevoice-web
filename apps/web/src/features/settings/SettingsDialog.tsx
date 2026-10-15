@@ -15,6 +15,7 @@ import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
+import { DeleteAllData } from "./DeleteAllData";
 import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
@@ -138,6 +139,7 @@ function AdvancedSettings({ t }: { t: Translate }) {
       </Row>
       <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
     </Group>
+    <DeleteAllData />
   </Section>;
 }
 
