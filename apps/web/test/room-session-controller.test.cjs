@@ -118,6 +118,24 @@ test('overlapping successful native transactions commit in order',async()=>{
  assert.deepEqual(stored.pairings.map(pairing=>pairing.fp),['second','first']);
  assert.deepEqual(Array.from(s.run('pairings.list.map(pairing=>pairing.fp)')),['second','first']);
 });
+test('a queued old-token refusal cannot revoke a newly committed pairing',async()=>{
+ let releaseFirst,stored={pairings:[PAIRED],pendingRevokes:[]},attempts=0;
+ const data={pairings:{read:async()=>stored,write:value=>{
+  attempts++;
+  if(attempts===1)return new Promise(resolve=>{releaseFirst=()=>{stored=JSON.parse(JSON.stringify(value));resolve()}});
+  stored=JSON.parse(JSON.stringify(value));return Promise.resolve();
+ }}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__replacement={...PAIRED,token:'tok-new'};
+ const replacement=s.run('keepPairings(current=>withPairing(current,__replacement))');
+ const refusal=s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ releaseFirst();await Promise.all([replacement,refusal]);
+ assert.equal(stored.pairings[0].token,'tok-new');
+ assert.equal(stored.pairings[0].revoked,undefined);
+ assert.equal(s.run('pairings.list[0].revoked'),undefined);
+});
 test('offline revocation stays in native storage across relaunch without WebView credentials',async()=>{
  let savedNative={pairings:[PAIRED],pendingRevokes:[]};
  const data={pairings:{read:async()=>savedNative,write:async value=>{savedNative=JSON.parse(JSON.stringify(value))}}};
@@ -1899,20 +1917,20 @@ test('A move given up leaves the next call\'s debts alone, and takes over a join
  assert.ok(s.run("outbox.list().some(entry=>entry.payload.data.utterance_id==='nueva')"),'the abandoned drain deleted nothing of it');
  s.run('disconnect()');
 });
-test('A refusal of a credential a new pairing has replaced does not revoke the new one',()=>{
+test('A refusal of a credential a new pairing has replaced does not revoke the new one',async()=>{
  const s=setup();
- s.run("pairingRefused('fp-mac',{token:'tok-old'})");
+ await s.run("pairingRefused('fp-mac',{token:'tok-old'})");
  assert.equal(s.run("pairings.list[0].revoked"),undefined);
- s.run("pairingRefused('fp-mac',{token:'tok-1'})");
+ await s.run("pairingRefused('fp-mac',{token:'tok-1'})");
  assert.equal(s.run("pairings.list[0].revoked"),true);
 });
-test('No more machines are watched than the bound, and the call\'s always is',()=>{
+test('No more machines are watched than the bound, and the call\'s always is',async()=>{
  const many=Array.from({length:9},(_,i)=>({...PAIRED,fp:'fp-'+i,device_id:'d'+i}));
  const s=setup({stored:{pairings:many}});
  assert.equal(s.run('liveMachines().length'),s.run('MAX_LINKS'));
  s.run("callNode='fp-8'");
  assert.ok(s.run("liveMachines().includes('fp-8')"));
- s.run("pairingRefused('fp-1')");
+ await s.run("pairingRefused('fp-1')");
  assert.equal(s.run("liveMachines().includes('fp-1')"),false,'a revoked one is not watched');
 });
 

@@ -674,9 +674,15 @@ function closePairing(){roomStore.patch({pairingOpen:false,pairingNote:''})}
 // on that machine — the call, or an action on its page (`asked`): one the page met while merely watching it says so in
 // its row, and asks nothing of a person who may be busy with another.
 // `token`: the credential that was refused — one a pairing made since has replaced is not this pairing's to lose.
-function pairingRefused(fp,{call=false,token=null,asked=false}={}){
+async function pairingRefused(fp,{call=false,token=null,asked=false}={}){
  const pairing=pairings.list.find(p=>p.fp===fp);if(!pairing||pairing.revoked||token!=null&&pairing.token!==token)return;
- void keepPairings(current=>revokedPairing(current,fp));
+ let revoked=false;
+ await keepPairings(current=>{
+  const latest=current.list.find(p=>p.fp===fp);
+  if(!latest||latest.revoked||token!=null&&latest.token!==token)return current;
+  revoked=true;return revokedPairing(current,fp);
+ });
+ if(!revoked)return;
  settleLink(fp,null,'revoked');
  const onCall=fp===state.callNode&&(call||inCallNow());
  if(!onCall&&!asked)return;
