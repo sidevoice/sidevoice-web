@@ -1409,7 +1409,7 @@ let captureBoundaryQueue=Promise.resolve();
 async function setCaptureFocus(node,thread_id,binding_id){
  const id=crypto.randomUUID(),target={node,thread_id,binding_id,generation:callGeneration,capture_boundary_id:id};
  captureTargets.set(id,target);
- const host=voice,operation=captureBoundaryQueue.then(()=>host.setCaptureBoundary(id));
+ const host=voice,operation=captureBoundaryQueue.then(()=>host.setCaptureBoundary?.(id));
  captureBoundaryQueue=operation.catch(()=>{});
  try{await operation}catch(error){captureTargets.delete(id);throw error}
  if(host!==voice||target.generation!==callGeneration){captureTargets.delete(id);return null}
@@ -1622,7 +1622,7 @@ function attachVoice(next){
  window.sidevoiceUI?.playbackLevel?.clear?.();
  voiceListeners.push(next.onTurn(voiceTurn),next.onState(voiceStateChanged),next.onLevel(voiceLevel),next.onError(voiceFailed));
  voiceListeners.push(next.onPlaybackLevel(level=>{if(voice===next)voicePlaybackLevel(level)}));
- // Preview only, until web#140 (voice 0.5.0) replaces this: voice 0.4.0 has no onAgentInterrupted.
+ // Preview only, until web#140 (voice 0.5.0) replaces this: voice 0.4.0 has no onAgentInterrupted nor setCaptureBoundary.
  if(next.onAgentInterrupted)voiceListeners.push(next.onAgentInterrupted(cut=>{
   const coreId=handleIds.get(cut.utterance_id),said=coreId&&replies.get(coreId);
   if(!said)return;
