@@ -206,6 +206,8 @@ export function useAppUpdate() {
     asked: !!updater && person.asked,
     /** The app's update as Settings › Updates shows it (appUpdateInView), and as the room's notice says it
      *  (appUpdateShown). */
+    /** Whether This device says the app's update is pending (appUpdatePending): not Settings' visibility. */
+    pending: appUpdatePending(status, shownMode, !!updater && person.asked, !!updater && person.checking),
     inView: appUpdateInView(status, shownMode, !!updater && person.asked, !!updater && person.checking, cancelled),
     noticed: appUpdateShown(status, shownMode, !!updater && person.checking, cancelled),
     can: {
@@ -243,6 +245,15 @@ export function appUpdateShown(status: UpdaterStatus | null, mode: UpdateMode | 
 export function appUpdateInView(status: UpdaterStatus | null, mode: UpdateMode | null, asked: boolean, checking = false, cancelled = false): UpdaterStatus | null {
   if (!status || status.state === "idle" || checking) return null;
   return asked || status.state !== "available" || cancelled || mode === "manual" ? status : null;
+}
+
+/** Whether the app's update is pending as This device says it: what the person's own check found (`asked`); else
+ *  manual's as soon as found, automatic's once ready — a download the app runs by itself, or an update it is about to
+ *  download, is neither pending nor current; nothing while the person's check runs. Settings › Updates shows more
+ *  (`appUpdateInView`: a download to cancel) without This device saying more. */
+export function appUpdatePending(status: UpdaterStatus | null, mode: UpdateMode | null, asked: boolean, checking = false): boolean {
+  if (!status || status.state === "idle" || checking) return false;
+  return asked || status.state === "ready" || mode === "manual";
 }
 
 /** What updates Sidevoice on a machine, as the connector's README documents it (sidevoice/sidevoice-connector,

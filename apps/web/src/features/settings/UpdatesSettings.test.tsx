@@ -237,6 +237,28 @@ test("This device says its version and Update available, a link to the row's but
   await landsOn(() => document.getElementById("updates-this-computer"), lineOf(() => document.getElementById("updates-this-computer")));
 });
 
+test("This device says what it always said of the app's update, whatever Updates shows for Cancel: automatic's download by itself and its cancel say nothing, manual's download says Update available", async () => {
+  const version = "0.10.0";
+  const auto = open({ notice: true, updater: { mode: "automatic", status: { state: "available", version } } });
+  await settle();
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  act(() => auto.fake.push({ state: "downloading", version, progress: 0.4 }));
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  auto.fake.updater.cancel.mockImplementationOnce(async () => { auto.fake.push({ state: "available", version }); });
+  await act(async () => { fireEvent.click(within(noticeBox()).getByRole("button", { name: "Cancel download" })); });
+  expect(auto.fake.updater.cancel).toHaveBeenCalledTimes(1);
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0$/);
+  act(() => auto.fake.push({ state: "ready", version }));
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
+  cleanup();
+  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  const manual = open({ updater: { mode: "manual", status: { state: "available", version } } });
+  await settle();
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
+  act(() => manual.fake.push({ state: "downloading", version, progress: 0.4 }));
+  expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.9\.0 · Update available$/);
+});
+
 test("This device: Up to date where the app (after a check) and its service both say so, with no link; nothing said where neither can", async () => {
   // Before any check, the app cannot say it is current: the line says the version alone.
   open({ service: { ...BUNDLED, bundled: { version: "0.9.0" }, update: "current" } });

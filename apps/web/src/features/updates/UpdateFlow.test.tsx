@@ -218,12 +218,12 @@ test("the app's own check, automatic: no Checking…, no progress anywhere — a
   expect(installed()).not.toHaveTextContent("Checking…");
   expect(checkButton()).not.toHaveAttribute("aria-busy");
   await wait(CHECK_MS);
-  // Downloading by itself: Updates and the room offer Cancel, step after step; not Up to date.
+  // Downloading by itself: Updates and the room offer Cancel, step after step; This device says nothing of it, nor Up to date.
   for (let step = 0; step < 4; step++) {
     expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading….*Cancel download$/);
     expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Checking|found/);
     expect(notice()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
-    expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Update available$/);
+    expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
     expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
     await wait(STEP_MS);
   }
