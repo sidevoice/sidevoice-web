@@ -467,3 +467,19 @@ test("a registration this app does not know reads as unknown, with nothing to do
   act(() => store.patch({ hostAgents: { fp: ready([known("codex", { ...newer, can: { connect: false, update: false, disconnect: false } })]) } }));
   expect(actions()).toEqual([]);
 });
+
+test("a machine with only Cursor installed lists Cursor, and Other to connect any agent by hand", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  // Claude Code connected long ago and Codex, neither installed any more: not shown, whatever their registration.
+  act(() => store.patch({ hostAgents: { fp: ready([
+    known("cursor", { label: "Cursor", version: null }),
+    known("claude", { label: "Claude Code", present: false, registration: "connected" }),
+    known("codex", { present: false }),
+  ]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  expect([...document.querySelectorAll(".host-agent-row .host-agent-name strong")].map((name) => name.textContent)).toEqual(["Cursor"]);
+  const other = screen.getByRole("button", { name: "Don’t see yours? Connect it by hand" });
+  fireEvent.click(other);
+  expect(document.querySelector("#host-agent-other-howto")).toHaveTextContent("sidevoice connector mcp");
+});
