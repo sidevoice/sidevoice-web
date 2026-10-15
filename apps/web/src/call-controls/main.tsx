@@ -3,6 +3,8 @@
  * its floating card window. Outside the app it shows nothing. */
 import { createRoot } from "react-dom/client";
 import "../styles/tokens.css";
+// The bichos, for the sticker look's avatar (CallCard LOOKS).
+import "../styles/bichos.css";
 import "./call-card.css";
 import { CallCard } from "./CallCard";
 import { callControlsHost } from "./host";

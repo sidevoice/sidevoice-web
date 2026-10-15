@@ -12,6 +12,11 @@ import { ChevronIcon, HangupIcon, HarnessIcon, MachinesIcon, MicrophoneIcon, Mic
 import { ConversationPicker, DevicePicker, duration, useCardShell, useHostState, useNow, useWave } from "./card-shell";
 import type { CallControlsHost, CallControlsState } from "./host";
 import type { Translate } from "../i18n/translator";
+import type { CSSProperties } from "react";
+import { useVariant } from "../lib/variants";
+import { avatarFor, avatarTone } from "../features/avatar/avatar-spec";
+import { avatarColor } from "../features/avatar/bicho-draw";
+import { CharacterAvatar } from "../features/avatar/CharacterAvatar";
 
 export { CARD_MARGIN, CLICK_GUARD_MS, DRAG_THRESHOLD_PX, HIDE_DELAY_MS, PANEL_CLOSE_MS, SHOW_DELAY_MS, WAVE_SAMPLE_MS, duration } from "./card-shell";
 
@@ -46,6 +51,19 @@ function YourWave({ levels, muted, still, t }: { levels: number[]; muted: boolea
   );
 }
 
+/* The card's look, compared on the live page (lib/variants.ts; briefs/plans/floating-cards-options.md): today's, or
+ * "sticker" — option A, drawn as the stage's balloon and the bichos are (paper and their ink in any theme, uneven
+ * corners, a soft shadow), with the conversation's own bicho in the avatar's place. Behaviour is the same. The desktop
+ * app has no panel, so it shows today's until one is chosen. */
+const LOOKS = ["today", "sticker"] as const;
+
+/** The conversation's bicho, as small as the sidebar's, acting out what the agent does (reconnecting: at rest). */
+function AgentBicho({ threadId, agent }: { threadId: string; agent: string }) {
+  const spec = avatarFor(threadId);
+  const mood = agent === "working" || agent === "speaking" ? agent : "idle";
+  return <span className="card-bicho" style={avatarTone(avatarColor(spec)) as CSSProperties}><CharacterAvatar spec={spec} mood={mood} size="small" /></span>;
+}
+
 export function CallCard({ host, t }: { host: CallControlsHost; t: Translate }) {
   const state = useHostState(host);
   if (!state) return null;
@@ -67,13 +85,14 @@ function TodayCard({ host, state, t }: { host: CallControlsHost; state: CallCont
   const selected = call.participants.find((participant) => participant.selected);
   const agent = reconnecting ? "reconnecting" : call.agent;
   const muteLabel = muted ? t("card.unmute") : t("card.mute");
+  const look = useVariant("floatingCard", LOOKS);
   const unreadElsewhere = call.participants.reduce((n, row) => n + (row.selected ? 0 : row.unread || 0), 0);
 
   return (
-    <div ref={shell.card} className="call-card" data-expanded={expanded || undefined} {...shell.handlers}>
+    <div ref={shell.card} className="call-card" data-look={look} data-expanded={expanded || undefined} {...shell.handlers}>
       <div className="card-row">
         <span className="card-avatar" data-state={agent} role="img" aria-label={reconnecting ? t("card.reconnecting") : t(agentLabel(call.agent))}>
-          <AgentMark state={agent} />
+          {look === "sticker" && selected ? <AgentBicho threadId={selected.threadId} agent={agent} /> : <AgentMark state={agent} />}
         </span>
         <div className="card-who">
           <button type="button" className="card-title" aria-expanded={panel === "conversations"} title={t("card.switchConversation")}

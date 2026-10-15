@@ -294,3 +294,16 @@ test("the call's duration reads like a clock", () => {
   expect(duration(0, 5_000)).toBe("");
   expect(duration(1_000, 1_000 + 3_725_000)).toBe("1:02:05");
 });
+
+test("the sticker look (variant floatingCard) shows the conversation's own bicho where today's card shows the brand mark", () => {
+  localStorage.setItem("sidevoice.variants", JSON.stringify({ floatingCard: "sticker" }));
+  render(<CallCard host={fakeHost()} t={t} />);
+  expect(card()).toHaveAttribute("data-look", "sticker");
+  expect(document.querySelector(".card-avatar .card-bicho .sv-avatar")).not.toBeNull();
+  expect(document.querySelector(".agent-mark")).toBeNull();
+  cleanup();
+  localStorage.removeItem("sidevoice.variants");
+  render(<CallCard host={fakeHost()} t={t} />);
+  expect(card()).toHaveAttribute("data-look", "today");
+  expect(document.querySelector(".agent-mark")).not.toBeNull();
+});

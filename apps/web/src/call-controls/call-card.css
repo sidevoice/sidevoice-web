@@ -131,3 +131,21 @@ body { font: 13px/1.35 "DM Sans", Inter, system-ui, var(--card-font-cjk), sans-s
 .call-card .device-option:hover { background: var(--btn); }
 .device-option .check { width: 12px; color: var(--accent); }
 .device-option[aria-selected=true] { font-weight: 600; }
+
+/* The `floatingCard` variant "sticker" (CallCard LOOKS; briefs/plans/floating-cards-options.md, option A): the card
+ * drawn as the stage's balloon and the bichos are — paper and their ink (#1b1428) in either theme, as the figures keep
+ * their colours over any app, uneven corners, a soft shadow under it as their ground's — with the conversation's own
+ * bicho, on a ground of its colour, in the avatar's place. Its controls wear the same ink; hanging up stays red. */
+.call-card[data-look="sticker"] {
+  --fg: #1b1428; --mu: #5f5970; --btn: rgb(27 20 40 / 7%); --btn-hover: rgb(27 20 40 / 13%); --line: rgb(27 20 40 / 14%);
+  --accent: #4a2f6b; --accent-bg: #f3eefa; --cross: #c62828;
+  background: #fffdf9; border: 2.5px solid #1b1428; border-radius: 18px 22px 20px 16px / 20px 16px 22px 18px;
+  box-shadow: 0 10px 18px -10px rgb(27 20 40 / 55%); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.call-card[data-look="sticker"] .card-avatar { width: 38px; height: 38px; border: 2px solid #1b1428; background: #fffdf9; overflow: hidden; }
+.card-bicho { display: block; width: 100%; height: 100%; background: color-mix(in srgb, var(--av-color, #b48cff) 24%, #fff); }
+.card-bicho .sv-avatar { display: block; width: 100%; height: 100%; }
+.call-card[data-look="sticker"] .card-title { font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; }
+.call-card[data-look="sticker"] :is(.card-mic, .card-skip, .card-hangup) { border: 2px solid #1b1428; }
+.call-card[data-look="sticker"] .card-panel .participant-row[data-selected] { border-color: #1b1428; background: #f3eefa; }
+.call-card[data-look="sticker"] .card-badge { color: #fff; }
