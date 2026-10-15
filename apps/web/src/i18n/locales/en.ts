@@ -178,7 +178,7 @@ export const messages = {
   "session.audio.interrupted": "Audio interrupted · Text may include parts that were not played",
   "session.audio.interruptedWhy": "Audio interrupted · {reason} · Text may include parts that were not played",
   "session.audio.unconfirmed": "Audio unconfirmed · This device did not say whether it played",
-  "session.audio.failed": "Audio not played · Playback failed",
+  "session.audio.failed": "Playback failed",
   "session.screen.unsupported": "This device cannot keep the screen awake.",
   "session.screen.on": "Screen kept awake during the call.",
   "session.screen.released": "The screen may turn off; return to the call to keep it awake.",

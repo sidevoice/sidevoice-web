@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
+import { audioNote } from "../../state/room-session-state.js";
 import { dayLabel, MessageList } from "./MessageList";
 
 const base = 1_700_000_000_000;
@@ -70,6 +71,15 @@ test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from
   const {container} = render(<MessageList conversation={view(rows)} />);
   expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent))
     .toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown", "Not played", "Not played", "Skipped"]);
+});
+test("T14 partial and unknown playback failures explain failure without claiming silence", () => {
+  const failed = (heard_chars: number | null) => ({audio: "failed", audio_reason: "playback_failed", heard_chars});
+  const {container} = render(<MessageList conversation={view([
+    message({segment: "partial-failure", text: "é🐙ab", ...failed(2), audioNote: audioNote(failed(2))}),
+    message({segment: "unknown-failure", text: "Unknown", ...failed(null), audioNote: audioNote(failed(null))}),
+  ])} />);
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["2 of 4 characters played", "Audio stopped · Played amount unknown"]);
+  expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual(["Playback failed", "Playback failed"]);
 });
 
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {

@@ -170,7 +170,7 @@ export const messages: Messages = {
   "session.audio.interrupted": "音声が中断されました · 再生されなかった部分がテキストに含まれている可能性があります",
   "session.audio.interruptedWhy": "音声が中断されました · {reason} · 再生されなかった部分がテキストに含まれている可能性があります",
   "session.audio.unconfirmed": "音声は未確認 · このデバイスは音が鳴ったかどうかを報告しませんでした",
-  "session.audio.failed": "音声は再生されませんでした · 再生に失敗しました",
+  "session.audio.failed": "再生に失敗しました",
   "session.screen.unsupported": "このデバイスでは画面をオンのままにできません。",
   "session.screen.on": "通話中は画面をオンにしています。",
   "session.screen.released": "画面が消える場合があります。オンのままにするには通話に戻ってください。",

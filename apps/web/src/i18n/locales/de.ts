@@ -169,7 +169,7 @@ export const messages: Messages = {
   "session.audio.interrupted": "Audio unterbrochen · Der Text kann Teile enthalten, die nicht abgespielt wurden",
   "session.audio.interruptedWhy": "Audio unterbrochen · {reason} · Der Text kann Teile enthalten, die nicht abgespielt wurden",
   "session.audio.unconfirmed": "Audio unbestätigt · Dieses Gerät hat nicht gemeldet, ob es abgespielt wurde",
-  "session.audio.failed": "Audio nicht abgespielt · Wiedergabe fehlgeschlagen",
+  "session.audio.failed": "Wiedergabe fehlgeschlagen",
   "session.screen.unsupported": "Dieses Gerät kann den Bildschirm nicht eingeschaltet lassen.",
   "session.screen.on": "Bildschirm bleibt während des Anrufs an.",
   "session.screen.released": "Der Bildschirm kann sich ausschalten; kehr zum Anruf zurück, damit er aktiv bleibt.",

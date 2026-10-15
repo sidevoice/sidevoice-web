@@ -169,7 +169,7 @@ export const messages: Messages = {
   "session.audio.interrupted": "音频已中断 · 文字中可能包含未播放的部分",
   "session.audio.interruptedWhy": "音频已中断 · {reason} · 文字中可能包含未播放的部分",
   "session.audio.unconfirmed": "音频未确认 · 此设备未告知是否已播放",
-  "session.audio.failed": "音频未播放 · 播放失败",
+  "session.audio.failed": "播放失败",
   "session.screen.unsupported": "此设备无法保持屏幕常亮。",
   "session.screen.on": "通话期间保持屏幕常亮。",
   "session.screen.released": "屏幕可能会熄灭；返回通话即可保持常亮。",

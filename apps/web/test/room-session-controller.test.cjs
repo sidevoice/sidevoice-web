@@ -1108,7 +1108,9 @@ async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=un
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
  if(timers)s.context.setTimeout=timers;
  const voice=withVoice(s,fakeVoice());
- s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',title:'A',binding_id:'b',epoch:0},room:{revision:0},clients:[],call:null,participants:[],messages:[]})});
+ s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
+  ?{participants:[{thread_id:'a',title:'A',available:true,reach:{state:'listening'},epoch:0}]}
+  :{binding:{thread_id:'a',title:'A',binding_id:'b'},room:{revision:0},clients:[],call:null,messages:[]}});
  s.run("RECONNECT_DELAYS_MS.splice(0,RECONNECT_DELAYS_MS.length,1,1);keepScreenAwake=()=>{};roomBinding={thread_id:'a',title:'A',binding_id:'b'}");
  const frames=socket=>socket.sent.filter(m=>typeof m==='string').map(m=>JSON.parse(m));
  const until=async(check,what)=>{for(let i=0;i<500;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,2))}assert.fail('never: '+what)};
@@ -1120,7 +1122,7 @@ async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=un
  const joined=s.run('toggleCall')();
  await until(()=>sockets.length===1,'the call socket');
  const {socket,hello}=await answer({session_id:'s1',resume:{token:'tok-a',seconds:60},resumed:false});await joined;
- s.run("threadEpochs.set('a',0)");
+ await s.run('refreshPeople()');
  return {s,sockets,voice,store,frames,answer,push,drop,until,first:socket,firstHello:hello};
 }
 // What the page sent the room, of one type, without what every frame carries.

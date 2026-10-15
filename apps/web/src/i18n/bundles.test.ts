@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { languageName, UI_LANGUAGES } from "./translator";
+import { languageName, translator, UI_LANGUAGES } from "./translator";
 import { systemLanguage } from "../services/system-language.js";
 
 /* AGENTS.md: English has every key (each catalogue's type holds it to them). Every language the interface is offered in
@@ -32,5 +32,16 @@ test.each([...locales.keys()])("the %s catalogue: exactly English's keys, the sa
   for (const [key, text] of Object.entries(catalogue)) {
     expect(text.trim(), key).not.toBe("");
     expect(placeholders(text), key).toEqual(placeholders(english[key]));
+  }
+});
+test("unheard and partial labels agree at 1, 2, 5 and 21 in French, Italian and Polish", () => {
+  for(const [language,unheard,partial] of [
+    ["fr","À écouter : ","Caractères lus : 1/1"],
+    ["it","Da ascoltare: ","Caratteri riprodotti: 1/1"],
+    ["pl","Nieodsłuchane: ","Odtworzone znaki: 1/1"],
+  ] as const){
+    const t=translator(language);
+    for(const n of [1,2,5,21])expect(t("state.unheard",{n})).toBe(unheard+n);
+    expect(t("messages.audio.partial",{heard:1,total:1})).toBe(partial);
   }
 });

@@ -122,6 +122,7 @@ export function ConversationSidebar() {
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
+                  label={(row) => [row.title, stateText(row, inCall, t), (row.unheard ?? 0) > 0 ? t("state.unheard", { n: row.unheard }) : null].filter(Boolean).join(" · ")}
                   sub={(row) => (
                     <span className="sidebar-state" data-state={conversationState(row, inCall)}>
                       {row.harness && <HarnessIcon harness={row.harness} size={12} />}

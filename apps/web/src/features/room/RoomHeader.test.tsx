@@ -53,7 +53,7 @@ test("while the list is down the header stays above it, and an avatar there swit
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
   expect(sidebar).toHaveAttribute("data-open");
   expect(header()).toHaveAttribute("data-list-down");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Review the nightly backups · Waiting for you" })); });
+  await act(async () => { fireEvent.click(within(header()).getByRole("button", { name: "Review the nightly backups · Waiting for you" })); });
   expect(selectParticipant).toHaveBeenCalledWith("fp-1|t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
   expect(header()).not.toHaveAttribute("data-list-down");
@@ -69,6 +69,17 @@ test("a row says its state in words beside its dot, and what is unread as a badg
   expect(row.querySelector(".sidebar-unread")).toHaveTextContent("2 new");
   // The tooltip still says both.
   expect(row.getAttribute("title")).toMatch(/^Review the nightly backups · Waiting for you · 2 new/);
+});
+test("T06 a read but unheard conversation names its audio attention on phone and rail, then clears it", () => {
+  phone(360);
+  const store=room([person("t-login","Fix the slow login"),person("t-backup","Review the nightly backups",{unheard:{count:2}})]);
+  const phoneButton=avatars().find(button=>button.getAttribute("data-thread")==="fp-1|t-backup")!;
+  const railButton=[...document.querySelectorAll<HTMLButtonElement>(".conversation-sidebar .person")].find(button=>button.textContent?.includes("Review the nightly backups"))!;
+  expect(phoneButton).toHaveAccessibleName(/2 unheard/);
+  expect(railButton).toHaveAccessibleName(/2 unheard/);
+  act(()=>store.patch({people:[person("t-login","Fix the slow login"),person("t-backup","Review the nightly backups",{unheard:{count:0}})]}));
+  expect(phoneButton).not.toHaveAccessibleName(/unheard/);
+  expect(railButton).not.toHaveAccessibleName(/unheard/);
 });
 
 test("Settings sits at the conversations' foot: it opens Settings through the header's own button, and a new conversation follows the list", () => {
