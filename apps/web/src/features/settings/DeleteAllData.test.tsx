@@ -63,8 +63,9 @@ test("confirmed reset calls native once and says the app is closing", async () =
 
 test("a partial helper report names the failed step without claiming success", async () => {
   bridge({ state: "partial", completed: ["app-data"], failed: [{ step: "models", key: "remove" }], agents: {} });
-  render(<RoomProvider runtime={false}><ResetReportNotice /></RoomProvider>);
+  render(<RoomProvider runtime={false}><dialog id="wizard" open /><ResetReportNotice /></RoomProvider>);
   expect(await screen.findByText(/Some Sidevoice data could not be deleted/)).toBeInTheDocument();
   expect(screen.getByText(/Could not delete models/)).toBeInTheDocument();
   expect(screen.getByText(/After setup, open Settings/)).toBeInTheDocument();
+  await waitFor(() => expect(document.getElementById("wizard")).toContainElement(screen.getByRole("alert")));
 });

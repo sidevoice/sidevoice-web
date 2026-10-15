@@ -856,7 +856,7 @@ export const messages = {
   "data.action": "Delete all Sidevoice data",
   "data.confirmTitle": "Delete all Sidevoice data?",
   "data.confirmWhat": "This stops and uninstalls the Sidevoice service, removes its local conversations and registrations it made, then clears this app’s data, models, WebKit storage and provider keys. Sidevoice will restart at setup.",
-  "data.confirmLimits": "The app itself stays installed. Remote machines and other devices keep their data; provider keys remain valid at providers; manual agent registrations, system permissions and backups are not removed. Some service safety files or open conversation processes may remain.",
+  "data.confirmLimits": "The app cannot delete its own .app bundle while running; remove it separately after quitting. Remote machines and other devices keep their data and may list this device until you revoke it there. Provider keys stay valid at providers. Manual or foreign agent registrations, system permissions, backups and external browser data are not removed. Service safety files or open conversation processes may remain.",
   "data.cancel": "Cancel",
   "data.endCall": "End the current call before deleting data.",
   "data.restarting": "Sidevoice is closing to finish deleting its data.",

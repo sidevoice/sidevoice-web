@@ -837,7 +837,7 @@ export const messages: Messages = {
   "data.action": "Supprimer toutes les données Sidevoice",
   "data.confirmTitle": "Supprimer toutes les données Sidevoice ?",
   "data.confirmWhat": "Cette action arrête et désinstalle le service Sidevoice, supprime ses conversations locales et les inscriptions d’agents qu’il a créées, puis efface les données, modèles, stockage WebKit et clés de fournisseurs de cette app. Sidevoice redémarrera à l’étape de configuration.",
-  "data.confirmLimits": "L’app reste installée. Les machines distantes et les autres appareils conservent leurs données ; les clés restent valides chez les fournisseurs. Les inscriptions manuelles d’agents, autorisations système et sauvegardes ne sont pas supprimées. Des fichiers de sécurité du service ou des processus de conversation ouverts peuvent rester.",
+  "data.confirmLimits": "L’app ne peut pas supprimer son propre paquet .app pendant son exécution ; supprimez-le séparément après l’avoir quittée. Les machines distantes et les autres appareils conservent leurs données et peuvent encore afficher cet appareil jusqu’à sa révocation sur chacun d’eux. Les clés restent valides chez les fournisseurs. Les inscriptions d’agents manuelles ou étrangères, les autorisations système, les sauvegardes et les données des navigateurs externes ne sont pas supprimées. Des fichiers de sécurité du service ou des processus de conversation ouverts peuvent rester.",
   "data.cancel": "Annuler",
   "data.endCall": "Terminez l’appel en cours avant de supprimer les données.",
   "data.restarting": "Sidevoice se ferme pour terminer la suppression de ses données.",

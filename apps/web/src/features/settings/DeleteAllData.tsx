@@ -30,18 +30,28 @@ export function ResetReportNotice() {
   const [report, setReport] = useState<Report>(null);
   const [error, setError] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [wizard, setWizard] = useState<HTMLDialogElement | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const current = () => setWizard(document.querySelector<HTMLDialogElement>("#wizard[open]"));
+    current();
+    const observer = new MutationObserver(current);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open"] });
+    return () => observer.disconnect();
+  }, [data]);
   useEffect(() => {
     let live = true;
     void data?.resetReport().then((value) => { if (live) setReport(value); }).catch(() => { if (live) setError(true); });
     return () => { live = false; };
   }, [data]);
   if (!data || dismissed || (!report && !error)) return null;
-  return <div className="data-reset-result" role={report?.state === "partial" || error ? "alert" : "status"}>
+  const notice = <div className="data-reset-result" role={report?.state === "partial" || error ? "alert" : "status"}>
     <Button variant="ghost" size="sm" className="data-reset-dismiss" onClick={() => setDismissed(true)}>{t("data.dismiss")}</Button>
     <p>{error ? t("data.reportFailed") : t(report?.state === "partial" ? "data.partial" : "data.complete")}</p>
     {report && <FailedItems failed={report.failed} />}
     {report?.state === "partial" && <p>{t("data.retryAfterSetup")}</p>}
   </div>;
+  return wizard ? createPortal(notice, wizard) : notice;
 }
 
 /** Desktop-only destructive action; the browser has no machine-wide deletion capability. */

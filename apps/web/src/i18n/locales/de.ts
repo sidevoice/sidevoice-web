@@ -840,7 +840,7 @@ export const messages: Messages = {
   "data.action": "Alle Sidevoice-Daten löschen",
   "data.confirmTitle": "Alle Sidevoice-Daten löschen?",
   "data.confirmWhat": "Der Sidevoice-Dienst wird gestoppt und deinstalliert. Seine lokalen Unterhaltungen und die von ihm erstellten Agentenregistrierungen werden entfernt. Danach werden App-Daten, Modelle, WebKit-Speicher und Anbieterschlüssel gelöscht. Sidevoice startet mit der Einrichtung neu.",
-  "data.confirmLimits": "Die App bleibt installiert. Computer an anderen Orten und andere Geräte behalten ihre Daten; Schlüssel bleiben beim Anbieter gültig. Manuelle Agentenregistrierungen, Systemberechtigungen und Backups werden nicht gelöscht. Sicherheitsdateien des Dienstes oder laufende Unterhaltungsprozesse können verbleiben.",
+  "data.confirmLimits": "Die App kann ihr eigenes .app-Paket während des Betriebs nicht löschen; entferne es nach dem Beenden separat. Computer an anderen Orten und andere Geräte behalten ihre Daten und können dieses Gerät weiter anzeigen, bis du es dort widerrufst. Anbieterschlüssel bleiben beim Anbieter gültig. Manuelle oder fremde Agentenregistrierungen, Systemberechtigungen, Backups und Daten in externen Browsern werden nicht gelöscht. Sicherheitsdateien des Dienstes oder laufende Unterhaltungsprozesse können verbleiben.",
   "data.cancel": "Abbrechen",
   "data.endCall": "Beende den aktuellen Anruf, bevor du Daten löschst.",
   "data.restarting": "Sidevoice wird beendet, um die Datenlöschung abzuschließen.",
