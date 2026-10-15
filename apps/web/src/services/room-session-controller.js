@@ -637,8 +637,8 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const d=await api(roomQuery('/api/presentation',fp),undefined,fp);
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  const nextThread=d.binding?.thread_id||null;
- if(nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id||nextThread&&!conversationCalls.has(conversationKey(fp,nextThread))){
-  await routeConversation(fp,nextThread,d.binding?.binding_id);
+ if(nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id||nextThread&&voice!==conversationCalls.get(conversationKey(fp,nextThread))?.call){
+  try{await routeConversation(fp,nextThread,d.binding?.binding_id)}catch(error){voiceFailed(error)}
   if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  }
  refreshApplied=asked;
@@ -798,6 +798,8 @@ async function refreshPeople(fp=state.callNode){
   const data=await api(roomQuery('/api/presentation/participants',fp),undefined,fp);
   if(links.get(fp)!==link||link.base!==base||asked!==link.peopleAsked||fp===state.callNode&&session!==state.sessionId||!Array.isArray(data?.participants))return;
   link.peopleAnswered=true;link.people=data.participants.map(person=>({...person,node:fp}));
+  const open=new Set(data.participants.map(person=>conversationKey(fp,person.thread_id)));
+  for(const entry of [...conversationCalls.values()])if(entry.node===fp&&!open.has(entry.key)&&entry.key!==targetId())void disposeConversation(entry.key).catch(()=>{});
   if(fp===state.callNode)for(const person of data.participants)acceptEpoch(person.thread_id,person.epoch);
   mergePeople();
   const activity={...state.harness};
@@ -1403,9 +1405,9 @@ function recordMessage(raw, socket) {
 // Which machine each of the voice's turns was said to. What the voice reports of a turn after the call moved to another
 // machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
 const turnNodes=new Map();
-let routing=Promise.resolve(),routeVersion=0;
+let routing=Promise.resolve(),routeVersion=0,desiredRouteKey=null;
 async function prepareConversationCall(node,thread_id,binding_id){
- if(!thread_id||!binding_id)return null;
+ if(!thread_id)return null;
  const key=conversationKey(node,thread_id);
  let entry=conversationCalls.get(key);
  if(!entry){
@@ -1416,20 +1418,26 @@ async function prepareConversationCall(node,thread_id,binding_id){
   entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{if(voice===call)voiceStateChanged(next)}),
    call.onLevel(level=>{if(voice===call)voiceLevel(level)}),call.onError(voiceFailed),
    call.onPlaybackLevel(level=>voicePlaybackLevel(level,entry)));
-  call.mute(!state.micEnabled);
-  try{await call.setSettings(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));await call.start()}
+  call.mute(!state.micEnabled||!binding_id);
+  try{
+   await call.setSettings(handed??voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));
+   if(conversationCalls.get(key)!==entry||entry.generation!==callGeneration)return null;
+   await call.start();
+  }
   catch(error){conversationCalls.delete(key);for(const stop of entry.listeners)stop();await call.dispose().catch(()=>{});throw error}
  }
- entry.binding_id=binding_id;
+ if(binding_id)entry.binding_id=binding_id;
  return entry;
 }
 function routeConversation(node,thread_id,binding_id){
  const version=++routeVersion;
+ desiredRouteKey=thread_id&&binding_id?conversationKey(node,thread_id):null;
  const operation=routing.then(async()=>{
   if(version!==routeVersion)return;
   const owner=voiceOwner??await voiceHost();
-  const entry=await prepareConversationCall(node,thread_id,binding_id);
+  const entry=binding_id?await prepareConversationCall(node,thread_id,binding_id):null;
   if(version!==routeVersion)return;
+  entry?.call.mute(!state.micEnabled);
   await owner.routeInput(entry?.call??null);
   if(version!==routeVersion)return;
   voice=entry?.call??null;
@@ -1440,7 +1448,10 @@ function routeConversation(node,thread_id,binding_id){
 }
 async function disposeConversation(key){
  const entry=conversationCalls.get(key);if(!entry)return;
- if(voice===entry.call)await routeConversation(null,null,null);
+ if(voice===entry.call){
+  if(!desiredRouteKey||desiredRouteKey===key)await routeConversation(null,null,null);
+  else voice=null;
+ }
  conversationCalls.delete(key);
  for(const stop of entry.listeners)stop();
  await entry.call.dispose();
@@ -1628,6 +1639,7 @@ function disconnect() {
     state.ws = null;
     voice = null;
     ++routeVersion;
+    desiredRouteKey=null;
     void voiceOwner?.routeInput(null).catch(()=>{});
     for(const entry of conversationCalls.values()){
      for(const stop of entry.listeners)stop();
@@ -1717,9 +1729,11 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said.
   state.callNode=fp;
   if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
-  voiceOwner=await voiceHost();if(epoch!==connectEpoch)return;
+  const owner=await voiceHost();if(epoch!==connectEpoch)return;voiceOwner=owner;
   void watchAudioDevices();
   await catalogue;handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
+  if(epoch!==connectEpoch)return;
+  if(rememberedOn(fp))await prepareConversationCall(fp,rememberedOn(fp),null);
   if(epoch!==connectEpoch)return;
   applyMicState();applyLockScreen(true);
   joinStatus('room');
@@ -1961,7 +1975,11 @@ async function saveVoiceSettings(){
  const next=readyVoiceSettings(draft,saved,state.voiceCatalogue.catalogs),load=voiceSettingsToLoad(next,state.voiceCatalogue.catalogs);
  const changed=JSON.stringify(next)!==JSON.stringify(saved);
  if(!changed&&(!handed||JSON.stringify(load)===JSON.stringify(handed)))return;
- if(conversationCalls.size){await Promise.all([...conversationCalls.values()].map(entry=>entry.call.setSettings(load)))}
+ if(conversationCalls.size)await Promise.all([...conversationCalls.values()].map(entry=>entry.call.setSettings(load)));
+ else{
+  const host=await voiceHost().catch(()=>null);
+  if(host){const probe=host.createCall();try{await probe.setSettings(load)}finally{await probe.dispose()}}
+ }
  handed=load;
  if(changed){writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now(),settingsError:null})}
 }
@@ -2017,7 +2035,7 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
  try{
   const host=await voiceHost();
   const trial=host.createCall();
-  await host.routeInput(trial);
+  try{await host.routeInput(trial)}catch(error){await trial.dispose();throw error}
   const settings=turnTrySettings();if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs))abort.abort();
   const run=tryEndOfTurn(trial,settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};

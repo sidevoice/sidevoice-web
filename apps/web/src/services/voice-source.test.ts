@@ -85,6 +85,16 @@ test("a remote slot loads from its provider's catalogue; the detector stays this
   expect(loaded).toEqual([["local", "silero-vad"], ["elevenlabs", "scribe_v2"], ["elevenlabs", "eleven_flash_v2_5"]]);
 });
 
+test("two conversation calls load shared weights but receive separate detector streams", async () => {
+  const { engine, loaded, calls } = fakeEngine();
+  const slots = await (await engineVoiceSource(engine).models(settings())).load();
+  const a = await slots.createVad();
+  const b = await slots.createVad();
+  expect(a).not.toBe(b);
+  expect(calls.filter(([kind]) => kind === "stream")).toHaveLength(2);
+  expect(loaded.filter(([, model]) => model === "silero-vad")).toHaveLength(1);
+});
+
 test("smart-turn adds this device's end-of-turn model", async () => {
   const { engine, loaded } = fakeEngine();
   const slots = await (await engineVoiceSource(engine).models(settings({ end_of_turn: "smart-turn" }))).load();
