@@ -45,6 +45,8 @@ export interface SelectProps {
   invalid?: boolean;
   /** What the box says while nothing (or a value no option has) is chosen. */
   placeholder?: ReactNode;
+  /** An icon in the box before its value, saying what is chosen there (a microphone) where no label above does. */
+  leading?: ReactNode;
   className?: string;
   style?: CSSProperties;
   "aria-label"?: string;
@@ -59,7 +61,7 @@ const EMPTY = "__sv-select-empty__";
 
 const isGroup = (item: SelectOption | SelectGroup): item is SelectGroup => "options" in item;
 
-export function Select({ id, value, defaultValue, onValueChange, options, size = "md", disabled, invalid, placeholder, className, style, ...aria }: SelectProps) {
+export function Select({ id, value, defaultValue, onValueChange, options, size = "md", disabled, invalid, placeholder, leading, className, style, ...aria }: SelectProps) {
   const provided = useOverlayPortal();
   // Its own open state, so it renders as it opens and finds where it is drawn (overlayContainer) from its trigger.
   const [open, setOpen] = useState(false);
@@ -90,7 +92,7 @@ export function Select({ id, value, defaultValue, onValueChange, options, size =
         data-value={current}>
         <SelectPrimitive.Value placeholder={<span className="ui-select-placeholder">{placeholder}</span>}>
           {chosen ? <span className="ui-select-value">
-            {chosen.icon && <span className="ui-select-icon" aria-hidden>{chosen.icon}</span>}
+            {(chosen.icon ?? leading) && <span className="ui-select-icon" aria-hidden>{chosen.icon ?? leading}</span>}
             <span className="ui-select-value-text">{chosen.label}</span>
           </span> : <span className="ui-select-placeholder">{placeholder}</span>}
         </SelectPrimitive.Value>
