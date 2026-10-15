@@ -1519,6 +1519,25 @@ for(const phase of ['pending STT','merge hold'])test(`F7 A to B during ${phase} 
  assert.equal(sentOf(c,c.first,'voice-user-turn').some(row=>row.text?.includes('Private instruction for A. Instruction for B')),false);
  s.run('disconnect()');
 });
+test('R7 an asynchronously delivered A start after selecting B still starts at A',async()=>{
+ const c=await callOnRoom(),{s,voice}=c;
+ s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ const aBoundary=voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ await s.run("select('fp-mac|b')");
+ const bBoundary=voice.calls.filter(([name])=>name==='setCaptureBoundary').at(-1)[1];
+ await new Promise(resolve=>setTimeout(resolve,0)); // Native event forwarding can arrive after the HTTP selection.
+ voice.emit('turn',{...started('a-delayed'),capture_boundary_id:aBoundary});
+ voice.emit('turn',{...finished('a-delayed','Private words for A'),capture_boundary_id:aBoundary});
+ voice.emit('turn',{...started('b-current'),capture_boundary_id:bBoundary});
+ voice.emit('turn',{...finished('b-current','Words for B'),capture_boundary_id:bBoundary});
+ const aStart=turnSent(c,c.first,'a-delayed','started')[0],aEnd=turnSent(c,c.first,'a-delayed','finished')[0];
+ const bStart=turnSent(c,c.first,'b-current','started')[0],bEnd=turnSent(c,c.first,'b-current','finished')[0];
+ assert.deepEqual([aStart.thread_id,aStart.binding_id,aEnd.thread_id,aEnd.binding_id,aEnd.text],['a','b','a','b','Private words for A']);
+ assert.deepEqual([bStart.thread_id,bStart.binding_id,bEnd.thread_id,bEnd.binding_id,bEnd.text],['b','b-binding','b','b-binding','Words for B']);
+ s.run('disconnect()');
+});
 test('F7 the new focus stays muted until voice acknowledges its capture boundary',async()=>{
  const c=await callOnRoom(),{s,voice}=c;
  let release;const gate=new Promise(resolve=>{release=resolve});

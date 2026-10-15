@@ -6,7 +6,8 @@ import flow from "../../test/fixtures/conversation-flow.json";
 const turnEvent = <T extends Parameters<typeof turnMessage>[0]>(event: T): T => event;
 
 test("a turn's phases become the room's voice-user-turn data, the timings under the room's name", () => {
-  expect(turnMessage(turnEvent({ phase: "started", turn_id: "t", capture_boundary_id: "focus", started_at: 5 }))).toEqual({ turn_id: "t", phase: "started", started_at: 5 });
+  expect(turnMessage(turnEvent({ phase: "started", turn_id: "t", capture_boundary_id: "focus", started_at: 5 }), {thread_id: "thread", binding_id: "focus"})).toEqual({ turn_id: "t", phase: "started", started_at: 5, thread_id: "thread", binding_id: "focus" });
+  expect(turnMessage(turnEvent({ phase: "started", turn_id: "empty", capture_boundary_id: "focus", started_at: 5 }))).toMatchObject({thread_id: "", binding_id: ""});
   expect(turnMessage(turnEvent({ phase: "cancelled", turn_id: "t", capture_boundary_id: "focus", merged: true }))).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
   expect(turnMessage(turnEvent({
     phase: "finished", turn_id: "t", capture_boundary_id: "focus", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,

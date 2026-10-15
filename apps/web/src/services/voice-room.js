@@ -13,7 +13,12 @@ export const ROOM_PLAYBACK_REASONS = ['user_interrupted', 'newer_turn', 'user_sk
  * @param {{thread_id: string, binding_id: string} | null} [target]
  */
 export function turnMessage(turn, target = null) {
-  if (turn.phase === 'started') return { turn_id: turn.turn_id, phase: 'started', started_at: turn.started_at };
+  if (turn.phase === 'started') return {
+    turn_id: turn.turn_id, phase: 'started', started_at: turn.started_at,
+    // Core admits the start against this captured focus, even if selection has since moved.
+    thread_id: target?.thread_id && target?.binding_id ? target.thread_id : '',
+    binding_id: target?.thread_id && target?.binding_id ? target.binding_id : '',
+  };
   if (turn.phase === 'cancelled') return { turn_id: turn.turn_id, phase: 'cancelled', merged: !!turn.merged };
   return {
     turn_id: turn.turn_id,
