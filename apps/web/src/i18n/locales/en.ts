@@ -96,6 +96,15 @@ export const messages = {
   "voiceModels.download": "Download",
   "voiceModels.retry": "Try again",
   "voiceModels.openSettings": "Open its settings",
+  // The call's details, opened from the stage's title (CallDetails).
+  "titleDetail.open": "Call details",
+  "titleDetail.machine": "Machine",
+  "titleDetail.agent": "Agent",
+  "titleDetail.harness": "Harness",
+  "titleDetail.model": "Model",
+  "titleDetail.effort": "Effort",
+  "titleDetail.voice": "Voice",
+  "titleDetail.noVoice": "No voice models chosen yet.",
   // The microphone and the speaker (AudioDevices).
   "devices.toggle": "Microphone and speaker",
   "devices.mic": "Microphone",
