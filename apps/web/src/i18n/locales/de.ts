@@ -901,7 +901,6 @@ export const messages: Messages = {
   "settings.call.presence.hiddenHint": "Ein leiser Ton, während der Agent arbeitet, nur bei ausgeschaltetem Bildschirm – in der Tasche, im Auto.",
   "settings.call.presence.alwaysHint": "Ein leiser Ton, immer wenn der Agent während eines Anrufs arbeitet.",
   "settings.call.device": "Dieses Gerät",
-  "settings.desktop.title": "Desktop-App",
   "settings.desktop.muteShortcut": "Kürzel zum Stummschalten",
   "settings.desktop.muteShortcutHint": "Schaltet das Mikrofon von überall stumm oder wieder an, auch wenn Sidevoice im Hintergrund läuft.",
   "settings.desktop.shortcutNone": "Nicht festgelegt",

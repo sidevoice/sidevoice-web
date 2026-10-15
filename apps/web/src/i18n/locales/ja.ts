@@ -899,7 +899,6 @@ export const messages: Messages = {
   "settings.call.presence.hiddenHint": "画面がオフのときだけ（ポケットの中や車の中など）、エージェントの作業中にやさしい音を鳴らします。",
   "settings.call.presence.alwaysHint": "通話中にエージェントが作業しているときは、常にやさしい音を鳴らします。",
   "settings.call.device": "このデバイス",
-  "settings.desktop.title": "デスクトップアプリ",
   "settings.desktop.muteShortcut": "ミュートのショートカット",
   "settings.desktop.muteShortcutHint": "Sidevoice がバックグラウンドにあっても、どこからでもマイクのミュートを切り替えます。",
   "settings.desktop.shortcutNone": "未設定",

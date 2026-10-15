@@ -18,6 +18,7 @@ import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DeleteAllData } from "./DeleteAllData";
 import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
+import { desktopHost } from "../../services/desktop-host";
 import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
@@ -113,13 +114,14 @@ function CallSettings({ t }: { t: Translate }) {
         <Segmented size="sm" label={t("settings.call.presence")} value={prefs.presence} onChange={(value) => set({ presence: value })}
           items={presence.map((option) => ({ value: option.value, label: t(option.label) }))} />
       </Row>
+      <DesktopCallSettings t={t} />
     </Group>
-    <DesktopCallSettings t={t} />
-    <Group title={t("settings.call.device")}>
+    {/* The desktop app keeps its computer awake as any app does; holding the screen on is for a browser or a phone. */}
+    {!desktopHost() && <Group title={t("settings.call.device")}>
       <Row label={t("settings.call.keepAwake")} description={wakeLock ? t("settings.call.keepAwakeHint") : t("settings.call.keepAwakeUnsupported")}>
         <Switch checked={prefs.keepAwake && wakeLock} disabled={!wakeLock} onChange={(keepAwake) => set({ keepAwake })} aria-label={t("settings.call.keepAwake")} />
       </Row>
-    </Group>
+    </Group>}
   </Section>;
 }
 

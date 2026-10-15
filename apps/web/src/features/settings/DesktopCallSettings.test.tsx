@@ -38,10 +38,10 @@ test("the mute shortcut is not in Call any more: an app offering only that has n
   expect(view.container).toBeEmptyDOMElement();
 });
 
-test("the call controls row, under Desktop app, with no shortcut beside it", async () => {
+test("the call controls row, with no group of its own and no shortcut beside it", async () => {
   inApp({ callControls: controlsBridge(true), muteShortcut: { get: vi.fn(), set: vi.fn() } });
   render(<DesktopCallSettings t={en} />);
-  expect(screen.getByText("Desktop app")).toBeInTheDocument();
+  expect(screen.queryByText("Desktop app")).toBeNull();
   expect(await screen.findByRole("switch", { name: "Always show the call controls" })).toHaveAttribute("aria-checked", "true");
   expect(screen.queryByText("Mute shortcut")).toBeNull();
   expect(screen.queryByRole("button", { name: "Change" })).toBeNull();
@@ -75,6 +75,5 @@ test("the always-shown switch reads the app's setting, sets it, and reverts and 
 test("in Spanish", async () => {
   inApp({ callControls: controlsBridge() });
   render(<DesktopCallSettings t={es} />);
-  expect(screen.getByText("Aplicación de escritorio")).toBeInTheDocument();
   expect(await screen.findByRole("switch", { name: "Mostrar siempre los controles de llamada" })).toBeInTheDocument();
 });

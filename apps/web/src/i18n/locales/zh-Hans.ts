@@ -898,7 +898,6 @@ export const messages: Messages = {
   "settings.call.presence.hiddenHint": "智能体工作时发出轻柔的声音，仅在屏幕关闭时——比如在口袋里或车里。",
   "settings.call.presence.alwaysHint": "通话中智能体工作时，始终发出轻柔的声音。",
   "settings.call.device": "此设备",
-  "settings.desktop.title": "桌面应用",
   "settings.desktop.muteShortcut": "静音快捷键",
   "settings.desktop.muteShortcutHint": "在任何地方将麦克风静音或取消静音，即使 Sidevoice 在后台。",
   "settings.desktop.shortcutNone": "未设置",

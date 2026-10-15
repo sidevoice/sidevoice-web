@@ -898,7 +898,6 @@ export const messages: Messages = {
   "settings.call.presence.hiddenHint": "Un son discret pendant que l’agent travaille, uniquement écran éteint — dans la poche, en voiture.",
   "settings.call.presence.alwaysHint": "Un son discret chaque fois que l’agent travaille pendant un appel.",
   "settings.call.device": "Cet appareil",
-  "settings.desktop.title": "App de bureau",
   "settings.desktop.muteShortcut": "Raccourci pour couper le micro",
   "settings.desktop.muteShortcutHint": "Coupe ou réactive le micro de n’importe où, même quand Sidevoice est en arrière-plan.",
   "settings.desktop.shortcutNone": "Aucun",

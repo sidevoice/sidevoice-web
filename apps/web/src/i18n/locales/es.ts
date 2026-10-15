@@ -912,7 +912,6 @@ export const messages: Messages = {
   "settings.call.presence.hiddenHint": "Un sonido suave mientras el agente trabaja, solo con la pantalla apagada: en el bolsillo, en el coche.",
   "settings.call.presence.alwaysHint": "Un sonido suave siempre que el agente trabaja durante una llamada.",
   "settings.call.device": "Este dispositivo",
-  "settings.desktop.title": "Aplicación de escritorio",
   "settings.desktop.muteShortcut": "Atajo para silenciar",
   "settings.desktop.muteShortcutHint": "Silencia o activa el micrófono desde cualquier sitio, aunque Sidevoice esté en segundo plano.",
   "settings.desktop.shortcutNone": "Sin atajo",

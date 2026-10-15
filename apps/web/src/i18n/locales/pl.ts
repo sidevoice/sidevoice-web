@@ -912,7 +912,6 @@ export const messages: Messages = {
   "settings.call.presence.hiddenHint": "Cichy dźwięk, gdy agent pracuje, tylko przy wyłączonym ekranie — w kieszeni, w samochodzie.",
   "settings.call.presence.alwaysHint": "Cichy dźwięk za każdym razem, gdy agent pracuje w trakcie połączenia.",
   "settings.call.device": "To urządzenie",
-  "settings.desktop.title": "Aplikacja na komputer",
   "settings.desktop.muteShortcut": "Skrót wyciszania",
   "settings.desktop.muteShortcutHint": "Wycisza lub włącza mikrofon z dowolnego miejsca, nawet gdy Sidevoice działa w tle.",
   "settings.desktop.shortcutNone": "Nie ustawiono",

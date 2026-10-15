@@ -920,7 +920,6 @@ export const messages = {
   "settings.call.presence.hiddenHint": "A soft sound while the agent works, only while the screen is off — in a pocket, in the car.",
   "settings.call.presence.alwaysHint": "A soft sound whenever the agent works during a call.",
   "settings.call.device": "This device",
-  "settings.desktop.title": "Desktop app",
   "settings.desktop.muteShortcut": "Mute shortcut",
   "settings.desktop.muteShortcutHint": "Mutes or unmutes the microphone from anywhere, even with Sidevoice in the background.",
   "settings.desktop.shortcutNone": "Not set",
