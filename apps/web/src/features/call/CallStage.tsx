@@ -1,9 +1,9 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useContext, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
+import { CloseIcon, HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
-import { useRoomStore } from "../../state/room-store";
+import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import type { ChatMessage } from "../../state/room-types";
 import { avatarFor, avatarTone } from "../avatar/avatar-spec";
 import { avatarColor } from "../avatar/bicho-draw";
@@ -104,12 +104,17 @@ const VOICE_ERRORS = ["a", "b"] as const;
 
 /** The room's errors, above the stage (#error is the runtime's id), as people read them: what was raw about one is
  *  behind its Details. The box stays in the page so what appears in it is read out at once. */
-function BootError({ place }: { place: "above" | "tile" }) {
+function BootError() {
+  const t = translator();
   const look = useVariant("voiceError", VOICE_ERRORS);
   const error = useRoomStore((state) => state.bootError);
-  // One box only (its id and live region): above the tile on a, laid on the tile's bottom-right on b.
-  if ((look === "b") !== (place === "tile")) return null;
-  return <div id="error" className="stage-error" data-place={place} role="alert" hidden={!error}>{error && <Alert tone="danger" title={errorLine(error)} details={error.details} />}</div>;
+  const store = useContext(RoomStoreContext);
+  // Laid over the tile, never pushing anything (operator, 2026-10-15): at its top on a, at its bottom-right on b; and
+  // closed by the person, its × an action of its own.
+  return <div id="error" className="stage-error" data-place={look === "b" ? "tile" : "top"} role="alert" hidden={!error}>
+    {error && <Alert tone="danger" title={errorLine(error)} details={error.details}
+      action={<Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("ui.close")} onClick={() => store?.patch({ bootError: null })}><CloseIcon size={16} /></Button>} />}
+  </div>;
 }
 
 function posterWords(t: Translate): PosterWords {
@@ -136,9 +141,8 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   if (!stage.threadId) {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
-        <BootError place="above" />
         <div className="stage-tile stage-empty">
-          <BootError place="tile" />
+          <BootError />
           <div className="stage-notice">{notice}</div>
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
@@ -151,7 +155,6 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const tone = avatarColor(spec);
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
-      <BootError place="above" />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <StageName stage={stage} className="stage-title" look={titleLook} tone={tone} />
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
@@ -160,7 +163,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
       <div ref={sceneRef} className="stage-slot">
       <div className="stage-tile" data-mood={mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-notice">{notice}</div>
-        <BootError place="tile" />
+        <BootError />
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />

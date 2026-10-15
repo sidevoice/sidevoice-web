@@ -7,7 +7,10 @@
 
 /* ---------- the stage ---------- */
 .call-stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--sv-space-2); padding: var(--sv-space-4) var(--sv-space-4) var(--sv-space-1); }
-#error.stage-error { flex: none; }
+/* The stage's error, laid over the tile (CallStage BootError): a at its top, across; b a card at its bottom-right. */
+#error.stage-error[data-place="top"] { position: absolute; z-index: 5; top: var(--stage-inset); left: 50%; transform: translateX(-50%);
+  width: min(32rem, calc(100% - 2 * var(--stage-inset))); max-height: calc(100% - 2 * var(--stage-inset)); overflow: auto; border-radius: var(--sv-radius-lg); box-shadow: var(--sv-shadow-xs); }
+#error.stage-error[data-place="top"] .ui-alert { border-radius: inherit; }
 /* Variant b: a compact card on the tile's bottom-right; its Details open inside it (it scrolls past the tile's height). */
 /* The card's words and buttons keep the interface's own size (a message to read and act on, not part of the slide);
  * its place and its width follow the tile. */
