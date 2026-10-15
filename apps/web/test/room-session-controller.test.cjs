@@ -1441,6 +1441,22 @@ test('T11 reversed history and participant responses cannot undo globally confir
  assert.equal(c.s.run("history.find(r=>r.segment==='history-reply').globally_heard"),true);
  c.s.run('disconnect()');
 });
+test('T06d/e return reconciliation shows only globally unheard rows and no notice bubble',async()=>{
+ const c=await callOnRoom();let heard=false;
+ c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>path.includes('/participants')
+  ?{participants:[{thread_id:'a',available:true,epoch:0,unheard:heard?null:{count:1,since:1}}]}
+  :{messages:[{id:'reply',thread:'a',role:'assistant',text:'Answer',status:heard?'playback_finished':'interrupted',audio_reason:heard?null:'user_interrupted',heard_chars:heard?6:2,globally_heard:heard,replayable:!heard,time:1,seq:1},
+   {id:'notice',thread:'a',role:'note',text:'',notice:{kind:heard?'reply_heard':'user_returned',corrects_message_id:'old',heard:[]},time:2,seq:2}]}});
+ await c.s.run('refreshHistory()');await c.s.run('refreshPeople()');
+ assert.equal(c.s.run("state.people.find(p=>p.thread_id==='a').unheard.count"),1);
+ assert.equal(c.s.run("history.find(r=>r.segment==='reply').replayable"),true);
+ heard=true;await c.s.run('refreshHistory()');await c.s.run('refreshPeople()');
+ assert.equal(c.s.run('history.length'),1,'sidevoice-only notices never become person or agent bubbles');
+ assert.equal(c.s.run("history[0].globally_heard"),true);
+ assert.equal(c.s.run("history[0].replayable"),false);
+ assert.equal(c.s.run("state.people.find(p=>p.thread_id==='a').unheard"),null);
+ c.s.run('disconnect()');
+});
 test('T11 a delayed transcript keeps its captured focus through a later selection',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('captured'));
