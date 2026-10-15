@@ -42,6 +42,7 @@
 .sidebar-body { display: grid; align-content: start; gap: var(--sv-space-4); min-width: 0; }
 .sidebar-group { display: grid; gap: var(--sv-space-0-5); min-width: 0; }
 .sidebar-group-label { display: flex; align-items: center; gap: var(--sv-space-1-5); min-width: 0; margin: 0 0 var(--sv-space-1); padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); line-height: 1rem; font-weight: 600; color: var(--sv-text-subtle); }
+.sidebar-group-label > svg { flex: none; }
 .sidebar-group-label span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sidebar-rows { display: grid; gap: var(--sv-space-1-5); min-width: 0; }
 .sidebar-empty { margin: 0; padding: var(--sv-space-5); border: 1px dashed var(--sv-border-strong); border-radius: var(--sv-radius-lg); font-size: var(--sv-font-sm); line-height: 1.25rem; text-align: center; color: var(--sv-text-muted); }

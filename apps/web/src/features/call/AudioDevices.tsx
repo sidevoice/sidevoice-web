@@ -2,9 +2,8 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useContext, useEffect, useRef, useState, type PointerEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { ErrorText } from "../../components/ui/ErrorText";
-import { Field } from "../../components/ui/Field";
 import { Select } from "../../components/ui/Select";
-import { ChevronIcon } from "../../components/ui/Icons";
+import { ChevronIcon, MicrophoneIcon, SpeakerIcon } from "../../components/ui/Icons";
 import { overlayContainer, useOverlayPortal } from "../../components/ui/Tooltip";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { MicWave } from "./CallIndicators";
@@ -118,14 +117,16 @@ function DeviceChoices() {
   const dismissLost = () => store?.patch({ audioLost: null });
   return <>
     {!devices ? <p className="audio-devices-note" role="status">{t("devices.loading")}</p> : <>
-      <Field label={t("devices.mic")}>
-        <Select id="audio-input" value={devices.input ?? ""} disabled={busy} onValueChange={(input) => void choose({ input: input || null })}
+      {/* Each box says what it holds by its icon, before the device chosen; its name is for screen readers. */}
+      <div className="audio-devices-choice">
+        <Select id="audio-input" aria-label={t("devices.mic")} leading={<MicrophoneIcon />} value={devices.input ?? ""} disabled={busy} onValueChange={(input) => void choose({ input: input || null })}
           options={[{ value: "", label: t("devices.default") }, ...devices.inputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "mic", t) }))]} />
-      </Field>
-      <Field label={t("devices.speaker")} hint={devices.outputSelectable ? undefined : t("devices.speakerFixed")}>
-        <Select id="audio-output" value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })}
+      </div>
+      <div className="audio-devices-choice">
+        <Select id="audio-output" aria-label={t("devices.speaker")} aria-describedby={devices.outputSelectable ? undefined : "audio-output-hint"} leading={<SpeakerIcon />} value={devices.outputSelectable ? devices.output ?? "" : ""} disabled={busy || !devices.outputSelectable} onValueChange={(output) => void choose({ output: output || null })}
           options={[{ value: "", label: t("devices.default") }, ...devices.outputs.map((device, index) => ({ value: device.id, label: deviceName(device.label, index, "speaker", t) }))]} />
-      </Field>
+        {!devices.outputSelectable && <p className="ui-field-hint" id="audio-output-hint">{t("devices.speakerFixed")}</p>}
+      </div>
     </>}
     {(lost?.input || lost?.output) && <p className="audio-devices-lost" role="status">
       {t(lost.input && lost.output ? "devices.lostBoth" : lost.input ? "devices.lostInput" : "devices.lostOutput")}
