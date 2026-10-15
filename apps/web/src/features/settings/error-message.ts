@@ -1,6 +1,6 @@
 import type { ErrorMessage } from "../../components/ui/ErrorText";
 import { failureCode } from "../../services/failure-code.js";
-import { translator, type Translate, type MessageKey } from "../../i18n/translator";
+import { hasTranslation, translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { messages as en } from "../../i18n/locales/en";
 
 /* How a failure reaches a person, wherever it happened (AGENTS.md: every text through i18n). Its code — the engine's, the
@@ -73,7 +73,8 @@ export function errorMessage(error: unknown, { known, what = "app", generic, t =
 }
 
 /** A key of this bundle for a code, when it has one: `prefix` + code. */
-export const keyFor = (prefix: string, code: string): MessageKey | null => hasHostKey(prefix + code) ? (prefix + code) as MessageKey : null;
+export const keyFor = (prefix: string, code: string, language?: string): MessageKey | null =>
+  (language ? hasTranslation(language, prefix + code) : hasHostKey(prefix + code)) ? (prefix + code) as MessageKey : null;
 
 /**
  * A failure of the voice, its models or their catalogues — the engine's, the voice module's, a try's, the browser's —

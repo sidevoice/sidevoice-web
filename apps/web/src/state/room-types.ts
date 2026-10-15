@@ -98,6 +98,10 @@ export interface MachineView {
 }
 
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */
+export interface AgentReadinessStatus {
+  state: "ready" | "needs_attention" | "unsupported";
+  reasons: { code: string; message?: string }[];
+}
 export interface DetectedAgent {
   id: string;
   label: string;
@@ -121,6 +125,8 @@ export interface DetectedAgent {
   manual?: { connect?: AgentManualStep[]; update?: AgentManualStep[]; disconnect?: AgentManualStep[]; replace?: AgentManualStep[] } | null;
   /** How to take Sidevoice out of the agent by hand (the connector's, as `instructions` is for adding it). */
   removal?: { command?: string; snippet?: string; file?: string | null } | null;
+  /** Delivery readiness from the connector; absence means ready. */
+  readiness?: AgentReadinessStatus | null;
 }
 
 /** One step done by hand: a command to run, or a snippet for a file. */
