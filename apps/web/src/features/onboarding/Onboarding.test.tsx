@@ -87,7 +87,7 @@ test("a browser starts by pairing another machine, shown how to prepare it, and 
   expect(title()).toHaveTextContent("Set up transcription");
 });
 
-test("the basics come first: appearance, the interface's language and the one the person speaks, Automatic by default", async () => {
+test("the basics come first: appearance and the interface's language, Automatic by default; the language spoken is the model's", async () => {
   localStorage.removeItem(ONBOARDING_STORAGE_KEY);
   actions.interfaceLanguage = vi.fn(() => "");
   actions.setInterfaceLanguage = vi.fn();
@@ -96,11 +96,9 @@ test("the basics come first: appearance, the interface's language and the one th
   expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
   expect(selectedValue("wizard-ui-language")).toBe("");
   expect(document.getElementById("wizard-ui-language")).toHaveTextContent("Automatic");
-  expect(selectedValue("wizard-speech-language")).toBe("");
+  expect(document.getElementById("wizard-speech-language")).toBeNull();
   chooseOption("wizard-ui-language", "es");
   expect(actions.setInterfaceLanguage).toHaveBeenCalledWith("es");
-  chooseOption("wizard-speech-language", "en");
-  expect(actions.editVoice).toHaveBeenCalledWith({ stt: { language: "en" } });
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Continue" })); });
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).basics_done).toBe(true);
   expect(title()).toHaveTextContent("Connect to your machine");
