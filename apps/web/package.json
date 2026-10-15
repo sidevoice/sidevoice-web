@@ -24,7 +24,7 @@
     "@radix-ui/react-tooltip": "^1.2.16",
     "@sidevoice/engine": "0.5.0",
     "@sidevoice/protocol": "0.2.1",
-    "@sidevoice/voice": "file:../../vendor/sidevoice-voice-91a823bd532514cf673a07f57e89397346cf9ec9.tgz",
+    "@sidevoice/voice": "file:../../vendor/sidevoice-voice-bc7b60f67d16ae11e8db2d50366a5cccb0083307.tgz",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.47.0",
