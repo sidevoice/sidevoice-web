@@ -12,7 +12,7 @@ import { uiLocale } from "../../i18n/locale";
 
 /** The delivery mark as a drawing, not a glyph: a text check sat below the time's line and at its own size. The
  *  warning only for a message that failed or is in doubt: a status this version does not know has no mark at all. */
-function DeliveryMark({ state }: { state: string }) {
+export function DeliveryMark({ state }: { state: string }) {
   if (state === "read") return <ReadIcon size={14} />;
   if (state === "delivered" || state === "unconfirmed") return <SentIcon size={14} />;
   if (state === "pending" || state === "sending") return <PendingIcon size={12} />;

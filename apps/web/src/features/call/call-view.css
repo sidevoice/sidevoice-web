@@ -159,7 +159,11 @@
 /* What was sent: its space above and below is margin, so a page is cut at its last line and not a sliver below it;
  * with the bubble's padding, the strip where the page before fades. It is never smaller than the bars' balloon it pops
  * out of (PersonTurn), and keeps its size: a longer turn pages inside it. */
-.person-said { flex: 1 1 8rem; min-width: 0; margin-block: var(--sv-space-2); }
+.person-said { flex: 1 1 8rem; min-width: 0; margin-block: var(--sv-space-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+/* Whether it got there: the transcript's checks, at the balloon's end, in the person's light ink. */
+.person-receipt { position: absolute; right: var(--sv-space-3); bottom: var(--sv-space-2); display: inline-flex; color: var(--sv-chat-person-fg); opacity: .85; }
+.person-receipt[data-state="read"] { opacity: 1; }
+.person-receipt:is([data-state="uncertain"], [data-state="not_sent"]) { color: var(--sv-danger); opacity: 1; }
 .person-turns .person-bubble[data-sent] { width: var(--person-live-w); height: var(--person-live-h); align-content: center; transform-origin: 100% 100%; }
 /* What was sent: a moment on the stage, then it leaves as the agent's balloon does (stage-bubble-out; a plain fade, reduced). */
 .person-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
