@@ -364,7 +364,7 @@
  * while a voice model needs something (said in words to assistive tech). The stage carries nothing else of the models
  * (operator, 2026-10-15); the agent's badge keeps the tile's foot. */
 .stage-name { display: grid; gap: .3em; justify-items: start; }
-.stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; max-width: 100%; margin: -.2em -.35em; padding: .2em .35em; border: 0;
+.stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; max-width: calc(100% + .7em); margin: -.2em -.35em; padding: .2em .35em; border: 0;
   border-radius: var(--sv-radius-md); background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: start; cursor: pointer;
   transition: background-color var(--sv-dur-fast) var(--sv-ease); }
 @media (hover: hover) { .stage-heading:hover { background: color-mix(in srgb, var(--sv-text) 7%, transparent); } }
@@ -417,7 +417,7 @@
 .ui-dialog.call-details-sheet .conversation-avatar { width: 36px; height: 36px; }
 @keyframes call-details-in { from { transform: translateX(24px); opacity: 0; } }
 @media (max-width: 899px) {
-  .ui-dialog.call-details-sheet[data-layout="dialog"] { width: 100vw; height: auto; margin: auto 0 0; }
+  .ui-dialog.call-details-sheet[data-layout="dialog"] { inset: auto 0 0 0; width: 100vw; height: auto; margin: auto 0 0; }
   .ui-dialog.call-details-sheet .ui-dialog-surface { height: auto; max-height: 85dvh; border-radius: var(--sv-radius-2xl) var(--sv-radius-2xl) 0 0; animation-name: call-details-up; }
   @keyframes call-details-up { from { transform: translateY(24px); opacity: 0; } }
 }

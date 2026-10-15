@@ -275,6 +275,11 @@
 .downloaded-model-title > :not(.downloaded-model-name) { flex: none; }
 /* The (i) right by the model's name: no room of its own either side, it reads as part of the name. */
 .downloaded-model-title > .ui-infotip { width: 18px; margin-inline: -6px -4px; }
+/* A phone has no room for the name and its tags on one line: the tags go under it, the name never cut to nothing. */
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
+  .downloaded-model-title { flex-wrap: wrap; }
+  .downloaded-model-title > .downloaded-model-name { flex: 1 0 100%; max-width: calc(100% - 22px); }
+}
 /* A tooltip that says its shortcut: the label, then its key caps, small, on the tooltip's own ground. */
 .shortcut-tip { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
 .ui-tooltip .shortcut-key { min-width: 1.25rem; height: 1.25rem; padding: 0 var(--sv-space-1); font-size: var(--sv-font-xs, 0.75rem); background: transparent; color: inherit; border-color: currentColor; opacity: 0.85; }
