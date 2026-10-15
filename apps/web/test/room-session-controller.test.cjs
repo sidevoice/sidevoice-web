@@ -1505,6 +1505,16 @@ test('R6 another device hearing an old miss retires its protected browser row',a
  assert.equal(c.s.run('history.length'),1000);
  c.s.run('disconnect()');
 });
+test('R6 an explicitly missing old ID is removed, while ordinary absent rows remain',async()=>{
+ const c=await callOnRoom();
+ c.s.run("state.history=[{segment:'evicted',thread:'fp-mac|a',role:'assistant',text:'Old miss',globally_heard:false,replayable:true},{segment:'pending-local',thread:'fp-mac|a',role:'user',text:'Pending',draft:true}]");
+ c.s.context.fetch=async path=>({ok:true,status:200,json:async()=>String(path).includes('resolve_id=evicted')
+  ?{messages:[],resolved:[],missing_ids:['evicted']}:{messages:[]}});
+ await c.s.run('refreshHistory()');
+ assert.equal(c.s.run("history.some(row=>row.segment==='evicted')"),false);
+ assert.equal(c.s.run("history.some(row=>row.segment==='pending-local')"),true,'absence alone does not delete a local row');
+ c.s.run('disconnect()');
+});
 test('T11 a delayed transcript keeps its captured focus through a later selection',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('captured'));
