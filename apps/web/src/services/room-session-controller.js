@@ -2038,7 +2038,7 @@ async function tryVoiceSettings(task,{text='',language=null,keep=true,onListenin
   try{
   // What each phase took, for the try to say how quick it was.
   let timings=null;const onTimings=value=>{timings=value};
-  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake})}
+  const result=task==='stt'?{text:await tryTranscription(routedTrial(host,trial),settings,{signal:abort.signal,finish:finish.signal,onTimings,onListening,onLevel,onTranscribing,onTake,fence:()=>host.routeInput(null)})}
    :(await tryVoice(routedTrial(host,trial),settings,text,{language,signal:abort.signal,onTimings,onProgress:onProgress&&(progress=>onProgress(sayingRange(progress,text)))}),{});
   result.timings=timings;
   if(keep){writeVoiceSettings(pageStorage(),settings);roomStore.patch({voiceSettings:settings})}

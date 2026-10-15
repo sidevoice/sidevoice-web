@@ -56,9 +56,19 @@ function takeOf(voice, onTake, dropping = () => false) {
  * @typedef {{step: 'listening', again: boolean} | {step: 'restarting'} | {step: 'speaking'} | {step: 'pause'} | {step: 'ended'}
  *   | {step: 'heard', text: string, endpoint_silence_ms: number | null} | {step: 'not-a-turn'}} TurnStep */
 
+/** How long leaving a try waits for its live take to be closed before the voice is stopped anyway. */
+const LEAVE_TAKE_MS = 1000;
+
 /** A failure of a try itself: `trial-silence` (nothing usable heard in time), `trial-cancelled`, `trial-not-heard`. */
 function trialError(code, detail) {
   return Object.assign(new Error(code), { code }, detail ? { detail } : {});
+}
+
+/** `error` as the try's own failure: its code where it has one, else `transcription-failed`. */
+function failureOf(error) {
+  const code = /** @type {{code?: unknown} | null | undefined} */ (error)?.code;
+  if (typeof code === 'string' && code) return error;
+  return trialError('transcription-failed', error instanceof Error ? error.message : undefined);
 }
 
 /** `promise`, or `signal`'s abort and the time limit first, as a try's own failures. */
@@ -78,7 +88,11 @@ function bounded(promise, { signal, timeoutMs }) {
  * talking or not. Stop and the longest take end the turn open at once with what was said (`endInput`); the result is that
  * turn's words, and a take with none — nothing said, or a turn that
  * came to nothing — is `trial-silence`. Stop before the voice listens is a cancel (nothing recorded yet), as is Stop
- * once the take has ended; an error of the voice ends the try with it.
+ * once the take has ended; an error of the voice ends the try with it. Closing the take is one operation, done once
+ * whatever ends the try: further microphone input is fenced off from the voice first (`fence`, awaited: the page
+ * routes the microphone away), so speech after the take cannot join its words, then the open turn is closed
+ * (`endInput`). A voice without `endInput`, or one that refuses, fails the try (`voice-module-unavailable`, or its own
+ * code) instead of reporting silence; leaving a live take that way never keeps the voice from stopping.
  * @param {TrialVoice} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * `onTimings`, once heard: how long the voice took to be ready, and how long transcribing took — not how the take
@@ -87,10 +101,10 @@ function bounded(promise, { signal, timeoutMs }) {
  * as the take ends and what was said is being transcribed — the microphone no longer counts then.
  * `onTake`, once the voice has stopped (heard, failed or cancelled): what the microphone gave it, where the voice hands
  * one, up to where the take ended — not what the voice went on recording while it transcribed.
- * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
+ * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void, fence?: () => Promise<void>}} [options]
  * @returns {Promise<string>}
  */
-export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake } = {}) {
+export async function tryTranscription(voice, settings, { signal, finish, timeoutMs = 20000, maxTakeMs = MAX_TAKE_MS, onState, onTimings, onListening, onLevel, onTranscribing, onTake, fence } = {}) {
   const stops = [];
   let readyMs = null;
   // Where the take ended, in Unix ms: the take handed stops there.
@@ -105,21 +119,40 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
   // Nothing heard: no turn in the take, or one that came to no words; and the try failed.
   let nothing = () => {};
   let fail = () => {};
-  // Ends the take where it stands; before the voice listens there is none to end.
-  const endTake = () => {
+  // Fences further microphone input off from this call, once, and closes the open turn, once (the voice does nothing
+  // without one). Both are told by the voice or the page as promises, whatever they throw is the try's failure.
+  let fencing = null, closing = null;
+  const fenceInput = () => (fencing ??= (async () => { await fence?.(); })());
+  const closeTake = () => (closing ??= (async () => {
+    await fenceInput();
+    if (typeof voice.endInput !== 'function') throw trialError('voice-module-unavailable');
+    await voice.endInput();
+  })().catch((error) => { throw failureOf(error); }));
+  // Ends the take where it stands; before the voice listens there is none to end. The voice's own end of the person's
+  // turn needs no closing, but what the person says next must not join it.
+  const endTake = (byVoice = true) => {
     if (!listening || ended) return false;
     ended = true;
     endedAt = Date.now();
     onTranscribing?.(true);
+    if (byVoice) fenceInput().catch((error) => fail(failureOf(error)));
     return true;
   };
-  // Stop or the longest take: the take ends and the turn open in it closes now (the voice does nothing without one);
-  // with no turn in it, nothing was heard.
+  // Stop or the longest take: the take ends and the turn open in it closes now; with no turn in it, nothing was heard
+  // once the voice has said so.
   const finishTake = () => {
-    if (!endTake()) return false;
-    voice.endInput().catch((error) => fail(error));
-    if (!open) nothing();
+    if (!endTake(false)) return false;
+    closeTake().then(() => { if (!open) nothing(); }, (error) => fail(error));
     return true;
+  };
+  // The try over with a take live (a turn open, not ended): it closes like any other, whatever the end, and the
+  // end's own result is kept.
+  const leaveTake = async () => {
+    if (!listening || ended || !open) return;
+    ended = true;
+    let timer;
+    await Promise.race([closeTake().catch(() => {}), new Promise((done) => { timer = setTimeout(done, LEAVE_TAKE_MS); })]);
+    clearTimeout(timer);
   };
   try {
     await voice.setSettings({ ...settings, ...TAKE_ENDS });
@@ -169,6 +202,7 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     clearTimeout(tooLong);
     if (stopped) finish?.removeEventListener('abort', stopped);
     for (const stop of stops) stop();
+    await leaveTake();
     await voice.stop().catch(() => {});
     recorder.stop();
     recorder.hand();

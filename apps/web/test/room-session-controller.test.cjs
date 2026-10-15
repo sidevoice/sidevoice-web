@@ -1967,12 +1967,12 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
  assert.equal(plain(await stt).text,'hola');
- assert.deepEqual([...voice.routes],['call-1',null]);
+ assert.deepEqual([...voice.routes],['call-1',null,null],'routed as it starts, fenced off when the take ends, released after');
  const tts=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'hola',keep:false})");
  await settleSoon();
  voice.said.at(-1).step({type:'done',outcome:{status:'heard'}});
  await tts;
- assert.deepEqual([...voice.routes].slice(2),['call-2',null]);
+ assert.deepEqual([...voice.routes].slice(3),['call-2',null]);
  s.run("roomStore.patch({voiceDraft:{...voiceSettings,end_of_turn:'silence'}})");
  const turn=s.run('window.sidevoiceActions.tryTurnSettings()');
  await settleSoon();
@@ -1980,7 +1980,7 @@ test('F2 each settings try gives its call the microphone only once started, and 
  await settleSoon();
  s.run('window.sidevoiceActions.cancelVoiceTry()');
  await assert.rejects(turn,{code:'trial-cancelled'});
- assert.deepEqual([...voice.routes].slice(4),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
+ assert.deepEqual([...voice.routes].slice(5),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
 });
 test('F3 a delayed start heard before a rebind keeps the binding it was heard under; speech after it, the new one',async()=>{
  const c=await callOnRoom(),a=c.voice.created[0];
@@ -2419,7 +2419,7 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const result=plain(await tried);assert.equal(result.text,'hola');
  // With how long its phases took (the fake voice says nothing of its recognition).
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop','dispose','stop'],'the temporary call is stopped and disposed after the try');
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop','dispose','stop'],'the temporary call is stopped and disposed after the try');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
@@ -2462,7 +2462,7 @@ test('A try requests a take and hands it over after the voice stops',async()=>{
  voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
  voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
  await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['mute',true],['mute',false],['stop'],['dispose','call-1'],['stop']]);
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop'],['dispose','call-1'],['stop']]);
  assert.deepEqual([...takes],[1]);
  assert.equal(listeners.size,0,'and the voice is let go');
  // The end of turn's too, once stopped.
