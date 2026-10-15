@@ -20,11 +20,16 @@ test('T12 skip defaults to heard and can be changed without a protocol skip valu
     .toEqual({ outcome: 'partial', heard_chars: 2 });
 });
 
-test('T06d–e/T16 written replies are not heard by default; reading mode only changes muted text', () => {
-  for (const reason of ['agents_muted', 'voice_off', 'inactive_conversation', 'disconnected'])
-    expect(writtenReplyHearing({ status: 'text_only', audio_reason: reason })).toEqual({ outcome: 'not_heard' });
+test('H2/T06d–e/T16 written delivery follows this page, not shared audio status or reason', () => {
+  const visible = { outputMuted: true, displayed: true };
+  const hidden = { outputMuted: true, displayed: false };
+  for (const status of ['text_only', 'playing', 'interrupted'])
+    expect(writtenReplyHearing({ status }, visible)).toEqual({ outcome: 'not_heard' });
   const reading = { ...HEARING_POLICY, readMutedReplies: true };
-  expect(writtenReplyHearing({ status: 'text_only', audio_reason: 'agents_muted' }, reading)).toEqual({ outcome: 'heard' });
-  expect(writtenReplyHearing({ status: 'text_only', audio_reason: 'voice_off' }, reading)).toEqual({ outcome: 'heard' });
-  expect(writtenReplyHearing({ status: 'text_only', audio_reason: 'inactive_conversation' }, reading)).toEqual({ outcome: 'not_heard' });
+  for (const status of ['text_only', 'playing', 'interrupted']) {
+    expect(writtenReplyHearing({ status }, visible, reading)).toEqual({ outcome: 'heard' });
+    expect(writtenReplyHearing({ status }, hidden, reading)).toEqual({ outcome: 'not_heard' });
+  }
+  expect(writtenReplyHearing({ status: 'playing' }, { outputMuted: false, displayed: true }, reading)).toBeNull();
+  expect(writtenReplyHearing({ status: 'text_only' }, { outputMuted: false, displayed: true }, reading)).toEqual({ outcome: 'not_heard' });
 });

@@ -574,6 +574,7 @@ function setSpeechOutput(next){
  speechOutput=next;state.speechOutput=next;
  if(next!=='on')stopReplies(next);
  if(state.sessionId){keepMessage('speech','voice-speech',next==='on'?{on:true}:{on:false,reason:next});flushOutbox()}
+ if(next!=='on')acknowledgeDisplayedHistory();
  if(next==='on')drainReplies();
 }
 function releaseHold(){spaceDown=false;state.holding=false;if(holding){holding=false;setMic(false)}}
@@ -662,21 +663,30 @@ async function resolveProtectedHistory(fp,messages,link,base){
 }
 // Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
 // conversations. The call's machine is asked on the call's beat, every other one on the machines' beat.
-const writtenHearing=new Set();
+const writtenHearing=new Map();
 function acknowledgeWrittenReply(fp,r){
- if(fp!==state.callNode||!state.sessionId||r.role!=='assistant'||r.status!=='text_only'||typeof r.id!=='string')return;
+ if(fp!==state.callNode||!state.sessionId||r.role!=='assistant'||typeof r.id!=='string')return;
  // Core accepts a written acknowledgement only from a session that focused this conversation.
  // Keep an unfocused row unconfirmed until this call has access, rather than sending a refused receipt once.
  if(state.roomBinding?.thread_id!==r.thread&&![...captureTargets.values()].some(target=>target.node===fp&&target.thread_id===r.thread&&target.generation===callGeneration))return;
  const marker=':voice:',at=r.id.lastIndexOf(marker);
  if(at<0||r.hearing==='heard')return;
  const key=state.sessionId+'\0'+r.id;
- if(writtenHearing.has(key))return;
- const decision=writtenReplyHearing(r);
+ const decision=writtenReplyHearing(r,{outputMuted:speechOutput!=='on',displayed:historyThreadId()===conversationKey(fp,r.thread)});
  if(!decision)return;
- writtenHearing.add(key);
+ const previous=writtenHearing.get(key);
+ if(previous==='heard'||previous===decision.outcome)return;
+ writtenHearing.set(key,decision.outcome);
  keepMessage('hearing','reply-hearing',{history_id:r.id,utterance_id:r.id.slice(at+marker.length),...decision});
  flushOutbox();
+}
+function acknowledgeDisplayedHistory(){
+ const viewed=historyThreadId();
+ for(const row of state.history){
+  if(row.thread!==viewed||row.role!=='assistant')continue;
+  const to=conversationOf(row.thread);
+  if(to?.node===state.callNode)acknowledgeWrittenReply(to.node,{id:row.segment,thread:to.thread,role:row.role,status:row.audio,hearing:row.hearing});
+ }
 }
 function mergeHistoryRows(fp,rows,missing=new Set()){
     let changed = false;
@@ -2086,7 +2096,7 @@ window.sidevoiceActions={
  selectParticipant(key){
   window.sidevoiceUI?.playbackLevel?.clear?.();
   const participant=state.people.find(item=>personKey(item)===key),to=conversationOf(key);
-  state.viewedThread=key;markHistorySeen();
+  state.viewedThread=key;markHistorySeen();acknowledgeDisplayedHistory();
   if(!state.sessionId)rememberThread(key);
   // Only a machine that has proved where it is: one being looked for again is not reachable until it answers.
   const hears=!!participant?.available&&state.machineLinks?.[to?.node]?.reach==='ok'&&linkBase(to?.node)!=null;

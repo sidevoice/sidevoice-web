@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
@@ -22,6 +22,7 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  // In dependency order: a module may import one listed before it.
  for(const name of new Set(Object.values(modules))){
   let text=fs.readFileSync(files[name],'utf8');
+  if(name==='HearingPolicy'&&readingMode){assert.ok(text.includes('readMutedReplies: false'));text=text.replace('readMutedReplies: false','readMutedReplies: true')}
   // The catalogues the translator finds by file (Vite's import.meta.glob): each one already loaded, by its path.
   text=text.replace(/import\.meta\.glob<\w+>\("\.\/locales\/\*\.ts", \{ eager: true \}\)/,()=>'({'+fs.readdirSync(sourceRoot+'/i18n/locales').map(file=>JSON.stringify('./locales/'+file)+':Locale'+file.slice(0,-3).split('-').map(part=>part[0].toUpperCase()+part.slice(1)).join('')).join(',')+'})');
   if(files[name].endsWith('.ts'))text=require('typescript').transpileModule(text,{compilerOptions:{target:99,module:99}}).outputText;
@@ -1102,8 +1103,8 @@ function joining(s,{admission={admitted:true,reason:null,message:null,clients:1,
  s.run("keepScreenAwake=()=>{};people=[{node:'fp-mac',thread_id:'t-1',title:'Astra',available:true,reach:{state:'listening'}}]");
  return {sockets,voice,tap:()=>s.run('toggleCall')()};
 }
-async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=undefined}={}){
- const s=setup({indexedDB,outboxScope,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
+async function callOnRoom({timers=null,indexedDB=null,outboxScope=null,stored=undefined,readingMode=false}={}){
+ const s=setup({indexedDB,outboxScope,readingMode,...(stored?{stored}:{})});const sockets=socketsOf(s);let ids=0;
  s.context.crypto={randomUUID:()=>'id-'+(++ids)};
  s.context.window.sidevoiceUI=new Proxy({},{get:()=>()=>{}});
  const store={'sidevoice.selected':'fp-mac|a'};s.context.sessionStorage=storageOf(store);
@@ -1496,6 +1497,45 @@ test('T16 a written muted reply gets one reliable semantic receipt without an au
  assert.deepEqual(plain([receipts[0].history_id,receipts[0].utterance_id,receipts[0].outcome,receipts[0].heard_chars??null]),['s1:voice:written','written','not_heard',null]);
  assert.equal(sentOf(c,c.first,'voice-playback').length,0,'written replies have no physical playback target');
  assert.deepEqual(plain([c.s.run("history[0].hearing"),c.s.run("history[0].hearing_unconfirmed")]),[null,true],'the mark waits for core confirmation');
+ c.s.run('disconnect()');
+});
+test('H2 reading mode acknowledges visible shared audio and a reply muted during playback',async()=>{
+ const c=await callOnRoom({readingMode:true});
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'local',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:local',text:'Local answer'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.s.run("setSpeechOutput('agents_muted')");
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ const rows=[
+  {id:'s1:voice:shared',thread:'a',role:'assistant',text:'Shared answer',status:'playing',hearing:null,hearing_unconfirmed:true,time:1,seq:1},
+  {id:'s1:voice:local',thread:'a',role:'assistant',text:'Local answer',status:'interrupted',hearing:null,hearing_unconfirmed:true,time:2,seq:2},
+ ];
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages:rows})});
+ await c.s.run('refreshHistory()');
+ const decisions=plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome]));
+ assert.ok(decisions.some(([id,outcome])=>id==='s1:voice:shared'&&outcome==='heard'),'the other device owning audio does not hide text delivered here');
+ assert.ok(decisions.some(([id,outcome])=>id==='s1:voice:local'&&outcome==='heard'),'a local mute can be upgraded by visible written delivery');
+ c.s.run('disconnect()');
+});
+test('H2 a hidden previously focused miss stays not heard and upgrades only when displayed',async()=>{
+ const c=await callOnRoom({readingMode:true});
+ c.s.run("state.people.push({node:'fp-mac',thread_id:'b',title:'B',available:false});setSpeechOutput('agents_muted');window.sidevoiceActions.selectParticipant('fp-mac|b')");
+ assert.equal(c.s.run('historyThreadId()'),'fp-mac|b');
+ const row={id:'s1:voice:hidden',thread:'a',role:'assistant',text:'Arrived in A',status:'text_only',audio_reason:'agents_muted',hearing:null,hearing_unconfirmed:true,time:1,seq:1};
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages:[row]})});
+ await c.s.run('refreshHistory()');
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:hidden','not_heard']]);
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|a')");
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:hidden','not_heard'],['s1:voice:hidden','heard']]);
+ await c.s.run('refreshHistory()');
+ assert.equal(sentOf(c,c.first,'reply-hearing').length,2,'repeat polls do not duplicate an outcome');
+ c.s.run('disconnect()');
+});
+test('H2 default reading-off mode reports a visible muted shared reply as not heard',async()=>{
+ const c=await callOnRoom();c.s.run("setSpeechOutput('agents_muted')");
+ const row={id:'s1:voice:shared-default',thread:'a',role:'assistant',text:'Shared answer',status:'playing',hearing:null,hearing_unconfirmed:true,time:1,seq:1};
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages:[row]})});
+ await c.s.run('refreshHistory()');
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:shared-default','not_heard']]);
  c.s.run('disconnect()');
 });
 test('T06c a written reply in an unfocused conversation waits for a valid hearing target',async()=>{

@@ -30,13 +30,13 @@ export function playbackHearing(report, text, action = null, policy = HEARING_PO
 }
 
 /**
- * A written reply has no audio handle. In reading mode a muted page accepts its text as read.
- * @param {{status:string,audio_reason?:string|null}} row
+ * This page can report written delivery while muted even when another device owns the audio.
+ * @param {{status:string}} row
+ * @param {{outputMuted:boolean,displayed:boolean}} presentation
  * @param {{skipCountsAsHeard:boolean,readMutedReplies:boolean}} policy
  * @returns {{outcome:'heard'|'not_heard'}|null}
  */
-export function writtenReplyHearing(row, policy = HEARING_POLICY) {
-  if (row?.status !== 'text_only') return null;
-  const muted = row.audio_reason === 'agents_muted' || row.audio_reason === 'voice_off';
-  return { outcome: muted && policy.readMutedReplies ? 'heard' : 'not_heard' };
+export function writtenReplyHearing(row, presentation, policy = HEARING_POLICY) {
+  if (!row || !presentation?.outputMuted && row.status !== 'text_only') return null;
+  return { outcome: presentation.outputMuted && presentation.displayed && policy.readMutedReplies ? 'heard' : 'not_heard' };
 }
