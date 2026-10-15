@@ -640,7 +640,6 @@ export const messages = {
   "agents.unknown": "Connection status is unknown",
   "agents.manualOnly": "Connect it manually",
   "agents.justConnected": "{agent} is ready for new conversations",
-  "agents.readiness.ready": "Ready",
   "agents.readiness.needs_attention": "Needs attention",
   "agents.readiness.unsupported": "Not supported",
   "agents.readiness.unknown_reason": "Sidevoice cannot show the reason for this status.",

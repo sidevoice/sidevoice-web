@@ -58,13 +58,11 @@
 /* Where a remote machine's steps are run, above them. */
 .host-agent-where { margin: 0 0 var(--sv-space-2); font-weight: 600; }
 
-/* Readiness is separate from the agent's MCP registration and actions. */
-.host-agent-readiness { margin: 0 var(--sv-space-5) var(--sv-space-3); border-top: 1px solid var(--sv-border); min-width: 0; padding-top: var(--sv-space-1); }
-.host-agent-readiness-toggle { width: 100%; height: auto; min-height: var(--sv-control-sm); justify-content: flex-start; padding-inline: 0; text-align: start; white-space: normal; }
-.host-agent-readiness-state.ui-badge { max-width: 100%; height: auto; min-height: 22px; padding-block: 3px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; text-align: center; }
-.host-agent-readiness-body { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-1) 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
-.host-agent-readiness-body p { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
+/* Readiness speaks only when something needs doing: a chip in the status line, its reasons below when opened. */
+.host-agent-readiness-toggle { flex: none; height: auto; padding: 0; }
+.host-agent-readiness-state.ui-badge { height: auto; min-height: 20px; padding-block: 2px; line-height: 1.2; white-space: nowrap; }
+.host-agent-readiness { display: grid; gap: var(--sv-space-2); margin: 0 var(--sv-space-5) var(--sv-space-3); border-top: 1px solid var(--sv-border); padding-top: var(--sv-space-2); min-width: 0; font-size: var(--sv-font-sm); }
+.host-agent-readiness p { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
 @media (max-width: 550px) {
   .host-agent-readiness { margin-inline: var(--sv-space-4); }
-  .host-agent-readiness-toggle { min-height: 44px; }
 }

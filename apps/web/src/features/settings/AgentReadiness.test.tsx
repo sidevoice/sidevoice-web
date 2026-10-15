@@ -1,16 +1,21 @@
 import { afterEach, expect, test } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { AgentReadiness } from "./AgentReadiness";
+import { useState } from "react";
+import { AgentReadiness, AgentReadinessDetails } from "./AgentReadiness";
 import { setUiLanguage, translator, UI_LANGUAGES } from "../../i18n/translator";
 import type { AgentReadinessStatus } from "../../state/room-types";
 
-const show = (readiness: AgentReadinessStatus) => render(<AgentReadiness readiness={readiness} id="agent-readiness" />);
+function Card({ readiness }: { readiness: AgentReadinessStatus }) {
+  const [open, setOpen] = useState(false);
+  return <><AgentReadiness readiness={readiness} id="agent-readiness" open={open} onToggle={() => setOpen((value) => !value)} />
+    {open && <AgentReadinessDetails readiness={readiness} id="agent-readiness" />}</>;
+}
+const show = (readiness: AgentReadinessStatus) => render(<Card readiness={readiness} />);
 afterEach(() => setUiLanguage("en"));
 
-test("ready shows only its chip", () => {
+test("ready says nothing", () => {
   const ready = show({ state: "ready", reasons: [] });
-  expect(screen.getByRole("status")).toHaveTextContent("Ready");
-  expect(screen.queryByRole("button")).toBeNull();
+  expect(ready.container).toBeEmptyDOMElement();
   ready.unmount();
 });
 
@@ -70,7 +75,7 @@ test("multiple reasons render in order; an unknown code uses its message", () =>
 
 test("all eight catalogues contain only the final readiness keys", () => {
   expect(UI_LANGUAGES).toHaveLength(8);
-  const keys = ["agents.readiness.ready", "agents.readiness.needs_attention", "agents.readiness.unsupported",
+  const keys = ["agents.readiness.needs_attention", "agents.readiness.unsupported",
     "agents.readiness.unknown_reason", "agents.readiness.cursor.bridge_not_running", "agents.readiness.cursor.unsupported"] as const;
   for (const language of UI_LANGUAGES) {
     const t = translator(language);

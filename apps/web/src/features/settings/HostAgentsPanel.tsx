@@ -15,7 +15,7 @@ import { NewMark } from "../highlights/highlights";
 import { InfoTip } from "../../components/ui/InfoTip";
 import "./host-agents.css";
 import { uiLocale } from "../../i18n/locale";
-import { AgentReadiness } from "./AgentReadiness";
+import { AgentReadiness, AgentReadinessDetails } from "./AgentReadiness";
 
 /** A machine's failure with its agents, in words (error-message.ts): its key's sentence, else this panel's own generic
  *  line, the key behind Details. */
@@ -125,6 +125,8 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
   const kind = manualKind(agent);
   const hasManualInstructions = recognized && manualSteps(agent, kind).length > 0;
   const panelId = `host-agent-howto-${fp.slice(0, 7)}-${agent.id}`;
+  const readinessId = `host-agent-readiness-${fp.slice(0, 7)}-${agent.id}`;
+  const [readinessOpen, setReadinessOpen] = useState(false);
 
   useEffect(() => { if (error) setOpen(true); }, [error]);
   useEffect(() => {
@@ -178,6 +180,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
               role={errorText ? "alert" : "status"} title={status.reason ? status.text + " · " + status.reason : status.text}>{status.text}{status.reason && <span className="host-agent-reason"> · {status.reason}</span>}</span>
             {failure && <ErrorDetails details={failure.details} />}
             {status.info && <InfoTip label={t("agents.statusInfo", { agent: agent.label })}>{status.info}</InfoTip>}
+            {agent.readiness && <AgentReadiness readiness={agent.readiness} id={readinessId} open={readinessOpen} onToggle={() => setReadinessOpen((value) => !value)} />}
           </span>
         </span>
         {/* Every action a button on the row, each with a hint: doing it by hand (add, replace, or take Sidevoice out), and
@@ -199,7 +202,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             </Tooltip>}
         </span>
       </div>
-      {agent.readiness && <AgentReadiness readiness={agent.readiness} id={`host-agent-readiness-${fp.slice(0, 7)}-${agent.id}`} />}
+      {agent.readiness && readinessOpen && <AgentReadinessDetails readiness={agent.readiness} id={readinessId} />}
       {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}
         onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConfirm(); } }}>
         <p>{t("agents.disconnectConfirm", { agent: agent.label })}</p>

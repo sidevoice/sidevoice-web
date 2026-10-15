@@ -624,7 +624,6 @@ export const messages: Messages = {
   "agents.unknown": "连接状态未知",
   "agents.manualOnly": "请手动连接",
   "agents.justConnected": "{agent} 已可用于新对话",
-  "agents.readiness.ready": "就绪",
   "agents.readiness.needs_attention": "需要处理",
   "agents.readiness.unsupported": "不受支持",
   "agents.readiness.unknown_reason": "Sidevoice 无法显示此状态的原因。",

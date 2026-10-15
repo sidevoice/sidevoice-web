@@ -625,7 +625,6 @@ export const messages: Messages = {
   "agents.unknown": "接続状態は不明です",
   "agents.manualOnly": "手動で接続してください",
   "agents.justConnected": "{agent} で新しい会話を始められます",
-  "agents.readiness.ready": "準備完了",
   "agents.readiness.needs_attention": "対応が必要",
   "agents.readiness.unsupported": "非対応",
   "agents.readiness.unknown_reason": "Sidevoice ではこの状態の理由を表示できません。",
