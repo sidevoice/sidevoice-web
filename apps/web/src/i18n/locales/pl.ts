@@ -656,6 +656,7 @@ export const messages: Messages = {
   "voice.source": "Źródło",
   "voice.source.local": "Na tym urządzeniu",
   "voice.model": "Model",
+  "voice.modelSettings": "Ustawienia modelu",
   "voice.language": "Język",
   "voice.language.detect": "Automatycznie (wykrywany)",
   "voice.voice": "Głos",

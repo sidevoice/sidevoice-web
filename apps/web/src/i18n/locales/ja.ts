@@ -647,6 +647,7 @@ export const messages: Messages = {
   "voice.source": "提供元",
   "voice.source.local": "このデバイス上",
   "voice.model": "モデル",
+  "voice.modelSettings": "モデルの設定",
   "voice.language": "言語",
   "voice.language.detect": "自動（検出）",
   "voice.voice": "声",

@@ -17,10 +17,16 @@
 .try-take-mark[data-kind="end"] { background: var(--sv-voice-text); }
 .try-take-mark[data-kind="end"]::before { border-radius: 1px; }
 .try-take-head { position: absolute; top: -2px; bottom: -2px; left: 0; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--sv-text); pointer-events: none; }
-.try-take-clock { flex: none; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A fixed width: the clock changing as it plays must not resize the waveform beside it (its bars would be recounted). */
+.try-take-clock { flex: none; min-width: 9ch; text-align: end; color: var(--sv-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .try-take-marks { display: flex; flex-wrap: wrap; gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
 .try-take-marks > span { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
 .try-take-key { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .try-take-marks [data-kind="speech"] > .try-take-key { background: var(--sv-positive); }
 .try-take-marks [data-kind="pause"] > .try-take-key { border-radius: 2px; background: color-mix(in srgb, var(--sv-text-muted) 45%, transparent); }
 .try-take-marks [data-kind="end"] > .try-take-key { border-radius: 1px; background: var(--sv-voice-text); }
+/* Inline (TryTake inline): in the try's first row, where the live level was — Play, the waveform at the level's height
+   and the clock, filling the room the button leaves. */
+.try-take[data-inline] { flex: 1; min-width: 0; }
+.try-take[data-inline] .try-take-player { gap: var(--sv-space-2); }
+.try-take[data-inline] .try-take-wave { height: 28px; }

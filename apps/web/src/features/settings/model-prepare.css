@@ -81,8 +81,8 @@
 .tts-try-said { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: start; font: inherit; font-size: var(--sv-font-md); line-height: 1.5rem; color: var(--sv-text); cursor: text; }
 .tts-try-said::before { content: "“"; } .tts-try-said::after { content: "”"; }
 
-/* The transcription try (SttTry): the button and the microphone's level on one row, always; under it an area of a fixed
-   height — listening and the take's length, then what was heard in their place — so nothing below it moves. */
+/* The transcription try (SttTry): the button and the microphone's level on one row, always; under it an area that grows
+   with what it holds — listening and the take's length, then what was heard — and takes no room while empty. */
 .stt-try { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .stt-try-head { display: flex; align-items: center; gap: var(--sv-space-3); min-height: 32px; }
 .stt-try-head .model-try-wave { flex: 1; min-width: 0; }
@@ -90,5 +90,10 @@
    narrows it rather than pushing the try past its card. */
 .stt-try-head { min-width: 0; }
 .stt-try-head .voice-wave { width: 100%; max-width: 9rem; }
-.stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-height: 3.75rem; min-width: 0; }
+.stt-try-area { display: grid; align-content: start; gap: var(--sv-space-1-5); min-width: 0; }
+.stt-try-area:empty { display: none; }
 .stt-try-area .model-try-take { flex: none; width: 100%; }
+/* The model's own settings (VoiceSettings), in a card of their own between the model and its try, once it is ready. */
+.model-settings-card { display: grid; }
+/* The voice's try: the sentence beside the button, where the transcription try draws the microphone's level. */
+.stt-try-head .tts-try-sentence { flex: 1; min-width: 0; }

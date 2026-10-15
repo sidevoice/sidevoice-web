@@ -13,7 +13,7 @@
 
 
 .turn-try-card { gap: var(--sv-space-3); margin-top: var(--sv-space-3); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); color: var(--sv-text); }
-.turn-try-card > .model-try { padding-top: var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+/* The try is the card's only content (its title is the row's label): no line above it, as End of turn's. */
 .turn-try-card .voice-wave { width: min(9rem, 36vw); height: 28px; }
 
 /* Starting again with a new setting is quick once its models are loaded: "Getting ready…" shows only if it takes a

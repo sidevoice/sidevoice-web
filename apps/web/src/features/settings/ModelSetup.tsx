@@ -305,7 +305,10 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
   return <div className="model-try stt-try" id="stt-try-panel" data-phase={trial.phase}>
     <div className="stt-try-head">
       {button}
-      <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={() => listening ? handle.level.current() / 100 : 0} /></span>
+      {/* Once the try is over, its take takes the level's place: Play and the recording's waveform, on the same row. */}
+      {!running && trial.take
+        ? <TryTake key={trial.attempt} take={trial.take} id="stt-take" turns={false} inline t={t} />
+        : <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={() => listening ? handle.level.current() / 100 : 0} /></span>}
     </div>
     <div className="stt-try-area" aria-live="polite">
       {trial.phase === "idle" && hint && <p className="model-try-hint">{hint}</p>}
@@ -323,8 +326,6 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
       </>}
       {trial.phase === "failed" && trial.error && <ErrorText className="stage-try-error" role="alert" message={trial.error} />}
     </div>
-    {/* The take to listen to, when the voice handed one: outside the live area, read when reached. */}
-    {!running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" turns={false} t={t} />}
   </div>;
 }
 
@@ -339,17 +340,11 @@ function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
   const running = trial.phase === "running";
   const sounding = running && trial.live;
   const text = handle.sentence ?? "";
-  const started = useRef(0);
-  if (sounding && !started.current) started.current = performance.now();
-  if (!sounding) started.current = 0;
-  const moving = () => sounding ? 0.35 + 0.3 * Math.abs(Math.sin((performance.now() - started.current) / 140)) : 0;
   const lit = running || (trial.phase === "done" && trial.said === text.trim());
   return <div className="model-try tts-try" id="tts-try-panel" data-phase={trial.phase}>
     <div className="stt-try-head">
       {button}
-      <span className="model-try-wave" aria-hidden><VoiceWaveform phase="listening" level={moving} /></span>
-    </div>
-    <div className="stt-try-area tts-try-area">
+      {/* The sentence in the level's place: what it will say, editable while it is silent, lit as it is heard. */}
       <div className="tts-try-sentence">
         {editing && !running
           ? <Textarea id="tts-sentence" className="voice-try-text" minRows={1} maxRows={3} maxLength={200} value={text} autoFocus
@@ -359,6 +354,8 @@ function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
         {!running && !editing && <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("voiceTry.edit")} title={t("voiceTry.edit")}
           onClick={() => setEditing(true)}><EditIcon /></Button>}
       </div>
+    </div>
+    <div className="stt-try-area tts-try-area">
       <div className="model-try-live" aria-live="polite">
         {trial.phase === "idle" && hint && <p className="model-try-hint">{hint}</p>}
         {running && !trial.live && <p className="model-try-state"><span className="ui-spinner ui-spinner--inline" aria-hidden />{t("try.starting")}</p>}

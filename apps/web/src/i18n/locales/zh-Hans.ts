@@ -646,6 +646,7 @@ export const messages: Messages = {
   "voice.source": "来源",
   "voice.source.local": "在此设备上",
   "voice.model": "模型",
+  "voice.modelSettings": "模型设置",
   "voice.language": "语言",
   "voice.language.detect": "自动（检测）",
   "voice.voice": "声音",

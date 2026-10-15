@@ -177,6 +177,26 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
     setKeyNote(t("keys.connected", { provider: name }));
     announce.current?.closest(".ui-group")?.querySelector<HTMLElement>(`#${task}-source`)?.focus();
   };
+  // The model's own settings (language; voice and speed), in a card of their own under the model once it can take them.
+  const modelSettings = model.ready ? <>
+    {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
+      <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
+        options={[{ value: "", label: t("voice.language.detect") }, ...choices.stt.languages.map((tag: string) => ({ value: tag, label: languageName(tag) }))]} />
+    </Row>}
+    {/* Always a list, even with the automatic voice alone in it: what the voice is, and that it is a choice. */}
+    {model.ready && task === "tts" && <Row label={t("voice.voice")} htmlFor="tts-voice">
+      <Select id="tts-voice" value={draft.tts.voice ?? ""} onValueChange={(voice) => edit({ tts: { voice: voice || null } })}
+        options={[{ value: "", label: t(choices.tts.automaticVoice as MessageKey) }, ...voices.map((voice: { id: string; name: string | null; languages: string[] }) => ({
+          value: voice.id, label: voice.name ?? voice.id, description: voice.languages.length ? voice.languages.map(languageName).join(", ") : undefined,
+        }))]} />
+    </Row>}
+    {model.ready && speed && <Row label={t("voice.speed")} htmlFor="tts-speed">
+      <span className="voice-speed">
+        <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
+        <output id="tts-speed-value" htmlFor="tts-speed">{draft.tts.speed.toFixed(2)}×</output>
+      </span>
+    </Row>}
+  </> : null;
   return (
     <Group>
       <Row label={t("voice.source")} description={sourceNote && !provider ? noteText(t, sourceNote) : undefined} htmlFor={task + "-source"}>
@@ -189,22 +209,8 @@ function SlotSettings({ task, draft, setup, trial: setupTry }: { task: Task; dra
           runtime={<ModelRuntime task={task} state={model} locked={model.installing} />}
           onDownload={() => downloadModel(task)} onCancel={cancelDownload} onRetry={() => downloadModel(task)} />
       </Row>
-      {model.ready && task === "stt" && <Row label={<>{t("voice.language")}<NewMark id="feature:speech-language" /></>} description={t("voice.language.hint")} htmlFor="stt-language">
-        <Select id="stt-language" value={draft.stt.language ?? ""} onValueChange={(language) => edit({ stt: { language: language || null } })}
-          options={[{ value: "", label: t("voice.language.detect") }, ...choices.stt.languages.map((tag: string) => ({ value: tag, label: languageName(tag) }))]} />
-      </Row>}
-      {/* Always a list, even with the automatic voice alone in it: what the voice is, and that it is a choice. */}
-      {model.ready && task === "tts" && <Row label={t("voice.voice")} htmlFor="tts-voice">
-        <Select id="tts-voice" value={draft.tts.voice ?? ""} onValueChange={(voice) => edit({ tts: { voice: voice || null } })}
-          options={[{ value: "", label: t(choices.tts.automaticVoice as MessageKey) }, ...voices.map((voice: { id: string; name: string | null; languages: string[] }) => ({
-            value: voice.id, label: voice.name ?? voice.id, description: voice.languages.length ? voice.languages.map(languageName).join(", ") : undefined,
-          }))]} />
-      </Row>}
-      {model.ready && speed && <Row label={t("voice.speed")} htmlFor="tts-speed">
-        <span className="voice-speed">
-          <input id="tts-speed" type="range" min={speed.min} max={speed.max} step={SPEED.step} value={draft.tts.speed} onChange={(event) => edit({ tts: { speed: Number(event.target.value) } })} />
-          <output id="tts-speed-value" htmlFor="tts-speed">{draft.tts.speed.toFixed(2)}×</output>
-        </span>
+      {modelSettings && <Row label={t("voice.modelSettings")} block>
+        <div className="turn-try-card model-settings-card" id={task + "-model-settings"}>{modelSettings}</div>
       </Row>}
       {/* The try, last, after all of the slot's settings: the same place and the same block as End of turn's. In the
           setup there before its model is, its button waiting for it and saying why, so the step looks the same. */}

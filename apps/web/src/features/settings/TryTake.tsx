@@ -40,8 +40,10 @@ const Bars = memo(function Bars({ columns }: { columns: number[] }) {
 
 type Mark = { kind: "speech" | "pause" | "end"; text: string };
 
-/** `turns`: whether the voice's turns are marked in it (the end of turn's try); without them, only its ends are. */
-export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: string; turns?: boolean; t: Translate }) {
+/** `turns`: whether the voice's turns are marked in it (the end of turn's try); without them, only its ends are.
+ *  `inline`: drawn in the try's first row, where the live level was (Play, the waveform and the clock): no title, and its
+ *  marks in words only for assistive tech. */
+export function TryTake({ take, id, turns = true, inline = false, t }: { take: VoiceTake; id: string; turns?: boolean; inline?: boolean; t: Translate }) {
   const length = takeMs(take);
   const marked = turns ? take.turns : [];
   const player = useMemo(() => createTakePlayer(take), [take]);
@@ -66,7 +68,8 @@ export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: st
   useEffect(() => {
     const node = wave.current;
     if (!node) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
+    // Recounted only when the width changes by a whole column: a pixel or two (the row reflowing) keeps the bars still.
+    const observer = new ResizeObserver(([entry]) => { const next = Math.round(entry.contentRect.width); setWidth((now) => (Math.abs(next - now) >= CELL ? next : now)); });
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -143,8 +146,8 @@ export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: st
   ]);
   const described = useId();
 
-  return <figure className="try-take" id={id}>
-    <figcaption className="try-take-title">{t("take.title")}</figcaption>
+  return <figure className="try-take" id={id} data-inline={inline || undefined}>
+    <figcaption className={inline ? "sr-only" : "try-take-title"}>{t("take.title")}</figcaption>
     <div className="try-take-player">
       <Button variant="secondary" size="icon-sm" className="try-take-play" id={id + "-play"} aria-label={t("take.play")} aria-pressed={playing} onClick={toggle}>
         {playing ? <PauseRecordingIcon /> : <PlayRecordingIcon />}
@@ -164,7 +167,7 @@ export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: st
       </div>
       <span className="try-take-clock" aria-hidden><span ref={clock} /> / {seconds(length)} s</span>
     </div>
-    <p className="try-take-marks" id={described}>
+    <p className={inline ? "sr-only" : "try-take-marks"} id={described}>
       <span>{t("take.length", { s: seconds(length) })}</span>
       {marks.length ? marks.map((mark, index) => <span key={index} data-kind={mark.kind}><i className="try-take-key" aria-hidden />{mark.text}</span>)
         : turns && <span>{t("take.noSpeech")}</span>}
