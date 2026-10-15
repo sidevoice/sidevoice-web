@@ -76,6 +76,17 @@ test("the smart end of turn adds its model's row under the other two; the silenc
   expect(rows()).toHaveLength(2);
 });
 
+test("mounted before the room's actions exist, the stage still reads the catalogue once the controller starts", () => {
+  window.sidevoiceActions = undefined as unknown as SidevoiceActions;
+  const store = createRoomStore();
+  render(<RoomProvider store={store}><TooltipProvider><Shown /></TooltipProvider></RoomProvider>);
+  // The controller loads after the stage mounted: its actions, then the settings it hands over.
+  const loadVoiceCatalogue = vi.fn().mockResolvedValue(undefined);
+  window.sidevoiceActions = { loadVoiceCatalogue } as unknown as SidevoiceActions;
+  act(() => store.patch({ voiceSettings: { ...defaultVoiceSettings(), end_of_turn: "smart-turn" } }));
+  expect(loadVoiceCatalogue).toHaveBeenCalledTimes(1);
+});
+
 test("the stage reads the catalogue itself, once: the Smart Turn row shows when it is read", () => {
   const loadVoiceCatalogue = vi.fn().mockResolvedValue(undefined);
   window.sidevoiceActions = { loadVoiceCatalogue } as unknown as SidevoiceActions;

@@ -378,6 +378,8 @@
 @media (prefers-reduced-motion: reduce) { .stage-heading, .stage-heading-chevron { transition: none; } }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-2); }
+  /* The heading takes the row, so the name gets the room there is, not its own shrink-wrapped width. */
+  .room-shell .stage-title h2 { justify-self: stretch; }
 }
 
 /* What the call runs on (CallDetails): the machine, the agent (harness, model, effort) and the voice's models — each

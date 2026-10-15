@@ -20,10 +20,12 @@ function useSlots(t: Translate): { stt: Slot | null; tts: Slot | null; turn: Slo
   const saved = useRoomStore((state) => state.facts.voiceSettings);
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const keys = useRoomStore((state) => state.facts.providerKeys);
-  // The catalogue is read as the stage first shows (as Settings, the setup and an install read it too):
-  // until it is, nothing is known of a model's state, and nothing is claimed of it.
+  // The catalogue is read as the stage first shows (as Settings, the setup and an install read it too): until it is,
+  // nothing is known of a model's state, and nothing is claimed of it. The room's actions may come after the stage has
+  // mounted (the controller loads on its own): asked again once they are, which the settings the controller hands over
+  // say, so the smart end of turn shows before any call too (2026-10-15).
   const catalogueState = useRoomStore((state) => state.facts.voiceCatalogue.state);
-  useEffect(() => { if (catalogueState === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (catalogueState === "idle") void window.sidevoiceActions?.loadVoiceCatalogue(); }, [catalogueState, saved]);
   const known = catalogueState === "ready";
   const settings = saved ? voiceSettingsHere(saved, catalogs) : null;
   const stt = useModelState("stt", settings);
