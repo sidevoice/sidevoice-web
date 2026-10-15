@@ -8,6 +8,8 @@ import "./transcript.css";
  * microphone's level comes from instead, 0 to 1, read the same way each frame. */
 
 const COLUMN_MS = 55; // one column of history per ~55 ms, so the scroll follows time and not the frame rate
+/** Below this level the microphone hears silence: the waveform waits instead of scrolling it in. */
+const SILENCE = 0.04;
 const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
@@ -124,6 +126,9 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
       const value = own ? Math.max(0, Math.min(1, own() || 0)) : samples ? waveColumn(samples) : 0;
       const values = columns.current;
       const now = performance.now();
+      // Silence adds no column: what was said holds its shape through the pauses and the wait for the end of turn, so
+      // the turn closes on the voice's own shape, frozen there while it is transcribed (operator, 2026-10-15).
+      if (value < SILENCE && values.length) { lastColumn = now; frame = requestAnimationFrame(tick); return; }
       if (!values.length || now - lastColumn >= COLUMN_MS) { values.push(value); lastColumn = now; }
       // Between columns the newest one keeps the loudest instant it covers, so a peak is never skipped.
       else values[values.length - 1] = Math.max(values[values.length - 1], value);
