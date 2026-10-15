@@ -70,6 +70,43 @@ test("the published browser host records opt-in takes and reports rendered speak
   expect(result.output.at(-1)).toBe(0);
 });
 
+test("the candidate browser host reports a heard reply with scalar progress and one terminal outcome", async ({ page }) => {
+  await installVoicePackageRoute(page);
+  await page.goto("/voice/");
+  const result = await page.evaluate(async () => {
+    const { default: init, createVoiceHost } = await import("/voice-contract/js/index.js");
+    await init();
+    let sink;
+    const played = [], events = [];
+    const source = { models: () => ({ load: async () => ({
+      vad: { position: 0, accept() { return []; }, reset() { this.position = 0; } },
+      transcriber: { transcribe: async () => "" },
+      speaker: { speak: async () => ({ samples: new Float32Array(16000).fill(0.2), sampleRate: 16000 }) },
+    }) }) };
+    const io = {
+      start(next) { sink = next; queueMicrotask(() => sink.ready()); },
+      stop() {}, stopPlayback() {},
+      play(utterance, chunk) {
+        played.push([utterance, chunk]);
+        queueMicrotask(() => { sink.chunkStarted(utterance, chunk); sink.chunkPlayed(utterance, chunk); sink.playbackEnded(); });
+      },
+    };
+    const host = createVoiceHost(source, { io });
+    await host.setSettings({ stt: { model: "fake" }, tts: { model: "fake" }, end_of_turn: "silence", patience: "fast" });
+    await host.start();
+    const saying = host.say("é🐙ab");
+    saying.onEvent((event) => events.push(event));
+    const outcome = await Promise.race([saying.outcome, new Promise((_, reject) => setTimeout(() => reject(Error("reply did not settle")), 5000))]);
+    await host.stop();
+    return { played, events, outcome };
+  });
+  expect(result.played.length).toBeGreaterThan(0);
+  expect(result.events.some((event) => event.type === "playing")).toBe(true);
+  expect(result.events.filter((event) => event.type === "done")).toHaveLength(1);
+  expect(result.outcome).toEqual({ status: "heard" });
+  expect(result.events.some((event) => event.type === "progress" && event.heard_chars === 4)).toBe(true);
+});
+
 test("a recorded settings try delivers the package take through the real trial action", async ({ page }) => {
   await installVoicePackageRoute(page);
   await installHarness(page);

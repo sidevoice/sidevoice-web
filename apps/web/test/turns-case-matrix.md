@@ -21,4 +21,4 @@ The controller tests exercise core frames in producer order: the voice emits `tu
 | T15 | Working facts and the existing three-second display clock. |
 | T16 | Connector/core own agent delivery; web renders the authoritative history and notices. |
 
-T02c/d queue admission and notice construction belong to core. The browser host wrapper test checks that device-loss notices cross `VoiceHost.onAudioDevices`; controller tests check the shared callback's report and mute behavior through a desktop-shaped host. Physical browser and native audio behavior remains a Turn Lab release gate.
+T02c/d queue admission and notice construction belong to core. A Chromium test drives the candidate browser `createVoiceHost` through a spoken reply and verifies its scalar progress and one terminal outcome. The browser host wrapper test checks that device-loss notices cross `VoiceHost.onAudioDevices`; controller tests check the shared callback's report and mute behavior through a desktop-shaped host. Physical browser and native audio behavior remains a Turn Lab release gate.
