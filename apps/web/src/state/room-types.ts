@@ -1,6 +1,6 @@
 import type { DeviceVoiceSettings } from '../services/voice-settings.js';
 import type { TurnStep } from '../services/voice-trial.js';
-import type { VoiceTake } from '../services/voice-take';
+import type { VoiceTake } from '@sidevoice/voice';
 /** The part of a reply sounding now, as offsets into its text; `from` and `to` are the same between its chunks. */
 export interface KaraokeRange {
   from: number;
@@ -259,8 +259,7 @@ export interface SidevoiceActions {
  *  text as JavaScript indexes it; between parts `from` and `to` meet at the end of what was heard, and the first sound
  *  is `{from: 0, to: 0}`. The end of turn: `onTurnStep`, each step of the person's turns as the voice tells it
  *  (voice-trial.js TurnStep), and `onLevel`. A try that records the person (transcription, the end of turn): `onTake`,
- *  once it has stopped, what the microphone gave the voice, kept in memory by whoever shows it and nowhere else —
- *  contract gap #40, pending in @sidevoice/voice: no voice hands one yet, and then it is never called. */
+ *  once the try stops: what the microphone gave the voice, kept in memory by whoever shows it and nowhere else. */
 export interface TrialProgress {
   onListening?(): void;
   onLevel?(level: number): void;

@@ -8,7 +8,7 @@ import { defaultVoiceSettings, type DeviceVoiceSettings } from "../../services/v
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
 import type { TurnStep } from "../../services/voice-trial.js";
-import type { VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
 import { translator } from "../../i18n/translator";
 
 /* Trying the end of turn where it is chosen, in its card after the choices: the actions stand in for
@@ -53,7 +53,7 @@ function renderTurn({ variant: _variant = "card" as (typeof variants)[number], s
     step: (step: TurnStep) => act(() => { running!.progress.onTurnStep!(step); }),
     /** The voice hears a turn: the try stops itself on it, and says when it decided. */
     heard: async (text: string, silenceMs: number | null) => { await act(async () => { running!.progress.onTurnStep!({ step: "heard", text, endpoint_silence_ms: silenceMs }); }); },
-    /** The take the voice hands once it has stopped (contract gap #40), when it hands one. */
+    /** The take the voice hands once it has stopped, when it hands one. */
     take: (take: VoiceTake) => act(() => { running!.progress.onTake?.(take); }),
     end: async (error: unknown) => { await act(async () => { end(error); }); },
     start: async () => { await act(async () => { fireEvent.click(button()); }); },
@@ -291,15 +291,6 @@ test("once it has decided, the try's take shows in its card to be played, with i
   take({ ...recorded, turns: [] });
   await end(Object.assign(new Error("Nothing heard."), { code: "trial-silence" }));
   expect(document.getElementById("turn-try-take")).toHaveTextContent("no speech detected");
-});
-
-test("a voice that hands no take shows none (@sidevoice/voice 0.3.x, the desktop app's)", async () => {
-  const { step, heard, start } = renderTurn();
-  await start();
-  step({ step: "listening", again: false });
-  await heard("hola", 900);
-  expect(area().querySelector(".turn-try-state")).toHaveTextContent("Detected you finished 0.9 s after you stopped speaking");
-  expect(document.getElementById("turn-try-take")).toBeNull();
 });
 
 test("laid out as the other tries: the button and the level on one row, then one area for the hint and the state, then the take", async () => {

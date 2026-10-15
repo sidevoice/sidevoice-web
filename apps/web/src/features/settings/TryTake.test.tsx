@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { TryTake } from "./TryTake";
 import { takeColumns, takeWav } from "./take-audio";
 import { translator } from "../../i18n/translator";
-import type { VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
 
 /* A try's take, played from memory: jsdom plays nothing and has no object URLs, so the page's player is watched
  * through them (`play`, `pause`, `createObjectURL`, `revokeObjectURL`); it has no PointerEvent either, so a mouse's
