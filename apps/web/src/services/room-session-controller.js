@@ -1766,7 +1766,7 @@ async function cleanupSetupTrials(){
  await voiceInstallDone;
  await cleanSetupDownloads({storage:pageStorage(),models:modelCatalogs,
   selected:()=>[state.voiceDraft||state.voiceSettings,state.voiceSettings,handed],
-  busy:()=>!!(state.ws||state.connecting||state.reconnecting||voiceInstall),
+  busy:()=>!!(state.ws||state.connecting||state.reconnecting||voiceInstall||voiceTry||turnTry),
   changed:loadVoiceCatalogue});
 }
 // Models not used for as long as the person chose (model-housekeeping.js), deleted where the engine can: none in use,

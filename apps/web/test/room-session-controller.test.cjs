@@ -1696,6 +1696,19 @@ test('Only a setup-origin download earns cleanup provenance; finishing removes i
  assert.equal(engine.calls.filter(([name])=>name==='uninstall').length,1);
 });
 
+test('Cleanup never uninstalls a model while a voice trial is active',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ const model={id:'trial-only',capabilities:['stt'],installed:false,builds:[{id:'trial/int8',available:true,installed:false}]};
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[model]}];s.context.__catalogs=catalogs;
+ const engine=fakeEngine(catalogs);engine.install=async()=>{model.installed=true;model.builds[0].installed=true};
+ engine.uninstall=async id=>{engine.calls.push(['uninstall',id])};withVoice(s,fakeVoice(),engine);
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'trial-only',language:null}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})");
+ await s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ s.run('roomStore.patch({voiceDraft:voiceSettings});voiceTry=new AbortController()');
+ await s.run('window.sidevoiceActions.cleanupSetupTrials()');
+ assert.equal(engine.calls.some(([name])=>name==='uninstall'),false);
+});
+
 test('Finishing during a second download still cleans an earlier completed setup trial',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');s.context.__original=s.run('voiceSettings');
  const chosen={id:'whisper-base',capabilities:['stt'],installed:true,builds:[{id:'chosen/int8',available:true,installed:true}]};
