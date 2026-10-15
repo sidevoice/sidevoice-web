@@ -279,6 +279,8 @@
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   .downloaded-model-title { flex-wrap: wrap; }
   .downloaded-model-title > .downloaded-model-name { flex: 1 0 100%; max-width: calc(100% - 22px); }
+  /* and a tag too long for a narrow phone ends in an ellipsis inside the row, never past it. */
+  .downloaded-model-title > :not(.downloaded-model-name):not(.ui-infotip) { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 /* A tooltip that says its shortcut: the label, then its key caps, small, on the tooltip's own ground. */
 .shortcut-tip { display: inline-flex; align-items: center; gap: var(--sv-space-2); }
