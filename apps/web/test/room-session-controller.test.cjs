@@ -1538,15 +1538,25 @@ test('H2 default reading-off mode reports a visible muted shared reply as not he
  assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:shared-default','not_heard']]);
  c.s.run('disconnect()');
 });
-test('T06c a written reply in an unfocused conversation waits for a valid hearing target',async()=>{
- const c=await callOnRoom();
+test('H4/T06c a visible unavailable conversation is acknowledged without moving audio focus',async()=>{
+ const c=await callOnRoom({readingMode:true});
+ c.s.run("state.people.push({node:'fp-mac',thread_id:'b',title:'B',available:false});setSpeechOutput('agents_muted');window.sidevoiceActions.selectParticipant('fp-mac|b')");
+ assert.equal(c.s.run('state.roomBinding.thread_id'),'a');
  const row={id:'s1:voice:elsewhere',thread:'b',role:'assistant',text:'Other conversation',status:'text_only',audio_reason:'inactive_conversation',hearing:null,hearing_unconfirmed:true,heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({messages:[row]})});
  await c.s.run('refreshHistory()');
- assert.equal(sentOf(c,c.first,'reply-hearing').length,0,'core has not granted this session access to b');
- c.s.run("state.roomBinding={thread_id:'b',binding_id:'binding-b'}");
- await c.s.run('refreshHistory()');
- assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:elsewhere','not_heard']]);
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['s1:voice:elsewhere','heard']]);
+ assert.equal(c.s.run('state.roomBinding.thread_id'),'a','reading B did not switch the call');
+ c.s.run('disconnect()');
+});
+test('H4/T07 a new call acknowledges retained visible text from a conversation it never focused',async()=>{
+ const c=await callOnRoom({readingMode:true});
+ c.s.run("state.people.push({node:'fp-mac',thread_id:'b',title:'B',available:false});setSpeechOutput('agents_muted')");
+ c.s.run("state.history.push({segment:'old-session:voice:saved',thread:'fp-mac|b',role:'assistant',text:'Saved reply',audio:'text_only',hearing:null})");
+ assert.equal(c.s.run("[...captureTargets.values()].some(target=>target.thread_id==='b')"),false);
+ c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['old-session:voice:saved','heard']]);
+ assert.equal(c.s.run('state.roomBinding.thread_id'),'a');
  c.s.run('disconnect()');
 });
 test('T06a a receipt before mute remains a genuine spoken interruption',async()=>{

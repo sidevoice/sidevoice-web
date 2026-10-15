@@ -666,9 +666,6 @@ async function resolveProtectedHistory(fp,messages,link,base){
 const writtenHearing=new Map();
 function acknowledgeWrittenReply(fp,r){
  if(fp!==state.callNode||!state.sessionId||r.role!=='assistant'||typeof r.id!=='string')return;
- // Core accepts a written acknowledgement only from a session that focused this conversation.
- // Keep an unfocused row unconfirmed until this call has access, rather than sending a refused receipt once.
- if(state.roomBinding?.thread_id!==r.thread&&![...captureTargets.values()].some(target=>target.node===fp&&target.thread_id===r.thread&&target.generation===callGeneration))return;
  const marker=':voice:',at=r.id.lastIndexOf(marker);
  if(at<0||r.hearing==='heard')return;
  const key=state.sessionId+'\0'+r.id;
