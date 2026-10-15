@@ -603,15 +603,12 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  const nextThread=d.binding?.thread_id||null;
  const wasSwitching=state.switching;
  let fenced=false;
- if(nextThread!==targetThread()&&voice){
+ if((nextThread!==targetThread()||d.binding?.binding_id!==state.roomBinding?.binding_id)&&voice){
   // The old boundary may still have words in STT or a merge hold. Keep the microphone closed until voice
   // has fenced those words, then make the new binding visible to new speech.
   fenced=true;++captureFencePending;state.switching=true;applyMicState();
   try{await setCaptureFocus(fp,nextThread,d.binding?.binding_id)}catch(error){--captureFencePending;state.switching=wasSwitching;applyMicState();throw error}
   if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode){--captureFencePending;state.switching=wasSwitching;applyMicState();return}
- }else if(activeCaptureBoundary){
-  const captured=captureTargets.get(activeCaptureBoundary);
-  if(captured&&captured.node===fp&&captured.thread_id===nextThread)captured.binding_id=d.binding?.binding_id;
  }
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
@@ -1296,7 +1293,6 @@ function recordMessage(raw, socket) {
 // machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
 const turnNodes=new Map();
 const captureTargets=new Map();
-let activeCaptureBoundary=null;
 let captureBoundaryQueue=Promise.resolve();
 async function setCaptureFocus(node,thread_id,binding_id){
  const id=crypto.randomUUID(),target={node,thread_id,binding_id,generation:callGeneration,capture_boundary_id:id};
@@ -1305,7 +1301,6 @@ async function setCaptureFocus(node,thread_id,binding_id){
  captureBoundaryQueue=operation.catch(()=>{});
  try{await operation}catch(error){captureTargets.delete(id);throw error}
  if(host!==voice||target.generation!==callGeneration){captureTargets.delete(id);return null}
- activeCaptureBoundary=id;
  // Keep a bounded set of completed boundaries while a late transcription can still name one.
  if(captureTargets.size>128){for(const [old] of captureTargets){if(old!==id&&![...turnNodes.values()].some(turn=>turn.capture_boundary_id===old)){captureTargets.delete(old);break}}}
  return id;

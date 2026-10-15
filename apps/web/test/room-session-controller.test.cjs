@@ -1542,6 +1542,20 @@ test('F7 a late terminal retains its captured target after many later starts',as
  assert.equal(turnSent(c,c.first,'old','finished')[0].text,'Old target words');
  c.s.run('disconnect()');
 });
+test('F7 a binding replacement keeps the old turn’s captured binding ID',async()=>{
+ const c=await callOnRoom(),first=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
+ c.voice.emit('turn',{...started('before-rebind'),capture_boundary_id:first});
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',binding_id:'next-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
+ await c.s.run('refresh()');
+ const second=c.voice.calls.filter(([name])=>name==='setCaptureBoundary').at(-1)[1];
+ assert.notEqual(second,first);
+ c.voice.emit('turn',{...finished('before-rebind','Before'),capture_boundary_id:first});
+ c.voice.emit('turn',{...started('after-rebind'),capture_boundary_id:second});
+ c.voice.emit('turn',{...finished('after-rebind','After'),capture_boundary_id:second});
+ assert.equal(turnSent(c,c.first,'before-rebind','finished')[0].binding_id,'b');
+ assert.equal(turnSent(c,c.first,'after-rebind','finished')[0].binding_id,'next-binding');
+ c.s.run('disconnect()');
+});
 test('T02 an accepted reply cannot start while a voice turn or its start acknowledgement is open',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('new-turn'));
