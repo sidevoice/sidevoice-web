@@ -1415,7 +1415,7 @@ async function prepareConversationCall(node,thread_id,binding_id){
   const call=owner.createCall();
   entry={call,key,node,thread_id,binding_id,generation:callGeneration,listeners:[]};
   conversationCalls.set(key,entry);
-  entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{if(voice===call)voiceStateChanged(next)}),
+  entry.listeners.push(call.onTurn(turn=>voiceTurn(turn,entry)),call.onState(next=>{entry.state=next;if(voice===call)voiceStateChanged(next)}),
    call.onLevel(level=>{if(voice===call)voiceLevel(level)}),call.onError(voiceFailed),
    call.onPlaybackLevel(level=>voicePlaybackLevel(level,entry)));
   call.mute(!state.micEnabled||!binding_id);
@@ -1441,7 +1441,9 @@ function routeConversation(node,thread_id,binding_id){
   await owner.routeInput(entry?.call??null);
   if(version!==routeVersion)return;
   voice=entry?.call??null;
-  if(!entry){voiceLevel(0);window.sidevoiceUI?.playbackLevel?.clear?.()}
+  // The focused call's state is the one shown: the last one it told, not the previous call's.
+  if(entry)voiceStateChanged(entry.state??null);
+  else{voiceLevel(0);window.sidevoiceUI?.playbackLevel?.clear?.()}
  });
  routing=operation.catch(()=>{});
  return operation;
@@ -1502,6 +1504,10 @@ function voiceTurn(event,entry=null){
     add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:thread?takeReceipt(segment)||'pending':'not_sent'});
    }else state.history=state.history.filter(r=>!(r.segment===segment&&r.thread===thread));
    markHistorySeen();
+  }else if(turn.phase==='finished'&&turn.text?.trim()){
+   // Another conversation's call ended its turn after the focus moved on: its words are that conversation's.
+   const thread=conversationKey(target.node,target.thread_id),segment=state.sessionId+':user-turn:'+turn.turn_id;
+   add('user',turn.text,null,thread,{history_id:segment,turn_id:turn.turn_id,draft:false,time:Date.now(),delivery:takeReceipt(segment)||'pending'});
   }
  });
  const payload=turnMessage(turn,target);

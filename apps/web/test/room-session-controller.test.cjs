@@ -1829,6 +1829,24 @@ test('a delayed native A start after selecting B retains A binding',async()=>{
  assert.deepEqual([bStart.thread_id,bStart.binding_id,bEnd.thread_id,bEnd.binding_id,bEnd.text],['b','b-binding','b','b-binding','Words for B']);
  s.run('disconnect()');
 });
+test('A words that end after B took the microphone are written in A, and B shows its own call state',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ a.emit('state',{listening:'speaking',recognising:0,playback:'idle',microphone:'live'});
+ a.emit('turn',started('a-open'));
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ const create=voice.createCall.bind(voice);
+ voice.createCall=()=>{const call=create();call.start=async()=>{call.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'})};return call};
+ await s.run("select('fp-mac|b')");
+ assert.equal(s.run('state.voiceState.listening'),'listening','the focused call is B, whose last state was listening');
+ assert.equal(s.run('state.userLive'),false);
+ const b=voice.created[1];b.emit('turn',started('b-open'));
+ a.emit('turn',finished('a-open','Words for A'));
+ assert.deepEqual(JSON.parse(s.run("JSON.stringify(state.history.filter(r=>r.role==='user').map(r=>[r.thread,r.text]))")),[['fp-mac|a','Words for A']]);
+ assert.equal(s.run('state.userTurn.id'),'b-open','B keeps its own open turn');
+ s.run('disconnect()');
+});
 test('stopping routed A while B starts does not cancel B or route its words to A',async()=>{
  const c=await callOnRoom(),{s,voice}=c;
  s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
