@@ -169,7 +169,9 @@ test("what is said on the stage is big and clear, the agent's bigger, three line
       expect(paint.loaded, at).toBe(true);
       paint.type.forEach((type, index) => {
         const [size, line] = index ? person : agent;
-        expect(type, at).toMatchObject({ size: `${size}px`, line: `${line}px`, weight: "450" });
+        // The size is a computed float (WebKit says 19.200001px for 19.2px).
+        expect(parseFloat(type.size), at).toBeCloseTo(size, 3);
+        expect(type, at).toMatchObject({ line: `${line}px`, weight: "450" });
         expect(type.family, at).toMatch(/^"?DM Sans/);
       });
       for (const [name, [ink, surface]] of Object.entries(paint.inks)) expect(contrast(ink, surface), `${at} ${name}`).toBeGreaterThanOrEqual(4.5);
