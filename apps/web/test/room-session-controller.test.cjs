@@ -1671,6 +1671,31 @@ test('A model the slot names but that is not on this device installs, its progre
  assert.equal(s.run('state.voiceInstall.details'),'net','what the engine said is only a detail');
 });
 
+test('Only a setup-origin download earns cleanup provenance; finishing removes it after the choice changes',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');s.context.__original=s.run('voiceSettings');
+ const model={id:'spare-stt',family:'whisper',capabilities:['stt'],installed:false,recommendedBuild:'spare-stt/int8',
+  builds:[{id:'spare-stt/int8',backend:'sherpa-onnx',available:true,installed:false}]};
+ const selected={id:'whisper-base',family:'whisper',capabilities:['stt'],installed:true,builds:[{id:'whisper-base/int8',available:true,installed:true}]};
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[selected,model]}];s.context.__catalogs=catalogs;
+ const engine=fakeEngine(catalogs);engine.install=async()=>{model.installed=true;model.builds[0].installed=true};
+ engine.uninstall=async id=>{engine.calls.push(['uninstall',id]);model.installed=false;model.builds[0].installed=false};
+ withVoice(s,fakeVoice(),engine);
+ const select="roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'spare-stt',language:null}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})";
+ s.run(select);
+ await s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ assert.deepEqual(JSON.parse(s.context.localStorage.getItem('sidevoice.setup-model-downloads')),['spare-stt']);
+ s.run('roomStore.patch({voiceDraft:__original})');await s.run('applyVoiceSettings()');
+ await s.run('window.sidevoiceActions.cleanupSetupTrials()');
+ assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[['uninstall','spare-stt']]);
+ assert.equal(s.context.localStorage.getItem('sidevoice.setup-model-downloads'),null);
+ // The same shared Settings control downloads without setup provenance.
+ s.run(select);
+ await s.run("window.sidevoiceActions.installVoiceModel('stt')");
+ s.run('roomStore.patch({voiceDraft:__original})');await s.run('applyVoiceSettings()');
+ await s.run('window.sidevoiceActions.cleanupSetupTrials()');
+ assert.equal(engine.calls.filter(([name])=>name==='uninstall').length,1);
+});
+
 test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{
  const notHere=CATALOGS.map(c=>c.id==='local'?{...c,models:[...c.models,{id:'whisper-small',family:'whisper',capabilities:['stt'],languages:['es'],voices:[],installed:false,builds:[build('whisper-small/int8',{installed:false})]}]}:c);
  const s=setup({strictDOM:true});
