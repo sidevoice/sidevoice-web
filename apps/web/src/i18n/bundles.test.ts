@@ -45,9 +45,7 @@ test("unheard and partial labels agree at 1, 2, 5 and 21 in French, Italian and 
     expect(t("messages.audio.partial",{heard:1,total:1})).toBe(partial);
   }
 });
-test("output restoration and unknown hearing copy name the sound and measured extent", () => {
-  expect(translator("es")("toolbar.agentsUnmute")).toBe("Quitar el silencio a los agentes");
-  expect(translator("it")("toolbar.agentsUnmute")).toBe("Riattiva l'audio degli agenti");
+test("unknown hearing copy names the sound and measured extent", () => {
   expect(translator("fr")("messages.audio.unknown")).toBe("Audio interrompu · Partie écoutée inconnue");
   expect(translator("fr")("messages.audio.notPlayed")).toBe("Audio non lu");
 });

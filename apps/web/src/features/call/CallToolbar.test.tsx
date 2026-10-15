@@ -52,16 +52,14 @@ test("a microphone the system or another app holds is said where the microphone 
   expect(screen.queryByText(silent)).toBeNull();
 });
 
-test("T06 output controls are distinct from microphone mute", () => {
-  const store=toolbar();
-  const setSpeechOutput=vi.fn();
-  window.sidevoiceActions={setSpeechOutput} as unknown as typeof window.sidevoiceActions;
-  const menu=document.getElementById("call-menu") as HTMLDetailsElement;
-  menu.open=true;
-  screen.getByRole("button",{name:"Mute agents"}).click();
-  expect(setSpeechOutput).toHaveBeenCalledWith("agents_muted");
-  act(()=>store.patch({speechOutput:"agents_muted"}));
-  expect(screen.getByRole("button",{name:"Unmute agents"})).toHaveAttribute("aria-pressed","true");
-  screen.getByRole("button",{name:"Turn spoken replies off"}).click();
-  expect(setSpeechOutput).toHaveBeenCalledWith("voice_off");
+test("call menu only offers connection statistics, including when output is unavailable", () => {
+  const store = toolbar();
+  const menu = document.getElementById("call-menu") as HTMLDetailsElement;
+  menu.open = true;
+  expect(screen.getByRole("button", { name: "Connection statistics" })).toBeInTheDocument();
+  expect(menu.querySelectorAll("button")).toHaveLength(1);
+  act(() => store.patch({ speechOutput: "agents_muted" }));
+  expect(menu.querySelectorAll("button")).toHaveLength(1);
+  act(() => store.patch({ speechOutput: "voice_off" }));
+  expect(menu.querySelectorAll("button")).toHaveLength(1);
 });
