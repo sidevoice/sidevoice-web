@@ -5,7 +5,7 @@ import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import type { DetectedAgent, HostAgentsState } from "../../state/room-types";
+import type { AgentReadinessStatus, DetectedAgent, HostAgentsState } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -482,4 +482,34 @@ test("a machine with only Cursor installed lists Cursor, and Other to connect an
   const other = screen.getByRole("button", { name: "Don’t see yours? Connect it by hand" });
   fireEvent.click(other);
   expect(document.querySelector("#host-agent-other-howto")).toHaveTextContent("sidevoice connector mcp");
+});
+
+test("readiness works for any agent, while an absent field leaves the Codex card unchanged", () => {
+  const store = createRoomStore();
+  setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
+  const agents = (state: AgentReadinessStatus["state"], reasons: AgentReadinessStatus["reasons"]) => ready([
+    known("cursor", { label: "Cursor", registration: "connected", readiness: { state, reasons } }),
+    known("codex", { registration: "connected" }),
+  ]);
+  act(() => store.patch({ hostAgents: { fp: agents("needs_attention", [{ code: "cursor.bridge_not_running", message: "Connector English fallback" }]) } }));
+  render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
+  const [cursor, codex] = [...document.querySelectorAll<HTMLElement>(".host-agent-row")];
+  const codexBefore = codex.innerHTML;
+  expect(within(cursor).getByRole("button", { name: "Needs attention" })).toBeInTheDocument();
+  fireEvent.click(within(cursor).getByRole("button", { name: "Needs attention" }));
+  expect(within(cursor).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Settings › Beta");
+  expect(codex.querySelector(".host-agent-readiness")).toBeNull();
+  expect(codex.innerHTML).toBe(codexBefore);
+  act(() => store.patch({ hostAgents: { fp: agents("unsupported", [{ code: "cursor.unsupported", message: "Connector English fallback" }]) } }));
+  expect(within(cursor).getByRole("button", { name: "Not supported" })).toHaveAttribute("aria-expanded", "true");
+  expect(within(cursor).getByRole("group", { name: "Not supported" })).toHaveTextContent("Cursor voice requires a Mac");
+  expect(codex.innerHTML).toBe(codexBefore);
+  act(() => store.patch({ hostAgents: { fp: ready([
+    known("cursor", { label: "Cursor", registration: "connected" }),
+    known("codex", { registration: "connected", readiness: { state: "needs_attention", reasons: [{ code: "other.future" }] } }),
+  ]) } }));
+  expect(cursor.querySelector(".host-agent-readiness")).toBeNull();
+  fireEvent.click(within(codex).getByRole("button", { name: "Needs attention" }));
+  expect(within(codex).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Sidevoice cannot show the reason for this status.");
+  expect(within(codex).getByRole("group", { name: "Needs attention" })).not.toHaveTextContent("other.future");
 });

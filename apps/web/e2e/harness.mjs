@@ -56,7 +56,7 @@ export async function respond(route, value, status = 200) {
 }
 
 /** The paired machine, answering at the page's own origin; what it was asked, and how it answers next. */
-export async function installHarness(page, { onboarding = { version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {}, baseline_release: 2 }, secondMachine = false, participants = {} } = {}) {
+export async function installHarness(page, { onboarding = { version: 1, choice: "remote", agents_done: false, deferred_at: null, completed_at: 1, trials: {}, baseline_release: 2 }, secondMachine = false, participants = {}, agents = null } = {}) {
   // `presentation`: every presentation request, with the machine it went to and the token it carried.
   const fake = { scans: 0, hostMode: "normal", connectMode: "success", authorization: [], presentation: [] };
   await page.route("**/api/**", async (route) => {
@@ -80,7 +80,7 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
       fake.authorization.push(request.headers().authorization || "");
       if (fake.hostMode === "revoked") return respond(route, { detail: "pairing revoked" }, 401);
       fake.scans++;
-      return respond(route, listing({ actionable: fake.scans >= 2 }));
+      return respond(route, agents ?? listing({ actionable: fake.scans >= 2 }));
     }
     if (pathname === "/api/host/agents/claude/connect") {
       fake.authorization.push(request.headers().authorization || "");
