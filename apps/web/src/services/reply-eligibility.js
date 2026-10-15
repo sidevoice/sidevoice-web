@@ -6,7 +6,9 @@ export function replyEligibility(reply, {sessionId, threadId, epoch, openTurns, 
   if (output !== 'on') return output;
   if (!Number.isInteger(epoch) || !Number.isInteger(reply.epoch)) return 'hold';
   // Manual replay deliberately keeps the history row's original epoch. Core issued it for this current session.
-  if (!reply.requested && reply.epoch !== epoch) return 'newer_turn';
+  if (!reply.requested && reply.epoch < epoch) return 'newer_turn';
+  // A newer reply may have come from another device. Wait for the room's epoch fact.
+  if (!reply.requested && reply.epoch > epoch) return 'hold';
   if (openTurns?.size) return 'hold';
   return 'play';
 }

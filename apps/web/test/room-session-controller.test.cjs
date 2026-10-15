@@ -1244,6 +1244,19 @@ test('T03 stale reply is written but never handed to either voice host',async()=
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').map(d=>[d.utterance_id,d.status,d.reason])),[['stale','unplayed','newer_turn']]);
  c.s.run('disconnect()');
 });
+test('T03/T11 a reply from another device waits for the newer room epoch, never discarded against a cached one',async()=>{
+ const c=await callOnRoom();let finish;
+ c.s.context.fetch=async path=>path.includes('/participants')?new Promise(resolve=>{finish=participants=>resolve({ok:true,status:200,json:async()=>({participants})})}):{ok:true,status:200,json:async()=>({messages:[]})};
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'other-device',thread_id:'a',revision:2,reply_revision:2,epoch:1,history_id:'row',text:'Current answer'}});
+ assert.equal(c.voice.said.length,0);assert.equal(sentOf(c,c.first,'voice-playback').length,0);
+ const pending=c.s.run('refreshPeople()');finish([{thread_id:'a',epoch:1,available:true}]);await pending;
+ assert.deepEqual(c.voice.said.map(s=>s.text),['Current answer']);
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'later',thread_id:'a',revision:3,epoch:2}});
+ assert.equal(c.s.run("threadEpochs.get('a')"),2);
+ const late=c.s.run('refreshPeople()');finish([{thread_id:'a',epoch:1,available:true}]);await late;
+ assert.equal(c.s.run("threadEpochs.get('a')"),2,'a delayed poll cannot roll the epoch back');
+ c.s.run('disconnect()');
+});
 test('T04 and T12 keep FIFO after skip, with no epoch change',async()=>{
  const c=await callOnRoom();
  for(const id of ['first','second'])c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:id,text:id}});
@@ -1256,6 +1269,16 @@ test('T04 and T12 keep FIFO after skip, with no epoch change',async()=>{
  assert.equal(c.s.run("threadEpochs.get('a')"),0);
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[['user_skipped',1]]);
  c.voice.said[1].step({type:'done',outcome:{status:'heard'}});
+ c.s.run('disconnect()');
+});
+test('T14 explicit skip wins a competing withdrawal while retaining the confirmed extent',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'skip-race',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'Hello'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});c.s.run('skipReply()');
+ c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['skip-race'],reason:'newer_turn'}});
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status==='interrupted').map(d=>[d.reason,d.heard_chars])),[['user_skipped',2]]);
  c.s.run('disconnect()');
 });
 test('T01 and T02 map played-zero barge-in to one core receipt before the terminal turn',async()=>{

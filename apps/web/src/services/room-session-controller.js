@@ -456,6 +456,7 @@ const replies=new Map(); // core utterance_id → queued or active reply
 const replyQueue=[];
 const handleIds=new Map(); // voice handle ID → core utterance ID
 const threadEpochs=new Map();
+function acceptEpoch(thread,epoch){if(Number.isInteger(epoch))threadEpochs.set(thread,Math.max(epoch,threadEpochs.get(thread)??epoch))}
 const openVoiceTurns=new Map();
 const awaitingTurnAck=new Map();
 const startMessageTurns=new Map();
@@ -594,7 +595,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
- if(d.binding?.thread_id&&Number.isInteger(d.binding.epoch))threadEpochs.set(d.binding.thread_id,d.binding.epoch);
+  if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
  if(changed){state.viewedThread=null;state.turns={};if(previousThread!==targetId())state.harness=Object.fromEntries(Object.entries(state.harness).filter(([id])=>id!==previousThread));
   // A new binding on the same conversation is a rejoin, not a move: what is playing for it goes on.
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
@@ -612,9 +613,9 @@ const HISTORY_ROLES=new Set(['user','assistant']);
 function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
 // Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
 // conversations. The call's machine is asked on the call's beat, every other one on the machines' beat.
-async function refreshHistory(fp=state.callNode) { const link = links.get(fp), base = link?.base; if (base == null) return; try {
+async function refreshHistory(fp=state.callNode) { const link = links.get(fp), base = link?.base; if (base == null) return; const asked=link.historyAsked=(link.historyAsked||0)+1; try {
     const data = await api(roomQuery('/api/presentation/history', fp), undefined, fp);
-    if (links.get(fp) !== link || link.base !== base || !Array.isArray(data?.messages)) return;
+    if (links.get(fp) !== link || link.base !== base || asked!==link.historyAsked || !Array.isArray(data?.messages)) return;
     let changed = false;
     for (const r of data.messages) {
         // A row this page cannot draw — no id, no text, or a role it does not know (sidevoice-core#112) — is left out,
@@ -632,6 +633,11 @@ async function refreshHistory(fp=state.callNode) { const link = links.get(fp), b
             changed = true;
         }
         const patch = { segment: r.id, thread, role: r.role, text: r.text, name: r.role === 'user' ? '' : state.people.find(p => personKey(p) === thread)?.title || r.name, time: r.time, seq: r.seq, session: r.session, revision: r.revision, epoch: r.epoch, audio_reason: r.audio_reason, heard_chars: r.heard_chars, globally_heard: r.globally_heard, offline: r.offline, interrupted: ['interrupted', 'disconnected'].includes(r.status), replayable: !!r.replayable, draft: false, delivery: r.role === 'user' ? r.status : undefined, audio: r.role === 'assistant' ? r.status : undefined };
+        if(row?.globally_heard&&!patch.globally_heard){
+            // A receipt confirmed after this snapshot was taken cannot be undone by it.
+            Object.assign(patch,{globally_heard:true,audio:row.audio,audio_reason:row.audio_reason,replayable:false,interrupted:row.interrupted});
+        }
+        if(Number.isInteger(row?.heard_chars))patch.heard_chars=Math.max(row.heard_chars,Number.isInteger(patch.heard_chars)?patch.heard_chars:0);
         if (!row) {
             state.history = [...state.history, patch];
             changed = true;
@@ -671,11 +677,12 @@ async function selectOnlyListeningConversation(){
 // moved since describes nobody it can talk to.
 async function refreshPeople(fp=state.callNode){
  const link=links.get(fp),base=link?.base;if(base==null)return;
+ const asked=link.peopleAsked=(link.peopleAsked||0)+1,session=state.sessionId;
  try{
   const data=await api(roomQuery('/api/presentation/participants',fp),undefined,fp);
-  if(links.get(fp)!==link||link.base!==base||!Array.isArray(data?.participants))return;
+  if(links.get(fp)!==link||link.base!==base||asked!==link.peopleAsked||fp===state.callNode&&session!==state.sessionId||!Array.isArray(data?.participants))return;
   link.peopleAnswered=true;link.people=data.participants.map(person=>({...person,node:fp}));
-  if(fp===state.callNode)for(const person of data.participants)if(Number.isInteger(person.epoch))threadEpochs.set(person.thread_id,person.epoch);
+  if(fp===state.callNode)for(const person of data.participants)acceptEpoch(person.thread_id,person.epoch);
   mergePeople();
   const activity={...state.harness};
   for(const person of data.participants){const key=conversationKey(fp,person.thread_id);
@@ -1205,7 +1212,7 @@ function recordMessage(raw, socket) {
     // room captured.
     if (t === 'voice-user-turn' && d.phase === 'started') {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
-        if(Number.isInteger(d.epoch))threadEpochs.set(d.thread_id,d.epoch);
+        acceptEpoch(d.thread_id,d.epoch);
         awaitingTurnAck.delete(d.turn_id);
         if (state.userTurn?.id === d.turn_id)
             state.userTurn = { ...state.userTurn, thread: conversationKey(state.callNode, d.thread_id) };
