@@ -132,6 +132,7 @@ test("the browser voice wrapper passes take options and output subscriptions thr
   const devices = { inputs: [], outputs: [], input: null, output: null, outputSelectable: false };
   const create = (_source: VoiceModelSource): VoiceHost => ({
     setSettings: async () => {},
+    setCaptureBoundary: async () => {},
     start: async (options) => { starts.push(options); },
     stop: async () => {},
     say: () => ({ id: "", cancel() {}, onEvent() {}, outcome: Promise.resolve({ status: "heard" }) }),

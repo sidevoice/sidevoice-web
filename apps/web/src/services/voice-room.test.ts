@@ -5,10 +5,10 @@ import flow from "../../test/fixtures/conversation-flow.json";
 /* The voice's events in the room's words. */
 
 test("a turn's phases become the room's voice-user-turn data, the timings under the room's name", () => {
-  expect(turnMessage({ phase: "started", turn_id: "t", started_at: 5 })).toEqual({ turn_id: "t", phase: "started", started_at: 5 });
-  expect(turnMessage({ phase: "cancelled", turn_id: "t", merged: true })).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
+  expect(turnMessage({ phase: "started", turn_id: "t", capture_boundary_id: "focus", started_at: 5 })).toEqual({ turn_id: "t", phase: "started", started_at: 5 });
+  expect(turnMessage({ phase: "cancelled", turn_id: "t", capture_boundary_id: "focus", merged: true })).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
   expect(turnMessage({
-    phase: "finished", turn_id: "t", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
+    phase: "finished", turn_id: "t", capture_boundary_id: "focus", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
     timings: { audio_ms: 1, endpoint_silence_ms: 2, recognition_ms: 3 },
   }, {thread_id: "thread", binding_id: "focus"})).toEqual({
     turn_id: "t", phase: "finished", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
