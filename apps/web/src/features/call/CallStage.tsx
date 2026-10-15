@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
@@ -91,8 +91,12 @@ function StageName({ stage, className, look, tone }: { stage: StageConversation;
 
 /** The agent's replies on the stage: the one sounding, followed as it is heard; once its last words are said it stays
  *  PAGE_MS, then leaves. A new reply over it: the one before lifts away at once (as the person's sent turn does). */
-function AgentBubbles({ reply, spokenTo }: { reply: ChatMessage | null; spokenTo: number | null }) {
+function AgentBubbles({ reply, spokenTo, onUp }: { reply: ChatMessage | null; spokenTo: number | null; onUp: (up: boolean) => void }) {
   const turns = useAgentTurns(reply, spokenTo);
+  // Whether a balloon is on the stage, for the agent to hold still under it (no idle pastime until it has gone).
+  const up = turns.length > 0;
+  useEffect(() => { onUp(up); }, [up, onUp]);
+  useEffect(() => () => onUp(false), [onUp]);
   return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
 }
 
@@ -120,6 +124,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const t = translator();
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
+  const [balloonUp, setBalloonUp] = useState(false);
   const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
@@ -160,7 +165,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
             {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"}
+            <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"} still={balloonUp}
               mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
             <StageDesk seed={stage.threadId} />
           </div>
@@ -169,7 +174,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
         <VoiceModels />
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}
-          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} />
+          <AgentBubbles key={stage.threadId} reply={reply} spokenTo={spokenTo} onUp={setBalloonUp} />
           {/* Working is said only to assistive tech here: the sidebar shows it. */}
           {stage.mood === "working" && <p className="sr-only" role="status"><span className="ui-spinner ui-spinner--inline" aria-hidden="true" />{t("stage.working")}</p>}
         </div>

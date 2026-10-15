@@ -48,6 +48,8 @@ export interface CharacterAvatarProps {
   label?: string;
   className?: string;
   ref?: Ref<HTMLSpanElement>;
+  /** No idle pastime while set (on the stage: while its balloon is up); quiet instead. */
+  still?: boolean;
 }
 
 /** "a" and "b" in turn, a new one each time `key` changes: each restarts the engine's per-word keyframes. */
@@ -85,7 +87,7 @@ function useLast(value: string | undefined): string | undefined {
   return value ?? last.current;
 }
 
-export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, playbackThreadId, unread, desk, label, className, ref }: CharacterAvatarProps) {
+export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, playbackThreadId, unread, desk, still, label, className, ref }: CharacterAvatarProps) {
   const avatar = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
     if (mouth !== "playback") return;
@@ -116,11 +118,12 @@ export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, p
   const enter = useEnter(acts);
   const working = useRotation("work", key, drawing.works, acts === "working");
   // Idle steps (idle.ts) while idle: offline sleeps instead, and so does the person out of a call (no steps).
-  const resting = useRotation("idle", key, drawing.idles, mood === "idle");
+  // Held still (its words still on screen): no pastime starts, it stays quiet until they go.
+  const resting = useRotation("idle", key, drawing.idles, mood === "idle" && !still);
   // During the entrance, what it had in hand stays on so it can drop away.
   const lastWork = useLast(working), lastIdle = useLast(resting);
   const work = working ?? (enter === "working" ? lastWork : undefined);
-  const idle = mood === "present" ? "quiet" : resting ?? (enter === "idle" ? lastIdle : undefined);
+  const idle = mood === "present" || (still && mood === "idle") ? "quiet" : resting ?? (enter === "idle" ? lastIdle : undefined);
   return (
     <span ref={(element) => { avatar.current = element; if (typeof ref === "function") ref(element); else if (ref) ref.current = element; }} className={cn("sv-avatar", className)} data-style="bichos" data-avatar-state={mood} data-mood={acts}
       data-size={engineSize(size)} data-mouth={mouth} data-beat={beat} data-work={work} data-idle={idle} data-enter={enter ?? undefined}
