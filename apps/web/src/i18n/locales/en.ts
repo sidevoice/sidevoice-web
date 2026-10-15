@@ -1176,6 +1176,9 @@ export const messages = {
   "take.pause": "pause from {from} to {to} s",
   "take.end": "turn ends at {s} s",
   "take.noSpeech": "no speech detected",
+  "take.keySpeech": "Speech starts",
+  "take.keyPause": "Pause",
+  "take.keyEnd": "Turn ends",
   // What failed, as people read it (error-message.ts): a code these words know, else the generic line about what failed.
   // The raw text of a failure is never one of these: it goes behind "Details".
   "error.generic": "Something went wrong with {what}.",

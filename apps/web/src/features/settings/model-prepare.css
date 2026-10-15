@@ -101,3 +101,10 @@
    and the sentence reads as a quote — a bar at its start. */
 .tts-try .stt-try-head { align-items: center; }
 .stt-try-head .tts-try-sentence { padding-inline-start: var(--sv-space-3); border-inline-start: 3px solid color-mix(in srgb, var(--sv-accent) 45%, transparent); }
+/* On a phone the try's first row stacks: the button on its line, then the level, the take or the sentence at full width
+   (side by side they leave neither room). */
+@media (max-width: 520px) {
+  .stt-try-head { flex-wrap: wrap; }
+  .stt-try-head > .model-try-wave, .stt-try-head > .try-take, .stt-try-head > .tts-try-sentence { flex-basis: 100%; }
+  .stt-try-head .voice-wave { max-width: none; }
+}

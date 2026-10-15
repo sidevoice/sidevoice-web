@@ -38,3 +38,21 @@
 .try-take[data-inline] .try-take-play:hover { background: color-mix(in srgb, var(--sv-accent) 12%, transparent); }
 .try-take[data-inline] .try-take-wave { height: 24px; }
 .try-take[data-inline] .try-take-clock { min-width: 8ch; font-size: var(--sv-font-xs); }
+/* Inline marks drawn bolder (a 3px line reaching past the bars, a 9px cap) and naming themselves on hover. */
+.try-take[data-inline] .try-take-mark, .try-take[data-inline] .try-take-pause { pointer-events: auto; cursor: default; }
+.try-take[data-inline] .try-take-mark { top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px; }
+.try-take[data-inline] .try-take-mark::before { top: -4px; left: -3px; width: 9px; height: 9px; }
+.try-take[data-inline] .try-take-pause { background: color-mix(in srgb, var(--sv-text-muted) 28%, transparent); }
+/* TakeKey: the colours' meaning in one quiet line, keys as the marks wear them. */
+.try-take-key-line { display: flex; flex-wrap: wrap; gap: var(--sv-space-1) var(--sv-space-3); margin: 0; font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-muted); }
+.try-take-key-line > span { display: inline-flex; align-items: center; gap: var(--sv-space-1-5); }
+.try-take-key-line [data-kind="speech"] > .try-take-key { background: var(--sv-positive); }
+.try-take-key-line [data-kind="pause"] > .try-take-key { border-radius: 2px; background: color-mix(in srgb, var(--sv-text-muted) 45%, transparent); }
+.try-take-key-line [data-kind="end"] > .try-take-key { border-radius: 1px; background: var(--sv-voice-text); }
+/* A wider, invisible target around each 3px mark, so its tooltip is easy to reach. */
+.try-take[data-inline] .try-take-mark::after { content: ""; position: absolute; inset: -2px -6px; }
+/* The inline take's caption (TakeKey) hangs under its capsule without taking room in the row, so the button stays
+   centred on the capsule; the row keeps space for it below. */
+.try-take[data-inline] { position: relative; }
+.try-take[data-inline] > .try-take-key-line { position: absolute; top: calc(100% + var(--sv-space-1-5)); left: var(--sv-space-3); right: 0; }
+.stt-try-head:has(.try-take-key-line) { margin-bottom: 1.375rem; }
