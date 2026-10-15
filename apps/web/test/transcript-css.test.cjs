@@ -28,7 +28,7 @@ test("the text box is never resized by hand, and there is no keyboard button to 
 test("on a phone the transcript is a sheet over a scrim; on a desktop a docked column that is gone while closed", () => {
   assert.match(rule(".call-layout > .transcript"), /width: 380px/);
   assert.match(css, /\.call-layout > \.transcript:not\(\[data-open\]\) \{ display: none; \}/);
-  const phone = css.slice(css.indexOf("@media (max-width: 899px)"));
+  const phone = css.slice(css.indexOf("@media (max-width: 559px), (max-width: 899px) and (pointer: coarse)"));
   assert.match(phone, /\.transcript-scrim\[data-open\] \{ opacity: 1; pointer-events: auto; \}/);
   assert.match(phone, /\.call-layout > \.transcript, \.call-layout > \.transcript:not\(\[data-open\]\) \{ display: flex; position: fixed;/);
   assert.match(phone, /\.transcript-grab \{ display: block;/);

@@ -103,7 +103,7 @@ test("with no conversation on the stage, the pill at the empty tile's top", asyn
   expect(document.querySelector(".stage-empty")!.firstElementChild).toBe(notice()!.parentElement);
 });
 
-test("manual, whatever update-notice value is stored: nothing by itself; once a check found one, Version 0.4.0 available · Download; nothing while it downloads; then Sidevoice 0.4.0 is ready · Restart to update", async () => {
+test("manual, whatever update-notice value is stored: nothing by itself; once a check found one, Version 0.4.0 available · Download; Cancel while it downloads; then Sidevoice 0.4.0 is ready · Restart to update", async () => {
   for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "manual" }, notice: picked });
     await settle();
@@ -117,9 +117,8 @@ test("manual, whatever update-notice value is stored: nothing by itself; once a 
     await act(async () => { fireEvent.click(action()); });
     expect(fake.updater.download).toHaveBeenCalledTimes(1);
     await act(async () => { fake.push({ ...FOUND, state: "downloading", progress: 0.4 }); });
-    // Its progress is Updates' to show: the room says nothing until it is ready.
-    expect(notice()).toBeNull();
-    await gone();
+    // Its progress is Updates' to show: the room offers Cancel while it downloads, then Restart when it is ready.
+    expect(said()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
     await act(async () => { fake.push(READY); });
     await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
     expect(fake.updater.restart).not.toHaveBeenCalled();
@@ -127,13 +126,13 @@ test("manual, whatever update-notice value is stored: nothing by itself; once a 
   }
 });
 
-test("automatic, whatever update-notice value is stored: nothing while the app's update is found or downloads by itself; once downloaded, Sidevoice 0.4.0 is ready · Restart to update, which restarts and has the service follow", async () => {
+test("automatic, whatever update-notice value is stored: nothing while the app's update is found, Cancel while it downloads by itself; once downloaded, Sidevoice 0.4.0 is ready · Restart to update, which restarts and has the service follow", async () => {
   for (const picked of STALE) {
     const { fake } = room({ updater: { mode: "automatic", status: FOUND }, notice: picked });
     await settle();
     expect(notice()).toBeNull();
     await act(async () => { fake.push({ ...FOUND, state: "downloading", progress: 0.4 }); });
-    expect(document.querySelector(".update-notice")).toBeNull();
+    expect(said()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
     await act(async () => { fake.push(READY); });
     await waitFor(() => expect(said()).toBe("Sidevoice 0.4.0 is ready · Restart to update"));
     expect(where()).toBe("pill");

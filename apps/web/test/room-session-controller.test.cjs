@@ -193,7 +193,7 @@ test('The controller publishes serializable snapshots through the React store br
 // What the page holds lives in its own realm; compared by value.
 const plain=value=>JSON.parse(JSON.stringify(value));
 test('Toggling the mic and holding space restores mute on release or loss of focus',()=>{
- const s=setup();const voice=fakeVoice();s.context.__voice=voice;s.run("voice=__voice;ws={}");
+ const s=setup();const voice=fakeVoice();s.context.__voice=voice;s.run("voice=__voice;ws={};conversationCalls.set('test',{call:__voice})");
  const key=code=>({code,target:new s.Element(),preventDefault(){}});
  s.run('toggleMic()');assert.equal(s.run('micEnabled'),false);assert.equal(voice.calls.at(-1)[1],true,'the voice is muted');
  s.handlers.keydown(key('Space'));assert.equal(s.run('micEnabled'),true);
@@ -533,39 +533,22 @@ test('The waveform bubble draws the level the voice reports, and nothing without
  assert.deepEqual(wave.slice(-2).map(Math.abs),[0.5,0.25],'the newest levels last');
  assert.equal(s.run("$('mic-level-meter').getAttribute('aria-valuenow')"),'25');
 });
-test('Speaker levels follow the active conversation and clear on silence and disconnect',()=>{
- const s=setup(),events=[];
- s.context.window.sidevoiceUI={playbackLevel:{publish:(level,thread)=>events.push([level,thread]),clear:()=>events.push([0,null])}};
- const host=fakeVoice();
- let output;
- host.onPlaybackLevel=listener=>{output=listener;return ()=>{output=null}};
- s.context.__voice=host;
- s.run("voice=__voice;state.callNode='fp-mac';state.roomBinding={thread_id:'one'};attachVoice(__voice)");
- const beforeMic=events.length;
- host.emit('level',0.9);
- assert.equal(events.length,beforeMic,'microphone levels never move the agent mouth');
- host.emit('state',{playback:'synthesizing'});
- output(0.8);
- assert.deepEqual(events.at(-1),[0,null],'no mouth while synthesis waits');
- host.emit('state',{playback:'playing'});
- s.run("state.sessionId='s';state.ws={close(){}};threadEpochs.set('one',0);receiveReply({session_id:'s',utterance_id:'old',thread_id:'one',epoch:0,text:'Old reply',history_id:'old-row',revision:0})");
- host.said[0].step({type:'playing'});
- output(0.7);
- assert.deepEqual(events.at(-1),[0.7,'fp-mac|one']);
- output(0);
- assert.deepEqual(events.at(-1),[0,'fp-mac|one'],'a pause within playback rests the mouth');
- s.run("roomStore.patch({roomBinding:{thread_id:'two'}})");
- assert.deepEqual(events.at(-1),[0,null],'switching conversations closes the old mouth');
- const beforeOldSample=events.length;
- output(0.8);
- assert.equal(events.length,beforeOldSample,'late old-playback samples cannot open the newly selected mouth');
- host.emit('state',{playback:'idle'});
+test('Speaker levels follow their speaking conversation and clear on disconnect',async()=>{
+ const c=await callOnRoom(),events=[];
+ c.s.context.window.sidevoiceUI={playbackLevel:{publish:(level,thread)=>events.push([level,thread]),clear:()=>events.push([0,null])}};
+ const call=c.voice.created[0],entry=c.s.run("conversationCalls.get('fp-mac|a')");
+ call.emit('level',0.9);
+ assert.equal(events.length,0,'microphone levels never move the agent mouth');
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'spoken',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'spoken',text:'Answer'}});
+ c.voice.said[0].step({type:'playing'});
+ c.s.context.__entry=entry;
+ c.s.run('voicePlaybackLevel(0.7,__entry)');
+ assert.deepEqual(events.at(-1),[0.7,'fp-mac|a']);
+ c.s.run('voicePlaybackLevel(0,__entry)');
+ assert.deepEqual(events.at(-1),[0,'fp-mac|a']);
+ c.s.run('disconnect()');
+ assert.equal(c.s.run('conversationCalls.size'),0);
  assert.deepEqual(events.at(-1),[0,null]);
- s.run('disconnect()');
- assert.equal(output,null,'the output subscription ends with the call');
- assert.deepEqual(events.at(-1),[0,null]);
- const old=fakeVoice();s.context.__old=old;
- assert.doesNotThrow(()=>s.run('voice=__old;attachVoice(__old)'), 'older hosts omit this optional method');
 });
 test('Aggregates summarize with nearest-rank percentiles and never turn a missing value into a zero',()=>{
  const s=setup();
@@ -1178,8 +1161,7 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
 
 // ----- the call's voice: the VoiceHost the page drives, here a fake that records what it was asked -----
 function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
- const on={},calls=[],said=[];
- const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
+ const calls=[],said=[],created=[],routes=[];
  // What the voice is asked to say: a handle the test steps through (`step`), as the voice's own goes.
  const say=(text,options)=>{
   calls.push(['say',text,options]);const listeners=new Set();let settle;
@@ -1188,11 +1170,25 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
    onEvent(listener){listeners.add(listener)},outcome:new Promise(resolve=>{settle=resolve}),step(event){for(const listener of listeners)listener(event);if(event.type==='done')settle(event.outcome)}};
   said.push(handle);return handle;
  };
- return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
+ const owner={calls,said,created,routes,routed:null,
+  emit(name,value){(this.routed??created.at(-1))?.emit(name,value)},
+  createCall(){
+   const on={},sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
+   const call=Object.create(owner);call.id='call-'+(created.length+1);
+   call.emit=(name,value)=>{for(const listener of on[name]||[])listener(value)};
+   call.onTurn=sub('turn');call.onState=sub('state');call.onLevel=sub('level');call.onPlaybackLevel=sub('output');call.onTake=listener=>typeof owner.onTake==='function'?owner.onTake(listener):sub('take')(listener);call.onError=sub('error');
+   // As the shared audio does: only a started call's lane can be given the microphone, and stopping it lets it go.
+   call.active=false;
+   call.start=async options=>{await owner.start(options);call.active=true};
+   call.stop=async()=>{call.active=false;if(owner.routed===call)owner.routed=null;await owner.stop()};
+   call.dispose=async()=>{calls.push(['dispose',call.id]);call.active=false;if(owner.routed===call)owner.routed=null;await owner.stop()};
+   created.push(call);return call;
+  },
+  async routeInput(call){if(call&&!call.active)throw new TypeError('a started call');routes.push(call?.id??null);this.routed=call},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
-  setCaptureBoundary:async id=>{calls.push(['setCaptureBoundary',id])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onAgentInterrupted:sub('agent-interrupted'),onTake:sub('take'),onError:sub('error')};
+ };
+ return owner;
 }
 // The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
 function fakeEngine(catalogs){
@@ -1248,8 +1244,8 @@ const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filt
 
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
- assert.deepEqual(voice.calls.map(([name])=>name).slice(0,4),['mute','setCaptureBoundary','setSettings','start']);
- assert.deepEqual(plain(voice.calls[2][1]),{...plain(c.s.run('voiceSettings')),end_of_turn:'silence'},'the settings this device keeps; Smart as silence when its model is unavailable');
+ assert.deepEqual(voice.calls.map(([name])=>name).slice(0,4),['mute','setSettings','start','mute']);
+ assert.deepEqual(plain(voice.calls[1][1]),{...plain(c.s.run('voiceSettings')),end_of_turn:'silence'},'the settings this device keeps; Smart as silence when its model is unavailable');
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','speech','ui_language']);
  assert.deepEqual(plain(firstHello.data.speech),{on:true});
@@ -1405,7 +1401,7 @@ test('T14 Skip stays heard by choice through output, focus and barge-in callback
   const handle=c.voice.said[0];handle.step({type:'playing'});c.s.run('skipReply()');
   if(race==='output')c.s.run("setSpeechOutput('agents_muted')");
   if(race==='focus')c.s.run("stopReplies('focus_changed')");
-  if(race==='barge-in')c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+  if(race==='barge-in')handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
   handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
   assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[[null,2]],race);
   assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>d.outcome)),['heard'],race);
@@ -1417,9 +1413,8 @@ test('T01 and T02 map played-zero barge-in to physical and semantic receipts bef
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('spoken'));
- c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:0,played:true});
- c.voice.emit('turn',finished('spoken','New words'));
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
+ c.voice.emit('turn',finished('spoken','New words'));
  const frames=c.frames(c.first).filter(f=>['voice-playback','reply-hearing','voice-user-turn'].includes(f.type));
  assert.deepEqual(plain(frames.filter(f=>f.type==='voice-playback'&&f.data.status!=='playing').map(f=>[f.data.utterance_id,f.data.status,f.data.reason,f.data.heard_chars])),[['core-reply','interrupted','user_interrupted',0]]);
  assert.deepEqual(plain(frames.filter(f=>f.type==='reply-hearing').map(f=>[f.data.history_id,f.data.utterance_id,f.data.outcome,f.data.heard_chars??null])),[['row','core-reply','not_heard',null]]);
@@ -1448,7 +1443,7 @@ test('T01 empty turn retires queued replies before its terminal frame, including
  reply('playing');reply('queued');reply('replay',true);
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('empty'));
- c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:1,played:true});
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
  c.voice.emit('turn',{turn_id:'empty',phase:'cancelled',merged:false});
  const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='empty'&&f.data.phase==='cancelled');
  assert.ok(end>0);
@@ -1461,7 +1456,7 @@ test('T05 a checkpoint cut reports every queued successor before final words and
  reply('first');reply('successor');reply('old-replay',true);
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('checkpoint'));
- c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
  c.voice.emit('turn',finished('checkpoint','New words'));
  const frames=c.frames(c.first),end=frames.findIndex(f=>f.type==='voice-user-turn'&&f.data.turn_id==='checkpoint'&&f.data.phase==='finished');
  for(const id of ['first','successor','old-replay'])assert.ok(frames.findIndex(f=>f.type==='voice-playback'&&f.data.utterance_id===id&&f.data.status!=='playing')<end);
@@ -1476,7 +1471,7 @@ test('T07 hang-up clears open turns, handles and deferred final sends before ano
  const handle=c.voice.said[0];handle.step({type:'playing'});
  c.voice.emit('turn',started('old-turn'));c.voice.emit('turn',finished('old-turn','Old words'));
  c.s.run('disconnect()');
- assert.deepEqual([c.s.run('openVoiceTurns.size'),c.s.run('turnNodes.size'),c.s.run('handleIds.size'),c.s.run('replyQueue.length')],[0,0,0,0]);
+ assert.deepEqual([c.s.run('openVoiceTurns.size'),c.s.run('turnNodes.size'),c.s.run('turnWireIds.size'),c.s.run('replyQueue.length')],[0,0,0,0]);
  const joining=c.s.run('toggleCall')();await c.until(()=>c.sockets.length===2,'new call');const {socket}=await c.answer({session_id:'s2',resume:{token:'tok-b'},resumed:false});await joining;
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'stopped'}});await settleSoon();
  assert.equal(c.s.run('outbox.list().length'),0,'a settled handle cannot restore the old call\'s words');
@@ -1502,7 +1497,7 @@ test('T07 deferred final words keep their captured node through a replacement se
 test('T04b a spoken turn retires several locally queued replies at the old epoch',async()=>{
  const c=await callOnRoom(),reply=(id,epoch=0)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch,history_id:id,text:id}});
  reply('one');reply('two');reply('three');const handle=c.voice.said[0];handle.step({type:'playing'});
- c.voice.emit('turn',started('new-spoken'));c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:1,played:true});
+ c.voice.emit('turn',started('new-spoken'));handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'barge-in'}});
  c.voice.emit('turn',finished('new-spoken','New question'));
  c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-spoken',thread_id:'a',revision:2,epoch:1}});
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason])),[['two','newer_turn'],['three','newer_turn'],['one','user_interrupted']]);
@@ -1557,7 +1552,7 @@ test('T06a agents mute wins either terminal callback order and retains the scala
   c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'muted',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'muted',text:'é🐙ab'}});
   const handle=c.voice.said[0];handle.step({type:'playing'});
   c.s.run("setSpeechOutput('agents_muted')");
-  const cut=()=>c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+  const cut=()=>handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
   const outcome=()=>handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason}});
   if(first==='interruption'){cut();outcome()}else{outcome();cut()}
   assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status,d.reason,d.heard_chars])),[['muted','interrupted','agents_muted',2]],`${reason}, ${first}`);
@@ -1664,7 +1659,7 @@ test('H4/T07 a new call acknowledges retained visible text from a conversation i
  const c=await callOnRoom({readingMode:true});
  c.s.run("state.people.push({node:'fp-mac',thread_id:'b',title:'B',available:false});setSpeechOutput('agents_muted')");
  c.s.run("state.history.push({segment:'old-session:voice:saved',thread:'fp-mac|b',role:'assistant',text:'Saved reply',audio:'text_only',hearing:null})");
- assert.equal(c.s.run("[...captureTargets.values()].some(target=>target.thread_id==='b')"),false);
+ assert.equal(c.voice.created.some(call=>call!==c.voice.created[0]),false);
  c.s.run("window.sidevoiceActions.selectParticipant('fp-mac|b')");
  assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome])),[['old-session:voice:saved','heard']]);
  assert.equal(c.s.run('state.roomBinding.thread_id'),'a');
@@ -1674,7 +1669,7 @@ test('T06a a receipt before mute remains a genuine spoken interruption',async()=
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'spoken',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'spoken',text:'Answer'}});
  const handle=c.voice.said[0];handle.step({type:'playing'});
- c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
  c.s.run("setSpeechOutput('agents_muted')");
  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_interrupted',2]]);
  assert.equal(sentOf(c,c.first,'voice-speech').at(-1).reason,'agents_muted');
@@ -1802,129 +1797,225 @@ test('T11 a delayed transcript keeps its captured focus through a later selectio
  assert.deepEqual([end.thread_id,end.binding_id],['a','b']);
  c.s.run('disconnect()');
 });
-for(const phase of ['pending STT','merge hold'])test(`F7 A to B during ${phase} routes each captured transcript to its own core target`,async()=>{
+for(const phase of ['pending STT','merge hold'])test(`A to B during ${phase} keeps independent call transcripts`,async()=>{
  const c=await callOnRoom(),{s,voice}=c;
+ const a=voice.created[0];
  s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
- const aBoundary=voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
- const aStart={...started('a-turn'),capture_boundary_id:aBoundary};
- const aEnd={...finished('a-turn','Private instruction for A'),capture_boundary_id:aBoundary};
- voice.emit('turn',aStart);
- if(phase==='merge hold'){
-  const original=voice.setCaptureBoundary;
-  voice.setCaptureBoundary=async id=>{voice.emit('turn',aEnd);await original(id)};
- }
+ a.emit('turn',started('a-turn'));
  s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
   :{binding:{thread_id:'b',title:'B',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ if(phase==='merge hold')a.emit('turn',finished('a-turn','Private instruction for A'));
  await s.run("select('fp-mac|b')");
- const boundaries=voice.calls.filter(([name])=>name==='setCaptureBoundary').map(([,id])=>id);
- assert.equal(boundaries.length,2,'initial focus and change each get a boundary');
- assert.notEqual(boundaries[0],boundaries[1]);
- if(phase==='pending STT')voice.emit('turn',aEnd);
- voice.emit('turn',{...started('b-turn'),capture_boundary_id:boundaries[1]});
- voice.emit('turn',{...finished('b-turn','Instruction for B'),capture_boundary_id:boundaries[1]});
- const a=turnSent(c,c.first,'a-turn','finished')[0],b=turnSent(c,c.first,'b-turn','finished')[0];
- assert.deepEqual([a.thread_id,a.binding_id,a.text],['a','b','Private instruction for A']);
- assert.deepEqual([b.thread_id,b.binding_id,b.text],['b','b-binding','Instruction for B']);
+ assert.equal(voice.created.length,2);
+ assert.equal(voice.routed,voice.created[1]);
+ if(phase==='pending STT')a.emit('turn',finished('a-turn','Private instruction for A'));
+ const b=voice.created[1];b.emit('turn',started('b-turn'));b.emit('turn',finished('b-turn','Instruction for B'));
+ const aEnd=turnSent(c,c.first,'a-turn','finished')[0],bEnd=turnSent(c,c.first,'b-turn','finished')[0];
+ assert.deepEqual([aEnd.thread_id,aEnd.binding_id,aEnd.text],['a','b','Private instruction for A']);
+ assert.deepEqual([bEnd.thread_id,bEnd.binding_id,bEnd.text],['b','b-binding','Instruction for B']);
  assert.equal(sentOf(c,c.first,'voice-user-turn').some(row=>row.text?.includes('Private instruction for A. Instruction for B')),false);
  s.run('disconnect()');
 });
-test('R7 an asynchronously delivered A start after selecting B still starts at A',async()=>{
- const c=await callOnRoom(),{s,voice}=c;
+test('a delayed native A start after selecting B retains A binding',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
  s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
- const aBoundary=voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
  s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
   :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
  await s.run("select('fp-mac|b')");
- const bBoundary=voice.calls.filter(([name])=>name==='setCaptureBoundary').at(-1)[1];
- await new Promise(resolve=>setTimeout(resolve,0)); // Native event forwarding can arrive after the HTTP selection.
- voice.emit('turn',{...started('a-delayed'),capture_boundary_id:aBoundary});
- voice.emit('turn',{...finished('a-delayed','Private words for A'),capture_boundary_id:aBoundary});
- voice.emit('turn',{...started('b-current'),capture_boundary_id:bBoundary});
- voice.emit('turn',{...finished('b-current','Words for B'),capture_boundary_id:bBoundary});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ a.emit('turn',started('a-delayed'));a.emit('turn',finished('a-delayed','Private words for A'));
+ const b=voice.created[1];b.emit('turn',started('b-current'));b.emit('turn',finished('b-current','Words for B'));
  const aStart=turnSent(c,c.first,'a-delayed','started')[0],aEnd=turnSent(c,c.first,'a-delayed','finished')[0];
  const bStart=turnSent(c,c.first,'b-current','started')[0],bEnd=turnSent(c,c.first,'b-current','finished')[0];
  assert.deepEqual([aStart.thread_id,aStart.binding_id,aEnd.thread_id,aEnd.binding_id,aEnd.text],['a','b','a','b','Private words for A']);
  assert.deepEqual([bStart.thread_id,bStart.binding_id,bEnd.thread_id,bEnd.binding_id,bEnd.text],['b','b-binding','b','b-binding','Words for B']);
  s.run('disconnect()');
 });
-test('F7 the new focus stays muted until voice acknowledges its capture boundary',async()=>{
+test('A words that end after B took the microphone are written in A, and B shows its own call state',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ a.emit('state',{listening:'speaking',recognising:0,playback:'idle',microphone:'live'});
+ a.emit('turn',started('a-open'));
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ const create=voice.createCall.bind(voice);
+ voice.createCall=()=>{const call=create();call.start=async()=>{call.active=true;call.emit('state',{listening:'listening',recognising:0,playback:'idle',microphone:'live'})};return call};
+ await s.run("select('fp-mac|b')");
+ assert.equal(s.run('state.voiceState.listening'),'listening','the focused call is B, whose last state was listening');
+ assert.equal(s.run('state.userLive'),false);
+ const b=voice.created[1];b.emit('turn',started('b-open'));
+ a.emit('turn',finished('a-open','Words for A'));
+ assert.deepEqual(JSON.parse(s.run("JSON.stringify(state.history.filter(r=>r.role==='user').map(r=>[r.thread,r.text]))")),[['fp-mac|a','Words for A']]);
+ assert.equal(s.run('state.userTurn.id'),'b-open','B keeps its own open turn');
+ s.run('disconnect()');
+});
+test('stopping routed A while B starts does not cancel B or route its words to A',async()=>{
+ const c=await callOnRoom(),{s,voice}=c;
+ s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ let release;const starting=new Promise(resolve=>{release=resolve});
+ const create=voice.createCall.bind(voice);
+ voice.createCall=()=>{const call=create();if(voice.created.length===2)call.start=async options=>{await starting;await voice.start(options);call.active=true};return call};
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ const selected=s.run("select('fp-mac|b')");
+ await c.until(()=>voice.created.length===2,'B starts while A is routed');
+ await s.run("disposeConversation('fp-mac|a')");
+ assert.ok(voice.calls.some(([name,id])=>name==='dispose'&&id==='call-1'));
+ release();await selected;
+ assert.equal(voice.routed,voice.created[1]);
+ voice.created[1].emit('turn',started('b-after-a'));
+ voice.created[1].emit('turn',finished('b-after-a','Only B'));
+ assert.equal(turnSent(c,c.first,'b-after-a','finished')[0].thread_id,'b');
+ s.run('disconnect()');
+});
+test('new focus waits for acknowledged input routing before changing binding',async()=>{
  const c=await callOnRoom(),{s,voice}=c;
  let release;const gate=new Promise(resolve=>{release=resolve});
- const original=voice.setCaptureBoundary;
- voice.setCaptureBoundary=async id=>{await original(id);await gate};
+ const original=voice.routeInput.bind(voice);
+ voice.routeInput=async call=>{if(call&&call!==voice.created[0])await gate;await original(call)};
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
  const selected=s.run("select('fp-mac|b')");
- await c.until(()=>voice.calls.filter(([name])=>name==='setCaptureBoundary').length===2,'new focus boundary requested');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],true);
- assert.equal(s.run('targetId()'),'fp-mac|a','binding is not applied while the boundary is pending');
+ await c.until(()=>voice.created.length===2,'new conversation call');
+ assert.equal(s.run('targetId()'),'fp-mac|a');
  release();await selected;
  assert.equal(s.run('targetId()'),'fp-mac|b');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ assert.equal(voice.routed,voice.created[1]);
  s.run('disconnect()');
 });
-test('R1 overlapping refresh fences release only their own mute ownership',async()=>{
+test('overlapping focus requests end routed to the latest conversation',async()=>{
  const c=await callOnRoom(),{s,voice}=c;
- const releases=[];const original=voice.setCaptureBoundary;
- voice.setCaptureBoundary=async id=>{await original(id);await new Promise(resolve=>releases.push(resolve))};
  let response=0;
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:++response===1?'b':'c',binding_id:'binding-'+response},room:{revision:response},clients:[],call:null,participants:[]})});
- const first=s.run('refresh()');
- await c.until(()=>releases.length===1,'first capture fence');
- const second=s.run('refresh()');
- await c.until(()=>s.run('captureFencePending')===2,'overlapping capture fences');
- assert.equal(s.run('captureFencePending'),2);
- releases.shift()();
- await c.until(()=>releases.length===1,'second capture fence');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],true,'the second fence still owns mute');
- releases.shift()();await Promise.all([first,second]);
- assert.equal(s.run('captureFencePending'),0);
- assert.equal(s.run('state.switching'),false);
+ await Promise.all([s.run('refresh()'),s.run('refresh()')]);
  assert.equal(s.run('targetThread()'),'c');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'capture resumes after both fences');
+ assert.equal(voice.routed,voice.created.at(-1));
  s.run('disconnect()');
 });
-test('R1 a stale presentation response cannot install a boundary after the newer focus',async()=>{
+test('stale presentation response cannot route input after newer focus',async()=>{
  const c=await callOnRoom(),requests=[];
  c.s.context.fetch=async()=>new Promise(resolve=>requests.push(resolve));
  const old=c.s.run('refresh()'),recent=c.s.run('refresh()');
  const answer=(resolve,thread)=>resolve({ok:true,status:200,json:async()=>({binding:{thread_id:thread,binding_id:'binding-'+thread},room:{revision:2},clients:[],call:null,participants:[]})});
  await c.until(()=>requests.length===2,'two presentation requests');
  answer(requests[1],'c');await recent;
- const count=c.voice.calls.filter(([name])=>name==='setCaptureBoundary').length;
+ const count=c.voice.routes.length;
  answer(requests[0],'b');await old;
  assert.equal(c.s.run('targetThread()'),'c');
- assert.equal(c.voice.calls.filter(([name])=>name==='setCaptureBoundary').length,count);
- assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ assert.equal(c.voice.routes.length,count);
  c.s.run('disconnect()');
 });
-test('R2 successful join unmutes the enabled microphone before speech',async()=>{
+test('successful join routes and unmutes before first speech',async()=>{
  const c=await callOnRoom();
  assert.equal(c.s.run('state.connecting'),false);
  assert.equal(c.s.run('state.micEnabled'),true);
+ assert.equal(c.voice.routed,c.voice.created[0]);
  assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
  c.s.run('disconnect()');
 });
-test('F7 a late terminal retains its captured target after many later starts',async()=>{
- const c=await callOnRoom(),boundary=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
- c.voice.emit('turn',{...started('old'),capture_boundary_id:boundary});
- for(let i=0;i<65;i++)c.voice.emit('turn',{...started('later-'+i),capture_boundary_id:boundary});
- c.voice.emit('turn',{...finished('old','Old target words'),capture_boundary_id:boundary});
+test('a late terminal retains source call after many later starts',async()=>{
+ const c=await callOnRoom(),a=c.voice.created[0];
+ a.emit('turn',started('old'));
+ for(let i=0;i<65;i++)a.emit('turn',started('later-'+i));
+ a.emit('turn',finished('old','Old target words'));
  assert.equal(turnSent(c,c.first,'old','finished')[0].text,'Old target words');
  c.s.run('disconnect()');
 });
-test('F7 a binding replacement keeps the old turn’s captured binding ID',async()=>{
- const c=await callOnRoom(),first=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
- c.voice.emit('turn',{...started('before-rebind'),capture_boundary_id:first});
+test('a binding replacement preserves an already started turn target',async()=>{
+ const c=await callOnRoom(),a=c.voice.created[0];
+ a.emit('turn',started('before-rebind'));
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',binding_id:'next-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
  await c.s.run('refresh()');
- const second=c.voice.calls.filter(([name])=>name==='setCaptureBoundary').at(-1)[1];
- assert.notEqual(second,first);
- c.voice.emit('turn',{...finished('before-rebind','Before'),capture_boundary_id:first});
- c.voice.emit('turn',{...started('after-rebind'),capture_boundary_id:second});
- c.voice.emit('turn',{...finished('after-rebind','After'),capture_boundary_id:second});
+ a.emit('turn',finished('before-rebind','Before'));
+ // Heard after the rebind: the voice stamps it then.
+ a.emit('turn',started('after-rebind',Date.now()));a.emit('turn',finished('after-rebind','After'));
  assert.equal(turnSent(c,c.first,'before-rebind','finished')[0].binding_id,'b');
  assert.equal(turnSent(c,c.first,'after-rebind','finished')[0].binding_id,'next-binding');
  c.s.run('disconnect()');
+});
+// ----- web #140 review: F1 a failed switch, F2 trial routing, F3 activation bindings, F4 disposal with open turns -----
+const toB=(c,binding_id='b-binding')=>{
+ c.s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ c.s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',title:'B',binding_id},room:{revision:1},clients:[],call:null,participants:[]}});
+};
+for(const failing of ['start','routeInput'])test(`F1 B's ${failing} rejected: B is selected and nobody has the microphone, never A; a later refresh gives it to B`,async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ assert.equal(voice.routed,a);
+ toB(c);
+ const said=[];s.context.window.sidevoiceUI=new Proxy({},{get:(_,key)=>key==='setBootError'?value=>said.push(value):()=>{}});
+ let fail=true;
+ const create=voice.createCall.bind(voice),route=voice.routeInput.bind(voice);
+ if(failing==='start')voice.createCall=()=>{const call=create();const start=call.start;call.start=async options=>{if(fail)throw Object.assign(Error('models-load-failed'),{code:'models-load-failed'});await start(options)};return call};
+ else voice.routeInput=async call=>{if(fail&&call&&call!==a)throw Object.assign(Error('audio-output-failed'),{code:'audio-output-failed'});await route(call)};
+ await s.run("select('fp-mac|b')");
+ assert.equal(s.run('targetId()'),'fp-mac|b','the room selected B');
+ assert.equal(voice.routed,null,'A no longer hears the microphone');
+ assert.equal(voice.routes.at(-1),null);
+ assert.equal(s.run('voice'),null,'no call is shown as listening');
+ assert.ok(said.some(Boolean),'the failure is said');
+ fail=false;
+ await s.run('refresh()');
+ assert.equal(voice.routed?.id,voice.created.at(-1).id,'the next refresh gives B the microphone');
+ assert.notEqual(voice.routed,a);
+ s.run('disconnect()');
+});
+test('F2 each settings try gives its call the microphone only once started, and again after a retune',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ const stt=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");
+ await settleSoon();
+ voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
+ assert.equal(plain(await stt).text,'hola');
+ assert.deepEqual([...voice.routes],['call-1',null],'routed as it starts, fenced off when the take ends (and so no longer its to release)');
+ const tts=s.run("window.sidevoiceActions.tryVoiceSettings('tts',{text:'hola',keep:false})");
+ await settleSoon();
+ voice.said.at(-1).step({type:'done',outcome:{status:'heard'}});
+ await tts;
+ assert.deepEqual([...voice.routes].slice(2),['call-2',null]);
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,end_of_turn:'silence'}})");
+ const turn=s.run('window.sidevoiceActions.tryTurnSettings()');
+ await settleSoon();
+ s.run("window.sidevoiceActions.editVoice({patience:'calm'})");
+ await settleSoon();
+ s.run('window.sidevoiceActions.cancelVoiceTry()');
+ await assert.rejects(turn,{code:'trial-cancelled'});
+ assert.deepEqual([...voice.routes].slice(4),['call-3','call-3',null],'routed as it starts, and again as the retune starts it again');
+});
+test('F3 a delayed start heard before a rebind keeps the binding it was heard under; speech after it, the new one',async()=>{
+ const c=await callOnRoom(),a=c.voice.created[0];
+ const heard=Date.now();await new Promise(resolve=>setTimeout(resolve,5));
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',binding_id:'replacement'},room:{revision:1},clients:[],call:null,participants:[]})});
+ await c.s.run('refresh()');
+ a.emit('turn',started('heard-before',heard));a.emit('turn',finished('heard-before','Before'));
+ a.emit('turn',started('heard-after',Date.now()));
+ assert.deepEqual([turnSent(c,c.first,'heard-before','started')[0].binding_id,turnSent(c,c.first,'heard-before','finished')[0].binding_id],['b','b']);
+ assert.equal(turnSent(c,c.first,'heard-after','started')[0].binding_id,'replacement');
+ c.s.run('disconnect()');
+});
+test('F3 A to B to A: the old A start keeps its first binding, new A speech the returned one',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ const heard=Date.now();await new Promise(resolve=>setTimeout(resolve,5));
+ toB(c);await s.run("select('fp-mac|b')");
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'a',title:'A',binding_id:'a-return'},room:{revision:2},clients:[],call:null,participants:[]}});
+ await s.run("select('fp-mac|a')");
+ assert.equal(voice.routed,a);
+ a.emit('turn',started('old-a',heard));a.emit('turn',finished('old-a','Old'));
+ a.emit('turn',started('new-a',Date.now()));
+ assert.deepEqual([turnSent(c,c.first,'old-a','started')[0].thread_id,turnSent(c,c.first,'old-a','started')[0].binding_id],['a','b']);
+ assert.deepEqual([turnSent(c,c.first,'new-a','started')[0].thread_id,turnSent(c,c.first,'new-a','started')[0].binding_id],['a','a-return']);
+ s.run('disconnect()');
+});
+for(const ending of ['the voice cancels it as it stops','the voice says nothing of it','its disposal fails'])test(`F4 closing a conversation with an open turn ends that turn once (${ending}), and releases the reply hold`,async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
+ a.emit('turn',started('closing-turn'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'closing-turn',revision:1,thread_id:'a',epoch:1}});
+ if(ending==='the voice cancels it as it stops')a.dispose=async()=>{voice.calls.push(['dispose',a.id]);a.emit('turn',{turn_id:'closing-turn',phase:'cancelled',merged:false})};
+ if(ending==='its disposal fails')a.dispose=async()=>{throw Error('dispose-failed')};
+ await s.run("disposeConversation('fp-mac|a')").catch(()=>{});
+ assert.deepEqual(plain(turnSent(c,c.first,'closing-turn','cancelled').map(d=>d.merged)),[false],'one cancellation reaches the room');
+ assert.equal(s.run("openVoiceTurns.has('closing-turn')"),false);
+ assert.equal(s.run("[...turnWireIds.keys()].length"),0);
+ s.run('disconnect()');
 });
 test('T02 an accepted reply cannot start while a voice turn or its start acknowledgement is open',async()=>{
  const c=await callOnRoom();
@@ -2142,7 +2233,7 @@ test('A hang-up while the settings are taken never starts the microphone, and on
  const slow=fakeVoice({start:()=>starting});const d=joining(late,{voice:slow});
  const joining2=d.tap();await settleSoon();
  late.run('disconnect()');started();await joining2;
- assert.deepEqual(slow.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['start','stop','stop'],'the hang-up, then what the join started');
+ assert.deepEqual(slow.calls.filter(([name])=>['start','stop'].includes(name)).map(([name])=>name),['start','stop'],'the hang-up stops the in-flight start exactly once');
  assert.equal(d.sockets.length,0);
 });
 test('A voice failure is said and logged',async()=>{
@@ -2160,7 +2251,7 @@ test('A move to another conversation leaves its replies to the room, which withd
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
  await s.run("select('fp-mac|b')");await settleSoon();
  assert.equal(s.run('targetId()'),'fp-mac|b');
- assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['setCaptureBoundary','cancel'],'focus change fences capture and stops local audio before withdrawal arrives');
+ assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['setSettings','start','cancel'],'B starts its own call while A keeps its turn and local audio is cancelled');
  c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['old-reply'],reason:'focus_changed'}});
  assert.equal(voice.said[0].cancelled,true);
  voice.said[0].step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});
@@ -2326,7 +2417,7 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const result=plain(await tried);assert.equal(result.text,'hola');
  // With how long its phases took (the fake voice says nothing of its recognition).
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop'],'the voice is started for the try, muted as its turn ends the take, and stopped after it');
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop','dispose','stop'],'the temporary call is stopped and disposed after the try');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
@@ -2369,7 +2460,7 @@ test('A try requests a take and hands it over after the voice stops',async()=>{
  voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
  voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
  await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['mute',true],['mute',false],['stop']]);
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop'],['dispose','call-1'],['stop']]);
  assert.deepEqual([...takes],[1]);
  assert.equal(listeners.size,0,'and the voice is let go');
  // The end of turn's too, once stopped.
@@ -2496,7 +2587,7 @@ test('Picking another machine\'s conversation moves the call there: the open tur
  assert.equal(s.run('state.switching'),true);
  assert.ok(voice.calls.some(([name])=>name==='cancelInput'),'what was being said was for the conversation left');
  assert.equal(voice.said[0].cancelled,true,'the reply sounding is stopped');
- assert.equal(voice.calls.filter(([name,muted])=>name==='mute').at(-1)[1],true,'nobody hears the person while the call moves');
+ assert.equal(voice.routed,c.voice.created[0],'A remains the routed call until the old session is drained');
  voice.said[0].step({type:'done',outcome:{status:'interrupted',heard_chars:4}});
  // The Mac acknowledges what it is owed; only then is its socket closed, as a hang-up.
  await c.until(()=>sentOf(c,first,'voice-playback').some(d=>d.utterance_id==='r1'&&d.status!=='playing'),'the stopped reply told to its machine');
@@ -2513,8 +2604,8 @@ test('Picking another machine\'s conversation moves the call there: the open tur
  assert.equal(hello.data.resume,undefined,'no ticket of the Mac\'s goes to the PC');
  await moved;
  assert.equal(s.run('callNode'),'fp-pc');assert.equal(s.run('sessionId'),'s2');assert.equal(s.run('state.switching'),false);
- assert.equal(voice.calls.some(([name])=>name==='stop'),false,'the voice goes on: no new microphone, no model loaded again');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'and hears the person again');
+ assert.ok(voice.calls.some(([name])=>name==='dispose'),'the old conversation call is disposed after the move');
+ await c.until(()=>voice.routed===voice.created.at(-1),'new conversation routed');
  assert.equal(JSON.parse(c.store['sidevoice.resume']).node,'fp-pc');
  assert.equal(c.store['sidevoice.selected'],'fp-pc|p');assert.equal(s.run('targetId()'),'fp-pc|p');
  s.run('disconnect()');
@@ -2724,4 +2815,20 @@ test('A paired machine that says it is behind says how to update it there; anyth
  // Once answered, the next question goes out again.
  await Promise.all([s.run("loadMachineInfo('fp-mac')"),new Promise(resolve=>setTimeout(()=>{answer();resolve()},0))]);
  assert.equal(asked.length,2);
+});
+
+test('replacement retains its own microphone after the previous trial\'s close completes',async()=>{
+ const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
+ // The first trial's close is held: the replacement starts and takes the microphone while the first still closes.
+ let release;const held=new Promise(resolve=>{release=resolve});const create=voice.createCall.bind(voice);
+ voice.createCall=()=>{const call=create();call.endInput=()=>call.id==='call-1'?held:Promise.resolve();return call};
+ const first=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");first.catch(()=>{});
+ await settleSoon();voice.created[0].emit('turn',{phase:'started',turn_id:'first'});
+ const second=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false})");second.catch(()=>{});
+ await settleSoon();
+ assert.equal(voice.routed?.id,'call-2');
+ release();await first.catch(()=>{});await settleSoon();
+ assert.equal(voice.routed?.id,'call-2','the first trial finishing its close does not take the microphone from the second');
+ voice.created[1].emit('turn',{phase:'finished',turn_id:'second',text:'second'});
+ assert.equal(plain(await second).text,'second');
 });
