@@ -15,6 +15,16 @@
   transition: border-color var(--sv-dur-base) var(--sv-ease), box-shadow var(--sv-dur-base) var(--sv-ease); }
 .stage-tile > * { --stage-inset: var(--sv-space-4); }
 @container stage (max-width: 480px) { .stage-tile > * { --stage-inset: var(--sv-space-3); } }
+/* The canvas the agent is drawn on keeps one shape per form factor (--stage-ratio, width over height), never whatever
+ * room is left: 16:9 on a web page (the lab's 800 × 440 scene nearly whole), 3:2 in the desktop app (its window's
+ * shape), and a square on a phone (the scene's middle, where what matters is: engine/backdrop.ts). It is as large as
+ * the tile allows and centred; the rest of the tile is black bands, as a letterboxed video's (useSceneScale fits it).
+ * Until it is fitted it fills the tile. */
+.stage-tile[data-mood] { --stage-ratio: 16 / 9; background: #000; }
+@media (min-width: 900px) { .stage-tile[data-mood][data-app] { --stage-ratio: 3 / 2; } }
+@media (max-width: 899px) { .stage-tile[data-mood] { --stage-ratio: 1; } }
+.stage-canvas { position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; overflow: hidden; transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg); }
 /* Speaking: a quiet ring in the accent around the whole tile. */
 .stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-accent) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 20%, transparent); }
 

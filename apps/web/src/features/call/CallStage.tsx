@@ -20,6 +20,7 @@ import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { errorLine } from "../settings/error-message";
+import { desktopHost } from "../../services/desktop-host";
 
 /** A harness by its product name, for the badge's tooltip; one not known, as it is reported. */
 function harnessName(id: string | null | undefined) {
@@ -106,15 +107,20 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
         <h2 title={stage.title}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
       </header>
-      <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} style={avatarTone(tone) as CSSProperties}>
-        <div className="stage-notice">{notice}</div>
-        <div className="stage-scene">
-          <StageBackdrop seed={stage.threadId} tone={tone} />
-          {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-          <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"}
-            mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
-          <StageDesk seed={stage.threadId} />
+      {/* The tile takes the room there is; the canvas the agent is drawn on keeps its form factor's shape in it, black
+          bands around it as a letterboxed video's (useSceneScale fits it; call-view.css names the shapes). What the
+          tile says — the name, the voice models, the replies, the badge — is laid on the tile, over canvas and bands. */}
+      <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
+        <div className="stage-canvas">
+          <div className="stage-scene">
+            <StageBackdrop seed={stage.threadId} tone={tone} />
+            {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
+            <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"}
+              mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
+            <StageDesk seed={stage.threadId} />
+          </div>
         </div>
+        <div className="stage-notice">{notice}</div>
         <div className="stage-name" translate="no">
           <h2 title={stage.title}>{stage.title}</h2>
           {stage.row?.machine && <span>{stage.row.machine}</span>}
