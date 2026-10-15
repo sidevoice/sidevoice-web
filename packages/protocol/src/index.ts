@@ -12,6 +12,9 @@ export interface Participant {
   harness?: string | null;
   available: boolean;
   selected: boolean;
+  epoch?: number;
+  unheard?: { count: number; since: number | null } | null;
+  working?: boolean | null;
   reach?: {
     state: "listening" | "holding" | "offline";
     detail?: string | null;
@@ -36,6 +39,9 @@ export interface VoiceUserTurn {
   turn_id: Identifier;
   phase: "started" | "finished" | "cancelled";
   revision?: number;
+  epoch?: number;
+  thread_id?: Identifier;
+  binding_id?: Identifier;
   text?: string;
   offline?: boolean;
   merged?: boolean;
@@ -47,7 +53,8 @@ export interface VoicePlayback {
   client_msg_id: Identifier;
   utterance_id: Identifier;
   status: "playing" | "heard" | "interrupted" | "unplayed" | "failed";
-  heard_chars: number;
+  heard_chars?: number;
+  reason?: "user_interrupted" | "newer_turn" | "user_skipped" | "focus_changed" | "call_ended" | "unheard" | "agents_muted" | "voice_off" | "connector_disconnected" | "heard_elsewhere";
   [key: string]: unknown;
 }
 
@@ -56,6 +63,7 @@ export interface VoiceReply {
   session_id: Identifier;
   utterance_id: Identifier;
   revision: number;
+  epoch: number;
   reply_revision: number;
   thread_id: Identifier;
   history_id: Identifier;
@@ -68,6 +76,7 @@ export interface VoiceReply {
 export type RoomClientEvent =
   | { type: "voice-user-turn"; data: VoiceUserTurn & { session_id: Identifier } }
   | { type: "voice-playback"; data: VoicePlayback & { session_id: Identifier } }
+  | { type: "voice-speech"; data: { session_id: Identifier; client_msg_id: Identifier; on: boolean; reason?: "voice_off" | "agents_muted" } }
   | { type: "voice-settings"; data: { session_id: Identifier; ui_language: string } }
   | { type: "voice-pong"; data: { session_id: Identifier } };
 
@@ -75,7 +84,8 @@ export type RoomServerEvent =
   | { type: "voice-session"; data: VoiceSession }
   | { type: "voice-reply"; data: VoiceReply }
   | { type: "voice-ack"; data: { client_msg_id: Identifier } }
-  | { type: "voice-user-turn"; data: { session_id: Identifier; phase: "started"; revision: number; thread_id: Identifier } }
+  | { type: "voice-user-turn"; data: { session_id: Identifier; phase: "started"; revision: number; epoch: number; thread_id: Identifier; turn_id: Identifier } }
+  | { type: "voice-reply-withdrawn"; data: { session_id: Identifier; utterance_ids: Identifier[]; reason: VoicePlayback["reason"] } }
   | { type: "voice-input-receipt"; data: Record<string, unknown> }
   /* Is anybody still there? The browser answers `{type:"voice-pong",data:{session_id}}`, and a
    * browser that stops answering loses its seat: behind a tunnel a closed tab leaves its socket up. */

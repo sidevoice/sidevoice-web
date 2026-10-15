@@ -40,7 +40,7 @@ export function stageConversation({ participants, title, viewed, selected, inCal
   const busy = isTarget && working;
   const personSpeaking = pendingPhase === "listening" || pendingPhase === "transcribing";
   const mood = stageMood({ inCall, isTarget, canHear: hears, reach: row?.reach ?? null, speaking, personSpeaking, working: busy });
-  return { threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: row?.unread ?? 0, mood };
+  return { threadId: viewed, row, title: row?.title || title, isTarget, inCall, canHear: hears, speaking, working: busy, unread: Math.max(row?.unread ?? 0, row?.unheard ?? 0), mood };
 }
 
 export function useStageConversation(): StageConversation {
