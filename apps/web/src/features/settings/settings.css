@@ -228,8 +228,11 @@
 .desktop-shortcut { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .desktop-shortcut p { margin: 0; font-size: var(--sv-font-sm); }
 .desktop-shortcut-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
-.desktop-shortcut-keys, .shortcut-keys { padding: 2px var(--sv-space-2); border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-sm); background: var(--sv-bg-sunken); font: 600 var(--sv-font-sm) / 1.5rem var(--sv-font-mono); color: var(--sv-text); }
-.desktop-shortcut-keys[data-state="refused"] { border-color: var(--sv-warning); }
+/* Each key its own cap, as macOS menus and keyboards draw them: a small raised tile (a thicker bottom edge), the
+   system font, centred; the caps of one shortcut side by side. */
+.shortcut-keys { display: inline-flex; align-items: center; gap: 4px; font: inherit; }
+.shortcut-key { display: inline-grid; place-items: center; min-width: 1.75rem; height: 1.75rem; padding: 0 var(--sv-space-2); border: 1px solid var(--sv-border); border-bottom-width: 2px; border-radius: 6px; background: var(--sv-surface-raised); font: 500 var(--sv-font-sm) / 1 var(--sv-font-sans, inherit); color: var(--sv-text); white-space: nowrap; }
+.shortcut-keys[data-state="refused"] .shortcut-key { border-color: var(--sv-warning); }
 .desktop-shortcut-refused { display: grid; gap: var(--sv-space-2); color: var(--sv-text); }
 .desktop-shortcut-alternatives { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); }
 .desktop-shortcut-note { color: var(--sv-text-muted); }

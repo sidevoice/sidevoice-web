@@ -30,15 +30,25 @@ export function ShortcutsSettings({ t }: { t: Translate }) {
   </Section>;
 }
 
+/** A shortcut as key caps, one per key: `⇧⌘M` and `Ctrl+Shift+M` alike become separate caps; words (Space, Press keys)
+ *  stay one. A screen reader hears the combination as written (aria-label). */
+function Keys({ combo, state }: { combo: string; state?: string }) {
+  const keys = combo.includes("+") ? combo.split("+").filter(Boolean)
+    : /^[⌘⌥⇧⌃]+./u.test(combo) ? [...combo.match(/^[⌘⌥⇧⌃]+/u)![0]].concat(combo.replace(/^[⌘⌥⇧⌃]+/u, "")) : [combo];
+  return <kbd className="shortcut-keys" data-state={state} aria-label={combo}>
+    {keys.map((key, index) => <kbd key={index} className="shortcut-key" aria-hidden>{key}</kbd>)}
+  </kbd>;
+}
+
 /** The keys the room answers while it is in front and nothing is being typed (room-session-controller.js), as the mute
  *  button's tooltip says them: ⌘D or Ctrl+D mutes and unmutes (either works anywhere; each system's own is shown), and
  *  Space held during a call talks while muted. Read only: the runtime owns them. */
 function PageShortcuts({ t }: { t: Translate }) {
   const mac = /^(Mac|iPhone|iPad)$/.test(deviceKind().os);
   return <Group title={t("settings.shortcuts.inApp")}>
-    <Row label={t("settings.shortcuts.mute")}><kbd className="shortcut-keys">{mac ? "⌘D" : "Ctrl+D"}</kbd></Row>
+    <Row label={t("settings.shortcuts.mute")}><Keys combo={mac ? "⌘D" : "Ctrl+D"} /></Row>
     <Row label={t("settings.shortcuts.holdToTalk")} description={t("settings.shortcuts.holdToTalkHint")}>
-      <kbd className="shortcut-keys">{t("settings.shortcuts.space")}</kbd>
+      <Keys combo={t("settings.shortcuts.space")} />
     </Row>
   </Group>;
 }
@@ -86,7 +96,7 @@ function MuteShortcutRow({ t }: { t: Translate }) {
   return <Row label={t("settings.desktop.muteShortcut")} block>
     <div className="desktop-shortcut">
       <div className="desktop-shortcut-line">
-        <kbd className="desktop-shortcut-keys" data-state={now?.state}>{recording ? t("settings.desktop.pressKeys") : shown || t("settings.desktop.shortcutNone")}</kbd>
+        <Keys combo={recording ? t("settings.desktop.pressKeys") : shown || t("settings.desktop.shortcutNone")} state={now?.state} />
         <Button size="sm" variant={recording ? "primary" : "secondary"} aria-pressed={recording} onKeyDown={record} onBlur={() => setRecording(false)}
           onClick={() => setRecording(!recording)}>{recording ? t("settings.desktop.recording") : t("settings.desktop.change")}</Button>
         {now?.accelerator && !recording && <Button size="sm" variant="ghost" tone="neutral" onClick={() => void set(null)}>{t("settings.desktop.clear")}</Button>}
