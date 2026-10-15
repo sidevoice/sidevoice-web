@@ -91,7 +91,8 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     return status.state === "granted" || status.state === "denied" ? status.state : "prompt";
   }
 
-  const onChange = () => { void check(); };
+  // A change while the prompt is open is its answer: the request says it, with what only it knows (none found, closed).
+  const onChange = () => { if (snapshot.state !== "requesting") void check(); };
 
   async function start() {
     if (!askable) return;
