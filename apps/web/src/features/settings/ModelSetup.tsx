@@ -324,7 +324,7 @@ function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
       {trial.phase === "failed" && trial.error && <ErrorText className="stage-try-error" role="alert" message={trial.error} />}
     </div>
     {/* The take to listen to, when the voice handed one: outside the live area, read when reached. */}
-    {!running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" t={t} />}
+    {!running && trial.take && <TryTake key={trial.attempt} take={trial.take} id="stt-take" turns={false} t={t} />}
   </div>;
 }
 
