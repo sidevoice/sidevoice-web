@@ -137,7 +137,7 @@ export const messages: Messages = {
   "session.reach.awayNamed": "No se llega a «{host}» por ningún camino. Comprueba que está encendida.",
   "session.mic.mute": "Silenciar micrófono",
   "session.mic.unmute": "Activar micrófono",
-  "session.mic.title": "{label}. Mantén Espacio para hablar si está silenciado.",
+  "session.mic.title": "{label}. Mantén pulsada la tecla Espacio para hablar con el micrófono silenciado.",
   "session.mic.choose": "Elige una conversación para hablar",
   "session.mic.chooseTitle": "Elige una conversación para hablar: sin ninguna seleccionada, el micrófono no envía nada.",
   "session.call.join": "Entrar en la llamada",

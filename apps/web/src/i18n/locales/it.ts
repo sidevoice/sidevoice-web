@@ -941,7 +941,7 @@ export const messages: Messages = {
   "settings.shortcuts.global": "Ovunque su questo computer",
   "settings.shortcuts.inApp": "Con Sidevoice in primo piano",
   "settings.shortcuts.mute": "Silenzia o riattiva il microfono",
-  "settings.shortcuts.holdToTalk": "Parla mentre è silenziato",
+  "settings.shortcuts.holdToTalk": "Parla con il microfono silenziato",
   "settings.shortcuts.holdToTalkHint": "Tieni premuto il tasto durante una chiamata; quando lo rilasci, il microfono torna silenziato.",
   "settings.shortcuts.space": "Spazio",
   "settings.call.keepAwake": "Tieni lo schermo acceso in chiamata",
