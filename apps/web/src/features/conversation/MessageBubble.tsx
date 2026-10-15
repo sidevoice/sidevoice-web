@@ -1,3 +1,6 @@
+import { Tooltip } from "../../components/ui/Tooltip";
+import { shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { Button } from "../../components/ui/Button";
 import { ListenAgainIcon, PendingIcon, ReadIcon, SentIcon, UncertainIcon } from "../../components/ui/Icons";
 import type { ChatMessage } from "../../state/room-types";
@@ -36,7 +39,9 @@ export function MessageBubble({ message, position }: { message: ChatMessage; pos
     <article className="chat-bubble" data-role={message.role} data-position={position} data-draft={message.draft || undefined}
       data-interrupted={message.interrupted && !message.globally_heard || undefined} aria-label={label}>
       <KaraokeText text={message.text} range={message.karaoke} playback={message.playback} />
-      {message.cancellable && <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>}
+      {message.cancellable && <Tooltip action content={shortcutTip(t("messages.cancel"), "cancelInput")}>
+        <Button variant="ghost" tone="danger" size="sm" className="cancel-input" aria-keyshortcuts={ariaKeyShortcuts("cancelInput")} onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
+      </Tooltip>}
       {(!message.draft || replay || delivery) && <div className="chat-meta">
         {audioMark && <span className="audio-fate-mark" title={audioMark}>{audioMark}</span>}
         {!message.draft && <time dateTime={new Date(message.time).toISOString()} title={new Date(message.time).toLocaleString(uiLocale())}>{new Date(message.time).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" })}</time>}

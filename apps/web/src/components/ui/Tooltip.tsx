@@ -24,6 +24,9 @@ export function overlayContainer(provided: HTMLElement | null, trigger: Element 
 interface TooltipProps {
   content: ReactNode;
   children: ReactElement;
+  /** The trigger is a button that does something (not an (i) that explains): a press does it and puts the tooltip away,
+   *  on touch too, so it never stays open over what the press opened, nor takes the Escape that closes it. */
+  action?: boolean;
 }
 
 /** Focus the browser shows, as a key moves it (not a click's, nor a script's after one). An engine without
@@ -36,7 +39,7 @@ function focusVisible(element: Element) {
  * (`:focus-visible`), never focus a script put there (a dialog or a notice closing); a click keeps it open (Radix's own
  * closes it on a click, which is just what an (i) gets). On touch: a tap toggles it, a tap outside or Escape closes it.
  * Drawn in a portal (the open dialog's, else the page's), so no scrolling box clips it. */
-export function Tooltip({ content, children }: TooltipProps) {
+export function Tooltip({ content, children, action }: TooltipProps) {
   const provided = useOverlayPortal();
   const [open, setOpenState] = useState(false);
   const openRef = useRef(false);
@@ -59,6 +62,7 @@ export function Tooltip({ content, children }: TooltipProps) {
         // Before Radix's own, which opens it on any focus: only on focus the browser shows.
         onFocus={(event) => { if (!focusVisible(event.currentTarget)) event.preventDefault(); }}
         onClick={(event) => {
+          if (action) { setOpen(false); window.setTimeout(() => { pressing.current = false; }, 0); return; }
           // Before Radix's own handler, which would close it.
           event.preventDefault();
           // A tap toggles, a click opens. Some browsers (WebKit) say "mouse" for a tap: a screen with no hover is a touch one.

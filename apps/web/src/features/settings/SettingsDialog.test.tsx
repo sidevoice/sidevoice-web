@@ -74,7 +74,7 @@ test("with a keyboard, Shortcuts follows Call: the keys the room answers, read o
   const pane = document.getElementById("pane-shortcuts")!;
   expect(pane).not.toHaveAttribute("hidden");
   expect(document.getElementById("settings-shortcuts")).toHaveAttribute("aria-current", "page");
-  expect([...pane.querySelectorAll(".shortcut-keys")].map((keys) => keys.textContent)).toEqual(["Ctrl+D", "Space"]);
+  expect([...pane.querySelectorAll(".shortcut-keys")].map((keys) => keys.getAttribute("aria-label"))).toEqual(["Ctrl+D", "Space", "S", "Ctrl+Z", "Ctrl+Shift+E", "T", "C"]);
   expect(pane.querySelector("button")).toBeNull();
   expect(document.getElementById("pane-call")).not.toHaveTextContent("Mute shortcut");
 });

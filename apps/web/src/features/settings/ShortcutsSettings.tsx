@@ -2,9 +2,11 @@ import { useEffect, useState, type KeyboardEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { muteShortcutBridge, type MuteShortcut } from "../../services/desktop-host";
-import { deviceKind } from "../../state/device-name";
 import { useMedia } from "../../state/call-layout";
 import type { Translate } from "../../i18n/translator";
+import { Keys, ShortcutKeys } from "../../components/ui/Keycaps";
+import { SHORTCUTS } from "../../state/shortcuts";
+import type { MessageKey } from "../../i18n/translator";
 
 /* Shortcuts, a Settings section of their own (web#137, 2026-10-15): the keys for the microphone, by where they work.
  * In the desktop app, its global shortcut that mutes the microphone from anywhere on the computer, recorded by pressing
@@ -30,26 +32,14 @@ export function ShortcutsSettings({ t }: { t: Translate }) {
   </Section>;
 }
 
-/** A shortcut as key caps, one per key: `⇧⌘M` and `Ctrl+Shift+M` alike become separate caps; words (Space, Press keys)
- *  stay one. A screen reader hears the combination as written (aria-label). */
-function Keys({ combo, state }: { combo: string; state?: string }) {
-  const keys = combo.includes("+") ? combo.split("+").filter(Boolean)
-    : /^[⌘⌥⇧⌃]+./u.test(combo) ? [...combo.match(/^[⌘⌥⇧⌃]+/u)![0]].concat(combo.replace(/^[⌘⌥⇧⌃]+/u, "")) : [combo];
-  return <kbd className="shortcut-keys" data-state={state} aria-label={combo}>
-    {keys.map((key, index) => <kbd key={index} className="shortcut-key" aria-hidden>{key}</kbd>)}
-  </kbd>;
-}
-
-/** The keys the room answers while it is in front and nothing is being typed (room-session-controller.js), as the mute
- *  button's tooltip says them: ⌘D or Ctrl+D mutes and unmutes (either works anywhere; each system's own is shown), and
- *  Space held during a call talks while muted. Read only: the runtime owns them. */
+/** The keys the room answers while it is in front and nothing is being typed, one row each, from the shortcuts table
+ *  (state/shortcuts.ts) that the key handler and the buttons' tooltips read too: each system's own keys are shown. Read
+ *  only: the runtime owns them. */
 function PageShortcuts({ t }: { t: Translate }) {
-  const mac = /^(Mac|iPhone|iPad)$/.test(deviceKind().os);
   return <Group title={t("settings.shortcuts.inApp")}>
-    <Row label={t("settings.shortcuts.mute")}><Keys combo={mac ? "⌘D" : "Ctrl+D"} /></Row>
-    <Row label={t("settings.shortcuts.holdToTalk")} description={t("settings.shortcuts.holdToTalkHint")}>
-      <Keys combo={t("settings.shortcuts.space")} />
-    </Row>
+    {SHORTCUTS.map((entry) => <Row key={entry.id} label={t(entry.label as MessageKey)} description={entry.id === "holdToTalk" ? t("settings.shortcuts.holdToTalkHint") : undefined}>
+      <ShortcutKeys id={entry.id} t={t} />
+    </Row>)}
   </Group>;
 }
 

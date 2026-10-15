@@ -12,6 +12,10 @@ import { translator } from "../../i18n/translator";
 import { ConversationAvatar } from "../call/ConversationAvatar";
 import { conversationState, isCallRow, machineGroups, stateText } from "../call/conversation-state";
 import { selectInCall, useStageConversation } from "../call/stage-view";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts } from "../../state/shortcuts";
+import { TOGGLE_CONVERSATIONS } from "../../state/use-room-shortcuts";
 import { ConversationRows } from "./ConversationRows";
 import { NewConversation } from "./NewConversation";
 import { openSettings } from "../settings/open-settings";
@@ -69,6 +73,14 @@ export function ConversationSidebar() {
     window.addEventListener(OPEN_CONVERSATIONS, show);
     return () => window.removeEventListener(OPEN_CONVERSATIONS, show);
   }, [openConversations]);
+  // The conversations' key (use-room-shortcuts.ts): the same as the toggle beside the list, in whichever layout this is.
+  const toggleNow = useRef(() => {});
+  toggleNow.current = () => { if (narrow) { if (open) close(); else openConversations(); } else toggle(); };
+  useEffect(() => {
+    const run = () => toggleNow.current();
+    window.addEventListener(TOGGLE_CONVERSATIONS, run);
+    return () => window.removeEventListener(TOGGLE_CONVERSATIONS, run);
+  }, []);
   // The panel hangs from the header's lower edge, wherever a banner above the room has put it: measured once per
   // opening, before it paints.
   useLayoutEffect(() => {
@@ -120,11 +132,13 @@ export function ConversationSidebar() {
         <div className="sidebar-brand"><SidevoiceMark size={22} /><span translate="no">Sidevoice</span></div>
         <div className="sidebar-head">
           <h2><ConversationsIcon />{t("sidebar.title")}</h2>
-          <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
-            aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")} title={rail ? t("sidebar.expand") : t("sidebar.collapse")}
-            onClick={toggle}>
-            {rail ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
-          </Button>
+          <Tooltip action content={shortcutTip(rail ? t("sidebar.expand") : t("sidebar.collapse"), "conversations")}>
+            <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-collapse" aria-controls="conversations" aria-expanded={!rail}
+              aria-label={rail ? t("sidebar.expand") : t("sidebar.collapse")} aria-keyshortcuts={ariaKeyShortcuts("conversations")}
+              onClick={toggle}>
+              {rail ? <SidebarExpandIcon /> : <SidebarCollapseIcon />}
+            </Button>
+          </Tooltip>
           <Button variant="ghost" tone="neutral" size="icon-sm" className="sidebar-close" aria-label={t("sidebar.close")} title={t("sidebar.close")} onClick={close}>
             <CloseUpIcon />
           </Button>

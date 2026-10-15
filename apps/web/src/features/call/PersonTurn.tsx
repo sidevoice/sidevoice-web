@@ -1,4 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { Button } from "../../components/ui/Button";
 import type { ConversationView } from "../../state/room-types";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
@@ -79,8 +82,10 @@ export function PersonTurn({ conversation, t }: { conversation: ConversationView
           <VoiceWaveform phase={conversation.pendingPhase === "transcribing" ? "transcribing" : "listening"} />
           {/* Its row kept whether or not the turn can be taken back now, so the balloon never changes size. */}
           <div className="person-live-actions">
-            {conversation.pendingCancellable && <Button variant="ghost" tone="neutral" size="sm" className="cancel-input"
-              onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>}
+            {conversation.pendingCancellable && <Tooltip action content={shortcutTip(t("stage.cancelTurn"), "cancelInput")}>
+              <Button variant="ghost" tone="neutral" size="sm" className="cancel-input" aria-keyshortcuts={ariaKeyShortcuts("cancelInput")}
+                onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("stage.cancelTurn")}</Button>
+            </Tooltip>}
           </div>
           <BalloonTail shape="person" />
         </div>

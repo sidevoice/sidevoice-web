@@ -1,3 +1,6 @@
+import { Tooltip } from "../../components/ui/Tooltip";
+import { shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
@@ -44,11 +47,13 @@ function ConversationsToggle({ t, hidden }: { t: Translate; hidden: ParticipantV
   const news = hidden.filter((row) => row.unread > 0 || (row.unheard ?? 0) > 0).length;
   const label = news ? t(news === 1 ? "header.allConversationsNews.one" : "header.allConversationsNews.other", { n: count, k: news }) : t("header.allConversations", { n: count });
   return (
-    <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} title={label}
-      aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
-      {hidden.length > 0 && <span className="conversations-rest" aria-hidden="true">+{Math.min(hidden.length, 99)}</span>}<ChevronIcon size={18} />
-      {news > 0 && <span className="conversations-cue" data-cue="unread" aria-hidden="true" />}
-    </Button>
+    <Tooltip action content={shortcutTip(label, "conversations")}>
+      <Button variant="ghost" tone="neutral" size="sm" className="conversations-toggle" aria-label={label} aria-keyshortcuts={ariaKeyShortcuts("conversations")}
+        aria-haspopup="dialog" aria-expanded={open} aria-controls="conversations" onClick={open ? closeConversations : openConversations}>
+        {hidden.length > 0 && <span className="conversations-rest" aria-hidden="true">+{Math.min(hidden.length, 99)}</span>}<ChevronIcon size={18} />
+        {news > 0 && <span className="conversations-cue" data-cue="unread" aria-hidden="true" />}
+      </Button>
+    </Tooltip>
   );
 }
 

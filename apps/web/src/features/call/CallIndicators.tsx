@@ -2,6 +2,9 @@ import { useRoomStore } from "../../state/room-store";
 import { Button } from "../../components/ui/Button";
 import { CallIcon, HangupIcon, MicrophoneIcon, MicrophoneOffIcon, SkipIcon, WarningIcon } from "../../components/ui/Icons";
 import { translator, type MessageKey } from "../../i18n/translator";
+import { Tooltip } from "../../components/ui/Tooltip";
+import { shortcutTip } from "../../components/ui/Keycaps";
+import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { cn } from "../../lib/cn";
 
 /* The lights and notes of the call bar. Each one is a projection of the session store and nothing else
@@ -26,10 +29,12 @@ export function SkipButton() {
   const t = translator();
   const playing = useRoomStore((state) => state.facts.botLive);
   return (
-    <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} title={t("toolbar.skip")}
-      onClick={() => window.sidevoiceActions?.skipReply()}>
-      <SkipIcon size={22} />
-    </Button>
+    <Tooltip action content={shortcutTip(t("toolbar.skip"), "skip")}>
+      <Button id="skip-reply" variant="ghost" className="call-button" disabled={!playing} aria-label={t("toolbar.skip")} aria-keyshortcuts={ariaKeyShortcuts("skip")}
+        onClick={() => window.sidevoiceActions?.skipReply()}>
+        <SkipIcon size={22} />
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -52,22 +57,26 @@ export function MuteButton() {
   const mic = useRoomStore((state) => state.mic);
   const silent = useMicSilent();
   return (
-    <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label} title={silent ?? mic.title}
-      aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
-      aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts="Meta+D Control+D"
-      onClick={() => window.sidevoiceActions?.toggleMic()}>
-      {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
-    </Button>
+    <Tooltip action content={shortcutTip(silent ?? mic.title, "mute")}>
+      <Button id="mute" variant="ghost" className={cn("call-button", mic.holding && "holding")} aria-label={mic.label}
+        aria-description={silent ?? undefined} data-silent={silent ? true : undefined}
+        aria-pressed={mic.pressed} disabled={mic.disabled} aria-keyshortcuts={ariaKeyShortcuts("mute")}
+        onClick={() => window.sidevoiceActions?.toggleMic()}>
+        {mic.pressed ? <MicrophoneOffIcon size={22} /> : <MicrophoneIcon size={22} />}
+      </Button>
+    </Tooltip>
   );
 }
 
 export function CallButton() {
   const call = useRoomStore((state) => state.call);
   return (
-    <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
-      aria-label={call.label} title={call.label} onClick={() => void window.sidevoiceActions?.toggleCall()}>
-      {call.joined ? <HangupIcon /> : <CallIcon />}
-    </Button>
+    <Tooltip action content={shortcutTip(call.label, "call")}>
+      <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
+        aria-label={call.label} aria-keyshortcuts={ariaKeyShortcuts("call")} onClick={() => void window.sidevoiceActions?.toggleCall()}>
+        {call.joined ? <HangupIcon /> : <CallIcon />}
+      </Button>
+    </Tooltip>
   );
 }
 
