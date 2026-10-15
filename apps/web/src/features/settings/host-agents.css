@@ -58,31 +58,18 @@
 /* Where a remote machine's steps are run, above them. */
 .host-agent-where { margin: 0 0 var(--sv-space-2); font-weight: 600; }
 
-/* Cursor's editor bridge is an independent readiness check below its unchanged two-line MCP row. */
-.host-agent-bridge { margin: 0 var(--sv-space-5) var(--sv-space-3); border-top: 1px solid var(--sv-border); }
+/* Cursor's editor bridge is an independent readiness check below its unchanged MCP row. */
+.host-agent-bridge { margin: 0 var(--sv-space-5) var(--sv-space-3); border-top: 1px solid var(--sv-border); min-width: 0; }
 .host-agent-bridge-toggle { width: 100%; height: auto; min-height: var(--sv-control-sm); justify-content: flex-start; padding-inline: 0; text-align: start; white-space: normal; }
 .host-agent-bridge-labels { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--sv-space-1) var(--sv-space-2); min-width: 0; overflow-wrap: anywhere; }
 .host-agent-bridge-toggle .ui-button-content { width: 100%; }
 .host-agent-bridge-toggle .ui-button-content > svg { flex: none; }
 .host-agent-bridge-state { margin-inline-start: auto; font-size: var(--sv-font-xs); font-weight: 600; color: var(--sv-text-muted); }
-.host-agent-bridge[data-state="ready"] .host-agent-bridge-state { color: var(--sv-positive); }
-.host-agent-bridge[data-state="needs_attention"] .host-agent-bridge-state { color: var(--sv-warning); }
-.host-agent-bridge-body { display: grid; gap: var(--sv-space-3); padding: var(--sv-space-1) 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
-.host-agent-bridge-body p { margin: 0; line-height: 1.4; }
-.host-agent-bridge-reason { color: var(--sv-text); }
-.host-agent-bridge-requirements { color: var(--sv-text-muted); }
-.host-agent-bridge-steps { display: grid; gap: var(--sv-space-2); margin: 0; padding-inline-start: var(--sv-space-5); }
-.host-agent-bridge-steps li { padding-inline-start: var(--sv-space-1); line-height: 1.4; }
-.host-agent-bridge-steps li::marker { color: var(--sv-text-muted); }
-.host-agent-bridge-steps .ui-quote { margin-block: var(--sv-space-2); }
-.host-agent-bridge-step-copy { overflow-wrap: anywhere; }
-.host-agent-bridge-setting-note { display: block; margin-top: 2px; color: var(--sv-text-muted); }
-.host-agent-bridge-step-state { display: inline-block; margin-inline-start: var(--sv-space-2); font-size: var(--sv-font-xs); font-weight: 600; white-space: nowrap; color: var(--sv-text-muted); }
-.host-agent-bridge-steps li[data-state="done"] .host-agent-bridge-step-state { color: var(--sv-positive); }
-.host-agent-bridge-steps li[data-state="needs_action"] .host-agent-bridge-step-state { color: var(--sv-warning); }
+.host-agent-bridge[data-state="running"] .host-agent-bridge-state { color: var(--sv-positive); }
+.host-agent-bridge[data-state="not_running"] .host-agent-bridge-state { color: var(--sv-warning); }
+.host-agent-bridge-body { display: grid; gap: var(--sv-space-2); padding: var(--sv-space-1) 0 var(--sv-space-3); font-size: var(--sv-font-sm); }
+.host-agent-bridge-body p { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
 @media (max-width: 550px) {
   .host-agent-bridge { margin-inline: var(--sv-space-4); }
   .host-agent-bridge-toggle { min-height: 44px; }
-  .host-agent-bridge-separator { display: none; }
-  .host-agent-bridge-requirements { display: grid; gap: 2px; }
 }

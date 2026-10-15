@@ -1,116 +1,62 @@
-import { afterEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, expect, test } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { CursorBridgeSetup } from "./CursorBridgeSetup";
 import { setUiLanguage, translator, UI_LANGUAGES } from "../../i18n/translator";
-import type { CursorBridgeReason, CursorBridgeStatus } from "../../state/room-types";
+import type { CursorBridgeStatus } from "../../state/room-types";
 
-const base: CursorBridgeStatus = {
-  state: "needs_attention", reason: "bridge_missing", cursor_version: "3.22.12",
-  minimum_cursor_version: "3.22.12", minimum_connector_version: "0.9.0",
-  steps: [
-    { id: "cursor_version", state: "done" },
-    { id: "enable_desktop_bridge", state: "unknown" },
-    { id: "bridge_running", state: "needs_action" },
-    { id: "sqlite3", state: "done" },
-    { id: "register_sidevoice", state: "done" },
-    { id: "join_editor_chat", state: "unknown" },
-    { id: "wait_for_chat_registration", state: "unknown" },
-  ],
-};
 const show = (bridge: CursorBridgeStatus) => {
   const view = render(<CursorBridgeSetup bridge={bridge} id="cursor-setup" />);
-  const title = translator()("agents.cursorBridge.title");
-  const button = screen.getByRole("button", { name: new RegExp(title) });
+  const button = screen.queryByRole("button", { name: /Desktop Bridge/ });
+  if (!button) return { view, button, panel: null };
   fireEvent.click(button);
-  return { view, panel: screen.getByRole("group", { name: title }), button };
+  return { view, button, panel: screen.getByRole("group", { name: "Desktop Bridge" }) };
 };
 afterEach(() => setUiLanguage("en"));
 
-test("bridge status stays separate from the setup steps, with the setting unknown rather than off", () => {
-  const { panel, button } = show(base);
+test("running bridge shows Ready and only the dependency sentence", () => {
+  const { button, panel } = show({ state: "running", chat_known: false });
   expect(button).toHaveAttribute("aria-expanded", "true");
   expect(button).toHaveAttribute("aria-controls", "cursor-setup");
+  expect(button).toHaveTextContent("Ready");
+  expect(panel).toHaveTextContent("Voice in the Cursor editor depends on Cursor’s Desktop Bridge.");
+  expect(panel?.querySelectorAll("p")).toHaveLength(1);
+  expect(panel).not.toHaveTextContent("Settings → Beta");
+  expect(panel).not.toHaveTextContent("Join the Sidevoice");
+  fireEvent.click(button!);
+  expect(screen.queryByRole("group", { name: "Desktop Bridge" })).toBeNull();
+});
+
+test("not running shows Needs attention and one setup instruction", () => {
+  const { button, panel } = show({ state: "not_running", chat_known: null });
   expect(button).toHaveTextContent("Needs attention");
-  expect(panel).toHaveTextContent("No running Desktop Bridge was found.");
-  expect(panel).toHaveTextContent("Cursor 3.22.12");
-  expect(panel).toHaveTextContent("Sidevoice service 0.9.0 or newer required");
-  const steps = [...panel.querySelectorAll(".host-agent-bridge-steps li")];
-  expect(steps).toHaveLength(7);
-  expect(steps.map((step) => step.getAttribute("data-state"))).toEqual(["done", "unknown", "needs_action", "done", "done", "unknown", "unknown"]);
-  expect(steps[1]).toHaveTextContent("Settings → Beta");
-  expect(steps[1]).toHaveTextContent("Allow CLI to access desktop agents");
-  expect(steps[1]).toHaveTextContent("Sidevoice cannot read this setting; check it in Cursor.");
-  expect(steps[1]).toHaveTextContent("Not verified");
-  expect(panel).toHaveTextContent("~/.cursor/desktop-bridge/*.json");
-  expect(panel).toHaveTextContent("sqlite3");
-  expect(panel).toHaveTextContent("new Cursor editor chat");
-  expect(panel).toHaveTextContent("bridge_chat_known is true");
-  fireEvent.click(button);
-  expect(screen.queryByRole("group", { name: "Desktop Bridge setup" })).toBeNull();
+  expect(panel?.querySelectorAll("p")).toHaveLength(2);
+  expect(panel).toHaveTextContent("Voice in the Cursor editor depends on Cursor’s Desktop Bridge.");
+  expect(panel).toHaveTextContent("Settings → Beta");
+  expect(panel).toHaveTextContent("Allow CLI to access desktop agents");
+  expect(panel).toHaveTextContent("restart Cursor");
+  expect(panel).not.toHaveTextContent("sqlite3");
+  expect(panel).not.toHaveTextContent("~/.cursor");
 });
 
-test("ready, attention, unknown, and unsupported use distinct summaries without calling unsupported an error", () => {
-  for (const [state, reason, summary] of [
-    ["ready", null, "Ready"], ["needs_attention", "bridge_stale", "Needs attention"],
-    ["unknown", "cursor_version_unknown", "Cannot verify"], ["unsupported", "editor_unavailable", "Unsupported"],
-  ] as const) {
-    const { view, panel, button } = show({ ...base, state, reason });
-    expect(button).toHaveTextContent(summary);
-    expect(button.closest(".host-agent-bridge")).toHaveAttribute("data-state", state);
-    if (reason === null) expect(panel.querySelector(".host-agent-bridge-reason")).toBeNull();
-    if (reason === "editor_unavailable") expect(panel).toHaveTextContent("the CLI alone cannot use the Desktop Bridge");
+test("unsupported and unknown bridge states look like agents without a bridge", () => {
+  for (const state of ["unsupported", "future_state"] as const) {
+    const { view, button } = show({ state, chat_known: false } as CursorBridgeStatus);
+    expect(button).toBeNull();
+    expect(document.querySelector(".host-agent-bridge")).toBeNull();
     view.unmount();
   }
 });
 
-test("every connector reason is localized and the unknown version is not presented as an old version", () => {
-  const cases: [CursorBridgeReason, string][] = [
-    ["cursor_version_too_old", "Update Cursor to 3.22.12"],
-    ["bridge_missing", "No running Desktop Bridge"],
-    ["bridge_stale", "Sidevoice could not verify a usable bridge"],
-    ["sqlite3_missing", "cannot find sqlite3"],
-    ["sidevoice_not_registered", "not connected to Sidevoice"],
-    ["cursor_version_unknown", "version could not be verified"],
-    ["registration_unknown", "registration could not be verified"],
-    ["editor_unavailable", "editor is unavailable"],
-  ];
-  for (const [reason, words] of cases) {
-    const { view, panel } = show({ ...base, reason, cursor_version: null });
-    expect(within(panel).getByText((text) => text.includes(words))).toBeInTheDocument();
-    expect(panel).toHaveTextContent("Cursor version not verified");
-    view.unmount();
-  }
-});
-
-test("the Cursor editor prompt uses the shared Quote and copies only the phrase", async () => {
-  const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-  const writeText = vi.fn(async (_text: string) => {});
-  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-  try {
-    const { panel } = show(base);
-    const join = panel.querySelectorAll<HTMLLIElement>(".host-agent-bridge-steps li")[5];
-    expect(join).toHaveTextContent("In a new Cursor editor chat (not cursor-agent), ask:");
-    expect(join.querySelector(".ui-quote blockquote")).toHaveTextContent("Join the Sidevoice voice room");
-    await act(async () => fireEvent.click(within(join).getByRole("button", { name: "Copy the message for your agent" })));
-    expect(writeText).toHaveBeenCalledExactlyOnceWith("Join the Sidevoice voice room");
-  } finally {
-    if (previous) Object.defineProperty(navigator, "clipboard", previous);
-    else Reflect.deleteProperty(navigator, "clipboard");
-  }
-});
-
-test("the new copy exists in all eight catalogues, including the unreadable-setting explanation", () => {
+test("all eight catalogues have exactly the five final bridge keys", () => {
   expect(UI_LANGUAGES).toHaveLength(8);
+  const keys = ["agents.cursorBridge.title", "agents.cursorBridge.state.ready", "agents.cursorBridge.state.needs_attention",
+    "agents.cursorBridge.dependency", "agents.cursorBridge.instruction"] as const;
   for (const language of UI_LANGUAGES) {
     const t = translator(language);
-    for (const key of ["agents.cursorBridge.title", "agents.cursorBridge.state.unsupported", "agents.cursorBridge.reason.editor_unavailable",
-      "agents.cursorBridge.step.enable_desktop_bridge", "agents.cursorBridge.step.wait_for_chat_registration", "agents.cursorBridge.joinPrompt", "agents.cursorBridge.settingUnknown"] as const)
-      expect(t(key), `${language}: ${key}`).not.toBe(key);
-    expect(t("agents.cursorBridge.step.cursor_version", { minimum: "3.22.12" })).toContain("3.22.12");
+    for (const key of keys) expect(t(key), `${language}: ${key}`).not.toBe(key);
   }
-  setUiLanguage("es");
-  const { panel, view } = show({ ...base, reason: "bridge_missing" });
-  expect(panel).toHaveTextContent("No se encontró ningún Desktop Bridge en ejecución.");
-  expect(panel).toHaveTextContent("Sidevoice no puede leer este ajuste");
+  setUiLanguage("de");
+  const { panel, view } = show({ state: "not_running", chat_known: false });
+  expect(panel).toHaveTextContent("Settings → Beta");
   view.unmount();
 });

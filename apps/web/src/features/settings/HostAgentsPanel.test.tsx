@@ -5,7 +5,7 @@ import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import type { DetectedAgent, HostAgentsState } from "../../state/room-types";
+import type { CursorBridgeStatus, DetectedAgent, HostAgentsState } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -484,26 +484,27 @@ test("a machine with only Cursor installed lists Cursor, and Other to connect an
   expect(document.querySelector("#host-agent-other-howto")).toHaveTextContent("sidevoice connector mcp");
 });
 
-test("Cursor shows bridge readiness beneath its unchanged MCP row while other agent cards stay unchanged", () => {
+test("Cursor bridge disclosure leaves the Codex card unchanged and hides unsupported or unknown states", () => {
   const store = createRoomStore();
   setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
-  act(() => store.patch({ hostAgents: { fp: ready([
-    known("cursor", { label: "Cursor", registration: "connected", cursor_bridge: {
-      state: "needs_attention", reason: "bridge_missing", cursor_version: "3.22.12",
-      minimum_cursor_version: "3.22.12", minimum_connector_version: "0.9.0",
-      steps: [{ id: "enable_desktop_bridge", state: "unknown" }, { id: "bridge_running", state: "needs_action" }],
-    } }),
+  const agents = (state: "running" | "not_running" | "unsupported" | "future_state") => ready([
+    known("cursor", { label: "Cursor", registration: "connected", cursor_bridge: { state, chat_known: null } as CursorBridgeStatus }),
     known("codex", { registration: "connected" }),
-  ]) } }));
+  ]);
+  act(() => store.patch({ hostAgents: { fp: agents("not_running") } }));
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
   const [cursor, codex] = [...document.querySelectorAll<HTMLElement>(".host-agent-row")];
   expect(cursor.querySelector(".host-agent-status")).toHaveTextContent(/^Connected$/);
   expect(cursor.querySelector(".host-agent-status")).toHaveClass("host-agent-ok");
-  expect(within(cursor).getByRole("button", { name: /Desktop Bridge setup.*Needs attention/ })).toBeInTheDocument();
+  expect(within(cursor).getByRole("button", { name: /Desktop Bridge.*Needs attention/ })).toBeInTheDocument();
   expect(within(cursor).getByRole("button", { name: "Disconnect Cursor from Sidevoice" })).toBeInTheDocument();
-  expect(codex.querySelector(".host-agent-bridge")).toBeNull();
-  expect(codex.querySelector(".host-agent-main")?.textContent).toContain("Connected");
-  expect(within(codex).getByRole("button", { name: "Disconnect Codex from Sidevoice" })).toBeInTheDocument();
-  fireEvent.click(within(cursor).getByRole("button", { name: /Desktop Bridge setup/ }));
-  expect(within(cursor).getByRole("group", { name: "Desktop Bridge setup" })).toHaveTextContent("No running Desktop Bridge was found.");
+  const codexBefore = codex.innerHTML;
+  fireEvent.click(within(cursor).getByRole("button", { name: /Desktop Bridge/ }));
+  expect(within(cursor).getByRole("group", { name: "Desktop Bridge" })).toHaveTextContent("Settings → Beta");
+  expect(codex.innerHTML).toBe(codexBefore);
+  for (const state of ["unsupported", "future_state"] as const) {
+    act(() => store.patch({ hostAgents: { fp: agents(state) } }));
+    expect(document.querySelector(".host-agent-bridge")).toBeNull();
+    expect(codex.innerHTML).toBe(codexBefore);
+  }
 });

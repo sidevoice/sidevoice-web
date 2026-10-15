@@ -91,19 +91,10 @@ export interface MachineView {
 }
 
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */
-export type CursorBridgeState = "ready" | "needs_attention" | "unknown" | "unsupported";
-export type CursorBridgeReason = "cursor_version_too_old" | "bridge_missing" | "bridge_stale" | "sqlite3_missing"
-  | "sidevoice_not_registered" | "cursor_version_unknown" | "registration_unknown" | "editor_unavailable";
-export type CursorBridgeStepId = "cursor_version" | "enable_desktop_bridge" | "bridge_running" | "sqlite3"
-  | "register_sidevoice" | "join_editor_chat" | "wait_for_chat_registration";
-export type CursorBridgeStepState = "done" | "needs_action" | "unknown";
+export type CursorBridgeState = "running" | "not_running" | "unsupported";
 export interface CursorBridgeStatus {
   state: CursorBridgeState;
-  reason: CursorBridgeReason | null;
-  cursor_version: string | null;
-  minimum_cursor_version: string;
-  minimum_connector_version: string;
-  steps: { id: CursorBridgeStepId; state: CursorBridgeStepState }[];
+  chat_known: boolean | null;
 }
 export interface DetectedAgent {
   id: string;

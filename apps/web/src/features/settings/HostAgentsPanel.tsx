@@ -199,8 +199,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             </Tooltip>}
         </span>
       </div>
-      {agent.id === "cursor" && agent.cursor_bridge &&
-        <CursorBridgeSetup bridge={agent.cursor_bridge} id={`host-agent-bridge-${fp.slice(0, 7)}-${agent.id}`} />}
+      {agent.id === "cursor" && agent.cursor_bridge && <CursorBridgeSetup bridge={agent.cursor_bridge} id={`host-agent-bridge-${fp.slice(0, 7)}-${agent.id}`} />}
       {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}
         onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConfirm(); } }}>
         <p>{t("agents.disconnectConfirm", { agent: agent.label })}</p>
