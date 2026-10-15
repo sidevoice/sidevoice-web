@@ -111,21 +111,24 @@ const SAID = "Okay, so here's what I'd like you to do next. First, go through th
   "still saves when you change it, because I think the one for automatic updates stopped doing that after yesterday's refactor.";
 
 test("what is said on the stage is big and clear, the agent's bigger, three lines a page with the page before fading above, and whole for assistive tech", async ({ page }) => {
-  // The agent's balloon a size up from the person's (2026-10-15): [size, line] of each.
-  for (const [width, agent, person] of [[1280, [24, 33], [21, 30]], [320, [21, 30], [18, 27]]]) {
+  // The agent's balloon a size up from the person's (2026-10-15): [size, line] of each, on a slide whose unit (--u) is
+  // one px — the tile's --k set so (its height over the lab's 440, times 440 over the form factor's --stage-ref: the web
+  // slide's 600, the phone's 360) — the line on whole pixels (the slide's 25.6/35.2 and 22.4/32, the phone's 22.4/32 and
+  // 19.2/28.8).
+  for (const [width, k, agent, person] of [[1280, 600 / 440, [25.6, 35], [22.4, 32]], [320, 360 / 440, [22.4, 32], [19.2, 29]]]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/voice/");
-    await page.evaluate((said) => {
+    await page.evaluate(([said, k]) => {
       const host = document.createElement("div");
       host.className = "call-layout";
-      host.innerHTML = `<div class="stage-tile" style="width: 100%; height: 640px">
+      host.innerHTML = `<div class="stage-tile" data-mood="listening" style="width: 100%; height: 640px; --k: ${k}">
         <div class="stage-top"><div class="speech-bubble stage-bubble" data-visible="" aria-hidden="true"><span class="paged-text">
           <span class="paged-text-run"><span class="karaoke-text" data-playback="playing" data-progress="true"><span class="karaoke-played">${said.slice(0, 90)}</span><span class="karaoke-upcoming">${said.slice(90)}</span></span></span>
         </span></div></div>
         <div class="person-turns"><div class="speech-bubble person-bubble" data-sent=""><span class="person-said"><span class="paged-text">
           <span class="paged-text-run">${said}</span></span></span></div></div></div>`;
       document.body.replaceChildren(host);
-    }, SAID);
+    }, [SAID, k]);
     await page.evaluate(() => document.fonts.load('450 18px "DM Sans"'));
     for (const theme of ["light", "dark"]) {
       const paint = await page.evaluate((theme) => {
