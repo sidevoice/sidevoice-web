@@ -460,6 +460,11 @@ function acceptEpoch(thread,epoch){if(Number.isInteger(epoch))threadEpochs.set(t
 const openVoiceTurns=new Map();
 const awaitingTurnAck=new Map();
 const startMessageTurns=new Map();
+let callGeneration=0;
+function clearTurnLifecycle(){
+ ++callGeneration;turnNodes.clear();openVoiceTurns.clear();handleIds.clear();replyQueue.length=0;
+ awaitingTurnAck.clear();startMessageTurns.clear();threadEpochs.clear();turnSend=Promise.resolve();turnSendPending=0;
+}
 let speechOutput='on';
 let stoppingReplies=false;
 function reportPlayback(said,data){
@@ -479,7 +484,7 @@ function stopReplies(reason,onlyPlaying=false){
  stoppingReplies=true;
  for(const said of [...replies.values()]){
   if(onlyPlaying&&!said.playing)continue;
-  said.action=reason;
+  if(said.action!=='user_skipped')said.action=reason;
   if(said.saying)said.saying.cancel();
   else finishReply(said,{status:'unplayed',reason});
  }
@@ -1184,7 +1189,7 @@ function recordMessage(raw, socket) {
     }
     if (t === 'voice-ack') {
         outbox.remove(d.client_msg_id);
-        startMessageTurns.delete(d.client_msg_id);
+        // Core acknowledges transport before it can accept or refuse the start.
         return;
     }
     // The room asks whether anyone is still here, because a closed tab behind a tunnel leaves its
@@ -1214,6 +1219,7 @@ function recordMessage(raw, socket) {
         state.roomRevision = Math.max(state.roomRevision, d.revision);
         acceptEpoch(d.thread_id,d.epoch);
         awaitingTurnAck.delete(d.turn_id);
+        for(const [id,turn] of startMessageTurns)if(turn===d.turn_id)startMessageTurns.delete(id);
         if (state.userTurn?.id === d.turn_id)
             state.userTurn = { ...state.userTurn, thread: conversationKey(state.callNode, d.thread_id) };
         drainReplies();
@@ -1255,10 +1261,12 @@ function recordMessage(raw, socket) {
             // An end refused because its start was: its words go again, as the start now allows.
             const words = relay.refusedMessage(d.client_msg_id, d.key);
             const turnId=startMessageTurns.get(d.client_msg_id);
-            if(turnId){startMessageTurns.delete(d.client_msg_id);awaitingTurnAck.delete(turnId)}
+            if(turnId){startMessageTurns.delete(d.client_msg_id);if(d.key!=='room.turns_full')awaitingTurnAck.delete(turnId)}
             if (words)
                 keepMessage('user-turn', 'voice-user-turn', words);
             flushOutbox();
+            drainReplies();
+            if(d.key!=='room.turns_full'&&d.key!=='room.input_ended')setRoomError(roomError(refusalError(d)));
             return;
         }
         setRoomError(roomError(refusalError(d)));
@@ -1274,13 +1282,19 @@ let turnSend=Promise.resolve();
 let turnSendPending=0;
 function voiceTurn(turn){
  if(turn.phase==='started'){
-  turnNodes.set(turn.turn_id,{node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id});
+  turnNodes.set(turn.turn_id,{node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration});
   if(turnNodes.size>64)turnNodes.delete(turnNodes.keys().next().value);
  }
  const target=turnNodes.get(turn.turn_id);
  if(turn.phase!=='started')turnNodes.delete(turn.turn_id);
- if(!target||target.node!==state.callNode)return;
- if(turn.phase==='started')openVoiceTurns.set(turn.turn_id,target.thread_id);
+ if(!target||target.node!==state.callNode||target.generation!==callGeneration)return;
+ if(turn.phase==='started'){
+  openVoiceTurns.set(turn.turn_id,target.thread_id);
+  // The voice displaces active handles itself. Replies still only in this page's queue need their own terminal receipt.
+  stoppingReplies=true;
+  for(const said of [...replies.values()])if(said.reply.thread_id===target.thread_id&&!said.saying)finishReply(said,{status:'unplayed',reason:'newer_turn'});
+  stoppingReplies=false;
+ }
  else openVoiceTurns.delete(turn.turn_id);
  roomStore.batch(()=>{
   if(turn.phase==='started'){
@@ -1303,7 +1317,9 @@ function voiceTurn(turn){
  const payload=turnMessage(turn,target);
  // A final turn frame cannot outrun the terminal playback evidence it caused.
  const active=turn.phase==='started'?[]:[...replies.values()].filter(said=>said.reply.thread_id===target.thread_id&&said.saying);
+ const generation=callGeneration;
  const send=()=>{
+  if(generation!==callGeneration||target.node!==state.callNode||!state.sessionId)return;
   const entry=keepMessage('user-turn','voice-user-turn',payload);
   if(turn.phase==='started'){awaitingTurnAck.set(turn.turn_id,target.thread_id);startMessageTurns.set(entry.id,turn.turn_id)}
   flushOutbox();drainReplies();
@@ -1311,7 +1327,7 @@ function voiceTurn(turn){
  if(!turnSendPending&&!active.length)send();
  else{
   ++turnSendPending;
-  turnSend=turnSend.then(async()=>{await Promise.allSettled(active.map(said=>said.saying.outcome));send()}).finally(()=>{--turnSendPending});
+  turnSend=turnSend.then(async()=>{await Promise.allSettled(active.map(said=>said.saying.outcome));send()}).finally(()=>{if(generation===callGeneration)--turnSendPending});
  }
 }
 // A receipt the room sent before this page had the row it is about: handed over once, then forgotten.
@@ -1413,6 +1429,7 @@ function disconnect() {
     window.sidevoiceTelemetry?.endCall?.('left');
     // A hang-up ends what the call still owed its session.
     outbox.clear();
+    clearTurnLifecycle();
     resumeToken = null;
     lastSeq = 0;
     keepTicket(true);
@@ -1463,7 +1480,7 @@ function attachVoice(next){
   const coreId=handleIds.get(cut.utterance_id),said=coreId&&replies.get(coreId);
   if(!said)return;
   const heard=scalarExtent(said.reply.text,cut.heard_until);
-  finishReply(said,cut.played?{status:'interrupted',reason:'user_interrupted',heard_chars:heard??0}:{status:'unplayed',reason:'newer_turn'});
+  finishReply(said,said.action==='user_skipped'?{status:cut.played?'interrupted':'unplayed',reason:'user_skipped',...(cut.played?{heard_chars:heard??0}:{})}:cut.played?{status:'interrupted',reason:'user_interrupted',heard_chars:heard??0}:{status:'unplayed',reason:'newer_turn'});
  }));
  void watchAudioDevices();
 }
@@ -1486,6 +1503,7 @@ async function watchAudioDevices(){
 }
 function audioDevicesChanged(devices){
  if(devices.lost){const kept=storedAudio();if(devices.lost.input)delete kept.input;if(devices.lost.output)delete kept.output;keepAudio(kept)}
+ if(devices.lost?.output)setSpeechOutput('agents_muted');
  roomStore.patch({audioDevices:{inputs:devices.inputs||[],outputs:devices.outputs||[],input:devices.input??null,output:devices.output??null,outputSelectable:!!devices.outputSelectable},
   ...(devices.lost?{audioLost:devices.lost}:{})});
 }
@@ -1702,6 +1720,7 @@ async function drainOutbox(node,ms,mine){
 }
 // The call's session ends, its voice does not: the socket is closed as a hang-up, and nothing of that session stays.
 function leaveSession(){
+ clearTurnLifecycle();
  const socket=state.ws;
  if(socket){socket.onclose=socket.onmessage=socket.onerror=null;try{socket.close(1000)}catch{}}
  window.sidevoiceTelemetry?.endCall?.('moved');
