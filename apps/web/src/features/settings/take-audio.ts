@@ -1,5 +1,8 @@
 import { waveColumn } from "../conversation/VoiceWaveform";
-import { takeMs, type VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
+
+/** How long a take lasts, in ms. */
+export const takeMs = (take: VoiceTake) => (take.samples.length / take.sampleRate) * 1000;
 
 /* A try's take as the page draws and plays it (TryTake.tsx): its loudness in columns, on the live waveform's own scale,
  * and a player over a copy of it in memory. Nothing of it leaves the page or is kept: the player's copy goes with

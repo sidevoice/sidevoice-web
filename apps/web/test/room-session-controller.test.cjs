@@ -436,7 +436,7 @@ test('The waveform bubble draws the level the voice reports, and nothing without
  assert.deepEqual(wave.slice(-2).map(Math.abs),[0.5,0.25],'the newest levels last');
  assert.equal(s.run("$('mic-level-meter').getAttribute('aria-valuenow')"),'25');
 });
-test('Optional speaker levels follow the active conversation and clear on silence and disconnect',()=>{
+test('Speaker levels follow the active conversation and clear on silence and disconnect',()=>{
  const s=setup(),events=[];
  s.context.window.sidevoiceUI={playbackLevel:{publish:(level,thread)=>events.push([level,thread]),clear:()=>events.push([0,null])}};
  const host=fakeVoice();
@@ -804,6 +804,21 @@ test('A local row survives reload with no native pairing',async()=>{
  assert.deepEqual(saved.pairings.map(pairing=>pairing.fp),[PAIRED.fp]);
 });
 
+test('An external uninstall projects absent and removes the former local machine',async()=>{
+ const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
+ let onStatus;
+ const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd'}),subscribe:listener=>{onStatus=listener;return()=>{}},pairing:()=>local};
+ const s=setup({paired:false,stored:{pairings:[PAIRED]},localHost:bridge});
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({participants:[],messages:[],binding:null,call:null}),text:async()=>''});
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(s.run('roomStore.getState().machines.some(machine=>machine.local)'),true);
+ onStatus({state:'absent',installed:false,reachable:false});
+ const snapshot=s.run('roomStore.getState()');
+ assert.equal(snapshot.facts.localHostStatus.state,'absent');
+ assert.equal(snapshot.machines.some(machine=>machine.local),false);
+ assert.equal(snapshot.machines.some(machine=>machine.id===PAIRED.fp),true,'another paired machine remains in the room');
+});
+
 test('In the desktop app, this device\'s agents are asked for in This device and another machine\'s under Remote machines; in a browser, all under Machines',async()=>{
  const local={fp:'fp-local',public_key:'pk-local',host:'MacBook',device_id:'local-device',token:'local-session-secret',urls:['http://127.0.0.1:43127'],rv:null};
  const bridge={state:()=>({state:'running',reachable:true,installed:true,service:'launchd',core:{version:'1.0',api:1}}),subscribe:()=>()=>{},pairing:()=>local};
@@ -1077,9 +1092,9 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
   said.push(handle);return handle;
  };
  return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
-  setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async()=>{calls.push(['start']);await start()},stop:async()=>{calls.push(['stop'])},
+  setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onError:sub('error')};
+  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onTake:sub('take'),onError:sub('error')};
 }
 // The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
 function fakeEngine(catalogs){
@@ -1241,7 +1256,7 @@ test('Settings send only the interface language to the room',async()=>{
 const build=(id,extra={})=>({id,backend:'sherpa-onnx',precision:'int8',downloadBytes:1,memoryMb:1,available:true,reasons:[],installed:true,...extra});
 const CATALOGS=[
  {id:'local',name:null,status:{stale:false},models:[
-  {id:'whisper-base',family:'whisper',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[build('whisper-base/int8')]},
+  {id:'whisper-base',family:'whisper',capabilities:['stt'],languages:['es','en'],voices:[],installed:true,builds:[build('whisper-base/int8',{accelerator:'cpu',acceleratorClass:'cpu'})]},
   {id:'kokoro-82m-v1.0',family:'kokoro',capabilities:['tts'],languages:['es'],voices:[{id:'ef_dora',languages:['es']}],speed:{min:0.5,max:2},installed:true,builds:[build('kokoro/int8')]},
  ]},
  {id:'openai',name:'OpenAI',status:{stale:false},models:[{id:'gpt-4o-transcribe',capabilities:['stt'],languages:[],voices:[]}]},
@@ -1260,6 +1275,8 @@ test('Opening the settings reads the engine\'s catalogues and which providers ha
  const facts=s.run('roomStore.getState().facts');
  assert.equal(facts.voiceCatalogue.state,'ready');
  assert.deepEqual(plain(facts.voiceCatalogue.catalogs.map(c=>[c.id,c.models.map(m=>m.id)])),[['local',['whisper-base','kokoro-82m-v1.0']],['openai',['gpt-4o-transcribe']],['elevenlabs',[]]]);
+ assert.equal(facts.voiceCatalogue.catalogs[0].models[0].builds[0].acceleratorClass,'cpu','the desktop engine class reaches the store');
+ assert.equal(Object.hasOwn(facts.voiceCatalogue.catalogs[0].models[1].builds[0],'acceleratorClass'),false,'a missing class stays missing');
  assert.deepEqual(plain(facts.providerKeys),{openai:true,elevenlabs:false},'one key per remote catalogue');
  assert.deepEqual(plain(facts.voiceDraft),plain(facts.voiceSettings),'the pane starts from what is kept');
 });
@@ -1569,7 +1586,7 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const result=plain(await tried);assert.equal(result.text,'hola');
  // With how long its phases took (the fake voice says nothing of its recognition).
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop'],'the voice is started for the try and stopped after it');
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop'],'the voice is started for the try, muted as its turn ends the take, and stopped after it');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
@@ -1597,7 +1614,7 @@ test('A try tells whoever shows it how it goes: the voice listening and the micr
  assert.deepEqual(plain(told),[{from:0,to:0},{from:10,to:18},{from:18,to:18}]);
 });
 
-test('A try that records the person hands on the take its voice gives once stopped (contract gap #40); a voice without one is asked for none',async()=>{
+test('A try requests a take and hands it over after the voice stops',async()=>{
  const s=setup({strictDOM:true}),voice=withVoice(s,fakeVoice());s.context.localStorage.setItem('sidevoice.settings','{}');
  const takes=[];s.context.takes=takes;
  const ask=async task=>{
@@ -1606,16 +1623,13 @@ test('A try that records the person hands on the take its voice gives once stopp
   voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
   await tried;
  };
- await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop']);
- assert.deepEqual(takes,[],'0.3.x hands none');
- // A voice with a take: asked for one as it starts, and it is handed on once the voice has stopped.
+ // Asked for one as it starts; handed on once the voice has stopped.
  const listeners=new Set();voice.calls.length=0;
  voice.start=async options=>{voice.calls.push(['start',options])};
  voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
  voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
  await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop']]);
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['mute',true],['mute',false],['stop']]);
  assert.deepEqual([...takes],[1]);
  assert.equal(listeners.size,0,'and the voice is let go');
  // The end of turn's too, once stopped.

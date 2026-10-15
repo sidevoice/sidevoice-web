@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TryTake } from "./TryTake";
 import { takeColumns, takeWav } from "./take-audio";
 import { translator } from "../../i18n/translator";
-import type { VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
 
 /* A try's take, played from memory: jsdom plays nothing and has no object URLs, so the page's player is watched
  * through them (`play`, `pause`, `createObjectURL`, `revokeObjectURL`); it has no PointerEvent either, so a mouse's
@@ -59,6 +59,22 @@ test("the whole take, from the moment the voice listened to the moment it stoppe
   expect(slider()).toHaveAttribute("aria-valuetext", "0.0 s of 4.0 s");
   // Drawn, never read out.
   expect(figure.querySelector(".try-take-bars")).toHaveAttribute("aria-hidden", "true");
+});
+
+test("a take whose turns are not marked (the transcription try's) shows only its start and its stop: no speech, pause or end", () => {
+  render(<TryTake take={takeOf(4000, { loud: [[500, 1500], [2000, 3000]], turns: [TURN] })} id="stt-take" turns={false} t={t} />);
+  const figure = document.getElementById("stt-take")!;
+  expect(figure.querySelector(".try-take-mark")).toBeNull();
+  expect(figure.querySelector(".try-take-pause")).toBeNull();
+  // In words, its length alone: from where it started to where it stopped.
+  const words = document.getElementById(slider().getAttribute("aria-describedby")!)!;
+  expect(words.textContent).toBe("4.0 s recorded");
+  expect(figure.querySelector(".try-take-clock")).toHaveTextContent("0.0 / 4.0 s");
+  expect(play()).toBeInTheDocument();
+  // With no speech in it, nothing is said of speech either.
+  cleanup();
+  render(<TryTake take={takeOf(2000)} id="stt-take" turns={false} t={t} />);
+  expect(document.getElementById("stt-take")).not.toHaveTextContent("no speech detected");
 });
 
 test("a take with no speech in it says so", () => {

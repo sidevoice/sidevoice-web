@@ -11,7 +11,7 @@ import { translator, type MessageKey } from "../../i18n/translator";
 import { voiceFailure, type ErrorMessage } from "./error-message";
 import type { TurnStep } from "../../services/voice-trial.js";
 import type { DeviceVoiceSettings as Settings } from "../../services/voice-settings.js";
-import type { VoiceTake } from "../../services/voice-take";
+import type { VoiceTake } from "@sidevoice/voice";
 import "./model-prepare.css";
 import "./turn-try.css";
 
@@ -26,8 +26,8 @@ import "./turn-try.css";
  * speech, heard by the microphone, would open turns of its own. Try and Stop are one button, so the focus stays.
  *
  * Once it has stopped, its take — what the microphone gave the voice since it last started to listen, with where each
- * turn's speech started, paused and ended — shows under the result, to play (TryTake), where the voice hands one
- * (contract gap #40). It is held here only, in memory, until the next try or until this goes away. */
+ * turn's speech started, paused and ended — shows under the result, to play (TryTake).
+ * It is held here only, in memory, until the next try or until this goes away. */
 
 /** Where the try shows (the preview's VARIANTS `turn-try`): a strip under the end-of-turn choice, with no border of its
  *  own (`strip`), or a card of its own after the end-of-turn choices, as a model's try looks (`card`). */

@@ -1,15 +1,19 @@
 import { expect, test, vi } from "vitest";
 import { pageVoice, swappingVoiceHost } from "./voice-module.js";
+import type { VoiceHost, VoiceModelSource } from "@sidevoice/voice";
 
 /* Where the page's voice and its models' catalogues come from: the desktop app's, or one engine on this page. */
 
 test("in the desktop app both are the app's: the voice, and the engine's catalogues and keys", async () => {
-  const engine = { catalogs: async () => [], setCredential: async () => {}, hasCredential: async () => false };
+  const builds = [{ accelerator: "metal", acceleratorClass: "gpu" }, { accelerator: "cpu" }];
+  const engine = { catalogs: async () => [{ models: [{ builds }] }], setCredential: async () => {}, hasCredential: async () => false };
   const host = { voice: { say: () => null }, engine };
   const load = vi.fn();
   const page = pageVoice({ host, load });
   expect(await page.voice()).toBe(host.voice);
   expect(await page.catalogs()).toBe(engine);
+  expect((await (await page.catalogs()).catalogs())[0].models[0].builds).toBe(builds);
+  expect(builds[1]).not.toHaveProperty("acceleratorClass");
   expect(load).not.toHaveBeenCalled();
   // An app that does not give the page its catalogues yet says so, by code.
   await expect(pageVoice({ host: { voice: host.voice, engine: {} }, load }).catalogs()).rejects.toMatchObject({ code: "catalogs-unavailable" });
@@ -17,7 +21,8 @@ test("in the desktop app both are the app's: the voice, and the engine's catalog
 
 test("on the web the voice and the catalogues share one engine, made once, whose host reads the keys this page keeps", async () => {
   const hosts: { credential(provider: string): Promise<string | null> }[] = [];
-  const webEngine = { catalogs: () => [{ id: "local", name: undefined, status: async () => ({ stale: false }), models: async () => [] }] };
+  const builds = [{ accelerator: "webgpu", acceleratorClass: "gpu" }, { accelerator: "wasm" }];
+  const webEngine = { catalogs: () => [{ id: "local", name: undefined, status: async () => ({ stale: false }), models: async () => [{ id: "whisper", builds }] }] };
   const create = vi.fn(async (host: (typeof hosts)[number]) => { hosts.push(host); return webEngine; });
   const createVoiceHost = vi.fn((source: object) => ({ source }));
   const load = vi.fn(async () => [{ default: async () => {}, createVoiceHost }, { default: async () => {}, WebEngine: { create } }]);
@@ -26,7 +31,8 @@ test("on the web the voice and the catalogues share one engine, made once, whose
   const catalogs = await page.catalogs();
   expect(create).toHaveBeenCalledTimes(1);
   expect(typeof voice.source.models).toBe("function");
-  expect(await catalogs.catalogs()).toEqual([{ id: "local", name: null, status: { stale: false }, models: [] }]);
+  expect(await catalogs.catalogs()).toEqual([{ id: "local", name: null, status: { stale: false }, models: [{ id: "whisper", builds }] }]);
+  expect(builds[1]).not.toHaveProperty("acceleratorClass");
   await catalogs.setCredential("openai", "sk-1");
   expect(await hosts[0].credential("openai")).toBe("sk-1");
   await catalogs.setCredential("openai", null);
@@ -120,4 +126,37 @@ test("Smart and Silence swapped are the voice's to apply: it restarts on the mod
   expect(voice.restarts()).toBe(2);
   expect(voice.told.at(-1)!.stt.model).toBe("whisper-small");
   expect(await host.transcribe(1)).toBe("whisper-small");
+});
+
+test("the browser voice wrapper passes take options and output subscriptions through to the package host", async () => {
+  const source: VoiceModelSource = { models: () => { throw Error("unused"); } };
+  const starts: ({ take?: boolean } | undefined)[] = [];
+  const takes = new Set<Parameters<VoiceHost["onTake"]>[0]>();
+  const levels = new Set<(value: number) => void>();
+  const devices = { inputs: [], outputs: [], input: null, output: null, outputSelectable: false };
+  const create = (_source: VoiceModelSource): VoiceHost => ({
+    setSettings: async () => {},
+    start: async (options) => { starts.push(options); },
+    stop: async () => {},
+    say: () => ({ id: "", cancel() {}, onEvent() {}, outcome: Promise.resolve({ status: "heard" }) }),
+    mute() {}, cancelInput() {},
+    onTurn: () => () => {}, onState: () => () => {}, onLevel: () => () => {}, onError: () => () => {},
+    onTake: (listener) => { takes.add(listener); return () => { takes.delete(listener); }; },
+    onPlaybackLevel: (listener) => { levels.add(listener); return () => { levels.delete(listener); }; },
+    audioDevices: async () => devices, setAudioDevices: async () => devices, onAudioDevices: () => () => {},
+  });
+  const host = swappingVoiceHost(create, source);
+  const heard: number[] = [], output: number[] = [];
+  const stopTake = host.onTake((take) => heard.push(take.ended_at));
+  const stopOutput = host.onPlaybackLevel((level) => output.push(level));
+  await host.start({ take: true });
+  await host.start();
+  for (const listener of takes) listener({ ended_at: 12, started_at: 0, sampleRate: 16000, samples: new Float32Array(), turns: [] });
+  for (const listener of levels) listener(0.6);
+  expect(starts).toEqual([{ take: true }, undefined]);
+  expect(heard).toEqual([12]);
+  expect(output).toEqual([0.6]);
+  stopTake(); stopOutput();
+  expect(takes.size).toBe(0);
+  expect(levels.size).toBe(0);
 });
