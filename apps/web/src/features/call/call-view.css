@@ -65,12 +65,18 @@
 
 /* Under the name, the agent's bubble; between turns its activity is said there to assistive tech only (the sidebar
  * shows it). */
-/* The balloon stands just above the agent's head, whatever the tile's size (operator, 2026-10-15): the scene is drawn
- * 440 tall and scaled to the tile (styles/call.css), the agent's head near 30% of it from the top, so the balloon's
- * foot, its tail below it besides, sits at 28% of the tile. A tile that holds its text at its smallest grows it upward. */
-.stage-top { position: absolute; z-index: 2; bottom: calc(72% + 40 * var(--u)); left: var(--stage-inset); right: var(--stage-inset);
-  display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; pointer-events: none; }
-.stage-top > * { grid-area: 1 / 1; align-self: end; }
+/* The balloon stands just above the agent's head, whatever the tile's size, and never leaves the tile (2026-10-15).
+ * The scene is drawn 440 tall, scaled to the tile (--k) and standing on its foot (styles/call.css): the agent's feet
+ * at 357 of it (83 above the tile's foot), its figure --fig tall with its feet at 106 of its 120 box, and the head's top
+ * near 20 of it (--stage-head-y: a reference, not every bicho's exact bound); idle, it grows 1.1 from 93.5. The
+ * balloon's foot, its tail below it besides, sits there; from the tile's top inset down, it is laid at the bottom of
+ * that room, and a balloon taller than the room starts at the top instead of leaving the tile (safe end). */
+.stage-top { --fig-px: min(calc(var(--stage-avatar-share, .56) * 440px * var(--k, 1)), var(--stage-avatar-max, 420px)); --idle-rise: 0px;
+  position: absolute; z-index: 2; top: var(--stage-inset); left: var(--stage-inset); right: var(--stage-inset);
+  bottom: calc(83px * var(--k, 1) + var(--fig-px) * (106 - var(--stage-head-y, 20)) / 120 + var(--idle-rise) + var(--tail-h) + 8 * var(--u));
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); justify-items: center; pointer-events: none; }
+.stage-tile[data-mood="idle"] .stage-top { --idle-rise: calc(var(--fig-px) * (var(--stage-avatar-idle, 1.1) - 1) * (93.504 - var(--stage-head-y, 20)) / 120); }
+.stage-top > * { grid-area: 1 / 1; align-self: safe end; }
 /* What is said on the stage, the agent's and the person's alike: big and clear, read at a glance (2026-10-14): 22.4/32 on the
  * slide, 19.2/28.8 on a phone's, within 16–28px (the tile's --person-fs). The brand's DM Sans as everywhere, bundled and variable, so its optical size
  * follows the size; a touch heavier and tighter than body text, as display text is; no line left ending on a lone word.
@@ -104,7 +110,7 @@
 /* Where it sits (`balloonPlace`): centred over the agent, its tail out of the bottom-left corner; or pushed left of the
  * agent, its right end over it, its tail out of the bottom-right corner and turned toward it. It pops out of its tail. */
 .stage-bubble .balloon-tail { left: var(--tail-at); }
-.stage-bubble[data-place="left"] { justify-self: end; margin-inline-end: max(0px, calc(50% - calc(112 * var(--u)))); transform-origin: calc(100% - var(--tail-at) - var(--tail-w) / 2) calc(100% + var(--tail-h)); }
+.stage-bubble[data-place="left"] { justify-self: end; margin-inline-end: clamp(0px, calc(50% - 112 * var(--u)), calc(100% - min(100%, 544 * var(--u)))); transform-origin: calc(100% - var(--tail-at) - var(--tail-w) / 2) calc(100% + var(--tail-h)); }
 .stage-bubble[data-place="left"] .balloon-tail { left: auto; right: var(--tail-at); transform: scaleX(-1); }
 /* A reply leaving (its time over, or a new one over it): it lifts away and fades where the next comes in. */
 .stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
