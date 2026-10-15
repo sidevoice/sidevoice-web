@@ -12,9 +12,10 @@ const CELL = 5; // column pitch in CSS pixels
 const BAR = 3;
 const FLOOR = 2; // a silent column is still a line, never a gap
 
-/** The call's bubbles draw wider, rounder bars on their pill (the soft cards, 2026-10-14); a settings try keeps the
- *  fine ones its row is sized for. */
+/** The person's balloon on the stage draws long rows of fine bars, as a voice note (2026-10-15); the transcript's open
+ *  turn wider, rounder bars on its pill (the soft cards, 2026-10-14); a settings try the fine ones its row is sized for. */
 export function waveformBrush(node: HTMLElement): { pitch: number; width: number } {
+  if (node.closest(".person-turns")) return { pitch: 6, width: 3 };
   return node.closest(".call-layout") ? { pitch: 8, width: 5 } : { pitch: CELL, width: BAR };
 }
 

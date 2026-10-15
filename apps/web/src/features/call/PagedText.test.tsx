@@ -17,7 +17,12 @@ const linesOf = (text: string) => Math.max(1, Math.ceil(text.length / CHARS));
 const shift = (run: Element) => -Number(/translateY\((-?[\d.]+)px\)/.exec((run as HTMLElement).style.transform)?.[1] ?? 0) || 0;
 const rect = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 100, width: 100, height: bottom - top, x: 0, y: top, toJSON() {} }) as DOMRect;
 
+/** The window's line height, as call-view.css gives it (PagedText reads it to count lines). */
+const lineStyle = document.createElement("style");
+lineStyle.textContent = `.paged-text { line-height: ${LINE}px; }`;
+
 beforeEach(() => {
+  document.head.append(lineStyle);
   vi.useFakeTimers();
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
     return this.classList.contains("paged-text") ? Math.min(3, linesOf(this.textContent!)) * LINE : 0;
@@ -38,7 +43,7 @@ beforeEach(() => {
     return Array.from({ length: lines }, (_, line) => rect(top + line * LINE, top + (line + 1) * LINE)) as unknown as DOMRectList;
   });
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { lineStyle.remove(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 const tick = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 const run = () => document.querySelector<HTMLElement>(".paged-text-run")!;
@@ -206,4 +211,47 @@ test("with the voice: a page it jumps to at once, however far; heard again from 
   expect(page()).toBe(0);
   view.rerender(voiced(words, 4 * CHARS));
   expect(page()).toBe(1);
+});
+
+test("a page never shows an empty line: the last one, shorter, is only as tall as its own lines", () => {
+  const words = text(7);
+  const view = render(voiced(words, 0));
+  // Three lines and the strip above them, while a whole page shows.
+  expect(windowOf().style.height).toBe(`calc(${3 * LINE}px + var(--peek))`);
+  view.rerender(voiced(words, 6 * CHARS + 1));
+  expect(page()).toBe(2);
+  // Its seventh line alone: one line tall.
+  expect(windowOf().style.height).toBe(`calc(${LINE}px + var(--peek))`);
+  expect(windowOf()).not.toHaveAttribute("data-more");
+});
+
+test("a line at a time: the line heard kept with the next one under it, never past the last line, never a page short", () => {
+  const words = text(7);
+  const scrolled = (heard: number) => <PagedText measure={words} follow=".karaoke-played" turn="scroll">
+    <KaraokeText text={words} playback="playing" range={heard > 0 ? { from: 0, to: heard } : null} />
+  </PagedText>;
+  const lineShown = () => shift(run()) / LINE;
+  const view = render(scrolled(0));
+  expect(lineShown()).toBe(0);
+  // Into its second line: still from the first, the third under it.
+  view.rerender(scrolled(CHARS + 1));
+  expect(lineShown()).toBe(0);
+  // Into its third: one line up, the fourth now under it.
+  view.rerender(scrolled(2 * CHARS + 1));
+  expect(lineShown()).toBe(1);
+  view.rerender(scrolled(words.length));
+  expect(lineShown()).toBe(4);
+  expect(windowOf().style.height).toBe(`calc(${3 * LINE}px + var(--peek))`);
+  expect(windowOf()).not.toHaveAttribute("data-more");
+});
+
+test("two lines a page, when asked", () => {
+  const pages = vi.fn();
+  render(<PagedText measure={text(5)} onPages={pages} lines={2}>{text(5)}</PagedText>);
+  expect(pages).toHaveBeenCalledExactlyOnceWith(3);
+  expect(windowOf().style.height).toBe(`calc(${2 * LINE}px + var(--peek))`);
+  tick(PAGE_MS);
+  expect(run().style.transform).toBe(`translateY(-${2 * LINE}px)`);
+  tick(PAGE_MS);
+  expect(windowOf().style.height).toBe(`calc(${LINE}px + var(--peek))`);
 });

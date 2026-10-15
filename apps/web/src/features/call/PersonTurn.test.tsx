@@ -66,8 +66,12 @@ const pageOf = (bubble: HTMLElement | null = sentBubble()) => {
 };
 const paged = () => words().querySelector<HTMLElement>(".paged-text")!;
 
-beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
-afterEach(() => { localStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
+/** The window's line height, as call-view.css gives it (PagedText reads it to count lines). */
+const lineStyle = document.createElement("style");
+lineStyle.textContent = `.paged-text { line-height: ${LINE}px; }`;
+
+beforeEach(() => { localStorage.clear(); document.head.append(lineStyle); vi.useFakeTimers(); });
+afterEach(() => { localStorage.clear(); lineStyle.remove(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 test("what was sent shows whole, in its window of three lines, with no check, cut or smaller type", () => {
   laidOut({ [LONG]: 7 });
@@ -76,7 +80,8 @@ test("what was sent shows whole, in its window of three lines, with no check, cu
   expect(words().textContent).toBe(LONG);
   expect(paged()).toBeInTheDocument();
   for (const decided of ["data-lines", "data-small", "data-faded"]) expect(words()).not.toHaveAttribute(decided);
-  expect(sentBubble()!.querySelector(".person-sent-check, svg")).toBeNull();
+  // Its balloon's tail is the only drawing on it.
+  expect(sentBubble()!.querySelector(".person-sent-check, svg:not(.balloon-tail)")).toBeNull();
 });
 
 test("a choice the preview's panel stored for sent-text or sent-repeat changes nothing", () => {

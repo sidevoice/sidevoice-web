@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { HarnessIcon } from "../../components/ui/Icons";
+import { HarnessIcon, MachinesIcon } from "../../components/ui/Icons";
 import { NARROW_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { useRoomStore } from "../../state/room-store";
 import type { ChatMessage } from "../../state/room-types";
@@ -14,7 +14,10 @@ import { uiLanguage, translator, type Translate } from "../../i18n/translator";
 import { moodText } from "./conversation-state";
 import { sounding, useAgentTurns, useSpokenTo, type AgentTurn } from "./speech-reading";
 import { PagedText } from "./PagedText";
-import { useStageConversation } from "./stage-view";
+import { useStageConversation, type StageConversation } from "./stage-view";
+import { BalloonTail } from "./BalloonTail";
+import { ConversationAvatar } from "./ConversationAvatar";
+import { useVariant } from "../../lib/variants";
 import { PersonTurn } from "./PersonTurn";
 import { TranscriptEntry } from "./TranscriptEntry";
 import { VoiceModels } from "./VoiceModels";
@@ -41,15 +44,48 @@ import "./call-view.css";
  * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
  * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
 
-/** One reply on the stage, as the person's sent turn shows (PagedText): three lines at a time, lit as the voice says
- *  them, its pages turning with the words heard. */
+/* The balloon's three looks, how many lines it shows and how it moves on are compared on the live page (lib/variants.ts,
+ * the playground's VARIANTS panel; 2026-10-15): `balloon` a (paper and ink, the classic comic), b (a soft blob tinted
+ * with the agent's colour, following the theme) or c (the agent's own skin: its colour, pale, its ink and its gloss);
+ * `balloonLines` 3 or 2; `balloonPaging` scroll (a line at a time) or page (a page at a time, the last one shorter). */
+const BALLOONS = ["a", "b", "c"] as const;
+const BALLOON_LINES = ["3", "2"] as const;
+const BALLOON_PAGING = ["scroll", "page"] as const;
+
+/** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css): a few lines at a
+ *  time (PagedText), lit as the voice says them, moving on with the words heard. */
 function AgentBubble({ turn }: { turn: AgentTurn }) {
+  const balloon = useVariant("balloon", BALLOONS);
+  const lines = useVariant("balloonLines", BALLOON_LINES);
+  const paging = useVariant("balloonPaging", BALLOON_PAGING);
   return (
-    <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
-      <PagedText measure={turn.text} follow=".karaoke-played">
+    <div className="speech-bubble stage-bubble" data-balloon={balloon} data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
+      <PagedText measure={turn.text} follow=".karaoke-played" lines={Number(lines)} turn={paging}>
         <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
       </PagedText>
+      {/* The bichos' gloss, on the look made of their skin. */}
+      {balloon === "c" && <svg className="balloon-shine" viewBox="0 0 40 20" aria-hidden="true"><path d="M3 17Q5 4 24 3" /></svg>}
+      <BalloonTail shape={balloon} />
     </div>
+  );
+}
+
+/* Where the call is, over the stage (2026-10-15): the conversation's name with more presence and its machine as a chip,
+ * in one of three looks compared on the live page (`stageTitle`): a (the name in a display weight after a swatch of the
+ * agent's colour, inked as the bichos are, the machine's chip beside it), b (the agent's small avatar with its state
+ * dot, the name over the machine's chip) or c (the name on an inked paper sticker, as the balloon, its edge in the
+ * agent's colour). The same on a desktop, above the tile, and on a phone, on the tile's corner. */
+const STAGE_TITLES = ["a", "b", "c"] as const;
+
+function StageName({ stage, className, look, tone }: { stage: StageConversation; className: string; look: (typeof STAGE_TITLES)[number]; tone: string }) {
+  const Tag = className === "stage-title" ? "header" : "div";
+  return (
+    // Its own tint: above the tile on a desktop, outside the tile that carries it.
+    <Tag className={className} data-look={look} translate="no" style={avatarTone(tone) as CSSProperties}>
+      {look === "b" && stage.row && <ConversationAvatar row={stage.row} />}
+      <h2 title={stage.title}>{look === "a" && <i className="stage-name-mark" aria-hidden="true" />}<span>{stage.title}</span></h2>
+      {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
+    </Tag>
   );
 }
 
@@ -83,6 +119,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const spokenTo = useSpokenTo(reply, stage.speaking, conversation.messages);
   // A phone keeps the transcript's button in the tile's corner; a desktop has it at the bar's right (CallToolbar).
   const narrow = useMedia(NARROW_QUERY);
+  const titleLook = useVariant("stageTitle", STAGE_TITLES);
 
   if (!stage.threadId) {
     return (
@@ -103,10 +140,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
     <section className="call-stage" aria-label={t("stage.label")}>
       <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
-      <header className="stage-title" translate="no">
-        <h2 title={stage.title}>{stage.title}</h2>
-        {stage.row?.machine && <span>{stage.row.machine}</span>}
-      </header>
+      <StageName stage={stage} className="stage-title" look={titleLook} tone={tone} />
       {/* The tile takes the room there is; the canvas the agent is drawn on keeps its form factor's shape in it, black
           bands around it as a letterboxed video's (useSceneScale fits it; call-view.css names the shapes). What the
           tile says — the name, the voice models, the replies, the badge — is laid on the tile, over canvas and bands. */}
@@ -121,10 +155,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
             <StageDesk seed={stage.threadId} />
           </div>
         </div>
-        <div className="stage-name" translate="no">
-          <h2 title={stage.title}>{stage.title}</h2>
-          {stage.row?.machine && <span>{stage.row.machine}</span>}
-        </div>
+        <StageName stage={stage} className="stage-name" look={titleLook} tone={tone} />
         <VoiceModels />
         <div className="stage-top">
           {/* Its own conversation's: another one on the stage starts with none of the replies before it. */}

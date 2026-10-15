@@ -101,5 +101,12 @@ test("a call bubble draws the soft cards' wider bars; a settings try keeps its f
   document.body.append(room);
   expect(waveformBrush(wave)).toEqual({ pitch: 8, width: 5 });
   expect(waveformBrush(document.createElement("span"))).toEqual({ pitch: 5, width: 3 });
+  // The person's balloon on the stage: long rows of fine bars, as a voice note.
+  const turns = document.createElement("div");
+  turns.className = "person-turns";
+  const own = document.createElement("span");
+  turns.append(own);
+  room.append(turns);
+  expect(waveformBrush(own)).toEqual({ pitch: 6, width: 3 });
   room.remove();
 });
