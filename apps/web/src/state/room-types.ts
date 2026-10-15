@@ -100,7 +100,7 @@ export interface MachineView {
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */
 export interface AgentReadinessStatus {
   state: "ready" | "needs_attention" | "unsupported";
-  reasons: string[];
+  reasons: { code: string; message?: string }[];
 }
 export interface DetectedAgent {
   id: string;

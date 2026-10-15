@@ -61,3 +61,8 @@ export function translator(language = uiLanguage()): Translate {
   return (key, params) => (bundle[key] ?? en[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
     params?.[name] === undefined ? "" : String(params[name]));
 }
+
+/** Whether this language's own catalogue contains the key, without using the English UI fallback. */
+export function hasTranslation(language: string, key: string): key is MessageKey {
+  return Object.hasOwn(locales[language]?.messages ?? en, key);
+}

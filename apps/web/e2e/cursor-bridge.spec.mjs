@@ -3,9 +3,10 @@ import { join } from "node:path";
 import { installHarness, listing } from "./harness.mjs";
 
 const readiness = (preset) => preset === "unknown_code"
-  ? { state: "needs_attention", reasons: ["cursor.future_code"] }
-  : preset === "needs_attention" ? { state: "needs_attention", reasons: ["cursor.bridge_not_running"] }
-  : preset === "unsupported" ? { state: "unsupported", reasons: ["cursor.unsupported"] }
+  ? { state: "needs_attention", reasons: [{ code: "cursor.future_code", message: "Check the new Cursor setup." }] }
+  : preset === "unknown_no_message" ? { state: "needs_attention", reasons: [{ code: "cursor.future_code" }] }
+  : preset === "needs_attention" ? { state: "needs_attention", reasons: [{ code: "cursor.bridge_not_running", message: "Connector English fallback" }] }
+  : preset === "unsupported" ? { state: "unsupported", reasons: [{ code: "cursor.unsupported", message: "Connector English fallback" }] }
   : { state: "ready", reasons: [] };
 
 async function show(page, { width, height, language = "en", preset }) {
@@ -40,7 +41,8 @@ async function show(page, { width, height, language = "en", preset }) {
   } else {
     await panel.locator(".host-agent-readiness-toggle").click();
     await expect(panel.locator(".host-agent-readiness-body p")).toHaveCount(1);
-    if (preset === "needs_attention") await expect(panel).toContainText("Settings → Beta");
+    if (preset === "needs_attention") await expect(panel).toContainText(language === "en" ? "Settings › Beta" : "Settings → Beta");
+    else if (preset === "unknown_code") await expect(panel).toContainText("Check the new Cursor setup.");
     else {
       await expect(panel).toContainText(language === "en" ? "Sidevoice cannot show the reason" : "Sidevoice");
       await expect(panel).not.toContainText("cursor.future_code");
@@ -49,7 +51,7 @@ async function show(page, { width, height, language = "en", preset }) {
   return { cursor, codex, panel };
 }
 
-for (const preset of ["ready", "needs_attention", "unsupported", "unknown_code"]) {
+for (const preset of ["ready", "needs_attention", "unsupported", "unknown_code", "unknown_no_message"]) {
   for (const [view, width, height] of [["desktop", 1280, 900], ["phone", 390, 844]]) {
     test(`agent readiness ${preset} on ${view}`, async ({ page }) => {
       const { cursor, codex, panel } = await show(page, { width, height, preset });
