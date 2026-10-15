@@ -78,7 +78,7 @@
 .pt-stage--empty { align-content: center; min-height: 220px; text-align: center; color: var(--sv-text-muted); }
 .pt-stage--empty p { margin: 0; }
 .pt-stage-name { justify-self: start; display: grid; }
-.pt-stage-name h3 { margin: 0; font-size: var(--sv-font-lg); font-weight: var(--sv-weight-bold); letter-spacing: -.01em; }
+.pt-stage-name h3 { margin: 0; font-size: var(--sv-font-lg); font-weight: var(--sv-weight-semibold); letter-spacing: -.01em; }
 .pt-stage-name span { font-size: var(--sv-font-sm); color: var(--sv-text-muted); }
 .pt-stage-top { display: grid; justify-items: center; min-height: 64px; width: 100%; }
 .pt-bubble { position: relative; display: grid; gap: var(--sv-space-1); max-width: min(30rem, 100%); padding: var(--sv-space-3) var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); box-shadow: var(--sv-shadow-sm); font-size: 1rem; line-height: 1.5rem; }
