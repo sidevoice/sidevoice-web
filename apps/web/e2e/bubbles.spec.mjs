@@ -63,6 +63,12 @@ test("transcribing bars keep 3:1 contrast at the pulse minimum and with reduced 
   };
   for (const theme of ["light", "dark"]) {
     await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
+    // The theme's colours settle over their (hair-long) transitions, and WebKit can read the new surface under the old ink
+    // for a frame: measure once they have (the settled pair is what a person sees; both themes pass at it).
+    await page.evaluate(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await Promise.all(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {})));
+    });
     for (const reduced of [false, true]) {
       const colors = await paint(reduced);
       expect(ratio(colors), `${theme}/${reduced ? "reduced" : "pulse"}: ${JSON.stringify(colors)}`).toBeGreaterThanOrEqual(3);
