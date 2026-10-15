@@ -400,6 +400,9 @@
 /* The name with its machine beside it; under them, on a desktop, the voice's models as a subtitle, at the
  * interface's own size (they are not part of the slide). */
 .stage-heading { display: flex; align-items: center; gap: .5em; min-width: 0; }
+/* The machine centred on the name's capitals, not on its line box (the heavy face sits low in it): the name's box
+ * trimmed to its cap height and baseline where the browser can. */
+.stage-heading h2 > span { text-box: trim-both cap alphabetic; }
 .stage-name { display: grid; gap: .3em; justify-items: start; }
 /* The subtitle: the voice's models as quiet words with their icons, no chips (a model needing attention keeps its
  * attention style, its state in words). */
@@ -407,7 +410,7 @@
 .stage-title-tags .voice-models { justify-content: flex-start; gap: var(--sv-space-3); }
 .stage-title-tags .voice-chip:not([data-attention]) { height: auto; padding: 0; border-color: transparent; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; color: var(--sv-text-muted); }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
-  .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-0-5); }
+  .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-2); }
 }
 .voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
