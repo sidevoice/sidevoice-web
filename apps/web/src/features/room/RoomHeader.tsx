@@ -105,7 +105,7 @@ function HeaderConversations({ t }: { t: Translate }) {
   const [shown, hold] = useHeldWhilePressed(placed.row.map((id) => order.find((row) => row.threadId === id)!), participants);
   const hidden = order.filter((row) => !placed.row.includes(row.threadId));
   const label = (row: ParticipantView) => [t("header.otherConversation", { title: row.title, state: stateText(row, inCall, t) }),
-    (row.unheard ?? 0) > 0 ? t("state.unheard", { n: row.unheard }) : null].filter(Boolean).join(" · ");
+    (row.unheard ?? 0) > 0 ? t("state.unheard", { n: row.unheard ?? 0 }) : null].filter(Boolean).join(" · ");
   const pick = (row: ParticipantView) => {
     // The one on the stage, or the call switching: nothing — focus and the tooltip stay.
     if (row.threadId === stage.threadId || row.switching) return;

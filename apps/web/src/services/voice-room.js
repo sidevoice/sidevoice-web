@@ -95,6 +95,7 @@ export function playbackReport(outcome, text, withdrawn = null, action = null) {
   if (outcome.status === 'heard') return { status: 'heard', heard_chars: characters(text) };
   const played = outcome.status === 'heard-up-to';
   const heard = played ? scalarExtent(text, outcome.heard_chars) : null;
+  if (action === 'user_skipped') return { status: played ? 'interrupted' : 'unplayed', ...(heard != null ? {heard_chars: heard} : {}), reason: 'user_skipped' };
   if (outcome.reason === 'failed') return { status: 'failed', ...(heard != null ? {heard_chars: heard} : {}) };
   const reason = roomReason(outcome, played, withdrawn, action);
   return { status: played ? 'interrupted' : 'unplayed', ...(heard != null ? {heard_chars: heard} : {}), ...(reason ? { reason } : {}) };

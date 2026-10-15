@@ -53,7 +53,7 @@ test("while the list is down the header stays above it, and an avatar there swit
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "All conversations (4)" })); });
   expect(sidebar).toHaveAttribute("data-open");
   expect(header()).toHaveAttribute("data-list-down");
-  await act(async () => { fireEvent.click(within(header()).getByRole("button", { name: "Review the nightly backups · Waiting for you" })); });
+  await act(async () => { fireEvent.click(within(header() as HTMLElement).getByRole("button", { name: "Review the nightly backups · Waiting for you" })); });
   expect(selectParticipant).toHaveBeenCalledWith("fp-1|t-backup");
   expect(sidebar).not.toHaveAttribute("data-open");
   expect(header()).not.toHaveAttribute("data-list-down");

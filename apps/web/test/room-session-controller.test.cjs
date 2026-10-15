@@ -1287,8 +1287,8 @@ test('T01 and T02 map played-zero barge-in to one core receipt before the termin
  const c=await callOnRoom();
  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'core-reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'é🐙ab'}});
  const handle=c.voice.said[0];handle.step({type:'playing'});
- c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:0,played:true});
  c.voice.emit('turn',started('spoken'));
+ c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:0,played:true});
  c.voice.emit('turn',finished('spoken','New words'));
  handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:0,reason:'barge-in'}});
  const frames=c.frames(c.first).filter(f=>['voice-playback','voice-user-turn'].includes(f.type));
@@ -1353,6 +1353,43 @@ test('T07 hang-up clears open turns, handles and deferred final sends before ano
  c.s.run("threadEpochs.set('a',0)");
  c.push(socket,{type:'voice-reply',data:{session_id:'s2',utterance_id:'new',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'new',text:'New reply'}});
  assert.equal(c.voice.said.at(-1).text,'New reply');
+ c.s.run('disconnect()');
+});
+test('T07 deferred final words keep their captured node through a replacement session',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'reply',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'row',text:'Reply'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('turn',started('during-drop'));c.voice.emit('turn',finished('during-drop','Words while away'));
+ c.drop(c.first);await c.until(()=>c.sockets.length===2,'reconnect');
+ const {socket}=await c.answer({session_id:'s2',resume:{token:'new'},resumed:false});
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:1,reason:'cancelled'}});
+ await c.until(()=>turnSent(c,socket,'during-drop','finished').length===1,'offline final words');
+ assert.equal(turnSent(c,socket,'during-drop','finished')[0].offline,true);
+ assert.equal(turnSent(c,socket,'during-drop','finished')[0].thread_id,'a');
+ c.s.run('disconnect()');
+});
+test('T04b a spoken turn retires several locally queued replies at the old epoch',async()=>{
+ const c=await callOnRoom(),reply=(id,epoch=0)=>c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:id,thread_id:'a',revision:1,reply_revision:1,epoch,history_id:id,text:id}});
+ reply('one');reply('two');reply('three');const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('turn',started('new-spoken'));c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:1,played:true});
+ c.voice.emit('turn',finished('new-spoken','New question'));
+ c.push(c.first,{type:'voice-user-turn',data:{session_id:'s1',phase:'started',turn_id:'new-spoken',thread_id:'a',revision:2,epoch:1}});
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.reason])),[['two','newer_turn'],['three','newer_turn'],['one','user_interrupted']]);
+ reply('fresh',1);assert.equal(c.voice.said.at(-1).text,'fresh');
+ c.s.run('disconnect()');
+});
+test('T08 typed context leaves queued playback and an open spoken turn untouched',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'one',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'one',text:'One'}});
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'two',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'two',text:'Two'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('turn',started('open'));
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'three',thread_id:'a',revision:2,reply_revision:2,epoch:1,history_id:'three',text:'Three'}});
+ c.s.run("$('text-message').value='Typed context'");
+ c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({accepted:true,messages:[]})});await c.s.run('sendText()');
+ assert.equal(handle.cancelled,false);assert.equal(c.s.run("openVoiceTurns.has('open')"),true);
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.utterance_id==='two').map(d=>[d.status,d.reason])),[['unplayed','newer_turn']],'the spoken start, not typing, retired the queued old reply');
+ assert.equal(sentOf(c,c.first,'voice-playback').some(d=>d.utterance_id==='three'),false,'typing does not retire a new held reply');
  c.s.run('disconnect()');
 });
 test('T06 output settings report local fate and send reliable eligibility without muting the mic',async()=>{
