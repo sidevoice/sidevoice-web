@@ -133,30 +133,36 @@ test("the browser voice wrapper passes take options and output subscriptions thr
   const starts: ({ take?: boolean } | undefined)[] = [];
   const takes = new Set<Parameters<VoiceHost["onTake"]>[0]>();
   const levels = new Set<(value: number) => void>();
+  const deviceNotices = new Set<(value: any) => void>();
   const devices = { inputs: [], outputs: [], input: null, output: null, outputSelectable: false };
   const create = (_source: VoiceModelSource): VoiceHost => ({
     setSettings: async () => {},
+    setCaptureBoundary: async () => {},
     start: async (options) => { starts.push(options); },
     stop: async () => {},
     say: () => ({ id: "", cancel() {}, onEvent() {}, outcome: Promise.resolve({ status: "heard" }) }),
     mute() {}, cancelInput() {},
-    onTurn: () => () => {}, onState: () => () => {}, onLevel: () => () => {}, onError: () => () => {},
+    onTurn: () => () => {}, onState: () => () => {}, onLevel: () => () => {}, onError: () => () => {}, onAgentInterrupted: () => () => {},
     onTake: (listener) => { takes.add(listener); return () => { takes.delete(listener); }; },
     onPlaybackLevel: (listener) => { levels.add(listener); return () => { levels.delete(listener); }; },
-    audioDevices: async () => devices, setAudioDevices: async () => devices, onAudioDevices: () => () => {},
-  });
+    audioDevices: async () => devices, setAudioDevices: async () => devices, onAudioDevices: (listener) => { deviceNotices.add(listener); return () => { deviceNotices.delete(listener); }; },
+  } as VoiceHost);
   const host = swappingVoiceHost(create, source);
-  const heard: number[] = [], output: number[] = [];
+  const heard: number[] = [], output: number[] = [], losses: unknown[] = [];
   const stopTake = host.onTake((take) => heard.push(take.ended_at));
   const stopOutput = host.onPlaybackLevel((level) => output.push(level));
+  const stopDevices = host.onAudioDevices((notice) => losses.push(notice.lost));
   await host.start({ take: true });
   await host.start();
   for (const listener of takes) listener({ ended_at: 12, started_at: 0, sampleRate: 16000, samples: new Float32Array(), turns: [] });
   for (const listener of levels) listener(0.6);
+  for (const listener of deviceNotices) listener({...devices,lost:{output:"usb"}});
   expect(starts).toEqual([{ take: true }, undefined]);
   expect(heard).toEqual([12]);
   expect(output).toEqual([0.6]);
-  stopTake(); stopOutput();
+  expect(losses).toEqual([{output:"usb"}]);
+  stopTake(); stopOutput(); stopDevices();
   expect(takes.size).toBe(0);
   expect(levels.size).toBe(0);
+  expect(deviceNotices.size).toBe(0);
 });

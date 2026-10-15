@@ -108,6 +108,37 @@ export function desktopHost() {
     ?.__sidevoiceDesktop?.host;
 }
 
+/** Private remote pairings are available in every desktop build. */
+export interface DesktopDataBridge {
+  pairings: {
+    read(): Promise<{ pairings: Pairing[]; pendingRevokes?: Pairing[] }>;
+    write(value: { pairings: Pairing[]; pendingRevokes: Pairing[] }): Promise<void>;
+  };
+}
+
+/** Machine reset is offered only where the native app supports it (currently macOS). */
+export interface DesktopResetBridge extends DesktopDataBridge {
+  deleteAll(): Promise<{
+    state: "needs-restart" | "partial";
+    service: "removed" | "absent";
+    agents: Record<string, { outcome?: "removed" | "foreign" | "unknown" | "failed" }>;
+    failed: { step: string; key: string; agent?: string }[];
+    pending: string[];
+  }>;
+  resetReport(): Promise<null | { state: "complete" | "partial"; completed: string[]; failed: { step: string; key: string; agent?: string }[]; agents: Record<string, unknown> }>;
+}
+
+export function desktopDataBridge(): DesktopDataBridge | null {
+  const data = desktopHost()?.data as Partial<DesktopDataBridge> | undefined;
+  return data && typeof data.pairings?.read === "function" && typeof data.pairings?.write === "function"
+    ? data as DesktopDataBridge : null;
+}
+
+export function desktopResetBridge(): DesktopResetBridge | null {
+  const data = desktopDataBridge() as DesktopResetBridge | null;
+  return data && typeof data.deleteAll === "function" && typeof data.resetReport === "function" ? data : null;
+}
+
 /** The desktop app's own build (sidevoice-desktop #56, `host.build`): a release — the only one with an updater
  *  (`host.updater`) —, a nightly, or a development build; its version, and where the build came from. */
 export interface DesktopBuild {

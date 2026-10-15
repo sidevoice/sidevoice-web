@@ -228,11 +228,15 @@
 .ui-dialog { padding: 0; border: 0; background: transparent; color: var(--sv-text); max-width: none; max-height: none; overflow: visible; }
 .ui-dialog[open] { display: flex; }
 .ui-dialog::backdrop { background: var(--sv-scrim); }
-.ui-dialog[data-layout="dialog"] { width: min(var(--ui-dialog-width, 560px), calc(100vw - 32px)); max-height: min(85dvh, 760px); margin: auto; }
+.ui-dialog[data-layout="dialog"] { width: min(var(--ui-dialog-width, 560px), calc(100vw - 32px)); margin: auto; }
 .ui-dialog[data-size="sm"] { --ui-dialog-width: 440px; }
 .ui-dialog[data-size="lg"] { --ui-dialog-width: 640px; }
-.ui-dialog-surface { display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: 100%; overflow: hidden; background: var(--sv-surface); color: var(--sv-text); }
+.ui-dialog-surface { display: flex; flex-direction: column; width: 100%; min-height: 0; overflow: hidden; background: var(--sv-surface); color: var(--sv-text); }
 [data-theme="dark"] .ui-dialog-surface { background: var(--sv-surface-raised); }
+/* The card is as tall as what it holds, up to its cap, which it carries itself: never a percentage of the dialog
+ * around it. A dialog's own height is the browser's fit-content, and WebKit up to Safari 26 (the macOS app's
+ * WKWebView) resolves a child's `max-height: 100%` against it as 0: the card drew as a 2px line. */
+.ui-dialog[data-layout="dialog"] .ui-dialog-surface { max-height: min(85dvh, 760px); }
 .ui-dialog[data-layout="dialog"] .ui-dialog-surface, .ui-dialog-surface--card { border: 1px solid var(--sv-border); border-radius: var(--sv-radius-2xl); box-shadow: var(--sv-shadow-lg); }
 .ui-dialog[data-layout="page"] { position: fixed; inset: 0; width: 100vw; height: 100dvh; margin: 0; }
 .ui-dialog[data-layout="page"] .ui-dialog-surface { height: 100%; background: var(--sv-bg); }
@@ -250,8 +254,8 @@
 .ui-dialog-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--sv-space-2); flex: none; padding: var(--sv-space-4) var(--sv-space-6); border-top: 1px solid var(--sv-border); }
 .ui-dialog-reason { margin: 0 auto 0 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 @media (max-width: 599px) {
-  .ui-dialog[data-layout="dialog"] { position: fixed; inset: 0; width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; }
-  .ui-dialog[data-layout="dialog"] .ui-dialog-surface { height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  .ui-dialog[data-layout="dialog"] { position: fixed; inset: 0; width: 100vw; height: 100dvh; margin: 0; }
+  .ui-dialog[data-layout="dialog"] .ui-dialog-surface { height: 100%; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
   .ui-dialog-head { min-height: 56px; padding: calc(var(--sv-space-3) + env(safe-area-inset-top)) var(--sv-space-4) var(--sv-space-3); }
   .ui-dialog-body { padding: 0 var(--sv-space-4) var(--sv-space-4); }
   .ui-dialog-body--flush { padding: 0; }

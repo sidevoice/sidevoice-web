@@ -1,0 +1,42 @@
+/* App policy for what the agent learns about a reply. Playback status and stop causes remain
+ * diagnostics; only this module turns them into semantic hearing evidence. */
+export const HEARING_POLICY = Object.freeze({
+  skipCountsAsHeard: true,
+  readMutedReplies: false,
+});
+
+const scalarLength = text => [...(text ?? '')].length;
+const extentOf = (report, length) => Number.isInteger(report?.heard_chars) && report.heard_chars >= 0
+  ? Math.min(report.heard_chars, length) : 0;
+
+/**
+ * @param {{status:string,heard_chars?:number,reason?:string}} report
+ * @param {string} text
+ * @param {string|null} action
+ * @param {{skipCountsAsHeard:boolean,readMutedReplies:boolean}} policy
+ * @returns {{outcome:'heard'|'partial'|'not_heard',heard_chars?:number}}
+ */
+export function playbackHearing(report, text, action = null, policy = HEARING_POLICY) {
+  const length = scalarLength(text);
+  if (report?.status === 'heard' || action === 'user_skipped' && policy.skipCountsAsHeard)
+    return { outcome: 'heard' };
+  // These are app availability choices, even when a physical prefix happened to play before stopping.
+  if (['agents_muted', 'voice_off', 'connector_disconnected', 'focus_changed', 'call_ended', 'heard_elsewhere'].includes(action))
+    return { outcome: 'not_heard' };
+  const extent = extentOf(report, length);
+  if (extent >= length && length > 0) return { outcome: 'heard' };
+  if (extent > 0) return { outcome: 'partial', heard_chars: extent };
+  return { outcome: 'not_heard' };
+}
+
+/**
+ * This page can report written delivery while muted even when another device owns the audio.
+ * @param {{status:string}} row
+ * @param {{outputMuted:boolean,displayed:boolean}} presentation
+ * @param {{skipCountsAsHeard:boolean,readMutedReplies:boolean}} policy
+ * @returns {{outcome:'heard'|'not_heard'}|null}
+ */
+export function writtenReplyHearing(row, presentation, policy = HEARING_POLICY) {
+  if (!row || !presentation?.outputMuted && row.status !== 'text_only') return null;
+  return { outcome: presentation.outputMuted && presentation.displayed && policy.readMutedReplies ? 'heard' : 'not_heard' };
+}

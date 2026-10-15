@@ -122,13 +122,17 @@ export function ConversationSidebar() {
                   onSelect={select}
                   lead={(row) => <ConversationAvatar row={row} />}
                   tooltip={(row) => [row.title + " · " + stateText(row, inCall, t), harnessLine(row), row.detail, row.activityNote].filter(Boolean).join("\n\n")}
+                  label={(row) => [row.title, stateText(row, inCall, t), (row.unheard ?? 0) > 0 ? t("state.unheard", { n: row.unheard ?? 0 }) : null].filter(Boolean).join(" · ")}
                   sub={(row) => (
                     <span className="sidebar-state" data-state={conversationState(row, inCall)}>
                       {row.harness && <HarnessIcon harness={row.harness} size={12} />}
                       <span className="sidebar-state-text">{stateText({ ...row, unread: 0 }, inCall, t)}</span>
                     </span>
                   )}
-                  end={(row) => unread(row) && <Badge tone="accent" className="sidebar-unread">{t("state.unread", { n: row.unread })}</Badge>}
+                  end={(row) => <>
+                    {(row.unheard ?? 0) > 0 && <Badge tone="accent" className="sidebar-unread">{t("state.unheard", { n: row.unheard ?? 0 })}</Badge>}
+                    {unread(row) && <Badge tone="accent" className="sidebar-unread">{t("state.unread", { n: row.unread })}</Badge>}
+                  </>}
                   aside={(row) => (
                     <DropdownMenu label={t("sidebar.options", { title: row.title })} trigger={<Button variant="ghost" tone="neutral" size="icon-sm" className="participant-more" aria-label={t("sidebar.options", { title: row.title })}><MoreIcon /></Button>}>
                       <DropdownMenuItem danger onSelect={() => void window.sidevoiceActions?.closeParticipant(row.threadId)}><CloseIcon />{t("sidebar.closeConversation")}</DropdownMenuItem>

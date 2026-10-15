@@ -20,6 +20,8 @@ export interface ConversationRowsProps {
   end?(row: ParticipantView): ReactNode;
   /** The row's tooltip; its title by default. */
   tooltip?(row: ParticipantView): string;
+  /** Spoken name for compact rows whose visible badges may be hidden in the rail. */
+  label?(row: ParticipantView): string;
   /** What leads the row; by default its initials and its state dot. The room's sidebar gives each agent's avatar. */
   lead?(row: ParticipantView): ReactNode;
   id?: string;
@@ -29,7 +31,7 @@ export interface ConversationRowsProps {
 /** The conversations of the call, as rows to choose from: the room's sidebar (ConversationSidebar) and the desktop app's
  *  call controls card both show them through this, each with its own words, actions and styles. A row is a plain
  *  button, not the system's Button: it is a list entry laid out by whoever shows it, and its parts are its own children. */
-export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, end, tooltip = (row) => row.title, lead, id, className }: ConversationRowsProps) {
+export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.switching, aside, end, tooltip = (row) => row.title, label, lead, id, className }: ConversationRowsProps) {
   return (
     <div id={id} className={className}>
       {rows.map((row) => (
@@ -41,6 +43,7 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
             aria-pressed={row.selected}
             disabled={disabled(row)}
             title={tooltip(row)}
+            aria-label={label?.(row)}
             onClick={() => onSelect(row.threadId)}
           >
             {lead ? lead(row) : <><span className="person-initials" aria-hidden="true">{initials(row.title)}</span><span className="person-state" data-state={row.reach} data-working={row.working || undefined}><span className="dot" /></span></>}

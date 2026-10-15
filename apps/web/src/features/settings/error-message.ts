@@ -98,6 +98,8 @@ const ROOM_FAILURES: Record<string, MessageKey> = {
   room_is_full: "room.failure.full", "room.full": "room.failure.full",
   node_offline: "room.failure.machineAway", node_unreachable: "room.failure.machineAway", node_timeout: "room.failure.machineAway",
   choose_node: "room.failure.machineAway",
+  "room.replay_unavailable": "room.failure.replayUnavailable",
+  "room.input_backlog_full": "room.failure.inputBacklogFull",
 };
 
 /** A failure of the room or a machine (a refusal, a request that never got an answer) as a person reads it. */

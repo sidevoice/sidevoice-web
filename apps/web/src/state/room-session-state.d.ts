@@ -18,7 +18,7 @@ export interface SessionFacts {
  userLive: boolean; botLive: boolean;
  /** The person's turn being said: the voice's id for it, the bubble's segment, and the conversation it goes to. */
  userTurn: {id: string; segment: string; thread: string | null} | null; pendingPhase: '' | 'listening' | 'transcribing'; pendingUserText: string;
- cancelledInput: boolean; textSending: boolean; micEnabled: boolean;
+ cancelledInput: boolean; textSending: boolean; micEnabled: boolean; speechOutput: 'on' | 'agents_muted' | 'voice_off';
  voiceState: VoiceState | null;
  /** A join that failed: its sentence, and what was raw about it, for its Details (error-message.ts). */
  joinStep: string | null; joinFailure: string; joinFailureDetails: string; joinProgress: number | null; joinDetail: string; joinSubject: string;
@@ -197,6 +197,7 @@ export interface SessionStore {
 }
 export function createRoomSessionStore(seed?: Partial<SessionFacts>): SessionStore;
 export function receiptView(status: string): {symbol: string; label: string};
+export function audioNote(row: {audio?: string; audio_reason?: string; heard_chars?: number | null; hearing?: "heard" | "partial" | "not_heard" | null; interrupted?: boolean}, ahead?: number): string;
 /** A conversation's title as every surface shows it: one line, unquoted, without a part naming its harness or model. */
 export function displayTitle(title: string | null | undefined, person?: { harness?: string | null; engine?: { model?: string | null } | null } | null): string;
 export function speechSegment(reply: {history_id?: string; session_id?: string; utterance_id?: string}): string;
