@@ -71,7 +71,7 @@
 @media (hover: none), (pointer: coarse) { .sidebar-rows .participant-more { opacity: 1; } }
 
 /* The rail: the same avatars in a narrow column, the machines told apart by a line. */
-@media (min-width: 900px) {
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .conversation-sidebar[data-collapsed] { width: 68px; padding-inline: 10px; }
   .conversation-sidebar[data-collapsed] .sidebar-head { justify-content: center; padding: 0; }
   .conversation-sidebar[data-collapsed] :is(.sidebar-head h2, .sidebar-group-label, .participant-copy, .sidebar-unread, .participant-more, .sidebar-empty) { display: none; }
@@ -90,7 +90,7 @@
 @keyframes room-menu-in { from { opacity: 0; transform: translateY(-4px); } }
 
 /* ----- a phone */
-@media (max-width: 899px) {
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   /* The header keeps its place above the scrim while the list is down, and until the scrim has faded after. */
   .room-header { position: relative; z-index: 1; gap: var(--sv-space-2); padding: 0 var(--sv-space-2) 0 var(--sv-space-4); transition: z-index 0s linear var(--sv-dur-base); }
   .room-header[data-list-down] { z-index: 32; transition: none; }
@@ -132,7 +132,9 @@
     transform: translateY(-100%); visibility: hidden; transition: transform var(--sv-dur-base) var(--sv-ease), visibility 0s linear var(--sv-dur-base); }
   .conversation-sidebar[data-open] { transform: none; visibility: visible; transition: transform var(--sv-dur-slow) var(--sv-ease); }
   .conversation-sidebar .sidebar-collapse { display: none; }
-  .conversation-sidebar .sidebar-close { display: inline-flex; }
+  /* The header's chevron (always there, turned up while the list is down) closes it, as do a tap outside and Escape: the
+     sheet's own arrow stays for assistive tech only, inside the dialog. */
+  .conversation-sidebar .sidebar-close { display: inline-flex; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .conversations-scrim { position: fixed; inset: 0; z-index: 30; display: block; background: var(--sv-scrim); opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease); }
   .conversations-scrim[data-open] { opacity: 1; pointer-events: auto; }
 }
@@ -148,7 +150,7 @@
 
 /* Settings at a desktop's conversations' foot, the header's gear pressed from there; a phone keeps the gear at its
  * header's right. The list ends with New conversation. */
-@media (min-width: 900px) { .room-header .header-settings { display: none; } }
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .room-header .header-settings { display: none; } }
 .sidebar-new { display: flex; justify-content: center; }
 .sidebar-settings { position: relative; justify-content: flex-start; }
 .conversation-sidebar[data-collapsed] .sidebar-settings { justify-content: center; }
@@ -157,7 +159,7 @@
 /* A desktop's room has no header, as a video call app's: the conversations' column from the top, the brand at its head
  * (the mark alone in the rail); the stage's conversation named above its tile, not on it. A phone keeps its header. */
 .sidebar-brand { display: none; }
-@media (min-width: 900px) {
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell > .room-header { display: none; }
   .room-shell .sidebar-brand { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; min-height: 40px; padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
   .room-shell .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
@@ -166,7 +168,7 @@
 }
 
 /* The rail keeps the cards' bichos, without their frames. */
-@media (min-width: 900px) {
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row { border-color: transparent; background: none; box-shadow: none; }
   .conversation-sidebar[data-collapsed] .sidebar-rows .participant-row[data-selected] { background: var(--sv-accent-soft); }
 }

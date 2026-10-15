@@ -41,6 +41,18 @@ export function useSceneScale() {
     const apply = () => {
       const { clientWidth: width, clientHeight: height } = node;
       if (!(width > 0 && height > 0)) return;
+      // A slot holding the tile: the tile itself takes its shape, as large as the slot allows (a slide in its window).
+      const tile = node.querySelector<HTMLElement>(":scope > .stage-tile");
+      if (tile) {
+        const shape = parseRatio(getComputedStyle(tile).getPropertyValue("--stage-ratio"));
+        if (shape > 0) {
+          const fitted = fitCanvas(width, height, shape);
+          tile.style.width = fitted.width + "px";
+          tile.style.height = fitted.height + "px";
+          tile.style.setProperty("--k", String(fitted.height / SCENE_HEIGHT));
+          return;
+        }
+      }
       const canvas = node.querySelector<HTMLElement>(":scope > .stage-canvas");
       const ratio = canvas ? parseRatio(getComputedStyle(node).getPropertyValue("--stage-ratio")) : NaN;
       if (!canvas || !(ratio > 0)) { node.style.setProperty("--k", String(height / SCENE_HEIGHT)); return; }

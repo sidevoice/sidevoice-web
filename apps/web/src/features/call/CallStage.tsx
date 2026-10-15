@@ -107,10 +107,11 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
         <h2 title={stage.title}>{stage.title}</h2>
         {stage.row?.machine && <span>{stage.row.machine}</span>}
       </header>
-      {/* The tile takes the room there is; the canvas the agent is drawn on keeps its form factor's shape in it, black
-          bands around it as a letterboxed video's (useSceneScale fits it; call-view.css names the shapes). What the
-          tile says — the name, the voice models, the replies, the badge — is laid on the tile, over canvas and bands. */}
-      <div ref={sceneRef} className="stage-tile" data-mood={stage.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
+      {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
+          background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
+          the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
+      <div ref={sceneRef} className="stage-slot">
+      <div className="stage-tile" data-mood={stage.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-notice">{notice}</div>
         <div className="stage-canvas">
           <div className="stage-scene">
@@ -142,6 +143,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
         </div>
         <PersonTurn conversation={conversation} t={t} />
         {narrow && <TranscriptEntry />}
+      </div>
       </div>
     </section>
   );

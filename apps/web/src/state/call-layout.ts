@@ -8,8 +8,12 @@ import { createStore, type StoreApi } from "zustand/vanilla";
  * panel and the transcript are both dialogs over the call, and one opening puts the other away. */
 
 export const SIDEBAR_COLLAPSED_KEY = "sidevoice.sidebar-collapsed";
-/** Below this width the conversations live in the header, and the transcript is a sheet. Matches styles/call.css. */
-export const NARROW_QUERY = "(max-width: 899px)";
+/** A phone (or a window too small for anything beside the call): the conversations live in the header, and the
+ *  transcript is a sheet. A touch screen under 900px, or any window under 560px; a narrower desktop window is still a
+ *  desktop, compact (COMPACT_QUERY) — decided 2026-10-15. Matches the stylesheets' media queries. */
+export const NARROW_QUERY = "(max-width: 559px), (max-width: 899px) and (pointer: coarse)";
+/** A desktop window under 900px: still a desktop, its conversations folded into their rail. */
+export const COMPACT_QUERY = "(max-width: 899px)";
 /** Below this width a desktop has no room for the open sidebar beside the docked transcript: the sidebar is its rail. */
 export const RAIL_WITH_TRANSCRIPT_QUERY = "(max-width: 1199px)";
 

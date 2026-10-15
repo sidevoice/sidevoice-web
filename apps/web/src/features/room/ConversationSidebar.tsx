@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "../../components/ui/DropdownMenu";
 import { CloseIcon, CloseUpIcon, ConversationsIcon, HarnessIcon, MoreIcon, SidebarCollapseIcon, SidebarExpandIcon, SettingsIcon, SidevoiceMark } from "../../components/ui/Icons";
 import { useSurface } from "../../lib/use-surface";
-import { isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
+import { COMPACT_QUERY, isNarrow, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, useCallLayout, useMedia } from "../../state/call-layout";
 import { RoomStoreContext, useRoomStore } from "../../state/room-store";
 import { GearNewMark, useHighlights } from "../highlights/highlights";
 import type { ParticipantView } from "../../state/room-types";
@@ -46,7 +46,9 @@ export function ConversationSidebar() {
   const close = useCallLayout((state) => state.closeConversations);
   const narrow = useMedia(NARROW_QUERY);
   const crowded = useMedia(RAIL_WITH_TRANSCRIPT_QUERY) && transcriptOpen && !narrow;
-  const rail = collapsed || crowded;
+  // A compact desktop window (under 900px, not a phone) keeps its conversations as the rail.
+  const compact = useMedia(COMPACT_QUERY) && !narrow;
+  const rail = collapsed || crowded || compact;
   const modal = narrow && open;
   const panel = useRef<HTMLElement>(null);
 

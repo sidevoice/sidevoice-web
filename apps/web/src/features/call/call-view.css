@@ -17,13 +17,15 @@
 @container stage (max-width: 480px) { .stage-tile > * { --stage-inset: var(--sv-space-3); } }
 /* The canvas the agent is drawn on keeps one shape per form factor (--stage-ratio, width over height), never whatever
  * room is left: 16:9 on a web page (the lab's 800 × 440 scene nearly whole), 3:2 in the desktop app (its window's
- * shape), and a square on a phone (the scene's middle, where what matters is: engine/backdrop.ts). It is as large as
- * the tile allows and centred; the rest of the tile is black bands, as a letterboxed video's (useSceneScale fits it).
- * Until it is fitted it fills the tile. */
-.stage-tile[data-mood] { --stage-ratio: 16 / 9; background: #000; }
-@media (min-width: 900px) { .stage-tile[data-mood][data-app] { --stage-ratio: 3 / 2; } }
-@media (max-width: 899px) { .stage-tile[data-mood] { --stage-ratio: 1; } }
-.stage-canvas { position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; overflow: hidden; transform: translate(-50%, -50%);
+ * shape), and a square on a phone (the scene's middle, where what matters is: engine/backdrop.ts). The whole TILE keeps
+ * that shape, as a slide in a presentation app: as large as its slot allows and centred, the app's own background
+ * around it (useSceneScale fits it); the canvas fills the tile. Until it is fitted it fills the slot. */
+.stage-slot { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; }
+.stage-slot > .stage-tile { width: 100%; height: 100%; flex: none; }
+.stage-tile[data-mood] { --stage-ratio: 16 / 9; }
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-tile[data-mood][data-app] { --stage-ratio: 3 / 2; } }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .stage-tile[data-mood] { --stage-ratio: 1; } }
+.stage-canvas { position: absolute; inset: 0; overflow: hidden;
   background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 18%, transparent), transparent 60%), var(--sv-stage-bg); }
 /* Speaking: a quiet ring in the accent around the whole tile. */
 .stage-tile[data-mood="speaking"] { border-color: color-mix(in srgb, var(--sv-accent) 45%, var(--sv-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 20%, transparent); }
@@ -46,7 +48,7 @@
  * bubble's top padding). */
 .speech-bubble { --paged-peek: var(--sv-space-5); font-size: 1.4rem; line-height: 2rem; font-weight: 450; letter-spacing: -.01em; text-wrap: pretty; }
 @container stage (max-width: 480px) { .speech-bubble { --paged-peek: var(--sv-space-4); font-size: 1.2rem; line-height: 1.8rem; } }
-@media (max-width: 899px) { .speech-bubble { --paged-peek: var(--sv-space-4); font-size: 1.2rem; line-height: 1.8rem; } }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .speech-bubble { --paged-peek: var(--sv-space-4); font-size: 1.2rem; line-height: 1.8rem; } }
 /* One width whatever the chunk, so the bubble does not jump as the voice moves from one chunk to the next. A soft card
  * (decided 2026-10-14), the agent's fill in the transcript too. The words said are the text's colour; the rest, and
  * the chunk before, the subtle one (5:1 and more on the bubble). */
@@ -63,7 +65,7 @@
 .stage-bubble .karaoke-text .karaoke-played { color: var(--sv-text); opacity: 1; }
 .stage-bubble .karaoke-text .karaoke-upcoming { color: var(--sv-text-subtle); opacity: 1; }
 @container stage (max-width: 480px) { .stage-bubble { padding-inline: var(--sv-space-5); } }
-@media (max-width: 899px) { .stage-bubble { padding-inline: var(--sv-space-5); } }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .stage-bubble { padding-inline: var(--sv-space-5); } }
 
 /* The harness and model, at the tile's foot; they step aside while the person's bubble is up. */
 .stage-tags { position: absolute; z-index: 2; left: 50%; bottom: var(--stage-inset); display: flex; justify-content: center; gap: var(--sv-space-1-5); max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); }
@@ -83,7 +85,7 @@
   border: 1px solid var(--sv-bubble-edge); border-radius: var(--sv-radius-2xl); border-bottom-right-radius: var(--sv-radius-sm);
   box-shadow: var(--sv-bubble-shadow); overflow-wrap: anywhere; }
 @container stage (max-width: 480px) { .person-bubble { padding: var(--sv-space-2) var(--sv-space-4); } }
-@media (max-width: 899px) { .person-bubble { padding: var(--sv-space-2) var(--sv-space-4); } }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .person-bubble { padding: var(--sv-space-2) var(--sv-space-4); } }
 /* Taking the turn back, said as clearly as the bars beside it. */
 .person-bubble .cancel-input { flex: none; font-size: var(--sv-font-md); }
 /* Speaking again: the sent one lifts away from the very place the bars come in, under them. */
@@ -112,7 +114,7 @@
 /* No conversation on the stage. Its button only does something where the conversations are not already beside it. */
 .stage-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sv-space-3); padding: var(--sv-space-6);
   background: var(--sv-stage-bg); text-align: center; color: var(--sv-text-muted); }
-@media (min-width: 900px) { .stage-empty .stage-choose { display: none; } }
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) { .stage-empty .stage-choose { display: none; } }
 
 /* ---------- the call bar: one tray of round buttons in the middle, under the join's line; the transcript at the
  * right edge. The call's own colour says join (positive) or leave (danger). ---------- */
@@ -193,7 +195,7 @@
 @media (hover: hover) { .call-menu-panel #stats-open:hover { background: var(--sv-accent-soft); color: var(--sv-text); } }
 
 /* ---------- a phone: the tray alone in the bar, a little tighter; the transcript's button is on the stage ---------- */
-@media (max-width: 899px) {
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   .call-stage { padding: var(--sv-space-3) var(--sv-space-3) var(--sv-space-1); }
   .call-bar { grid-template-columns: minmax(0, 1fr); padding: var(--sv-space-2) var(--sv-space-2) calc(var(--sv-space-3) + env(safe-area-inset-bottom, 0px)); }
   .call-bar .controls { grid-column: 1; }
@@ -211,7 +213,7 @@
  * brand fills (40px from the same top), so the stage's name and the brand sit level; the text starts where the
  * sidebar's labels start inside their column. */
 .stage-title { display: none; }
-@media (min-width: 900px) {
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .call-stage { padding-top: var(--sv-space-3); }
   .room-shell .stage-title { display: grid; align-content: center; flex: none; min-width: 0; min-height: 40px; padding: 0 var(--sv-space-2); }
   .room-shell .stage-title h2 { min-width: 0; overflow: hidden; margin: 0; font-size: var(--sv-font-lg); line-height: 1.375rem; font-weight: var(--sv-weight-semibold); letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis; color: var(--sv-text); }
@@ -295,7 +297,7 @@
 /* A popover (.ui-popover) of the microphone and the speaker, one under the other, compact; on a phone it spans the
  * screen above the call's controls, as the bar did. */
 .ui-popover.audio-devices { width: min(18rem, calc(100vw - 24px)); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border-radius: var(--sv-radius-xl); }
-@media (max-width: 899px) { .ui-popover.audio-devices { width: calc(100vw - 24px); } }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .ui-popover.audio-devices { width: calc(100vw - 24px); } }
 .audio-devices-note, .audio-devices-lost, .audio-devices-error { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .audio-devices-lost { color: var(--sv-text); }
 .audio-devices-error { flex-direction: column; align-items: flex-start; gap: 0; color: var(--sv-danger); }

@@ -143,7 +143,7 @@
 .text-composer .composer-send:is(:disabled, [data-empty]) { background: var(--sv-disabled-bg); border-color: transparent; color: var(--sv-disabled-text); pointer-events: none; }
 
 /* ----- a phone: the transcript rises from the bottom as a sheet over the dimmed call */
-@media (max-width: 899px) {
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   .transcript-scrim {
     display: block; position: fixed; inset: 0; z-index: 30; background: var(--sv-scrim);
     opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease);
