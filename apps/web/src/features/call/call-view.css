@@ -8,6 +8,12 @@
 /* ---------- the stage ---------- */
 .call-stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--sv-space-2); padding: var(--sv-space-4) var(--sv-space-4) var(--sv-space-1); }
 #error.stage-error { flex: none; }
+/* Variant b: a compact card on the tile's bottom-right; its Details open inside it (it scrolls past the tile's height). */
+#error.stage-error[data-place="tile"] { position: absolute; z-index: 5; right: var(--stage-inset); bottom: var(--stage-inset); width: min(22rem, calc(100% - 2 * var(--stage-inset)));
+  max-height: calc(100% - 2 * var(--stage-inset)); overflow: auto; border-radius: var(--sv-radius-lg); box-shadow: var(--sv-shadow-xs); }
+#error.stage-error[data-place="tile"] .ui-alert { border-radius: inherit; }
+/* The transcript's button holds that corner on a phone: the card sits above it. */
+.stage-tile:has(> .transcript-entry) > #error.stage-error[data-place="tile"] { bottom: calc(var(--stage-inset) + 44px + var(--sv-space-2)); max-height: calc(100% - 2 * var(--stage-inset) - 44px - var(--sv-space-2)); }
 
 /* The tile fills the call; what sits on it keeps one inset from its edges, smaller on a small tile. */
 .stage-tile { container: stage / inline-size; position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden;
@@ -361,8 +367,7 @@
 
 /* The conversation's name and its machine, over the stage (CallStage StageName; 2026-10-15): the name in a display
  * weight, one line cut with an ellipsis; the machine a small chip with its icon. Its look is the `stageTitle` variant —
- * a: after a swatch of the agent's colour drawn as a bicho's body (lit from the top left, their ink round it), the
- * machine's chip beside it; b: the agent's small avatar with its state dot, the name over the chip; c: the name on a
+ * a: the name, the machine's chip beside it on the name's baseline; b: the agent's small avatar with its state dot, the name over the chip; c: the name on a
  * paper sticker inked as the balloon, the agent's colour along its edge. The same on a desktop, above the tile, and
  * on a phone, on the tile's corner (the sticker its own plate there). */
 :is(.stage-title, .stage-name) h2 { display: flex; align-items: center; gap: var(--sv-space-2); min-width: 0; margin: 0; font-size: var(--sv-font-xl); line-height: 1.5rem;
@@ -375,8 +380,7 @@
 .stage-machine > svg { flex: none; }
 .stage-machine > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 :where(.stage-name):is([data-look="a"], [data-look="c"]) { display: flex; align-items: center; gap: var(--sv-space-2); }
-.stage-name-mark { flex: none; width: 16px; height: 16px; border: 2.5px solid #1b1428; border-radius: 52% 48% 50% 46% / 50% 46% 54% 50%;
-  background: radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 62%, white), var(--av-color, var(--sv-accent)) 50%, color-mix(in srgb, var(--av-color, var(--sv-accent)) 70%, black)); }
+:where(.stage-name)[data-look="a"] { align-items: baseline; }
 :where(.stage-name)[data-look="b"] { grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sv-space-2); align-items: center; }
 :is(.stage-title, .stage-name)[data-look="b"] .conversation-avatar { grid-row: 1 / span 2; width: 36px; height: 36px; }
 :is(.stage-title, .stage-name)[data-look="b"] h2 { font-size: var(--sv-font-lg); line-height: 1.375rem; }
@@ -385,8 +389,9 @@
   border-radius: 10px 13px 11px 9px / 11px 9px 13px 10px; background: #fffdf9; box-shadow: inset 5px 0 0 var(--av-color, var(--sv-accent)), 0 6px 12px -6px rgb(27 20 40 / 50%);
   font-size: var(--sv-font-lg); line-height: 1.5rem; color: #1b1428; transform: rotate(-1deg); }
 .stage-name[data-look="c"] { padding: var(--sv-space-1) 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-@media (min-width: 900px) {
+@media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell .stage-title:is([data-look="a"], [data-look="c"]) { display: flex; align-items: center; gap: var(--sv-space-2); }
+  .room-shell .stage-title[data-look="a"] { align-items: baseline; }
   .room-shell .stage-title[data-look="b"] { grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sv-space-2); align-items: center; }
 }
 .voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
