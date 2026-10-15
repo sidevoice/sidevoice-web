@@ -397,13 +397,17 @@
   font-size: .6em; line-height: 1.3333em; font-weight: var(--sv-weight-semibold); white-space: nowrap; color: var(--sv-text-muted); }
 .stage-machine > svg { flex: none; width: 1em; height: 1em; }
 .stage-machine > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Two rows, the name over its machine; across from them, on a desktop, the models and the agent's badge, at the
- * interface's own size (they are not part of the slide). On a phone the agent's badge sits under the machine. */
-.stage-heading { display: grid; justify-items: start; gap: .25em; min-width: 0; }
+/* The name with its machine beside it; under them, on a desktop, the voice's models as a subtitle, at the
+ * interface's own size (they are not part of the slide). */
+.stage-heading { display: flex; align-items: center; gap: .5em; min-width: 0; }
 .stage-name { display: grid; gap: .3em; justify-items: start; }
-.stage-title-tags { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1-5); min-width: 0; font-size: var(--sv-font-xs); }
+/* The subtitle: the voice's models as quiet words with their icons, no chips (a model needing attention keeps its
+ * attention style, its state in words). */
+.stage-title-tags { display: flex; min-width: 0; font-size: var(--sv-font-sm); }
+.stage-title-tags .voice-models { justify-content: flex-start; gap: var(--sv-space-3); }
+.stage-title-tags .voice-chip:not([data-attention]) { height: auto; padding: 0; border-color: transparent; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; color: var(--sv-text-muted); }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
-  .room-shell .stage-title { display: flex; align-items: center; justify-content: space-between; gap: var(--sv-space-4); }
+  .room-shell .stage-title { display: grid; justify-items: start; align-content: center; gap: var(--sv-space-0-5); }
 }
 .voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }

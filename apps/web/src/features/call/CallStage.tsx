@@ -91,6 +91,7 @@ function StageName({ stage, className, tone, children }: { stage: StageConversat
         <h2 title={stage.title}><span>{stage.title}</span></h2>
         {stage.row?.machine && <span className="stage-machine"><MachinesIcon size={12} /><span>{stage.row.machine}</span></span>}
       </span>
+      {/* Under them, as a subtitle: what the call is talked to with (until the title's detail view comes). */}
       {children}
     </Tag>
   );
