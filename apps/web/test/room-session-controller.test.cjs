@@ -1519,6 +1519,29 @@ for(const phase of ['pending STT','merge hold'])test(`F7 A to B during ${phase} 
  assert.equal(sentOf(c,c.first,'voice-user-turn').some(row=>row.text?.includes('Private instruction for A. Instruction for B')),false);
  s.run('disconnect()');
 });
+test('F7 the new focus stays muted until voice acknowledges its capture boundary',async()=>{
+ const c=await callOnRoom(),{s,voice}=c;
+ let release;const gate=new Promise(resolve=>{release=resolve});
+ const original=voice.setCaptureBoundary;
+ voice.setCaptureBoundary=async id=>{await original(id);await gate};
+ s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
+ const selected=s.run("select('fp-mac|b')");
+ await c.until(()=>voice.calls.filter(([name])=>name==='setCaptureBoundary').length===2,'new focus boundary requested');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],true);
+ assert.equal(s.run('targetId()'),'fp-mac|a','binding is not applied while the boundary is pending');
+ release();await selected;
+ assert.equal(s.run('targetId()'),'fp-mac|b');
+ assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ s.run('disconnect()');
+});
+test('F7 a late terminal retains its captured target after many later starts',async()=>{
+ const c=await callOnRoom(),boundary=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
+ c.voice.emit('turn',{...started('old'),capture_boundary_id:boundary});
+ for(let i=0;i<65;i++)c.voice.emit('turn',{...started('later-'+i),capture_boundary_id:boundary});
+ c.voice.emit('turn',{...finished('old','Old target words'),capture_boundary_id:boundary});
+ assert.equal(turnSent(c,c.first,'old','finished')[0].text,'Old target words');
+ c.s.run('disconnect()');
+});
 test('T02 an accepted reply cannot start while a voice turn or its start acknowledgement is open',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('new-turn'));

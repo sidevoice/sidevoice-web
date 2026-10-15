@@ -339,7 +339,8 @@ const relay=createTurnRelay();
 // selected nothing is heard (2026-09-26).
 // Nor while the call moves to another machine (`moveCall`): nobody is there to hear it.
 let moving=false;
-function applyMicState(){voice?.mute(!state.micEnabled||moving||state.switching||state.connecting||!!(state.ws&&!targetId()))}
+let captureFencePending=0;
+function applyMicState(){voice?.mute(!state.micEnabled||moving||captureFencePending>0||state.switching||state.connecting||!!(state.ws&&!targetId()))}
 function showScreenLock(lockState,note){state.screenLock={state:lockState,note}}
 async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
@@ -601,12 +602,13 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
  const nextThread=d.binding?.thread_id||null;
  const wasSwitching=state.switching;
+ let fenced=false;
  if(nextThread!==targetThread()&&voice){
   // The old boundary may still have words in STT or a merge hold. Keep the microphone closed until voice
   // has fenced those words, then make the new binding visible to new speech.
-  state.switching=true;applyMicState();
-  try{await setCaptureFocus(fp,nextThread,d.binding?.binding_id)}catch(error){state.switching=wasSwitching;applyMicState();throw error}
-  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode){state.switching=wasSwitching;applyMicState();return}
+  fenced=true;++captureFencePending;state.switching=true;applyMicState();
+  try{await setCaptureFocus(fp,nextThread,d.binding?.binding_id)}catch(error){--captureFencePending;state.switching=wasSwitching;applyMicState();throw error}
+  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode){--captureFencePending;state.switching=wasSwitching;applyMicState();return}
  }else if(activeCaptureBoundary){
   const captured=captureTargets.get(activeCaptureBoundary);
   if(captured&&captured.node===fp&&captured.thread_id===nextThread)captured.binding_id=d.binding?.binding_id;
@@ -619,6 +621,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
+ if(fenced)--captureFencePending;
  if(state.switching!==wasSwitching){state.switching=wasSwitching;applyMicState()}
  applyMicState();
  if(previousThread!==targetId())stopReplies('focus_changed');else drainReplies();
@@ -1294,10 +1297,14 @@ function recordMessage(raw, socket) {
 const turnNodes=new Map();
 const captureTargets=new Map();
 let activeCaptureBoundary=null;
+let captureBoundaryQueue=Promise.resolve();
 async function setCaptureFocus(node,thread_id,binding_id){
  const id=crypto.randomUUID(),target={node,thread_id,binding_id,generation:callGeneration,capture_boundary_id:id};
  captureTargets.set(id,target);
- try{await voice.setCaptureBoundary(id)}catch(error){captureTargets.delete(id);throw error}
+ const host=voice,operation=captureBoundaryQueue.then(()=>host.setCaptureBoundary(id));
+ captureBoundaryQueue=operation.catch(()=>{});
+ try{await operation}catch(error){captureTargets.delete(id);throw error}
+ if(host!==voice||target.generation!==callGeneration){captureTargets.delete(id);return null}
  activeCaptureBoundary=id;
  // Keep a bounded set of completed boundaries while a late transcription can still name one.
  if(captureTargets.size>128){for(const [old] of captureTargets){if(old!==id&&![...turnNodes.values()].some(turn=>turn.capture_boundary_id===old)){captureTargets.delete(old);break}}}
@@ -1310,7 +1317,6 @@ function voiceTurn(turn){
   const captured=turn.capture_boundary_id?captureTargets.get(turn.capture_boundary_id):null;
   if(turn.capture_boundary_id&&!captured)return;
   turnNodes.set(turn.turn_id,captured||{node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration});
-  if(turnNodes.size>64)turnNodes.delete(turnNodes.keys().next().value);
  }
  const target=turnNodes.get(turn.turn_id);
  if(target&&turn.capture_boundary_id&&target.capture_boundary_id!==turn.capture_boundary_id)return;
