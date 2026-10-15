@@ -107,11 +107,10 @@
   color: var(--balloon-unsaid); overflow-wrap: anywhere;
   transform-origin: calc(var(--tail-at) + var(--tail-w) / 2) calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; }
 @keyframes stage-balloon-in { from { opacity: 0; transform: translateY(calc(10 * var(--u))) scale(.6); } }
-/* Where it sits (`balloonPlace`): centred over the agent, its tail out of the bottom-left corner; or pushed left of the
- * agent, its right end over it, its tail out of the bottom-right corner and turned toward it. It pops out of its tail. */
-.stage-bubble .balloon-tail { left: var(--tail-at); }
-.stage-bubble[data-place="left"] { justify-self: end; margin-inline-end: clamp(0px, calc(50% - 112 * var(--u)), calc(100% - min(100%, 544 * var(--u)))); transform-origin: calc(100% - var(--tail-at) - var(--tail-w) / 2) calc(100% + var(--tail-h)); }
-.stage-bubble[data-place="left"] .balloon-tail { left: auto; right: var(--tail-at); transform: scaleX(-1); }
+/* Where it sits: pushed left of the agent, its right end over it, its tail out of the bottom-right corner and turned
+ * toward it; it pops out of that tail. */
+.stage-bubble { justify-self: end; margin-inline-end: clamp(0px, calc(50% - 112 * var(--u)), calc(100% - min(100%, 544 * var(--u)))); transform-origin: calc(100% - var(--tail-at) - var(--tail-w) / 2) calc(100% + var(--tail-h)); }
+.stage-bubble .balloon-tail { left: auto; right: var(--tail-at); transform: scaleX(-1); }
 /* A reply leaving (its time over, or a new one over it): it lifts away and fades where the next comes in. */
 .stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
 @keyframes stage-bubble-out { to { opacity: 0; transform: translateY(calc(-28 * var(--u))) scale(.94); } }

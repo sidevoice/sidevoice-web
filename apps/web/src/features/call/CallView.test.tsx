@@ -104,7 +104,6 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
   // The balloon is the decided look: its place is the stored one (centre by default), always three lines.
-  expect(document.querySelector(".stage-bubble")).toHaveAttribute("data-place", "center");
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-lines");
   // Said to assistive tech only: no badge over the agent (the sidebar shows it).
   expect(workingLine()).toHaveClass("sr-only");

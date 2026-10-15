@@ -36,21 +36,16 @@ import "./call-view.css";
  * The agent is the conversation's bicho, on the scene its seed rolls (features/avatar/StageScene.tsx): a backdrop, a
  * desk that slides in while it works, and a wanted poster in its place while the room cannot reach it. */
 
-/* The balloon is made of the agent's own skin (decided 2026-10-15: its colour, pale, its ink and its gloss). Still
- * compared on the live page (lib/variants.ts, the playground's VARIANTS panel): `balloonPlace` center (its tail out of
- * its bottom-left corner) or left (pushed left of the agent, its tail out of its bottom-right corner toward it);
- * three lines at a time (decided 2026-10-15); `balloonPaging` scroll (a line at a time) or page (a page at a time, the last one shorter). */
-const BALLOON_PLACES = ["center", "left"] as const;
-const BALLOON_PAGING = ["scroll", "page"] as const;
+/* The balloon, decided 2026-10-15: made of the agent's own skin (its colour, pale, its ink and its gloss), pushed left of
+ * the agent with its tail out of its bottom-right corner toward it, three lines tall, a page at a time (the last page
+ * turning only as far as its last line: PagedText fixed). */
 
 /** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css): a few lines at a
  *  time (PagedText), lit as the voice says them, moving on with the words heard. */
 function AgentBubble({ turn }: { turn: AgentTurn }) {
-  const place = useVariant("balloonPlace", BALLOON_PLACES);
-  const paging = useVariant("balloonPaging", BALLOON_PAGING);
   return (
-    <div className="speech-bubble stage-bubble" data-place={place} data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
-      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn={paging} fixed>
+    <div className="speech-bubble stage-bubble" data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
+      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn="page" fixed>
         <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
       </PagedText>
       {/* The bichos' gloss, as on their skin. */}
