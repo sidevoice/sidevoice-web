@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { ChatMessage, ConversationView } from "../../state/room-types";
 import { translator } from "../../i18n/translator";
+import { audioNote } from "../../state/room-session-state.js";
 import { dayLabel, MessageList } from "./MessageList";
 
 const base = 1_700_000_000_000;
@@ -57,6 +58,47 @@ test("the thinking dots start the agent's next run, wearing its face", () => {
 test("an interrupted reply says so to a screen reader too", () => {
   render(<MessageList conversation={view([message({ segment: "i", text: "Te decía que", interrupted: true })])} />);
   expect(screen.getByRole("article", { name: "Agente, interrupted: Te decía que" })).toHaveAttribute("data-interrupted", "true");
+});
+
+test("T01/T06/T12 marks use confirmed scalar extent and never infer hearing from reading text", () => {
+  const rows = [
+    message({segment: "partial", text: "é🐙ab", interrupted: true, hearing: "partial", heard_chars: 2}),
+    message({segment: "unknown", text: "unknown", interrupted: true, hearing: null, hearing_unconfirmed: true, heard_chars: null}),
+    message({segment: "unplayed", text: "unplayed", audio: "text_only", audio_reason: "voice_off", hearing: "not_heard"}),
+    message({segment: "newer", text: "never started", audio: "interrupted", interrupted: true, audio_reason: "newer_turn", hearing: "not_heard", heard_chars: 0}),
+    message({segment: "skipped", text: "skipped", audio: "interrupted", hearing: "heard"}),
+  ];
+  const {container} = render(<MessageList conversation={view(rows)} />);
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node=>node.textContent))
+    .toEqual(["2 of 4 characters heard", "Hearing not confirmed", "Not heard", "Not heard"]);
+});
+test("T14 partial and unknown playback failures explain failure without claiming silence", () => {
+  const failed = (heard_chars: number | null) => ({audio: "failed", audio_reason: "playback_failed", heard_chars,
+    hearing: heard_chars == null ? null : "partial" as const, hearing_unconfirmed: heard_chars == null});
+  const {container} = render(<MessageList conversation={view([
+    message({segment: "partial-failure", text: "é🐙ab", ...failed(2), audioNote: audioNote(failed(2))}),
+    message({segment: "unknown-failure", text: "Unknown", ...failed(null), audioNote: audioNote(failed(null))}),
+  ])} />);
+  expect([...container.querySelectorAll(".audio-fate-mark")].map(node => node.textContent)).toEqual(["2 of 4 characters heard", "Hearing not confirmed"]);
+  expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual(["Playback failed", "Playback failed"]);
+});
+test("F8 core admission reasons for inactive and disconnected audiences are explained", () => {
+  const rows = ["inactive_conversation", "disconnected"].map((audio_reason) => {
+    const core = { audio: "text_only", audio_reason, globally_heard: false };
+    return message({ ...core, text: audio_reason, audioNote: audioNote(core) });
+  });
+  const { container } = render(<MessageList conversation={view(rows)} />);
+  expect([...container.querySelectorAll(".chat-audio-note")].map(node => node.textContent)).toEqual([
+    "No audio · You were in another conversation", "No audio · The call was disconnected",
+  ]);
+});
+
+test("F9 a manually heard text-only reply no longer claims it was not played", () => {
+  const core = { audio: "text_only", audio_reason: "voice_off", heard_chars: 6, hearing: "heard" as const, globally_heard: true, replayable: false };
+  const { container } = render(<MessageList conversation={view([message({ segment: "manual-heard", text: "Answer", ...core, audioNote: audioNote(core) })])} />);
+  expect(container.querySelector(".audio-fate-mark")).toBeNull();
+  expect(container.querySelector(".chat-audio-note")).toBeNull();
+  expect(screen.getByRole("article", { name: "Agente: Answer" })).toBeInTheDocument();
 });
 
 test("keeps a live user draft visible beside a newly queued reply and renders karaoke declaratively", () => {
