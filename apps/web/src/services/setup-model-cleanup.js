@@ -1,13 +1,10 @@
-/* Models installed by this device's first-run setup alone. An install earns provenance only after a fresh catalogue
- * said no build was present before it and another fresh catalogue confirms success. The small device-local record
- * survives a setup reload; it is cleared before cleanup so a failed deletion is never retried on the next launch. */
+/* Candidate models installed by first-run setup. A catalogue comparison can identify a possible setup download,
+ * but cannot prove that all current builds still belong to it or that another tab is not using one. The record is
+ * therefore never an authorization to uninstall. */
 
 import { LOCAL_CATALOG } from './model-catalogs.js';
-import { modelPurposes } from './model-housekeeping.js';
 
 /** @typedef {import('./model-catalogs.js').CatalogView} CatalogView */
-/** @typedef {import('./model-catalogs.js').ModelCatalogs} ModelCatalogs */
-/** @typedef {import('./voice-settings.js').DeviceVoiceSettings} DeviceVoiceSettings */
 
 export const SETUP_DOWNLOADS_KEY = 'sidevoice.setup-model-downloads';
 
@@ -37,7 +34,7 @@ function read(storage) {
   } catch { return null; }
 }
 
-/** A successful setup install with no pre-existing build is the only source of an owned model ID. */
+/** A successful setup install with no pre-existing build is the only source of a candidate model ID. */
 export function recordSetupInstall(storage, id, absentBeforeInstall, after) {
   const newModel = localModel(after, id);
   if (!absentBeforeInstall || !newModel || !installed(newModel)) return false;
@@ -50,7 +47,14 @@ export function recordSetupInstall(storage, id, absentBeforeInstall, after) {
   } catch { return false; }
 }
 
-/** Read and clear before any asynchronous catalogue read or uninstall. A failed clear authorizes nothing. */
+/** Any ordinary install or explicit removal invalidates a setup candidate, even if the operation later fails. */
+export function forgetSetupInstall(storage, id) {
+  const ids = read(storage);
+  if (!ids?.includes(id)) return;
+  try { storage.removeItem(SETUP_DOWNLOADS_KEY); } catch { /* Leaving a candidate cannot authorize deletion. */ }
+}
+
+/** Consume the candidate list after setup; a failed clear cannot authorize deletion. */
 function take(storage) {
   const ids = read(storage);
   if (!ids?.length) return [];
@@ -61,29 +65,7 @@ function take(storage) {
 }
 
 /**
- * Quietly remove only confirmed setup downloads that are neither selected nor in use at the moment of deletion.
- * @param {{storage: Storage | null, models: () => Promise<ModelCatalogs>, selected: () => (DeviceVoiceSettings | null | undefined)[],
- *   busy: () => boolean, changed?: () => Promise<unknown>, log?: (error: unknown) => void}} options
+ * The existing whole-model uninstall has no store-wide ownership receipt or atomic check of selections and use.
+ * Finishing setup discards candidates without deleting files until the host can provide that guarantee.
  */
-export async function cleanSetupDownloads({ storage, models, selected, busy, changed, log = console.warn }) {
-  const ids = take(storage);
-  if (!ids.length || busy()) return;
-  let host;
-  try { host = await models(); } catch (error) { log(error); return; }
-  if (typeof host.uninstall !== 'function') return;
-  let removed = false;
-  for (const id of ids) {
-    if (busy()) break;
-    try {
-      const catalogs = await host.catalogs();
-      const model = localModel(catalogs, id);
-      if (!model || !installed(model)) continue;
-      const settings = selected();
-      if (!settings.length || !settings[0] || settings.some((value) => value && modelPurposes(catalogs, value)(id).length)) continue;
-      if (busy()) break;
-      await host.uninstall(id);
-      removed = true;
-    } catch (error) { log(error); }
-  }
-  if (removed) try { await changed?.(); } catch (error) { log(error); }
-}
+export function discardSetupDownloadCandidates(storage) { take(storage); }

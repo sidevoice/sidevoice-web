@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),test=require('node:test'),{moc
 // This device's pairing, as the page keeps it, for every test that does not say otherwise: the machine proved itself
 // at the page's own origin a moment ago, so requests go where they always went and carry its token.
 const PAIRED={fp:'fp-mac',public_key:'pk',host:'macbook',urls:['http://127.0.0.1:8768'],rv:{url:'https://room.example',node:'mac'},device_id:'dev-1',token:'tok-1',paired_at:1};
-function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null,readingMode=false}={}){
+function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:null,localHost=null,indexedDB=null,outboxScope=null,readingMode=false,mutateController=null}={}){
  const sourceRoot=__dirname+'/../src'; const uiSource=fs.readdirSync(sourceRoot,{recursive:true}).filter(file=>String(file).endsWith('.tsx')).map(file=>fs.readFileSync(sourceRoot+'/'+file,'utf8')).join('\n');
  class Element{constructor(id){this.id=id;this.children=[];this.dataset={};this.style={setProperty(){}};this.classList={add(){},remove(){}};this.parentElement=this;this.listeners={};this.attributes={}}addEventListener(name,fn){this.listeners[name]=fn}showModal(){this.open=true}close(){this.open=false;this.listeners.close?.()}contains(node){return node===this||this.children.includes(node)}removeAttribute(){}closest(){return null}querySelector(){return null}append(...children){this.children.push(...children)}replaceChildren(...children){this.children=[...children]}remove(){}setAttribute(name,value){this.attributes[name]=value}getAttribute(name){return this.attributes[name]}click(){this.onclick?.()}}
  const elements=new Map(),handlers={},documentHandlers={},observers=[];
@@ -33,7 +33,7 @@ function setup({strictDOM=false,paired=true,stored=paired?{pairings:[PAIRED]}:nu
  // The projections speak through the translator, as the room's store makes them (state/room-store.ts).
  vm.runInContext('SessionState.speakWith((key,params)=>Translator.translator()(key,params))',context);
  const source=fs.readFileSync(sourceRoot+'/services/room-session-controller.js','utf8');
- const loaded=imports(source,sourceRoot+'/services');
+ const loaded=imports(mutateController?mutateController(source):source,sourceRoot+'/services');
  vm.runInContext('"use strict";\n'+loaded,context);
  for(const name of Object.keys(vm.runInContext('SessionState.initialSessionFacts()',context)))Object.defineProperty(context,name,{get:()=>vm.runInContext('state.'+name,context),set:value=>{context.__fact=value;vm.runInContext('state.'+name+'=__fact',context)},configurable:true});
  // Paired: the first machine proved itself at the page's own origin, and the call is on it.
@@ -2315,7 +2315,7 @@ test('A model the slot names but that is not on this device installs, its progre
  assert.equal(s.run('state.voiceInstall.details'),'net','what the engine said is only a detail');
 });
 
-test('Only a setup-origin download earns cleanup provenance; finishing removes it after the choice changes',async()=>{
+test('B3 finishing discards the candidate without starting a destructive host request',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');s.context.__original=s.run('voiceSettings');
  const model={id:'spare-stt',family:'whisper',capabilities:['stt'],installed:false,recommendedBuild:'spare-stt/int8',
   builds:[{id:'spare-stt/int8',backend:'sherpa-onnx',available:true,installed:false}]};
@@ -2330,14 +2330,10 @@ test('Only a setup-origin download earns cleanup provenance; finishing removes i
  assert.deepEqual(JSON.parse(s.context.localStorage.getItem('sidevoice.setup-model-downloads')),['spare-stt']);
  s.run('roomStore.patch({voiceDraft:__original})');await s.run('applyVoiceSettings()');
  await s.run('window.sidevoiceActions.cleanupSetupTrials()');
- assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[['uninstall','spare-stt']]);
+ assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[]);
+ assert.equal(model.installed,true,'the trial files remain until an atomic host operation exists');
  assert.equal(s.context.localStorage.getItem('sidevoice.setup-model-downloads'),null);
- // The same shared Settings control downloads without setup provenance.
- s.run(select);
- await s.run("window.sidevoiceActions.installVoiceModel('stt')");
- s.run('roomStore.patch({voiceDraft:__original})');await s.run('applyVoiceSettings()');
- await s.run('window.sidevoiceActions.cleanupSetupTrials()');
- assert.equal(engine.calls.filter(([name])=>name==='uninstall').length,1);
+
 });
 
 test('Cleanup never uninstalls a model while a voice trial is active',async()=>{
@@ -2353,7 +2349,7 @@ test('Cleanup never uninstalls a model while a voice trial is active',async()=>{
  assert.equal(engine.calls.some(([name])=>name==='uninstall'),false);
 });
 
-test('Finishing during a second download still cleans an earlier completed setup trial',async()=>{
+test('B3 finishing during a second download discards candidates after cancellation without deleting the first',async()=>{
  const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');s.context.__original=s.run('voiceSettings');
  const chosen={id:'whisper-base',capabilities:['stt'],installed:true,builds:[{id:'chosen/int8',available:true,installed:true}]};
  const first={id:'first-trial',capabilities:['stt'],installed:false,builds:[{id:'first/int8',available:true,installed:false}]};
@@ -2372,8 +2368,97 @@ test('Finishing during a second download still cleans an earlier completed setup
  pick('second-trial');const pending=s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
  await settleSoon();
  await s.run('window.sidevoiceActions.cleanupSetupTrials()');await pending;
- assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[['uninstall','first-trial']]);
+ assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[]);
+ assert.equal(first.installed,true);
  assert.equal(s.context.localStorage.getItem('sidevoice.setup-model-downloads'),null);
+});
+
+test('B1 two tabs share files but not engine use or in-memory settings: neither simultaneous finisher deletes B’s selected model',async()=>{
+ const a=setup({strictDOM:true}),b=setup({strictDOM:true});
+ a.context.localStorage.setItem('sidevoice.settings','{}');b.context.localStorage=a.context.localStorage;
+ a.context.__original=a.run('voiceSettings');
+ const selected={id:'whisper-base',capabilities:['stt'],installed:true,builds:[{id:'base/int8',available:true,installed:true}]};
+ const model={id:'shared-trial',capabilities:['stt'],installed:false,builds:[{id:'shared/int8',available:true,installed:false}]};
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[selected,model]}];a.context.__catalogs=catalogs;b.context.__catalogs=catalogs;
+ const engineA=fakeEngine(catalogs),engineB=fakeEngine(catalogs);
+ engineA.install=async()=>{model.installed=true;model.builds[0].installed=true};
+ engineA.uninstall=async id=>{engineA.calls.push(['uninstall',id]);model.installed=false};
+ engineB.uninstall=async id=>{engineB.calls.push(['uninstall',id]);model.installed=false};
+ withVoice(a,fakeVoice(),engineA);withVoice(b,fakeVoice(),engineB);
+ a.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'shared-trial',language:null}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})");
+ await a.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ a.run('roomStore.patch({voiceDraft:__original})');await a.run('applyVoiceSettings()');
+ b.run("roomStore.patch({voiceCatalogue:{state:'ready',catalogs:__catalogs}});window.sidevoiceActions.editVoice({stt:{model:'shared-trial'}})");
+ await b.run('applying');b.run('state.ws={}'); // B is using the model in another call.
+ assert.equal(JSON.parse(a.context.localStorage.getItem('sidevoice.voice-settings')).stt.model,'shared-trial');
+ assert.equal(a.run('voiceSettings.stt.model'),'whisper-base','A did not learn B’s selection');
+ await Promise.all([a.run('window.sidevoiceActions.cleanupSetupTrials()'),b.run('window.sidevoiceActions.cleanupSetupTrials()')]);
+ assert.deepEqual(engineA.calls.filter(([name])=>name==='uninstall'),[]);
+ assert.deepEqual(engineB.calls.filter(([name])=>name==='uninstall'),[]);
+ assert.equal(model.installed,true);
+});
+
+test('B2 Settings build and explicit replacement invalidate candidate before deferred setup completes',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');
+ const base={id:'whisper-base',capabilities:['stt'],installed:true,builds:[{id:'base/int8',available:true,installed:true}]};
+ const model={id:'small',capabilities:['stt'],installed:false,builds:[{id:'small/int8',available:true,installed:false},{id:'small/fp32',available:true,installed:false}]};
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[base,model]}];s.context.__catalogs=catalogs;
+ const engine=fakeEngine(catalogs);engine.install=async(id,{build})=>{const chosen=model.builds.find(row=>row.id===build);chosen.installed=true;model.installed=true};
+ engine.uninstall=async id=>{engine.calls.push(['uninstall',id]);model.installed=false;model.builds.forEach(row=>row.installed=false)};
+ withVoice(s,fakeVoice(),engine);
+ const pick=build=>{s.context.__build=build;s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'small',language:null,build:__build}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})")};
+ pick('small/int8');await s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ assert.deepEqual(JSON.parse(s.context.localStorage.getItem('sidevoice.setup-model-downloads')),['small']);
+ pick('small/fp32');await s.run("window.sidevoiceActions.installVoiceModel('stt')");
+ assert.equal(s.context.localStorage.getItem('sidevoice.setup-model-downloads'),null,'Settings build invalidates the entire candidate');
+ await s.run('window.sidevoiceActions.uninstallVoiceModel("small")');
+ pick('small/fp32');await s.run("window.sidevoiceActions.installVoiceModel('stt')");
+ await s.run('window.sidevoiceActions.cleanupSetupTrials()');
+ assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[['uninstall','small']],'only the person’s explicit removal reached the host');
+ assert.equal(model.builds[1].installed,true,'replacement Settings download remains');
+});
+
+test('B3 a Settings selection while cleanup is pending cannot be erased by a delayed host uninstall',async()=>{
+ const s=setup({strictDOM:true});s.context.localStorage.setItem('sidevoice.settings','{}');s.context.__original=s.run('voiceSettings');
+ const base={id:'whisper-base',capabilities:['stt'],installed:true,builds:[{id:'base/int8',available:true,installed:true}]};
+ const model={id:'late-choice',capabilities:['stt'],installed:false,builds:[{id:'late/int8',available:true,installed:false}]};
+ const catalogs=[{id:'local',name:null,status:{stale:false},models:[base,model]}];s.context.__catalogs=catalogs;
+ const engine=fakeEngine(catalogs);engine.install=async()=>{model.installed=true;model.builds[0].installed=true};
+ let releaseUninstall;const wouldDelete=new Promise(resolve=>{releaseUninstall=resolve});
+ engine.uninstall=async id=>{engine.calls.push(['uninstall',id]);await wouldDelete;model.installed=false};
+ withVoice(s,fakeVoice(),engine);
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'late-choice',language:null}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})");
+ await s.run("window.sidevoiceActions.installVoiceModel('stt',{setup:true})");
+ s.run('roomStore.patch({voiceDraft:__original})');await s.run('applyVoiceSettings()');
+ let releaseCleanup;const pending=new Promise(resolve=>{releaseCleanup=resolve});s.context.__pending=pending;s.run('voiceInstallDone=__pending');
+ const finishing=s.run('window.sidevoiceActions.cleanupSetupTrials()');
+ s.run("window.sidevoiceActions.editVoice({stt:{model:'late-choice'}})");await s.run('applying');
+ releaseCleanup();await finishing;releaseUninstall();
+ assert.equal(s.run('voiceDraft.stt.model'),'late-choice');
+ assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[]);
+ assert.equal(model.installed,true);
+});
+
+test('M4 a Settings-origin download before completion is not recorded; removing both origin checks fails the same trace',async()=>{
+ async function run(mutateController){
+  const s=setup({strictDOM:true,mutateController});s.context.localStorage.setItem('sidevoice.settings','{}');
+  const model={id:'settings-only',capabilities:['stt'],installed:false,builds:[{id:'settings/int8',available:true,installed:false}]};
+  const catalogs=[{id:'local',name:null,status:{stale:false},models:[model]}];s.context.__catalogs=catalogs;
+  const engine=fakeEngine(catalogs);engine.install=async()=>{model.installed=true;model.builds[0].installed=true};
+  engine.uninstall=async id=>{engine.calls.push(['uninstall',id])};withVoice(s,fakeVoice(),engine);
+  s.run("roomStore.patch({voiceDraft:{...voiceSettings,stt:{catalog:'local',model:'settings-only',language:null}},voiceCatalogue:{state:'ready',catalogs:__catalogs}})");
+  await s.run("window.sidevoiceActions.installVoiceModel('stt')");
+  const record=s.context.localStorage.getItem('sidevoice.setup-model-downloads');
+  await s.run('window.sidevoiceActions.cleanupSetupTrials()');
+  assert.deepEqual(engine.calls.filter(([name])=>name==='uninstall'),[]);
+  return record;
+ }
+ assert.equal(await run(null),null);
+ const removeOriginChecks=source=>{
+  assert.ok(source.includes('setup&&!setupCleanupStarted?')&&source.includes('if(setup&&before&&!setupCleanupStarted)'));
+  return source.replace('setup&&!setupCleanupStarted?','!setupCleanupStarted?').replace('if(setup&&before&&!setupCleanupStarted)','if(before&&!setupCleanupStarted)');
+ };
+ assert.deepEqual(JSON.parse(await run(removeOriginChecks)),['settings-only'],'the in-memory guard mutation is detected without changing a repository file');
 });
 
 test('A model chosen before it is on this device waits: the one in use stays, and it switches once its install is done',async()=>{

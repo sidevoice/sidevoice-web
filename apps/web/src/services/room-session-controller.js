@@ -15,7 +15,7 @@ import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
-import {setupModelAbsent,recordSetupInstall,cleanSetupDownloads} from './setup-model-cleanup.js';
+import {setupModelAbsent,recordSetupInstall,forgetSetupInstall,discardSetupDownloadCandidates} from './setup-model-cleanup.js';
 import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange,scalarExtent} from './voice-room.js';
@@ -1974,6 +1974,7 @@ async function installVoiceModel(task,{setup=false}={}){
  at(null);
  try{
   const models=await modelCatalogs();
+  if(!setup)forgetSetupInstall(pageStorage(),slot.model);
   // A setup download earns provenance only from a fresh local listing with no installed build beforehand.
   const before=setup&&!setupCleanupStarted?setupModelAbsent(await models.catalogs().catch(()=>null),slot.model):false;
   await models.install(slot.model,{build:build?.id??null,engine:build?.backend??null,signal:abort.signal,onProgress:progress=>{if(voiceInstall===abort)at(progress.fraction)}});
@@ -1986,17 +1987,14 @@ async function installVoiceModel(task,{setup=false}={}){
  finally{if(voiceInstall===abort)voiceInstall=null;finishInstall()}
 }
 function cancelVoiceInstall(){voiceInstall?.abort()}
-// Once Ready is saved, the wizard closes independently of this best-effort cleanup. The record is consumed before
-// any host request, and a late setup install cannot claim ownership after cleanup begins.
+// Once Ready is saved, the wizard closes independently. Without a store-owned receipt and an atomic cross-context
+// selection/use check, the page cannot safely delete a model; it only discards the candidate record.
 async function cleanupSetupTrials(){
  setupCleanupStarted=true;
  voiceInstall?.abort();
- // Finish cancellation before consuming the one-shot provenance, so an unrelated pending download cannot skip older trials.
+ // Finish cancellation before discarding candidates, so a late setup install cannot recreate the record.
  await voiceInstallDone;
- await cleanSetupDownloads({storage:pageStorage(),models:modelCatalogs,
-  selected:()=>[state.voiceDraft||state.voiceSettings,state.voiceSettings,handed],
-  busy:()=>!!(state.ws||state.connecting||state.reconnecting||voiceInstall||voiceTry||turnTry),
-  changed:loadVoiceCatalogue});
+ discardSetupDownloadCandidates(pageStorage());
 }
 // Models not used for as long as the person chose (model-housekeeping.js), deleted where the engine can: none in use,
 // none the engine says nothing about; the catalogues read again once one went.
@@ -2014,6 +2012,7 @@ async function setDeleteUnusedModels(days){
 // Its code stays on what it throws, for the pane to say a model in use as such.
 async function uninstallVoiceModel(model){
  const models=await modelCatalogs();
+ forgetSetupInstall(pageStorage(),model);
  try{await models.uninstall(model)}catch(error){throw voiceRefused(error,'delete')}
  await loadVoiceCatalogue();
 }
