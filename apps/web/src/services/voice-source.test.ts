@@ -69,8 +69,9 @@ test("silence loads the detector, then each slot from the catalogue it names, an
   const slots = await models.load();
   expect(loaded).toEqual([["local", "silero-vad"], ["local", "whisper-base"], ["local", "kokoro-82m-v1.0"]]);
   expect(slots.endOfTurn).toBeUndefined();
-  expect(await slots.vad.accept(new Float32Array(512))).toEqual([{ end: 512, speech: true, probability: 0.9 }]);
-  await slots.vad.reset();
+  const vad = await slots.createVad();
+  expect(await vad.accept(new Float32Array(512))).toEqual([{ end: 512, speech: true, probability: 0.9 }]);
+  await vad.reset();
   expect(await slots.transcriber.transcribe(new Float32Array(3), 16000, undefined)).toBe("hola");
   await slots.speaker.speak("hola", undefined, "es", 1.1);
   expect(calls).toEqual([["stream", { threshold: 0.6, minSilenceMs: 200, minSpeechMs: 400 }], ["accept", 512], ["reset"], ["transcribe", new Float32Array(3), 16000, null], ["speak", "hola", "ef_dora", "es", 1.1]]);
@@ -114,7 +115,7 @@ test("what this device cannot run is refused with a code before anything loads",
 
 test("a detector at another rate than the voice feeds is refused, and a provider's failure keeps its code and words", async () => {
   const slow = fakeEngine({ vadRate: 8000 });
-  await expect((await engineVoiceSource(slow.engine).models(settings())).load()).rejects.toMatchObject({ code: "vad-sample-rate" });
+  await expect((async () => (await (await engineVoiceSource(slow.engine).models(settings())).load()).createVad())()).rejects.toMatchObject({ code: "vad-sample-rate" });
   const failing = fakeEngine();
   const tts = { catalog: "elevenlabs", model: "eleven_flash_v2_5" };
   const models = await engineVoiceSource(failing.engine).models(settings({ tts }));

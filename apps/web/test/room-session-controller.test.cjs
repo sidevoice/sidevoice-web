@@ -1180,8 +1180,7 @@ test('A reload takes the call back: the tab keeps the ticket, the next join send
 
 // ----- the call's voice: the VoiceHost the page drives, here a fake that records what it was asked -----
 function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
- const on={},calls=[],said=[];
- const sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
+ const calls=[],said=[],created=[],routes=[];
  // What the voice is asked to say: a handle the test steps through (`step`), as the voice's own goes.
  const say=(text,options)=>{
   calls.push(['say',text,options]);const listeners=new Set();let settle;
@@ -1190,11 +1189,21 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
    onEvent(listener){listeners.add(listener)},outcome:new Promise(resolve=>{settle=resolve}),step(event){for(const listener of listeners)listener(event);if(event.type==='done')settle(event.outcome)}};
   said.push(handle);return handle;
  };
- return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
+ const owner={calls,said,created,routes,routed:null,
+  emit(name,value){(this.routed??created.at(-1))?.emit(name,value)},
+  createCall(){
+   const on={},sub=name=>listener=>{(on[name]||=new Set()).add(listener);return ()=>on[name].delete(listener)};
+   const call=Object.create(owner);call.id='call-'+(created.length+1);
+   call.emit=(name,value)=>{for(const listener of on[name]||[])listener(value)};
+   call.onTurn=sub('turn');call.onState=sub('state');call.onLevel=sub('level');call.onPlaybackLevel=sub('output');call.onTake=sub('take');call.onError=sub('error');
+   call.dispose=async()=>{calls.push(['dispose',call.id]);await owner.stop()};
+   created.push(call);return call;
+  },
+  async routeInput(call){routes.push(call?.id??null);this.routed=call},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
-  setCaptureBoundary:async id=>{calls.push(['setCaptureBoundary',id])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
-  onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onAgentInterrupted:sub('agent-interrupted'),onTake:sub('take'),onError:sub('error')};
+ };
+ return owner;
 }
 // The desktop app's engine as the page reads it (`host.engine`): its catalogues, and the keys it keeps per provider.
 function fakeEngine(catalogs){
@@ -1250,8 +1259,8 @@ const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filt
 
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
- assert.deepEqual(voice.calls.map(([name])=>name).slice(0,4),['mute','setCaptureBoundary','setSettings','start']);
- assert.deepEqual(plain(voice.calls[2][1]),{...plain(c.s.run('voiceSettings')),end_of_turn:'silence'},'the settings this device keeps; Smart as silence when its model is unavailable');
+ assert.deepEqual(voice.calls.map(([name])=>name).slice(0,4),['mute','setSettings','start','mute']);
+ assert.deepEqual(plain(voice.calls[1][1]),{...plain(c.s.run('voiceSettings')),end_of_turn:'silence'},'the settings this device keeps; Smart as silence when its model is unavailable');
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','speech','ui_language']);
  assert.deepEqual(plain(firstHello.data.speech),{on:true});
@@ -1804,126 +1813,99 @@ test('T11 a delayed transcript keeps its captured focus through a later selectio
  assert.deepEqual([end.thread_id,end.binding_id],['a','b']);
  c.s.run('disconnect()');
 });
-for(const phase of ['pending STT','merge hold'])test(`F7 A to B during ${phase} routes each captured transcript to its own core target`,async()=>{
+for(const phase of ['pending STT','merge hold'])test(`A to B during ${phase} keeps independent call transcripts`,async()=>{
  const c=await callOnRoom(),{s,voice}=c;
+ const a=voice.created[0];
  s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
- const aBoundary=voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
- const aStart={...started('a-turn'),capture_boundary_id:aBoundary};
- const aEnd={...finished('a-turn','Private instruction for A'),capture_boundary_id:aBoundary};
- voice.emit('turn',aStart);
- if(phase==='merge hold'){
-  const original=voice.setCaptureBoundary;
-  voice.setCaptureBoundary=async id=>{voice.emit('turn',aEnd);await original(id)};
- }
+ a.emit('turn',started('a-turn'));
  s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
   :{binding:{thread_id:'b',title:'B',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ if(phase==='merge hold')a.emit('turn',finished('a-turn','Private instruction for A'));
  await s.run("select('fp-mac|b')");
- const boundaries=voice.calls.filter(([name])=>name==='setCaptureBoundary').map(([,id])=>id);
- assert.equal(boundaries.length,2,'initial focus and change each get a boundary');
- assert.notEqual(boundaries[0],boundaries[1]);
- if(phase==='pending STT')voice.emit('turn',aEnd);
- voice.emit('turn',{...started('b-turn'),capture_boundary_id:boundaries[1]});
- voice.emit('turn',{...finished('b-turn','Instruction for B'),capture_boundary_id:boundaries[1]});
- const a=turnSent(c,c.first,'a-turn','finished')[0],b=turnSent(c,c.first,'b-turn','finished')[0];
- assert.deepEqual([a.thread_id,a.binding_id,a.text],['a','b','Private instruction for A']);
- assert.deepEqual([b.thread_id,b.binding_id,b.text],['b','b-binding','Instruction for B']);
+ assert.equal(voice.created.length,2);
+ assert.equal(voice.routed,voice.created[1]);
+ if(phase==='pending STT')a.emit('turn',finished('a-turn','Private instruction for A'));
+ const b=voice.created[1];b.emit('turn',started('b-turn'));b.emit('turn',finished('b-turn','Instruction for B'));
+ const aEnd=turnSent(c,c.first,'a-turn','finished')[0],bEnd=turnSent(c,c.first,'b-turn','finished')[0];
+ assert.deepEqual([aEnd.thread_id,aEnd.binding_id,aEnd.text],['a','b','Private instruction for A']);
+ assert.deepEqual([bEnd.thread_id,bEnd.binding_id,bEnd.text],['b','b-binding','Instruction for B']);
  assert.equal(sentOf(c,c.first,'voice-user-turn').some(row=>row.text?.includes('Private instruction for A. Instruction for B')),false);
  s.run('disconnect()');
 });
-test('R7 an asynchronously delivered A start after selecting B still starts at A',async()=>{
- const c=await callOnRoom(),{s,voice}=c;
+test('a delayed native A start after selecting B retains A binding',async()=>{
+ const c=await callOnRoom(),{s,voice}=c,a=voice.created[0];
  s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
- const aBoundary=voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
  s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
   :{binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
  await s.run("select('fp-mac|b')");
- const bBoundary=voice.calls.filter(([name])=>name==='setCaptureBoundary').at(-1)[1];
- await new Promise(resolve=>setTimeout(resolve,0)); // Native event forwarding can arrive after the HTTP selection.
- voice.emit('turn',{...started('a-delayed'),capture_boundary_id:aBoundary});
- voice.emit('turn',{...finished('a-delayed','Private words for A'),capture_boundary_id:aBoundary});
- voice.emit('turn',{...started('b-current'),capture_boundary_id:bBoundary});
- voice.emit('turn',{...finished('b-current','Words for B'),capture_boundary_id:bBoundary});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ a.emit('turn',started('a-delayed'));a.emit('turn',finished('a-delayed','Private words for A'));
+ const b=voice.created[1];b.emit('turn',started('b-current'));b.emit('turn',finished('b-current','Words for B'));
  const aStart=turnSent(c,c.first,'a-delayed','started')[0],aEnd=turnSent(c,c.first,'a-delayed','finished')[0];
  const bStart=turnSent(c,c.first,'b-current','started')[0],bEnd=turnSent(c,c.first,'b-current','finished')[0];
  assert.deepEqual([aStart.thread_id,aStart.binding_id,aEnd.thread_id,aEnd.binding_id,aEnd.text],['a','b','a','b','Private words for A']);
  assert.deepEqual([bStart.thread_id,bStart.binding_id,bEnd.thread_id,bEnd.binding_id,bEnd.text],['b','b-binding','b','b-binding','Words for B']);
  s.run('disconnect()');
 });
-test('F7 the new focus stays muted until voice acknowledges its capture boundary',async()=>{
+test('new focus waits for acknowledged input routing before changing binding',async()=>{
  const c=await callOnRoom(),{s,voice}=c;
  let release;const gate=new Promise(resolve=>{release=resolve});
- const original=voice.setCaptureBoundary;
- voice.setCaptureBoundary=async id=>{await original(id);await gate};
+ const original=voice.routeInput.bind(voice);
+ voice.routeInput=async call=>{if(call&&call!==voice.created[0])await gate;await original(call)};
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'b',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
  const selected=s.run("select('fp-mac|b')");
- await c.until(()=>voice.calls.filter(([name])=>name==='setCaptureBoundary').length===2,'new focus boundary requested');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],true);
- assert.equal(s.run('targetId()'),'fp-mac|a','binding is not applied while the boundary is pending');
+ await c.until(()=>voice.created.length===2,'new conversation call');
+ assert.equal(s.run('targetId()'),'fp-mac|a');
  release();await selected;
  assert.equal(s.run('targetId()'),'fp-mac|b');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ assert.equal(voice.routed,voice.created[1]);
  s.run('disconnect()');
 });
-test('R1 overlapping refresh fences release only their own mute ownership',async()=>{
+test('overlapping focus requests end routed to the latest conversation',async()=>{
  const c=await callOnRoom(),{s,voice}=c;
- const releases=[];const original=voice.setCaptureBoundary;
- voice.setCaptureBoundary=async id=>{await original(id);await new Promise(resolve=>releases.push(resolve))};
  let response=0;
  s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:++response===1?'b':'c',binding_id:'binding-'+response},room:{revision:response},clients:[],call:null,participants:[]})});
- const first=s.run('refresh()');
- await c.until(()=>releases.length===1,'first capture fence');
- const second=s.run('refresh()');
- await c.until(()=>s.run('captureFencePending')===2,'overlapping capture fences');
- assert.equal(s.run('captureFencePending'),2);
- releases.shift()();
- await c.until(()=>releases.length===1,'second capture fence');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],true,'the second fence still owns mute');
- releases.shift()();await Promise.all([first,second]);
- assert.equal(s.run('captureFencePending'),0);
- assert.equal(s.run('state.switching'),false);
+ await Promise.all([s.run('refresh()'),s.run('refresh()')]);
  assert.equal(s.run('targetThread()'),'c');
- assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'capture resumes after both fences');
+ assert.equal(voice.routed,voice.created.at(-1));
  s.run('disconnect()');
 });
-test('R1 a stale presentation response cannot install a boundary after the newer focus',async()=>{
+test('stale presentation response cannot route input after newer focus',async()=>{
  const c=await callOnRoom(),requests=[];
  c.s.context.fetch=async()=>new Promise(resolve=>requests.push(resolve));
  const old=c.s.run('refresh()'),recent=c.s.run('refresh()');
  const answer=(resolve,thread)=>resolve({ok:true,status:200,json:async()=>({binding:{thread_id:thread,binding_id:'binding-'+thread},room:{revision:2},clients:[],call:null,participants:[]})});
  await c.until(()=>requests.length===2,'two presentation requests');
  answer(requests[1],'c');await recent;
- const count=c.voice.calls.filter(([name])=>name==='setCaptureBoundary').length;
+ const count=c.voice.routes.length;
  answer(requests[0],'b');await old;
  assert.equal(c.s.run('targetThread()'),'c');
- assert.equal(c.voice.calls.filter(([name])=>name==='setCaptureBoundary').length,count);
- assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ assert.equal(c.voice.routes.length,count);
  c.s.run('disconnect()');
 });
-test('R2 successful join unmutes the enabled microphone before speech',async()=>{
+test('successful join routes and unmutes before first speech',async()=>{
  const c=await callOnRoom();
  assert.equal(c.s.run('state.connecting'),false);
  assert.equal(c.s.run('state.micEnabled'),true);
+ assert.equal(c.voice.routed,c.voice.created[0]);
  assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
  c.s.run('disconnect()');
 });
-test('F7 a late terminal retains its captured target after many later starts',async()=>{
- const c=await callOnRoom(),boundary=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
- c.voice.emit('turn',{...started('old'),capture_boundary_id:boundary});
- for(let i=0;i<65;i++)c.voice.emit('turn',{...started('later-'+i),capture_boundary_id:boundary});
- c.voice.emit('turn',{...finished('old','Old target words'),capture_boundary_id:boundary});
+test('a late terminal retains source call after many later starts',async()=>{
+ const c=await callOnRoom(),a=c.voice.created[0];
+ a.emit('turn',started('old'));
+ for(let i=0;i<65;i++)a.emit('turn',started('later-'+i));
+ a.emit('turn',finished('old','Old target words'));
  assert.equal(turnSent(c,c.first,'old','finished')[0].text,'Old target words');
  c.s.run('disconnect()');
 });
-test('F7 a binding replacement keeps the old turn’s captured binding ID',async()=>{
- const c=await callOnRoom(),first=c.voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
- c.voice.emit('turn',{...started('before-rebind'),capture_boundary_id:first});
+test('a binding replacement preserves an already started turn target',async()=>{
+ const c=await callOnRoom(),a=c.voice.created[0];
+ a.emit('turn',started('before-rebind'));
  c.s.context.fetch=async()=>({ok:true,status:200,json:async()=>({binding:{thread_id:'a',binding_id:'next-binding'},room:{revision:1},clients:[],call:null,participants:[]})});
  await c.s.run('refresh()');
- const second=c.voice.calls.filter(([name])=>name==='setCaptureBoundary').at(-1)[1];
- assert.notEqual(second,first);
- c.voice.emit('turn',{...finished('before-rebind','Before'),capture_boundary_id:first});
- c.voice.emit('turn',{...started('after-rebind'),capture_boundary_id:second});
- c.voice.emit('turn',{...finished('after-rebind','After'),capture_boundary_id:second});
+ a.emit('turn',finished('before-rebind','Before'));
+ a.emit('turn',started('after-rebind'));a.emit('turn',finished('after-rebind','After'));
  assert.equal(turnSent(c,c.first,'before-rebind','finished')[0].binding_id,'b');
  assert.equal(turnSent(c,c.first,'after-rebind','finished')[0].binding_id,'next-binding');
  c.s.run('disconnect()');
