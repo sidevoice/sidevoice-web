@@ -501,8 +501,8 @@ test("readiness works for any agent, while an absent field leaves the Codex card
   expect(codex.querySelector(".host-agent-readiness")).toBeNull();
   expect(codex.innerHTML).toBe(codexBefore);
   act(() => store.patch({ hostAgents: { fp: agents("unsupported", ["cursor.unsupported"]) } }));
-  expect(cursor.querySelector(".host-agent-readiness [role=status]")).toHaveTextContent("Not supported");
-  expect(within(cursor).queryByRole("group", { name: "Needs attention" })).toBeNull();
+  expect(within(cursor).getByRole("button", { name: "Not supported" })).toHaveAttribute("aria-expanded", "true");
+  expect(within(cursor).getByRole("group", { name: "Not supported" })).toHaveTextContent("Cursor voice requires a Mac");
   expect(codex.innerHTML).toBe(codexBefore);
   act(() => store.patch({ hostAgents: { fp: ready([
     known("cursor", { label: "Cursor", registration: "connected" }),
@@ -510,6 +510,6 @@ test("readiness works for any agent, while an absent field leaves the Codex card
   ]) } }));
   expect(cursor.querySelector(".host-agent-readiness")).toBeNull();
   fireEvent.click(within(codex).getByRole("button", { name: "Needs attention" }));
-  expect(within(codex).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Sidevoice cannot show why this agent needs attention.");
+  expect(within(codex).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Sidevoice cannot show the reason for this status.");
   expect(within(codex).getByRole("group", { name: "Needs attention" })).not.toHaveTextContent("other.future");
 });

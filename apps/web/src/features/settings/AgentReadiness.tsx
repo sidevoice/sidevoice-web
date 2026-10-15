@@ -6,6 +6,7 @@ import type { AgentReadinessStatus } from "../../state/room-types";
 
 const reasonKeys: Record<string, MessageKey> = {
   "cursor.bridge_not_running": "agents.readiness.cursor.bridge_not_running",
+  "cursor.unsupported": "agents.readiness.cursor.unsupported",
 };
 
 /** The connector reports codes; the web owns their wording for every agent. */
@@ -18,7 +19,7 @@ export function AgentReadiness({ readiness, id }: { readiness: AgentReadinessSta
   const chip = <Badge className="host-agent-readiness-state" tone={state === "ready" ? "positive" : state === "needs_attention" ? "warning" : "neutral"}>{label}</Badge>;
   const reasons = Array.isArray(readiness.reasons) && readiness.reasons.length ? readiness.reasons : [""];
   return <div className="host-agent-readiness" data-state={state}>
-    {state === "needs_attention" ? <>
+    {state !== "ready" ? <>
       <DisclosureButton className="host-agent-readiness-toggle" open={open} controls={id} onClick={() => setOpen((value) => !value)}>
         {chip}
       </DisclosureButton>

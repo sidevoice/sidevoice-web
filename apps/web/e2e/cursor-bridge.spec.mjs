@@ -34,13 +34,15 @@ async function show(page, { width, height, language = "en", preset }) {
     await expect(panel.locator("button")).toHaveCount(0);
   } else if (preset === "unsupported") {
     await expect(panel).toContainText(language === "en" ? "Not supported" : "");
-    await expect(panel.locator("button")).toHaveCount(0);
+    await panel.locator(".host-agent-readiness-toggle").click();
+    await expect(panel.locator(".host-agent-readiness-body p")).toHaveCount(1);
+    await expect(panel).toContainText("Cursor voice requires a Mac");
   } else {
     await panel.locator(".host-agent-readiness-toggle").click();
     await expect(panel.locator(".host-agent-readiness-body p")).toHaveCount(1);
     if (preset === "needs_attention") await expect(panel).toContainText("Settings → Beta");
     else {
-      await expect(panel).toContainText(language === "en" ? "Sidevoice cannot show why" : "Sidevoice");
+      await expect(panel).toContainText(language === "en" ? "Sidevoice cannot show the reason" : "Sidevoice");
       await expect(panel).not.toContainText("cursor.future_code");
     }
   }
