@@ -18,10 +18,11 @@ async function show(page, { width, height, language = "en", preset }) {
   await page.addInitScript((ui) => localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: ui })), language);
   await page.goto("/voice/");
   await page.waitForFunction(() => !!window.sidevoiceActions);
-  await page.locator("#settings-open").click();
+  await page.waitForFunction(() => typeof document.getElementById("settings-open")?.onclick === "function");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.locator("#settings-machines").click();
-  await page.locator(".machines-menu .machine-entry[data-name='E2E Host']").click();
   const cursor = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-name strong", { hasText: "Cursor" }) });
+  if (!(await cursor.isVisible())) await page.locator(".machines-menu .machine-entry[data-name='E2E Host']").click();
   const codex = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-name strong", { hasText: "Codex" }) });
   await expect(cursor).toBeVisible();
   await expect(codex.locator(".host-agent-readiness")).toHaveCount(0);
