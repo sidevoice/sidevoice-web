@@ -84,7 +84,7 @@
   font-size: var(--sv-font-xs); line-height: 1rem; color: var(--sv-text-subtle); white-space: nowrap;
 }
 .chat-meta time { font-variant-numeric: tabular-nums; }
-.audio-fate-mark { margin-right: auto; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; color: var(--sv-voice-text); font-weight: 600; }
+.audio-fate-mark { margin-right: auto; min-width: 0; flex: 1 1 auto; white-space: normal; overflow-wrap: break-word; color: var(--sv-voice-text); font-weight: 600; }
 .chat-meta .ui-button.listen-again { width: 22px; height: 22px; border-radius: 50%; color: var(--sv-text-subtle); }
 .chat-meta .ui-button.listen-again svg { width: 12px; height: 12px; }
 /* Small to the eye, not to a finger: its tap area reaches past what it draws. */
