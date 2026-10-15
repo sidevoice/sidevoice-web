@@ -1081,7 +1081,7 @@ export const messages: Messages = {
   "wizard.mic.state.prompt": "Pas encore autorisé",
   "wizard.mic.askBrowser": "Votre navigateur vous le demandera une fois.",
   "wizard.mic.askSystem": "Votre ordinateur vous le demandera une fois.",
-  "wizard.mic.dismissed": "La demande a été fermée sans réponse. « Autoriser le micro » la refait.",
+  "wizard.mic.dismissed": "La demande a été fermée sans réponse. Sélectionnez « Autoriser le micro » pour la renouveler.",
   "wizard.mic.state.requesting": "En attente de votre réponse",
   "wizard.mic.requestingBrowser": "Répondez à la demande de votre navigateur pour utiliser le micro.",
   "wizard.mic.requestingSystem": "Répondez à la demande de votre ordinateur pour utiliser le micro.",
