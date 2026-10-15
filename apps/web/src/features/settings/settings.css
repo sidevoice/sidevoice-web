@@ -222,12 +222,13 @@
 /* No slide under reduced motion: the levels swap at once (settings-levels.tsx never starts one; this is its guard). */
 @media (prefers-reduced-motion: reduce) { .settings-page [data-motion] { animation: none; } }
 
-/* The desktop app's mute shortcut: the keys as they read, Change (recording the next combination) and Clear; a shortcut
-   another app has, with others to pick; a clash with VoiceOver said under it. */
+/* Shortcuts. The desktop app's mute shortcut: the keys as they read, Change (recording the next combination) and Clear;
+   a shortcut another app has, with others to pick; a clash with VoiceOver said under it. The keys the room answers
+   (`shortcut-keys`) wear the same key cap, with nothing to change. */
 .desktop-shortcut { display: grid; gap: var(--sv-space-2); min-width: 0; }
 .desktop-shortcut p { margin: 0; font-size: var(--sv-font-sm); }
 .desktop-shortcut-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sv-space-2); }
-.desktop-shortcut-keys { padding: 2px var(--sv-space-2); border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-sm); background: var(--sv-bg-sunken); font: 600 var(--sv-font-sm) / 1.5rem var(--sv-font-mono); color: var(--sv-text); }
+.desktop-shortcut-keys, .shortcut-keys { padding: 2px var(--sv-space-2); border: 1px solid var(--sv-border-strong); border-radius: var(--sv-radius-sm); background: var(--sv-bg-sunken); font: 600 var(--sv-font-sm) / 1.5rem var(--sv-font-mono); color: var(--sv-text); }
 .desktop-shortcut-keys[data-state="refused"] { border-color: var(--sv-warning); }
 .desktop-shortcut-refused { display: grid; gap: var(--sv-space-2); color: var(--sv-text); }
 .desktop-shortcut-alternatives { display: flex; flex-wrap: wrap; gap: var(--sv-space-2); }

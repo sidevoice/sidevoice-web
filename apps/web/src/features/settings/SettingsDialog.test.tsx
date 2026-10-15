@@ -1,6 +1,7 @@
-import { afterEach, expect, test, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, onTestFinished, test, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SettingsDialog } from "./SettingsDialog";
+import { KEYBOARD_QUERY } from "./ShortcutsSettings";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
 import { defaultVoiceSettings, editVoiceSettings } from "../../services/voice-settings.js";
@@ -44,6 +45,63 @@ test("the sections are General, Transcription, Voice, Call, Providers, Machines 
   fireEvent.click(document.getElementById("settings-call")!);
   expect(document.getElementById("voice-end-of-turn")).toBeInTheDocument();
   expect(screen.getByRole("radiogroup", { name: "Thinking sound" })).toBeInTheDocument();
+});
+
+/** A device with a mouse or a trackpad, where a keyboard is all but certain (jsdom's media queries match nothing). */
+function withKeyboard() {
+  const matchMedia = window.matchMedia;
+  window.matchMedia = ((media: string) => ({ ...matchMedia(media), matches: media === KEYBOARD_QUERY })) as typeof window.matchMedia;
+  onTestFinished(() => { window.matchMedia = matchMedia; });
+}
+
+/** The desktop app, as its bridge shows it: the global mute shortcut and the call controls' setting. */
+function inDesktopApp() {
+  const shortcut = { accelerator: "Cmd+Shift+M", label: "⇧⌘M", state: "on", alternatives: [], voiceOver: false };
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: {
+    muteShortcut: { get: vi.fn(async () => shortcut), set: vi.fn(async () => shortcut) },
+    callControls: { settings: vi.fn(async () => ({ alwaysShown: false })), setAlwaysShown: vi.fn(async (alwaysShown: boolean) => ({ alwaysShown })) },
+  } } });
+  onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+}
+
+const navLabels = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
+
+test("with a keyboard, Shortcuts follows Call: the keys the room answers, read only; Call keeps its own", () => {
+  withKeyboard();
+  open("whisper-base");
+  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Shortcuts", "Providers", "Machines", "Advanced"]);
+  fireEvent.click(document.getElementById("settings-shortcuts")!);
+  const pane = document.getElementById("pane-shortcuts")!;
+  expect(pane).not.toHaveAttribute("hidden");
+  expect(document.getElementById("settings-shortcuts")).toHaveAttribute("aria-current", "page");
+  expect([...pane.querySelectorAll(".shortcut-keys")].map((keys) => keys.textContent)).toEqual(["Ctrl+D", "Space"]);
+  expect(pane.querySelector("button")).toBeNull();
+  expect(document.getElementById("pane-call")).not.toHaveTextContent("Mute shortcut");
+});
+
+test("without a keyboard (a phone, a tablet on its own) there is no Shortcuts, and a place asked in it opens General", () => {
+  const store = open("whisper-base");
+  expect(navLabels()).not.toContain("Shortcuts");
+  expect(document.getElementById("pane-shortcuts")).toBeNull();
+  act(() => store.patch({ settingsSection: "shortcuts" }));
+  expect(store.getState().facts.settingsSection).toBe("general");
+  expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
+});
+
+test("in the desktop app, Shortcuts holds its global mute shortcut, and Call keeps only the call controls' setting", async () => {
+  inDesktopApp();
+  open("whisper-base");
+  expect(navLabels()).toContain("Shortcuts");
+  expect(navLabels().indexOf("Shortcuts")).toBe(navLabels().indexOf("Call") + 1);
+  fireEvent.click(document.getElementById("settings-call")!);
+  const call = document.getElementById("pane-call")!;
+  expect(await within(call).findByRole("switch", { name: "Always show the call controls" })).toBeInTheDocument();
+  expect(call).not.toHaveTextContent("Mute shortcut");
+  fireEvent.click(document.getElementById("settings-shortcuts")!);
+  const pane = document.getElementById("pane-shortcuts")!;
+  expect(await within(pane).findByText("⇧⌘M")).toBeInTheDocument();
+  expect([...pane.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Anywhere on this computer", "While Sidevoice is in front"]);
+  expect(within(pane).getByRole("button", { name: "Change" })).toBeInTheDocument();
 });
 
 test("General: appearance, this device's name, then the interface's language", () => {

@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -18,6 +18,7 @@ import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
 import { DeleteAllData } from "./DeleteAllData";
 import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
+import { ShortcutsSettings, useShortcutsSection } from "./ShortcutsSettings";
 import { NewAtEnd, NewOnIcon, useHighlights } from "../highlights/highlights";
 import { machineStatus, type MachineStatus } from "./machine-status";
 import { MachineEntryCopy, MachineEntryState, StateOnIcon, machineEntryName } from "./MachineState";
@@ -46,6 +47,8 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   { id: "transcription", label: "settings.section.transcription", icon: (size) => <TranscriptionIcon size={size} /> },
   { id: "voice", label: "settings.section.voice", icon: (size) => <VoicesIcon size={size} /> },
   { id: "call", label: "settings.section.call", icon: (size) => <CallSettingsIcon size={size} /> },
+  // The keys for the microphone: in the desktop app, or wherever there is a keyboard (ShortcutsSettings).
+  { id: "shortcuts", label: "settings.section.shortcuts", icon: (size) => <ShortcutsIcon size={size} /> },
   { id: "this-computer", label: "settings.section.thisDevice", icon: (size = 18) => <ThisComputerIcon size={size} /> },
   { id: "providers", label: "settings.section.providers", icon: (size) => <IntegrationsIcon size={size} /> },
   { id: "machines", label: "settings.section.machines", icon: (size) => <MachinesIcon size={size} /> },
@@ -241,9 +244,15 @@ export function SettingsDialog() {
   const show = (section: string) => store?.patch({ settingsSection: section });
   // Updates: in the desktop app, or wherever a machine is behind.
   const updatesShown = useUpdatesSection();
-  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown));
-  // Updates shown as the last machine behind is updated (a browser, a phone): General.
-  useEffect(() => { if (current === "updates" && !updatesShown) show("general"); }, [current, updatesShown]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Shortcuts: in the desktop app, or wherever there is a keyboard; never on a phone.
+  const shortcutsShown = useShortcutsSection();
+  const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
+    && (section.id !== "shortcuts" || shortcutsShown));
+  // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
+  // goes (a tablet's keyboard taken off): General.
+  useEffect(() => {
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown)) show("general");
+  }, [current, updatesShown, shortcutsShown]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
   // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
@@ -313,6 +322,7 @@ export function SettingsDialog() {
                 <Pane id="transcription" current={current}><SlotSection id="transcription" t={t} /></Pane>
                 <Pane id="voice" current={current}><SlotSection id="voice" t={t} /></Pane>
                 <Pane id="call" current={current}><CallSettings t={t} /></Pane>
+                {shortcutsShown && <Pane id="shortcuts" current={current}><ShortcutsSettings t={t} /></Pane>}
                 <Pane id="providers" current={current}><ProviderKeys /></Pane>
                 {ownComputer && <Pane id="this-computer" current={current}><ThisComputerSettings /></Pane>}
                 <Pane id="machines" current={current}><MachineList /></Pane>

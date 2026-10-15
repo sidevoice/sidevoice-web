@@ -124,6 +124,8 @@ export const ArrowLeftIcon = mark(ArrowLeft, 20);
 export const UpdateIcon = mark(RefreshCcwDot, 18);
 /** The call's own behaviour: your turn, the sound while the agent works, the screen. */
 export const CallSettingsIcon = mark(Phone, 16);
+/** The keys for the microphone: the desktop app's global one, and those the room answers while it is in front. */
+export const ShortcutsIcon = mark(Keyboard, 16);
 export const IntegrationsIcon = mark(KeyRound, 16);
 export const AdvancedIcon = mark(Wrench, 16);
 

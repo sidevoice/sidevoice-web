@@ -931,6 +931,16 @@ export const messages = {
   "settings.desktop.alwaysShown": "Always show the call controls",
   "settings.desktop.alwaysShownHint": "Off: they show only while the Sidevoice window is minimised during a call.",
   "settings.desktop.changeFailed": "Couldn't change it. Try again.",
+  // Shortcuts, a section of their own (ShortcutsSettings): where each works, and the keys the room answers. The desktop
+  // app's mute shortcut keeps its settings.desktop.* words above.
+  "settings.section.shortcuts": "Shortcuts",
+  "settings.shortcuts.description": "Keys that mute the microphone, or let you talk while it's muted.",
+  "settings.shortcuts.global": "Anywhere on this computer",
+  "settings.shortcuts.inApp": "While Sidevoice is in front",
+  "settings.shortcuts.mute": "Mute or unmute the microphone",
+  "settings.shortcuts.holdToTalk": "Talk while muted",
+  "settings.shortcuts.holdToTalkHint": "Hold the key down during a call; let go and the microphone mutes again.",
+  "settings.shortcuts.space": "Space",
   "settings.call.keepAwake": "Keep the screen on during a call",
   "settings.call.keepAwakeHint": "Off lets the screen turn off as usual; the call goes on.",
   "settings.call.keepAwakeUnsupported": "This browser can't keep the screen on.",
