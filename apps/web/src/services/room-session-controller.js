@@ -1544,7 +1544,7 @@ function disconnect() {
     state.ws = null;
     voice = null;
     window.sidevoiceUI?.playbackLevel?.clear?.();
-    // What is being said ends with the call, and the room ends its replies with the session: nothing is reported.
+    // The call owns these handles; their hearing choices were offered above before the socket closes.
     replies.clear();
     current?.stop().catch(() => {});
     for (const stop of voiceListeners.splice(0)) stop();
