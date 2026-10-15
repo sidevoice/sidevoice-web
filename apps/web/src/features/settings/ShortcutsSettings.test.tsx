@@ -50,17 +50,14 @@ const groups = () => [...document.querySelectorAll(".ui-group-title")].map((titl
 const pageKeys = () => [...[...document.querySelectorAll(".ui-group")].at(-1)!.querySelectorAll(".ui-row")].filter((row) => row.querySelector(".shortcut-keys"))
   .map((row) => [row.querySelector(".ui-row-label")!.textContent, row.querySelector(".shortcut-keys")!.getAttribute("aria-label")]);
 
-test("Shortcuts shows in the desktop app where it offers the mute shortcut, or wherever a keyboard is likely; never on a phone", () => {
+test("Shortcuts is hidden for now (sidevoice-web#148), with a keyboard, in the desktop app or on a phone", () => {
   keyboard(false);
   expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
-  // A bridge without the mute shortcut (an app before it) is no reason.
-  inApp({ muteShortcut: { get: () => null } });
-  expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
   inApp({ muteShortcut: muteBridge().bridge });
-  expect(renderHook(() => useShortcutsSection()).result.current).toBe(true);
+  expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
   delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
   keyboard(true);
-  expect(renderHook(() => useShortcutsSection()).result.current).toBe(true);
+  expect(renderHook(() => useShortcutsSection()).result.current).toBe(false);
 });
 
 test("outside the app: only the keys the room answers while it is in front, read only; Ctrl+D off a Mac", () => {
@@ -68,7 +65,7 @@ test("outside the app: only the keys the room answers while it is in front, read
   expect(screen.getByRole("heading", { name: "Shortcuts" })).toBeInTheDocument();
   expect(screen.getByText("Keys for the call: the microphone, skipping, taking back what you said, the call itself and its panels.")).toBeInTheDocument();
   expect(groups()).toEqual(["While Sidevoice is in front"]);
-  expect(pageKeys()).toEqual([["Mute or unmute the microphone","Ctrl+D"], ["Talk while muted","Space"], ["Skip what is playing","S"], ["Cancel what you said","Ctrl+Z"], ["Join or leave the call","Ctrl+Shift+E"], ["Show or hide the transcript","T"], ["Show or hide the conversations","C"]]);
+  expect(pageKeys()).toEqual([["Mute or unmute the microphone","Ctrl+D"], ["Talk while muted","Space"], ["Skip what is playing","Ctrl+S"]]);
   expect(screen.getByText("Hold the key down during a call; let go and the microphone mutes again.")).toBeInTheDocument();
   // Nothing to set: no control at all.
   expect(screen.queryByRole("button")).toBeNull();
@@ -78,7 +75,7 @@ test("outside the app: only the keys the room answers while it is in front, read
 test("on a Mac the mute key reads ⌘D", () => {
   vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15");
   render(<ShortcutsSettings t={en} />);
-  expect(pageKeys()).toEqual([["Mute or unmute the microphone","⌘D"], ["Talk while muted","Space"], ["Skip what is playing","S"], ["Cancel what you said","⌘Z"], ["Join or leave the call","⇧⌘E"], ["Show or hide the transcript","T"], ["Show or hide the conversations","C"]]);
+  expect(pageKeys()).toEqual([["Mute or unmute the microphone","⌘D"], ["Talk while muted","Space"], ["Skip what is playing","⌘S"]]);
 });
 
 test("in the app: its global mute shortcut first, anywhere on this computer; then the room's keys", async () => {
@@ -89,7 +86,7 @@ test("in the app: its global mute shortcut first, anywhere on this computer; the
   expect(await within(global).findByLabelText("⇧⌘M")).toBeInTheDocument();
   expect(within(global).getByText("Mute shortcut")).toBeInTheDocument();
   expect(within(global).getByText("Mutes or unmutes the microphone from anywhere, even with Sidevoice in the background.")).toBeInTheDocument();
-  expect(pageKeys()).toEqual([["Mute or unmute the microphone","Ctrl+D"], ["Talk while muted","Space"], ["Skip what is playing","S"], ["Cancel what you said","Ctrl+Z"], ["Join or leave the call","Ctrl+Shift+E"], ["Show or hide the transcript","T"], ["Show or hide the conversations","C"]]);
+  expect(pageKeys()).toEqual([["Mute or unmute the microphone","Ctrl+D"], ["Talk while muted","Space"], ["Skip what is playing","Ctrl+S"]]);
   // Only the call controls' setting stays in Call: no switch here.
   expect(screen.queryByRole("switch")).toBeNull();
 });
@@ -223,7 +220,7 @@ test("in Spanish", async () => {
   render(<ShortcutsSettings t={es} />);
   expect(screen.getByRole("heading", { name: "Atajos" })).toBeInTheDocument();
   expect(groups()).toEqual(["En cualquier parte del ordenador", "Con Sidevoice en primer plano"]);
-  expect(pageKeys()).toEqual([["Silenciar o activar el micrófono","Ctrl+D"], ["Hablar estando silenciado","Espacio"], ["Saltar lo que está sonando","S"], ["Cancelar lo que has dicho","Ctrl+Z"], ["Entrar en la llamada o salir de ella","Ctrl+Shift+E"], ["Mostrar u ocultar la transcripción","T"], ["Mostrar u ocultar las conversaciones","C"]]);
+  expect(pageKeys()).toEqual([["Silenciar o activar el micrófono","Ctrl+D"], ["Hablar estando silenciado","Espacio"], ["Saltar lo que está sonando","Ctrl+S"]]);
   expect(await screen.findByText("Sin atajo")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Cambiar" }));
   expect(screen.getByRole("button", { name: "Grabando — Esc para parar" })).toBeInTheDocument();

@@ -3,8 +3,6 @@ import { TranscriptIcon } from "../../components/ui/Icons";
 import { useCallLayout } from "../../state/call-layout";
 import { useTranscriptUnread } from "../conversation/transcript-unread";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { shortcutTip } from "../../components/ui/Keycaps";
-import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { translator } from "../../i18n/translator";
 
 /* The one way into the whole transcript (TranscriptPanel): in the stage tile's corner on a phone, at the call bar's right
@@ -17,9 +15,9 @@ export function TranscriptEntry() {
   const unread = useTranscriptUnread();
   const label = open ? t("transcript.hide") : unread ? t("transcript.showUnread", { n: unread }) : t("transcript.show");
   return (
-    <Tooltip action content={shortcutTip(label, "transcript")}>
+    <Tooltip action content={label}>
       <Button id="transcript-toggle" variant="secondary" size="icon" className="transcript-entry" aria-controls="transcript" aria-expanded={open}
-        aria-haspopup="dialog" aria-label={label} aria-keyshortcuts={ariaKeyShortcuts("transcript")} onClick={toggle}>
+        aria-haspopup="dialog" aria-label={label} onClick={toggle}>
         <TranscriptIcon size={20} />{unread > 0 && <span className="transcript-entry-dot" aria-hidden="true" />}
       </Button>
     </Tooltip>

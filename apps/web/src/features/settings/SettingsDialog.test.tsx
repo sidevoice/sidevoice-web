@@ -66,42 +66,24 @@ function inDesktopApp() {
 
 const navLabels = () => [...document.querySelectorAll(".settings-nav > button")].map((button) => button.textContent);
 
-test("with a keyboard, Shortcuts follows Call: the keys the room answers, read only; Call keeps its own", () => {
+test("Shortcuts is hidden for now (sidevoice-web#148): not with a keyboard, not in the desktop app, and a place asked in it opens General", async () => {
   withKeyboard();
-  open("whisper-base");
-  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Shortcuts", "Providers", "Machines", "Advanced"]);
-  fireEvent.click(document.getElementById("settings-shortcuts")!);
-  const pane = document.getElementById("pane-shortcuts")!;
-  expect(pane).not.toHaveAttribute("hidden");
-  expect(document.getElementById("settings-shortcuts")).toHaveAttribute("aria-current", "page");
-  expect([...pane.querySelectorAll(".shortcut-keys")].map((keys) => keys.getAttribute("aria-label"))).toEqual(["Ctrl+D", "Space", "S", "Ctrl+Z", "Ctrl+Shift+E", "T", "C"]);
-  expect(pane.querySelector("button")).toBeNull();
-  expect(document.getElementById("pane-call")).not.toHaveTextContent("Mute shortcut");
-});
-
-test("without a keyboard (a phone, a tablet on its own) there is no Shortcuts, and a place asked in it opens General", () => {
   const store = open("whisper-base");
-  expect(navLabels()).not.toContain("Shortcuts");
+  expect(navLabels()).toEqual(["General", "Transcription", "Voice", "Call", "Providers", "Machines", "Advanced"]);
   expect(document.getElementById("pane-shortcuts")).toBeNull();
   act(() => store.patch({ settingsSection: "shortcuts" }));
   expect(store.getState().facts.settingsSection).toBe("general");
   expect(document.getElementById("pane-general")).not.toHaveAttribute("hidden");
 });
 
-test("in the desktop app, Shortcuts holds its global mute shortcut, and Call keeps only the call controls' setting", async () => {
+test("in the desktop app Shortcuts is hidden too, and Call keeps only the call controls' setting", async () => {
   inDesktopApp();
   open("whisper-base");
-  expect(navLabels()).toContain("Shortcuts");
-  expect(navLabels().indexOf("Shortcuts")).toBe(navLabels().indexOf("Call") + 1);
+  expect(navLabels()).not.toContain("Shortcuts");
   fireEvent.click(document.getElementById("settings-call")!);
   const call = document.getElementById("pane-call")!;
   expect(await within(call).findByRole("switch", { name: "Always show the call controls" })).toBeInTheDocument();
   expect(call).not.toHaveTextContent("Mute shortcut");
-  fireEvent.click(document.getElementById("settings-shortcuts")!);
-  const pane = document.getElementById("pane-shortcuts")!;
-  expect(await within(pane).findByLabelText("⇧⌘M")).toBeInTheDocument();
-  expect([...pane.querySelectorAll(".ui-group-title")].map((title) => title.textContent)).toEqual(["Anywhere on this computer", "While Sidevoice is in front"]);
-  expect(within(pane).getByRole("button", { name: "Change" })).toBeInTheDocument();
 });
 
 test("General: appearance, this device's name, then the interface's language", () => {
