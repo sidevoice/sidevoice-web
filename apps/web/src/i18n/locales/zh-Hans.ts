@@ -733,6 +733,7 @@ export const messages: Messages = {
   "try.timing.tts": "首个声音用时 {s} 秒",
   "voiceTry.sentence": "语音朗读的内容",
   "voiceTry.edit": "编辑句子",
+  "voiceTry.done": "完成",
   "try.loadedIn": "（模型加载用时 {s} 秒）",
   "try.slow": "在此设备上较慢，换个更小的模型可能更合适。",
   "try.starting": "正在准备…",

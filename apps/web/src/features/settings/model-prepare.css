@@ -97,3 +97,7 @@
 .model-settings-card { display: grid; }
 /* The voice's try: the sentence beside the button, where the transcription try draws the microphone's level. */
 .stt-try-head .tts-try-sentence { flex: 1; min-width: 0; }
+/* The voice try's row: the button and the sentence centred on each other, however many lines the sentence takes,
+   and the sentence reads as a quote — a bar at its start. */
+.tts-try .stt-try-head { align-items: center; }
+.stt-try-head .tts-try-sentence { padding-inline-start: var(--sv-space-3); border-inline-start: 3px solid color-mix(in srgb, var(--sv-accent) 45%, transparent); }

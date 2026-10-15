@@ -734,6 +734,7 @@ export const messages: Messages = {
   "try.timing.tts": "{s} 秒で最初の音声",
   "voiceTry.sentence": "読み上げる文",
   "voiceTry.edit": "文を編集",
+  "voiceTry.done": "完了",
   "try.loadedIn": "（モデルの読み込み {s} 秒）",
   "try.slow": "このデバイスでは動作が遅めです。より小さいモデルのほうが合うかもしれません。",
   "try.starting": "準備中…",

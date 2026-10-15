@@ -736,6 +736,7 @@ export const messages: Messages = {
   "try.timing.tts": "Erster Ton nach {s} s",
   "voiceTry.sentence": "Was die Stimme sagt",
   "voiceTry.edit": "Satz bearbeiten",
+  "voiceTry.done": "Fertig",
   "try.loadedIn": "(Modell in {s} s geladen)",
   "try.slow": "Langsam auf diesem Gerät – ein kleineres Modell passt vielleicht besser.",
   "try.starting": "Wird vorbereitet…",

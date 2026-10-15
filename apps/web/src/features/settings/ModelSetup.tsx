@@ -8,7 +8,7 @@ import type { Translate, MessageKey } from "../../i18n/translator";
 import type { PrepareStatus } from "./ModelPrepare";
 import { MAX_TAKE_MS } from "../../services/voice-trial.js";
 import { Textarea } from "../../components/ui/Input";
-import { EditIcon } from "../../components/ui/Icons";
+import { CheckIcon, EditIcon } from "../../components/ui/Icons";
 import { VoiceWaveform } from "../conversation/VoiceWaveform";
 import { wordEnd } from "../conversation/KaraokeText";
 import { readingMoves, readingPosition, readOn, type Reading } from "../call/speech-chunks";
@@ -348,11 +348,16 @@ function TtsTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; 
       <div className="tts-try-sentence">
         {editing && !running
           ? <Textarea id="tts-sentence" className="voice-try-text" minRows={1} maxRows={3} maxLength={200} value={text} autoFocus
-              aria-label={t("voiceTry.sentence")} onChange={(event) => handle.setSentence?.(event.target.value)} onBlur={() => setEditing(false)} />
+              aria-label={t("voiceTry.sentence")} onChange={(event) => handle.setSentence?.(event.target.value)} onBlur={() => setEditing(false)}
+              // Enter (without Shift) or Escape ends the edit, as the check beside it does.
+              onKeyDown={(event) => { if ((event.key === "Enter" && !event.shiftKey) || event.key === "Escape") { event.preventDefault(); setEditing(false); } }} />
           : lit ? <TrySentence key={trial.attempt} text={trial.said || text} range={trial.range} sounding={sounding} done={!running} />
           : <button type="button" className="tts-try-said" aria-label={t("voiceTry.edit")} onClick={() => setEditing(true)}>{text}</button>}
         {!running && !editing && <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("voiceTry.edit")} title={t("voiceTry.edit")}
           onClick={() => setEditing(true)}><EditIcon /></Button>}
+        {/* Editing: a check to say it is done (pressed before the box loses focus, so the press is not lost). */}
+        {editing && !running && <Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("voiceTry.done")} title={t("voiceTry.done")}
+          onMouseDown={(event) => event.preventDefault()} onClick={() => setEditing(false)}><CheckIcon /></Button>}
       </div>
     </div>
     <div className="stt-try-area tts-try-area">
