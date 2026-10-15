@@ -35,7 +35,7 @@
  * (WCAG 2.5.8). The phone's nominal sizes, a little smaller than a desktop's, are the phone form factor's, never a
  * window width's. */
 .stage-tile { --stage-ref: 600; --u: calc(var(--k, 1) * 440px / var(--stage-ref));
-  --stage-inset: calc(16 * var(--u)); --stage-top: calc(76 * var(--u)); --entry: clamp(36px, calc(44 * var(--u)), 56px);
+  --stage-inset: calc(16 * var(--u)); --entry: clamp(36px, calc(44 * var(--u)), 56px);
   --chip-fs: clamp(11px, calc(12 * var(--u)), 15px); --name-fs: clamp(14px, calc(20 * var(--u)), 26px);
   --bubble-fs: clamp(18px, calc(25.6 * var(--u)), 34px); --bubble-lh: 1.375; --bubble-pad: 24; --peek: 20; --tail-w: calc(72 * var(--u)); --tail-h: calc(40 * var(--u));
   --person-fs: clamp(16px, calc(22.4 * var(--u)), 28px); --person-lh: 1.4286; --person-pad-b: 12; --person-pad-i: 20; --person-live-w: 272; }
@@ -53,7 +53,7 @@
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) {
   .stage-tile[data-mood] { --stage-ratio: 1; --stage-ref: 360; }
   /* The phone's slide: a tighter inset, smaller balloons and a smaller tail. */
-  .stage-tile { --stage-inset: calc(12 * var(--u)); --stage-top: calc(72 * var(--u));
+  .stage-tile { --stage-inset: calc(12 * var(--u));
     --bubble-fs: clamp(18px, calc(22.4 * var(--u)), 34px); --bubble-lh: 1.4286; --bubble-pad: 20; --peek: 16; --tail-w: calc(58 * var(--u)); --tail-h: calc(32 * var(--u));
     --person-fs: clamp(16px, calc(19.2 * var(--u)), 28px); --person-lh: 1.5; --person-pad-b: 8; --person-pad-i: 16; --person-live-w: 240; }
 }
@@ -68,9 +68,12 @@
 
 /* Under the name, the agent's bubble; between turns its activity is said there to assistive tech only (the sidebar
  * shows it). */
-.stage-top { position: absolute; z-index: 2; top: var(--stage-top); left: var(--stage-inset); right: var(--stage-inset);
+/* The balloon stands just above the agent's head, whatever the tile's size (operator, 2026-10-15): the scene is drawn
+ * 440 tall and scaled to the tile (styles/call.css), the agent's head near 30% of it from the top, so the balloon's
+ * foot, its tail below it besides, sits at 28% of the tile. A tile that holds its text at its smallest grows it upward. */
+.stage-top { position: absolute; z-index: 2; bottom: calc(72% + 40 * var(--u)); left: var(--stage-inset); right: var(--stage-inset);
   display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; pointer-events: none; }
-.stage-top > * { grid-area: 1 / 1; align-self: start; }
+.stage-top > * { grid-area: 1 / 1; align-self: end; }
 /* What is said on the stage, the agent's and the person's alike: big and clear, read at a glance (2026-10-14): 22.4/32 on the
  * slide, 19.2/28.8 on a phone's, within 16–28px (the tile's --person-fs). The brand's DM Sans as everywhere, bundled and variable, so its optical size
  * follows the size; a touch heavier and tighter than body text, as display text is; no line left ending on a lone word.

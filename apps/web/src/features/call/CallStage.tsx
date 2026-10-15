@@ -47,20 +47,18 @@ import "./call-view.css";
 /* The balloon is made of the agent's own skin (decided 2026-10-15: its colour, pale, its ink and its gloss). Still
  * compared on the live page (lib/variants.ts, the playground's VARIANTS panel): `balloonPlace` center (its tail out of
  * its bottom-left corner) or left (pushed left of the agent, its tail out of its bottom-right corner toward it);
- * `balloonLines` 3 or 2; `balloonPaging` scroll (a line at a time) or page (a page at a time, the last one shorter). */
+ * three lines at a time (decided 2026-10-15); `balloonPaging` scroll (a line at a time) or page (a page at a time, the last one shorter). */
 const BALLOON_PLACES = ["center", "left"] as const;
-const BALLOON_LINES = ["3", "2"] as const;
 const BALLOON_PAGING = ["scroll", "page"] as const;
 
 /** One reply on the stage, in a speech balloon whose tail points down at the agent (call-view.css): a few lines at a
  *  time (PagedText), lit as the voice says them, moving on with the words heard. */
 function AgentBubble({ turn }: { turn: AgentTurn }) {
   const place = useVariant("balloonPlace", BALLOON_PLACES);
-  const lines = useVariant("balloonLines", BALLOON_LINES);
   const paging = useVariant("balloonPaging", BALLOON_PAGING);
   return (
     <div className="speech-bubble stage-bubble" data-place={place} data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
-      <PagedText measure={turn.text} follow=".karaoke-played" lines={Number(lines)} turn={paging}>
+      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn={paging}>
         <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
       </PagedText>
       {/* The bichos' gloss, as on their skin. */}
@@ -125,6 +123,8 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const stage = useStageConversation();
   const sceneRef = useSceneScale();
   const [balloonUp, setBalloonUp] = useState(false);
+  // Under its balloon the agent holds still (operator, 2026-10-15): work that starts meanwhile waits for it to go.
+  const mood = balloonUp && stage.mood === "working" ? "speaking" : stage.mood;
   const conversation = useRoomStore((state) => state.conversation);
   const showConversations = useCallLayout((state) => state.showConversations);
   const reply = stage.isTarget ? sounding(conversation.messages, stage.speaking) : null;
@@ -158,14 +158,14 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
           background around it (useSceneScale fits it in its slot; call-view.css names the shapes). What the tile says —
           the name, the voice models, the replies, the badge — is laid on the tile, at its corners. */}
       <div ref={sceneRef} className="stage-slot">
-      <div className="stage-tile" data-mood={stage.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
+      <div className="stage-tile" data-mood={mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-notice">{notice}</div>
         <BootError place="tile" />
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />
             {stage.mood === "offline" && <WantedPoster spec={spec} seed={stage.threadId} words={posterWords(t)} language={uiLanguage()} />}
-            <CharacterAvatar className="stage-agent" spec={spec} mood={stage.mood} size="stage" unread={stage.unread > 0} desk={stage.mood === "working"} still={balloonUp}
+            <CharacterAvatar className="stage-agent" spec={spec} mood={mood} size="stage" unread={stage.unread > 0} desk={mood === "working"} still={balloonUp}
               mouth="playback" playbackThreadId={stage.threadId} label={t("stage.agentState", { title: stage.title, state: moodText(stage.mood, t) })} />
             <StageDesk seed={stage.threadId} />
           </div>

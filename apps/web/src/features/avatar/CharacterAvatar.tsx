@@ -48,7 +48,7 @@ export interface CharacterAvatarProps {
   label?: string;
   className?: string;
   ref?: Ref<HTMLSpanElement>;
-  /** No idle pastime while set (on the stage: while its balloon is up); quiet instead. */
+  /** Held still while set (on the stage: while its balloon is up): no idle pastime and no work in hand; quiet instead. */
   still?: boolean;
 }
 
@@ -116,7 +116,7 @@ export function CharacterAvatar({ spec, mood, size, mouth = "voice", mouthKey, p
   const acts = ENGINE_MOOD[mood];
   const beat = useBeat(mood === "speaking" && mouth === "voice" ? mouthKey : undefined);
   const enter = useEnter(acts);
-  const working = useRotation("work", key, drawing.works, acts === "working");
+  const working = useRotation("work", key, drawing.works, acts === "working" && !still);
   // Idle steps (idle.ts) while idle: offline sleeps instead, and so does the person out of a call (no steps).
   // Held still (its words still on screen): no pastime starts, it stays quiet until they go.
   const resting = useRotation("idle", key, drawing.idles, mood === "idle" && !still);
