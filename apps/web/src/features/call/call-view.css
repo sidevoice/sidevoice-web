@@ -85,38 +85,27 @@
  * lean, as drawn by hand. Its skin — fill, ink and shadow — is a layer under the words (::before), so it can lean while
  * the words stay square to the page and their lines are measured true; its tail (BalloonTail) leaves the bottom edge
  * off the middle and curves down to the agent; it pops out of that tail as it comes. Bigger words than the person's
- * (2026-10-15): 25.6/35.2 on the slide, 22.4/32 on a phone's, within 18–34px (--bubble-fs). The words said are the balloon's ink, the rest a quieter one (4.5:1 and more
- * on its fill). The `balloon` variant (CallStage) picks its look: a, paper and ink in either theme, is this rule. */
+ * (2026-10-15): 25.6/35.2 on the slide, 22.4/32 on a phone's, within 18–34px (--bubble-fs). The words said are the
+ * balloon's ink, the rest a quieter one (4.5:1 and more on its fill). Made of the agent's own skin, in either theme as
+ * the bichos are (decided 2026-10-15): its colour, pale, lit from the top left as their bodies (engine shade()), their
+ * even ink all round and their gloss (.balloon-shine); the words not yet said a mix of the ink and the fill, 4.5:1 on
+ * the palest and the deepest coat alike. */
 .stage-bubble { --balloon-line: clamp(3px, calc(var(--k, 1) * 3.6px), 5px);
-  --balloon-lines: calc(var(--balloon-line) * .75) var(--balloon-line) var(--balloon-line) calc(var(--balloon-line) * .8);
-  --balloon-ink: #1b1428; --balloon-fill: #fffdf9; --balloon-said: #1b1428; --balloon-unsaid: #6c6679; --balloon-sheen: none;
-  --balloon-radius: calc(30 * var(--u)) calc(38 * var(--u)) calc(34 * var(--u)) calc(28 * var(--u)) / calc(34 * var(--u)) calc(28 * var(--u)) calc(38 * var(--u)) calc(30 * var(--u));
-  --balloon-tilt: -.6deg; --balloon-shadow: 0 calc(14 * var(--u)) calc(24 * var(--u)) calc(-14 * var(--u)) rgb(27 20 40 / 55%);
-  --fs: var(--bubble-fs); --lh: var(--bubble-lh);
+  --balloon-lines: var(--balloon-line); --balloon-ink: #1b1428; --balloon-said: #1b1428;
+  --balloon-fill: color-mix(in srgb, var(--av-color, #b48cff) 22%, #fff); --balloon-unsaid: color-mix(in srgb, #1b1428 68%, var(--balloon-fill));
+  --balloon-sheen: radial-gradient(90% 130% at 24% 14%, rgb(255 255 255 / 80%), transparent 58%);
+  --balloon-radius: calc(36 * var(--u)) calc(42 * var(--u)) calc(40 * var(--u)) calc(34 * var(--u)) / calc(38 * var(--u)) calc(34 * var(--u)) calc(42 * var(--u)) calc(40 * var(--u));
+  --balloon-tilt: .5deg; --balloon-shadow: 0 calc(14 * var(--u)) calc(24 * var(--u)) calc(-14 * var(--u)) rgb(27 20 40 / 55%);
+  --fs: var(--bubble-fs); --lh: var(--bubble-lh); --tail-at: calc(24 * var(--u));
   position: relative; isolation: isolate; display: grid; width: 100%; max-width: calc(544 * var(--u)); min-width: 0; padding: var(--paged-peek) calc(var(--bubble-pad) * var(--u));
   color: var(--balloon-unsaid); overflow-wrap: anywhere;
-  transform-origin: 50% calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; }
+  transform-origin: calc(var(--tail-at) + var(--tail-w) / 2) calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; }
 @keyframes stage-balloon-in { from { opacity: 0; transform: translateY(calc(10 * var(--u))) scale(.6); } }
-/* b: a soft blob in the agent's colour, light or dark with the theme, no ink: its edge a deeper (or, dark, a lighter)
- * shade of the agent, a highlight from the top left as on the bichos' bodies, a glow of its colour under it. */
-.stage-bubble[data-balloon="b"] { --balloon-line: 2px; --balloon-lines: 2px; --balloon-tilt: 0deg;
-  --balloon-fill: color-mix(in srgb, var(--av-color, var(--sv-accent)) 10%, var(--sv-chat-agent-bg));
-  --balloon-ink: color-mix(in srgb, var(--av-color, var(--sv-accent)) 65%, var(--sv-text));
-  --balloon-said: var(--sv-text); --balloon-unsaid: var(--sv-text-muted);
-  --balloon-sheen: radial-gradient(120% 160% at 18% -20%, rgb(255 255 255 / 65%), transparent 55%);
-  --balloon-radius: calc(44 * var(--u)) calc(52 * var(--u)) calc(48 * var(--u)) calc(40 * var(--u)) / calc(40 * var(--u)) calc(48 * var(--u)) calc(52 * var(--u)) calc(44 * var(--u));
-  --balloon-shadow: 0 calc(18 * var(--u)) calc(34 * var(--u)) calc(-16 * var(--u)) color-mix(in srgb, var(--av-color, var(--sv-accent)) 65%, transparent); }
-[data-theme="dark"] .stage-bubble[data-balloon="b"] { --balloon-fill: color-mix(in srgb, var(--av-color, var(--sv-accent)) 16%, var(--sv-chat-agent-bg));
-  --balloon-sheen: radial-gradient(120% 160% at 18% -20%, rgb(255 255 255 / 5%), transparent 55%);
-  --balloon-shadow: 0 calc(18 * var(--u)) calc(36 * var(--u)) calc(-14 * var(--u)) rgb(0 0 0 / 70%), 0 0 calc(28 * var(--u)) calc(-8 * var(--u)) color-mix(in srgb, var(--av-color, var(--sv-accent)) 45%, transparent); }
-/* c: made of the agent's own skin, in either theme as the bichos are: its colour, pale, lit from the top left as their
- * bodies (engine shade()), their even ink all round and their gloss (.balloon-shine); the words not yet said a mix of
- * the ink and the fill, 4.5:1 on the palest and the deepest coat alike. */
-.stage-bubble[data-balloon="c"] { --balloon-lines: var(--balloon-line); --balloon-tilt: .5deg;
-  --balloon-fill: color-mix(in srgb, var(--av-color, #b48cff) 22%, #fff);
-  --balloon-unsaid: color-mix(in srgb, #1b1428 68%, var(--balloon-fill));
-  --balloon-sheen: radial-gradient(90% 130% at 24% 14%, rgb(255 255 255 / 80%), transparent 58%);
-  --balloon-radius: calc(36 * var(--u)) calc(42 * var(--u)) calc(40 * var(--u)) calc(34 * var(--u)) / calc(38 * var(--u)) calc(34 * var(--u)) calc(42 * var(--u)) calc(40 * var(--u)); }
+/* Where it sits (`balloonPlace`): centred over the agent, its tail out of the bottom-left corner; or pushed left of the
+ * agent, its right end over it, its tail out of the bottom-right corner and turned toward it. It pops out of its tail. */
+.stage-bubble .balloon-tail { left: var(--tail-at); }
+.stage-bubble[data-place="left"] { justify-self: end; margin-inline-end: max(0px, calc(50% - calc(112 * var(--u)))); transform-origin: calc(100% - var(--tail-at) - var(--tail-w) / 2) calc(100% + var(--tail-h)); }
+.stage-bubble[data-place="left"] .balloon-tail { left: auto; right: var(--tail-at); transform: scaleX(-1); }
 /* A reply leaving (its time over, or a new one over it): it lifts away and fades where the next comes in. */
 .stage-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; pointer-events: none; }
 @keyframes stage-bubble-out { to { opacity: 0; transform: translateY(calc(-28 * var(--u))) scale(.94); } }
