@@ -135,7 +135,7 @@ test("automatic, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevo
     await wait(STEP_MS);
     expect(percentOf()).toBe(percent);
     expect(appRow()).toHaveTextContent(new RegExp(`^Sidevoice 0\\.4\\.0 · Downloading…\\s?${percent}\\s?%(Cancel download|Cancelar la descarga)$`));
-    expect(notice()).toBeNull();
+    expect(notice()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
     noRestart();
   }
   await wait(STEP_MS);
@@ -172,11 +172,11 @@ test("manual, the person's check: Sidevoice 0.3.0 · Checking…, then Sidevoice
   expect(appRow()).toHaveAttribute("data-state", "available");
   await act(async () => { fireEvent.click(within(appRow()!).getByRole("button", { name: "Download", hidden: true })); });
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
-  // Its progress is the line's: the room says nothing while it downloads.
+  // Its progress is the line's; the room offers Cancel while it downloads.
   await wait(STEP_MS);
   expect(percentOf()).toBe("30");
   expect(within(appRow()!).getAllByRole("button", { hidden: true }).map((button) => button.textContent)).toEqual(["Cancel download"]);
-  expect(notice()).toBeNull();
+  expect(notice()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
   await wait(3 * STEP_MS);
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 readyRestart to update$/);
   expect(notice()).toBe("Sidevoice 0.4.0 is ready · Restart to update");
@@ -218,13 +218,12 @@ test("the app's own check, automatic: no Checking…, no progress anywhere — a
   expect(installed()).not.toHaveTextContent("Checking…");
   expect(checkButton()).not.toHaveAttribute("aria-busy");
   await wait(CHECK_MS);
-  // Downloading by itself: nothing in Updates, the room or This device says so, step after step; nor Up to date.
+  // Downloading by itself: Updates and the room offer Cancel, step after step; not Up to date.
   for (let step = 0; step < 4; step++) {
-    expect(appRow()).toBeNull();
-    expect(document.querySelector("[role=progressbar]")).toBeNull();
-    expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Checking|Downloading|found|0\.4\.0/);
-    expect(notice()).toBeNull();
-    expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
+    expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading….*Cancel download$/);
+    expect(document.getElementById("pane-updates")).not.toHaveTextContent(/Checking|found/);
+    expect(notice()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
+    expect(deviceLine()).toHaveTextContent(/^Sidevoice 0\.3\.0 · Update available$/);
     expect(installed()).toHaveTextContent(/^Sidevoice 0\.3\.0$/);
     await wait(STEP_MS);
   }
@@ -254,7 +253,7 @@ test("the app's own check, manual: no Checking…; Sidevoice 0.4.0 available · 
   expect(appRow()).toHaveTextContent(/^Sidevoice 0\.4\.0 · Downloading…\s?0\s?%(Cancel download|Cancelar la descarga)$/);
   await wait(STEP_MS);
   expect(percentOf()).toBe("30");
-  expect(notice()).toBeNull();
+  expect(notice()).toBe("Sidevoice 0.4.0 · Downloading… · Cancel download");
 });
 
 test("in Spanish: Sidevoice 0.3.0 · Buscando…, Sidevoice 0.4.0 · Descargando… n %, then Sidevoice 0.4.0 lista · Reiniciar para actualizar; manual's Sidevoice 0.4.0 disponible · Descargar", async () => {

@@ -1092,7 +1092,6 @@ export const messages: Messages = {
   "updates.action.download": "ダウンロード",
   "updates.action.retryDownload": "ダウンロードを再試行",
   "updates.action.cancelDownload": "ダウンロードをキャンセル",
-  "updates.action.cancelDownloadNamed": "アップデートのダウンロードをキャンセル",
   "updates.action.updateAll": "Sidevoice をアップデート",
   "updates.action.updatingAll": "Sidevoice をアップデートしています…",
   "updates.action.retryAll": "アップデートを再試行",

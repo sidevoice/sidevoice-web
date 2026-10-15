@@ -16,7 +16,7 @@ export function fakeUpdater({ status = { state: "idle" }, mode = "automatic", wi
     subscribe: vi.fn((listener: (status: UpdaterStatus) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; }),
     check: vi.fn(async () => now),
     download: vi.fn(async () => now),
-    cancel: vi.fn(async () => undefined),
+    cancel: vi.fn(async (): Promise<void> => undefined),
     restart: vi.fn(async () => undefined),
   };
   for (const name of without) delete (updater as Partial<typeof updater>)[name];

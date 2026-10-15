@@ -1091,7 +1091,6 @@ export const messages: Messages = {
   "updates.action.download": "下载",
   "updates.action.retryDownload": "重试下载",
   "updates.action.cancelDownload": "取消下载",
-  "updates.action.cancelDownloadNamed": "取消更新下载",
   "updates.action.updateAll": "更新 Sidevoice",
   "updates.action.updatingAll": "正在更新 Sidevoice…",
   "updates.action.retryAll": "重试更新 Sidevoice",

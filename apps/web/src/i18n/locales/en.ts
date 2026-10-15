@@ -1123,7 +1123,6 @@ export const messages = {
   "updates.action.download": "Download",
   "updates.action.retryDownload": "Retry download",
   "updates.action.cancelDownload": "Cancel download",
-  "updates.action.cancelDownloadNamed": "Cancel the update download",
   "updates.action.updateAll": "Update Sidevoice",
   "updates.action.updatingAll": "Updating Sidevoice…",
   "updates.action.retryAll": "Retry updating Sidevoice",

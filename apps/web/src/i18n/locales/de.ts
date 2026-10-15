@@ -1094,7 +1094,6 @@ export const messages: Messages = {
   "updates.action.download": "Herunterladen",
   "updates.action.retryDownload": "Download wiederholen",
   "updates.action.cancelDownload": "Download abbrechen",
-  "updates.action.cancelDownloadNamed": "Update-Download abbrechen",
   "updates.action.updateAll": "Sidevoice aktualisieren",
   "updates.action.updatingAll": "Sidevoice wird aktualisiert…",
   "updates.action.retryAll": "Update erneut versuchen",

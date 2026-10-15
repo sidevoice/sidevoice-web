@@ -13,12 +13,12 @@ import { uiLocale } from "../../i18n/locale";
 
 const percent = (progress: number) => new Intl.NumberFormat(uiLocale(), { style: "percent" }).format(progress);
 
-/** Whether the app's update, as `status` says it, has a button in its row: Download (manual, or a download that
- *  failed, as Retry; or one the person cancelled, which the app does not fetch again by itself) or Restart to update
- *  (ready, either mode). */
-function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: ReturnType<typeof useAppUpdate>["can"], cancelled = false) {
+/** Whether the app's update, as `status` says it, has a button in its row: Download (an update available, as the app
+ *  says it: whichever mode, so a download the app stopped is never left without one), Cancel (downloading) or Restart
+ *  to update (ready). */
+function hasAction(status: UpdaterStatus | null, can: ReturnType<typeof useAppUpdate>["can"]) {
   if (status?.state === "ready") return can.restart;
-  return status?.state === "available" && can.download && (mode === "manual" || cancelled || status.error?.code === "update-download-failed");
+  return status?.state === "available" && can.download;
 }
 
 /** Sidevoice on this computer, in Settings › Updates (a release's updater; none, `service` alone), top to bottom:
@@ -26,11 +26,11 @@ function hasAction(status: UpdaterStatus | null, mode: UpdateMode | null, can: R
  *  check says so (`current`: a check went through, the app idle and its service as the app bundles it), Checking…
  *  while the person's check runs — and Check for updates; then, only while a newer version waits, one line with just
  *  the new version and its one action (UPDATE_PLACE `app`, where a landing focuses): Sidevoice 0.4.0 available ·
- *  Download in manual mode (automatic fetches it by itself: a check never downloads in manual), Sidevoice 0.4.0 ·
- *  Downloading… with its progress in the line, Sidevoice 0.4.0 ready · Restart to update, in either mode, only ever
+ *  Download (a check never downloads in manual; automatic's download starts by itself), Sidevoice 0.4.0 ·
+ *  Downloading… with its progress in the line and a Cancel, Sidevoice 0.4.0 ready · Restart to update, in either mode, only ever
  *  pressed by the person; a download or an install that failed, said under it, with Retry download. Each version is
  *  said once: the installed one on its line, the new one on its own. What the person's own check found shows each step;
- *  one the app found by itself shows only as `inView` has it (automatic: once ready). Its service is folded into it: the
+ *  one the app found by itself shows only as `inView` has it (automatic: downloading, to cancel, and ready). Its service is folded into it: the
  *  app's update found, it follows the app's restart; else, behind the one the app bundles, its Update Sidevoice is that
  *  line (`service`), as is what stands in the way. Each part shows where the app has the method for it. Restart to
  *  update restarts with `onRestart` first. A check that finds none says so to a screen reader too. Up to date is never
@@ -44,7 +44,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
   // A call of this page's that failed; and whether the person's own check found nothing.
   const [failure, setFailure] = useState<unknown>(null);
   const [upToDate, setUpToDate] = useState(false);
-  const { status, mode, can, checkedAt, inView, cancelled } = update;
+  const { status, mode, can, checkedAt, inView } = update;
   // What the app says next replaces what a call of this page's said.
   useEffect(() => { setFailure(null); }, [status?.state]);
   if (!update.updater) return <>{service}</>;
@@ -64,7 +64,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
       if (action !== "check" || !next || next.error) return;
       if (next.state === "idle") setUpToDate(true);
       // Found one with a button in its line: there, in view and focused.
-      else if (hasAction(next, mode, can)) store?.patch({ settingsFocus: UPDATE_PLACE.app });
+      else if (hasAction(next, can)) store?.patch({ settingsFocus: UPDATE_PLACE.app });
     } catch (reason) { setFailure(reason); }
     finally { setBusy(null); }
   }
@@ -100,7 +100,7 @@ export function AppUpdateSettings({ service, onRestart, current }: { service?: R
       </div>
       {!!checkError && <div className="app-update-failure" role="alert"><ErrorText message={updaterFailure(checkError, { t })} /></div>}
       {/* A newer version: the app's, its service following its restart; else what its service waits for. */}
-      {found ? <AppUpdateRow status={found} mode={mode} can={can} cancelled={cancelled} busy={busy} error={rowError} act={(action) => void act(action)} t={t} /> : service}
+      {found ? <AppUpdateRow status={found} can={can} busy={busy} error={rowError} act={(action) => void act(action)} t={t} /> : service}
     </div>
   </>;
 }
@@ -116,24 +116,22 @@ function rowWords(status: UpdaterStatus, moving: boolean, t: Translate) {
 }
 
 /** The app's update once found, on one line with its one action: Sidevoice 0.4.0 available · Download (or Retry
- *  download), its words its description; Sidevoice 0.4.0 · Downloading… with its progress in the line and a Cancel
- *  (automatic: from the start, with no Download; a download the person cancelled is available again, with its
- *  Download, in either mode); Sidevoice 0.4.0 ready · Restart to update; what failed under it. The line is where a
+ *  download), its words its description; Sidevoice 0.4.0 · Downloading… with its progress in the line and a Cancel,
+ *  after which it is available again, with its Download, in either mode; Sidevoice 0.4.0 ready · Restart to update; what failed under it. The line is where a
  *  landing goes. */
-function AppUpdateRow({ status, mode, can, cancelled, busy, error, act, t }: { status: UpdaterStatus; mode: UpdateMode | null;
-  can: ReturnType<typeof useAppUpdate>["can"]; cancelled: boolean; busy: "check" | "download" | "cancel" | "restart" | null; error: unknown;
+function AppUpdateRow({ status, can, busy, error, act, t }: { status: UpdaterStatus;
+  can: ReturnType<typeof useAppUpdate>["can"]; busy: "check" | "download" | "cancel" | "restart" | null; error: unknown;
   act: (action: "download" | "cancel" | "restart") => void;
   t: Translate }) {
   const downloadFailed = (error as { code?: unknown } | null)?.code === "update-download-failed" || status.error?.code === "update-download-failed";
   const progress = status.progress == null ? null : Math.max(0, Math.min(1, status.progress));
   const copyId = useId();
-  // Downloading; or automatic's, found and downloading by itself from then on.
-  const moving = status.state === "downloading" || (status.state === "available" && mode !== "manual" && !downloadFailed && !cancelled);
+  const moving = status.state === "downloading";
   const button = status.state === "ready" ? can.restart && <Button size="sm" variant="primary" loading={busy === "restart"} aria-describedby={copyId}
       onClick={() => act("restart")}>{t("updates.action.restartAll")}</Button>
-    : status.state === "available" && hasAction(status, mode, can, cancelled) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"}
+    : status.state === "available" && hasAction(status, can) ? <Button size="sm" variant={downloadFailed ? "secondary" : "primary"} loading={busy === "download"}
         aria-describedby={copyId} onClick={() => act("download")}>{t(downloadFailed ? "updates.action.retryDownload" : "updates.action.download")}</Button>
-      : status.state === "downloading" && can.cancel ? <Button size="sm" variant="secondary" loading={busy === "cancel"} aria-label={t("updates.action.cancelDownloadNamed")}
+      : status.state === "downloading" ? <Button size="sm" variant="secondary" loading={busy === "cancel"} aria-describedby={copyId}
         onClick={() => act("cancel")}>{t("updates.action.cancelDownload")}</Button>
       : null;
   const copy = rowWords(status, moving, t);

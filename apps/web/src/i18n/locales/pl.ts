@@ -1110,7 +1110,6 @@ export const messages: Messages = {
   "updates.action.download": "Pobierz",
   "updates.action.retryDownload": "Ponów pobieranie",
   "updates.action.cancelDownload": "Anuluj pobieranie",
-  "updates.action.cancelDownloadNamed": "Anuluj pobieranie aktualizacji",
   "updates.action.updateAll": "Zaktualizuj Sidevoice",
   "updates.action.updatingAll": "Aktualizowanie Sidevoice…",
   "updates.action.retryAll": "Ponów aktualizację Sidevoice",
