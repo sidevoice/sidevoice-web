@@ -1555,6 +1555,20 @@ test('R1 overlapping refresh fences release only their own mute ownership',async
  assert.equal(voice.calls.filter(([name])=>name==='mute').at(-1)[1],false,'capture resumes after both fences');
  s.run('disconnect()');
 });
+test('R1 a stale presentation response cannot install a boundary after the newer focus',async()=>{
+ const c=await callOnRoom(),requests=[];
+ c.s.context.fetch=async()=>new Promise(resolve=>requests.push(resolve));
+ const old=c.s.run('refresh()'),recent=c.s.run('refresh()');
+ const answer=(resolve,thread)=>resolve({ok:true,status:200,json:async()=>({binding:{thread_id:thread,binding_id:'binding-'+thread},room:{revision:2},clients:[],call:null,participants:[]})});
+ await c.until(()=>requests.length===2,'two presentation requests');
+ answer(requests[1],'c');await recent;
+ const count=c.voice.calls.filter(([name])=>name==='setCaptureBoundary').length;
+ answer(requests[0],'b');await old;
+ assert.equal(c.s.run('targetThread()'),'c');
+ assert.equal(c.voice.calls.filter(([name])=>name==='setCaptureBoundary').length,count);
+ assert.equal(c.voice.calls.filter(([name])=>name==='mute').at(-1)[1],false);
+ c.s.run('disconnect()');
+});
 test('R2 successful join unmutes the enabled microphone before speech',async()=>{
  const c=await callOnRoom();
  assert.equal(c.s.run('state.connecting'),false);
