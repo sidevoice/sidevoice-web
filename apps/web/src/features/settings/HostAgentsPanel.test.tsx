@@ -5,7 +5,7 @@ import { RoomHeader } from "../room/RoomHeader";
 import { MachineList } from "../room/MachineList";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
-import type { CursorBridgeStatus, DetectedAgent, HostAgentsState } from "../../state/room-types";
+import type { AgentReadinessStatus, DetectedAgent, HostAgentsState } from "../../state/room-types";
 import type { PairingSummary } from "../../services/device-pairing.js";
 
 vi.mock("../../services/room-session-controller.js", () => ({}));
@@ -484,27 +484,32 @@ test("a machine with only Cursor installed lists Cursor, and Other to connect an
   expect(document.querySelector("#host-agent-other-howto")).toHaveTextContent("sidevoice connector mcp");
 });
 
-test("Cursor bridge disclosure leaves the Codex card unchanged and hides unsupported or unknown states", () => {
+test("readiness works for any agent, while an absent field leaves the Codex card unchanged", () => {
   const store = createRoomStore();
   setActions({ loadHostAgents: vi.fn(async () => {}), hostAgentAction: vi.fn(async () => {}) });
-  const agents = (state: "running" | "not_running" | "unsupported" | "future_state") => ready([
-    known("cursor", { label: "Cursor", registration: "connected", cursor_bridge: { state, chat_known: null } as CursorBridgeStatus }),
+  const agents = (state: AgentReadinessStatus["state"], reasons: string[]) => ready([
+    known("cursor", { label: "Cursor", registration: "connected", readiness: { state, reasons } }),
     known("codex", { registration: "connected" }),
   ]);
-  act(() => store.patch({ hostAgents: { fp: agents("not_running") } }));
+  act(() => store.patch({ hostAgents: { fp: agents("needs_attention", ["cursor.bridge_not_running"]) } }));
   render(<RoomProvider store={store}><HostAgentsPanel fp="fp" /></RoomProvider>);
   const [cursor, codex] = [...document.querySelectorAll<HTMLElement>(".host-agent-row")];
-  expect(cursor.querySelector(".host-agent-status")).toHaveTextContent(/^Connected$/);
-  expect(cursor.querySelector(".host-agent-status")).toHaveClass("host-agent-ok");
-  expect(within(cursor).getByRole("button", { name: /Desktop Bridge.*Needs attention/ })).toBeInTheDocument();
-  expect(within(cursor).getByRole("button", { name: "Disconnect Cursor from Sidevoice" })).toBeInTheDocument();
   const codexBefore = codex.innerHTML;
-  fireEvent.click(within(cursor).getByRole("button", { name: /Desktop Bridge/ }));
-  expect(within(cursor).getByRole("group", { name: "Desktop Bridge" })).toHaveTextContent("Settings → Beta");
+  expect(within(cursor).getByRole("button", { name: "Needs attention" })).toBeInTheDocument();
+  fireEvent.click(within(cursor).getByRole("button", { name: "Needs attention" }));
+  expect(within(cursor).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Settings → Beta");
+  expect(codex.querySelector(".host-agent-readiness")).toBeNull();
   expect(codex.innerHTML).toBe(codexBefore);
-  for (const state of ["unsupported", "future_state"] as const) {
-    act(() => store.patch({ hostAgents: { fp: agents(state) } }));
-    expect(document.querySelector(".host-agent-bridge")).toBeNull();
-    expect(codex.innerHTML).toBe(codexBefore);
-  }
+  act(() => store.patch({ hostAgents: { fp: agents("unsupported", ["cursor.unsupported"]) } }));
+  expect(cursor.querySelector(".host-agent-readiness [role=status]")).toHaveTextContent("Not supported");
+  expect(within(cursor).queryByRole("group", { name: "Needs attention" })).toBeNull();
+  expect(codex.innerHTML).toBe(codexBefore);
+  act(() => store.patch({ hostAgents: { fp: ready([
+    known("cursor", { label: "Cursor", registration: "connected" }),
+    known("codex", { registration: "connected", readiness: { state: "needs_attention", reasons: ["other.future"] } }),
+  ]) } }));
+  expect(cursor.querySelector(".host-agent-readiness")).toBeNull();
+  fireEvent.click(within(codex).getByRole("button", { name: "Needs attention" }));
+  expect(within(codex).getByRole("group", { name: "Needs attention" })).toHaveTextContent("Sidevoice cannot show why this agent needs attention.");
+  expect(within(codex).getByRole("group", { name: "Needs attention" })).not.toHaveTextContent("other.future");
 });

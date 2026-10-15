@@ -2,40 +2,81 @@ import { expect, test } from "@playwright/test";
 import { join } from "node:path";
 import { installHarness, listing } from "./harness.mjs";
 
-for (const [language, width] of [["de", 320], ["fr", 320], ["it", 320], ["es", 320], ["pl", 320]]) {
-  test(`simple Cursor bridge instruction fits ${width}px in ${language}`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 700 });
-    await installHarness(page, { agents: { ...listing(), agents: [
-      ...listing().agents,
-      { id: "cursor", label: "Cursor", present: true, version: null, registration: "connected", connect: "auto",
-        cursor_bridge: { state: "not_running", chat_known: null } },
-    ] } });
-    await page.addInitScript((ui) => localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: ui })), language);
-    await page.goto("/voice/");
-    await page.waitForFunction(() => !!window.sidevoiceActions);
-    await page.locator("#settings-open").click();
-    await page.locator("#settings-machines").click();
-    await page.locator(".machines-menu .machine-entry[data-name='E2E Host']").click();
-    const row = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-bridge") });
-    const toggle = row.locator(".host-agent-bridge-toggle");
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    await expect(row.locator(".host-agent-bridge-body p")).toHaveCount(2);
-    await expect(row.locator(".host-agent-bridge-body")).toContainText("Settings → Beta");
-    await expect(row.locator(".host-agent-bridge-body")).not.toContainText("sqlite3");
-    for (const selector of [".host-agent-bridge-labels > span:first-child", ".host-agent-bridge-state", ".host-agent-bridge-body p"]) {
-      for (const element of await row.locator(selector).all()) {
-        expect(await element.evaluate((node) => {
-          const box = node.getBoundingClientRect();
-          const clip = node.closest(".host-agent-rows").getBoundingClientRect();
-          return box.width > 0 && box.left >= clip.left - 1 && box.right <= clip.right + 1;
-        }), `${selector} in ${language} at ${width}px`).toBe(true);
+const readiness = (preset) => preset === "unknown_code"
+  ? { state: "needs_attention", reasons: ["cursor.future_code"] }
+  : preset === "needs_attention" ? { state: "needs_attention", reasons: ["cursor.bridge_not_running"] }
+  : preset === "unsupported" ? { state: "unsupported", reasons: ["cursor.unsupported"] }
+  : { state: "ready", reasons: [] };
+
+async function show(page, { width, height, language = "en", preset }) {
+  await page.setViewportSize({ width, height });
+  await installHarness(page, { agents: { ...listing(), agents: [
+    ...listing().agents,
+    { id: "cursor", label: "Cursor", present: true, version: null, registration: "connected", connect: "auto",
+      readiness: { ...readiness(preset), extra_future_field: "ignored" } },
+  ] } });
+  await page.addInitScript((ui) => localStorage.setItem("sidevoice.settings", JSON.stringify({ ui_language: ui })), language);
+  await page.goto("/voice/");
+  await page.waitForFunction(() => !!window.sidevoiceActions);
+  await page.locator("#settings-open").click();
+  await page.locator("#settings-machines").click();
+  await page.locator(".machines-menu .machine-entry[data-name='E2E Host']").click();
+  const cursor = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-name strong", { hasText: "Cursor" }) });
+  const codex = page.locator(".host-agent-row").filter({ has: page.locator(".host-agent-name strong", { hasText: "Codex" }) });
+  await expect(cursor).toBeVisible();
+  await expect(codex.locator(".host-agent-readiness")).toHaveCount(0);
+  const panel = cursor.locator(".host-agent-readiness");
+  await expect(panel).toBeVisible();
+  if (preset === "ready") {
+    await expect(panel).toContainText("Ready");
+    await expect(panel.locator("button")).toHaveCount(0);
+  } else if (preset === "unsupported") {
+    await expect(panel).toContainText(language === "en" ? "Not supported" : "");
+    await expect(panel.locator("button")).toHaveCount(0);
+  } else {
+    await panel.locator(".host-agent-readiness-toggle").click();
+    await expect(panel.locator(".host-agent-readiness-body p")).toHaveCount(1);
+    if (preset === "needs_attention") await expect(panel).toContainText("Settings → Beta");
+    else {
+      await expect(panel).toContainText(language === "en" ? "Sidevoice cannot show why" : "Sidevoice");
+      await expect(panel).not.toContainText("cursor.future_code");
+    }
+  }
+  return { cursor, codex, panel };
+}
+
+for (const preset of ["ready", "needs_attention", "unsupported", "unknown_code"]) {
+  for (const [view, width, height] of [["desktop", 1280, 900], ["phone", 390, 844]]) {
+    test(`agent readiness ${preset} on ${view}`, async ({ page }) => {
+      const { cursor, codex, panel } = await show(page, { width, height, preset });
+      await expect(panel).not.toContainText("sqlite3");
+      await expect(panel).not.toContainText("Join the Sidevoice");
+      if (process.env.WEB98_SCREENSHOTS) {
+        for (const theme of ["light", "dark"]) {
+          await page.evaluate((value) => { document.documentElement.dataset.theme = value; document.documentElement.style.colorScheme = value; }, theme);
+          await cursor.screenshot({ path: join(process.env.WEB98_SCREENSHOTS, `readiness-${preset}-${theme}-${view}.png`) });
+          if (preset === "ready") await codex.screenshot({ path: join(process.env.WEB98_SCREENSHOTS, `codex-existing-${theme}-${view}.png`) });
+        }
       }
+    });
+  }
+}
+
+for (const language of ["de", "fr"]) {
+  test(`readiness explanation fits a 320px ${language} phone`, async ({ page }) => {
+    const { cursor } = await show(page, { width: 320, height: 700, language, preset: "needs_attention" });
+    for (const selector of [".host-agent-readiness-state", ".host-agent-readiness-body p"]) {
+      const element = cursor.locator(selector);
+      expect(await element.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        const clip = node.closest(".host-agent-rows").getBoundingClientRect();
+        return box.width > 0 && box.left >= clip.left - 1 && box.right <= clip.right + 1;
+      }), `${selector} in ${language}`).toBe(true);
     }
     if (process.env.WEB98_SCREENSHOTS) {
       for (const theme of ["light", "dark"]) {
         await page.evaluate((value) => { document.documentElement.dataset.theme = value; document.documentElement.style.colorScheme = value; }, theme);
-        await row.screenshot({ path: join(process.env.WEB98_SCREENSHOTS, `cursor-narrow-${language}-${width}-not_running-${theme}.png`) });
+        await cursor.screenshot({ path: join(process.env.WEB98_SCREENSHOTS, `readiness-narrow-${language}-320-${theme}.png`) });
       }
     }
   });

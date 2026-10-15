@@ -15,7 +15,7 @@ import { NewMark } from "../highlights/highlights";
 import { InfoTip } from "../../components/ui/InfoTip";
 import "./host-agents.css";
 import { uiLocale } from "../../i18n/locale";
-import { CursorBridgeSetup } from "./CursorBridgeSetup";
+import { AgentReadiness } from "./AgentReadiness";
 
 /** A machine's failure with its agents, in words (error-message.ts): its key's sentence, else this panel's own generic
  *  line, the key behind Details. */
@@ -199,7 +199,7 @@ export function HostAgentRow({ fp, agent }: { fp: string; agent: DetectedAgent }
             </Tooltip>}
         </span>
       </div>
-      {agent.id === "cursor" && agent.cursor_bridge && <CursorBridgeSetup bridge={agent.cursor_bridge} id={`host-agent-bridge-${fp.slice(0, 7)}-${agent.id}`} />}
+      {agent.readiness && <AgentReadiness readiness={agent.readiness} id={`host-agent-readiness-${fp.slice(0, 7)}-${agent.id}`} />}
       {confirming && agent.registration === "connected" && !busy && <div className="host-agent-confirm" role="group" aria-label={t("agents.disconnectNamed", { agent: agent.label })}
         onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelConfirm(); } }}>
         <p>{t("agents.disconnectConfirm", { agent: agent.label })}</p>

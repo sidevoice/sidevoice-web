@@ -91,10 +91,9 @@ export interface MachineView {
 }
 
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */
-export type CursorBridgeState = "running" | "not_running" | "unsupported";
-export interface CursorBridgeStatus {
-  state: CursorBridgeState;
-  chat_known: boolean | null;
+export interface AgentReadinessStatus {
+  state: "ready" | "needs_attention" | "unsupported";
+  reasons: string[];
 }
 export interface DetectedAgent {
   id: string;
@@ -119,8 +118,8 @@ export interface DetectedAgent {
   manual?: { connect?: AgentManualStep[]; update?: AgentManualStep[]; disconnect?: AgentManualStep[]; replace?: AgentManualStep[] } | null;
   /** How to take Sidevoice out of the agent by hand (the connector's, as `instructions` is for adding it). */
   removal?: { command?: string; snippet?: string; file?: string | null } | null;
-  /** Cursor editor delivery readiness, separate from its MCP registration and per-chat bridge registration. */
-  cursor_bridge?: CursorBridgeStatus | null;
+  /** Delivery readiness from the connector; absence means ready. */
+  readiness?: AgentReadinessStatus | null;
 }
 
 /** One step done by hand: a command to run, or a snippet for a file. */

@@ -4,7 +4,7 @@ import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
 import type { UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
-import type { CursorBridgeState, CursorBridgeStatus, TrialProgress } from "../state/room-types";
+import type { AgentReadinessStatus, TrialProgress } from "../state/room-types";
 
 /* Every screen the storyboard shows (journeys.html): each a state of the real app, seeded — the room's facts, the
  * setup's record and step, and what to press once it is drawn (Settings open at a section, the transcript, a pairing
@@ -71,21 +71,25 @@ const agentsListing = () => ({ status: "ready", error: null, busy: {}, actionErr
   { id: "claude-code", label: "Claude Code", present: true, version: "2.4.1", registration: "connected", connect: "auto", instructions: null },
   { id: "codex", label: "Codex", present: true, version: "0.157.0", registration: "not-connected", connect: "auto", actionable: false, instructions: { command: "codex mcp add sidevoice -- sidevoice mcp", file: null, snippet: null } },
 ] } });
-/** Connector #130's bridge state is independent of MCP registration and a specific chat. */
-const cursorBridge = (state: CursorBridgeState): CursorBridgeStatus => ({ state, chat_known: null });
-const cursorAgentsListing = (state: CursorBridgeState) => {
+/** Connector #130's readiness is independent of MCP registration. */
+const cursorReadiness = (state: "ready" | "needs_attention" | "unsupported" | "unknown_code"): AgentReadinessStatus => ({
+  state: state === "unknown_code" ? "needs_attention" : state,
+  reasons: state === "needs_attention" ? ["cursor.bridge_not_running"] : state === "unknown_code" ? ["cursor.future_code"] :
+    state === "unsupported" ? ["cursor.unsupported"] : [],
+});
+const cursorAgentsListing = (state: "ready" | "needs_attention" | "unsupported" | "unknown_code") => {
   const listing = agentsListing();
   return { ...listing, value: { ...listing.value, agents: [...listing.value.agents,
-    { id: "cursor", label: "Cursor", present: true, version: null, registration: "connected", connect: "auto", cursor_bridge: cursorBridge(state) }] } };
+    { id: "cursor", label: "Cursor", present: true, version: null, registration: "connected", connect: "auto", readiness: cursorReadiness(state) }] } };
 };
-const showCursorBridgeInSettings = async (doc: Document) => {
+const showCursorReadinessInSettings = async (doc: Document) => {
   openSettings("machines")(doc);
   await new Promise((resolve) => setTimeout(resolve, 100));
-  if (!doc.querySelector<HTMLElement>(".host-agent-row .host-agent-name strong")?.getClientRects().length) {
+  if (!doc.querySelector<HTMLElement>(".host-agent-readiness")?.getClientRects().length) {
     doc.querySelector<HTMLElement>('.machine-entry[data-machine="local-host"]')?.click();
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  doc.querySelector<HTMLElement>(".host-agent-bridge-toggle")?.click();
+  doc.querySelector<HTMLElement>(".host-agent-readiness-toggle")?.click();
 };
 const REPLY = "I ran the tests: two fail in the settings pane, both about the Save button that no longer exists. Shall I update them?";
 /** A reply longer than a page of the stage's bubble, to see its pages follow the voice. */
@@ -169,11 +173,11 @@ export const JOURNEYS: Journey[] = [
       desktop: localBridge(stopped), facts: { localHostStatus: stopped, localHostAvailable: true } },
     { id: "w3", caption: "Ready here: the agents on this computer, Connect or Disconnect each.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true } },
-    { id: "w3-cursor-bridge", caption: "Cursor's Desktop Bridge status on the shared onboarding agent card.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
+    { id: "w3-cursor-bridge", caption: "Cursor readiness on the shared onboarding agent card.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true,
-        hostAgents: { [THIS.fp]: cursorAgentsListing("not_running") } }, after: async (doc) => {
+        hostAgents: { [THIS.fp]: cursorAgentsListing("needs_attention") } }, after: async (doc) => {
           await new Promise((resolve) => setTimeout(resolve, 100));
-          doc.querySelector<HTMLElement>("#wizard .host-agent-bridge-toggle")?.click();
+          doc.querySelector<HTMLElement>("#wizard .host-agent-readiness-toggle")?.click();
         } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], callNode: null, machineLinks: {} } },
     { id: "w4", caption: "Transcription, its model not downloaded yet: the try's block already there, its button and the footer's waiting for the model, saying why.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
@@ -239,10 +243,10 @@ export const JOURNEYS: Journey[] = [
       facts: { localHostAvailable: true, inApp: true }, after: openSettings("this-computer") },
     { id: "s-machine-local", caption: "Machines: this computer, running — its service, agents, devices.", desktop: localBridge(running),
       facts: { pairings: [THIS, NUC], machineLinks: { [THIS.fp]: { reach: "ok", via: "node" }, [NUC.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true }, after: openSettings("machines") },
-    ...(["running", "not_running", "unsupported"] as const).map((state) => ({
-      id: `s-cursor-bridge-${state}`, caption: `Cursor Desktop Bridge: ${state}, with its simple status open.`, desktop: localBridge(running),
+    ...(["ready", "needs_attention", "unsupported", "unknown_code"] as const).map((state) => ({
+      id: `s-cursor-readiness-${state}`, caption: `Cursor readiness: ${state}.`, desktop: localBridge(running),
       facts: { pairings: [THIS], machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true,
-        hostAgents: { [THIS.fp]: cursorAgentsListing(state) } }, after: showCursorBridgeInSettings,
+        hostAgents: { [THIS.fp]: cursorAgentsListing(state) } }, after: showCursorReadinessInSettings,
     })),
     { id: "s-machine-stopped", caption: "Machines: this computer, stopped — Start brings it back.", desktop: localBridge(stopped),
       facts: { pairings: [THIS, NUC], localHostStatus: stopped, localHostAvailable: true }, after: openSettings("machines") },
