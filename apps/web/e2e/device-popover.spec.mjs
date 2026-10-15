@@ -36,8 +36,10 @@ test("the chevron's panel opens right above it, its left edge on the microphone'
   expect(Math.abs(left), "aligned with the chevron").toBeLessThanOrEqual(4);
   expect(box.width, "compact, not the bar's width").toBeLessThanOrEqual(320);
   expect(onTop).toBe(true);
-  await expect(panel.getByText("Microphone", { exact: true })).toBeVisible();
-  await expect(panel.getByText("Speaker", { exact: true })).toBeVisible();
+  // Each picker is named by its icon and its accessible name, with no text label of its own.
+  await expect(panel.getByRole("combobox", { name: "Microphone" })).toBeVisible();
+  await expect(panel.getByRole("combobox", { name: "Speaker" })).toBeVisible();
+  await expect(panel.getByRole("combobox")).toHaveCount(2);
   // No refresh and no close: the list is read on opening and follows the devices; it closes on its own.
   await expect(panel.getByRole("button")).toHaveCount(0);
   // The chevron closes it again.
