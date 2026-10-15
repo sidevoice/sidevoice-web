@@ -1,6 +1,6 @@
 import type { DeviceVoiceSettings } from '../services/voice-settings.js';
 import type { TurnStep } from '../services/voice-trial.js';
-import type { VoiceTake } from '../services/voice-take';
+import type { VoiceTake } from '@sidevoice/voice';
 /** The part of a reply sounding now, as offsets into its text; `from` and `to` are the same between its chunks. */
 export interface KaraokeRange {
   from: number;
@@ -31,6 +31,11 @@ export interface ChatMessage {
   /** The room's own word for this row: `pending`, `sending`, `read`, `not_sent`… */
   status?: string;
   audio_reason?: string | null;
+  epoch?: number;
+  heard_chars?: number | null;
+  hearing?: "heard" | "partial" | "not_heard" | null;
+  hearing_unconfirmed?: boolean;
+  globally_heard?: boolean | null;
   karaoke?: KaraokeRange | null;
   playback?: "pending" | "playing" | "complete";
 }
@@ -52,6 +57,8 @@ export interface ParticipantView {
   available: boolean;
   switching: boolean;
   unread: number;
+  /** Core's aggregate across devices, independent of whether text was opened. */
+  unheard?: number;
   reach: "listening" | "holding" | "offline";
   /** Honest activity support: unsupported and unknown are different messages. */
   activityNote?: string | null;
@@ -174,6 +181,7 @@ export interface SidevoiceActions {
   cancelInput(): Promise<void>;
   /** Stops the reply sounding now on this device; the reply stays written and what is queued after it plays on. */
   skipReply(): void;
+  setSpeechOutput?(output: "on" | "agents_muted" | "voice_off"): void;
   /** Changes the voice settings the settings pane is editing; Save keeps them. */
   editVoice(patch: { stt?: Partial<DeviceVoiceSettings["stt"]> & { build?: string | null }; tts?: Partial<DeviceVoiceSettings["tts"]> & { build?: string | null }; patience?: DeviceVoiceSettings["patience"]; end_of_turn?: DeviceVoiceSettings["end_of_turn"]; idle_unload_minutes?: number; turn_model?: string }): void;
   /** Keeps `key` for a remote provider with the voice, or removes it with null. Rejects `{code}` or with the sentence. */
@@ -259,13 +267,12 @@ export interface SidevoiceActions {
  *  text as JavaScript indexes it; between parts `from` and `to` meet at the end of what was heard, and the first sound
  *  is `{from: 0, to: 0}`. The end of turn: `onTurnStep`, each step of the person's turns as the voice tells it
  *  (voice-trial.js TurnStep), and `onLevel`. A try that records the person (transcription, the end of turn): `onTake`,
- *  once it has stopped, what the microphone gave the voice, kept in memory by whoever shows it and nowhere else —
- *  contract gap #40, pending in @sidevoice/voice: no voice hands one yet, and then it is never called. */
+ *  once the try stops: what the microphone gave the voice, kept in memory by whoever shows it and nowhere else. */
 export interface TrialProgress {
   onListening?(): void;
   onLevel?(level: number): void;
   /** Transcription's: the take has ended (Stop, its longest, or the voice's end of the turn) and what was said is being
-   *  transcribed; false again when a turn of it came to nothing and it listens on. */
+   *  transcribed. */
   onTranscribing?(transcribing: boolean): void;
   onProgress?(range: KaraokeRange): void;
   onTurnStep?(step: TurnStep): void;

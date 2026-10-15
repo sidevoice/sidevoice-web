@@ -51,3 +51,15 @@ test("a microphone the system or another app holds is said where the microphone 
   act(() => store.patch({ micEnabled: true, voiceState: { listening: "listening", recognising: 0, playback: "idle", microphone: "live" } } as never));
   expect(screen.queryByText(silent)).toBeNull();
 });
+
+test("call menu only offers connection statistics, including when output is unavailable", () => {
+  const store = toolbar();
+  const menu = document.getElementById("call-menu") as HTMLDetailsElement;
+  menu.open = true;
+  expect(screen.getByRole("button", { name: "Connection statistics" })).toBeInTheDocument();
+  expect(menu.querySelectorAll("button")).toHaveLength(1);
+  act(() => store.patch({ speechOutput: "agents_muted" }));
+  expect(menu.querySelectorAll("button")).toHaveLength(1);
+  act(() => store.patch({ speechOutput: "voice_off" }));
+  expect(menu.querySelectorAll("button")).toHaveLength(1);
+});

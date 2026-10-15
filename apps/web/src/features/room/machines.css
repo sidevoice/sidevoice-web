@@ -73,6 +73,7 @@
 /* This device not prepared yet: what preparing it does, then the install's panel (while it shows one) and the two ways. */
 .this-computer-prepare { display: grid; gap: var(--sv-space-4); min-width: 0; }
 .this-computer-prepare > p { max-width: 60ch; margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
+.this-computer-prepare > .this-computer-absent { color: var(--sv-text); font-weight: var(--sv-weight-semibold); }
 .this-computer-prepare > .local-install-entry--machines { margin-top: 0; }
 
 @media (max-width: 640px) {

@@ -5,6 +5,7 @@ import { isVisibleLocalHostInstall, localHostInstallController, type LocalHostIn
 import { useRoomStore } from "../../state/room-store";
 import { translator } from "../../i18n/translator";
 import { LocalHostInstallEntry, useLocalInstallOffer } from "./LocalHostInstallEntry";
+import { PrepareThisComputer } from "./PrepareThisComputer";
 import "./pairing.css";
 
 /* The first screen without a machine. Where this app can prepare this computer, doing so is the main action and
@@ -17,12 +18,18 @@ export function NoMachineScreen({
   const t = translator();
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
+  const localHostAvailable = useRoomStore((state) => state.facts.localHostAvailable);
+  const localHostStatus = useRoomStore((state) => state.facts.localHostStatus);
   const install = useSyncExternalStore(installController.subscribe, installController.getSnapshot, installController.getSnapshot);
   const offer = useLocalInstallOffer(installController);
+  const projectedLocalOnly = machines.length === 1 && machines[0].local && !machines[0].pairingId;
+  const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === source;
   const localInstallPanel = machines.length > 0 && isVisibleLocalHostInstall(install, source);
   if (!ready || (machines.length > 0 && !localInstallPanel)) return null;
-  const noMachines = machines.length === 0;
+  const noMachines = machines.length === 0 || preparingWithoutPairing;
   const installHere = noMachines && offer.supported;
+  const twoWays = noMachines && localHostAvailable &&
+    (localHostStatus.state === "absent" || isVisibleLocalHostInstall(install, source));
 
   return (
     <section className="no-machine-screen" aria-labelledby={noMachines ? "no-machine-title" : "local-install-title"}>
@@ -31,12 +38,18 @@ export function NoMachineScreen({
         <h1 id="no-machine-title">{t("noMachine.title")}</h1>
         <p>{t("noMachine.body")}</p>
       </>}
+      {twoWays && <>
+        {localHostStatus.state === "absent" && install.phase === "idle" && <p className="no-machine-absent">{t("hosts.status.absent")}</p>}
+        <p className="no-machine-hint">{t("localInstall.description")}</p>
+        <LocalHostInstallEntry showCta={false} controller={installController} source={source} holdSuccess anotherMachine={false} />
+        <PrepareThisComputer id="no-machine-prepare" controller={installController} />
+      </>}
       <div className="no-machine-actions">
-        {installHere && offer.offered && <Button variant="primary" onClick={() => installController.start(source)}>{t("localInstall.cta")}</Button>}
+        {!twoWays && installHere && offer.offered && <Button variant="primary" onClick={() => installController.start(source)}>{t("localInstall.cta")}</Button>}
         <Button variant={installHere ? "secondary" : "primary"} onClick={() => window.sidevoiceActions?.openPairing()}><AddIcon />{t("noMachine.connect")}</Button>
       </div>
-      {installHere && offer.offered && <p className="no-machine-hint">{t("localInstall.description")}</p>}
-      <LocalHostInstallEntry showCta={false} controller={installController} source={source} holdSuccess />
+      {!twoWays && installHere && offer.offered && <p className="no-machine-hint">{t("localInstall.description")}</p>}
+      {!twoWays && <LocalHostInstallEntry showCta={false} controller={installController} source={source} holdSuccess />}
     </section>
   );
 }

@@ -1,4 +1,7 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /* The paired machine the e2e specs talk to, answered at the page's own origin: its identity proved with a real P-256
  * key, and its Agents API faked (salvaged from #48). `onboarding` is the setup's record the page starts with. */
@@ -101,3 +104,14 @@ export async function installHarness(page, { onboarding = { version: 1, choice: 
   return fake;
 }
 
+
+/** Serve the installed voice package as browser modules for deterministic host/WASM contract tests. */
+export async function installVoicePackageRoute(page) {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../node_modules/@sidevoice/voice");
+  await page.route("**/voice-contract/**", (route) => {
+    const relative = new URL(route.request().url()).pathname.split("/voice-contract/")[1];
+    const file = path.resolve(root, relative);
+    if (!file.startsWith(root + path.sep)) return route.abort();
+    return route.fulfill({ body: readFileSync(file), contentType: file.endsWith(".wasm") ? "application/wasm" : "text/javascript" });
+  });
+}

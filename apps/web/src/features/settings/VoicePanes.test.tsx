@@ -7,6 +7,7 @@ import { createRoomStore, installRoomBridge, RoomStoreContext, useRoomStore } fr
 import { defaultVoiceSettings } from "../../services/voice-settings.js";
 import type { SidevoiceActions, TrialProgress } from "../../state/room-types";
 import type { CatalogView } from "../../services/model-catalogs.js";
+import type { ModelBuild } from "@sidevoice/engine";
 import { chooseOption, listOptions } from "../../test/select";
 import { setUiLanguage } from "../../i18n/translator";
 
@@ -21,13 +22,14 @@ function VoicePanes() {
 /* The voice panes, on the engine's catalogues (Providers' own: ProviderKeys.test); the interface speaks English here
  * (the test's system). */
 
-const build = (id: string, extra: Record<string, unknown> = {}) => ({ id, backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
+const build = (id: string, extra: Partial<ModelBuild> = {}): ModelBuild => ({ id, backend: "sherpa-onnx", precision: "int8", accelerator: "cpu", acceleratorClass: "cpu", downloadBytes: 1e6, memoryMb: 1, available: true, reasons: [], installed: true, ...extra });
+const withoutClass = (value: ModelBuild): ModelBuild => { delete value.acceleratorClass; return value; };
 const local = (id: string, family: string, capabilities: string[], extra: Record<string, unknown> = {}) =>
   ({ id, family, capabilities, parametersM: 1, license: "MIT", languages: ["es"], voices: [], installed: true, builds: [build(id + "/int8")], ...extra });
 const catalogs = [
   { id: "local", name: null, status: { stale: false }, models: [
     local("whisper-base", "whisper", ["stt"]),
-    local("whisper-large", "whisper", ["stt"], { builds: [build("whisper-large/int8", { available: false, accelerator: undefined, reasons: [{ code: "memory", params: {} }] })] }),
+    local("whisper-large", "whisper", ["stt"], { builds: [withoutClass(build("whisper-large/int8", { available: false, accelerator: undefined, reasons: [{ code: "memory", params: {} }] }))] }),
     local("moonshine-tiny", "moonshine", ["stt"]),
     local("kokoro-82m-v1.0", "kokoro", ["tts"], { voices: [{ id: "ef_dora", languages: ["es"] }], speed: { min: 0.5, max: 2 } }),
     local("piper-es", "piper", ["tts"], { installed: false, voices: [{ id: "davefx", languages: ["es"] }], recommendedBuild: "piper-es/onnx",
@@ -354,7 +356,7 @@ test("a try that failed says why in its block, and offers it again", async () =>
 });
 
 
-test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes; stopped by the person, it goes", async () => {
+test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes, with no turn marked in it; stopped by the person, it goes", async () => {
   const { actions } = renderPane();
   const block = document.getElementById("stt-try-block")!;
   const take = { sampleRate: 16000, samples: new Float32Array(32000), started_at: 0, ended_at: 2000, turns: [{ turn_id: "t1", speech_ms: 300, pauses: [], end_ms: 1700 }] };
@@ -365,9 +367,11 @@ test("a transcription try that stopped shows its take in its try block, after th
   expect(block.querySelector("#stt-take")).toBeNull();
   await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 900, audio_ms: 1200, endpoint_silence_ms: 500, recognition_ms: 300 } }); });
   const shown = block.querySelector("#stt-take")!;
+  // Only where it started and stopped: the transcription try ends no turn (decided 2026-10-15), so none is marked.
   expect(shown).toHaveTextContent("2.0 s recorded");
-  expect(shown).toHaveTextContent("speech starts at 0.3 s");
-  expect(shown).toHaveTextContent("turn ends at 1.7 s");
+  expect(shown).not.toHaveTextContent("speech starts");
+  expect(shown).not.toHaveTextContent("turn ends");
+  expect(shown.querySelector(".try-take-mark, .try-take-pause")).toBeNull();
   expect(shown.closest("[aria-live]")).toBeNull();
   // After what was heard, and not in the model's card (the try moved out of it, into the try block).
   expect(block.querySelector("#stt-heard")!.compareDocumentPosition(shown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -417,14 +421,20 @@ function runtimeLines(builds: ReturnType<typeof build>[]) {
   return { summary: runtime.querySelector(".model-runtime-summary")!.textContent, auto: runtime.querySelector(".model-runtime-option .model-runtime-detail")!.textContent, titles };
 }
 
-test("what a build runs on is the accelerator the engine resolved for it here: a graphics card, the Neural Engine, the processor, or nothing", () => {
-  const on = (accelerator: string | undefined, backend: string, extra: Record<string, unknown> = {}) =>
-    build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, backend, ...extra });
+test("the engine's accelerator class chooses the hardware label; the API only names a graphics card", () => {
+  const on = (accelerator: string | undefined, acceleratorClass: ModelBuild["acceleratorClass"], backend: string, extra: Partial<ModelBuild> = {}) =>
+    acceleratorClass === undefined
+      ? withoutClass(build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, backend, ...extra }))
+      : build("whisper-base/" + (accelerator ?? "none") + "-" + backend, { accelerator, acceleratorClass, backend, ...extra });
   const { summary, auto, titles } = runtimeLines([
-    on("metal", "whisper-cpp"), on("cuda", "whisper-cpp"), on("webgpu", "transformers-js"), on("coreml", "sherpa-onnx"),
-    on("cpu", "sherpa-onnx"), on("wasm", "transformers-js"),
-    // Not run on this device: remote, not runnable here (the engine gives it no accelerator), or unknown to the page.
-    on("remote", "sherpa-onnx"), on(undefined, "mlx", { available: false, reasons: [{ code: "memory", params: {} }] }), on("unknown", "onnxruntime"),
+    on("metal", "gpu", "whisper-cpp"), on("cuda", "gpu", "whisper-cpp"), on("webgpu", "gpu", "transformers-js"),
+    on("vulkan", "gpu", "onnxruntime"), on("coreml", "neural-engine", "sherpa-onnx"),
+    on("metal", "cpu", "sherpa-onnx"), on("wasm", "cpu", "transformers-js"),
+    on("cuda", "neural-engine", "mlx"),
+    on("remote", undefined, "sherpa-onnx"),
+    on("cpu", undefined, "mlx", { available: false, reasons: [{ code: "memory", params: {} }] }),
+    on("webgpu", "future-class" as ModelBuild["acceleratorClass"], "onnxruntime"),
+    on(undefined, "gpu", "whisper-cpp"),
   ]);
   // Metal is the Mac's graphics card, never the processor: in the summary, Automatic and its own option.
   expect(summary).toBe("whisper.cpp · int8 · graphics card (Metal)");
@@ -433,19 +443,22 @@ test("what a build runs on is the accelerator the engine resolved for it here: a
     "whisper.cpp · int8 · graphics card (Metal)",
     "whisper.cpp · int8 · graphics card (CUDA)",
     "Transformers.js · int8 · graphics card (WebGPU)",
+    "ONNX Runtime · int8 · graphics card (vulkan)",
     "Sherpa-ONNX · int8 · Neural Engine",
     "Sherpa-ONNX · int8 · processor",
     "Transformers.js · int8 · processor",
+    "MLX · int8 · Neural Engine",
     "Sherpa-ONNX · int8",
     "MLX · int8",
     "ONNX Runtime · int8",
+    "whisper.cpp · int8",
   ]);
 });
 
 test("in Spanish, a whisper.cpp build on Metal runs on the graphics card, and a Sherpa-ONNX one on the processor", () => {
   act(() => setUiLanguage("es"));
   try {
-    const { titles } = runtimeLines([build("whisper-base/q5_1", { backend: "whisper-cpp", precision: "q5_1", accelerator: "metal" }), build("whisper-base/int8")]);
+    const { titles } = runtimeLines([build("whisper-base/q5_1", { backend: "whisper-cpp", precision: "q5_1", accelerator: "metal", acceleratorClass: "gpu" }), build("whisper-base/int8")]);
     expect(titles.slice(1)).toEqual(["whisper.cpp · q5_1 · tarjeta gráfica (Metal)", "Sherpa-ONNX · int8 · procesador"]);
   } finally { act(() => setUiLanguage("en")); }
 });
@@ -503,6 +516,8 @@ test("the smart end of turn has its model chosen like the others — just the mo
   expect(listOptions("voice-end-of-turn")[0].label).toMatch(/^Smart/);
   expect(listOptions("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
   expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
+  // Kept as Smart, without its model: calls end turns with silence until it is downloaded, never downloading it.
+  expect(document.getElementById("turn-model-card")).toHaveTextContent("Will switch when ready: the turn ends with silence until then.");
   fireEvent.click(document.getElementById("turn-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");
 });
@@ -526,4 +541,3 @@ test("a provider chosen without its key says so in a row with Connect, which ope
     expect(document.activeElement).toBe(document.getElementById("stt-source"));
   }
 });
-

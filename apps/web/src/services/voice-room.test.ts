@@ -1,17 +1,21 @@
 import { expect, test } from "vitest";
-import { characters, playbackReport, ROOM_PLAYBACK_REASONS, sayingRange, turnMessage } from "./voice-room.js";
+import { characters, playbackReport, ROOM_PLAYBACK_REASONS, sayingRange, scalarExtent, turnMessage } from "./voice-room.js";
+import flow from "../../test/fixtures/conversation-flow.json";
 
 /* The voice's events in the room's words. */
+const turnEvent = <T extends Parameters<typeof turnMessage>[0]>(event: T): T => event;
 
 test("a turn's phases become the room's voice-user-turn data, the timings under the room's name", () => {
-  expect(turnMessage({ phase: "started", turn_id: "t", started_at: 5 })).toEqual({ turn_id: "t", phase: "started", started_at: 5 });
-  expect(turnMessage({ phase: "cancelled", turn_id: "t", merged: true })).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
-  expect(turnMessage({
-    phase: "finished", turn_id: "t", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
+  expect(turnMessage(turnEvent({ phase: "started", turn_id: "t", capture_boundary_id: "focus", started_at: 5 }), {thread_id: "thread", binding_id: "focus"})).toEqual({ turn_id: "t", phase: "started", started_at: 5, thread_id: "thread", binding_id: "focus" });
+  expect(turnMessage(turnEvent({ phase: "started", turn_id: "empty", capture_boundary_id: "focus", started_at: 5 }))).toMatchObject({thread_id: "", binding_id: ""});
+  expect(turnMessage(turnEvent({ phase: "cancelled", turn_id: "t", capture_boundary_id: "focus", merged: true }))).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
+  expect(turnMessage(turnEvent({
+    phase: "finished", turn_id: "t", capture_boundary_id: "focus", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
     timings: { audio_ms: 1, endpoint_silence_ms: 2, recognition_ms: 3 },
-  })).toEqual({
+  }), {thread_id: "thread", binding_id: "focus"})).toEqual({
     turn_id: "t", phase: "finished", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
     timings_ms: { audio_ms: 1, endpoint_silence_ms: 2, recognition_ms: 3 },
+    thread_id: "thread", binding_id: "focus",
   });
 });
 
@@ -20,17 +24,41 @@ test("how something said ended becomes the room's playback report, with only the
   expect(characters("héllo 👋")).toBe(7);
   const cases: [Parameters<typeof playbackReport>, ReturnType<typeof playbackReport>][] = [
     [[{ status: "heard-up-to", heard_chars: 3, reason: "barge-in" }, "hola"], { status: "interrupted", heard_chars: 3, reason: "user_interrupted" }],
-    [[{ status: "not-played", reason: "barge-in" }, "hola"], { status: "unplayed", heard_chars: 0, reason: "newer_turn" }],
-    [[{ status: "not-played", reason: "cancelled" }, "hola", "newer_turn"], { status: "unplayed", heard_chars: 0, reason: "newer_turn" }],
+    [[{ status: "not-played", reason: "barge-in" }, "hola"], { status: "unplayed", reason: "newer_turn" }],
+    [[{ status: "not-played", reason: "cancelled" }, "hola", "newer_turn"], { status: "unplayed", reason: "newer_turn" }],
     [[{ status: "heard-up-to", heard_chars: 2, reason: "cancelled" }, "hola", "focus_changed"], { status: "interrupted", heard_chars: 2, reason: "focus_changed" }],
-    [[{ status: "not-played", reason: "cancelled" }, "hola"], { status: "unplayed", heard_chars: 0, reason: "user_skipped" }],
-    [[{ status: "not-played", reason: "stopped" }, "hola"], { status: "unplayed", heard_chars: 0, reason: "call_ended" }],
+    [[{ status: "heard-up-to", heard_chars: 2, reason: "barge-in" }, "hola", null, "agents_muted"], { status: "interrupted", heard_chars: 2, reason: "agents_muted" }],
+    [[{ status: "heard-up-to", heard_chars: 2, reason: "cancelled" }, "hola", null, "agents_muted"], { status: "interrupted", heard_chars: 2, reason: "agents_muted" }],
+    [[{ status: "not-played", reason: "barge-in" }, "hola", null, "agents_muted"], { status: "unplayed", reason: "agents_muted" }],
+    [[{ status: "not-played", reason: "cancelled" }, "hola", null, "user_skipped"], { status: "unplayed" }],
+    [[{ status: "not-played", reason: "stopped" }, "hola"], { status: "unplayed", reason: "call_ended" }],
     [[{ status: "heard-up-to", heard_chars: 1, reason: "failed", code: "x" }, "hola"], { status: "failed", heard_chars: 1 }],
-    [[{ status: "not-played", reason: "failed", code: "credential-missing" }, "hola"], { status: "failed", heard_chars: 0 }],
+    [[{ status: "not-played", reason: "failed", code: "credential-missing" }, "hola"], { status: "failed" }],
   ];
   for (const [args, report] of cases) {
     expect(playbackReport(...args)).toEqual(report);
     if ("reason" in report) expect(ROOM_PLAYBACK_REASONS).toContain(report.reason);
+  }
+});
+
+test("played zero remains a partial interruption and scalar counts never use UTF-16 units", () => {
+  expect(playbackReport({ status: "heard-up-to", heard_chars: 0, reason: "barge-in" }, "é🐙ab"))
+    .toEqual({status: "interrupted", reason: "user_interrupted", heard_chars: 0});
+  expect(scalarExtent("é🐙ab", 3, "utf16")).toBe(2);
+  expect(scalarExtent("é🐙ab", 200)).toBe(4);
+});
+
+test("core #120 playback fixture stays mapped at the browser boundary", () => {
+  for (const entry of flow.playback) {
+    if ("type" in entry.voice) continue;
+    const voice = entry.voice as {reason?: string | {reason:string}, local_action?: string};
+    const outcome = {...entry.voice, ...(typeof voice.reason === "object" ? {reason:voice.reason.reason} : {})};
+    const action = voice.local_action
+      ? voice.local_action === "skip" ? "user_skipped" : voice.local_action
+      : null;
+    const report = playbackReport(outcome as Parameters<typeof playbackReport>[0], flow.text, null, action);
+    expect(report).toMatchObject(entry.core);
+    if (entry.voice.status === "heard") expect(report.heard_chars).toBe(characters(flow.text));
   }
 });
 

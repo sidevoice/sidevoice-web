@@ -15,7 +15,6 @@ import { ResetReportNotice } from "../features/settings/DeleteAllData";
 import { PairingDialog } from "../features/pairing/PairingDialog";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { NoMachineScreen } from "../features/pairing/NoMachineScreen";
-import { LocalHostInstallEntry } from "../features/pairing/LocalHostInstallEntry";
 import { LocalHostBanner } from "../features/settings/LocalHostBanner";
 import { UpdateNotice } from "../features/updates/UpdateNotice";
 import { StorageBlockedBanner } from "../features/settings/StorageBlockedBanner";
@@ -28,9 +27,13 @@ import { useUiLanguage } from "../i18n/use-ui-language";
 function RoomContent() {
   const ready = useRoomStore((state) => state.facts.machinesReady);
   const machines = useRoomStore((state) => state.machines);
+  const localHostStatus = useRoomStore((state) => state.facts.localHostStatus);
   const install = useSyncExternalStore(localHostInstallController.subscribe, localHostInstallController.getSnapshot, localHostInstallController.getSnapshot);
   const pendingLocalSelection = useRef(false);
-  const noMachine = ready && machines.length === 0;
+  // Native projects an installing service as a local row before it has a pairing; preparation still belongs in the empty state.
+  const projectedLocalOnly = machines.length === 1 && machines[0].local && !machines[0].pairingId;
+  const preparingWithoutPairing = projectedLocalOnly && install.phase !== "idle" && install.source === "no-machine";
+  const noMachine = ready && (machines.length === 0 || preparingWithoutPairing);
   const onboarding = useOnboarding();
   // Until the first setup is finished the room stays out of reach: no header, call bar or settings behind the wizard.
   const setupPending = !onboarding.ready || !onboarding.record.completed_at;
@@ -38,6 +41,13 @@ function RoomContent() {
   useEffect(() => {
     if (install.phase === "installing") {
       pendingLocalSelection.current = true;
+      return;
+    }
+    const recovered = localHostStatus.state === "running" && localHostStatus.reachable === true
+      && machines.some((machine) => machine.local && machine.state === "connected" && machine.pairingId);
+    if ((install.phase === "failed" || install.phase === "cancelled") && recovered) {
+      pendingLocalSelection.current = false;
+      localHostInstallController.clear();
       return;
     }
     if (install.phase === "idle" || install.phase === "failed" || install.phase === "cancelled") {
@@ -51,7 +61,7 @@ function RoomContent() {
       pendingLocalSelection.current = false;
       localHostInstallController.clear();
     }
-  }, [install.phase, machines]);
+  }, [install.phase, machines, localHostStatus.state, localHostStatus.reachable]);
 
   return (
     <>
@@ -60,8 +70,6 @@ function RoomContent() {
       <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
         <RoomHeader />
         <LocalHostBanner />
-        {!noMachine && install.phase !== "idle" && install.source === "no-machine" &&
-          <LocalHostInstallEntry showCta={false} source="no-machine" holdSuccess className="local-install-entry--room" />}
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
         <main className={noMachine ? undefined : "call-layout"}>
           {noMachine ? <NoMachineScreen source="no-machine" /> : <>

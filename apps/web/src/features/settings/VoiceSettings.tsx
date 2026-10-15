@@ -6,7 +6,7 @@ import { Field } from "../../components/ui/Field";
 import { Group, Row } from "../../components/ui/Card";
 import { Alert } from "../../components/ui/Alert";
 import { Segmented } from "../../components/ui/Tabs";
-import { voiceChoices, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
+import { voiceChoices, voiceSettingsToLoad, endOfTurnModel, endOfTurnModels, IDLE_UNLOAD_MINUTES, SPEED, type DeviceVoiceSettings as Settings, type Note } from "../../services/voice-settings.js";
 import { SPEECH_LANGUAGES } from "../../services/system-language.js";
 import { translator, type Translate, type MessageKey } from "../../i18n/translator";
 import { PROVIDER_SAYS, ProviderKeyNeeded, reasonState } from "./ProviderConnect";
@@ -251,8 +251,12 @@ export function TurnChoices({ draft, setup = false, active = true, turnTry }: { 
   const catalogs = useRoomStore((state) => state.facts.voiceCatalogue.catalogs);
   const turnModels = useMemo(() => endOfTurnModels(catalogs), [catalogs]);
   const saved = useRoomStore((state) => state.facts.voiceSettings);
-  const turnPending = saved && (saved.end_of_turn !== "smart-turn" || saved.turn_model !== draft.turn_model)
-    ? t(saved.end_of_turn === "smart-turn" ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: saved.turn_model ?? "" }) : undefined;
+  // What ends turns until the chosen model is ready: the smart model in use when it is on disk, else silence — Smart
+  // kept without its model too (voiceSettingsToLoad). As the slots say it, outside the setup (nothing is in use there).
+  const inUse = saved ? voiceSettingsToLoad(saved, catalogs) : null;
+  const inUseModel = inUse?.end_of_turn === "smart-turn" ? endOfTurnModel(catalogs, inUse.turn_model)?.id ?? null : null;
+  const turnPending = !setup && inUse && inUseModel !== turn.model?.id
+    ? t(inUseModel ? "voice.prepare.willSwitch" : "voice.prepare.willSwitchSilence", { model: inUseModel ?? "" }) : undefined;
   // In the same place whichever end of turn is chosen, so switching keeps a try that runs, and the focus.
   const tryIt = <TurnTry draft={draft} smart={smart} smartReady={turn.ready} setup={setup} active={active} handle={turnTry} />;
   return (

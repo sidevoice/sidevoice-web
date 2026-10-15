@@ -9,7 +9,7 @@ import { installHarness } from "./harness.mjs";
 
 test.use({ viewport: { width: 360, height: 780 }, hasTouch: true, isMobile: true });
 
-const build = (id, installed, extra = {}) => ({ id, backend: "transformers.js", precision: "fp16", accelerator: "webgpu", downloadBytes: 1_600e6,
+const build = (id, installed, extra = {}) => ({ id, backend: "transformers.js", precision: "fp16", accelerator: "webgpu", acceleratorClass: "gpu", downloadBytes: 1_600e6,
   memoryMb: 1900, available: true, reasons: [], installed, ...extra });
 const model = (id, family, task, installed, extra = {}) => ({ id, family, capabilities: [task], parametersM: 809, license: "MIT",
   languages: ["es", "en", "de", "fr", "it", "pt", "nl", "pl"], voices: [], installed, builds: [build(id + "/fp16", installed)],
@@ -62,10 +62,13 @@ for (const [language, width] of [["en", 360], ["es", 360], ["de", 360], ["pl", 3
     await installHarness(page);
     await page.goto("/voice/");
     await page.waitForFunction(() => !!window.sidevoiceActions && !!window.sidevoiceUI?.store);
-    const seed = () => page.evaluate((catalogs) => window.sidevoiceUI.store.patch({
-      voiceCatalogue: { state: "ready", catalogs, error: "" }, modelsRemovable: true, providerKeys: { elevenlabs: true, openai: false },
-      voiceSettings: { ...window.sidevoiceUI.store.getState().facts.voiceSettings, stt: { catalog: "local", model: "whisper-large-v3-turbo", language: null } },
-    }), CATALOGS);
+    const seed = () => page.evaluate((catalogs) => {
+      const settings = { ...window.sidevoiceUI.store.getState().facts.voiceSettings, stt: { catalog: "local", model: "whisper-large-v3-turbo", language: null } };
+      window.sidevoiceUI.store.patch({
+        voiceCatalogue: { state: "ready", catalogs, error: "" }, modelsRemovable: true, providerKeys: { elevenlabs: true, openai: false },
+        voiceSettings: settings, voiceDraft: settings,
+      });
+    }, CATALOGS);
 
     await page.locator("#settings-open").click();
     await seed();
@@ -77,6 +80,7 @@ for (const [language, width] of [["en", 360], ["es", 360], ["de", 360], ["pl", 3
       await seed();
       // Its "how it runs" open too, where it has one.
       for (const fold of await page.locator(".model-runtime-toggle[aria-expanded='false']:visible").all()) await fold.click();
+      if (id === "settings-transcription") await expect(page.locator(".model-runtime-summary:visible")).toContainText("WebGPU");
       await page.waitForTimeout(350);
       expect(await overflow(page), id).toEqual([]);
       await page.goBack();
