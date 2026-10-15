@@ -91,6 +91,20 @@ export interface MachineView {
 }
 
 /** A host's view of one supported coding agent. Instructions always come from that host's connector. */
+export type CursorBridgeState = "ready" | "needs_attention" | "unknown" | "unsupported";
+export type CursorBridgeReason = "cursor_version_too_old" | "bridge_missing" | "bridge_stale" | "sqlite3_missing"
+  | "sidevoice_not_registered" | "cursor_version_unknown" | "registration_unknown" | "editor_unavailable";
+export type CursorBridgeStepId = "cursor_version" | "enable_desktop_bridge" | "bridge_running" | "sqlite3"
+  | "register_sidevoice" | "join_editor_chat" | "wait_for_chat_registration";
+export type CursorBridgeStepState = "done" | "needs_action" | "unknown";
+export interface CursorBridgeStatus {
+  state: CursorBridgeState;
+  reason: CursorBridgeReason | null;
+  cursor_version: string | null;
+  minimum_cursor_version: string;
+  minimum_connector_version: string;
+  steps: { id: CursorBridgeStepId; state: CursorBridgeStepState }[];
+}
 export interface DetectedAgent {
   id: string;
   label: string;
@@ -114,6 +128,8 @@ export interface DetectedAgent {
   manual?: { connect?: AgentManualStep[]; update?: AgentManualStep[]; disconnect?: AgentManualStep[]; replace?: AgentManualStep[] } | null;
   /** How to take Sidevoice out of the agent by hand (the connector's, as `instructions` is for adding it). */
   removal?: { command?: string; snippet?: string; file?: string | null } | null;
+  /** Cursor editor delivery readiness, separate from its MCP registration and per-chat bridge registration. */
+  cursor_bridge?: CursorBridgeStatus | null;
 }
 
 /** One step done by hand: a command to run, or a snippet for a file. */
