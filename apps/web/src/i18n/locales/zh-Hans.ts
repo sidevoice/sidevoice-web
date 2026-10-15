@@ -92,8 +92,6 @@ export const messages: Messages = {
   "devices.mic": "麦克风",
   "devices.speaker": "扬声器",
   "devices.default": "系统默认",
-  "devices.refresh": "重新查找设备",
-  "devices.close": "关闭",
   "devices.loading": "正在查找设备…",
   "devices.unnamedMic": "麦克风 {n}",
   "devices.unnamedSpeaker": "扬声器 {n}",

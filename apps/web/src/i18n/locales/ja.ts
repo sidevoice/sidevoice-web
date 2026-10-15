@@ -93,8 +93,6 @@ export const messages: Messages = {
   "devices.mic": "マイク",
   "devices.speaker": "スピーカー",
   "devices.default": "システムのデフォルト",
-  "devices.refresh": "デバイスを再検索",
-  "devices.close": "閉じる",
   "devices.loading": "デバイスを検索しています…",
   "devices.unnamedMic": "マイク {n}",
   "devices.unnamedSpeaker": "スピーカー {n}",

@@ -92,8 +92,6 @@ export const messages: Messages = {
   "devices.mic": "Micro",
   "devices.speaker": "Haut-parleur",
   "devices.default": "Par défaut du système",
-  "devices.refresh": "Rechercher à nouveau les appareils",
-  "devices.close": "Fermer",
   "devices.loading": "Recherche des appareils…",
   "devices.unnamedMic": "Micro {n}",
   "devices.unnamedSpeaker": "Haut-parleur {n}",

@@ -263,8 +263,9 @@
 .voice-chip { background: color-mix(in srgb, var(--sv-surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .stage-badge { background: color-mix(in srgb, var(--sv-surface) 84%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
-/* The microphone and the speaker (AudioDevices): the devices' button at the microphone's left, in its pill, and the bar
- * it opens above the call's controls. The level and the chevron share its place, one showing at a time. */
+/* The microphone and the speaker (AudioDevices): the devices' button at the microphone's left, in its pill, and the
+ * small panel it opens right above it, its left edge on the pill's. The level and the chevron share the button's
+ * place, one showing at a time. */
 .audio-devices-toggle { display: grid; place-items: center; width: 44px; height: var(--sv-call-button, 48px); padding: 0 0 0 4px; border: 0; border-radius: var(--sv-radius-pill) 0 0 var(--sv-radius-pill);
   background: transparent; color: var(--sv-text-muted); cursor: pointer; transition: background-color var(--sv-dur-fast) var(--sv-ease); }
 .audio-devices-toggle > * { grid-area: 1 / 1; }
@@ -275,13 +276,11 @@
 #mic-control[data-muted="true"] .audio-devices-toggle { color: var(--sv-danger); }
 @media (hover: hover) { .audio-devices-toggle:hover { background: var(--sv-hover); color: var(--sv-text); } }
 .audio-devices-toggle:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
-.call-bar { position: relative; }
-.audio-devices { position: absolute; z-index: 5; left: 50%; bottom: calc(100% + var(--sv-space-2)); transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sv-space-3);
-  width: min(640px, calc(100vw - 2 * var(--sv-space-4))); padding: var(--sv-space-3) var(--sv-space-3) var(--sv-space-3) var(--sv-space-4);
-  border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: var(--sv-surface); box-shadow: var(--sv-shadow-md); }
-.audio-devices-field { flex: 1 1 200px; min-width: 0; }
-.audio-devices-actions { display: flex; gap: var(--sv-space-1); margin-inline-start: auto; }
-.audio-devices-note, .audio-devices-lost, .audio-devices-error { flex-basis: 100%; display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+/* A popover (.ui-popover) of the microphone and the speaker, one under the other, compact; on a phone it spans the
+ * screen above the call's controls, as the bar did. */
+.ui-popover.audio-devices { width: min(18rem, calc(100vw - 24px)); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-4); border-radius: var(--sv-radius-xl); }
+@media (max-width: 899px) { .ui-popover.audio-devices { width: calc(100vw - 24px); } }
+.audio-devices-note, .audio-devices-lost, .audio-devices-error { display: flex; align-items: center; gap: var(--sv-space-2); margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .audio-devices-lost { color: var(--sv-text); }
 .audio-devices-error { flex-direction: column; align-items: flex-start; gap: 0; color: var(--sv-danger); }
 @media (prefers-reduced-motion: reduce) { .audio-devices-toggle, .audio-devices-toggle .audio-chevron, .mic-wave, .mic-wave i { transition: none; } }
