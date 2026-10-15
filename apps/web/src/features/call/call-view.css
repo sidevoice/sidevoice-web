@@ -127,10 +127,12 @@
  * the transcript (transcript.css: one rule for both), its tail out of the tile's corner toward the speaker, off the
  * picture (BalloonTail). Speaking again during what was just sent's moment, the sent one lifts away under the new bars
  * (PersonTurn). */
-.person-turns { --person-live-w: min(17rem, 75cqi); --person-live-h: 6.5rem;
+/* One size for the person's balloon from the bars to what is sent (operator, 2026-10-15): three lines of what was said,
+ * with their margins and the balloon's padding; it never grows or shrinks as its words move on. */
+.person-turns { --person-live-w: min(17rem, 75cqi); --person-live-h: calc(3 * 2rem + 2 * var(--sv-space-2) + 2 * var(--sv-space-3));
   position: absolute; z-index: 3; right: var(--stage-inset); bottom: var(--stage-inset); display: flex; flex-direction: column; align-items: flex-end; gap: var(--sv-space-2); }
-@container stage (max-width: 480px) { .person-turns { --person-live-w: min(15rem, 75cqi); --person-live-h: 6rem; } }
-@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .person-turns { --person-live-w: min(15rem, 75cqi); --person-live-h: 6rem; } }
+@container stage (max-width: 480px) { .person-turns { --person-live-w: min(15rem, 75cqi); --person-live-h: calc(3 * 1.8rem + 4 * var(--sv-space-2)); } }
+@media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .person-turns { --person-live-w: min(15rem, 75cqi); --person-live-h: calc(3 * 1.8rem + 4 * var(--sv-space-2)); } }
 .person-bubble { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sv-space-1) var(--sv-space-2);
   width: max-content; max-width: min(75cqi, 28rem); padding: var(--sv-space-3) var(--sv-space-5); overflow-wrap: anywhere; }
 .person-turns .person-bubble { --balloon-line: clamp(3px, calc(var(--k, 1) * 3.6px), 5px); --balloon-ink: #1b1428; --balloon-fill: var(--sv-chat-person-bg);
@@ -149,7 +151,7 @@
  * row, long and fine as a voice note, on the balloon itself (no pill of their own), in the person's light ink; under
  * them, at the end, the way to take the turn back, its row kept even while it is not offered. Transcribing, the bars
  * hold their last frame and shimmer, a light passing along them while they quiver (still, reduced). */
-.person-turns .person-bubble[data-live] { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: var(--sv-space-1);
+.person-turns .person-bubble[data-live] { transform-origin: 100% calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: var(--sv-space-1);
   width: var(--person-live-w); height: var(--person-live-h); padding: var(--sv-space-3) var(--sv-space-4) var(--sv-space-2); }
 .person-turns .person-bubble[data-live] :is(.voice-wave, .voice-bars) { width: 100%; height: 2.75rem; padding: 0; border-radius: 0; background: none; color: var(--sv-chat-person-fg); }
 .person-turns .person-bubble[data-live] .voice-bars { display: flex; justify-content: flex-end; }
@@ -168,12 +170,11 @@
 
 /* What was sent: its space above and below is margin, so a page is cut at its last line and not a sliver below it;
  * with the bubble's padding, the strip where the page before fades. It is never smaller than the bars' balloon it pops
- * out of (PersonTurn), and grows from it when it needs more room. */
+ * out of (PersonTurn), and keeps its size: a longer turn pages inside it. */
 .person-said { flex: 1 1 8rem; min-width: 0; margin-block: var(--sv-space-2); }
-.person-turns .person-bubble[data-sent] { min-width: var(--person-live-w); min-height: var(--person-live-h); transform-origin: 100% 100%; }
-/* What was sent: a moment on the stage, then it lifts toward the agent, shrinks and fades (a plain fade, reduced). */
-.person-bubble[data-leaving] { animation: person-sent-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
-@keyframes person-sent-out { to { opacity: 0; transform: translateY(-48px) scale(.72); } }
+.person-turns .person-bubble[data-sent] { width: var(--person-live-w); height: var(--person-live-h); align-content: center; transform-origin: 100% 100%; }
+/* What was sent: a moment on the stage, then it leaves as the agent's balloon does (stage-bubble-out; a plain fade, reduced). */
+.person-bubble[data-leaving] { animation: stage-bubble-out 500ms var(--sv-ease) forwards; transform-origin: 100% 100%; }
 @media (prefers-reduced-motion: reduce) {
   /* Its own duration: app.css cuts every animation short under reduced motion, and this fade is the reduced one. */
   .person-bubble[data-leaving] { animation: person-sent-fade 500ms linear forwards !important; }

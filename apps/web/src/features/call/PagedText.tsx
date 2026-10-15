@@ -35,8 +35,10 @@ function topFor(current: number, total: number, lines: number, turn: PagedTurn) 
   return Math.max(0, Math.min(top, lastTop(total, lines, turn)));
 }
 
-export function PagedText({ children, measure, onPages, follow, lines = 3, turn = "page" }: { children: ReactNode; measure: unknown;
-  onPages?: (pages: number) => void; follow?: string; lines?: number; turn?: PagedTurn }) {
+export function PagedText({ children, measure, onPages, follow, lines = 3, turn = "page", fixed }: { children: ReactNode; measure: unknown;
+  onPages?: (pages: number) => void; follow?: string; lines?: number; turn?: PagedTurn;
+  /** Always `lines` tall, whatever is shown: a box that never grows or shrinks as its words move on (the stage's balloon). */
+  fixed?: boolean }) {
   const box = useRef<HTMLSpanElement>(null);
   const run = useRef<HTMLSpanElement>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -83,7 +85,7 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
     const at = topFor(Math.max(0, Math.min(layout.total - 1, current)), layout.total, lines, turn);
     if (at !== top) setTop(at);
   });
-  const shown = layout ? Math.min(lines, turn === "page" ? layout.total - top : layout.total) : lines;
+  const shown = layout && !fixed ? Math.min(lines, turn === "page" ? layout.total - top : layout.total) : lines;
   // The window as tall as the lines it shows (the strip above it, --peek, besides); until laid out, call-view.css caps it.
   const style = { "--paged-lines": lines, height: layout?.line ? `calc(${shown * layout.line}px + var(--peek))` : undefined } as CSSProperties;
   return <span ref={box} className="paged-text" data-turn={turn} data-more={(layout && top + shown < layout.total) || undefined} style={style}>

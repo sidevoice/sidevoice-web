@@ -53,7 +53,7 @@ function SentBubble({ turn, cut, under, from, onDone }: { turn: SentTurn; cut: b
   }, [leaving]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div ref={box} className="speech-bubble person-bubble" data-sent="" data-leaving={leaving || undefined} data-under={under || undefined} translate="no">
-      <span className="person-said"><PagedText measure={turn.text} onPages={setPages}>{turn.text}</PagedText></span>
+      <span className="person-said"><PagedText measure={turn.text} onPages={setPages} fixed>{turn.text}</PagedText></span>
       <BalloonTail shape="person" />
     </div>
   );
