@@ -1506,7 +1506,8 @@ function voicePlaybackLevel(level){
  window.sidevoiceUI?.playbackLevel?.publish?.(level,sounding[0].thread);
 }
 // The bubble of the turn being recorded draws the level the voice reports, as a waveform of the last moments.
-window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null}};
+// `level`: the microphone's level now, 0 to 1, as the meter shows it (the bubble's bars follow it frame by frame).
+window.sidevoiceAudio={readWaveform(){return voice?waveLevels.map((value,index)=>value*(index%2?1:-1)):null},level(){return voice?waveLevels[waveLevels.length-1]:0}};
 // A reply to say: written in the conversation, and said after what is being said. Which replies are stale is the
 // room's to say (`voice-reply-withdrawn`); one this page already says is not said twice.
 function receiveReply(d){

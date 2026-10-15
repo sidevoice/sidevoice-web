@@ -101,7 +101,8 @@
   @keyframes person-sent-fade { to { opacity: 0; } }
 }
 /* Its waveform's pill (transcript.css, shared with the transcript's open turn) is sized here. */
-.person-bubble .voice-wave { display: block; flex: none; width: 10rem; height: 1.75rem; }
+/* Your voice as it comes, in the accent (purple). */
+.person-bubble .voice-wave { display: block; flex: none; width: 10rem; height: 1.75rem; color: var(--sv-accent); }
 .person-bubble .voice-wave canvas { display: block; width: 100%; height: 100%; }
 /* The bars stand in for the waveform where the device asks for less motion: still, at rest heights. */
 .person-bubble .voice-bars { display: inline-flex; flex: none; align-items: center; gap: 3px; height: 20px; }
@@ -318,3 +319,10 @@
   mask-image: linear-gradient(transparent, rgb(0 0 0 / 35%) var(--peek), #000 var(--peek)); }
 .paged-text-run { display: block; transition: transform 600ms var(--sv-ease); }
 @media (prefers-reduced-motion: reduce) { .paged-text-run { transition: none; } }
+/* The agent's words as a comic speech balloon (operator, 2026-10-15): an inked outline, a hard offset shadow and a
+   tail pointing down at the creature it comes from, with round, even corners. */
+.stage-bubble { --balloon-ink: color-mix(in srgb, var(--sv-text) 82%, transparent); border: 2px solid var(--balloon-ink); border-radius: 26px;
+  box-shadow: 3px 4px 0 var(--balloon-ink); color: var(--sv-text-subtle); }
+.stage-bubble::after { content: ""; position: absolute; left: 50%; bottom: -10px; width: 18px; height: 18px; margin-left: -9px;
+  background: var(--sv-chat-agent-bg); border-right: 2px solid var(--balloon-ink); border-bottom: 2px solid var(--balloon-ink);
+  border-bottom-right-radius: 3px; transform: rotate(45deg) skew(8deg, 8deg); pointer-events: none; }

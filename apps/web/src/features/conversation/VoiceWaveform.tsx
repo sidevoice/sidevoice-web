@@ -116,7 +116,9 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
     if (reduced || phase !== "listening") return () => { observer.disconnect(); mutation.disconnect(); };
 
     const tick = () => {
-      const own = ownLevel.current;
+      // The level now, as the meter measures it (0 to 1): the call's, or the try's own. Only a host without it falls back to
+      // the analyser's history, which, averaged, barely moves.
+      const own = ownLevel.current ?? window.sidevoiceAudio?.level?.bind(window.sidevoiceAudio);
       const samples = own ? null : window.sidevoiceAudio?.readWaveform() ?? null;
       const value = own ? Math.max(0, Math.min(1, own() || 0)) : samples ? waveColumn(samples) : 0;
       const values = columns.current;
