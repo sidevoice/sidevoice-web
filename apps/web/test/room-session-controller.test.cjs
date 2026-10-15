@@ -79,6 +79,45 @@ test('native hydration precedes local status and unchanged status never rewrites
  assert.equal(writes.length,0);
  assert.equal(s.run('pairings.list[0].fp'),'fp-mac');
 });
+test('overlapping native pairing transactions derive from the last committed write',async()=>{
+ let rejectFirst,stored={pairings:[],pendingRevokes:[]},attempts=0;
+ const data={pairings:{read:async()=>stored,write:value=>{
+  attempts++;
+  if(attempts===1)return new Promise((_,reject)=>{rejectFirst=reject});
+  stored=JSON.parse(JSON.stringify(value));return Promise.resolve();
+ }}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__first={...PAIRED,fp:'first',device_id:'first'};
+ s.context.__second={...PAIRED,fp:'second',device_id:'second'};
+ const first=s.run('keepPairings(current=>withPairing(current,__first))');
+ const second=s.run('keepPairings(current=>withPairing(current,__second))');
+ await new Promise(resolve=>setTimeout(resolve,0));
+ rejectFirst(Error('write failed'));
+ await assert.rejects(first);
+ await second;
+ assert.deepEqual(stored.pairings.map(pairing=>pairing.fp),['second']);
+ assert.deepEqual(Array.from(s.run('pairings.list.map(pairing=>pairing.fp)')),['second']);
+ assert.deepEqual(Array.from(s.run('storedPairingState.list.map(pairing=>pairing.fp)')),['second']);
+});
+test('overlapping successful native transactions commit in order',async()=>{
+ let releaseFirst,stored={pairings:[],pendingRevokes:[]},attempts=0;
+ const data={pairings:{read:async()=>stored,write:value=>{
+  attempts++;
+  if(attempts===1)return new Promise(resolve=>{releaseFirst=()=>{stored=JSON.parse(JSON.stringify(value));resolve()}});
+  stored=JSON.parse(JSON.stringify(value));return Promise.resolve();
+ }}};
+ const s=setup({paired:false,nativeData:data});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ s.context.__first={...PAIRED,fp:'first',device_id:'first'};
+ s.context.__second={...PAIRED,fp:'second',device_id:'second'};
+ const first=s.run('keepPairings(current=>withPairing(current,__first))');
+ const second=s.run('keepPairings(current=>withPairing(current,__second))');
+ await new Promise(resolve=>setTimeout(resolve,0));
+ releaseFirst();await Promise.all([first,second]);
+ assert.deepEqual(stored.pairings.map(pairing=>pairing.fp),['second','first']);
+ assert.deepEqual(Array.from(s.run('pairings.list.map(pairing=>pairing.fp)')),['second','first']);
+});
 test('offline revocation stays in native storage across relaunch without WebView credentials',async()=>{
  let savedNative={pairings:[PAIRED],pendingRevokes:[]};
  const data={pairings:{read:async()=>savedNative,write:async value=>{savedNative=JSON.parse(JSON.stringify(value))}}};
