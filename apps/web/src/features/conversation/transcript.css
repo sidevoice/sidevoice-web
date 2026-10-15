@@ -1,5 +1,6 @@
-/* The transcript (TranscriptPanel): docked at the call's right on a desktop, a sheet from the bottom on a phone (899px,
- * as state/call-layout.ts NARROW_QUERY says); its runs of messages drawn as a chat app draws them, and the text box
+/* The transcript (TranscriptPanel): docked at the call's right on a desktop, over the call from the right on a compact
+ * desktop window, a sheet from the bottom on a phone (state/call-layout.ts NARROW_QUERY and COMPACT_QUERY say which
+ * is which); its runs of messages drawn as a chat app draws them, and the text box
  * always under them. Its look is the design system's "Transcript" pattern (design-system/app-patterns.css).
  * The shared components' rules load after this file, so a rule here that reshapes one of them names it as well. */
 
@@ -159,6 +160,22 @@
   .transcript-head { padding-top: var(--sv-space-2); }
   #messages { padding-inline: var(--sv-space-3); }
   .text-composer { padding: var(--sv-space-2) var(--sv-space-3) max(var(--sv-space-3), env(safe-area-inset-bottom)); }
+}
+
+/* ----- a compact desktop window (560–899px, a fine pointer: COMPACT_QUERY): no room to dock it beside the rail and a
+ * call that still fits its bar, so it slides in over the dimmed call from the right edge, the call's whole height and
+ * as wide as it docks; the call does not move under it */
+@media (min-width: 560px) and (max-width: 899px) and (pointer: fine) {
+  .transcript-scrim {
+    display: block; position: fixed; inset: 0; z-index: 30; background: var(--sv-scrim);
+    opacity: 0; pointer-events: none; transition: opacity var(--sv-dur-base) var(--sv-ease);
+  }
+  .transcript-scrim[data-open] { opacity: 1; pointer-events: auto; }
+  .call-layout > .transcript, .call-layout > .transcript:not([data-open]) {
+    display: flex; position: absolute; z-index: 31; top: 0; right: 0; bottom: 0; box-shadow: var(--sv-shadow-lg);
+    transform: translateX(105%); visibility: hidden; transition: transform .25s ease, visibility 0s linear .25s;
+  }
+  .call-layout > .transcript[data-open] { transform: none; visibility: visible; transition: transform .25s ease; }
 }
 
 /* ----- the conversation's pieces, wherever they show (the call's stage shows the first two, at its own size and

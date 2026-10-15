@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "../../app/App";
 import { createRoomStore, type RoomStore } from "../../state/room-store";
-import { NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
+import { COMPACT_QUERY, NARROW_QUERY, RAIL_WITH_TRANSCRIPT_QUERY, SIDEBAR_COLLAPSED_KEY } from "../../state/call-layout";
 import { OPEN_CONVERSATIONS } from "../room/ConversationSidebar";
 import { WORKING_SHOWN_AFTER_MS, type SessionFacts } from "../../state/room-session-state.js";
 import { markSetUp } from "../../test/onboarding";
@@ -62,10 +62,12 @@ beforeEach(() => {
 });
 afterEach(() => { delete window.sidevoiceActions; localStorage.clear(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
-/** A window of a given kind: a phone, or a desktop too narrow for the open sidebar beside the docked transcript. */
-function viewport({ narrow = false, crowded = false }) {
+/** A window of a given kind: a phone, a compact desktop window, or a desktop too narrow for the open sidebar beside the
+ *  docked transcript. */
+function viewport({ narrow = false, compact = false, crowded = false }) {
   vi.spyOn(window, "matchMedia").mockImplementation((media: string) => ({
-    media, matches: (media === NARROW_QUERY && narrow) || (media === RAIL_WITH_TRANSCRIPT_QUERY && (narrow || crowded)), onchange: null,
+    media, matches: (media === NARROW_QUERY && narrow) || (media === COMPACT_QUERY && compact) || (media === RAIL_WITH_TRANSCRIPT_QUERY && (narrow || compact || crowded)),
+    onchange: null,
     addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
   }) as unknown as MediaQueryList);
 }
@@ -579,6 +581,46 @@ test("a desktop too narrow for both shows the rail while the transcript is docke
   expect(sidebar).not.toHaveAttribute("data-collapsed");
   expect(document.getElementById("transcript")).not.toHaveAttribute("data-open");
   // The person's own choice was not touched.
+  expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBeNull();
+});
+
+test("a compact desktop window keeps the rail, whose toggle opens the whole list over the stage as a dialog; the transcript opens over the call too", async () => {
+  viewport({ compact: true });
+  const store = room();
+  selectParticipant.mockImplementation((threadId: string) => store.patch({ viewedThread: threadId }));
+  const sidebar = document.getElementById("conversations")!;
+  const toggle = screen.getByRole("button", { name: "Expand conversations" });
+  expect(sidebar).toHaveAttribute("data-collapsed");
+  expect(sidebar).not.toHaveAttribute("role");
+  // A desktop's way into the transcript, at the bar's right end; a desktop's foot, Settings in the rail.
+  expect(document.getElementById("transcript-toggle")!.closest(".call-bar-end")).not.toBeNull();
+  expect(sidebar.querySelector(".sidebar-settings")).not.toBeNull();
+  toggle.focus();
+  await act(async () => { fireEvent.click(toggle); });
+  expect(sidebar).toHaveAttribute("data-open");
+  expect(sidebar).not.toHaveAttribute("data-collapsed");
+  expect(sidebar).toHaveAttribute("role", "dialog");
+  expect(sidebar).toHaveAttribute("aria-modal", "true");
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(toggle).toHaveAccessibleName("Collapse conversations");
+  expect(document.activeElement).toBe(rowOf("Fix the slow login"));
+  escape();
+  expect(sidebar).toHaveAttribute("data-collapsed");
+  expect(sidebar).not.toHaveAttribute("role");
+  expect(document.activeElement).toBe(toggle);
+  // One chosen there: the list goes, and focus goes to its avatar in the rail.
+  await act(async () => { fireEvent.click(toggle); });
+  await act(async () => { fireEvent.click(rowOf("Review the nightly backups")); });
+  expect(selectParticipant).toHaveBeenCalledWith("fp-2|t-backup");
+  expect(sidebar).not.toHaveAttribute("data-open");
+  expect(document.activeElement).toBe(rowOf("Review the nightly backups"));
+  // The transcript is a dialog over the call as well, and opening it puts the list away.
+  await act(async () => { fireEvent.click(toggle); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Show transcript/ })); });
+  expect(sidebar).not.toHaveAttribute("data-open");
+  expect(document.getElementById("transcript")).toHaveAttribute("role", "dialog");
+  expect(document.getElementById("transcript")).toHaveAttribute("aria-modal", "true");
+  // None of it touched the person's own choice for a wide window.
   expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBeNull();
 });
 

@@ -11,19 +11,20 @@ test("as many avatars as fit beside \"+\" and the chevron, or all of them when t
   const widths = [320, 360, 375, 390, 412, 430];
   expect(widths.map((width) => rowCapacity(row(width), 99).avatars)).toEqual([3, 4, 4, 5, 5, 6]);
   expect(widths.map((width) => rowCapacity(row(width), 99).chevron)).toEqual(widths.map(() => true));
-  const fitting = widths.map((width) => [4, 5, 6, 6, 7, 7].find((n) => !rowCapacity(row(width), n).chevron && rowCapacity(row(width), n + 1).chevron));
+  const fitting = widths.map((width) => [4, 5, 6, 6, 7, 7].find((n) => !rowCapacity(row(width), n, false).chevron && rowCapacity(row(width), n + 1, false).chevron));
   expect(fitting).toEqual([4, 5, 6, 6, 7, 7]);
-  // A 360px phone with five conversations: all of them, and no chevron; with six, four and the chevron.
-  expect(rowCapacity(row(360), 5)).toEqual({ avatars: 5, chevron: false });
+  // A 360px phone with five conversations: all of them, and (were the chevron not always there) no chevron; with six,
+  // four and the chevron.
+  expect(rowCapacity(row(360), 5, false)).toEqual({ avatars: 5, chevron: false });
   expect(rowCapacity(row(360), 6)).toEqual({ avatars: 4, chevron: true });
   // No cap: a wider screen shows more.
   expect(rowCapacity(row(899), 99).avatars).toBe(Math.floor((row(899) - 60) / 42) - 1);
 });
 
-test("the chevron shows only when some are not in the row (the operator's decision); always, at the one constant's flip", () => {
-  expect(CHEVRON_ALWAYS).toBe(false);
-  expect(rowCapacity(row(390), 3)).toEqual({ avatars: 3, chevron: false });
-  expect(rowCapacity(row(390), 3, true)).toEqual({ avatars: 3, chevron: true });
+test("the chevron always shows (the operator's decision, 2026-10-15); only when some are not in the row, at the one constant's flip", () => {
+  expect(CHEVRON_ALWAYS).toBe(true);
+  expect(rowCapacity(row(390), 3)).toEqual({ avatars: 3, chevron: true });
+  expect(rowCapacity(row(390), 3, false)).toEqual({ avatars: 3, chevron: false });
   expect(rowCapacity(row(390), 0, true)).toEqual({ avatars: 0, chevron: true });
 });
 

@@ -35,7 +35,7 @@ export function ConversationRows({ rows, onSelect, sub, disabled = (row) => row.
   return (
     <div id={id} className={className}>
       {rows.map((row) => (
-        <div className="participant-row" data-selected={row.selected || undefined} key={row.threadId}>
+        <div className="participant-row" data-thread={row.threadId} data-selected={row.selected || undefined} key={row.threadId}>
           <button
             type="button"
             className="person"
