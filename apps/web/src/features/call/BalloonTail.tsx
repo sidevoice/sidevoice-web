@@ -4,12 +4,8 @@
  * to its tip: the agent's ones down to the agent under the balloon, the person's out of the tile's corner toward
  * whoever is speaking, off the picture as a comic draws a speaker out of frame. */
 const TAILS = {
-  /** From left of the middle, hooking to a sharp tip over the agent. */
-  a: "M12 1C12 15 25 24 36 38C33 26 32 14 32 1",
-  /** A long swoosh from right of the middle, its outer side one sweeping curve. */
-  b: "M42 1C42 14 40 26 34 39C48 30 62 18 62 1",
-  /** A stubby nub with a round end, as the bichos' own feet and arms. */
-  c: "M16 1C16 12 22 24 30 31Q36 36 38 30C40 22 38 12 38 1",
+  /** The agent's: a stubby nub with a round end, as the bichos' own feet and arms. */
+  agent: "M16 1C16 12 22 24 30 31Q36 36 38 30C40 22 38 12 38 1",
   /** The person's: from near the balloon's right end, out toward the tile's corner. */
   person: "M24 1C24 14 40 28 64 36C52 26 46 14 46 1",
 } as const;

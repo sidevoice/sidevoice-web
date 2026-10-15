@@ -60,36 +60,24 @@
  * the words stay square to the page and their lines are measured true; its tail (BalloonTail) leaves the bottom edge
  * off the middle and curves down to the agent; it pops out of that tail as it comes. Bigger words than the person's
  * (2026-10-15): 24/33px, 21/30 on a phone. The words said are the balloon's ink, the rest a quieter one (4.5:1 and more
- * on its fill). The `balloon` variant (CallStage) picks its look: a, paper and ink in either theme, is this rule. */
+ * on its fill). Made of the agent's own skin, in either theme as the bichos are (decided 2026-10-15): its colour, pale,
+ * lit from the top left as their bodies (engine shade()), their even ink all round and their gloss (.balloon-shine);
+ * the words not yet said a mix of the ink and the fill, 4.5:1 on the palest and the deepest coat alike. */
 .stage-bubble { --balloon-line: clamp(3px, calc(var(--k, 1) * 3.6px), 5px);
-  --balloon-lines: calc(var(--balloon-line) * .75) var(--balloon-line) var(--balloon-line) calc(var(--balloon-line) * .8);
-  --balloon-ink: #1b1428; --balloon-fill: #fffdf9; --balloon-said: #1b1428; --balloon-unsaid: #6c6679; --balloon-sheen: none;
-  --balloon-radius: 30px 38px 34px 28px / 34px 28px 38px 30px; --balloon-tilt: -.6deg; --balloon-shadow: 0 14px 24px -14px rgb(27 20 40 / 55%);
+  --balloon-lines: var(--balloon-line); --balloon-ink: #1b1428; --balloon-said: #1b1428;
+  --balloon-fill: color-mix(in srgb, var(--av-color, #b48cff) 22%, #fff); --balloon-unsaid: color-mix(in srgb, #1b1428 68%, var(--balloon-fill));
+  --balloon-sheen: radial-gradient(90% 130% at 24% 14%, rgb(255 255 255 / 80%), transparent 58%);
+  --balloon-radius: 36px 42px 40px 34px / 38px 34px 42px 40px; --balloon-tilt: .5deg; --balloon-shadow: 0 14px 24px -14px rgb(27 20 40 / 55%);
   --tail-w: 72px; --tail-h: 40px;
   position: relative; isolation: isolate; display: grid; width: 100%; max-width: 34rem; min-width: 0; padding: var(--paged-peek) var(--sv-space-6);
   font-size: 1.6rem; line-height: 2.2rem; color: var(--balloon-unsaid); overflow-wrap: anywhere;
-  transform-origin: 50% calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; }
+  transform-origin: calc(var(--sv-space-6) + var(--tail-w) / 2) calc(100% + var(--tail-h)); animation: stage-balloon-in 460ms cubic-bezier(.3, 1.5, .5, 1) both; }
 @keyframes stage-balloon-in { from { opacity: 0; transform: translateY(10px) scale(.6); } }
-/* b: a soft blob in the agent's colour, light or dark with the theme, no ink: its edge a deeper (or, dark, a lighter)
- * shade of the agent, a highlight from the top left as on the bichos' bodies, a glow of its colour under it. */
-.stage-bubble[data-balloon="b"] { --balloon-line: 2px; --balloon-lines: 2px; --balloon-tilt: 0deg;
-  --balloon-fill: color-mix(in srgb, var(--av-color, var(--sv-accent)) 10%, var(--sv-chat-agent-bg));
-  --balloon-ink: color-mix(in srgb, var(--av-color, var(--sv-accent)) 65%, var(--sv-text));
-  --balloon-said: var(--sv-text); --balloon-unsaid: var(--sv-text-muted);
-  --balloon-sheen: radial-gradient(120% 160% at 18% -20%, rgb(255 255 255 / 65%), transparent 55%);
-  --balloon-radius: 44px 52px 48px 40px / 40px 48px 52px 44px;
-  --balloon-shadow: 0 18px 34px -16px color-mix(in srgb, var(--av-color, var(--sv-accent)) 65%, transparent); }
-[data-theme="dark"] .stage-bubble[data-balloon="b"] { --balloon-fill: color-mix(in srgb, var(--av-color, var(--sv-accent)) 16%, var(--sv-chat-agent-bg));
-  --balloon-sheen: radial-gradient(120% 160% at 18% -20%, rgb(255 255 255 / 5%), transparent 55%);
-  --balloon-shadow: 0 18px 36px -14px rgb(0 0 0 / 70%), 0 0 28px -8px color-mix(in srgb, var(--av-color, var(--sv-accent)) 45%, transparent); }
-/* c: made of the agent's own skin, in either theme as the bichos are: its colour, pale, lit from the top left as their
- * bodies (engine shade()), their even ink all round and their gloss (.balloon-shine); the words not yet said a mix of
- * the ink and the fill, 4.5:1 on the palest and the deepest coat alike. */
-.stage-bubble[data-balloon="c"] { --balloon-lines: var(--balloon-line); --balloon-tilt: .5deg;
-  --balloon-fill: color-mix(in srgb, var(--av-color, #b48cff) 22%, #fff);
-  --balloon-unsaid: color-mix(in srgb, #1b1428 68%, var(--balloon-fill));
-  --balloon-sheen: radial-gradient(90% 130% at 24% 14%, rgb(255 255 255 / 80%), transparent 58%);
-  --balloon-radius: 36px 42px 40px 34px / 38px 34px 42px 40px; }
+/* Where it sits (`balloonPlace`): centred over the agent, its tail out of the bottom-left corner; or pushed left of the
+ * agent, its right end over it, its tail out of the bottom-right corner and turned toward it. It pops out of its tail. */
+.stage-bubble .balloon-tail { left: var(--sv-space-6); }
+.stage-bubble[data-place="left"] { justify-self: end; margin-inline-end: max(0px, calc(50% - 7rem)); transform-origin: calc(100% - var(--sv-space-6) - var(--tail-w) / 2) calc(100% + var(--tail-h)); }
+.stage-bubble[data-place="left"] .balloon-tail { left: auto; right: var(--sv-space-6); transform: scaleX(-1); }
 @container stage (max-width: 480px) { .stage-bubble { --tail-w: 58px; --tail-h: 32px; padding-inline: var(--sv-space-5); font-size: 1.4rem; line-height: 2rem; } }
 @media (max-width: 559px), (max-width: 899px) and (pointer: coarse) { .stage-bubble { --tail-w: 58px; --tail-h: 32px; padding-inline: var(--sv-space-5); font-size: 1.4rem; line-height: 2rem; } }
 /* A reply leaving (its time over, or a new one over it): it lifts away and fades where the next comes in. */
