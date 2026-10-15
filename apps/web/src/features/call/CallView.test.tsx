@@ -98,16 +98,26 @@ test("the stage plays what the agent says as a karaoke bubble, the whole reply i
   expect(stageAgent()).toHaveAccessibleName("Fix the slow login · Speaking");
 
   // Its last words said, it stays a moment, whole; what the agent is doing stands under it.
+  vi.useFakeTimers();
   patch(store, { botLive: false, karaokeState: null, harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login"),
     history: [{ ...store.getState().facts.history[0], audio: "played" }] } as Partial<SessionFacts>);
   expect(document.querySelector(".stage-bubble .karaoke-played")?.textContent).toBe(REPLY);
   expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-leaving");
+  // The balloon is the decided look: its place is the stored one (centre by default), always three lines.
+  expect(document.querySelector(".stage-bubble")).toHaveAttribute("data-place", "center");
+  expect(document.querySelector(".stage-bubble")).not.toHaveAttribute("data-lines");
   // Said to assistive tech only: no badge over the agent (the sidebar shows it).
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
   expect(document.querySelector(".stage-activity")).toBeNull();
+  // Under its balloon the agent holds still and shows as speaking: the work waits for the balloon to go.
+  expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
+  expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
+  // The balloon gone, it works at the desk that slid in, a tool in hand, the cogs turning.
+  tick(AGENT_LINGER_MS + SENT_LEAVING_MS);
+  expect(document.querySelector(".stage-bubble")).toBeNull();
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "working");
-  // It works at the desk that slid in, a tool in hand, the cogs turning.
   expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
   expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
   expect(stageAgent()).toHaveAttribute("data-desk");
@@ -231,7 +241,8 @@ test("the preview holds the stage avatar in a mood, with something unheard when 
   expect(stageAgent()).toHaveAttribute("data-avatar-state", "speaking");
   for (const mood of ["idle", "listening", "working", "present", "offline"] as const) {
     patch(store, { avatarPreview: { mood } });
-    expect(stageAgent()).toHaveAttribute("data-avatar-state", mood);
+    // Its reply's balloon is up here, and under it a working agent shows as speaking.
+    expect(stageAgent()).toHaveAttribute("data-avatar-state", mood === "working" ? "speaking" : mood);
     expect(stageAgent()).not.toHaveAttribute("data-unread");
   }
   patch(store, { avatarPreview: { mood: "present", unread: true } });
@@ -729,14 +740,18 @@ test("the transcript button wears a dot for what arrives while it is closed; ope
 test("the Working… line over the agent is an sr-only status, with no visible badge in its place", () => {
   const store = room();
   expect(workingLine()).toBeNull();
+  vi.useFakeTimers();
   patch(store, { harness: { "fp-1|t-login": true }, ...lasted("fp-1|t-login") });
-  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "working");
+  // While the reply's balloon is up the stage shows speaking; the sr-only status still follows the real mood.
+  expect(document.querySelector(".stage-bubble")).not.toBeNull();
+  expect(document.querySelector(".stage-tile")).toHaveAttribute("data-mood", "speaking");
+  expect(stageAgent()).toHaveAttribute("data-mood", "speaking");
   expect(workingLine()).toHaveClass("sr-only");
   expect(workingLine()).toHaveTextContent("Working…");
   expect(workingLine()!.querySelector(".ui-spinner")).toHaveAttribute("aria-hidden", "true");
   expect(screen.getAllByRole("status")).toContain(workingLine());
   expect(document.querySelector(".stage-activity")).toBeNull();
-  // The desk still says it to the eye.
+  // The desk waits for the balloon to go (the first test follows it out).
   expect(document.querySelector(".stage-desk svg.desk")).toBeInTheDocument();
   // The work over, the line goes.
   patch(store, { harness: { "fp-1|t-login": false } });
@@ -751,15 +766,19 @@ test("a working-badge choice left in storage changes nothing: the line stays sr-
   expect(document.querySelector(".stage-activity")).toBeNull();
 }, WHOLE_APP_MS);
 
-test("the voice error shows above the tile on variant a and inside it, as one alert, on variant b", () => {
+test("the voice error lies over the tile as one alert: at its top on variant a, on the tile on b; its close clears it", () => {
   const store = room();
   patch(store, { bootError: { text: "Algo falló con la voz.", details: "TypeError\nFailed to fetch" } });
   expect(document.querySelectorAll("#error")).toHaveLength(1);
-  expect(document.querySelector(".stage-tile #error")).toBeNull();
+  expect(document.querySelector(".stage-tile #error")).toHaveAttribute("data-place", "top");
   act(() => { localStorage.setItem(VARIANTS_KEY, JSON.stringify({ voiceError: "b" })); window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })); });
   expect(document.querySelectorAll("#error")).toHaveLength(1);
   const card = document.querySelector<HTMLElement>(".stage-tile #error")!;
+  expect(card).toHaveAttribute("data-place", "tile");
   expect(card).toHaveAttribute("role", "alert");
   expect(card).toHaveTextContent("Algo falló con la voz.");
   expect(card.querySelector("details, summary, button")).not.toBeNull();
+  fireEvent.click(within(card).getByRole("button", { name: "Close" }));
+  expect(store.getState().facts.bootError).toBeNull();
+  expect(document.querySelector("#error")).toBeEmptyDOMElement();
 }, WHOLE_APP_MS);
