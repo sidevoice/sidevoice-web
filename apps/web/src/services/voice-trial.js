@@ -11,15 +11,16 @@
 /** A transcription try records until Stop or its longest take, with no end of turn of its own: when a turn ends is End
  *  of turn's to choose and to try, not this one's (decided 2026-10-15). The voice has no end of turn that never ends one
  *  (`end_of_turn` is `silence` or `smart-turn`), so the try asks for silence — the detector alone, no end-of-turn model
- *  to load — at its longest pause (`calm`, 3.5 s): a pause that long ends the turn, and with it the take. */
-const TAKE_ENDS = { end_of_turn: 'silence', patience: 'calm' };
+ *  to load — at the ordinary pause (`normal`, 2.5 s): a pause that long ends the turn, and with it the take. Stop does
+ *  not wait for it (`VoiceCallHost.endInput`). */
+const TAKE_ENDS = { end_of_turn: 'silence', patience: 'normal' };
 /** A voice try says a sentence and ends no turn, so it asks for no end-of-turn model: the voice loads every model its
  *  settings name, downloading what is not on disk, and with Smart it would fetch Smart's model behind the catalogue the
  *  page shows — End of turn would then offer to download a model already on disk, and this try's ready time would
  *  include that download. End of turn downloads its model, with progress, and tries it itself. */
 const SAY_ENDS = { end_of_turn: 'silence' };
 /** The longest take, from when the voice listens: past it, talking or not, the take ends there and what was said is
- *  transcribed — the voice's mute ends the open turn with what was said (`VoiceHost.mute`). */
+ *  transcribed — `VoiceCallHost.endInput` closes the open turn with what was said. */
 export const MAX_TAKE_MS = 10_000;
 
 /** A monotonic clock where there is one (pages, workers), else the wall clock. */
@@ -42,6 +43,10 @@ function takeOf(voice, onTake, dropping = () => false) {
     stop,
   };
 }
+
+/** The call's voice with `endInput`, closing the open turn at once with what was captured (its transcription starts,
+ *  `finished` follows; nothing without an open turn). TEMPORARY: the pinned package's types do not carry it yet.
+ * @typedef {import('@sidevoice/voice').VoiceCallHost & {endInput(): Promise<void>}} TrialVoice */
 
 /** A step of the person's turns as a try of the end of turn tells it (`tryEndOfTurn`): `listening` once the voice
  * listens (`again` after other settings restarted it), `restarting` while they do; within a turn, `speaking` and
@@ -70,18 +75,18 @@ function bounded(promise, { signal, timeoutMs }) {
 /**
  * Words the person says, through `settings`: the voice is set to them and listens, and the take goes on until Stop
  * (`finish` aborts), `maxTakeMs`, or the voice ending the person's turn on its own (a pause as long as `TAKE_ENDS`'s),
- * talking or not. The take ends by muting the microphone (unmuted again after), which ends the turn open with what was
- * said and lets no other start; the result is that turn's words, and a take with none — nothing said, or a turn that
+ * talking or not. Stop and the longest take end the turn open at once with what was said (`endInput`); the result is that
+ * turn's words, and a take with none — nothing said, or a turn that
  * came to nothing — is `trial-silence`. Stop before the voice listens is a cancel (nothing recorded yet), as is Stop
  * once the take has ended; an error of the voice ends the try with it.
- * @param {import('@sidevoice/voice').VoiceCallHost} voice
+ * @param {TrialVoice} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * `onTimings`, once heard: how long the voice took to be ready, and how long transcribing took — not how the take
  * ended, which is End of turn's. As it goes: `onListening` once the voice hears the microphone (its models loaded, the
  * microphone open), and `onLevel`, the microphone's level from 0 to 1 as the voice measures it. `onTranscribing`, once,
  * as the take ends and what was said is being transcribed — the microphone no longer counts then.
  * `onTake`, once the voice has stopped (heard, failed or cancelled): what the microphone gave it, where the voice hands
- * one, up to where the take ended — not what the muted voice went on recording while it transcribed.
+ * one, up to where the take ended — not what the voice went on recording while it transcribed.
  * @param {{signal?: AbortSignal, finish?: AbortSignal, timeoutMs?: number, maxTakeMs?: number, onState?: (state: import('@sidevoice/voice').VoiceCallState) => void, onTimings?: (timings: TrialTimings) => void, onListening?: () => void, onLevel?: (level: number) => void, onTranscribing?: (transcribing: boolean) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
  * @returns {Promise<string>}
  */
@@ -97,20 +102,22 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
   let ended = false, open = false;
   let tooLong = null;
   let stopped = null;
-  // Nothing heard: no turn in the take, or one that came to no words.
+  // Nothing heard: no turn in the take, or one that came to no words; and the try failed.
   let nothing = () => {};
-  // Ends the take where it stands, by muting; before the voice listens there is none to end.
+  let fail = () => {};
+  // Ends the take where it stands; before the voice listens there is none to end.
   const endTake = () => {
     if (!listening || ended) return false;
     ended = true;
     endedAt = Date.now();
-    voice.mute(true);
     onTranscribing?.(true);
     return true;
   };
-  // Stop or the longest take: the take ends, and with no turn in it, nothing was heard.
+  // Stop or the longest take: the take ends and the turn open in it closes now (the voice does nothing without one);
+  // with no turn in it, nothing was heard.
   const finishTake = () => {
     if (!endTake()) return false;
+    voice.endInput().catch((error) => fail(error));
     if (!open) nothing();
     return true;
   };
@@ -118,6 +125,7 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     await voice.setSettings({ ...settings, ...TAKE_ENDS });
     const heard = new Promise((resolve, reject) => {
       nothing = () => reject(trialError('trial-silence'));
+      fail = reject;
       stops.push(voice.onTurn((turn) => {
         if (turn.phase === 'started') { open = true; return; }
         // Joined into the next turn, which tells its words.
@@ -160,7 +168,6 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
     closed = true;
     clearTimeout(tooLong);
     if (stopped) finish?.removeEventListener('abort', stopped);
-    if (ended) voice.mute(false);
     for (const stop of stops) stop();
     await voice.stop().catch(() => {});
     recorder.stop();
@@ -168,7 +175,7 @@ export async function tryTranscription(voice, settings, { signal, finish, timeou
   }
 }
 
-/** `take` up to Unix ms `at`, where the try ended it: what the voice recorded after it, muted, is not the person's. */
+/** `take` up to Unix ms `at`, where the try ended it: what the voice recorded after it is not the person's. */
 function takeUpTo(take, at) {
   const length = Math.max(0, Math.min(take.samples.length, Math.round(((at - take.started_at) * take.sampleRate) / 1000)));
   if (length === take.samples.length) return take;
