@@ -1524,7 +1524,7 @@ function disconnect() {
     window.sidevoiceTelemetry?.endCall?.('left');
     // A deliberate hang-up is this app's not-heard choice for replies still pending. Offer the
     // semantic frames on the live socket before closing it; a lost frame remains unconfirmed.
-    for(const said of replies.values())if(!said.terminal){said.action='call_ended';reportHearing(said,{status:'unplayed'})}
+    for(const said of replies.values())if(!said.terminal){if(said.action!=='user_skipped')said.action='call_ended';reportHearing(said,{status:'unplayed'})}
     // A hang-up ends what the call still owed its session.
     outbox.clear();
     writtenHearing.clear();

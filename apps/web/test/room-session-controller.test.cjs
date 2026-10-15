@@ -1475,6 +1475,17 @@ test('T07 deliberate hang-up offers a not_heard decision for a pending reply bef
  assert.equal(handle.cancelled,false,'the voice host is stopped with the call, not replayed');
  assert.equal(c.s.run('outbox.size'),0,'the ended session does not retry a receipt under a new one');
 });
+test('H3 Skip chosen before hang-up stays heard through delayed voice cancellation',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'skip-hangup',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'s1:voice:skip-hangup',text:'Answer'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.s.run('skipReply()');
+ assert.equal(handle.cancelled,true,'voice cancellation is pending');
+ c.s.run('disconnect()');
+ handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'cancelled'}});
+ assert.deepEqual(plain(sentOf(c,c.first,'reply-hearing').map(d=>[d.history_id,d.outcome,d.heard_chars??null])),[['s1:voice:skip-hangup','heard',null]]);
+ assert.equal(sentOf(c,c.first,'reply-hearing').length,1,'the late callback cannot change the settled choice');
+});
 test('T16 a written muted reply gets one reliable semantic receipt without an audio handle',async()=>{
  const c=await callOnRoom();
  const row={id:'s1:voice:written',thread:'a',role:'assistant',text:'Written only',status:'text_only',audio_reason:'agents_muted',hearing:null,hearing_unconfirmed:true,heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
