@@ -82,7 +82,7 @@ function roomReason(stop, played, withdrawn, action) {
   // Skip is an explicit hearing choice, even if withdrawal arrives before cancellation settles.
   if (action === 'user_skipped') return action;
   if (stop.reason === 'cancelled') return withdrawn ?? action ?? null;
-  if (stop.reason === 'barge-in') return played ? 'user_interrupted' : 'newer_turn';
+  if (stop.reason === 'barge-in') return action ?? (played ? 'user_interrupted' : 'newer_turn');
   if (stop.reason === 'stopped') return action ?? 'call_ended';
   return null;
 }

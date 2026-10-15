@@ -1536,7 +1536,7 @@ function attachVoice(next){
   const coreId=handleIds.get(cut.utterance_id),said=coreId&&replies.get(coreId);
   if(!said)return;
   const heard=scalarExtent(said.reply.text,cut.heard_until);
-  finishReply(said,said.action==='user_skipped'?{status:cut.played?'interrupted':'unplayed',reason:'user_skipped',...(cut.played?{heard_chars:heard??0}:{})}:cut.played?{status:'interrupted',reason:'user_interrupted',heard_chars:heard??0}:{status:'unplayed',reason:'newer_turn'});
+  finishReply(said,{status:cut.played?'interrupted':'unplayed',reason:said.action??(cut.played?'user_interrupted':'newer_turn'),...(cut.played?{heard_chars:heard??0}:{})});
  }));
  void watchAudioDevices();
 }

@@ -1434,6 +1434,30 @@ test('T06 output loss mutes agents, reports pending fate, and keeps the device e
  assert.equal(c.s.run('state.audioLost.output'),'disconnected');
  c.s.run('disconnect()');
 });
+test('T06a agents mute wins either terminal callback order and retains the scalar prefix',async()=>{
+ for(const first of ['interruption','outcome']){
+  const c=await callOnRoom();
+  c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'muted',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'muted',text:'é🐙ab'}});
+  const handle=c.voice.said[0];handle.step({type:'playing'});
+  c.s.run("setSpeechOutput('agents_muted')");
+  const cut=()=>c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+  const outcome=()=>handle.step({type:'done',outcome:{status:'heard-up-to',heard_chars:2,reason:'barge-in'}});
+  if(first==='interruption'){cut();outcome()}else{outcome();cut()}
+  assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.utterance_id,d.status,d.reason,d.heard_chars])),[['muted','interrupted','agents_muted',2]],first);
+  assert.deepEqual(plain(sentOf(c,c.first,'voice-speech').at(-1)),{session_id:'s1',client_msg_id:sentOf(c,c.first,'voice-speech').at(-1).client_msg_id,on:false,reason:'agents_muted'});
+  c.s.run('disconnect()');
+ }
+});
+test('T06a a receipt before mute remains a genuine spoken interruption',async()=>{
+ const c=await callOnRoom();
+ c.push(c.first,{type:'voice-reply',data:{session_id:'s1',utterance_id:'spoken',thread_id:'a',revision:1,reply_revision:1,epoch:0,history_id:'spoken',text:'Answer'}});
+ const handle=c.voice.said[0];handle.step({type:'playing'});
+ c.voice.emit('agent-interrupted',{utterance_id:handle.id,heard_until:2,played:true});
+ c.s.run("setSpeechOutput('agents_muted')");
+ assert.deepEqual(plain(sentOf(c,c.first,'voice-playback').filter(d=>d.status!=='playing').map(d=>[d.reason,d.heard_chars])),[['user_interrupted',2]]);
+ assert.equal(sentOf(c,c.first,'voice-speech').at(-1).reason,'agents_muted');
+ c.s.run('disconnect()');
+});
 test('T11 reversed history and participant responses cannot undo globally confirmed hearing',async()=>{
  const c=await callOnRoom(),requests=[];
  c.s.context.fetch=async path=>new Promise(resolve=>requests.push({path,resolve}));
