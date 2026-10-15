@@ -4,7 +4,7 @@ import { WORKING_SHOWN_AFTER_MS } from "../state/room-session-state.js";
 import { emptyOnboardingRecord, type OnboardingRecord, type OnboardingStep } from "../services/onboarding-state";
 import type { PairingSummary } from "../services/device-pairing.js";
 import type { UpdateMode, UpdaterStatus } from "../features/updates/useUpdates";
-import type { TrialProgress } from "../state/room-types";
+import type { CursorBridgeState, CursorBridgeStatus, TrialProgress } from "../state/room-types";
 
 /* Every screen the storyboard shows (journeys.html): each a state of the real app, seeded — the room's facts, the
  * setup's record and step, and what to press once it is drawn (Settings open at a section, the transcript, a pairing
@@ -71,6 +71,34 @@ const agentsListing = () => ({ status: "ready", error: null, busy: {}, actionErr
   { id: "claude-code", label: "Claude Code", present: true, version: "2.4.1", registration: "connected", connect: "auto", instructions: null },
   { id: "codex", label: "Codex", present: true, version: "0.157.0", registration: "not-connected", connect: "auto", actionable: false, instructions: { command: "codex mcp add sidevoice -- sidevoice mcp", file: null, snippet: null } },
 ] } });
+/** Connector #130's exact machine-wide shape; the chat steps cannot be verified from an agent listing. */
+const cursorBridge = (state: CursorBridgeState): CursorBridgeStatus => {
+  const reason = { ready: null, needs_attention: "bridge_missing", unknown: "cursor_version_unknown", unsupported: "editor_unavailable" } as const;
+  const bridgeReady = state === "ready" || state === "unknown";
+  return {
+    state, reason: reason[state], cursor_version: state === "unknown" || state === "unsupported" ? null : "3.22.12",
+    minimum_cursor_version: "3.22.12", minimum_connector_version: "0.9.0",
+    steps: [
+      { id: "cursor_version", state: state === "unknown" || state === "unsupported" ? "unknown" : "done" },
+      { id: "enable_desktop_bridge", state: bridgeReady ? "done" : "unknown" },
+      { id: "bridge_running", state: bridgeReady ? "done" : "needs_action" },
+      { id: "sqlite3", state: "done" },
+      { id: "register_sidevoice", state: "done" },
+      { id: "join_editor_chat", state: "unknown" },
+      { id: "wait_for_chat_registration", state: "unknown" },
+    ],
+  };
+};
+const cursorAgentsListing = (state: CursorBridgeState) => {
+  const listing = agentsListing();
+  return { ...listing, value: { ...listing.value, agents: [...listing.value.agents,
+    { id: "cursor", label: "Cursor", present: true, version: state === "unsupported" ? null : "3.22.12", registration: "connected", connect: "auto", cursor_bridge: cursorBridge(state) }] } };
+};
+const showCursorBridgeInSettings = async (doc: Document) => {
+  openSettings("this-computer")(doc);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  doc.querySelector<HTMLElement>(".host-agent-bridge-toggle")?.click();
+};
 const REPLY = "I ran the tests: two fail in the settings pane, both about the Save button that no longer exists. Shall I update them?";
 /** A reply longer than a page of the stage's bubble, to see its pages follow the voice. */
 const LONG_REPLY = "I went through the settings pane: every toggle saves again, and the one for automatic updates had lost its listener " +
@@ -153,6 +181,9 @@ export const JOURNEYS: Journey[] = [
       desktop: localBridge(stopped), facts: { localHostStatus: stopped, localHostAvailable: true } },
     { id: "w3", caption: "Ready here: the agents on this computer, Connect or Disconnect each.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
       facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true } },
+    { id: "w3-cursor-bridge", caption: "Cursor's Desktop Bridge steps on the shared onboarding agent card.", setup: { step: "W3", record: { basics_done: true, choice: "agents" } }, desktop: localBridge(running),
+      facts: { pairings: [THIS], callNode: null, machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true,
+        hostAgents: { [THIS.fp]: cursorAgentsListing("needs_attention") } }, after: (doc) => { doc.querySelector<HTMLElement>(".host-agent-bridge-toggle")?.click(); } },
     { id: "w2r", caption: "Another machine: how to prepare it, then its one-time code.", setup: { step: "W2r", record: { basics_done: true, choice: "remote" } }, facts: { pairings: [], callNode: null, machineLinks: {} } },
     { id: "w4", caption: "Transcription, its model not downloaded yet: the try's block already there, its button and the footer's waiting for the model, saying why.", setup: { step: "W4", record: { basics_done: true, choice: "remote" } },
       facts: { voiceSettings: { ...defaultVoiceSettings(), stt: { catalog: "local", model: "whisper-small", language: null } } } },
@@ -217,6 +248,11 @@ export const JOURNEYS: Journey[] = [
       facts: { localHostAvailable: true, inApp: true }, after: openSettings("this-computer") },
     { id: "s-machine-local", caption: "Machines: this computer, running — its service, agents, devices.", desktop: localBridge(running),
       facts: { pairings: [THIS, NUC], machineLinks: { [THIS.fp]: { reach: "ok", via: "node" }, [NUC.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true }, after: openSettings("machines") },
+    ...(["ready", "needs_attention", "unknown", "unsupported"] as const).map((state) => ({
+      id: `s-cursor-bridge-${state}`, caption: `Cursor Desktop Bridge: ${state}, with its setup steps open.`, desktop: localBridge(running),
+      facts: { pairings: [THIS], machineLinks: { [THIS.fp]: { reach: "ok", via: "node" } }, localHostStatus: running, localHostAvailable: true,
+        hostAgents: { [THIS.fp]: cursorAgentsListing(state) } }, after: showCursorBridgeInSettings,
+    })),
     { id: "s-machine-stopped", caption: "Machines: this computer, stopped — Start brings it back.", desktop: localBridge(stopped),
       facts: { pairings: [THIS, NUC], localHostStatus: stopped, localHostAvailable: true }, after: openSettings("machines") },
     { id: "s-machine-remote", caption: "Machines: a remote machine, connected.", facts: { pairings: [NUC, WORKSTATION, LAPTOP], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }, after: openSettings("machines") },
