@@ -1068,8 +1068,6 @@ export const messages: Messages = {
   "wizard.group.basics": "基本",
   "wizard.basics.body": "Sidevoice の見た目と使用する言語です。「設定」からいつでも変更できます。",
   "wizard.basics.uiLanguage": "表示言語",
-  "wizard.basics.speech": "あなたが話す言語",
-  "wizard.basics.speechHint": "「自動」にすると、話しながら言語を認識します。",
   "wizard.languageAuto": "自動",
   "wizard.prepare": "このコンピュータを準備",
   "wizard.agentsHere": "このコンピュータの準備ができました。ここで使っているエージェントに Sidevoice を接続しましょう。",

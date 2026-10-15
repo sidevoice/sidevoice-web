@@ -1067,8 +1067,6 @@ export const messages: Messages = {
   "wizard.group.basics": "基本设置",
   "wizard.basics.body": "Sidevoice 的外观和使用的语言。你可以随时在“设置”中更改。",
   "wizard.basics.uiLanguage": "界面语言",
-  "wizard.basics.speech": "你说的语言",
-  "wizard.basics.speechHint": "“自动”会在你说话时识别语言。",
   "wizard.languageAuto": "自动",
   "wizard.prepare": "准备本机",
   "wizard.agentsHere": "本机已准备就绪。请将 Sidevoice 连接到你在这里使用的智能体。",

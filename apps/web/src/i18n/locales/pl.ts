@@ -1085,8 +1085,6 @@ export const messages: Messages = {
   "wizard.group.basics": "Podstawy",
   "wizard.basics.body": "Jak wygląda Sidevoice i jakich języków używa. Możesz to zmienić w każdej chwili w Ustawieniach.",
   "wizard.basics.uiLanguage": "Język interfejsu",
-  "wizard.basics.speech": "Język, w którym mówisz",
-  "wizard.basics.speechHint": "Tryb automatyczny rozpoznaje go, gdy mówisz.",
   "wizard.languageAuto": "Automatycznie",
   "wizard.prepare": "Przygotuj ten komputer",
   "wizard.agentsHere": "Ten komputer jest gotowy. Połącz Sidevoice z agentami, których tu używasz.",
