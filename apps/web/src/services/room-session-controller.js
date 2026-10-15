@@ -324,7 +324,7 @@ const request=async(path,options,fp=state.callNode)=>{
  const pairing=pairings.list.find(p=>p.fp===fp),link=links.get(fp),base=link?.base;if(!pairing||pairing.revoked)throw worded(noMachine());
  let response;
  try{response=await fetch(url,withToken(options,pairing.token))}catch(error){if(link&&link.base===base)link.doubted=base;throw error}
- if(response.status===401)pairingRefused(fp,{token:pairing.token});
+ if(response.status===401)void pairingRefused(fp,{token:pairing.token}).catch(()=>{});
  return response;
 };
 // Which conversation this tab talks to is this tab's own state: the room routes, it never chooses for anyone. It is
@@ -798,7 +798,7 @@ async function hostApi(fp,path,options={}){
  let data=null;
  try{data=await response.json()}catch{}
  // Asked of the machine from its page — its agents, its devices, its card: the person's own act on it.
- if(response.status===401){pairingRefused(fp,{token:pairing.token,asked:true});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
+ if(response.status===401){void pairingRefused(fp,{token:pairing.token,asked:true}).catch(()=>{});throw Object.assign(Error('unreachable'),{key:'unreachable'})}
  if(!response.ok){
   const failure=data?.error&&typeof data.error==='object'?data.error:data;
   const key=typeof failure?.key==='string'&&/^[a-z0-9._-]+$/.test(failure.key)?failure.key:response.status===503?'no-connector':'request-failed';
@@ -1337,7 +1337,7 @@ function openSession(socket,hello={},fp=state.callNode,token=null){return new Pr
  socket.onerror=()=>{broken=true};
  socket.onclose=event=>{clearTimeout(timer);timer=null;
   // The machine no longer knows this device's token: final, and the pairing is what has to change.
-  if(event?.code===4401){pairingRefused(fp,{call:true,token});return fail({text:reachNote(state)||NO_MACHINE},true)}
+  if(event?.code===4401){void pairingRefused(fp,{call:true,token}).catch(()=>{});return fail({text:reachNote(state)||NO_MACHINE},true)}
   // However the reason arrived — the close code, the frame's own name for it, the frame's sentence —
   // the person reads one sentence for one reason.
   // A room that answered and said no is not a room that is away: these are the refusals a reconnection
@@ -1551,7 +1551,7 @@ async function lostConnection(event,epoch,token=null){
  window.sidevoiceTelemetry?.endCall?.('connection_lost');
  // Nothing the call is doing stops with its socket: the voice goes on hearing and speaking, and what it reports waits
  // in the outbox. The room parks the session meanwhile, so its turn and its history stay as they are here too.
- if(event?.code===4401){pairingRefused(state.callNode,{call:true,token});return}
+ if(event?.code===4401){void pairingRefused(state.callNode,{call:true,token}).catch(()=>{});return}
  if(!shouldReconnect(event)){const message=bundled('room.failure.closed');callEndedBy('failed',message.text);disconnect();failJoin(message);return}
  state.reconnecting=true;
  // The first seconds of a drop are the network's, not the person's: no line, no control held. One that outlasts the
