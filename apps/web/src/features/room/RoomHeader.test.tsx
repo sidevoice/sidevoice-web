@@ -77,6 +77,9 @@ test("T06 a read but unheard conversation names its audio attention on phone and
   const railButton=[...document.querySelectorAll<HTMLButtonElement>(".conversation-sidebar .person")].find(button=>button.textContent?.includes("Review the nightly backups"))!;
   expect(phoneButton).toHaveAccessibleName(/2 unheard/);
   expect(railButton).toHaveAccessibleName(/2 unheard/);
+  act(()=>fireEvent.click(document.querySelector(".sidebar-collapse")!));
+  expect(document.querySelector("#conversations")).toHaveAttribute("data-collapsed");
+  expect(railButton).toHaveAccessibleName(/2 unheard/);
   act(()=>store.patch({people:[person("t-login","Fix the slow login"),person("t-backup","Review the nightly backups",{unheard:{count:0}})]}));
   expect(phoneButton).not.toHaveAccessibleName(/unheard/);
   expect(railButton).not.toHaveAccessibleName(/unheard/);
