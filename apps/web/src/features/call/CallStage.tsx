@@ -107,20 +107,14 @@ function AgentBubbles({ reply, spokenTo, onUp }: { reply: ChatMessage | null; sp
   return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
 }
 
-/* Where a failure shows is compared on the live page (`voiceError`, 2026-10-15): a (above the tile, as it has been) or b
- * (a compact card on the tile's bottom-right, its Details opening inside it and never over the call bar). */
-const VOICE_ERRORS = ["a", "b"] as const;
-
-/** The room's errors, above the stage (#error is the runtime's id), as people read them: what was raw about one is
- *  behind its Details. The box stays in the page so what appears in it is read out at once. */
+/** The room's errors (#error is the runtime's id), as people read them: what was raw about one is behind its Details.
+ *  Laid over the top of the stage, over its title rather than the call (decided 2026-10-15), never pushing anything,
+ *  and closed by the person. The box stays in the page so what appears in it is read out at once. */
 function BootError() {
   const t = translator();
-  const look = useVariant("voiceError", VOICE_ERRORS);
   const error = useRoomStore((state) => state.bootError);
   const store = useContext(RoomStoreContext);
-  // Laid over the tile, never pushing anything (operator, 2026-10-15): at its top on a, at its bottom-right on b; and
-  // closed by the person, its × an action of its own.
-  return <div id="error" className="stage-error" data-place={look === "b" ? "tile" : "top"} role="alert" hidden={!error}>
+  return <div id="error" className="stage-error" role="alert" hidden={!error}>
     {error && <Alert tone="danger" title={errorLine(error)} details={error.details}
       action={<Button variant="ghost" tone="neutral" size="icon-sm" aria-label={t("ui.close")} onClick={() => store?.patch({ bootError: null })}><CloseIcon size={16} /></Button>} />}
   </div>;
@@ -149,8 +143,8 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   if (!stage.threadId) {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
+        <BootError />
         <div className="stage-tile stage-empty">
-          <BootError />
           <div className="stage-notice">{notice}</div>
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
@@ -163,6 +157,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const tone = avatarColor(spec);
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
+        <BootError />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <StageName stage={stage} className="stage-title" tone={tone}>
         {!narrow && <span className="stage-title-tags"><VoiceModels /></span>}
@@ -173,7 +168,6 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
       <div ref={sceneRef} className="stage-slot">
       <div className="stage-tile" data-mood={mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-notice">{notice}</div>
-        <BootError />
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />

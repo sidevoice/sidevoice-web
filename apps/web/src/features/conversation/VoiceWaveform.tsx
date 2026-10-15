@@ -76,9 +76,10 @@ export function VoiceWaveform({ phase, level }: { phase: WaveformPhase; level?: 
 
     const size = () => {
       const ratio = window.devicePixelRatio || 1;
+      // Its layout size, not its box on screen: a balloon popping in (scaled) must not make the bars smaller for good.
       const box = node.getBoundingClientRect();
-      width = Math.max(1, Math.round(box.width || node.clientWidth || 0));
-      height = Math.max(1, Math.round(box.height || node.clientHeight || 0));
+      width = Math.max(1, Math.round(node.clientWidth || box.width || 0));
+      height = Math.max(1, Math.round(node.clientHeight || box.height || 0));
       node.width = Math.round(width * ratio);
       node.height = Math.round(height * ratio);
       context.setTransform?.(ratio, 0, 0, ratio, 0, 0);

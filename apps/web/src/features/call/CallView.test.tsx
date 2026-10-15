@@ -766,15 +766,12 @@ test("a working-badge choice left in storage changes nothing: the line stays sr-
   expect(document.querySelector(".stage-activity")).toBeNull();
 }, WHOLE_APP_MS);
 
-test("the voice error lies over the tile as one alert: at its top on variant a, on the tile on b; its close clears it", () => {
+test("the voice error lies over the stage's top as one alert, outside the tile; its close clears it", () => {
   const store = room();
   patch(store, { bootError: { text: "Algo falló con la voz.", details: "TypeError\nFailed to fetch" } });
   expect(document.querySelectorAll("#error")).toHaveLength(1);
-  expect(document.querySelector(".stage-tile #error")).toHaveAttribute("data-place", "top");
-  act(() => { localStorage.setItem(VARIANTS_KEY, JSON.stringify({ voiceError: "b" })); window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })); });
-  expect(document.querySelectorAll("#error")).toHaveLength(1);
-  const card = document.querySelector<HTMLElement>(".stage-tile #error")!;
-  expect(card).toHaveAttribute("data-place", "tile");
+  expect(document.querySelector(".stage-tile #error")).toBeNull();
+  const card = document.querySelector<HTMLElement>(".call-stage > #error")!;
   expect(card).toHaveAttribute("role", "alert");
   expect(card).toHaveTextContent("Algo falló con la voz.");
   expect(card.querySelector("details, summary, button")).not.toBeNull();
