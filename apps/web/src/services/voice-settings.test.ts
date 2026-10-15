@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
+import { defaultVoiceSettings, editVoiceSettings, readVoiceSettings, readyVoiceSettings, remoteProviders, voiceChoices, voiceSettingsToLoad, writeVoiceSettings, VOICE_SETTINGS_KEY } from "./voice-settings.js";
 import type { CatalogView } from "./model-catalogs.js";
 
 /* The voice settings this device keeps, and the choices the pane offers from the engine's catalogues. */
@@ -114,6 +114,20 @@ test("a model chosen before it is here waits: the one in use stays, the rest of 
   expect(readyVoiceSettings(draft, saved, CATALOGS).stt).toEqual(draft.stt);
   // The same model takes its other changes at once.
   expect(readyVoiceSettings({ ...saved, stt: { ...saved.stt, language: "es" } }, saved, []).stt.language).toBe("es");
+});
+
+test("the voice is given Smart only with its model on disk: silence until End of turn's Download, so no call or try downloads it", () => {
+  const smart = { ...defaultVoiceSettings(), end_of_turn: "smart-turn" as const };
+  const withTurn = (installed: boolean) => CATALOGS.map((catalog) => catalog.id === "local"
+    ? { ...catalog, models: [...catalog.models, local("smart-turn-v3", "smart-turn", ["end-of-turn"], { installed, builds: [build("smart-turn-v3/fp32", { installed })] })] }
+    : catalog) as CatalogView[];
+  expect(voiceSettingsToLoad(smart, withTurn(false))).toEqual({ ...smart, end_of_turn: "silence" });
+  expect(voiceSettingsToLoad(smart, withTurn(true))).toEqual(smart);
+  // Nothing read yet, nothing known to be on disk; no model that ends turns here, silence as before.
+  expect(voiceSettingsToLoad(smart, [])).toEqual({ ...smart, end_of_turn: "silence" });
+  expect(voiceSettingsToLoad(smart, CATALOGS)).toEqual({ ...smart, end_of_turn: "silence" });
+  // What the settings keep is untouched: Smart stays the choice, and switches in once its model is there.
+  expect(readyVoiceSettings(smart, smart, withTurn(false)).end_of_turn).toBe("smart-turn");
 });
 
 test("the voice detector every call uses is the local Silero VAD where it runs, else another VAD that does", async () => {
