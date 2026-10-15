@@ -264,8 +264,7 @@ export interface SidevoiceActions {
 export interface TrialProgress {
   onListening?(): void;
   onLevel?(level: number): void;
-  /** Transcription's: the take has ended (Stop, its longest, or the voice's end of the turn) and what was said is being
-   *  transcribed; false again when a turn of it came to nothing and it listens on. */
+  /** Transcription's: the take has ended (Stop or its longest) and what was said is being transcribed. */
   onTranscribing?(transcribing: boolean): void;
   onProgress?(range: KaraokeRange): void;
   onTurnStep?(step: TurnStep): void;
