@@ -3,13 +3,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { DeleteAllData, ResetReportNotice } from "./DeleteAllData";
 import { RoomProvider } from "../../app/RoomProvider";
 import { createRoomStore } from "../../state/room-store";
+import { setUiLanguage } from "../../i18n/translator";
 
 afterEach(() => { cleanup(); Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
 
 function bridge(result: unknown = null) {
   const data = {
     pairings: { read: vi.fn(async () => ({ pairings: [] })), write: vi.fn(async () => {}) },
-    deleteAll: vi.fn(async () => ({ state: "needs-restart", service: "removed", agents: {}, failed: [], pending: [] })),
+    deleteAll: vi.fn(async () => ({ state: "needs-restart", service: "removed", agents: {}, failed: [], pending: ["app-data"] })),
     resetReport: vi.fn(async () => result),
   };
   Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data } } });
@@ -61,6 +62,17 @@ test("confirmed reset calls native once and says the app is closing", async () =
   expect(await screen.findByText(/closing to finish deleting/)).toBeInTheDocument();
 });
 
+test("native cancellation closes the web confirmation without a reset result", async () => {
+  const data = bridge();
+  data.deleteAll.mockRejectedValueOnce({ key: "reset.cancelled" });
+  show();
+  fireEvent.click(screen.getByRole("button", { name: "Delete all Sidevoice data" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "Delete all Sidevoice data" }).at(-1)!);
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(data.deleteAll).toHaveBeenCalledOnce();
+  expect(screen.queryByText(/closing to finish deleting/)).not.toBeInTheDocument();
+});
+
 test("a partial helper report names the failed step without claiming success", async () => {
   bridge({ state: "partial", completed: ["app-data"], failed: [{ step: "models", key: "remove" }], agents: {} });
   render(<RoomProvider runtime={false}><dialog id="wizard" open /><ResetReportNotice /></RoomProvider>);
@@ -68,4 +80,13 @@ test("a partial helper report names the failed step without claiming success", a
   expect(screen.getByText(/Could not delete models/)).toBeInTheDocument();
   expect(screen.getByText(/After setup, open Settings/)).toBeInTheDocument();
   await waitFor(() => expect(document.getElementById("wizard")).toContainElement(screen.getByRole("alert")));
+});
+
+test("German partial results form a grammatical sentence for a plural step", async () => {
+  try {
+    act(() => setUiLanguage("de"));
+    bridge({ state: "partial", completed: [], failed: [{ step: "models", key: "remove" }], agents: {} });
+    render(<RoomProvider runtime={false}><ResetReportNotice /></RoomProvider>);
+    expect(await screen.findByText("Löschen fehlgeschlagen: Modelle.")).toBeInTheDocument();
+  } finally { act(() => setUiLanguage("en")); }
 });

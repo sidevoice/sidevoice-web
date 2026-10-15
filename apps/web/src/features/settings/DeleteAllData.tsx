@@ -73,7 +73,7 @@ export function DeleteAllData() {
     setBusy(true); setError(null);
     try {
       const result = await data.deleteAll();
-      setRestarting(true);
+      setRestarting(result.pending.length > 0);
       setOpen(false);
       if (result.failed.length) setReport({ state: "partial", completed: ["service"], failed: result.failed, agents: result.agents });
     } catch (failure) {

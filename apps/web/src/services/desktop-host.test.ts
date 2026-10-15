@@ -1,5 +1,5 @@
 import { describe, expect, onTestFinished, test } from "vitest";
-import { desktopBuild, localHostLocator, normalizeLocalHostPairing } from "./desktop-host";
+import { desktopBuild, desktopDataBridge, desktopResetBridge, localHostLocator, normalizeLocalHostPairing } from "./desktop-host";
 
 const pairing = normalizeLocalHostPairing({
   fp: "fp-local", public_key: "key", device_id: "local-device", token: "session-secret",
@@ -15,6 +15,18 @@ test.each(["not-installed", "stopped-by-person", "service-failed"] as const)(
 
 test("an unreachable native report cannot retain a local locator even if a stale pairing is supplied", () => {
   expect(localHostLocator(pairing, { state: "running", reachable: false })).toBeNull();
+});
+
+test("native pairings are selected on Windows and Linux without the macOS reset capability", () => {
+  const pairings = { read: async () => ({ pairings: [], pendingRevokes: [] }), write: async () => {} };
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data: { pairings } } } });
+  onTestFinished(() => { Reflect.deleteProperty(window, "__sidevoiceDesktop"); });
+  expect(desktopDataBridge()?.pairings).toBe(pairings);
+  expect(desktopResetBridge()).toBeNull();
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: {
+    data: { pairings, deleteAll: async () => ({}), resetReport: async () => null },
+  } } });
+  expect(desktopResetBridge()).not.toBeNull();
 });
 
 describe("desktopBuild", () => {
