@@ -1078,6 +1078,7 @@ function fakeVoice({start=async()=>{},setSettings=async()=>{}}={}){
  };
  return {calls,said,emit:(name,value)=>{for(const listener of on[name]||[])listener(value)},
   setSettings:async settings=>{calls.push(['setSettings',settings]);await setSettings(settings)},start:async options=>{calls.push(options?['start',options]:['start']);await start(options)},stop:async()=>{calls.push(['stop'])},
+  setCaptureBoundary:async id=>{calls.push(['setCaptureBoundary',id])},
   say,mute:muted=>calls.push(['mute',muted]),cancelInput:()=>calls.push(['cancelInput']),
   onTurn:sub('turn'),onState:sub('state'),onLevel:sub('level'),onPlaybackLevel:sub('output'),onAgentInterrupted:sub('agent-interrupted'),onTake:sub('take'),onError:sub('error')};
 }
@@ -1135,8 +1136,8 @@ const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filt
 
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
- assert.deepEqual(voice.calls.map(([name])=>name).slice(0,3),['setSettings','start','mute']);
- assert.deepEqual(plain(voice.calls[0][1]),plain(c.s.run('voiceSettings')),'the settings this device keeps');
+ assert.deepEqual(voice.calls.map(([name])=>name).slice(0,4),['mute','setCaptureBoundary','setSettings','start']);
+ assert.deepEqual(plain(voice.calls[2][1]),plain(c.s.run('voiceSettings')),'the settings this device keeps');
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','speech','ui_language']);
  assert.deepEqual(plain(firstHello.data.speech),{on:true});
@@ -1492,6 +1493,32 @@ test('T11 a delayed transcript keeps its captured focus through a later selectio
  assert.deepEqual([end.thread_id,end.binding_id],['a','b']);
  c.s.run('disconnect()');
 });
+for(const phase of ['pending STT','merge hold'])test(`F7 A to B during ${phase} routes each captured transcript to its own core target`,async()=>{
+ const c=await callOnRoom(),{s,voice}=c;
+ s.run("state.people=[{node:'fp-mac',thread_id:'a',title:'A'},{node:'fp-mac',thread_id:'b',title:'B'}]");
+ const aBoundary=voice.calls.find(([name])=>name==='setCaptureBoundary')[1];
+ const aStart={...started('a-turn'),capture_boundary_id:aBoundary};
+ const aEnd={...finished('a-turn','Private instruction for A'),capture_boundary_id:aBoundary};
+ voice.emit('turn',aStart);
+ if(phase==='merge hold'){
+  const original=voice.setCaptureBoundary;
+  voice.setCaptureBoundary=async id=>{voice.emit('turn',aEnd);await original(id)};
+ }
+ s.context.fetch=async(path,options)=>({ok:true,status:200,json:async()=>String(path).includes('/select')||options?.method==='POST'?{}
+  :{binding:{thread_id:'b',title:'B',binding_id:'b-binding'},room:{revision:1},clients:[],call:null,participants:[]}});
+ await s.run("select('fp-mac|b')");
+ const boundaries=voice.calls.filter(([name])=>name==='setCaptureBoundary').map(([,id])=>id);
+ assert.equal(boundaries.length,2,'initial focus and change each get a boundary');
+ assert.notEqual(boundaries[0],boundaries[1]);
+ if(phase==='pending STT')voice.emit('turn',aEnd);
+ voice.emit('turn',{...started('b-turn'),capture_boundary_id:boundaries[1]});
+ voice.emit('turn',{...finished('b-turn','Instruction for B'),capture_boundary_id:boundaries[1]});
+ const a=turnSent(c,c.first,'a-turn','finished')[0],b=turnSent(c,c.first,'b-turn','finished')[0];
+ assert.deepEqual([a.thread_id,a.binding_id,a.text],['a','b','Private instruction for A']);
+ assert.deepEqual([b.thread_id,b.binding_id,b.text],['b','b-binding','Instruction for B']);
+ assert.equal(sentOf(c,c.first,'voice-user-turn').some(row=>row.text?.includes('Private instruction for A. Instruction for B')),false);
+ s.run('disconnect()');
+});
 test('T02 an accepted reply cannot start while a voice turn or its start acknowledgement is open',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('new-turn'));
@@ -1724,7 +1751,7 @@ test('A move to another conversation leaves its replies to the room, which withd
  s.context.fetch=async()=>({ok:true,json:async()=>({binding:{thread_id:'b',binding_id:'new'},room:{revision:0},participants:[],messages:[]})});
  await s.run("select('fp-mac|b')");await settleSoon();
  assert.equal(s.run('targetId()'),'fp-mac|b');
- assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['cancel'],'focus change stops local audio before withdrawal arrives');
+ assert.deepEqual(voice.calls.slice(before).map(([name])=>name).filter(name=>name!=='mute'),['setCaptureBoundary','cancel'],'focus change fences capture and stops local audio before withdrawal arrives');
  c.push(c.first,{type:'voice-reply-withdrawn',data:{session_id:'s1',utterance_ids:['old-reply'],reason:'focus_changed'}});
  assert.equal(voice.said[0].cancelled,true);
  voice.said[0].step({type:'done',outcome:{status:'not-played',reason:'cancelled'}});

@@ -339,7 +339,7 @@ const relay=createTurnRelay();
 // selected nothing is heard (2026-09-26).
 // Nor while the call moves to another machine (`moveCall`): nobody is there to hear it.
 let moving=false;
-function applyMicState(){voice?.mute(!state.micEnabled||moving||!!(state.ws&&!targetId()))}
+function applyMicState(){voice?.mute(!state.micEnabled||moving||state.switching||state.connecting||!!(state.ws&&!targetId()))}
 function showScreenLock(lockState,note){state.screenLock={state:lockState,note}}
 async function keepScreenAwake(){
  // Asked for while connecting too: Safari grants the lock to the tap that started the
@@ -578,7 +578,8 @@ async function select(key){
  if(!to||state.switching||key===targetId()||!state.sessionId)return;
  if(to.node!==state.callNode)return moveCall(to.node,to.thread);
  state.switching=true;
- try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){setRoomError(roomError(e))}finally{state.switching=false}
+ applyMicState();
+ try{await post('/api/presentation/select',{thread_id:to.thread,session_id:state.sessionId});rememberThread(key);await refresh()}catch(e){setRoomError(roomError(e))}finally{state.switching=false;applyMicState()}
 }
 // Answers can arrive out of order, and one asked before this page had a session describes nobody: either
 // would read as the binding changing and cancel a reply just handed to this page.
@@ -598,6 +599,18 @@ function followServedBuild(served){
 async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;const asked=++refreshAsked,session=state.sessionId;try{
  const d=await api(roomQuery('/api/presentation',fp),undefined,fp);
  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode)return;
+ const nextThread=d.binding?.thread_id||null;
+ const wasSwitching=state.switching;
+ if(nextThread!==targetThread()&&voice){
+  // The old boundary may still have words in STT or a merge hold. Keep the microphone closed until voice
+  // has fenced those words, then make the new binding visible to new speech.
+  state.switching=true;applyMicState();
+  try{await setCaptureFocus(fp,nextThread,d.binding?.binding_id)}catch(error){state.switching=wasSwitching;applyMicState();throw error}
+  if(asked<refreshApplied||session!==state.sessionId||fp!==state.callNode){state.switching=wasSwitching;applyMicState();return}
+ }else if(activeCaptureBoundary){
+  const captured=captureTargets.get(activeCaptureBoundary);
+  if(captured&&captured.node===fp&&captured.thread_id===nextThread)captured.binding_id=d.binding?.binding_id;
+ }
  refreshApplied=asked;
  const previousThread=targetId(),changed=state.roomBinding?.binding_id!==d.binding?.binding_id;roomStore.batch(()=>{state.roomBinding=d.binding;if(d.binding?.thread_id)rememberThread(targetId());
   if(d.binding?.thread_id)acceptEpoch(d.binding.thread_id,d.binding.epoch);
@@ -606,6 +619,7 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
   state.pendingUserText='';state.userLive=state.botLive=false;markHistorySeen()}
  updateComposer();
  const call=d.call?.id===state.sessionId?d.call:null;if(call?.error)setRoomError(roomError(call.error,'call'));});
+ if(state.switching!==wasSwitching){state.switching=wasSwitching;applyMicState()}
  applyMicState();
  if(previousThread!==targetId())stopReplies('focus_changed');else drainReplies();
  // The page follows the build of whoever serves it: this answer's only when the machine itself served the page.
@@ -1278,14 +1292,28 @@ function recordMessage(raw, socket) {
 // Which machine each of the voice's turns was said to. What the voice reports of a turn after the call moved to another
 // machine (its words, transcribed late; its cancellation) is that machine's no longer, and goes nowhere.
 const turnNodes=new Map();
+const captureTargets=new Map();
+let activeCaptureBoundary=null;
+async function setCaptureFocus(node,thread_id,binding_id){
+ const id=crypto.randomUUID(),target={node,thread_id,binding_id,generation:callGeneration,capture_boundary_id:id};
+ captureTargets.set(id,target);
+ try{await voice.setCaptureBoundary(id)}catch(error){captureTargets.delete(id);throw error}
+ activeCaptureBoundary=id;
+ // Keep a bounded set of completed boundaries while a late transcription can still name one.
+ if(captureTargets.size>128){for(const [old] of captureTargets){if(old!==id&&![...turnNodes.values()].some(turn=>turn.capture_boundary_id===old)){captureTargets.delete(old);break}}}
+ return id;
+}
 let turnSend=Promise.resolve();
 let turnSendPending=0;
 function voiceTurn(turn){
  if(turn.phase==='started'){
-  turnNodes.set(turn.turn_id,{node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration});
+  const captured=turn.capture_boundary_id?captureTargets.get(turn.capture_boundary_id):null;
+  if(turn.capture_boundary_id&&!captured)return;
+  turnNodes.set(turn.turn_id,captured||{node:state.callNode,thread_id:targetThread(),binding_id:state.roomBinding?.binding_id,generation:callGeneration});
   if(turnNodes.size>64)turnNodes.delete(turnNodes.keys().next().value);
  }
  const target=turnNodes.get(turn.turn_id);
+ if(target&&turn.capture_boundary_id&&target.capture_boundary_id!==turn.capture_boundary_id)return;
  if(turn.phase!=='started')turnNodes.delete(turn.turn_id);
  if(!target||target.node!==state.callNode||target.generation!==callGeneration)return;
  if(turn.phase==='started'){
@@ -1301,7 +1329,7 @@ function voiceTurn(turn){
    personSignal();
    state.cancelledInput=false;
    // The row's id is the room's for this turn (`session:user-turn:turn_id`) from the start.
-   state.userTurn={id:turn.turn_id,segment:state.sessionId+':user-turn:'+turn.turn_id,thread:targetId()};
+   state.userTurn={id:turn.turn_id,segment:state.sessionId+':user-turn:'+turn.turn_id,thread:conversationKey(target.node,target.thread_id)};
    state.pendingPhase='listening';
    partial('');
   }else if(state.userTurn?.id===turn.turn_id){
@@ -1543,6 +1571,8 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
+  next.mute(true);
+  await setCaptureFocus(fp,targetThread()||rememberedOn(fp),state.roomBinding?.binding_id);
   await next.setSettings(voiceSettingsHere(state.voiceSettings,state.voiceCatalogue.catalogs));
   // A hang-up while the settings were taken leaves this join: nothing of it may start the microphone after it.
   if(epoch!==connectEpoch)return;
@@ -1691,6 +1721,7 @@ async function moveCall(fp,thread){
   leaveSession();
   rememberThread(conversationKey(fp,thread));
   state.callNode=fp;syncLinks();
+  await setCaptureFocus(fp,thread,null);
   if(linkBase(fp)==null)await locate(fp,{move:true,fresh:true});
   if(epoch!==connectEpoch)return;
   if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
