@@ -626,13 +626,40 @@ async function refresh(){const fp=state.callNode;if(linkBase(fp)==null)return;co
 }catch{}}
 const HISTORY_ROLES=new Set(['user','assistant']);
 function readableHistoryRow(r){return !!r&&typeof r==='object'&&typeof r.id==='string'&&!!r.id&&typeof r.text==='string'&&HISTORY_ROLES.has(r.role)}
+// Recent history omits an older miss once it is heard elsewhere. Resolve only retained misses absent from
+// the projection: an explicit row or missing ID is authoritative, while ordinary absence is not.
+async function resolveProtectedHistory(fp,messages,link,asked){
+ const seen=new Set(messages.filter(readableHistoryRow).map(row=>row.thread+'\0'+row.id));
+ const byThread=new Map();
+ for(const row of state.history){
+  const source=conversationOf(row.thread);
+  if(source?.node!==fp||row.role!=='assistant'||row.globally_heard!==false||!row.segment||seen.has(source.thread+'\0'+row.segment))continue;
+  if(!byThread.has(source.thread))byThread.set(source.thread,[]);
+  byThread.get(source.thread).push(row.segment);
+ }
+ const resolved=[],missing=new Set();
+ for(const [thread,ids] of byThread){
+  for(let i=0;i<ids.length;i+=64){
+   const batch=ids.slice(i,i+64),wanted=new Set(batch);
+   const path='/api/presentation/history?thread_id='+encodeURIComponent(thread)+batch.map(id=>'&resolve_id='+encodeURIComponent(id)).join('');
+   const answer=await api(roomQuery(path,fp),undefined,fp);
+   if(links.get(fp)!==link||asked!==link.historyAsked)return null;
+   if(!Array.isArray(answer?.resolved)||!Array.isArray(answer?.missing_ids))throw Error('history resolution missing');
+   for(const row of answer.resolved)if(readableHistoryRow(row)&&row.thread===thread&&wanted.has(row.id))resolved.push(row);
+   for(const id of answer.missing_ids)if(wanted.has(id))missing.add(thread+'\0'+id);
+  }
+ }
+ return {resolved,missing};
+}
 // Each machine's history: its rows carry the conversation's key, so the same thread name on two machines is two
 // conversations. The call's machine is asked on the call's beat, every other one on the machines' beat.
 async function refreshHistory(fp=state.callNode) { const link = links.get(fp), base = link?.base; if (base == null) return; const asked=link.historyAsked=(link.historyAsked||0)+1; try {
     const data = await api(roomQuery('/api/presentation/history', fp), undefined, fp);
     if (links.get(fp) !== link || link.base !== base || asked!==link.historyAsked || !Array.isArray(data?.messages)) return;
+    const resolution=await resolveProtectedHistory(fp,data.messages,link,asked);
+    if(!resolution||links.get(fp)!==link||link.base!==base||asked!==link.historyAsked)return;
     let changed = false;
-    for (const r of data.messages) {
+    for (const r of [...data.messages,...resolution.resolved]) {
         // A row this page cannot draw — no id, no text, or a role it does not know (sidevoice-core#112) — is left out,
         // not the rest of the history with it.
         if (!readableHistoryRow(r)) continue;
@@ -661,6 +688,10 @@ async function refreshHistory(fp=state.callNode) { const link = links.get(fp), b
             state.history = state.history.map(r => r === row ? { ...r, ...patch } : r);
             changed = true;
         }
+    }
+    if(resolution.missing.size){
+        const kept=state.history.filter(row=>!resolution.missing.has(conversationOf(row.thread)?.thread+'\0'+row.segment)||conversationOf(row.thread)?.node!==fp);
+        if(kept.length!==state.history.length){state.history=kept;changed=true}
     }
     if (changed) {
         capHistory();

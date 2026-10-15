@@ -1484,6 +1484,27 @@ test('F6 core-retained old unheard reply survives the live and session history c
  assert.ok(JSON.parse(c.store['voice-room-transcript']).some(row=>row.segment==='old-miss'),'session cache retains the miss too');
  c.s.run('disconnect()');
 });
+test('R6 another device hearing an old miss retires its protected browser row',async()=>{
+ const c=await callOnRoom(),requests=[];
+ const miss={id:'old-miss',thread:'a',role:'assistant',text:'Manual replay remains available',status:'text_only',audio_reason:'voice_off',heard_chars:null,globally_heard:false,replayable:true,time:1,seq:1};
+ const recent=Array.from({length:1000},(_,i)=>({id:'recent-'+i,thread:'a',role:'user',text:'Recent '+i,status:'delivered',time:i+2,seq:i+2}));
+ let heardElsewhere=false;
+ c.s.context.fetch=async path=>{
+  requests.push(String(path));
+  const data=String(path).includes('resolve_id=old-miss')
+   ?{messages:recent,resolved:[{...miss,status:'playback_finished',audio_reason:null,heard_chars:miss.text.length,globally_heard:true,replayable:false}],missing_ids:[]}
+   :{messages:heardElsewhere?recent:[miss,...recent]};
+  return {ok:true,status:200,json:async()=>data};
+ };
+ await c.s.run('refreshHistory()');
+ assert.equal(c.s.run("history.find(row=>row.segment==='old-miss').globally_heard"),false);
+ heardElsewhere=true;await c.s.run('refreshHistory()');
+ assert.ok(requests.some(path=>path.includes('thread_id=a')&&path.includes('resolve_id=old-miss')),'the retained ID is resolved explicitly');
+ assert.equal(c.s.run("history.some(row=>row.segment==='old-miss')"),false,'the now-heard old row loses its cap exemption');
+ assert.equal(JSON.parse(c.store['voice-room-transcript']).some(row=>row.segment==='old-miss'),false,'the cache loses its false miss too');
+ assert.equal(c.s.run('history.length'),1000);
+ c.s.run('disconnect()');
+});
 test('T11 a delayed transcript keeps its captured focus through a later selection',async()=>{
  const c=await callOnRoom();
  c.voice.emit('turn',started('captured'));
