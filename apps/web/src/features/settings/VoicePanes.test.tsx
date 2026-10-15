@@ -354,7 +354,7 @@ test("a try that failed says why in its block, and offers it again", async () =>
 });
 
 
-test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes; stopped by the person, it goes", async () => {
+test("a transcription try that stopped shows its take in its try block, after the result and outside what is read out as it comes, with no turn marked in it; stopped by the person, it goes", async () => {
   const { actions } = renderPane();
   const block = document.getElementById("stt-try-block")!;
   const take = { sampleRate: 16000, samples: new Float32Array(32000), started_at: 0, ended_at: 2000, turns: [{ turn_id: "t1", speech_ms: 300, pauses: [], end_ms: 1700 }] };
@@ -365,9 +365,11 @@ test("a transcription try that stopped shows its take in its try block, after th
   expect(block.querySelector("#stt-take")).toBeNull();
   await act(async () => { running.finish({ text: "hola", timings: { ready_ms: 900, audio_ms: 1200, endpoint_silence_ms: 500, recognition_ms: 300 } }); });
   const shown = block.querySelector("#stt-take")!;
+  // Only where it started and stopped: the transcription try ends no turn (decided 2026-10-15), so none is marked.
   expect(shown).toHaveTextContent("2.0 s recorded");
-  expect(shown).toHaveTextContent("speech starts at 0.3 s");
-  expect(shown).toHaveTextContent("turn ends at 1.7 s");
+  expect(shown).not.toHaveTextContent("speech starts");
+  expect(shown).not.toHaveTextContent("turn ends");
+  expect(shown.querySelector(".try-take-mark, .try-take-pause")).toBeNull();
   expect(shown.closest("[aria-live]")).toBeNull();
   // After what was heard, and not in the model's card (the try moved out of it, into the try block).
   expect(block.querySelector("#stt-heard")!.compareDocumentPosition(shown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -503,6 +505,8 @@ test("the smart end of turn has its model chosen like the others — just the mo
   expect(listOptions("voice-end-of-turn")[0].label).toMatch(/^Smart/);
   expect(listOptions("turn-model").map((option) => option.value)).toEqual(["smart-turn-v3.2"]);
   expect(document.getElementById("turn-model-card")).toHaveTextContent(/Not downloaded\s*9 MB/);
+  // Kept as Smart, without its model: calls end turns with silence until it is downloaded, never downloading it.
+  expect(document.getElementById("turn-model-card")).toHaveTextContent("Will switch when ready: the turn ends with silence until then.");
   fireEvent.click(document.getElementById("turn-model-download")!);
   expect(actions.installVoiceModel).toHaveBeenCalledWith("end-of-turn");
 });

@@ -1133,7 +1133,7 @@ const turnSent=(c,socket,turn_id,phase)=>sentOf(c,socket,'voice-user-turn').filt
 test('A call subscribes to its voice, chooses, starts it, and only then joins the room with the hello the room takes',async()=>{
  const c=await callOnRoom();const {voice,firstHello}=c;
  assert.deepEqual(voice.calls.map(([name])=>name).slice(0,3),['setSettings','start','mute']);
- assert.deepEqual(plain(voice.calls[0][1]),plain(c.s.run('voiceSettings')),'the settings this device keeps');
+ assert.deepEqual(plain(voice.calls[0][1]),{...plain(c.s.run('voiceSettings')),end_of_turn:'silence'},'the settings this device keeps; Smart as silence, no catalogue saying its model is on disk');
  assert.equal(firstHello.type,'client-ready');
  assert.deepEqual(Object.keys(firstHello.data).sort(),['conversation','ui_language']);
  assert.equal(firstHello.data.conversation,'a');
@@ -1569,7 +1569,7 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const result=plain(await tried);assert.equal(result.text,'hola');
  // With how long its phases took (the fake voice says nothing of its recognition).
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','stop'],'the voice is started for the try and stopped after it');
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop'],'the voice is started for the try, muted as its turn ends the take, and stopped after it');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
@@ -1612,10 +1612,11 @@ test('A try requests a take and hands it over after the voice stops',async()=>{
  voice.onTake=listener=>{listeners.add(listener);return ()=>listeners.delete(listener)};
  voice.stop=async()=>{voice.calls.push(['stop']);for(const listener of listeners)listener({sampleRate:16000,samples:new Float32Array(16),started_at:0,ended_at:1,turns:[]})};
  await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
- assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['stop']]);
+ assert.deepEqual(plain(voice.calls.slice(1)),[['start',{take:true}],['mute',true],['mute',false],['stop']]);
  assert.deepEqual([...takes],[1]);
  assert.equal(listeners.size,0,'and the voice is let go');
  // The end of turn's too, once stopped.
+ s.run("roomStore.patch({voiceDraft:{...voiceSettings,end_of_turn:'silence'}})");
  const turn=s.run("window.sidevoiceActions.tryTurnSettings({onTake:take=>takes.push(take.ended_at+1)})");
  await new Promise(resolve=>setTimeout(resolve,0));
  s.run('window.sidevoiceActions.cancelVoiceTry()');
@@ -1666,6 +1667,57 @@ test('A model chosen before it is on this device waits: the one in use stays, an
  assert.equal(s.run('voiceDraft.stt.model'),'whisper-small','the choice waits');
  await s.run("window.sidevoiceActions.installVoiceModel('stt')");await s.run('applying');await settleSoon();
  assert.equal(s.run('voiceSettings.stt.model'),'whisper-small','switched once it is here');
+});
+
+// ----- Smart's model: downloaded by End of turn's Download only. The voice downloads every model it is given that is
+// not on disk, so it is never given Smart without its model -----
+const withSmartTurn=installed=>CATALOGS.map(c=>c.id==='local'?{...c,models:[...c.models,{id:'smart-turn-v3',family:'smart-turn',capabilities:['end-of-turn'],languages:[],voices:[],installed,builds:[build('smart-turn-v3/fp32',{installed})]}]}:c);
+// An engine whose install puts the model on disk, and says each it was asked for.
+function installingEngine(catalogs){
+ const engine={...fakeEngine(catalogs),install:async model=>{engine.calls.push(['install',model]);const m=catalogs[0].models.find(x=>x.id===model);m.installed=true;m.builds=m.builds.map(b=>({...b,installed:true}))}};
+ return engine;
+}
+const installs=engine=>engine.calls.filter(([name])=>name==='install');
+const endsGiven=voice=>voice.calls.filter(([name])=>name==='setSettings').map(([,settings])=>settings.end_of_turn);
+test('A call with Smart and its model not on disk runs with silence, downloading nothing; its Download switches the call to Smart',async()=>{
+ const s=setup();const engine=installingEngine(withSmartTurn(false));
+ // The voice starts as long as the test lets it: the call is the voice's here, its room never reached.
+ let starting,started;const voice=fakeVoice({start:()=>starting});
+ const call=async(given)=>{starting=new Promise(resolve=>{started=resolve});const joined=c.tap();
+  for(let i=0;i<200&&endsGiven(voice).length<given;i++)await new Promise(resolve=>setTimeout(resolve,2));
+  return async()=>{s.run('disconnect()');started();await joined}};
+ withVoice(s,null,engine);const c=joining(s,{voice});
+ assert.equal(s.run('voiceSettings.end_of_turn'),'smart-turn','Smart, as by default');
+ assert.equal(s.run('voiceCatalogue.state'),'idle','no catalogue read yet');
+ const hangUp=await call(1);
+ assert.deepEqual(endsGiven(voice),['silence'],'the catalogue is read as the call starts, and says the model is not on disk');
+ assert.deepEqual(installs(engine),[],'nothing downloads it');
+ assert.equal(s.run('voiceSettings.end_of_turn'),'smart-turn','Smart stays the choice');
+ // End of turn's Download (Settings, or the call's badge): the one install, and the call takes Smart once it is there.
+ await s.run("window.sidevoiceActions.installVoiceModel('end-of-turn')");await s.run('applying');
+ assert.deepEqual(installs(engine),[['install','smart-turn-v3']]);
+ assert.deepEqual(endsGiven(voice),['silence','smart-turn']);
+ await hangUp();
+ // The next call, with the model on disk, starts with Smart.
+ await (await call(3))();
+ assert.deepEqual(endsGiven(voice),['silence','smart-turn','smart-turn']);
+});
+test('Outside a call, Smart without its model on disk is not given to the voice either: a change applies with silence, and the end of turn\'s try does not start',async()=>{
+ const s=setup({strictDOM:true});const engine=installingEngine(withSmartTurn(false));
+ const voice=withVoice(s,fakeVoice(),engine);s.context.localStorage.setItem('sidevoice.settings','{}');
+ s.run("$('settings-open').onclick()");await settleSoon();
+ await assert.rejects(s.run('window.sidevoiceActions.tryTurnSettings()'),{code:'trial-cancelled'});
+ assert.deepEqual(voice.calls.map(([name])=>name).filter(name=>name==='setSettings'||name==='start'),[],'the try gives the voice nothing and never starts it');
+ s.run("window.sidevoiceActions.editVoice({patience:'calm'})");await s.run('applying');
+ assert.deepEqual(endsGiven(voice),['silence'],'the change is given to the voice with silence');
+ assert.equal(s.run('voiceSettings.end_of_turn'),'smart-turn','and Smart stays the choice');
+ assert.deepEqual(installs(engine),[]);
+ // With its model on disk, the try runs Smart.
+ await s.run("window.sidevoiceActions.installVoiceModel('end-of-turn')");
+ const turn=s.run('window.sidevoiceActions.tryTurnSettings()');await settleSoon();
+ s.run('window.sidevoiceActions.cancelVoiceTry()');await assert.rejects(turn,{code:'trial-cancelled'});
+ assert.equal(endsGiven(voice).at(-1),'smart-turn');
+ assert.deepEqual(installs(engine),[['install','smart-turn-v3']],'only its Download installed it');
 });
 
 // ----- several machines at once: the call follows the conversation picked -----

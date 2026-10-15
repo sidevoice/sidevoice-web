@@ -240,6 +240,20 @@ export function voiceSettingsHere(settings, catalogs) {
 }
 
 /**
+ * `settings` as the voice is given them, for a call or a try: as this device can take them (voiceSettingsHere), and the
+ * smart end of turn as silence while its model is not on disk. The voice loads every model its settings name and
+ * downloads what is missing; this one is downloaded only by End of turn's Download (its size, progress and cancel said),
+ * and switched to once it is there. With no catalogues read, nothing is known to be on disk.
+ * @param {DeviceVoiceSettings} settings
+ * @param {CatalogView[]} catalogs
+ * @returns {DeviceVoiceSettings}
+ */
+export function voiceSettingsToLoad(settings, catalogs) {
+  const here = voiceSettingsHere(settings, catalogs);
+  return modelReady(here, 'end-of-turn', catalogs) ? here : { ...here, end_of_turn: 'silence' };
+}
+
+/**
  * What the pane offers, for `settings`, from `catalogs` (the engine's). `languages` are the tags offered for a model
  * that lists none (a remote one).
  * @param {CatalogView[]} catalogs

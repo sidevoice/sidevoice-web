@@ -15,7 +15,7 @@ import {pageVoice} from './voice-module.js';
 import {readCallPreferences} from './call-preferences.ts';
 import {clampDeviceName,deviceNameProblem} from './device-name-rules.js';
 import {readDeleteUnused,writeDeleteUnused,staleModels} from './model-housekeeping.js';
-import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
+import {readVoiceSettings,writeVoiceSettings,editVoiceSettings,defaultVoiceSettings,remoteProviders,voiceSettingsHere,voiceSettingsToLoad,endOfTurnModel,readyVoiceSettings,modelReady} from './voice-settings.js';
 import {createTurnRelay} from './turn-relay.js';
 import {turnMessage,playbackReport,sayingRange} from './voice-room.js';
 import {refusalError} from './refusals.js';
@@ -1420,6 +1420,8 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
  // Nothing to join without a machine this device is paired with: the tap asks for a code instead.
  if(!pairings.list.some(p=>!p.revoked)){openPairing(pairings.list.length?reachNote(state):'');return}
  personSignal();primeNowPlaying();state.callEnded=null;state.connecting=true;const epoch=++connectEpoch;keepScreenAwake();setRoomError('');joinStatus('voice');
+ // Whether Smart's model is on disk is the catalogue's to say (voiceSettingsToLoad): read while the machine is looked for.
+ const catalogue=state.voiceCatalogue.state==='ready'?null:loadVoiceCatalogue();
  try{
   const fp=await callMachine(epoch);if(epoch!==connectEpoch)return;
   // From here the call is this machine's: what the voice reports is kept for it, and its reach is the one said.
@@ -1427,7 +1429,7 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const next=await voiceHost();if(epoch!==connectEpoch)return;
   voice=next;attachVoice(next);
-  await next.setSettings(voiceSettingsHere(state.voiceSettings,state.voiceCatalogue.catalogs));
+  await catalogue;await next.setSettings(handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs));
   // A hang-up while the settings were taken leaves this join: nothing of it may start the microphone after it.
   if(epoch!==connectEpoch)return;
   await next.start();
@@ -1634,8 +1636,8 @@ async function keptProviderKeys(models,catalogs){return Object.fromEntries(await
 async function loadVoiceCatalogue(){
  roomStore.patch({voiceCatalogue:{...state.voiceCatalogue,state:'loading',error:''}});
  try{const models=await modelCatalogs();const catalogs=await models.catalogs();roomStore.patch({voiceCatalogue:{state:'ready',catalogs,error:''},modelsRemovable:typeof models.uninstall==='function',providerKeys:await keptProviderKeys(models,catalogs)});
-  // A model chosen while it was not here yet is put in use once it is.
-  if(state.voiceDraft)void applyVoiceSettings();
+  // A model chosen while it was not here yet is put in use once it is; Smart's too, kept from before (`handed`).
+  void applyVoiceSettings();
   void deleteUnusedModels(models,catalogs)}
  catch(error){const words=voiceError(error,'models');roomStore.patch({voiceCatalogue:{state:'failed',catalogs:[],error:errorLine(words),details:words.details||''}})}
 }
@@ -1654,13 +1656,17 @@ function applyVoiceSettings(){
  return applying;
 }
 // The voice takes the settings first when this page has one: what it refuses is not kept, and a call goes on as it was.
+// It is given them as voiceSettingsToLoad has them; `handed` is what it was last given (a call's start, a change), which
+// Smart's model coming onto disk changes while the settings stay as they were.
+let handed=null;
 async function saveVoiceSettings(){
- const draft=state.voiceDraft,saved=state.voiceSettings;if(!draft||!saved)return;
- const next=readyVoiceSettings(draft,saved,state.voiceCatalogue.catalogs);
- if(JSON.stringify(next)===JSON.stringify(saved))return;
+ const saved=state.voiceSettings,draft=state.voiceDraft||saved;if(!draft||!saved)return;
+ const next=readyVoiceSettings(draft,saved,state.voiceCatalogue.catalogs),load=voiceSettingsToLoad(next,state.voiceCatalogue.catalogs);
+ const changed=JSON.stringify(next)!==JSON.stringify(saved);
+ if(!changed&&(!handed||JSON.stringify(load)===JSON.stringify(handed)))return;
  const host=await voiceHost().catch(()=>null);
- if(host)await host.setSettings(voiceSettingsHere(next,state.voiceCatalogue.catalogs));
- writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now(),settingsError:null});
+ if(host){await host.setSettings(load);handed=load}
+ if(changed){writeVoiceSettings(pageStorage(),next);roomStore.patch({voiceSettings:next,settingsSavedAt:Date.now(),settingsError:null})}
 }
 // A try of the settings being edited (`voice-trial.js`), through the page's voice and outside any call: never during
 // one, since it would take that call's voice. Settings that work are this device's from then on. As it goes it tells
@@ -1698,8 +1704,9 @@ function finishVoiceTry(){if(voiceTryFinish)voiceTryFinish.abort();else cancelVo
 // the page's voice, outside any call, in the same place (one try at a time, stopped by `cancelVoiceTry`). It listens
 // until stopped, 30 s with no speech or a failure of the voice, telling whoever shows it each step of the person's
 // turns (TrialProgress `onTurnStep`) and the microphone's level. A change of the end of turn while it runs (`editVoice`)
-// restarts it with the change; the smart one without its model ready stops it. It keeps nothing: settings apply as
-// they change.
+// restarts it with the change; the smart one without its model ready stops it, and never starts: the voice would
+// download its model, which only End of turn's Download does (the try's button says why it waits). It keeps nothing:
+// settings apply as they change.
 const TURN_FIELDS=['patience','end_of_turn','turn_model'];
 let turnTry=null;
 const turnTrySettings=()=>voiceSettingsHere(state.voiceDraft||state.voiceSettings,state.voiceCatalogue.catalogs);
@@ -1708,7 +1715,8 @@ async function tryTurnSettings({onLevel,onTurnStep,onTake}={}){
  voiceTry?.abort();const abort=voiceTry=new AbortController();
  try{
   const host=await voiceHost();
-  const run=tryEndOfTurn(host,turnTrySettings(),{signal:abort.signal,onLevel,onTurnStep,onTake});
+  const settings=turnTrySettings();if(!modelReady(settings,'end-of-turn',state.voiceCatalogue.catalogs))abort.abort();
+  const run=tryEndOfTurn(host,settings,{signal:abort.signal,onLevel,onTurnStep,onTake});
   turnTry={abort,run};
   await run.done;
  }catch(error){throw voiceRefused(error,'try')}

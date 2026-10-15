@@ -9,9 +9,10 @@ import type { Translate } from "../../i18n/translator";
 import "./try-take.css";
 
 /* A try's take, once the try is over (transcription's in its try block, the end of turn's in its own card): the whole
- * of it as a waveform, from the moment the voice listened to the moment it stopped, with where speech started, the
- * pauses within a turn and where the voice ended it; Play, and a click, a drag or the arrow keys to move in it. It plays
- * from memory and goes with the try (TryState.take, TurnTrial.take): nothing of it is sent or kept.
+ * of it as a waveform, from the moment the voice listened to the moment it stopped — the end of turn's with where
+ * speech started, the pauses within a turn and where the voice ended it; transcription's with its start and its stop
+ * only, as it ends no turn (`turns`, decided 2026-10-15) — Play, and a click, a drag or the arrow keys to move in it. It
+ * plays from memory and goes with the try (TryState.take, TurnTrial.take): nothing of it is sent or kept.
  *
  * Its marks are said in words as well (the line under it, which the waveform's slider names as its description), and
  * the slider says where it stands and how long it lasts. React draws the take and its marks; where it stands — the
@@ -39,8 +40,10 @@ const Bars = memo(function Bars({ columns }: { columns: number[] }) {
 
 type Mark = { kind: "speech" | "pause" | "end"; text: string };
 
-export function TryTake({ take, id, t }: { take: VoiceTake; id: string; t: Translate }) {
+/** `turns`: whether the voice's turns are marked in it (the end of turn's try); without them, only its ends are. */
+export function TryTake({ take, id, turns = true, t }: { take: VoiceTake; id: string; turns?: boolean; t: Translate }) {
   const length = takeMs(take);
+  const marked = turns ? take.turns : [];
   const player = useMemo(() => createTakePlayer(take), [take]);
   // Unmounted, or another take: the player stops and lets go of its copy.
   useEffect(() => () => player.release(), [player]);
@@ -131,8 +134,9 @@ export function TryTake({ take, id, t }: { take: VoiceTake; id: string; t: Trans
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  // The marks in words, in the order they came: each turn's speech, its pauses, its end.
-  const marks: Mark[] = take.turns.flatMap((turn) => [
+  // The marks in words, in the order they came: each turn's speech, its pauses, its end; none but its length where
+  // its turns are not marked.
+  const marks: Mark[] = marked.flatMap((turn) => [
     { kind: "speech" as const, text: t("take.speech", { s: seconds(turn.speech_ms) }) },
     ...turn.pauses.map((pause) => ({ kind: "pause" as const, text: t("take.pause", { from: seconds(pause.from_ms), to: seconds(pause.to_ms) }) })),
     ...(turn.end_ms != null ? [{ kind: "end" as const, text: t("take.end", { s: seconds(turn.end_ms) }) }] : []),
@@ -150,7 +154,7 @@ export function TryTake({ take, id, t }: { take: VoiceTake; id: string; t: Trans
         onKeyDown={keyDown} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
         <Bars columns={columns} />
         <span ref={played} className="try-take-played" aria-hidden><Bars columns={columns} /></span>
-        {take.turns.map((turn) => <Fragment key={turn.turn_id}>
+        {marked.map((turn) => <Fragment key={turn.turn_id}>
           {turn.pauses.map((pause) => <span key={pause.from_ms} className="try-take-pause" data-kind="pause" aria-hidden
             style={{ left: percent(pause.from_ms), width: `${(share(pause.to_ms) - share(pause.from_ms)) * 100}%` }} />)}
           <span className="try-take-mark" data-kind="speech" aria-hidden style={{ left: percent(turn.speech_ms) }} />
@@ -163,7 +167,7 @@ export function TryTake({ take, id, t }: { take: VoiceTake; id: string; t: Trans
     <p className="try-take-marks" id={described}>
       <span>{t("take.length", { s: seconds(length) })}</span>
       {marks.length ? marks.map((mark, index) => <span key={index} data-kind={mark.kind}><i className="try-take-key" aria-hidden />{mark.text}</span>)
-        : <span>{t("take.noSpeech")}</span>}
+        : turns && <span>{t("take.noSpeech")}</span>}
     </p>
   </figure>;
 }

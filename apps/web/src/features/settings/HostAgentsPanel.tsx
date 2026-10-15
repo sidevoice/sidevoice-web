@@ -265,7 +265,8 @@ export function HostAgentsPanel({ fp }: { fp: string | null }) {
   );
   if (!value && (listing?.status === "loading" || !listing || listing.status === "idle")) return <p className="muted" role="status">{t("agents.scanning")}</p>;
 
-  const rows = (value?.agents ?? []).filter((agent) => agent.present || agent.registration === "connected");
+  // Only the agents installed on the machine; any other is connected by hand (OtherAgentSection, always below).
+  const rows = (value?.agents ?? []).filter((agent) => agent.present);
   const scanning = listing?.status === "loading";
   const failed = listing?.status === "failed";
   return (
