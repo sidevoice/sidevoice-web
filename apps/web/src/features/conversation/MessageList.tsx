@@ -1,7 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { shortcutTip } from "../../components/ui/Keycaps";
-import { ariaKeyShortcuts } from "../../state/shortcuts";
 import { Button } from "../../components/ui/Button";
 import { ChevronIcon, TranscriptIcon } from "../../components/ui/Icons";
 import type { ConversationView } from "../../state/room-types";
@@ -69,8 +67,8 @@ export function MessageList({ conversation, visible = true }: { conversation: Co
     return () => observer.disconnect();
   }, []);
 
-  const cancel = <Tooltip action content={shortcutTip(t("messages.cancel"), "cancelInput")}>
-    <Button variant="ghost" tone="danger" size="sm" className="cancel-input" aria-keyshortcuts={ariaKeyShortcuts("cancelInput")} onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
+  const cancel = <Tooltip action content={t("messages.cancel")}>
+    <Button variant="ghost" tone="danger" size="sm" className="cancel-input" onClick={() => void window.sidevoiceActions?.cancelInput()}>{t("messages.cancel")}</Button>
   </Tooltip>;
   return (
     <div className="message-viewport-wrap">

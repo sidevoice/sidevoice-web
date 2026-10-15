@@ -71,9 +71,9 @@ export function MuteButton() {
 export function CallButton() {
   const call = useRoomStore((state) => state.call);
   return (
-    <Tooltip action content={shortcutTip(call.label, "call")}>
+    <Tooltip action content={call.label}>
       <Button id="connect" variant="primary" className={cn("call-button", call.joined && "joined", call.busy && "reconnecting")}
-        aria-label={call.label} aria-keyshortcuts={ariaKeyShortcuts("call")} onClick={() => void window.sidevoiceActions?.toggleCall()}>
+        aria-label={call.label} onClick={() => void window.sidevoiceActions?.toggleCall()}>
         {call.joined ? <HangupIcon /> : <CallIcon />}
       </Button>
     </Tooltip>

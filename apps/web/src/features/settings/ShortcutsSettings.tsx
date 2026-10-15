@@ -2,7 +2,6 @@ import { useEffect, useState, type KeyboardEvent } from "react";
 import { Button } from "../../components/ui/Button";
 import { Group, Row, Section } from "../../components/ui/Card";
 import { muteShortcutBridge, type MuteShortcut } from "../../services/desktop-host";
-import { useMedia } from "../../state/call-layout";
 import type { Translate } from "../../i18n/translator";
 import { Keys, ShortcutKeys } from "../../components/ui/Keycaps";
 import { SHORTCUTS } from "../../state/shortcuts";
@@ -18,10 +17,11 @@ import type { MessageKey } from "../../i18n/translator";
  *  here would reach the room there. */
 export const KEYBOARD_QUERY = "(any-pointer: fine)";
 
-/** Whether Shortcuts shows: in the desktop app where it offers the mute shortcut, or wherever a keyboard is likely. */
+/** Whether Shortcuts shows. Hidden for now (operator decision, 2026-10-16): it stays out of Settings until shortcuts are
+ *  redesigned and customizable (sidevoice/sidevoice-web#148). The section keeps its code; when it returns it shows in the
+ *  desktop app where it offers the mute shortcut, or wherever a keyboard is likely (KEYBOARD_QUERY). */
 export function useShortcutsSection() {
-  const keyboard = useMedia(KEYBOARD_QUERY);
-  return keyboard || muteShortcutBridge() !== null;
+  return false;
 }
 
 export function ShortcutsSettings({ t }: { t: Translate }) {

@@ -4,11 +4,9 @@
  * Bindings follow what Meet, Zoom and Slack huddles teach (Ctrl/Cmd+D mutes) and keep clear of what browsers and
  * systems own (no Ctrl/Cmd+arrows: history and Spaces; no Alt chords; no Cmd+W/T/N/Q/M/H):
  *  - "mod" keys carry Cmd on a Mac and Ctrl elsewhere (either is accepted, each system's own is shown) and work wherever
- *    the page has focus, except while typing;
- *  - "plain" single letters are for what costs nothing to do by mistake, and never fire while typing, inside a dialog,
- *    or with any modifier held (WCAG 2.1.4). */
+ *    the page has focus, except while typing. Skip is Cmd/Ctrl+S: the handler cancels the browser's Save for it. */
 
-export type ShortcutId = "mute" | "holdToTalk" | "skip" | "cancelInput" | "call" | "transcript" | "conversations";
+export type ShortcutId = "mute" | "holdToTalk" | "skip";
 
 export interface Shortcut {
   id: ShortcutId;
@@ -19,8 +17,6 @@ export interface Shortcut {
   /** Cmd (Mac) or Ctrl (elsewhere). */
   mod?: boolean;
   shift?: boolean;
-  /** A letter pressed alone: held back while typing, in a dialog, or with a modifier. */
-  plain?: boolean;
   /** Held, not pressed: the runtime owns it (it needs the release). */
   hold?: boolean;
   /** Its text in Settings: a message key. */
@@ -30,11 +26,7 @@ export interface Shortcut {
 export const SHORTCUTS: readonly Shortcut[] = [
   { id: "mute", code: "KeyD", key: "D", mod: true, label: "settings.shortcuts.mute" },
   { id: "holdToTalk", code: "Space", key: "Space", hold: true, label: "settings.shortcuts.holdToTalk" },
-  { id: "skip", code: "KeyS", key: "S", plain: true, label: "toolbar.skip" },
-  { id: "cancelInput", code: "KeyZ", key: "Z", mod: true, label: "settings.shortcuts.cancelInput" },
-  { id: "call", code: "KeyE", key: "E", mod: true, shift: true, label: "settings.shortcuts.call" },
-  { id: "transcript", code: "KeyT", key: "T", plain: true, label: "settings.shortcuts.transcript" },
-  { id: "conversations", code: "KeyC", key: "C", plain: true, label: "settings.shortcuts.conversations" },
+  { id: "skip", code: "KeyS", key: "S", mod: true, label: "toolbar.skip" },
 ];
 
 export function shortcut(id: ShortcutId): Shortcut {
@@ -44,19 +36,18 @@ export function shortcut(id: ShortcutId): Shortcut {
 type KeyEventLike = Pick<KeyboardEvent, "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">;
 
 /** The pressed shortcut an event is, among those a handler answers (not the held ones). `typing`: the event is in a
- *  field or a menu; `dialog`: it is inside a dialog. */
-export function shortcutOf(event: KeyEventLike, context: { typing: boolean; dialog: boolean }): Shortcut | null {
+ *  field or a menu. */
+export function shortcutOf(event: KeyEventLike, context: { typing: boolean }): Shortcut | null {
   if (event.altKey || context.typing) return null;
   const mod = event.metaKey || event.ctrlKey;
   for (const entry of SHORTCUTS) {
     if (entry.hold || entry.code !== event.code || !!entry.mod !== mod || !!entry.shift !== event.shiftKey) continue;
-    if (entry.plain && context.dialog) continue;
     return entry;
   }
   return null;
 }
 
-/** The combination as it is written on this system: "⌘D", "⇧⌘E", "Ctrl+Shift+E", "S"; `space` is the word for Space. */
+/** The combination as it is written on this system: "⌘D", "⌘S", "Ctrl+S"; `space` is the word for Space. */
 export function shortcutCombo(id: ShortcutId, mac: boolean, space = "Space"): string {
   const entry = shortcut(id);
   const key = entry.key === "Space" ? space : entry.key;
