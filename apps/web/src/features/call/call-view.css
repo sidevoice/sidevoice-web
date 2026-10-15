@@ -224,13 +224,15 @@
 .stage-notice { position: absolute; z-index: 4; top: var(--stage-inset); left: 50%; display: flex; justify-content: center; width: max-content;
   max-width: calc(100% - 2 * var(--stage-inset)); transform: translateX(-50%); pointer-events: none; }
 .stage-notice:empty { display: none; }
-.stage-tile:has(> .voice-models, > .voice-attention) > .stage-notice { max-width: calc(100% - 2 * (var(--stage-inset) + min(40%, 14rem) + var(--sv-space-2))); }
+.stage-tile:has(> .voice-models, > .voice-attention) > .stage-notice { max-width: calc(100% - 2 * (var(--stage-inset) + min(40%, 16rem) + var(--sv-space-2))); }
 .stage-notice > * { pointer-events: auto; padding: var(--sv-space-1) var(--sv-space-1) var(--sv-space-1) var(--sv-space-3); border: 1px solid var(--sv-border);
   border-radius: var(--sv-radius-pill); background: var(--sv-accent-soft); box-shadow: var(--sv-shadow-md); }
 
 /* The call's voice models (VoiceModels): the tile's top-right corner, one under the other, small; the conversation's
- * name holds the top-left and the agent's badge the foot. */
-.voice-models { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; justify-items: end; gap: var(--sv-space-1); max-width: min(40%, 14rem); }
+ * name holds the top-left and the agent's badge the foot. Their column is no wider than the corner allows, so a chip
+ * keeps the tile's inset from its edge as the rest of its chrome does, and a long model's name ends in an ellipsis
+ * instead of running past the edge. */
+.voice-models { position: absolute; z-index: 2; top: var(--stage-inset); right: var(--stage-inset); display: grid; grid-template-columns: minmax(0, auto); justify-items: end; gap: var(--sv-space-1); max-width: min(40%, 16rem); }
 /* Quiet while ready: no fill, a faint edge, the muted text colour (AA on the tile) and a softer icon; full contrast on
  * hover or focus. Not ready, the attention style, its state in words. */
 .voice-chip { display: inline-flex; align-items: center; gap: var(--sv-space-1); max-width: 100%; height: 24px; padding: 0 var(--sv-space-2);

@@ -30,3 +30,15 @@ for (const [label, viewport, ratio] of [["a web page, 16:9", { width: 1280, heig
     expect(Math.abs((box.y - tile.y) - (tile.y + tile.height - box.y - box.height))).toBeLessThanOrEqual(2);
   });
 }
+
+test("the voice models' chips keep the tile's inset from its right edge, as the rest of its chrome", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const { tile } = await canvasOnStage(page, false);
+  const chips = page.locator(".voice-models .voice-chip");
+  await expect(chips.first()).toBeVisible();
+  for (const chip of await chips.all()) {
+    const box = await chip.boundingBox();
+    // 16px (the tile's inset) inside its 1px border.
+    expect(tile.x + tile.width - (box.x + box.width)).toBeGreaterThanOrEqual(16);
+  }
+});
