@@ -279,6 +279,11 @@ test("an ended turn shows its pause and end marks under the detected result", as
   await expect(page.locator("#turn-try-panel")).toContainText("Detected you finished");
   const take = page.locator("#turn-try-take");
   await expect(take).toBeVisible();
-  await expect(take.locator('.try-take-marks [data-kind="pause"]')).toHaveCount(1);
-  await expect(take.locator('.try-take-marks [data-kind="end"]')).toHaveCount(1);
+  // The inline take draws its marks on the wave, names what the colours mean under it, and says each in words to assistive tech.
+  await expect(take.locator('.try-take-wave [data-kind="pause"]')).toHaveCount(1);
+  await expect(take.locator('.try-take-wave [data-kind="end"]')).toHaveCount(1);
+  await expect(take.locator('.try-take-key-line [data-kind="pause"]')).toBeVisible();
+  await expect(take.locator('.try-take-key-line [data-kind="end"]')).toBeVisible();
+  await expect(take.locator('.sr-only [data-kind="pause"]')).toHaveCount(1);
+  await expect(take.locator('.sr-only [data-kind="end"]')).toHaveCount(1);
 });
