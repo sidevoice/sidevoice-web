@@ -6,11 +6,11 @@ import flow from "../../test/fixtures/conversation-flow.json";
 const turnEvent = <T extends Parameters<typeof turnMessage>[0]>(event: T): T => event;
 
 test("a turn's phases become the room's voice-user-turn data, the timings under the room's name", () => {
-  expect(turnMessage(turnEvent({ phase: "started", turn_id: "t", capture_boundary_id: "focus", started_at: 5 }), {thread_id: "thread", binding_id: "focus"})).toEqual({ turn_id: "t", phase: "started", started_at: 5, thread_id: "thread", binding_id: "focus" });
-  expect(turnMessage(turnEvent({ phase: "started", turn_id: "empty", capture_boundary_id: "focus", started_at: 5 }))).toMatchObject({thread_id: "", binding_id: ""});
-  expect(turnMessage(turnEvent({ phase: "cancelled", turn_id: "t", capture_boundary_id: "focus", merged: true }))).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
+  expect(turnMessage(turnEvent({ phase: "started", turn_id: "t", started_at: 5 }), {thread_id: "thread", binding_id: "focus"})).toEqual({ turn_id: "t", phase: "started", started_at: 5, thread_id: "thread", binding_id: "focus" });
+  expect(turnMessage(turnEvent({ phase: "started", turn_id: "empty", started_at: 5 }))).toMatchObject({thread_id: "", binding_id: ""});
+  expect(turnMessage(turnEvent({ phase: "cancelled", turn_id: "t", merged: true }))).toEqual({ turn_id: "t", phase: "cancelled", merged: true });
   expect(turnMessage(turnEvent({
-    phase: "finished", turn_id: "t", capture_boundary_id: "focus", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
+    phase: "finished", turn_id: "t", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
     timings: { audio_ms: 1, endpoint_silence_ms: 2, recognition_ms: 3 },
   }), {thread_id: "thread", binding_id: "focus"})).toEqual({
     turn_id: "t", phase: "finished", text: "hola", language: "es", started_at: 5, ended_at: 9, merged: false,
@@ -50,9 +50,10 @@ test("played zero remains a partial interruption and scalar counts never use UTF
 
 test("core #120 playback fixture stays mapped at the browser boundary", () => {
   for (const entry of flow.playback) {
-    if ("type" in entry.voice) continue;
     const voice = entry.voice as {reason?: string | {reason:string}, local_action?: string};
-    const outcome = {...entry.voice, ...(typeof voice.reason === "object" ? {reason:voice.reason.reason} : {})};
+    // A qualified turn in the reply's conversation is what the call's say handle ends as `barge-in`.
+    const reason = typeof voice.reason === "object" ? voice.reason.reason : "app_action" in entry ? "barge-in" : undefined;
+    const outcome = {...entry.voice, ...(reason ? {reason} : {})};
     const action = voice.local_action
       ? voice.local_action === "skip" ? "user_skipped" : voice.local_action
       : null;

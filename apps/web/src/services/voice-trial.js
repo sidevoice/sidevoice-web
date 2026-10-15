@@ -28,7 +28,7 @@ const now = () => globalThis.performance?.now?.() ?? Date.now();
 /**
  * The take of a try: requested only when the UI wants it. A take from a retuned listening stretch is discarded;
  * the latest take is handed over after the voice stops.
- * @param {import('@sidevoice/voice').VoiceHost} voice
+ * @param {import('@sidevoice/voice').VoiceCallHost} voice
  * @param {((take: import('@sidevoice/voice').VoiceTake) => void) | undefined} onTake
  * @param {() => boolean} [dropping]
  */
@@ -74,7 +74,7 @@ function bounded(promise, { signal, timeoutMs }) {
  * said and lets no other start; the result is that turn's words, and a take with none — nothing said, or a turn that
  * came to nothing — is `trial-silence`. Stop before the voice listens is a cancel (nothing recorded yet), as is Stop
  * once the take has ended; an error of the voice ends the try with it.
- * @param {import('@sidevoice/voice').VoiceHost} voice
+ * @param {import('@sidevoice/voice').VoiceCallHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * `onTimings`, once heard: how long the voice took to be ready, and how long transcribing took — not how the take
  * ended, which is End of turn's. As it goes: `onListening` once the voice hears the microphone (its models loaded, the
@@ -179,7 +179,7 @@ function takeUpTo(take, at) {
  * `text` said through `settings`, in `language`: the voice is set to them (its end of turn aside: `SAY_ENDS`) and
  * started, says it, and the try succeeds once it was heard to its end. Cut short or not played, it fails with why (the
  * voice's own code when it failed).
- * @param {import('@sidevoice/voice').VoiceHost} voice
+ * @param {import('@sidevoice/voice').VoiceCallHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * @param {string} text
  * `onTimings`, once heard: how long the voice took to be ready, and from asking it to speak to its first sound.
@@ -226,7 +226,7 @@ export async function tryVoice(voice, settings, text, { language = null, signal,
  * `retune` puts other settings in place while it runs: the voice takes a patience or an end of turn only as it starts,
  * so the turn in progress is dropped, the voice stops, takes them, and listens again. Asked again while it does, it
  * goes on with the latest; the same settings change nothing.
- * @param {import('@sidevoice/voice').VoiceHost} voice
+ * @param {import('@sidevoice/voice').VoiceCallHost} voice
  * @param {import('@sidevoice/voice').VoiceSettings} settings
  * @param {{signal?: AbortSignal, quietMs?: number, onLevel?: (level: number) => void, onTurnStep?: (step: TurnStep) => void, onTake?: (take: import('@sidevoice/voice').VoiceTake) => void}} [options]
  * @returns {{done: Promise<void>, retune: (settings: import('@sidevoice/voice').VoiceSettings) => Promise<void>}} `done`

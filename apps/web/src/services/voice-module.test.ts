@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { pageVoice, swappingVoiceHost } from "./voice-module.js";
+import { pageVoice } from "./voice-module.js";
 import type { VoiceHost, VoiceModelSource } from "@sidevoice/voice";
 
 /* Where the page's voice and its models' catalogues come from: the desktop app's, or one engine on this page. */
@@ -58,111 +58,26 @@ test("an engine the browser will not let keep files (site data blocked) is the v
 });
 
 
-/* A model changed mid-call (contract gap #31): the voice keeps its slots and is never restarted for it. The voice here
- * restarts as @sidevoice/voice does — on its first settings and when a slot's model or the end of turn changes —
- * loading its models then; anything else it takes as configuration. */
-type Settings = { stt: { catalog: string; model: string; language?: string | null }; tts: { catalog: string; model: string; voice?: string | null }; end_of_turn?: string; turn_model?: string };
-function fakeVoice() {
-  const told: Settings[] = [];
-  let restarts = 0;
-  let models: { transcriber: { transcribe(...args: unknown[]): Promise<unknown> } } | null = null;
-  let stages = "";
-  const create = (source: { models(settings: Settings): Promise<{ load(): Promise<typeof models> }> }) => ({
-    async setSettings(settings: Settings) {
-      told.push(settings);
-      const next = JSON.stringify([settings.stt.catalog, settings.stt.model, settings.tts.catalog, settings.tts.model, settings.end_of_turn ?? "silence"]);
-      if (next !== stages) { restarts++; models = await (await source.models(settings)).load(); stages = next; }
-    },
-    transcribe: (samples: number) => models!.transcriber.transcribe(samples),
-    onTurn: () => () => {},
-  });
-  return { create, told, restarts: () => restarts };
-}
-function modelSource() {
-  const finishing: Record<string, () => void> = {};
-  const source = {
-    models: vi.fn(async (settings: Settings) => {
-      if (settings.stt.model === "too-big") throw Object.assign(new Error("model-unfit"), { code: "model-unfit" });
-      return { load: vi.fn(async () => ({
-        vad: { accept: async () => [], reset: () => {} },
-        transcriber: { transcribe: (samples: number) => samples === 0
-          ? new Promise((resolve) => { finishing[settings.stt.model] = () => resolve(settings.stt.model); }) : Promise.resolve(settings.stt.model) },
-        speaker: { speak: async () => new Float32Array() },
-      })) };
-    }),
-  };
-  return { source, finishing };
-}
-const settingsWith = (model: string, extra: Partial<Settings> = {}): Settings =>
-  ({ stt: { catalog: "local", model, language: null }, tts: { catalog: "local", model: "kokoro" }, end_of_turn: "silence", ...extra });
-
-test("another model mid-call moves the slot once it is ready, without restarting the voice; what was under way finishes on the model it began with", async () => {
-  const voice = fakeVoice();
-  const { source, finishing } = modelSource();
-  const host = swappingVoiceHost(voice.create as never, source as never) as unknown as { setSettings(settings: Settings): Promise<void>; transcribe(samples: number): Promise<unknown> };
-  await host.setSettings(settingsWith("whisper-base"));
-  expect(voice.restarts()).toBe(1);
-  expect(await host.transcribe(1)).toBe("whisper-base");
-  const underWay = host.transcribe(0);
-  await host.setSettings(settingsWith("whisper-small", { stt: { catalog: "local", model: "whisper-small", language: "es" } }));
-  expect(voice.restarts()).toBe(1);
-  // The voice was told the language, on the slots it was made with.
-  expect(voice.told.at(-1)!.stt).toEqual({ catalog: "local", model: "whisper-base", language: "es" });
-  expect(await host.transcribe(1)).toBe("whisper-small");
-  finishing["whisper-base"]();
-  expect(await underWay).toBe("whisper-base");
-  // A model this device can't run is refused, and the one in use stays.
-  await expect(host.setSettings(settingsWith("too-big"))).rejects.toMatchObject({ code: "model-unfit" });
-  expect(await host.transcribe(1)).toBe("whisper-small");
-  expect(voice.restarts()).toBe(1);
-});
-
-test("Smart and Silence swapped are the voice's to apply: it restarts on the models chosen then", async () => {
-  const voice = fakeVoice();
-  const { source } = modelSource();
-  const host = swappingVoiceHost(voice.create as never, source as never) as unknown as { setSettings(settings: Settings): Promise<void>; transcribe(samples: number): Promise<unknown> };
-  await host.setSettings(settingsWith("whisper-base"));
-  await host.setSettings(settingsWith("whisper-small", { end_of_turn: "smart-turn" }));
-  expect(voice.restarts()).toBe(2);
-  expect(voice.told.at(-1)!.stt.model).toBe("whisper-small");
-  expect(await host.transcribe(1)).toBe("whisper-small");
-});
-
-test("the browser voice wrapper passes take options and output subscriptions through to the package host", async () => {
+test("the browser supplies the new shared owner and creates separate calls through it", async () => {
+  const calls: string[] = [];
   const source: VoiceModelSource = { models: () => { throw Error("unused"); } };
-  const starts: ({ take?: boolean } | undefined)[] = [];
-  const takes = new Set<Parameters<VoiceHost["onTake"]>[0]>();
-  const levels = new Set<(value: number) => void>();
-  const deviceNotices = new Set<(value: any) => void>();
-  const devices = { inputs: [], outputs: [], input: null, output: null, outputSelectable: false };
-  const create = (_source: VoiceModelSource): VoiceHost => ({
-    setSettings: async () => {},
-    setCaptureBoundary: async () => {},
-    start: async (options) => { starts.push(options); },
-    stop: async () => {},
-    say: () => ({ id: "", cancel() {}, onEvent() {}, outcome: Promise.resolve({ status: "heard" }) }),
-    mute() {}, cancelInput() {},
-    onTurn: () => () => {}, onState: () => () => {}, onLevel: () => () => {}, onError: () => () => {}, onAgentInterrupted: () => () => {},
-    onTake: (listener) => { takes.add(listener); return () => { takes.delete(listener); }; },
-    onPlaybackLevel: (listener) => { levels.add(listener); return () => { levels.delete(listener); }; },
-    audioDevices: async () => devices, setAudioDevices: async () => devices, onAudioDevices: (listener) => { deviceNotices.add(listener); return () => { deviceNotices.delete(listener); }; },
-  } as VoiceHost);
-  const host = swappingVoiceHost(create, source);
-  const heard: number[] = [], output: number[] = [], losses: unknown[] = [];
-  const stopTake = host.onTake((take) => heard.push(take.ended_at));
-  const stopOutput = host.onPlaybackLevel((level) => output.push(level));
-  const stopDevices = host.onAudioDevices((notice) => losses.push(notice.lost));
-  await host.start({ take: true });
-  await host.start();
-  for (const listener of takes) listener({ ended_at: 12, started_at: 0, sampleRate: 16000, samples: new Float32Array(), turns: [] });
-  for (const listener of levels) listener(0.6);
-  for (const listener of deviceNotices) listener({...devices,lost:{output:"usb"}});
-  expect(starts).toEqual([{ take: true }, undefined]);
-  expect(heard).toEqual([12]);
-  expect(output).toEqual([0.6]);
-  expect(losses).toEqual([{output:"usb"}]);
-  stopTake(); stopOutput(); stopDevices();
-  expect(takes.size).toBe(0);
-  expect(levels.size).toBe(0);
-  expect(deviceNotices.size).toBe(0);
+  const owner = {
+    createCall: () => ({ id: `call-${calls.push("created")}` }),
+    routeInput: async (call: { id: string } | null) => { calls.push(call?.id ?? "none"); },
+  };
+  const create = vi.fn((_source: VoiceModelSource) => owner);
+  const { voice } = pageVoice({ host: {}, load: async () => [
+    { default: async () => {}, createVoiceHost: create },
+    { default: async () => {}, WebEngine: { create: async () => ({ catalogs: () => [] }) } },
+  ] });
+  const host = await voice();
+  const a = host.createCall();
+  const b = host.createCall();
+  expect(a).not.toBe(b);
+  await host.routeInput(a);
+  await host.routeInput(b);
+  await host.routeInput(null);
+  expect(calls).toEqual(["created", "created", "call-1", "call-2", "none"]);
+  expect(create).toHaveBeenCalledOnce();
+  expect(source.models).toBeDefined();
 });

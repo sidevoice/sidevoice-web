@@ -146,7 +146,7 @@ export function engineVoiceSource(engine: WebEngine, { onProgress }: VoiceSource
             endOfTurn ? load({ catalog: LOCAL_CATALOG, model: endOfTurn.id }) : Promise.resolve(null),
           ]);
           return {
-            vad: await vadOf(detector),
+            createVad: () => vadOf(detector),
             transcriber: transcriberOf(transcriber),
             speaker: speakerOf(speaker),
             ...(classifier ? { endOfTurn: endOfTurnOf(classifier) } : {}),
