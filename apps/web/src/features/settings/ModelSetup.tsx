@@ -94,7 +94,7 @@ export type TryState = {
   attempt: number;
   /** While it runs: the voice listens (transcription) or sounds (voice); before that its models load. */
   live: boolean;
-  /** Transcription's, while it runs: the take has ended (Stop or its longest) and is being transcribed. */
+  /** Transcription's, while it runs: the take has ended (Stop, its longest, or a silence) and is being transcribed. */
   transcribing: boolean;
   /** The voice's: the sentence it says, and the part of it sounding (none before its first sound). */
   said: string;
@@ -294,7 +294,7 @@ function TryBody({ task, handle, roomy = false, sample, quote = true, t }: { tas
 
 /** The transcription try, one layout that never jumps. Its first row: the try's button and, beside it, the microphone's
  *  level, always there — flat until it listens, moving while it does. Its second, of a fixed height: while it listens,
- *  what to do and the take's length filling to its longest; once the take has ended (Stop or its longest),
+ *  what to do and the take's length filling to its longest; once the take has ended (Stop, its longest, a silence),
  *  "Transcribing…", the level flat and the take's length stopped where it ended; once done, in its place, what was
  *  heard and how quick; or why it failed. */
 function SttTry({ handle, hint, button, t }: { handle: VoiceTry; hint?: string; button?: ReactNode; t: Translate }) {

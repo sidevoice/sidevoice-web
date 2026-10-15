@@ -1566,12 +1566,10 @@ test('A try of the voice settings being edited goes through the page\'s voice, o
  const tried=s.run("window.sidevoiceActions.tryVoiceSettings('stt')");
  await new Promise(resolve=>setTimeout(resolve,0));
  voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
- // The take goes on until Stop (or its longest): a turn the voice ends is a part of it.
- s.run('window.sidevoiceActions.finishVoiceTry()');
  const result=plain(await tried);assert.equal(result.text,'hola');
  // With how long its phases took (the fake voice says nothing of its recognition).
  assert.equal(typeof result.timings.ready_ms,'number');assert.equal(result.timings.recognition_ms,null);
- assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop'],'the voice is started for the try, muted as Stop ends the take, and stopped after it');
+ assert.deepEqual(voice.calls.map(([name])=>name),['setSettings','start','mute','mute','stop'],'the voice is started for the try, muted as its turn ends the take, and stopped after it');
  assert.equal(voice.calls[0][1].stt.model,'moonshine-tiny','what is being edited is what is tried');
  assert.equal(JSON.parse(s.run("localStorage.getItem('sidevoice.voice-settings')")).stt.model,'moonshine-tiny','what worked is this device\'s now');
  assert.deepEqual(asked,[],'nothing of it goes to the room or the machine');
@@ -1585,7 +1583,7 @@ test('A try tells whoever shows it how it goes: the voice listening and the micr
  const told=[];s.context.told=told;
  const listened=s.run("window.sidevoiceActions.tryVoiceSettings('stt',{keep:false,onListening:()=>told.push('listening'),onLevel:level=>told.push(level)})");
  await new Promise(resolve=>setTimeout(resolve,0));
- voice.emit('level',0.5);voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});s.run('window.sidevoiceActions.finishVoiceTry()');
+ voice.emit('level',0.5);voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
  await listened;
  assert.deepEqual([...told],['listening',0.5]);
  // The voice counts characters as Unicode does; the page indexes the sentence as JavaScript does (the 👋 is two).
@@ -1606,7 +1604,6 @@ test('A try that records the person hands on the take its voice gives once stopp
   const tried=s.run("window.sidevoiceActions."+task);
   await new Promise(resolve=>setTimeout(resolve,0));
   voice.emit('turn',{phase:'finished',turn_id:'t1',text:'hola'});
-  s.run('window.sidevoiceActions.finishVoiceTry()');
   await tried;
  };
  await ask("tryVoiceSettings('stt',{keep:false,onTake:take=>takes.push(take.ended_at)})");
