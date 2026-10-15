@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { localHostBridge } from "../../services/desktop-host";
+import { createMicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
 import {
   createOnboardingRepository,
   emptyOnboardingRecord,
@@ -15,7 +16,8 @@ import { RoomStoreContext, useRoomStore, type RoomViewState } from "../../state/
 import { RELEASE } from "../whats-new/catalogue";
 
 /* The first-run setup over the real room: the basics (W0: appearance, languages), where the agents run (W1), this
- * computer prepared (W2) and its agents connected (W3), or another machine paired (W2r), transcription (W4) and voice
+ * computer prepared (W2) and its agents connected (W3), or another machine paired (W2r), the microphone allowed (W4m),
+ * transcription (W4) and voice
  * (W4v) chosen on this device (trying them is suggested, not required), the end of turn (W5), and Ready (W6). Its own record says what the person answered; the machine, its pairing and the device's voice settings
  * say what is done, read live, so a step already achieved is never asked for again. */
 
@@ -31,6 +33,12 @@ interface OnboardingValue {
   canHostAgents: boolean;
   localReady: boolean;
   remoteReady: boolean;
+  /** Whether the microphone may be used here (microphone-access.ts), and whether that is all the setup needs of it. */
+  microphone: MicrophoneSnapshot & { ready: boolean };
+  /** Asks for the microphone (Allow, Check again). */
+  requestMicrophone(): Promise<void>;
+  /** Where the app can open the system's microphone settings. */
+  openMicrophoneSettings: (() => Promise<void>) | null;
   /** Whether the voice settings being edited for `task` are the ones the person tried. */
   tried(task: "stt" | "tts"): boolean;
   openWizard(step?: OnboardingStep): void;
@@ -66,10 +74,17 @@ function answering(room: RoomViewState, local: boolean) {
     && room.facts.machineLinks[machine.pairingId]?.reach === "ok") ?? null;
 }
 
-/** What resume reads of the room: which machines answer, and the device's kept voice settings. */
-function liveFacts(room: RoomViewState) {
+/** Whether the setup has what it needs of the microphone: allowed, or nothing to ask here; where the browser cannot say
+ *  without asking, allowed once in this setup. */
+function microphoneReady(microphone: MicrophoneSnapshot, record: OnboardingRecord) {
+  return microphone.state === "granted" || microphone.state === "none" || (!microphone.known && microphone.state === "prompt" && record.microphone_done);
+}
+
+/** What resume reads of the room: which machines answer, and the device's kept voice settings; and the microphone. */
+function liveFacts(room: RoomViewState, microphone: boolean) {
   const kept = room.facts.voiceSettings;
   return {
+    microphoneReady: microphone,
     localReady: !!answering(room, true) && room.facts.localHostStatus.state === "running",
     remoteReady: !!answering(room, false),
     sttKey: kept ? trialKey(kept.stt) : null,
@@ -96,7 +111,12 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   const recordRef = useRef(initial.record);
   const writes = useRef(Promise.resolve());
   const decided = useRef(false);
-  const live = liveFacts(room);
+  // Read for the setup's whole life: the platform's answer, live (a permission changed in the browser or the system's
+  // settings is seen at once).
+  const [microphoneAccess] = useState(() => createMicrophoneAccess());
+  useEffect(() => () => microphoneAccess.dispose(), [microphoneAccess]);
+  const microphone = useSyncExternalStore(microphoneAccess.subscribe, microphoneAccess.getSnapshot, microphoneAccess.getSnapshot);
+  const live = liveFacts(room, microphoneReady(microphone, record));
   const resume = useCallback((current: OnboardingRecord, facts: ReturnType<typeof liveFacts>) =>
     resumeOnboarding({ record: current, canHostAgents, ...facts }), [canHostAgents]);
 
@@ -122,7 +142,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
   useEffect(() => {
     // Where it resumes depends on this device's voice settings too (what was chosen): it waits for them as well as the
     // machines, which the runtime may know first.
-    if (!ready || decided.current || !room.facts.machinesReady || !room.facts.voiceSettings) return;
+    if (!ready || decided.current || !room.facts.machinesReady || !room.facts.voiceSettings || microphone.state === "checking") return;
     // A step asked for (the storyboard's) opens there, whatever the record says.
     if (startAt) { decided.current = true; setStep(startAt); setOpen(true); return; }
     if (record.completed_at) return;
@@ -132,7 +152,12 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     if (live.localReady && !record.choice) void persist({ choice: "agents" });
     setStep(resume(live.localReady && !record.choice ? { ...record, choice: "agents" } : record, live));
     setOpen(true);
-  }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, live, persist, resume, startAt]);
+  }, [ready, record, room.facts.machinesReady, room.facts.voiceSettings, microphone.state, live, persist, resume, startAt]);
+
+  // Allowed during the setup: kept, for a browser that cannot say so without asking again.
+  useEffect(() => {
+    if (microphone.state === "granted" && !record.microphone_done && !record.completed_at) void persist({ microphone_done: true });
+  }, [microphone.state, record.microphone_done, record.completed_at, persist]);
 
   // The desktop's floating call card shows only once the first setup is finished and its wizard is closed: the room
   // says so in its facts, which the card's host passes on (FLOATING-CARD-SPEC FC1).
@@ -145,6 +170,9 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     path: canHostAgents ? record.choice : "remote",
     localReady: live.localReady,
     remoteReady: live.remoteReady,
+    microphone: { ...microphone, ready: live.microphoneReady },
+    requestMicrophone: () => microphoneAccess.request(),
+    openMicrophoneSettings: microphoneAccess.openSettings,
     tried: (task) => !!draft && record.trials[task] === trialKey(draft[task]),
     openWizard(requested) {
       setError(null);
@@ -171,7 +199,7 @@ export function OnboardingProvider({ children, repository: given, startAt }: { c
     },
     // Entering needs every step done as things stand now, and the completion read back: never an optimistic flag.
     async complete() {
-      const now = resume(recordRef.current, liveFacts(roomStore.getState()));
+      const now = resume(recordRef.current, liveFacts(roomStore.getState(), microphoneReady(microphoneAccess.getSnapshot(), recordRef.current)));
       if (now !== "W6") { setStep(now); setError("onboarding.prerequisites"); return false; }
       // Set up on this release: what it already has is not news to the person.
       const saved = await persist({ completed_at: Math.floor(Date.now() / 1000), deferred_at: null, baseline_release: RELEASE });

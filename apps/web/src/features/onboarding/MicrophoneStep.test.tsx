@@ -1,0 +1,171 @@
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { App } from "../../app/App";
+import { createRoomStore } from "../../state/room-store";
+import { defaultVoiceSettings } from "../../services/voice-settings.js";
+import { ONBOARDING_STORAGE_KEY } from "../../services/onboarding-state";
+import { devicePlatform } from "../../services/microphone-access";
+import type { SidevoiceActions } from "../../state/room-types";
+
+vi.mock("../../services/room-session-controller.js", () => ({}));
+
+/** The whole App rendered: past vitest's five seconds on a busy machine (see Onboarding.test.tsx). */
+const WHOLE_APP_MS = 15_000;
+
+/* The setup's microphone step (web#129): asked for before transcription, through the browser's permission or the
+ * desktop app's; every state it can be in — not asked, waiting, allowed (and on by itself), blocked (how to allow it,
+ * Check again), the request closed, no microphone — and where there is nothing to ask. */
+
+const NUC = { fp: "fp-nuc", device_id: "d-1", urls: ["https://nuc.example"], rv: null, host: "NUC", paired_at: 1_700_000_000, revoked: false };
+
+/** The browser's microphone permission, as `permissions.query` gives it: its state, changed by the test. */
+function permission(state: PermissionState) {
+  const status = Object.assign(new EventTarget(), { name: "microphone", state });
+  return { status, set(next: PermissionState) { status.state = next; status.dispatchEvent(new Event("change")); } };
+}
+
+let stop: ReturnType<typeof vi.fn>;
+function browser(state: PermissionState, getUserMedia: (constraints: MediaStreamConstraints) => Promise<unknown>) {
+  const granted = permission(state);
+  const media = { getUserMedia: vi.fn(getUserMedia) };
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: media });
+  Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: vi.fn(async () => granted.status) } });
+  return { granted, media };
+}
+const stream = () => ({ getTracks: () => [{ stop }] });
+const refused = (name: string) => Object.assign(new Error(name), { name });
+
+beforeEach(() => {
+  stop = vi.fn();
+  localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ basics_done: true, choice: "remote" }));
+  window.sidevoiceActions = { loadVoiceCatalogue: vi.fn().mockResolvedValue(undefined), editVoice: vi.fn(), cancelVoiceTry: vi.fn() } as unknown as SidevoiceActions;
+});
+afterEach(() => {
+  delete window.sidevoiceActions;
+  delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop;
+  delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+  delete (navigator as { permissions?: unknown }).permissions;
+  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  vi.restoreAllMocks();
+});
+
+const wizard = () => within(document.getElementById("wizard")!);
+const title = () => wizard().getByRole("heading", { level: 2 });
+const action = () => document.getElementById("wizard-mic-action")!;
+const said = () => document.querySelector("#wizard .wizard-mic [role=status]")!.textContent;
+const tile = () => document.querySelector("#wizard .wizard-mic-tile")!.textContent;
+
+/** The setup over the room, its other machine paired: where it resumes is the microphone's or transcription's. */
+async function setup() {
+  const store = createRoomStore();
+  act(() => store.patch({ machinesReady: true, voiceSettings: defaultVoiceSettings(), pairings: [NUC], machineLinks: { [NUC.fp]: { reach: "ok", via: "node" } } }));
+  render(<App store={store} />);
+  await waitFor(() => expect(document.getElementById("wizard")).toHaveAttribute("open"));
+}
+
+test("not asked yet: Allow microphone asks the browser, lets the microphone go at once, and the setup moves on to transcription", async () => {
+  let answer!: (value: unknown) => void;
+  const { media } = browser("prompt", () => new Promise((resolve) => { answer = resolve; }));
+  await setup();
+  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(wizard().getByRole("list", { name: "Setup progress" }).children).toHaveLength(8);
+  expect(tile()).toContain("Not allowed yet");
+  expect(tile()).toContain("Your browser will ask you once.");
+  expect(action()).toHaveTextContent("Allow microphone");
+  await act(async () => { fireEvent.click(action()); });
+  expect(media.getUserMedia).toHaveBeenCalledWith({ audio: true });
+  expect(action()).toHaveAttribute("aria-busy", "true");
+  expect(said()).toBe("Answer your browser’s request to use the microphone.");
+  await act(async () => { answer(stream()); });
+  expect(stop).toHaveBeenCalled();
+  expect(tile()).toContain("Allowed");
+  expect(said()).toBe("Microphone allowed.");
+  await waitFor(() => expect(title()).toHaveTextContent("Set up transcription"), { timeout: 3000 });
+  // Kept for a browser that could not say so without asking again.
+  expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).microphone_done).toBe(true);
+}, WHOLE_APP_MS);
+
+test("blocked: how to allow it for the site, Check again (still blocked, said so), and allowed in the browser it moves on by itself", async () => {
+  const { granted, media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
+  await setup();
+  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(tile()).toContain("Blocked");
+  expect(document.querySelector("#wizard .wizard-mic-help .ui-alert-title")).toHaveTextContent("Sidevoice can’t use the microphone");
+  expect(wizard().getByText(/select the site settings icon beside the web address/)).toBeInTheDocument();
+  expect(action()).toHaveTextContent("Check again");
+  // No way on but allowing it: no Continue.
+  expect(wizard().queryByRole("button", { name: "Continue" })).toBeNull();
+  action().focus();
+  await act(async () => { fireEvent.click(action()); });
+  expect(media.getUserMedia).toHaveBeenCalledTimes(1);
+  expect(said()).toBe("Still blocked.");
+  expect(document.activeElement).toBe(action());
+  await act(async () => { granted.set("granted"); });
+  await waitFor(() => expect(title()).toHaveTextContent("Set up transcription"), { timeout: 3000 });
+}, WHOLE_APP_MS);
+
+test("the request closed without an answer is not a block: Allow microphone again", async () => {
+  browser("prompt", () => Promise.reject(refused("NotAllowedError")));
+  await setup();
+  await act(async () => { fireEvent.click(action()); });
+  expect(tile()).toContain("Not allowed yet");
+  expect(said()).toBe("The request was closed without an answer. Allow microphone asks again.");
+  expect(action()).toHaveTextContent("Allow microphone");
+}, WHOLE_APP_MS);
+
+test("already allowed: never asked again; Back from transcription shows it allowed, with Continue", async () => {
+  const { media } = browser("granted", () => Promise.resolve(stream()));
+  await setup();
+  expect(title()).toHaveTextContent("Set up transcription");
+  fireEvent.click(wizard().getByRole("button", { name: "Back" }));
+  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(tile()).toContain("Allowed");
+  expect(action()).toHaveTextContent("Continue");
+  expect(media.getUserMedia).not.toHaveBeenCalled();
+  // Arrived at allowed, it stays: Back always lands where it says.
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  expect(title()).toHaveTextContent("Allow the microphone");
+}, WHOLE_APP_MS);
+
+test("none connected: No microphone found, and Check again finds one", async () => {
+  let found = false;
+  browser("prompt", () => found ? Promise.resolve(stream()) : Promise.reject(refused("NotFoundError")));
+  await setup();
+  await act(async () => { fireEvent.click(action()); });
+  expect(tile()).toContain("No microphone found");
+  expect(tile()).toContain("Connect a microphone or turn one on, then check again.");
+  expect(action()).toHaveTextContent("Check again");
+  found = true;
+  await act(async () => { fireEvent.click(action()); });
+  await waitFor(() => expect(title()).toHaveTextContent("Set up transcription"), { timeout: 3000 });
+}, WHOLE_APP_MS);
+
+test("in the desktop app on a Mac: the system's permission through the app, its settings opened from the step", async () => {
+  let state: "prompt" | "granted" | "denied" = "denied";
+  const microphone = { state: vi.fn(async () => state), request: vi.fn(async () => state === "granted" ? "granted" : "denied"), openSettings: vi.fn(async () => {}) };
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { voice: {}, microphone } } });
+  await setup();
+  expect(title()).toHaveTextContent("Allow the microphone");
+  expect(wizard().getByText(/System Settings › Privacy & Security › Microphone and turn on Sidevoice/)).toBeInTheDocument();
+  fireEvent.click(wizard().getByRole("button", { name: "Open System Settings" }));
+  expect(microphone.openSettings).toHaveBeenCalled();
+  state = "granted";
+  await act(async () => { fireEvent.click(action()); });
+  expect(microphone.request).toHaveBeenCalled();
+  await waitFor(() => expect(title()).toHaveTextContent("Set up transcription"), { timeout: 3000 });
+}, WHOLE_APP_MS);
+
+test("nothing to ask: an app that asks for itself when its call opens, or a page with no microphone API, goes straight to transcription", async () => {
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { voice: {} } } });
+  await setup();
+  expect(title()).toHaveTextContent("Set up transcription");
+}, WHOLE_APP_MS);
+
+test("where its settings are: the platform the page runs on, a phone none", () => {
+  const nav = (platform: string, userAgent = "", maxTouchPoints = 0) => ({ platform, userAgent, maxTouchPoints }) as Navigator;
+  expect(devicePlatform(nav("MacIntel"))).toBe("mac");
+  expect(devicePlatform(nav("MacIntel", "", 5))).toBe("other");
+  expect(devicePlatform(nav("Win32"))).toBe("windows");
+  expect(devicePlatform(nav("Linux x86_64"))).toBe("linux");
+  expect(devicePlatform(nav("Linux armv8l", "Mozilla/5.0 (Linux; Android 14)"))).toBe("other");
+});

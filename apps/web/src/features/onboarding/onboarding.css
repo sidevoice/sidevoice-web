@@ -74,6 +74,22 @@
 .wizard-stage-step > p { margin: 0; line-height: 1.5rem; color: var(--sv-text-muted); }
 .wizard-stage { min-width: 0; }
 
+/* ----- the microphone (MicrophoneStep): why, then the microphone as a tile saying where it stands — its mark (crossed
+   out once blocked or none found; a check once allowed), its name, its state and a line under it —, and, blocked, how to
+   allow it. Its colours follow the state: the accent's until answered, positive allowed, the warning's blocked. */
+.wizard-mic-tile { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; column-gap: var(--sv-space-4); padding: var(--sv-space-4); border: 1px solid var(--sv-border); border-radius: var(--sv-radius-lg); background: var(--sv-bg-subtle); }
+[data-theme="dark"] .wizard-mic-tile { background: var(--sv-surface); }
+.wizard-mic-mark { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--sv-accent-soft); color: var(--sv-accent-text); transition: background var(--sv-dur-fast) var(--sv-ease), color var(--sv-dur-fast) var(--sv-ease); }
+.wizard-mic[data-state="granted"] .wizard-mic-mark { background: var(--sv-positive-soft); color: var(--sv-positive); }
+.wizard-mic[data-state="denied"] .wizard-mic-mark, .wizard-mic[data-state="missing"] .wizard-mic-mark { background: var(--sv-warning-soft); color: var(--sv-warning); }
+.wizard-mic-check { position: absolute; inset-block-end: -2px; inset-inline-end: -2px; display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-positive); color: var(--sv-surface); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
+.wizard-mic-check svg { width: 10px; height: 10px; }
+.wizard-mic-text { display: grid; gap: 2px; min-width: 0; }
+.wizard-mic-name { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-mic-state { display: flex; align-items: center; gap: var(--sv-space-2); font-weight: var(--sv-weight-semibold); line-height: 1.375rem; color: var(--sv-text); }
+.wizard-mic-line { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
+.wizard-body > section > p.wizard-mic-also { font-size: var(--sv-font-sm); line-height: 1.25rem; }
+@media (prefers-reduced-motion: reduce) { .wizard-mic-mark { transition: none; } .wizard-mic-check { animation: none; } }
 
 /* ----- Ready (ReadyStep): the mark arriving, the title, what was set up, what to tell an agent; Enter in the footer —
    in the setup's frame, its last bar mustard. Only transform and opacity move; nothing arrives later than half a second;

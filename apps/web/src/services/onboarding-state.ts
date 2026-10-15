@@ -2,10 +2,11 @@
  * here, or another machine), whether the agents step was answered, the transcription and voice chosen (and, apart, the
  * ones the person tried: trying is optional), the end of turn chosen, and when it was put off or finished. It lives on
  * the device, like the voice settings it tries; the machine, its agents and its pairing keep their own state, and the
- * setup only reads them. Completion is written fail-closed: it counts only once it reads back. */
+ * setup only reads them, as it reads whether the microphone may be used. Completion is written fail-closed: it counts
+ * only once it reads back. */
 
 export type OnboardingPath = "agents" | "remote";
-export type OnboardingStep = "W0" | "W1" | "W2" | "W2r" | "W3" | "W4" | "W4v" | "W5" | "W6";
+export type OnboardingStep = "W0" | "W1" | "W2" | "W2r" | "W3" | "W4m" | "W4" | "W4v" | "W5" | "W6";
 export type OnboardingTask = "stt" | "tts";
 
 export interface OnboardingRecord {
@@ -14,6 +15,8 @@ export interface OnboardingRecord {
   basics_done: boolean;
   choice: OnboardingPath | null;
   agents_done: boolean;
+  /** The microphone was allowed in the setup: what counts where the browser cannot say it without asking. */
+  microphone_done: boolean;
   /** The end of turn step was answered. */
   turn_done: boolean;
   deferred_at: number | null;
@@ -37,7 +40,7 @@ export type OnboardingPatch = Partial<Omit<OnboardingRecord, "version" | "trials
 export const ONBOARDING_STORAGE_KEY = "sidevoice.onboarding";
 
 export const emptyOnboardingRecord = (): OnboardingRecord => ({
-  version: 1, basics_done: false, choice: null, agents_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
+  version: 1, basics_done: false, choice: null, agents_done: false, microphone_done: false, turn_done: false, deferred_at: null, completed_at: null, trials: {}, chosen: {}, baseline_release: 0, features: {},
 });
 
 export class OnboardingStorageError extends Error {
@@ -75,6 +78,7 @@ export function normalizeOnboardingRecord(value: unknown): OnboardingRecord {
     basics_done: input.basics_done === true,
     choice: input.choice === "agents" || input.choice === "remote" ? input.choice : null,
     agents_done: input.agents_done === true,
+    microphone_done: input.microphone_done === true,
     turn_done: input.turn_done === true,
     deferred_at: timestamp(input.deferred_at),
     completed_at: timestamp(input.completed_at),
@@ -119,6 +123,8 @@ export interface ResumeFacts {
   localReady: boolean;
   /** Another machine is paired, in use and answering. */
   remoteReady: boolean;
+  /** The microphone may be used here, or there is nothing to ask (microphone-access.ts), as things stand now. */
+  microphoneReady: boolean;
   /** The keys of this device's transcription and voice settings now (`trialKey`). */
   sttKey: string | null;
   ttsKey: string | null;
@@ -134,6 +140,8 @@ export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   if (path === "agents" && !facts.localReady) return "W2";
   if (path === "remote" && !facts.remoteReady) return "W2r";
   if (path === "agents" && !record.agents_done) return "W3";
+  // The microphone before the first voice step: its try, the first thing that listens, then works the first time.
+  if (!facts.microphoneReady) return "W4m";
   // Chosen, tried or not: trying is the setup's suggestion, not a condition.
   const settled = (task: OnboardingTask, key: string | null) => !!key && (record.chosen[task] === key || record.trials[task] === key);
   if (!settled("stt", facts.sttKey)) return "W4";

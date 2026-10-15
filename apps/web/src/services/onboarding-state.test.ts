@@ -10,7 +10,7 @@ const stt = { catalog: "local", model: "whisper-base", language: null };
 const tts = { catalog: "elevenlabs", model: "eleven_flash_v2_5", voice: "v1", speed: 1 };
 const basics = () => ({ ...emptyOnboardingRecord(), basics_done: true });
 const facts = (patch: Partial<ResumeFacts> = {}): ResumeFacts => ({
-  record: basics(), canHostAgents: true, localReady: false, remoteReady: false,
+  record: basics(), canHostAgents: true, localReady: false, remoteReady: false, microphoneReady: true,
   sttKey: trialKey(stt), ttsKey: trialKey(tts), ...patch,
 });
 function memory(fail: { set?: boolean; keep?: boolean } = {}) {
@@ -58,6 +58,17 @@ test("resume: the basics, where the agents run, then the machine, the agents, tr
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true, ttsKey: trialKey({ ...tts, voice: "v2" }) }))).toBe("W4v");
   expect(resumeOnboarding(facts({ record: tried, remoteReady: true, sttKey: null }))).toBe("W4");
   expect(resumeOnboarding(facts({ record: tried, remoteReady: false }))).toBe("W2r");
+});
+
+test("resume: the microphone, once the machine is there and before transcription, whenever it may not be used now", () => {
+  const remote = { ...basics(), choice: "remote" as const };
+  expect(resumeOnboarding(facts({ record: remote, remoteReady: true, microphoneReady: false }))).toBe("W4m");
+  // Allowed once and blocked since: asked again, even with everything else done.
+  const done = { ...remote, microphone_done: true, chosen: { stt: trialKey(stt)!, tts: trialKey(tts)! }, turn_done: true };
+  expect(resumeOnboarding(facts({ record: done, remoteReady: true, microphoneReady: false }))).toBe("W4m");
+  // The machine comes first: no microphone step without one.
+  expect(resumeOnboarding(facts({ record: remote, microphoneReady: false }))).toBe("W2r");
+  expect(normalizeOnboardingRecord({ microphone_done: true }).microphone_done).toBe(true);
 });
 
 test("the record is kept in this device's storage, and a write counts only once it reads back", async () => {

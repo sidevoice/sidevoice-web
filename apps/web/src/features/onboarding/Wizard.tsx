@@ -20,6 +20,7 @@ import { hostStatusText, localHostRecovery, runLocalHostAction, type LocalHostAc
 import { useOnboarding } from "./onboarding-context";
 import { DeviceNameField } from "../settings/DeviceNameField";
 import { ReadyStep } from "./ReadyStep";
+import { MicrophoneAction, MicrophoneStep } from "./MicrophoneStep";
 import "./onboarding.css";
 import { useRoomStore } from "../../state/room-store";
 import type { OnboardingStep } from "../../services/onboarding-state";
@@ -27,13 +28,14 @@ import type { OnboardingStep } from "../../services/onboarding-state";
 /* The first-run setup, one dialog over the room: of a fixed height, so nothing jumps between steps, and the whole
  * screen on a phone. Its order is the operator's: the basics (appearance, the interface's and the person's
  * languages), where the agents are (this computer prepared and its agents connected in one step, or another machine
- * paired), transcription, voice, and when a turn ends. Transcription and voice are this device's settings (as in
+ * paired), the microphone allowed (before the first thing that listens), transcription, voice, and when a turn ends. Transcription and voice are this device's settings (as in
  * Settings); trying them is recommended, not required: Continue waits only for the chosen model to be ready. */
 
 const GROUPS: { key: MessageKey; steps: OnboardingStep[] }[] = [
   { key: "wizard.group.basics", steps: ["W0"] },
   { key: "wizard.group.where", steps: ["W1"] },
   { key: "wizard.group.agents", steps: ["W2", "W3", "W2r"] },
+  { key: "wizard.group.microphone", steps: ["W4m"] },
   { key: "wizard.group.transcription", steps: ["W4"] },
   { key: "wizard.group.voice", steps: ["W4v"] },
   { key: "wizard.group.call", steps: ["W5"] },
@@ -43,17 +45,19 @@ const GROUPS: { key: MessageKey; steps: OnboardingStep[] }[] = [
 // Preparing this computer and connecting its agents are one step to the person: the same title through both.
 const TITLES: Record<OnboardingStep, MessageKey> = {
   W0: "wizard.title.basics", W1: "wizard.title.where", W2: "wizard.title.install", W2r: "wizard.title.pair", W3: "wizard.title.install",
-  W4: "wizard.title.stt", W4v: "wizard.title.tts", W5: "wizard.title.turn", W6: "wizard.title.ready",
+  W4m: "wizard.title.microphone", W4: "wizard.title.stt", W4v: "wizard.title.tts", W5: "wizard.title.turn", W6: "wizard.title.ready",
 };
 
 /** The steps in the order they come, for the side a new one slides in from. */
-const ORDER: OnboardingStep[] = ["W0", "W1", "W2", "W2r", "W3", "W4", "W4v", "W5", "W6"];
+const ORDER: OnboardingStep[] = ["W0", "W1", "W2", "W2r", "W3", "W4m", "W4", "W4v", "W5", "W6"];
 
-function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean): OnboardingStep | null {
+/** The step Back goes to. `microphone`: whether there is a microphone to ask for here (else its step is never shown). */
+function previous(step: OnboardingStep, path: "agents" | "remote" | null, canHostAgents: boolean, microphone: boolean): OnboardingStep | null {
   if (step === "W1") return "W0";
   if (step === "W2" || step === "W3") return "W1";
   if (step === "W2r") return canHostAgents ? "W1" : "W0";
-  if (step === "W4") return path === "agents" ? "W3" : "W2r";
+  if (step === "W4m" || (step === "W4" && !microphone)) return path === "agents" ? "W3" : "W2r";
+  if (step === "W4") return "W4m";
   if (step === "W4v") return "W4";
   if (step === "W5") return "W4v";
   if (step === "W6") return "W5";
@@ -198,6 +202,9 @@ function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onC
   </>;
 }
 
+/** How long "Allowed" shows once the microphone is allowed on its step, before the setup moves on. */
+export const MICROPHONE_HOLD_MS = 900;
+
 /** Why a step's model holds its footer, in the step's own words; nothing once it is ready. */
 const WAIT_KEY = { stt: "settings.save.waitTranscription", tts: "settings.save.waitVoice", turn: "settings.save.waitTurn" } as const;
 function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: Translate) {
@@ -265,28 +272,39 @@ export function Wizard() {
   // A machine prepared or paired while its step shows moves the setup on by itself, to where it then stands (a machine
   // that answers after the setup opened leaves the steps already done behind). Only one that becomes ready there: a
   // step arrived at with its machine already ready (Back) stays, with Continue — Back always lands where it says.
-  const readyOnArrival = useRef({ step, local: onboarding.localReady, remote: onboarding.remoteReady });
-  if (readyOnArrival.current.step !== step) readyOnArrival.current = { step, local: onboarding.localReady, remote: onboarding.remoteReady };
+  const readyOnArrival = useRef({ step, local: onboarding.localReady, remote: onboarding.remoteReady, microphone: onboarding.microphone.ready });
+  if (readyOnArrival.current.step !== step) readyOnArrival.current = { step, local: onboarding.localReady, remote: onboarding.remoteReady, microphone: onboarding.microphone.ready };
   useEffect(() => {
     if (!onboarding.open) return;
     const arrived = readyOnArrival.current;
     if (step === "W2" && onboarding.localReady && !arrived.local) onboarding.openWizard();
     if (step === "W2r" && onboarding.remoteReady && !arrived.remote) onboarding.openWizard();
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The microphone allowed on its step: "Allowed" is seen for a moment, then transcription. Arrived at already allowed
+  // (Back), it stays, with Continue.
+  const microphoneAllowed = onboarding.open && step === "W4m" && onboarding.microphone.ready && !readyOnArrival.current.microphone;
+  useEffect(() => {
+    if (!microphoneAllowed) return;
+    const timer = setTimeout(() => onboarding.goTo("W4"), MICROPHONE_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [microphoneAllowed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The voice steps start at the microphone, unless it is already allowed (or there is nothing to ask here).
+  const voiceStart: OnboardingStep = onboarding.microphone.ready ? "W4" : "W4m";
 
   async function choosePath(next: "agents" | "remote") {
     if (!await onboarding.setPath(next)) return;
     if (next === "agents") {
       onboarding.goTo(onboarding.localReady ? "W3" : "W2");
-    } else onboarding.goTo(onboarding.remoteReady ? "W4" : "W2r");
+    } else onboarding.goTo(onboarding.remoteReady ? voiceStart : "W2r");
   }
 
   async function finishAgents() {
-    if (await onboarding.markAgentsDone()) onboarding.goTo("W4");
+    if (await onboarding.markAgentsDone()) onboarding.goTo(voiceStart);
   }
 
   async function finishBasics() {
-    if (await onboarding.markBasicsDone()) onboarding.goTo(onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? "W4" : "W2r");
+    if (await onboarding.markBasicsDone()) onboarding.goTo(onboarding.canHostAgents ? "W1" : onboarding.remoteReady ? voiceStart : "W2r");
   }
 
   async function finishStage(task: "stt" | "tts") {
@@ -309,7 +327,7 @@ export function Wizard() {
   }
 
   const current = GROUPS.findIndex((group) => group.steps.includes(step));
-  const back = previous(step, onboarding.path, onboarding.canHostAgents);
+  const back = previous(step, onboarding.path, onboarding.canHostAgents, onboarding.microphone.state !== "none");
   const error = onboarding.error ? t(`wizard.error.${onboarding.error.replace("onboarding.", "")}` as MessageKey) : "";
   const agents = agentsFp ? hostAgents[agentsFp] : undefined;
 
@@ -359,6 +377,7 @@ export function Wizard() {
         <PairMachine idPrefix="wizard-pairing" rows={2} submitIn={onboarding.remoteReady ? null : footerSlot} />
       </section>}
       {step === "W3" && <section>{agentsBlock}</section>}
+      {step === "W4m" && <MicrophoneStep microphone={onboarding.microphone} openSettings={onboarding.openMicrophoneSettings} t={t} />}
       {stageTask && <StageStep key={step} task={stageTask} stage={stage} t={t} />}
       {step === "W5" && <TurnStep turnTry={turnTry} t={t} />}
       {ready && <ReadyStep path={onboarding.path} machineName={remoteName} title={title} t={t} />}
@@ -369,9 +388,10 @@ export function Wizard() {
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
-      {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W4")}>{t("wizard.continue")}</Button>}
+      {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(voiceStart)}>{t("wizard.continue")}</Button>}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
+      {step === "W4m" && <MicrophoneAction microphone={onboarding.microphone} onRequest={() => void onboarding.requestMicrophone()} onContinue={() => onboarding.goTo("W4")} t={t} />}
       {stageTask && <ModelStepFooter reason={waitReason(model, stageTask, t)}
         tryReason={stageTask === "tts" && !sample.trim() ? t("wizard.wait.sentence") : undefined}
         running={trial.trial.phase === "running"} tried={onboarding.tried(stageTask)}
