@@ -36,7 +36,7 @@ async function withUpdater(page, language, first = STATES[0], stored = null) {
       updater: {
         settings: async () => ({ mode: "manual" }), setMode: async (mode) => ({ mode }),
         status: async () => now, subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
-        check: async () => now, download: async () => now, restart: async () => undefined,
+        check: async () => now, download: async () => now, cancel: async () => undefined, restart: async () => undefined,
       },
     } };
   }, { language, first, stored });
@@ -77,7 +77,7 @@ for (const language of ["en", "es", "fr", "it", "de", "ja", "zh-Hans", "pl"]) {
       await page.evaluate((next) => window.__pushUpdate(next), status);
       await expect(row).toHaveAttribute("data-state", status.state);
       if (status.state === "downloading") await expect(row.getByRole("progressbar")).toBeVisible();
-      else await expect(row.getByRole("button")).toBeVisible();
+      await expect(row.getByRole("button")).toBeVisible();
       expect(await pane.evaluate(fits), label(status)).toEqual({ out: [], paneFits: true, pageFits: true });
     }
   });
@@ -135,8 +135,7 @@ for (const language of ["en", "es"]) {
         const shown = page.locator(".update-notice:not([data-leaving])");
         for (const status of STATES) {
           await page.evaluate((next) => window.__pushUpdate(next), status);
-          // Manual, as this app is: a download's progress is Updates' to show, never the room's.
-          if (status.state === "downloading") { await expect(page.locator(".update-notice")).toHaveCount(0); continue; }
+          // A download's progress is Updates' to show; the room offers its Cancel.
           await expect(shown).toBeVisible();
           await expect(shown.locator(".update-notice-text")).toHaveAttribute("title", new RegExp(VERSION.replace(/[.+]/g, "\\$&")));
           expect(await shown.evaluate(noticeFits), label(status)).toEqual({ inside: true, hideLast: true, hideInside: true, actionWhole: true, wordsBeforeAction: true,
@@ -160,12 +159,13 @@ test("the notice's Download acts in place, its download said in Updates only; a 
   await expect(shown.locator(".update-notice-text")).toHaveText(`Version ${VERSION} available`);
   await shown.getByRole("button", { name: "Download" }).click();
   await page.evaluate((version) => window.__pushUpdate({ state: "downloading", version, progress: 0.3 }), VERSION);
-  // Downloading: the room says nothing of the app's, and nothing of the machine behind elsewhere.
-  await expect(page.locator(".update-notice")).toHaveCount(0);
+  // Downloading: the room offers Cancel, and says nothing of the machine behind elsewhere.
+  await expect(shown.getByRole("button", { name: "Cancel download" })).toBeVisible();
+  await expect(shown).not.toContainText("sidevoice update");
   await page.locator(".sidebar-settings").click();
   await page.locator("#settings-updates").click();
   await expect(page.locator("#updates-app")).toHaveAttribute("data-state", "downloading");
   const machine = page.locator("[id^='updates-machine-']").first();
   await expect(machine).toContainText("sidevoice update");
-  await expect(page.locator(".update-notice")).toHaveCount(0);
+  await expect(page.locator(".update-notice")).not.toContainText("sidevoice update");
 });
