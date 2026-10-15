@@ -750,3 +750,16 @@ test("a working-badge choice left in storage changes nothing: the line stays sr-
   expect(workingLine()).toHaveClass("sr-only");
   expect(document.querySelector(".stage-activity")).toBeNull();
 }, WHOLE_APP_MS);
+
+test("the voice error shows above the tile on variant a and inside it, as one alert, on variant b", () => {
+  const store = room();
+  patch(store, { bootError: { text: "Algo falló con la voz.", details: "TypeError\nFailed to fetch" } });
+  expect(document.querySelectorAll("#error")).toHaveLength(1);
+  expect(document.querySelector(".stage-tile #error")).toBeNull();
+  act(() => { localStorage.setItem(VARIANTS_KEY, JSON.stringify({ voiceError: "b" })); window.dispatchEvent(new StorageEvent("storage", { key: VARIANTS_KEY })); });
+  expect(document.querySelectorAll("#error")).toHaveLength(1);
+  const card = document.querySelector<HTMLElement>(".stage-tile #error")!;
+  expect(card).toHaveAttribute("role", "alert");
+  expect(card).toHaveTextContent("Algo falló con la voz.");
+  expect(card.querySelector("details, summary, button")).not.toBeNull();
+}, WHOLE_APP_MS);

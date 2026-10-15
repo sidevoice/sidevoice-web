@@ -96,11 +96,18 @@ function AgentBubbles({ reply, spokenTo }: { reply: ChatMessage | null; spokenTo
   return <>{turns.map((turn) => <AgentBubble key={turn.key} turn={turn} />)}</>;
 }
 
+/* Where a failure shows is compared on the live page (`voiceError`, 2026-10-15): a (above the tile, as it has been) or b
+ * (a compact card on the tile's bottom-right, its Details opening inside it and never over the call bar). */
+const VOICE_ERRORS = ["a", "b"] as const;
+
 /** The room's errors, above the stage (#error is the runtime's id), as people read them: what was raw about one is
  *  behind its Details. The box stays in the page so what appears in it is read out at once. */
-function BootError() {
+function BootError({ place }: { place: "above" | "tile" }) {
+  const look = useVariant("voiceError", VOICE_ERRORS);
   const error = useRoomStore((state) => state.bootError);
-  return <div id="error" className="stage-error" role="alert" hidden={!error}>{error && <Alert tone="danger" title={errorLine(error)} details={error.details} />}</div>;
+  // One box only (its id and live region): above the tile on a, laid on the tile's bottom-right on b.
+  if ((look === "b") !== (place === "tile")) return null;
+  return <div id="error" className="stage-error" data-place={place} role="alert" hidden={!error}>{error && <Alert tone="danger" title={errorLine(error)} details={error.details} />}</div>;
 }
 
 function posterWords(t: Translate): PosterWords {
@@ -124,8 +131,9 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   if (!stage.threadId) {
     return (
       <section className="call-stage" aria-label={t("stage.label")}>
-        <BootError />
+        <BootError place="above" />
         <div className="stage-tile stage-empty">
+          <BootError place="tile" />
           <div className="stage-notice">{notice}</div>
           <p>{t("stage.empty")}</p>
           <Button className="stage-choose" onClick={showConversations}>{t("stage.chooseConversation")}</Button>
@@ -138,7 +146,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
   const tone = avatarColor(spec);
   return (
     <section className="call-stage" aria-label={t("stage.label")}>
-      <BootError />
+      <BootError place="above" />
       {/* Named above the tile where the room has no header (a desktop), in place of the tile's own name. */}
       <StageName stage={stage} className="stage-title" look={titleLook} tone={tone} />
       {/* The tile keeps its form factor's shape, as a slide does: as large as the room allows, centred, the app's own
@@ -147,6 +155,7 @@ export function CallStage({ notice }: { notice?: ReactNode } = {}) {
       <div ref={sceneRef} className="stage-slot">
       <div className="stage-tile" data-mood={stage.mood} data-app={desktopHost() ? "" : undefined} style={avatarTone(tone) as CSSProperties}>
         <div className="stage-notice">{notice}</div>
+        <BootError place="tile" />
         <div className="stage-canvas">
           <div className="stage-scene">
             <StageBackdrop seed={stage.threadId} tone={tone} />

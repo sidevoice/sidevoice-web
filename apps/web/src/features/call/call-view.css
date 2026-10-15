@@ -8,6 +8,12 @@
 /* ---------- the stage ---------- */
 .call-stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--sv-space-2); padding: var(--sv-space-4) var(--sv-space-4) var(--sv-space-1); }
 #error.stage-error { flex: none; }
+/* Variant b: a compact card on the tile's bottom-right; its Details open inside it (it scrolls past the tile's height). */
+#error.stage-error[data-place="tile"] { position: absolute; z-index: 5; right: var(--stage-inset); bottom: var(--stage-inset); width: min(22rem, calc(100% - 2 * var(--stage-inset)));
+  max-height: calc(100% - 2 * var(--stage-inset)); overflow: auto; border-radius: var(--sv-radius-lg); box-shadow: var(--sv-shadow-xs); }
+#error.stage-error[data-place="tile"] .ui-alert { border-radius: inherit; }
+/* The transcript's button holds that corner on a phone: the card sits above it. */
+.stage-tile:has(> .transcript-entry) > #error.stage-error[data-place="tile"] { bottom: calc(var(--stage-inset) + 44px + var(--sv-space-2)); max-height: calc(100% - 2 * var(--stage-inset) - 44px - var(--sv-space-2)); }
 
 /* The tile fills the call; what sits on it keeps one inset from its edges, smaller on a small tile. */
 .stage-tile { container: stage / inline-size; position: relative; flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden;
