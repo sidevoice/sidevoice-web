@@ -50,7 +50,7 @@ function AgentBubble({ turn }: { turn: AgentTurn }) {
   const paging = useVariant("balloonPaging", BALLOON_PAGING);
   return (
     <div className="speech-bubble stage-bubble" data-place={place} data-visible="" data-leaving={turn.leaving || undefined} aria-hidden="true" translate="no">
-      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn={paging}>
+      <PagedText measure={turn.text} follow=".karaoke-played" lines={3} turn={paging} fixed>
         <KaraokeText text={turn.text} playback="playing" range={turn.spoken > 0 ? { from: 0, to: Math.min(turn.spoken, turn.text.length) } : null} />
       </PagedText>
       {/* The bichos' gloss, as on their skin. */}

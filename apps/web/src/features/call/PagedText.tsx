@@ -25,14 +25,16 @@ function layoutOf(node: HTMLElement, run: HTMLElement): Layout {
 }
 
 /** The furthest first line the window can show. */
-function lastTop(total: number, lines: number, turn: PagedTurn) {
-  return turn === "page" ? Math.floor((total - 1) / lines) * lines : Math.max(0, total - lines);
+/** A fixed window's last page ends on the last line, full (operator, 2026-10-15): it turns only as far as that, never
+ *  leaving it a line or two in a window three tall. */
+function lastTop(total: number, lines: number, turn: PagedTurn, fixed = false) {
+  return turn === "page" && !fixed ? Math.floor((total - 1) / lines) * lines : Math.max(0, total - lines);
 }
 
 /** The first line shown while line `current` is heard: its page's first, or the line that keeps the next one in view. */
-function topFor(current: number, total: number, lines: number, turn: PagedTurn) {
+function topFor(current: number, total: number, lines: number, turn: PagedTurn, fixed = false) {
   const top = turn === "page" ? Math.floor(current / lines) * lines : current - lines + 2;
-  return Math.max(0, Math.min(top, lastTop(total, lines, turn)));
+  return Math.max(0, Math.min(top, lastTop(total, lines, turn, fixed)));
 }
 
 export function PagedText({ children, measure, onPages, follow, lines = 3, turn = "page", fixed }: { children: ReactNode; measure: unknown;
@@ -61,7 +63,7 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
       const next = layoutOf(node, inner);
       if (!next) return;
       setLayout((before) => before && before.line === next.line && before.total === next.total ? before : next);
-      setTop((before) => Math.min(turn === "page" ? Math.floor(before / lines) * lines : before, lastTop(next.total, lines, turn)));
+      setTop((before) => Math.min(turn === "page" ? Math.floor(before / lines) * lines : before, lastTop(next.total, lines, turn, fixed)));
     });
     observer.observe(node);
     observer.observe(inner);
@@ -69,7 +71,7 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
   }, [measure, follow, lines, turn]);
   // By time: a page every PAGE_MS, or a line every PAGE_MS / lines (the same pace).
   useEffect(() => {
-    if (follow || !layout || top >= lastTop(layout.total, lines, turn)) return;
+    if (follow || !layout || top >= lastTop(layout.total, lines, turn, fixed)) return;
     const next = window.setTimeout(() => setTop((now) => now + (turn === "page" ? lines : 1)), turn === "page" ? PAGE_MS : PAGE_MS / lines);
     return () => window.clearTimeout(next);
   }, [follow, top, layout, lines, turn]);
@@ -82,7 +84,7 @@ export function PagedText({ children, measure, onPages, follow, lines = 3, turn 
     const last = mark.textContent && rects.length ? rects[rects.length - 1] : null;
     // Measured from the run's own top: the transform moves the run and the words in it alike, mid-turn too.
     const current = !last ? 0 : Math.floor((last.bottom - run.current.getBoundingClientRect().top - 1) / layout.line);
-    const at = topFor(Math.max(0, Math.min(layout.total - 1, current)), layout.total, lines, turn);
+    const at = topFor(Math.max(0, Math.min(layout.total - 1, current)), layout.total, lines, turn, fixed);
     if (at !== top) setTop(at);
   });
   const shown = layout && !fixed ? Math.min(lines, turn === "page" ? layout.total - top : layout.total) : lines;
