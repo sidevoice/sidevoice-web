@@ -408,6 +408,8 @@ export function Wizard() {
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
       {step === "W1" && skips && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
+      {/* Skip for now, secondary, always left of the step's forward action (operator, 2026-10-16). */}
+      {machineWaits && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       {/* Continue in sight while this computer is prepared, waiting and saying why, as the permissions step does
           (operator, 2026-10-16): aria-disabled (blockedBy), so it stays focusable and its tooltip shows. */}
       {step === "W2" && <Tooltip content={onboarding.localReady ? null : t("wizard.prepare.continueWaiting")}>
@@ -417,7 +419,6 @@ export function Wizard() {
       </Tooltip>}
       {step === "W2" && !onboarding.localReady && <span id="wizard-prepare-continue-why" className="sr-only">{t("wizard.prepare.continueWaiting")}</span>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(sttStep)}>{t("wizard.continue")}</Button>}
-      {machineWaits && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
       {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })}
@@ -442,7 +443,7 @@ function SkipMachine({ onSkip, t }: { onSkip(): void; t: Translate }) {
   const [asking, setAsking] = useState(false);
   const back = useRef<HTMLButtonElement>(null);
   return <>
-    <Button type="button" variant="ghost" tone="neutral" id="wizard-step-skip" onClick={() => setAsking(true)}>{t("wizard.skip.later")}</Button>
+    <Button type="button" variant="secondary" id="wizard-step-skip" onClick={() => setAsking(true)}>{t("wizard.skip.later")}</Button>
     {asking && createPortal(<Dialog open size="sm" id="wizard-skip-machine" titleId="wizard-skip-machine-title" title={t("wizard.skip.machineTitle")}
       initialFocus={back} onClose={() => setAsking(false)}
       footer={<>
