@@ -61,7 +61,7 @@ function escape() {
 }
 
 test("the call area, flow by flow: what waits, whether the room is behind the setup, whether the conversations show", () => {
-  const facts = { ready: true, open: false, done: false, noMachine: false, voice: "missing" as const };
+  const facts = { ready: true, open: false, done: false, noMachine: false, microphone: true, voice: "missing" as const };
   expect(callArea(FLOW_RULES.b, facts)).toEqual({ roomHidden: false, waiting: "voice", blocked: false });
   expect(callArea(FLOW_RULES.b, { ...facts, noMachine: true })).toEqual({ roomHidden: false, waiting: "machine", blocked: true });
   expect(callArea(FLOW_RULES.b, { ...facts, voice: "unknown" }).waiting).toBe("unknown");
@@ -73,6 +73,14 @@ test("the call area, flow by flow: what waits, whether the room is behind the se
   expect(callArea(FLOW_RULES.c, { ...facts, done: true, noMachine: true }).waiting).toBe("machine");
   expect(callArea(FLOW_RULES.d, facts).roomHidden).toBe(true);
   expect(callArea(FLOW_RULES.d, { ...facts, done: true })).toEqual({ roomHidden: false, waiting: "voice", blocked: false });
+  // The microphone (required to call): after the machine, before the voice's models; clears on grant; a and c unaffected.
+  for (const rules of [FLOW_RULES.b, FLOW_RULES.d]) {
+    expect(callArea(rules, { ...facts, done: true, microphone: false })).toEqual({ roomHidden: false, waiting: "microphone", blocked: false });
+    expect(callArea(rules, { ...facts, done: true, microphone: false, noMachine: true }).waiting).toBe("machine");
+    expect(callArea(rules, { ...facts, done: true, microphone: true, voice: "ready" }).waiting).toBeNull();
+  }
+  expect(callArea(FLOW_RULES.a, { ...facts, microphone: false })).toEqual(callArea(FLOW_RULES.a, facts));
+  expect(callArea(FLOW_RULES.c, { ...facts, microphone: false })).toEqual(callArea(FLOW_RULES.c, facts));
 });
 
 test("a: no Later, Escape does nothing, and the app opened again resumes at the step it stood at", async () => {

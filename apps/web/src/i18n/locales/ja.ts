@@ -1106,6 +1106,8 @@ export const messages: Messages = {
   "wizard.mic.allow": "マイクを許可",
   "voiceSetup.title": "音声の準備がまだできていません",
   "voiceSetup.body": "通話にはこれらが必要です。ここでダウンロードするか、プロバイダーのキーを追加してください。",
+  "micSetup.title": "マイクを許可してください",
+  "micSetup.body": "エージェントがあなたの声を聞くために必要です。",
   "wizard.skip.microphone": "マイクなしで続ける",
   "wizard.skip.machine": "マシンなしで続ける",
   "wizard.skip.stt": "文字起こしなしで続ける",

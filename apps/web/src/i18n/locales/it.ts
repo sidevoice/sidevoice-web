@@ -1123,6 +1123,8 @@ export const messages: Messages = {
   "wizard.mic.allow": "Consenti microfono",
   "voiceSetup.title": "La tua voce non è ancora pronta",
   "voiceSetup.body": "Una chiamata ne ha bisogno. Scaricali qui o aggiungi la chiave di un fornitore.",
+  "micSetup.title": "Consenti il microfono",
+  "micSetup.body": "I tuoi agenti ne hanno bisogno per sentirti.",
   "wizard.skip.microphone": "Continua senza microfono",
   "wizard.skip.machine": "Continua senza una macchina",
   "wizard.skip.stt": "Continua senza trascrizione",

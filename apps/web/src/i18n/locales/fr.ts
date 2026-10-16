@@ -1105,6 +1105,8 @@ export const messages: Messages = {
   "wizard.mic.allow": "Autoriser le micro",
   "voiceSetup.title": "Votre voix n’est pas encore prête",
   "voiceSetup.body": "Un appel en a besoin. Téléchargez-les ici ou ajoutez la clé d’un fournisseur.",
+  "micSetup.title": "Autorisez le micro",
+  "micSetup.body": "Vos agents en ont besoin pour vous entendre.",
   "wizard.skip.microphone": "Continuer sans micro",
   "wizard.skip.machine": "Continuer sans machine",
   "wizard.skip.stt": "Continuer sans transcription",
