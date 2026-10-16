@@ -897,8 +897,6 @@ export const messages: Messages = {
   "storage.blockedTitle": "网站数据已被阻止",
   "settings.section.call": "通话",
   "settings.section.permissions": "权限",
-  "settings.permissions.site": "在浏览器中，这是网站的权限。在电脑上，可通过网址旁的网站设置图标更改。",
-  "settings.permissions.sitePhone": "在 iPhone 或 iPad 的 Safari 中：点按 aA，再点“网站设置”，然后将“麦克风”设为“允许”。",
   "settings.call.description": "通话的行为：何时结束你的发言、智能体工作时的声音，以及屏幕。",
   "settings.call.turn": "你的发言",
   "settings.call.working": "智能体工作时",

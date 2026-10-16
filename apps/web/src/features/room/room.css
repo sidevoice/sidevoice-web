@@ -173,6 +173,10 @@
 .sidebar-brand { display: none; }
 @media (min-width: 900px), (min-width: 560px) and (pointer: fine) {
   .room-shell > .room-header { display: none; }
+  /* With no machine there are no conversations, and with them no Settings at their foot: the header stays, its gear with
+   * it, so Settings is always reachable (operator, 2026-10-16). */
+  .room-shell[data-no-machine] > .room-header { display: flex; }
+  .room-shell[data-no-machine] > .room-header .header-settings { display: inline-flex; }
   .room-shell .sidebar-brand { display: flex; align-items: center; gap: var(--sv-space-2); flex: none; min-height: 40px; padding-inline-start: var(--sv-space-2); font-size: var(--sv-font-lg); line-height: 1.5rem; font-weight: var(--sv-weight-bold); letter-spacing: -.01em; color: var(--sv-text); }
   .room-shell .sidebar-brand svg { flex: none; color: var(--sv-accent-text); }
   .room-shell .conversation-sidebar[data-collapsed] .sidebar-brand { justify-content: center; padding: 0; }

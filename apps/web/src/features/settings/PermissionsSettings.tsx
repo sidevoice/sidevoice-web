@@ -1,5 +1,4 @@
 import { Section } from "../../components/ui/Card";
-import { desktopHost } from "../../services/desktop-host";
 import type { MicrophoneAccess, MicrophoneSnapshot } from "../../services/microphone-access";
 import { PermissionsList } from "../permissions/PermissionsList";
 import type { Translate } from "../../i18n/translator";
@@ -22,9 +21,5 @@ export function PermissionsSettings({ t, access, microphone }: { t: Translate; a
   return <Section id="permissions" title={t("settings.section.permissions")}>
     {microphone && <PermissionsList microphone={microphone} openSettings={access?.openSettings ?? null} onRequest={() => void access?.request()} t={t}
       actionId="permissions-mic-action" helpId="settings-mic-help" />}
-    {!desktopHost() && <div className="perm-site-note">
-      <p>{t("settings.permissions.site")}</p>
-      <p>{t("settings.permissions.sitePhone")}</p>
-    </div>}
   </Section>;
 }

@@ -898,8 +898,6 @@ export const messages: Messages = {
   "storage.blockedTitle": "サイトデータがブロックされています",
   "settings.section.call": "通話",
   "settings.section.permissions": "アクセス許可",
-  "settings.permissions.site": "ブラウザでは、これはサイトのアクセス許可です。パソコンでは、ウェブアドレスの横にあるサイト設定のアイコンから変更できます。",
-  "settings.permissions.sitePhone": "iPhone や iPad の Safari では、aA をタップし、「Web サイトの設定」を開いて、「マイク」を「許可」にします。",
   "settings.call.description": "通話中の動作です。ターンの終わり方、エージェントの作業中に流れる音、画面について設定します。",
   "settings.call.turn": "あなたのターン",
   "settings.call.working": "エージェントの作業中",

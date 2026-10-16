@@ -911,8 +911,6 @@ export const messages: Messages = {
   // The Call section, and Advanced's models (SettingsDialog).
   "settings.section.call": "Połączenie",
   "settings.section.permissions": "Uprawnienia",
-  "settings.permissions.site": "W przeglądarce to uprawnienie witryny. Na komputerze zmień je ikoną ustawień witryny obok adresu strony.",
-  "settings.permissions.sitePhone": "Na iPhonie lub iPadzie w Safari: stuknij aA, potem Ustawienia witryny, i ustaw Mikrofon na Zezwalaj.",
   "settings.call.description": "Jak zachowuje się połączenie: kiedy kończy się twoja wypowiedź, jaki dźwięk słychać, gdy agent pracuje, i co z ekranem.",
   "settings.call.turn": "Twoja wypowiedź",
   "settings.call.working": "Gdy agent pracuje",

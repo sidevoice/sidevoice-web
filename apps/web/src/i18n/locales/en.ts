@@ -920,8 +920,6 @@ export const messages = {
   // The Call section, and Advanced's models (SettingsDialog).
   "settings.section.call": "Call",
   "settings.section.permissions": "Permissions",
-  "settings.permissions.site": "In a browser this is the site’s permission. On a computer, change it from the site settings icon beside the web address.",
-  "settings.permissions.sitePhone": "On an iPhone or iPad, in Safari: tap aA, then Website Settings, and set Microphone to Allow.",
   "settings.call.description": "How a call behaves: when your turn ends, the sound while the agent works, and the screen.",
   "settings.call.turn": "Your turn",
   "settings.call.working": "While the agent works",

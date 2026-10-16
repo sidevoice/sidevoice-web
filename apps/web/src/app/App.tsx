@@ -67,7 +67,7 @@ function RoomContent() {
     <>
       <StorageBlockedBanner />
       <ResetReportNotice />
-      <div className="room-shell" hidden={setupPending} aria-hidden={setupPending || undefined}>
+      <div className="room-shell" data-no-machine={noMachine || undefined} hidden={setupPending} aria-hidden={setupPending || undefined}>
         <RoomHeader />
         <LocalHostBanner />
         {/* The call: the conversations, the stage over its bar, and the transcript when it is open (2026-10-10). */}
