@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { CheckIcon, MicrophoneIcon, MicrophoneOffIcon } from "../../components/ui/Icons";
+import { CheckIcon } from "../../components/ui/Icons";
 import { desktopHost } from "../../services/desktop-host";
 import { createMicrophoneAccess, devicePlatform, type MicrophoneAccess, type MicrophoneSnapshot } from "../../services/microphone-access";
 import type { MessageKey, Translate } from "../../i18n/translator";
@@ -62,14 +62,6 @@ export function announcement(microphone: MicrophoneSnapshot, t: Translate) {
   if (state === "missing") return t(unchanged ? "wizard.mic.stillMissing" : "wizard.mic.state.missing");
   if (state === "prompt" && dismissed) return t("wizard.mic.dismissed");
   return "";
-}
-
-/** The microphone's mark: crossed out once blocked or none found, a check on it once allowed. */
-export function MicrophoneMark({ view, className = "perm-mark" }: { view: MicrophoneView; className?: string }) {
-  return <span className={className} data-state={view.state} aria-hidden>
-    {view.blocked ? <MicrophoneOffIcon size={20} /> : <MicrophoneIcon size={20} />}
-    {view.state === "granted" && <span className="perm-mark-check"><CheckIcon size={10} /></span>}
-  </span>;
 }
 
 /** Where it stands, as a badge whose word says it (its colour only repeats it); a spinner while it is being read or

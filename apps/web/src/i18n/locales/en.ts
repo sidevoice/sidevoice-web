@@ -1132,7 +1132,6 @@ export const messages = {
   "wizard.mic.denied.siteWindows": "Already allowed there? Windows may be blocking the browser: Settings › Privacy & security › Microphone.",
   "wizard.mic.stillDenied": "Still blocked.",
   "wizard.mic.allow": "Allow microphone",
-  "wizard.mic.allowed": "Microphone allowed",
   "voiceSetup.title": "Your voice isn’t ready yet",
   "voiceSetup.body": "A call needs these. Download them here, or add a provider’s key.",
   "wizard.skip.machine": "Continue without a machine",
@@ -1153,7 +1152,6 @@ export const messages = {
   "wizard.mic.openSettings": "Open System Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).
   "perm.mic.why": "Needed so your agent can hear you",
-  "perm.refresh": "Refresh status",
   "perm.state.none": "Nothing to allow here",
   "wizard.turnIntro": "How Sidevoice knows you have finished speaking. You can change it in Settings → Call.",
   "voice.endOfTurn.smartHint": "A small model hears when you have finished, so a pause to think does not cut you off.",

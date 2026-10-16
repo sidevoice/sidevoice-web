@@ -236,9 +236,10 @@ test("put off, the setup leaves one action that resumes it where it stands", asy
   paired(store);
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Do this later" })); });
   expect(JSON.parse(localStorage.getItem(ONBOARDING_STORAGE_KEY)!).deferred_at).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Setup is not finished" })).toBeInTheDocument();
+  // Flow c leaves its "setup pending" card (a region, not a heading) in the call area.
+  expect(screen.getByRole("region", { name: "Setup is not finished" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
-  // Paired already: it does not ask for the machine again.
+  // Paired already: it does not ask for the machine again (and jsdom has no microphone to ask for).
   expect(title()).toHaveTextContent("Set up transcription");
 });
 
