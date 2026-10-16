@@ -89,6 +89,38 @@ test("in the desktop app Shortcuts is hidden too, and Call keeps only the call c
   expect(call).not.toHaveTextContent("Mute shortcut");
 });
 
+/** The desktop app that can reset its machine (macOS): `host.data` with deleteAll, and uninstall where it has it. */
+function withReset({ uninstall }: { uninstall: boolean }) {
+  const data = { pairings: { read: vi.fn(async () => ({ pairings: [] })), write: vi.fn(async () => {}) },
+    deleteAll: vi.fn(), resetReport: vi.fn(async () => null), ...(uninstall ? { uninstall: vi.fn() } : {}) };
+  Object.defineProperty(window, "__sidevoiceDesktop", { configurable: true, value: { host: { data } } });
+  onTestFinished(() => { delete (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop; });
+}
+
+test("a browser has no Danger zone, and a place asked in it opens General", () => {
+  withMicrophone();
+  const store = open("whisper-base");
+  expect(navLabels()).not.toContain("Danger zone");
+  expect(document.getElementById("pane-danger")).toBeNull();
+  expect(document.getElementById("delete-all-sidevoice-data")).toBeNull();
+  act(() => store.patch({ settingsSection: "danger" }));
+  expect(store.getState().facts.settingsSection).toBe("general");
+});
+
+test.each([false, true])("the desktop app's Danger zone is the last section, in red, with Delete out of Advanced (uninstall: %s)", (uninstall) => {
+  withMicrophone();
+  withReset({ uninstall });
+  open("whisper-base");
+  expect(navLabels().at(-1)).toBe("Danger zone");
+  expect(document.getElementById("settings-danger")).toHaveClass("settings-nav-danger");
+  expect(document.getElementById("pane-advanced")!.querySelector("#delete-all-sidevoice-data")).toBeNull();
+  fireEvent.click(document.getElementById("settings-danger")!);
+  const pane = document.getElementById("pane-danger")!;
+  expect(pane).not.toHaveAttribute("hidden");
+  expect(pane.querySelector(".danger-group #delete-all-sidevoice-data")).toBeInTheDocument();
+  expect(!!pane.querySelector(".danger-group #uninstall-sidevoice")).toBe(uninstall);
+});
+
 test("General: appearance, this device's name, then the interface's language", () => {
   open("whisper-base");
   expect([...document.querySelectorAll("#pane-general .ui-row-label")].map((label) => label.textContent))
