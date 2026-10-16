@@ -56,3 +56,11 @@
   .perm-mark-check, .perm-hero-figure[data-state] { animation: none; }
   .perm-hero-figure:is([data-state="denied"], [data-state="missing"], [data-state="requesting"]) { transform: none; }
 }
+
+/* The setup's step: the person's bicho centred on top, the list of permissions under it (rows as in Settings), Refresh
+ * status at its foot. */
+.wizard-perm { display: grid; gap: var(--sv-space-3); }
+.wizard-perm > .perm-hero-figure { justify-self: center; }
+.wizard-perm > .perm-refresh { justify-self: end; }
+.perm-badge-focus { display: inline-flex; border-radius: var(--sv-radius-pill); }
+.perm-badge-focus:focus-visible { outline: 2px solid var(--sv-focus); outline-offset: 2px; }
