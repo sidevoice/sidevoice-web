@@ -102,6 +102,8 @@ export const messages: Messages = {
   "titleDetail.effort": "Esfuerzo",
   "titleDetail.voice": "Voz",
   "titleDetail.noVoice": "Aún no hay modelos de voz elegidos.",
+  "titleDetail.pin": "Fijar junto al título",
+  "titleDetail.unpin": "Desfijar",
   // The microphone and the speaker (AudioDevices).
   "devices.toggle": "Micrófono y altavoz",
   "devices.mic": "Micrófono",
