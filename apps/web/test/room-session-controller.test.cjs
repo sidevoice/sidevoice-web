@@ -2752,10 +2752,27 @@ function voiceWithDevices(){
  });
  return voice;
 }
+test('Refreshing devices never opens the voice host, and an opened host fills the list',async()=>{
+ const s=setup();withVoice(s,voiceWithDevices());
+ s.run('page.voice=async()=>{globalThis.__opened++;return window.__sidevoiceDesktop.host.voice}');
+ s.context.__opened=0;
+ await s.run('refreshAudioDevices')();
+ s.handlers.focus?.();
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(s.context.__opened,0,'the section and focus refreshes do not create a host');
+ await s.run('voiceHost')();
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(s.context.__opened,1);
+ assert.equal(s.run('audioDevices.inputs.length'),2,'the host opening reads the device list');
+ await s.run('refreshAudioDevices')();
+ assert.equal(s.context.__opened,1,'later refreshes reuse the host');
+ assert.equal(s.run('audioDevices.outputs.length'),1);
+});
 test('This device\'s microphone and speaker are given to the voice when it is made, kept as chosen, and a lost one is said once',async()=>{
  const s=setup();const voice=withVoice(s,voiceWithDevices());
  s.context.localStorage.setItem('sidevoice.audio-devices',JSON.stringify({input:'mic-b'}));
- await s.run('watchAudioDevices')();
+ await s.run('voiceHost')();
+ await s.run('refreshAudioDevices')();
  assert.deepEqual(plain(voice.calls.find(([name])=>name==='setAudioDevices')[1]),{input:'mic-b'},'the kept choice, given to the voice');
  assert.equal(s.run('audioDevices.input'),'mic-b');
  await s.run("window.sidevoiceActions.setAudioDevices({output:'out-a'})");

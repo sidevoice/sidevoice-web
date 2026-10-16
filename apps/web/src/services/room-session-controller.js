@@ -1714,8 +1714,8 @@ const AUDIO_KEY='sidevoice.audio-devices';
 function storedAudio(){try{const kept=JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}');return kept&&typeof kept==='object'?kept:{}}catch{return {}}}
 function keepAudio(choice){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(choice))}catch{}}
 let audioWatched=null;
-async function watchAudioDevices(){
- const host=await voiceHost().catch(()=>null);if(!host||audioWatched===host)return;audioWatched=host;
+async function watchAudioDevices(host){
+ if(audioWatched===host)return;audioWatched=host;
  if(typeof host.audioDevices!=='function'){roomStore.patch({audioDevices:null});return}
  host.onAudioDevices(audioDevicesChanged);
  const kept=storedAudio();
@@ -1739,8 +1739,12 @@ async function setAudioDevices(choice){
  keepAudio(kept);audioDevicesChanged(devices);return devices;
 }
 async function refreshAudioDevices(){
- await watchAudioDevices();
- const host=await voiceHost();if(typeof host.audioDevices==='function')audioDevicesChanged(await host.audioDevices());
+ // Focus, permission and section changes must never start the voice just to read this list.
+ const opening=voiceHostOpening;
+ if(!opening)return;
+ const host=await opening;
+ await watchAudioDevices(host);
+ if(typeof host.audioDevices==='function')audioDevicesChanged(await host.audioDevices());
 }
 // The list stays fresh by itself: the permission changing and the window coming back read it again (the host tells of
 // devices plugged in or out), whatever Settings or the panel did or did not do at load.
@@ -1769,7 +1773,6 @@ async function toggleCall(){if(state.ws||state.connecting||state.reconnecting){d
   state.callNode=fp;
   if(linkBase(fp)==null){const text=reachNote(state)||NO_MACHINE;reachFailure={text,node:fp};throw worded(text)}
   const owner=await voiceHost();if(epoch!==connectEpoch)return;voiceOwner=owner;
-  void watchAudioDevices();
   await catalogue;handed=voiceSettingsToLoad(state.voiceSettings,state.voiceCatalogue.catalogs);
   if(epoch!==connectEpoch)return;
   if(rememberedOn(fp))await prepareConversationCall(fp,rememberedOn(fp),null);
@@ -1980,7 +1983,7 @@ async function replayReply(historyId){
  * page's storage), and the engine hands it to the provider. */
 const page=pageVoice();
 let voiceHostOpening=null,catalogsOpening=null;
-function voiceHost(){return voiceHostOpening??=page.voice().catch(error=>{voiceHostOpening=null;throw error})}
+function voiceHost(){return voiceHostOpening??=page.voice().then(host=>{void watchAudioDevices(host).catch(()=>{});return host}).catch(error=>{voiceHostOpening=null;throw error})}
 function modelCatalogs(){return catalogsOpening??=page.catalogs().catch(error=>{catalogsOpening=null;throw error})}
 async function keptProviderKeys(models,catalogs){return Object.fromEntries(await Promise.all(remoteProviders(catalogs).map(async({id})=>[id,await models.hasCredential(id).catch(()=>null)])))}
 async function loadVoiceCatalogue(){
