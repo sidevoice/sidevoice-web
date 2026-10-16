@@ -90,7 +90,11 @@ test("resume, with skips (onboardingFlow d): what was passed without is passed; 
   const agents = { ...basics(), choice: "agents" as const, machine_skipped: true };
   // This computer passed without: no agents to connect either.
   expect(resumeOnboarding(facts({ record: agents, skips: true }))).toBe("W4");
-  expect(normalizeOnboardingRecord({ machine_skipped: true, stt_skipped: true, tts_skipped: true })).toMatchObject({ machine_skipped: true, stt_skipped: true, tts_skipped: true });
+  // Skipped from where you work, no way chosen: on to the voice; without skips, where you work again.
+  const unchosen = { ...basics(), machine_skipped: true };
+  expect(resumeOnboarding(facts({ record: unchosen, canHostAgents: true, skips: true }))).toBe("W4");
+  expect(resumeOnboarding(facts({ record: unchosen, canHostAgents: true }))).toBe("W1");
+  expect(normalizeOnboardingRecord({ microphone_skipped: true, machine_skipped: true, stt_skipped: true, tts_skipped: true })).toMatchObject({ microphone_skipped: true, machine_skipped: true, stt_skipped: true, tts_skipped: true });
 });
 
 test("the record is kept in this device's storage, and a write counts only once it reads back", async () => {

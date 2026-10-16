@@ -180,8 +180,15 @@ test("d: each step passed without is kept, a reload goes on from there, and Read
   expect(wizard().queryByRole("button", { name: "Do this later" })).toBeNull();
   expect(escape()).toBe(false);
   expect(wizardOpen()).toBe(true);
-  expect(wizard().getByText("You’ll need a machine to call your agents. You can connect one from the call area.")).toBeInTheDocument();
-  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Continue without a machine" })); });
+  // Skip for now says first what it means; Go back stays.
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+  const ask = within(document.getElementById("wizard-skip-machine")!);
+  expect(ask.getByText("You’ll need a machine to call your agents. You can connect one from the call area.")).toBeInTheDocument();
+  await act(async () => { fireEvent.click(ask.getByRole("button", { name: "Go back" })); });
+  expect(document.getElementById("wizard-skip-machine")).toBeNull();
+  expect(record().machine_skipped ?? false).toBe(false);
+  await act(async () => { fireEvent.click(wizard().getByRole("button", { name: "Skip for now" })); });
+  await act(async () => { fireEvent.click(within(document.getElementById("wizard-skip-machine")!).getByRole("button", { name: "Continue without a machine" })); });
   expect(record().machine_skipped).toBe(true);
   expect(title()).toHaveTextContent("Set up transcription");
   // Opened again: on from where it stood, not back at the machine.

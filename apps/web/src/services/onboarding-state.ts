@@ -157,8 +157,9 @@ export function resumeOnboarding(facts: ResumeFacts): OnboardingStep {
   let path: OnboardingPath | null = !facts.canHostAgents ? "remote" : record.choice ?? (facts.localReady ? "agents" : null);
   // A machine connected anywhere (Settings, the call area) is the machine's step done, whichever way was chosen.
   if (facts.live && (facts.localReady || facts.remoteReady) && !(path === "agents" ? facts.localReady : path === "remote" && facts.remoteReady)) path = facts.localReady ? "agents" : "remote";
-  if (!path) return "W1";
   const machineSkipped = !!facts.skips && record.machine_skipped;
+  // Skipped from where you work (d), no way was chosen: on to the voice.
+  if (!path && !machineSkipped) return "W1";
   if (path === "agents" && !facts.localReady && !machineSkipped) return "W2";
   if (path === "remote" && !facts.remoteReady && !machineSkipped) return "W2r";
   if (path === "agents" && facts.localReady && !record.agents_done) return "W3";

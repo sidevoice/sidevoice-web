@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
+import { Dialog } from "../../components/ui/Dialog";
 import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, BackIcon } from "../../components/ui/Icons";
 import { localHostInstallController } from "../../services/local-host-install";
 import { useDialogFocusReturn } from "../../lib/focus-return";
@@ -403,13 +405,11 @@ export function Wizard() {
     <footer className="wizard-actions" data-model-step={stageTask || step === "W5" || step === "W4m" ? "" : undefined}>
       {back && <Button type="button" variant="ghost" tone="neutral" className="wizard-back" onClick={() => onboarding.goTo(back)}><BackIcon /><span className="wizard-back-label">{t("wizard.back")}</span></Button>}
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
+      {step === "W1" && skips && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
       {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(sttStep)}>{t("wizard.continue")}</Button>}
-      {machineWaits && <>
-        <p className="wizard-reason" id="wizard-stage-reason" title={t("wizard.skip.machineReason")}>{t("wizard.skip.machineReason")}</p>
-        <Button type="button" variant="secondary" id="wizard-step-skip" onClick={() => void skipMachine()}>{t("wizard.skip.machine")}</Button>
-      </>}
+      {machineWaits && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       <span ref={setFooterSlot} className="wizard-slot" />
       {step === "W3" && <Button type="button" variant="primary" onClick={() => void finishAgents()}>{t("wizard.continue")}</Button>}
       {step === "W4m" && <MicrophoneContinue microphone={onboarding.microphone} onContinue={() => void onboarding.markMicrophoneDone().then((done) => { if (done) onboarding.goTo(permissionsNext); })}
@@ -425,6 +425,25 @@ export function Wizard() {
       </Button>}
     </footer>
   </dialog>;
+}
+
+/** "Skip for now" on the machine (onboardingFlow d, operator 2026-10-16): beside where you work and while this computer is
+ *  prepared or a machine paired, a quiet button that first says what it means — no calls until a machine is connected,
+ *  and where to connect one later — with Go back (focused) and Continue without a machine. */
+function SkipMachine({ onSkip, t }: { onSkip(): void; t: Translate }) {
+  const [asking, setAsking] = useState(false);
+  const back = useRef<HTMLButtonElement>(null);
+  return <>
+    <Button type="button" variant="ghost" tone="neutral" id="wizard-step-skip" onClick={() => setAsking(true)}>{t("wizard.skip.later")}</Button>
+    {asking && createPortal(<Dialog open size="sm" id="wizard-skip-machine" titleId="wizard-skip-machine-title" title={t("wizard.skip.machineTitle")}
+      initialFocus={back} onClose={() => setAsking(false)}
+      footer={<>
+        <Button ref={back} type="button" variant="ghost" tone="neutral" onClick={() => setAsking(false)}>{t("wizard.skip.goBack")}</Button>
+        <Button type="button" variant="primary" onClick={() => { setAsking(false); onSkip(); }}>{t("wizard.skip.machine")}</Button>
+      </>}>
+      <p>{t("wizard.skip.machineReason")}</p>
+    </Dialog>, document.body)}
+  </>;
 }
 
 /** What a put-off setup leaves in the call's own space (the rest of the room as ever, Settings included): one action back
