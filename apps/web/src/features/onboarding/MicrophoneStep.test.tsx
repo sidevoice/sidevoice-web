@@ -70,7 +70,6 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   await setup();
   expect(title()).toHaveTextContent("Permissions");
   expect(wizard().getByRole("list", { name: "Setup progress" }).children).toHaveLength(8);
-  expect(tile()).toContain("Not allowed yet");
   expect(tile()).toContain("Your browser will ask you once.");
   expect(action()).toHaveTextContent("Allow microphone");
   await act(async () => { fireEvent.click(action()); });
@@ -79,10 +78,10 @@ test("not asked yet: Allow microphone asks the browser, lets the microphone go a
   expect(said()).toBe("Answer your browser’s request to use the microphone.");
   await act(async () => { answer(stream()); });
   expect(stop).toHaveBeenCalled();
-  expect(tile()).toContain("Allowed");
+  expect(action()).toHaveTextContent("Microphone allowed");
   expect(said()).toBe("Microphone allowed.");
   // Allowed, it says so and waits for Continue: it never moves on by itself.
-  await waitFor(() => expect(tile()).toContain("Allowed"));
+  await waitFor(() => expect(action()).toHaveTextContent("Microphone allowed"));
   expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
@@ -94,7 +93,6 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   const { granted, media } = browser("denied", () => Promise.reject(refused("NotAllowedError")));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
-  expect(tile()).toContain("Blocked");
   expect(document.querySelector("#wizard .wizard-mic-help .ui-alert-title")).toHaveTextContent("Sidevoice can’t use the microphone");
   expect(wizard().getByText(/select the site settings icon beside the web address/)).toBeInTheDocument();
   expect(action()).toHaveTextContent("Check again");
@@ -112,11 +110,11 @@ test("blocked: how to allow it for the site, Check again (still blocked, said so
   // The site now reads allowed, but a plain read never upgrades a block (the computer may still be blocking the
   // browser): only a successful request does.
   await act(async () => { granted.set("granted"); });
-  expect(tile()).toContain("Blocked");
+  expect(action()).toHaveTextContent("Check again");
   media.getUserMedia.mockResolvedValue(stream());
   await act(async () => { fireEvent.click(action()); });
   // Allowed, it says so and waits for Continue: it never moves on by itself.
-  await waitFor(() => expect(tile()).toContain("Allowed"));
+  await waitFor(() => expect(action()).toHaveTextContent("Microphone allowed"));
   expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
@@ -150,7 +148,6 @@ test("the request closed without an answer is not a block: Allow microphone agai
   browser("prompt", () => Promise.reject(refused("NotAllowedError")));
   await setup();
   await act(async () => { fireEvent.click(action()); });
-  expect(tile()).toContain("Not allowed yet");
   expect(said()).toBe("The request was closed without an answer. Allow microphone asks again.");
   expect(action()).toHaveTextContent("Allow microphone");
 }, WHOLE_APP_MS);
@@ -159,8 +156,7 @@ test("already allowed: never asked again; the step still shows it allowed, with 
   const { media } = browser("granted", () => Promise.resolve(stream()));
   await setup();
   expect(title()).toHaveTextContent("Permissions");
-  expect(tile()).toContain("Allowed");
-  expect(action()).toHaveTextContent("Allowed");
+  expect(action()).toHaveTextContent("Microphone allowed");
   expect(action()).toHaveAttribute("aria-disabled", "true");
   expect(proceed()).toHaveTextContent("Continue");
   expect(proceed()).toHaveClass("ui-button--primary");
@@ -175,13 +171,12 @@ test("none connected: No microphone found, and Check again finds one", async () 
   browser("prompt", () => found ? Promise.resolve(stream()) : Promise.reject(refused("NotFoundError")));
   await setup();
   await act(async () => { fireEvent.click(action()); });
-  expect(tile()).toContain("No microphone found");
   expect(tile()).toContain("Connect a microphone or turn one on, then check again.");
   expect(action()).toHaveTextContent("Check again");
   found = true;
   await act(async () => { fireEvent.click(action()); });
   // Allowed, it says so and waits for Continue: it never moves on by itself.
-  await waitFor(() => expect(tile()).toContain("Allowed"));
+  await waitFor(() => expect(action()).toHaveTextContent("Microphone allowed"));
   expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");
@@ -200,7 +195,7 @@ test("in the desktop app on a Mac: the system's permission through the app, its 
   await act(async () => { fireEvent.click(action()); });
   expect(microphone.request).toHaveBeenCalled();
   // Allowed, it says so and waits for Continue: it never moves on by itself.
-  await waitFor(() => expect(tile()).toContain("Allowed"));
+  await waitFor(() => expect(action()).toHaveTextContent("Microphone allowed"));
   expect(title()).toHaveTextContent("Permissions");
   await act(async () => { fireEvent.click(proceed()); });
   expect(title()).toHaveTextContent("Set up transcription");

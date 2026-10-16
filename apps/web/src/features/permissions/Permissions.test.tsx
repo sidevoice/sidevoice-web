@@ -12,7 +12,6 @@ import { PermissionsSettings } from "../settings/PermissionsSettings";
 const t = translator("en");
 afterEach(() => {
   cleanup();
-  localStorage.removeItem("sidevoice.variants");
   delete (navigator as { mediaDevices?: unknown }).mediaDevices;
   delete (navigator as { permissions?: unknown }).permissions;
   vi.restoreAllMocks();
@@ -23,25 +22,22 @@ const snapshot = (state: MicrophoneSnapshot["state"], extra: Partial<MicrophoneS
   ({ state, asker: "page", known: true, dismissed: false, unchanged: false, from: null, ...extra });
 const row = () => document.querySelector("[data-permission=microphone]")!;
 
-{
-  test("every state says where the microphone stands; blocked, how to allow it", () => {
-    const cases: [MicrophoneSnapshot, string, string | null][] = [
-      [snapshot("prompt"), "Not allowed yet", "Your browser will ask you once."],
-      [snapshot("requesting", { from: "prompt" }), "Waiting for your answer", "Answer your browser’s request to use the microphone."],
-      [snapshot("granted"), "Allowed", "Your voice will work in calls."],
-      [snapshot("denied"), "Blocked", null],
-      [snapshot("missing"), "No microphone found", "Connect a microphone or turn one on, then check again."],
-    ];
-    for (const [microphone, state, line] of cases) {
-      render(<PermissionsStep microphone={microphone} openSettings={null} t={t} platform="other" />);
-      expect(row()).toHaveTextContent(state);
-      if (line) expect(row()).toHaveTextContent(line);
-      expect(document.querySelector(".wizard-mic-help") !== null).toBe(microphone.state === "denied");
-      cleanup();
-    }
-  });
-}
-
+test("every state says where the microphone stands in its one button and line; blocked, how to allow it", () => {
+  const cases: [MicrophoneSnapshot, string, string | null][] = [
+    [snapshot("prompt"), "Allow microphone", "Your browser will ask you once."],
+    [snapshot("requesting", { from: "prompt" }), "Allow microphone", "Answer your browser’s request to use the microphone."],
+    [snapshot("granted"), "Microphone allowed", null],
+    [snapshot("denied"), "Check again", null],
+    [snapshot("missing"), "Check again", "Connect a microphone or turn one on, then check again."],
+  ];
+  for (const [microphone, button, line] of cases) {
+    render(<PermissionsStep microphone={microphone} openSettings={null} t={t} platform="other" />);
+    expect(row().querySelector("#wizard-mic-action")).toHaveTextContent(button);
+    if (line) expect(row()).toHaveTextContent(line);
+    expect(document.querySelector(".wizard-mic-help") !== null).toBe(microphone.state === "denied");
+    cleanup();
+  }
+});
 
 test("no Refresh status in the setup (it stays in Settings); blocked, the footer's action is described by the how-to, which is a live alert", () => {
   render(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} platform="other" />);
@@ -55,39 +51,32 @@ test("no Refresh status in the setup (it stays in Settings); blocked, the footer
   expect(screen.getByRole("button", { name: "Continue without microphone" })).not.toHaveAttribute("aria-disabled");
 });
 
-test("the bicho is calm in every state, its wrapper follows the permission state, and its explanation follows it too", () => {
-  const cases: [MicrophoneSnapshot, RegExp, string][] = [
-    [snapshot("prompt"), /Allow it now/, "prompt"], [snapshot("requesting", { from: "prompt" }), /Allow it now/, "requesting"],
-    [snapshot("granted"), /only while voice is on in a call/, "granted"], [snapshot("denied"), /Fix it, then check again/, "denied"],
-    [snapshot("requesting", { from: "denied" }), /Fix it, then check again/, "denied"], [snapshot("missing"), /Allow it now|Fix it/, "missing"],
+test("the bicho is calm in every state and its wrapper follows the permission state", () => {
+  const cases: [MicrophoneSnapshot, string][] = [
+    [snapshot("prompt"), "prompt"], [snapshot("requesting", { from: "prompt" }), "requesting"], [snapshot("granted"), "granted"],
+    [snapshot("denied"), "denied"], [snapshot("requesting", { from: "denied" }), "denied"], [snapshot("missing"), "missing"],
   ];
-  for (const [microphone, why, state] of cases) {
+  for (const [microphone, state] of cases) {
     render(<PermissionsStep microphone={microphone} openSettings={null} t={t} platform="other" />);
-    expect(document.querySelector(".perm-hero-why")).toHaveTextContent(why);
     expect(document.querySelector(".perm-hero .sv-avatar")).toHaveAttribute("data-avatar-state", "present");
     expect(document.querySelector(".perm-hero-figure")).toHaveAttribute("data-state", state);
     cleanup();
   }
 });
 
-test("the in-card control is one element whose words and look follow the state, in each of its looks; Allowed keeps it, not pressable", () => {
-  for (const look of ["a", "b", "c"]) {
-    localStorage.setItem("sidevoice.variants", JSON.stringify({ permissionButton: look }));
-    const onRequest = vi.fn();
-    const view = render(<PermissionsStep microphone={snapshot("prompt")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
-    const control = screen.getByRole("button", { name: "Allow microphone" });
-    expect(control).toHaveAttribute("data-look", look);
-    fireEvent.click(control);
-    expect(onRequest).toHaveBeenCalledTimes(1);
-    view.rerender(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
-    expect(screen.getByRole("button", { name: "Check again" })).toBe(control);
-    view.rerender(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
-    expect(screen.getByRole("button", { name: "Allowed" })).toBe(control);
-    expect(control).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(control);
-    expect(onRequest).toHaveBeenCalledTimes(1);
-    cleanup();
-  }
+test("the in-card control is one element whose words follow the state; Microphone allowed keeps it, not pressable", () => {
+  const onRequest = vi.fn();
+  const view = render(<PermissionsStep microphone={snapshot("prompt")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
+  const control = screen.getByRole("button", { name: "Allow microphone" });
+  fireEvent.click(control);
+  expect(onRequest).toHaveBeenCalledTimes(1);
+  view.rerender(<PermissionsStep microphone={snapshot("denied")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
+  expect(screen.getByRole("button", { name: "Check again" })).toBe(control);
+  view.rerender(<PermissionsStep microphone={snapshot("granted")} openSettings={null} t={t} platform="other" onRequest={onRequest} />);
+  expect(screen.getByRole("button", { name: "Microphone allowed" })).toBe(control);
+  expect(control).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(control);
+  expect(onRequest).toHaveBeenCalledTimes(1);
 });
 
 function browser(state: PermissionState) {

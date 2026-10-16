@@ -1110,7 +1110,6 @@ export const messages = {
   "wizard.group.call": "Your turn",
   "wizard.group.permissions": "Permissions",
   "wizard.title.permissions": "Permissions",
-  "wizard.mic.intro": "Sidevoice listens through your microphone, only while you’re in a call. Allow it now, so your voice works from the first try.",
   "wizard.mic.label": "Microphone",
   "wizard.mic.checking": "Checking…",
   "wizard.mic.state.prompt": "Not allowed yet",
@@ -1143,8 +1142,6 @@ export const messages = {
   "wizard.mic.openSettings": "Open System Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).
   "perm.mic.why": "Used while voice is on in a call and for the setup’s tries, and only then.",
-  "perm.hero.granted": "Sidevoice listens only while voice is on in a call, and for the setup’s tries.",
-  "perm.hero.blocked": "Without it, voice can’t hear you. Fix it, then check again.",
   "perm.refresh": "Refresh status",
   "perm.state.none": "Nothing to allow here",
   "wizard.turnIntro": "How Sidevoice knows you have finished speaking. You can change it in Settings → Call.",

@@ -12,13 +12,12 @@
   border: 2px solid var(--sv-surface); border-radius: 50%; background: var(--sv-positive); color: var(--sv-surface); animation: wizard-ready-pop 220ms var(--sv-ease) both; }
 .perm-badge { flex: none; gap: var(--sv-space-1); white-space: nowrap; }
 .perm-badge svg { width: 12px; height: 12px; }
-.perm-name { font-weight: var(--sv-weight-semibold); color: var(--sv-text); }
 .perm-line { font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 .perm-help { margin-top: var(--sv-space-1); }
 .wizard-body > section > p.perm-also, .perm-also { margin: 0; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); }
 
-/* The person's bicho, large and centred, the microphone's mark on its badge; the state under it in a display weight,
- * its line, and why. */
+/* The person's bicho, large and centred, the microphone's mark on its badge
+ * and its one button. */
 .perm-hero { display: grid; justify-items: center; gap: var(--sv-space-1); padding: var(--sv-space-5) var(--sv-space-4) var(--sv-space-4); text-align: center;
   border: 1px solid var(--sv-border); border-radius: var(--sv-radius-xl); background: radial-gradient(circle at 50% 30%, var(--sv-accent-soft), transparent 70%), var(--sv-bg-subtle); }
 .perm-hero-figure { position: relative; display: block; width: 112px; height: 112px; margin-bottom: var(--sv-space-2); transform-origin: 50% 90%;
@@ -29,9 +28,6 @@
 .perm-hero-figure:is([data-state="denied"], [data-state="missing"]) { transform: translateY(5px) rotate(-4deg) scale(.97); filter: saturate(.55); }
 .perm-hero-figure[data-state="requesting"] { transform: rotate(3deg) translateX(2px); }
 @keyframes perm-hop { 0% { transform: none; } 30% { transform: translateY(-10px) scale(1.03, .98); } 55% { transform: translateY(0) scale(1.04, .94); } 75% { transform: translateY(-3px); } 100% { transform: none; } }
-.perm-hero-chip { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sv-space-2); }
-.perm-hero .perm-mark { width: 28px; height: 28px; }
-.perm-hero .perm-mark > svg { width: 16px; height: 16px; }
 /* The block's one button (decided look: full width under the bicho, one size in every state). Allowed, it wears the
  * positive green of an allowed permission, a check before its words, and cannot be pressed. */
 .perm-control { width: 100%; max-width: 18rem; min-width: 12rem; margin-top: var(--sv-space-2); gap: var(--sv-space-2); }
@@ -40,13 +36,9 @@
   height: auto; min-height: var(--sv-control-md, 40px); opacity: 1; border-color: transparent; background: transparent; box-shadow: none;
   color: var(--sv-positive); font-weight: var(--sv-weight-semibold); cursor: default; }
 .perm-hero-figure .sv-avatar { display: block; width: 100%; height: 100%; }
-.perm-hero .perm-name { font-size: var(--sv-font-sm); font-weight: var(--sv-weight-regular); color: var(--sv-text-muted); }
-.perm-hero-state { display: inline-flex; align-items: center; gap: var(--sv-space-2); font-size: var(--sv-font-xl); line-height: 1.75rem; font-weight: var(--sv-weight-heavy);
-  letter-spacing: -.01em; color: var(--sv-text); }
 .perm-blocks { display: grid; gap: var(--sv-space-3); margin: 0; padding: 0; list-style: none; }
 .perm-hero > .ui-alert, .perm-hero > .perm-also { justify-self: stretch; text-align: start; }
 .perm-hero > .perm-also { margin-top: 0; }
-.perm-hero .perm-hero-why { margin: var(--sv-space-1) 0 0; text-align: center; font-size: var(--sv-font-sm); line-height: 1.25rem; color: var(--sv-text-muted); text-align: center; }
 
 /* The refresh button of Settings › Permissions. */
 .perm-refresh { justify-self: start; gap: var(--sv-space-1-5); }
@@ -60,7 +52,7 @@
 .perm-site-note p { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .perm-mark, .perm-hero-figure, .perm-toggle-track, .perm-toggle-knob { transition: none; }
+  .perm-mark, .perm-hero-figure { transition: none; }
   .perm-mark-check, .perm-hero-figure[data-state] { animation: none; }
   .perm-hero-figure:is([data-state="denied"], [data-state="missing"], [data-state="requesting"]) { transform: none; }
 }
