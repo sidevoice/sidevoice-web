@@ -103,3 +103,20 @@ test("the app's state is authoritative: its change events move it with no probe"
   access.dispose();
   expect(listeners.size).toBe(0);
 });
+
+test("the app's \"missing\" is the missing state, in both directions", async () => {
+  let system: "prompt" | "granted" | "denied" | "missing" = "granted";
+  const listeners = new Set<() => void>();
+  (window as { __sidevoiceDesktop?: unknown }).__sidevoiceDesktop = { host: { voice: {}, microphone: {
+    state: async () => system,
+    request: async () => system === "granted" ? "granted" : "denied",
+    onChange: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); },
+  } } };
+  const access = createMicrophoneAccess();
+  await waitFor(() => expect(stateOf(access)()).toBe("granted"));
+  system = "missing"; listeners.forEach((l) => l());
+  await waitFor(() => expect(stateOf(access)()).toBe("missing"));
+  system = "prompt"; listeners.forEach((l) => l());
+  await waitFor(() => expect(stateOf(access)()).toBe("prompt"));
+  access.dispose();
+});
