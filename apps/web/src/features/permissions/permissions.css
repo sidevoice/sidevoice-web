@@ -80,3 +80,6 @@
   .ui-row.perm-step-row > .ui-row-control { grid-column: 2; grid-row: 1; }
   .ui-row.perm-step-row .ui-row-description { grid-column: 1 / -1; grid-row: 2; margin: 0; }
 }
+
+/* The setup's Continue while the microphone is not allowed yet: the primary's own colour, faded — waiting, not broken. */
+.ui-button.wizard-continue-waiting:is(:disabled, [aria-disabled="true"]):not([data-loading]) { background: var(--sv-accent); border-color: var(--sv-accent); color: var(--sv-on-accent); opacity: .45; }

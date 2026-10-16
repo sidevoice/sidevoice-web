@@ -79,7 +79,11 @@ export function PermissionsStep({ microphone, openSettings, onRequest = () => {}
  *  "Continue without microphone" until it is allowed, then the primary Continue. One element, so focus stays on it. */
 export function MicrophoneContinue({ microphone, onContinue, t }: { microphone: MicrophoneSnapshot; onContinue(): void; t: Translate }) {
   const { done } = microphoneAction(microphone);
-  return <Button type="button" variant={done ? "primary" : "secondary"} id="wizard-mic-continue" onClick={onContinue}>
-    {t(done ? "wizard.continue" : "wizard.mic.continueWithout")}
-  </Button>;
+  // Two ways on (operator, 2026-10-16): "Continue without microphone", secondary, at the left until it is allowed; and
+  // Continue, the primary, in the brand's colour but waiting until the microphone is allowed.
+  return <>
+    {!done && <Button type="button" variant="secondary" id="wizard-mic-skip" onClick={onContinue}>{t("wizard.mic.continueWithout")}</Button>}
+    <Button type="button" variant="primary" id="wizard-mic-continue" className={done ? undefined : "wizard-continue-waiting"} disabled={!done} onClick={onContinue}>
+      {t("wizard.continue")}</Button>
+  </>;
 }
