@@ -31,6 +31,8 @@ export interface MicrophoneBridge {
   state(): Promise<"prompt" | "granted" | "denied">;
   request(): Promise<"granted" | "denied">;
   openSettings?(): Promise<void>;
+  /** Tells when the system's answer changes (the person changed it in the system's settings); returns how to stop. */
+  onChange?(listener: () => void): () => void;
 }
 
 export interface MicrophoneAccess {
@@ -106,6 +108,25 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     await check();
   }
 
+  /** Whether a microphone is plugged in, as the device list says (it lists them without permission); null where it cannot say. */
+  async function devices(): Promise<boolean | null> {
+    if (typeof media?.enumerateDevices !== "function") return null;
+    try {
+      const list = await media.enumerateDevices();
+      return list.some((device) => device.kind === "audioinput");
+    } catch { return null; }
+  }
+
+  /** A silent getUserMedia (the permission already reads allowed, so nothing is shown), its tracks stopped at once:
+   *  what the browser really gives, whatever the site's permission says (the computer may block the browser itself). */
+  async function probe(): Promise<"granted" | "denied" | "missing"> {
+    try {
+      const stream = await media!.getUserMedia({ audio: true });
+      for (const track of stream.getTracks()) track.stop();
+      return "granted";
+    } catch (error) { return refusal(error); }
+  }
+
   async function check() {
     if (!askable || disposed) return;
     const mine = ++run;
@@ -113,15 +134,29 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     let now: Awaited<ReturnType<typeof read>>;
     try { now = await read(); } catch { now = null; }
     if (mine !== run) return;
-    // Unknown, it stays as this page last found it: asked and allowed stays allowed; otherwise not asked yet.
-    let state: MicrophoneState = now ?? (before === "granted" || before === "denied" || before === "missing" ? before : "prompt");
-    // Only an answer to a request (getUserMedia) moves a page out of blocked or none found. The site's permission can
-    // read allowed while the computer blocks the browser itself, so a plain read never upgrades it: it only confirms
-    // the block. The app's own read is the system's answer, and may.
-    if (!bridge && (before === "denied" || before === "missing")) state = now === "denied" ? "denied" : before;
-    // A missing microphone is only found by asking: a read that says allowed (or not asked) keeps it until the next ask.
-    const kept = before === "missing" && state !== "denied" ? "missing" : state;
-    set({ state: kept, unchanged: kept === before && snapshot.unchanged, dismissed: kept === "prompt" && snapshot.dismissed });
+    let state: MicrophoneState;
+    if (bridge) {
+      // The app's own read is the system's answer: authoritative, in every direction.
+      state = now ?? (before === "granted" || before === "denied" ? before : "prompt");
+    } else {
+      const plugged = await devices();
+      if (mine !== run) return;
+      if (now === "denied") state = "denied";
+      else if (plugged === false) state = "missing";
+      else if (now === "granted") {
+        // A site permission that reads allowed is not the browser's word: the computer may block it. Moving up from
+        // anything else is confirmed by a silent probe; only its success is "granted".
+        if (before === "denied" || before === "missing" || before === "prompt") {
+          const probed = await probe();
+          if (mine !== run) return;
+          state = probed;
+        } else state = "granted";
+      } else if (now === "prompt") {
+        // Without a device list, a missing microphone is only found by asking: a read of "not asked" keeps it.
+        state = before === "missing" && plugged === null ? "missing" : "prompt";
+      } else state = before === "granted" || before === "denied" || before === "missing" ? before : "prompt";
+    }
+    set({ state, unchanged: state === before && snapshot.unchanged, dismissed: state === "prompt" && snapshot.dismissed });
   }
 
   async function request() {
@@ -151,11 +186,16 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     set({ state: answer, unchanged: answer === before, from: null });
   }
 
-  // Back from the system's settings or the browser's: read it again.
-  const onReturn = () => { if (win.document?.visibilityState !== "hidden" && (snapshot.state === "denied" || snapshot.state === "prompt")) void check(); };
+  // Back from the system's settings or the browser's: read it again, whatever it was.
+  const onReturn = () => { if (win.document?.visibilityState !== "hidden" && snapshot.state !== "requesting") void check(); };
+  let unwatchBridge: (() => void) | undefined;
   if (askable) {
     win.addEventListener?.("focus", onReturn);
     win.document?.addEventListener?.("visibilitychange", onReturn);
+    // A microphone plugged in or out.
+    media?.addEventListener?.("devicechange", onChange);
+    // The app says when the system's answer changes, where it can.
+    unwatchBridge = bridge?.onChange?.(onChange);
     void start();
   }
 
@@ -168,6 +208,8 @@ export function createMicrophoneAccess(win: Window & typeof globalThis = window)
     dispose() {
       disposed = true;
       status?.removeEventListener?.("change", onChange);
+      media?.removeEventListener?.("devicechange", onChange);
+      unwatchBridge?.();
       win.removeEventListener?.("focus", onReturn);
       win.document?.removeEventListener?.("visibilitychange", onReturn);
       listeners.clear();
