@@ -2,16 +2,17 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
-import { Group, Row } from "../../components/ui/Card";
+import { DisclosureButton } from "../../components/ui/DisclosureButton";
+import { Group, Row, Section } from "../../components/ui/Card";
 import { useRoomStore } from "../../state/room-store";
-import { desktopResetBridge, type DesktopResetBridge } from "../../services/desktop-host";
+import { desktopResetBridge, desktopUninstallBridge, type DesktopResetBridge } from "../../services/desktop-host";
 import { translator, type MessageKey } from "../../i18n/translator";
 
 const steps: Record<string, MessageKey> = {
   "app-data": "data.step.app", models: "data.step.models", webview: "data.step.webview",
   cache: "data.step.cache", "saved-state": "data.step.saved", logs: "data.step.logs",
   preferences: "data.step.preferences", keychain: "data.step.keychain",
-  agents: "data.step.agents",
+  agents: "data.step.agents", app: "data.step.appBundle",
 };
 
 type Report = Awaited<ReturnType<DesktopResetBridge["resetReport"]>>;
@@ -54,26 +55,42 @@ export function ResetReportNotice() {
   return wizard ? createPortal(notice, wizard) : notice;
 }
 
-/** Desktop-only destructive action; the browser has no machine-wide deletion capability. */
-export function DeleteAllData() {
-  const data = desktopResetBridge();
+/** What each action says: its row, its button, its confirmation, and what it says once the app is quitting. */
+interface ActionCopy { id: string; title: MessageKey; hint: MessageKey; action: MessageKey; confirmTitle: MessageKey; confirmWhat: MessageKey; quitting: MessageKey }
+const COPY: Record<"deleteAll" | "uninstall", ActionCopy> = {
+  deleteAll: {
+    id: "delete-all-sidevoice-data", title: "data.title", hint: "data.hint", action: "data.action",
+    confirmTitle: "data.confirmTitle", confirmWhat: "data.confirmWhat", quitting: "data.restarting",
+  },
+  uninstall: {
+    id: "uninstall-sidevoice", title: "data.uninstall.title", hint: "data.uninstall.hint", action: "data.uninstall.action",
+    confirmTitle: "data.uninstall.confirmTitle", confirmWhat: "data.uninstall.confirmWhat", quitting: "data.uninstall.quitting",
+  },
+};
+
+/** One destructive row: its red button opens a short confirmation (what happens in one sentence, what stays behind a
+ *  disclosure); the app then asks once more natively and quits to finish. */
+type Started = Pick<Awaited<ReturnType<DesktopResetBridge["deleteAll"]>>, "pending" | "failed" | "agents">;
+
+function DangerAction({ action, run, inCall }: { action: keyof typeof COPY; run: () => Promise<Started>; inCall: boolean }) {
   const t = translator();
-  const inCall = useRoomStore((state) => Boolean(state.facts.ws || state.facts.reconnecting));
+  const copy = COPY[action];
   const [open, setOpen] = useState(false);
+  const [limits, setLimits] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
   const [report, setReport] = useState<Report>(null);
-  const [restarting, setRestarting] = useState(false);
+  const [quitting, setQuitting] = useState(false);
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
-  if (!data) return null;
+  const limitsId = useId();
 
-  async function erase() {
-    if (!data || !open || busy || inCall) return;
+  async function confirm() {
+    if (!open || busy || inCall) return;
     setBusy(true); setError(null);
     try {
-      const result = await data.deleteAll();
-      setRestarting(result.pending.length > 0);
+      const result = await run();
+      setQuitting(result.pending.length > 0);
       setOpen(false);
       if (result.failed.length) setReport({ state: "partial", completed: ["service"], failed: result.failed, agents: result.agents });
     } catch (failure) {
@@ -82,31 +99,54 @@ export function DeleteAllData() {
       setError(key === "reset.busy" ? "data.busy"
         : key === "reset.service-failed" ? "data.serviceFailed"
         : key === "reset.unsafe" || key === "reset.unavailable" ? "data.unsafeScope"
-        : key === "reset.unsupported-connector" ? "data.connectorUpdateRequired" : "data.failed");
+        : key === "reset.unsupported-connector" ? "data.connectorUpdateRequired"
+        : key === "reset.app-unremovable" ? "data.appUnremovable" : "data.failed");
     } finally { setBusy(false); }
   }
 
-  return <Group title={t("data.group")}>
-    <Row label={t("data.title")} description={t("data.hint")}>
-      <Button id="delete-all-sidevoice-data" variant="danger" size="sm" disabled={inCall || busy || restarting}
-        onClick={() => { setError(null); setOpen(true); }}>{t("data.action")}</Button>
+  return <>
+    <Row label={t(copy.title)} description={t(copy.hint)}>
+      <Button id={copy.id} variant="danger" size="sm" disabled={inCall || busy || quitting}
+        onClick={() => { setError(null); setLimits(false); setOpen(true); }}>{t(copy.action)}</Button>
     </Row>
-    {inCall && <p className="data-reset-note" role="status">{t("data.endCall")}</p>}
-    {restarting && <p className="data-reset-note" role="status">{t("data.restarting")}</p>}
+    {quitting && <p className="data-reset-note" role="status">{t(copy.quitting)}</p>}
     {report && <div className="data-reset-note" role={report.state === "partial" ? "alert" : "status"}>
       <p>{t(report.state === "partial" ? "data.partial" : "data.complete")}</p>
       <FailedItems failed={report.failed} />
     </div>}
     {error && !open && <p className="data-reset-note" role="alert">{t(error)}</p>}
-    {open && createPortal(<Dialog open size="sm" titleId={titleId} title={t("data.confirmTitle")}
+    {open && createPortal(<Dialog open size="sm" titleId={titleId} title={t(copy.confirmTitle)}
       initialFocus={cancel} onClose={busy ? undefined : () => setOpen(false)}
       footer={<>
         <Button ref={cancel} variant="ghost" tone="neutral" disabled={busy} onClick={() => setOpen(false)}>{t("data.cancel")}</Button>
-        <Button variant="danger" loading={busy} disabled={inCall} onClick={() => void erase()}>{t("data.action")}</Button>
+        <Button variant="danger" loading={busy} disabled={inCall} onClick={() => void confirm()}>{t(copy.action)}</Button>
       </>}>
-      <p>{t("data.confirmWhat")}</p>
-      <p className="muted">{t("data.confirmLimits")}</p>
+      <p>{t(copy.confirmWhat)}</p>
+      <DisclosureButton open={limits} controls={limitsId} onClick={() => setLimits((shown) => !shown)}>{t("data.limitsToggle")}</DisclosureButton>
+      <p id={limitsId} className="muted" hidden={!limits}>{t("data.confirmLimits")}</p>
       {error && <p role="alert">{t(error)}</p>}
     </Dialog>, document.body)}
-  </Group>;
+  </>;
+}
+
+/** Whether Settings has a Danger zone: only where one of its actions exists (the desktop app that can reset its
+ *  machine). A browser has no machine-wide deletion, so it shows none. */
+export function dangerZoneShown() {
+  return desktopResetBridge() !== null;
+}
+
+/** The last section of Settings, in red: what deletes Sidevoice's data, and, where the app can, Sidevoice itself. */
+export function DangerZone() {
+  const data = desktopResetBridge();
+  const uninstall = desktopUninstallBridge();
+  const t = translator();
+  const inCall = useRoomStore((state) => Boolean(state.facts.ws || state.facts.reconnecting));
+  if (!data) return null;
+  return <Section id="danger" className="danger-zone" title={t("settings.section.danger")} description={t("settings.danger.description")}>
+    <Group className="danger-group">
+      <DangerAction action="deleteAll" run={() => data.deleteAll()} inCall={inCall} />
+      {uninstall && <DangerAction action="uninstall" run={() => uninstall.uninstall()} inCall={inCall} />}
+    </Group>
+    {inCall && <p className="data-reset-note" role="status">{t("data.endCall")}</p>}
+  </Section>;
 }

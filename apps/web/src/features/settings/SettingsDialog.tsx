@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogSurface } from "../../components/ui/Dialog";
 import { OverlayPortalProvider } from "../../components/ui/Tooltip";
-import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon } from "../../components/ui/Icons";
+import { AdvancedIcon, ArrowLeftIcon, BackIcon, CallSettingsIcon, CheckIcon, GeneralIcon, IntegrationsIcon, MachinesIcon, ShortcutsIcon, PermissionsIcon, TranscriptionIcon, VoicesIcon, ThisComputerIcon, OtherMachineIcon, UpdateIcon, WarningIcon } from "../../components/ui/Icons";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Select } from "../../components/ui/Select";
@@ -15,7 +15,7 @@ import { ProviderKeys } from "./ProviderKeys";
 import { IdleUnloadChoice, SlotPane, TurnChoices, useVoiceReadiness } from "./VoiceSettings";
 import { catalogueShown } from "./ModelSetup";
 import { DeleteUnusedChoice, DownloadedModels } from "./DownloadedModels";
-import { DeleteAllData } from "./DeleteAllData";
+import { DangerZone, dangerZoneShown } from "./DangerZone";
 import { DeviceNameField } from "./DeviceNameField";
 import { DesktopCallSettings } from "./DesktopCallSettings";
 import { desktopHost } from "../../services/desktop-host";
@@ -61,6 +61,8 @@ const SECTIONS: { id: string; label: MessageKey; icon: (size?: number) => ReactN
   // Everything that updates: in the desktop app, or wherever a machine is behind (UpdatesSettings).
   { id: "updates", label: "settings.section.updates", icon: (size) => <UpdateIcon size={size} /> },
   { id: "advanced", label: "settings.section.advanced", icon: (size) => <AdvancedIcon size={size} /> },
+  // Last, in red: what deletes Sidevoice's data or Sidevoice itself. Only where one of those exists (DangerZone).
+  { id: "danger", label: "settings.section.danger", icon: (size) => <WarningIcon size={size} /> },
 ];
 
 /** What a place asked for (`settingsFocus`) can focus: a control that takes it now. */
@@ -141,7 +143,7 @@ function RestartNote({ t }: { t: Translate }) {
   return inCall ? <Alert tone="warning" title={t("settings.restart.title")}>{t("voice.restartNote")}</Alert> : null;
 }
 
-/** For diagnosis and recovery, and the engine's internals: models' memory, this device's settings, the build. */
+/** For diagnosis and the engine's internals: models' memory, this device's settings, the build. */
 function AdvancedSettings({ t }: { t: Translate }) {
   const draft = useRoomStore((state) => state.facts.voiceDraft ?? state.facts.voiceSettings);
   const build = (window as unknown as { sidevoiceBuildId?: string }).sidevoiceBuildId ?? "dev";
@@ -153,7 +155,6 @@ function AdvancedSettings({ t }: { t: Translate }) {
       </Row>
       <Row label={t("settings.general.build")}><code id="build-id" className="settings-build">{build}</code></Row>
     </Group>
-    <DeleteAllData />
   </Section>;
 }
 
@@ -261,13 +262,16 @@ export function SettingsDialog() {
   // something to ask (not in an app that asks for itself when its call opens, nor a page with no microphone).
   const mic = useMicrophoneAccess();
   const permissionsShown = mic.microphone?.state !== "none";
+  // The Danger zone: only where one of its actions exists (the desktop app); a browser has none.
+  const dangerShown = dangerZoneShown();
   const sections = SECTIONS.filter((section) => (section.id !== "this-computer" || ownComputer) && (section.id !== "updates" || updatesShown)
-    && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown));
+    && (section.id !== "shortcuts" || shortcutsShown) && (section.id !== "permissions" || permissionsShown) && (section.id !== "danger" || dangerShown));
   // Updates shown as the last machine behind is updated (a browser, a phone), or Shortcuts as the mouse or trackpad
   // goes (a tablet's keyboard taken off): General.
   useEffect(() => {
-    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)) show("general");
-  }, [current, updatesShown, shortcutsShown, permissionsShown]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((current === "updates" && !updatesShown) || (current === "shortcuts" && !shortcutsShown) || (current === "permissions" && !permissionsShown)
+      || (current === "danger" && !dangerShown)) show("general");
+  }, [current, updatesShown, shortcutsShown, permissionsShown, dangerShown]); // eslint-disable-line react-hooks/exhaustive-deps
   const label = (id: string) => t(ownComputer && id === "machines" ? "settings.section.remoteMachines" : SECTIONS.find((section) => section.id === id)?.label ?? "settings.title");
   // This device's icon wears its connected dot, as a machine's does.
   const icon = (id: string, size?: number) => ownComputer && id === "machines" ? <OtherMachineIcon size={size ?? 18} />
@@ -308,7 +312,7 @@ export function SettingsDialog() {
               inert={motionOf(across, 1)?.startsWith("out") || undefined} data-motion={motionOf(across, 1)}>
               {phone ? <ul className="settings-menu">
                   {sections.map((section) => <li key={section.id}>
-                    <MenuRow id={"settings-" + section.id} aria-controls={"pane-" + section.id} icon={<NewOnIcon icon={icon(section.id, 20)} isNew={isNew(section.id)} />}
+                    <MenuRow id={"settings-" + section.id} className={section.id === "danger" ? "settings-nav-danger" : undefined} aria-controls={"pane-" + section.id} icon={<NewOnIcon icon={icon(section.id, 20)} isNew={isNew(section.id)} />}
                       // This device is a machine's entry too, named as one: its name, its service's state, new.
                       aria-label={section.id === "this-computer" ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
                       label={label(section.id)} summary={summaries[section.id]} badge={badge(section.id)} end={<NewAtEnd isNew={isNew(section.id)} spoken={t("highlights.navNew")} />}
@@ -318,7 +322,7 @@ export function SettingsDialog() {
                 : sections.map((section) => {
                   // This device is a machine's entry too: its name, and its service's state under it, said in its name.
                   const device = section.id === "this-computer";
-                  return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : "ui-nav-item"} aria-controls={"pane-" + section.id}
+                  return <Fragment key={section.id}><button type="button" id={"settings-" + section.id} className={device ? "ui-nav-item this-device-entry" : section.id === "danger" ? "ui-nav-item settings-nav-danger" : "ui-nav-item"} aria-controls={"pane-" + section.id}
                     aria-current={section.id === current ? section.id === "machines" ? "true" : "page" : undefined} aria-label={device ? machineEntryName(label(section.id), thisDevice, isNew(section.id), t) : undefined}
                     onClick={() => section.id === "machines" ? store?.patch({ settingsSection: "machines", machinesView: { machine: null } }) : show(section.id)}>
                     <NewOnIcon icon={icon(section.id)} isNew={isNew(section.id)} />
@@ -344,6 +348,7 @@ export function SettingsDialog() {
                 <Pane id="machines" current={current}><MachineList /></Pane>
                 {updatesShown && <Pane id="updates" current={current}><UpdatesSettings /></Pane>}
                 <Pane id="advanced" current={current}><AdvancedSettings t={t} /></Pane>
+                {dangerShown && <Pane id="danger" current={current}><DangerZone /></Pane>}
               </div>
             </div>
             {/* Settings' own polite region (a machine forgotten), never the call's. */}
