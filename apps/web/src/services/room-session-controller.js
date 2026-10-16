@@ -1741,7 +1741,19 @@ async function setAudioDevices(choice){
 async function refreshAudioDevices(){
  // Focus, permission and section changes must never start the voice just to read this list.
  const opening=voiceHostOpening;
- if(!opening)return;
+ if(!opening){
+  const media=globalThis.navigator?.mediaDevices;
+  if(typeof media?.enumerateDevices!=='function')return;
+  const listed=await media.enumerateDevices().catch(()=>null);
+  if(!listed||voiceHostOpening)return;
+  const devices=kind=>listed.filter(device=>device.kind===kind&&device.deviceId&&device.deviceId!=='default'&&device.deviceId!=='communications')
+   .map(device=>({id:device.deviceId,label:device.label||''}));
+  const inputs=devices('audioinput'),outputs=devices('audiooutput'),kept=storedAudio();
+  audioDevicesChanged({inputs,outputs,input:inputs.some(device=>device.id===kept.input)?kept.input:null,
+   output:outputs.some(device=>device.id===kept.output)?kept.output:null,
+   outputSelectable:typeof globalThis.AudioContext?.prototype?.setSinkId==='function'});
+  return;
+ }
  const host=await opening;
  await watchAudioDevices(host);
  if(typeof host.audioDevices==='function')audioDevicesChanged(await host.audioDevices());

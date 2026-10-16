@@ -2753,13 +2753,19 @@ function voiceWithDevices(){
  return voice;
 }
 test('Refreshing devices never opens the voice host, and an opened host fills the list',async()=>{
- const s=setup();withVoice(s,voiceWithDevices());
+ const s=setup();
  s.run('page.voice=async()=>{globalThis.__opened++;return window.__sidevoiceDesktop.host.voice}');
  s.context.__opened=0;
+ s.context.navigator={mediaDevices:{enumerateDevices:async()=>[
+  {kind:'audioinput',deviceId:'default',label:'System'},
+  {kind:'audioinput',deviceId:'browser-mic',label:'Browser microphone'},
+ ]}};
  await s.run('refreshAudioDevices')();
  s.handlers.focus?.();
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(s.context.__opened,0,'the section and focus refreshes do not create a host');
+ assert.equal(s.run('audioDevices.inputs[0].id'),'browser-mic','a browser still lists devices without a host');
+ withVoice(s,voiceWithDevices());
  await s.run('voiceHost')();
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(s.context.__opened,1);
