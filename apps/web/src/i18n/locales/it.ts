@@ -1145,6 +1145,7 @@ export const messages: Messages = {
   "wizard.recap.micLater": "L’area di chiamata te lo chiederà",
   "wizard.recap.downloading": "Download · {percent}",
   "wizard.mic.continueWaiting": "Consenti l’uso del microfono per continuare.",
+  "wizard.prepare.continueWaiting": "Prepara questo computer per continuare.",
   "wizard.mic.checkAgain": "Verifica di nuovo",
   "wizard.mic.openSettings": "Apri Impostazioni di Sistema",
   "perm.mic.why": "Necessario perché il tuo agente ti senta",

@@ -4,6 +4,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ChoiceCard } from "../../components/ui/Card";
 import { Dialog } from "../../components/ui/Dialog";
+import { Tooltip } from "../../components/ui/Tooltip";
 import { ArrowRightIcon, OtherMachineIcon, SidevoiceMark, ThisComputerIcon, BackIcon } from "../../components/ui/Icons";
 import { localHostInstallController } from "../../services/local-host-install";
 import { useDialogFocusReturn } from "../../lib/focus-return";
@@ -407,7 +408,14 @@ export function Wizard() {
       {step === "W0" && <Button type="button" variant="primary" onClick={() => void finishBasics()}>{t("wizard.continue")}</Button>}
       {step === "W1" && skips && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       {step === "W1" && <Button type="button" variant="primary" disabled={!choice} onClick={() => choice && void choosePath(choice)}>{t("wizard.continue")}</Button>}
-      {step === "W2" && onboarding.localReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>}
+      {/* Continue in sight while this computer is prepared, waiting and saying why, as the permissions step does
+          (operator, 2026-10-16): aria-disabled (blockedBy), so it stays focusable and its tooltip shows. */}
+      {step === "W2" && <Tooltip content={onboarding.localReady ? null : t("wizard.prepare.continueWaiting")}>
+        <Button type="button" variant="primary" id="wizard-prepare-continue" className={onboarding.localReady ? undefined : "wizard-continue-waiting"}
+          disabled={!onboarding.localReady} blockedBy={onboarding.localReady ? undefined : "wizard-prepare-continue-why"}
+          onClick={() => onboarding.goTo("W3")}>{t("wizard.continue")}</Button>
+      </Tooltip>}
+      {step === "W2" && !onboarding.localReady && <span id="wizard-prepare-continue-why" className="sr-only">{t("wizard.prepare.continueWaiting")}</span>}
       {step === "W2r" && onboarding.remoteReady && <Button type="button" variant="primary" onClick={() => onboarding.goTo(sttStep)}>{t("wizard.continue")}</Button>}
       {machineWaits && <SkipMachine onSkip={() => void skipMachine()} t={t} />}
       <span ref={setFooterSlot} className="wizard-slot" />

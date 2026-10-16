@@ -1156,6 +1156,7 @@ export const messages = {
   "wizard.recap.micLater": "The call area will ask for it",
   "wizard.recap.downloading": "Downloading · {percent}",
   "wizard.mic.continueWaiting": "Allow the microphone to continue.",
+  "wizard.prepare.continueWaiting": "Prepare this computer to continue.",
   "wizard.mic.checkAgain": "Check again",
   "wizard.mic.openSettings": "Open System Settings",
   // The permissions screen (PermissionsStep, Settings › Permissions).

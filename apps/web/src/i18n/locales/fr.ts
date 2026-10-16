@@ -1127,6 +1127,7 @@ export const messages: Messages = {
   "wizard.recap.micLater": "La zone d’appel vous le demandera",
   "wizard.recap.downloading": "Téléchargement · {percent}",
   "wizard.mic.continueWaiting": "Autorisez le micro pour continuer.",
+  "wizard.prepare.continueWaiting": "Préparez cet ordinateur pour continuer.",
   "wizard.mic.checkAgain": "Vérifier à nouveau",
   "wizard.mic.openSettings": "Ouvrir Réglages Système",
   "perm.mic.why": "Nécessaire pour que votre agent vous entende",

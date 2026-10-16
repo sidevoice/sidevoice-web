@@ -1128,6 +1128,7 @@ export const messages: Messages = {
   "wizard.recap.micLater": "通話エリアで許可を求めます",
   "wizard.recap.downloading": "ダウンロード中 · {percent}",
   "wizard.mic.continueWaiting": "続けるにはマイクを許可してください。",
+  "wizard.prepare.continueWaiting": "続けるには、このコンピュータを準備してください。",
   "wizard.mic.checkAgain": "もう一度確認",
   "wizard.mic.openSettings": "システム設定を開く",
   "perm.mic.why": "エージェントがあなたの声を聞くために必要です",

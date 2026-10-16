@@ -1127,6 +1127,7 @@ export const messages: Messages = {
   "wizard.recap.micLater": "通话区域会请求权限",
   "wizard.recap.downloading": "正在下载 · {percent}",
   "wizard.mic.continueWaiting": "请允许使用麦克风以继续。",
+  "wizard.prepare.continueWaiting": "请先准备本机以继续。",
   "wizard.mic.checkAgain": "再检查一次",
   "wizard.mic.openSettings": "打开系统设置",
   "perm.mic.why": "这是让你的智能体听到你的必要条件",
