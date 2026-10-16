@@ -202,9 +202,6 @@ function ModelStepFooter({ reason, tryReason, running, tried, onTry, onStop, onC
   </>;
 }
 
-/** How long "Allowed" shows once the microphone is allowed on its step, before the setup moves on. */
-export const MICROPHONE_HOLD_MS = 900;
-
 /** Why a step's model holds its footer, in the step's own words; nothing once it is ready. */
 const WAIT_KEY = { stt: "settings.save.waitTranscription", tts: "settings.save.waitVoice", turn: "settings.save.waitTurn" } as const;
 function waitReason(model: ModelState, slot: keyof typeof WAIT_KEY, t: Translate) {
@@ -272,25 +269,17 @@ export function Wizard() {
   // A machine prepared or paired while its step shows moves the setup on by itself, to where it then stands (a machine
   // that answers after the setup opened leaves the steps already done behind). Only one that becomes ready there: a
   // step arrived at with its machine already ready (Back) stays, with Continue — Back always lands where it says.
-  const readyOnArrival = useRef({ step, local: onboarding.localReady, remote: onboarding.remoteReady, microphone: onboarding.microphone.ready });
-  if (readyOnArrival.current.step !== step) readyOnArrival.current = { step, local: onboarding.localReady, remote: onboarding.remoteReady, microphone: onboarding.microphone.ready };
+  const readyOnArrival = useRef({ step, local: onboarding.localReady, remote: onboarding.remoteReady });
+  if (readyOnArrival.current.step !== step) readyOnArrival.current = { step, local: onboarding.localReady, remote: onboarding.remoteReady };
   useEffect(() => {
     if (!onboarding.open) return;
     const arrived = readyOnArrival.current;
     if (step === "W2" && onboarding.localReady && !arrived.local) onboarding.openWizard();
     if (step === "W2r" && onboarding.remoteReady && !arrived.remote) onboarding.openWizard();
   }, [onboarding.open, step, onboarding.localReady, onboarding.remoteReady, onboarding.record.agents_done]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The microphone allowed on its step: "Allowed" is seen for a moment, then transcription. Arrived at already allowed
-  // (Back), it stays, with Continue.
-  const microphoneAllowed = onboarding.open && step === "W4m" && onboarding.microphone.ready && !readyOnArrival.current.microphone;
-  useEffect(() => {
-    if (!microphoneAllowed) return;
-    const timer = setTimeout(() => onboarding.goTo("W4"), MICROPHONE_HOLD_MS);
-    return () => clearTimeout(timer);
-  }, [microphoneAllowed]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The voice steps start at the microphone, unless it is already allowed (or there is nothing to ask here).
-  const voiceStart: OnboardingStep = onboarding.microphone.ready ? "W4" : "W4m";
+  // The voice steps start at the microphone whenever there is one to ask for, allowed already or not: the step always
+  // shows, saying it is allowed, and waits for Continue (operator, 2026-10-16).
+  const voiceStart: OnboardingStep = onboarding.microphone.state === "none" ? "W4" : "W4m";
 
   async function choosePath(next: "agents" | "remote") {
     if (!await onboarding.setPath(next)) return;
