@@ -105,8 +105,6 @@ export const messages = {
   "titleDetail.effort": "Effort",
   "titleDetail.voice": "Voice",
   "titleDetail.noVoice": "No voice models chosen yet.",
-  "titleDetail.pin": "Pin beside the title",
-  "titleDetail.unpin": "Unpin",
   // The microphone and the speaker (AudioDevices).
   "devices.toggle": "Microphone and speaker",
   "devices.mic": "Microphone",

@@ -49,9 +49,6 @@ export const DeleteIcon = mark(Trash2, 16);
 export const VoiceDetectionIcon = mark(Activity, 16);
 export const ConnectorIcon = mark(Plug, 12);
 export const ChevronIcon = mark(ChevronDown, 16);
-/** Pinning the call's details along the title, and putting them back. */
-export const ChevronRightIcon = mark(ChevronRight, 14);
-export const ChevronLeftIcon = mark(ChevronLeft, 14);
 /** Puts away what dropped from above: a phone's conversations panel. */
 export const CloseUpIcon = mark(ChevronUp, 18);
 /** More of a list above, or below, what it shows: a select's long list. */

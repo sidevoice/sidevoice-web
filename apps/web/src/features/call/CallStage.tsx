@@ -77,8 +77,7 @@ function StageName({ stage, className, tone, voice }: { stage: StageConversation
   return (
     // Its own tint: above the tile on a desktop, outside the tile that carries it.
     <Tag className={className} translate="no" style={avatarTone(tone) as CSSProperties}>
-      {/* Above the tile (a desktop) the details can stay pinned along the title. */}
-      <StageHeading stage={stage} voice={voice} pinnable={Tag === "header"} />
+      <StageHeading stage={stage} voice={voice} />
     </Tag>
   );
 }

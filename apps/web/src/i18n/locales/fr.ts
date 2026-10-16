@@ -96,8 +96,6 @@ export const messages: Messages = {
   "titleDetail.effort": "Effort",
   "titleDetail.voice": "Voix",
   "titleDetail.noVoice": "Aucun modèle vocal choisi pour l’instant.",
-  "titleDetail.pin": "Épingler à côté du titre",
-  "titleDetail.unpin": "Désépingler",
   "devices.toggle": "Micro et haut-parleur",
   "devices.mic": "Micro",
   "devices.speaker": "Haut-parleur",

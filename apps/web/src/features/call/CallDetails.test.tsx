@@ -8,10 +8,9 @@ import type { StageConversation } from "./stage-view";
 import type { VoiceModelRow } from "./VoiceModels";
 import { StageHeading } from "./CallDetails";
 
-afterEach(() => { cleanup(); localStorage.removeItem("sidevoice.callDetailsPinned"); });
+afterEach(() => cleanup());
 
-/* The stage's title opens what the call runs on (CallDetails) in a popover, which above the tile can pin it along the
- * title; it wears a dot while a voice model needs something. */
+/* The stage's title opens what the call runs on (CallDetails) in a popover; it wears a dot while a voice model needs something. */
 
 const row = { threadId: "t-1", title: "Fix the slow login", machine: "Laptop", harness: "claude", model: "claude-opus-5-5", effort: "xhigh",
   available: true, reach: { state: "listening" }, unread: 0 } as unknown as ParticipantView;
@@ -19,9 +18,9 @@ const stage = { threadId: "t-1", row, title: "Fix the slow login", isTarget: tru
 const slot = (task: "stt" | "tts", attention: boolean) => ({ slot: { id: task === "stt" ? "whisper-base" : "eleven_flash_v2_5", where: "on this device", state: attention ? "needs a key" : "ready",
   attention, task, status: attention ? "needsKey" : "ready", catalog: "local" }, label: task === "stt" ? "Speech to text" : "Text to speech", icon: null }) as VoiceModelRow;
 
-function heading(attention = false, pinnable = false) {
+function heading(attention = false) {
   const rows = [slot("stt", false), slot("tts", attention)];
-  render(<RoomProvider store={createRoomStore()}><TooltipProvider><StageHeading stage={stage} voice={{ rows, attention }} pinnable={pinnable} /></TooltipProvider></RoomProvider>);
+  render(<RoomProvider store={createRoomStore()}><TooltipProvider><StageHeading stage={stage} voice={{ rows, attention }} /></TooltipProvider></RoomProvider>);
   return screen.getByRole("button", { name: /Fix the slow login/ });
 }
 
@@ -43,22 +42,4 @@ test("the popover: the machine, the agent's harness, model and effort, and each 
   expect([...details.querySelectorAll(".call-details-agent dd")].map((dd) => dd.textContent?.trim())).toEqual(["Claude Code", "claude-opus-5-5", "xhigh"]);
   expect(details.querySelectorAll(".voice-model")).toHaveLength(2);
   expect(within(details).getByRole("button", { name: "Add the key" })).toBeInTheDocument();
-  // Only above the tile can it be pinned.
-  expect(within(details).queryByRole("button", { name: "Pin beside the title" })).toBeNull();
-});
-
-test("above the tile, pinned: the agent and the models along the title, kept on this device, until unpinned", () => {
-  fireEvent.click(heading(true, true));
-  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Pin beside the title" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
-  const pinned = document.querySelector(".call-details-pinned") as HTMLElement;
-  expect([...pinned.querySelectorAll(".call-details-chip")].map((chip) => chip.textContent?.trim())).toEqual(["Claude Code · claude-opus-5-5 · xhigh", "whisper-base", "eleven_flash_v2_5"]);
-  expect(pinned.querySelectorAll(".call-details-chip[data-attention]")).toHaveLength(1);
-  expect(localStorage.getItem("sidevoice.callDetailsPinned")).toBe("1");
-  cleanup();
-  heading(false, true);
-  expect(document.querySelector(".call-details-pinned")).not.toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Unpin" }));
-  expect(document.querySelector(".call-details-pinned")).toBeNull();
-  expect(localStorage.getItem("sidevoice.callDetailsPinned")).toBeNull();
 });
