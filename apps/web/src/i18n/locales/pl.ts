@@ -108,7 +108,7 @@ export const messages: Messages = {
   "devices.speaker": "Głośnik",
   "devices.default": "Domyślne systemowe",
   "devices.needsMic": "Zezwól na dostęp do mikrofonu, aby wybrać urządzenia. Możesz to zrobić w Uprawnieniach.",
-  "call.needsMic": "Zezwól na dostęp do mikrofonu, aby dzwonić. Możesz to zrobić w Ustawienia › Uprawnienia.",
+  "call.needsMic": "Zezwól na dostęp do mikrofonu, aby dzwonić. Otwórz Ustawienia › Uprawnienia.",
   "devices.loading": "Wyszukiwanie urządzeń…",
   "devices.unnamedMic": "Mikrofon {n}",
   "devices.unnamedSpeaker": "Głośnik {n}",
